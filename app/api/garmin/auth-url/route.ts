@@ -9,7 +9,10 @@ export async function GET(request: NextRequest) {
     }
 
     const token = authHeader.substring(7);
-    await verifyFirebaseIdToken(token);
+    const decodedToken = await verifyFirebaseIdToken(token);
+    if (!decodedToken) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     // Generate Garmin OAuth URL
     const clientId = process.env.GARMIN_CLIENT_ID;

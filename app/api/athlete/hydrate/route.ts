@@ -11,6 +11,9 @@ export async function POST(request: NextRequest) {
 
     const token = authHeader.substring(7);
     const decodedToken = await verifyFirebaseIdToken(token);
+    if (!decodedToken) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const firebaseId = decodedToken.uid;
 
     // Find athlete by Firebase ID

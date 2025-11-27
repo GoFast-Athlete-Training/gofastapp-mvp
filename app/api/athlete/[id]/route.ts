@@ -13,7 +13,10 @@ export async function GET(
     }
 
     const token = authHeader.substring(7);
-    await verifyFirebaseIdToken(token);
+    const decodedToken = await verifyFirebaseIdToken(token);
+    if (!decodedToken) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     const athlete = await getAthleteById(params.id);
     if (!athlete) {
@@ -42,6 +45,9 @@ export async function PUT(
 
     const token = authHeader.substring(7);
     const decodedToken = await verifyFirebaseIdToken(token);
+    if (!decodedToken) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     // Verify athlete owns this profile
     const athlete = await getAthleteById(params.id);

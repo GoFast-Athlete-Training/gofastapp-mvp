@@ -1,120 +1,70 @@
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
-import { getAuth, Auth } from 'firebase-admin/auth';
+import { initializeApp, getApps, cert, App } from "firebase-admin/app";
+import { getAuth, Auth } from "firebase-admin/auth";
 
 let app: App | null = null;
 let adminAuth: Auth | null = null;
 
-/**
- * Initialize Firebase Admin SDK (lazy initialization)
- * Matches backend pattern from gofastbackendv2-fall2025
- */
-function initializeFirebase(): App {
-  if (typeof window !== 'undefined') {
-    throw new Error('Firebase Admin can only be initialized on the server');
-  }
-
-  // Return existing app if already initialized
-  if (app) {
-    return app;
-  }
+function safeGetServiceAccount() {
+  const env = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!env) return null;
 
   try {
-    // Check if already initialized globally
-    const existingApps = getApps();
-    if (existingApps.length > 0) {
-      app = existingApps[0];
-      adminAuth = getAuth(app);
-      console.log('✅ FIREBASE: Admin SDK already initialized');
-      return app;
-    }
-
-    // Get Firebase service account from environment
-    const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT;
-    
-    if (!serviceAccountEnv) {
-      console.error('❌ FIREBASE: FIREBASE_SERVICE_ACCOUNT environment variable not set');
-      console.error('❌ FIREBASE: Set this in Vercel environment variables as FIREBASE_SERVICE_ACCOUNT');
-      throw new Error('Firebase service account not configured. Set FIREBASE_SERVICE_ACCOUNT environment variable.');
-    }
-
-    // Parse service account JSON
-    let serviceAccount;
-    try {
-      serviceAccount = JSON.parse(serviceAccountEnv);
-    } catch (parseError) {
-      console.error('❌ FIREBASE: Failed to parse FIREBASE_SERVICE_ACCOUNT JSON:', parseError);
-      throw new Error('FIREBASE_SERVICE_ACCOUNT is not valid JSON. Check your environment variable.');
-    }
-
-    // Validate required fields
-    if (!serviceAccount.project_id && !serviceAccount.projectId) {
-      throw new Error('Firebase service account missing project_id');
-    }
-    if (!serviceAccount.client_email && !serviceAccount.clientEmail) {
-      throw new Error('Firebase service account missing client_email');
-    }
-    if (!serviceAccount.private_key && !serviceAccount.privateKey) {
-      throw new Error('Firebase service account missing private_key');
-    }
-
-    // Normalize field names (service account can have either format)
-    const normalizedAccount = {
-      projectId: serviceAccount.project_id || serviceAccount.projectId,
-      clientEmail: serviceAccount.client_email || serviceAccount.clientEmail,
-      privateKey: (serviceAccount.private_key || serviceAccount.privateKey)?.replace(/\\n/g, '\n'),
+    const json = JSON.parse(env);
+    return {
+      projectId: json.project_id || json.projectId,
+      clientEmail: json.client_email || json.clientEmail,
+      privateKey: (json.private_key || json.privateKey)?.replace(/\\n/g, "\n"),
     };
-
-    // Initialize Firebase Admin
-    app = initializeApp({
-      credential: cert(normalizedAccount as any),
-      projectId: normalizedAccount.projectId,
-    });
-
-    adminAuth = getAuth(app);
-
-    console.log('✅ FIREBASE: Admin SDK initialized successfully');
-    console.log('✅ FIREBASE: Project ID:', normalizedAccount.projectId);
-    
-    return app;
-  } catch (error: any) {
-    console.error('❌ FIREBASE: Failed to initialize Admin SDK:', error.message);
-    throw error;
+  } catch (err) {
+    console.error("❌ FIREBASE: Invalid FIREBASE_SERVICE_ACCOUNT JSON", err);
+    return null;
   }
 }
 
-/**
- * Get Firebase Admin Auth instance
- * Initializes if not already done
- */
-export function getAdminAuth(): Auth {
-  if (typeof window !== 'undefined') {
-    throw new Error('Firebase Admin can only be used on the server');
+export function initAdmin() {
+  if (typeof window !== "undefined") return;
+
+  if (app) return app;
+
+  const existing = getApps();
+  if (existing.length > 0) {
+    app = existing[0];
+    adminAuth = getAuth(app);
+    return app;
   }
 
-  if (!adminAuth) {
-    initializeFirebase();
+  const serviceAccount = safeGetServiceAccount();
+
+  if (!serviceAccount) {
+    console.warn("⚠️ FIREBASE ADMIN DISABLED: No service account provided");
+    return null;
   }
 
-  if (!adminAuth) {
-    throw new Error('Failed to initialize Firebase Admin Auth');
+  app = initializeApp({
+    credential: cert(serviceAccount as any),
+    projectId: serviceAccount.projectId,
+  });
+
+  adminAuth = getAuth(app);
+  console.log("✅ Firebase Admin initialized:", serviceAccount.projectId);
+
+  return app;
+}
+
+export function getAdminAuth() {
+  if (typeof window !== "undefined") {
+    throw new Error("Firebase Admin cannot run client-side");
   }
 
+  if (!adminAuth) initAdmin();
   return adminAuth;
 }
 
-/**
- * Verify Firebase ID Token
- * Server-side only
- */
 export async function verifyFirebaseIdToken(token: string) {
-  if (typeof window !== 'undefined') {
-    throw new Error('verifyFirebaseIdToken can only be called on the server');
-  }
-
   const auth = getAdminAuth();
+  if (!auth) {
+    console.warn("⚠️ verifyFirebaseIdToken called but Admin not initialized");
+    return null;
+  }
   return auth.verifyIdToken(token);
 }
-
-// Export for backward compatibility
-export { adminAuth };
-
