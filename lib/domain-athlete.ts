@@ -72,14 +72,20 @@ export async function hydrateAthlete(athleteId: string) {
   }
 
   // Calculate weekly totals
+  type ActivitySummary = {
+    distance?: number;
+    duration?: number;
+  };
+
   const weeklyTotals = athlete.activities.reduce(
-    (acc: { distance: number; duration: number; activities: number }, activity) => {
-      return {
-        distance: acc.distance + (activity.distance || 0),
-        duration: acc.duration + (activity.duration || 0),
-        activities: acc.activities + 1,
-      };
-    },
+    (
+      acc: { distance: number; duration: number; activities: number },
+      activity: ActivitySummary
+    ) => ({
+      distance: acc.distance + (activity.distance || 0),
+      duration: acc.duration + (activity.duration || 0),
+      activities: acc.activities + 1,
+    }),
     { distance: 0, duration: 0, activities: 0 }
   );
 
