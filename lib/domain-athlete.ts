@@ -73,7 +73,7 @@ export async function hydrateAthlete(athleteId: string) {
 
   // Calculate weekly totals
   const weeklyTotals = athlete.activities.reduce(
-    (acc, activity) => {
+    (acc: { distance: number; duration: number; activities: number }, activity) => {
       return {
         distance: acc.distance + (activity.distance || 0),
         duration: acc.duration + (activity.duration || 0),
