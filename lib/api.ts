@@ -1,7 +1,6 @@
 'use client';
 
 import axios from 'axios';
-import { getAuth } from 'firebase/auth';
 import { auth } from './firebase';
 
 const api = axios.create({
