@@ -40,9 +40,14 @@ FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY----
 
 ## Database
 
-Set your PostgreSQL connection string:
+Set your PostgreSQL connection string. For Prisma Accelerate (recommended):
 ```bash
-DATABASE_URL=postgresql://user:password@localhost:5432/gofast
+DATABASE_URL="prisma+postgres://accelerate.prisma-data.net/?api_key=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqd3RfaWQiOjEsInNlY3VyZV9rZXkiOiJza19DUVRFOGVuWE1ZWExabWNkRXUxZDMiLCJhcGlfa2V5IjoiMDFLQjM0NjRSVEVCOEo0VzJFUUowNDk3M1IiLCJ0ZW5hbnRfaWQiOiIyOWY0MTAyYmFhOGNiOTQ1NTcxNTM0MzczOTkyYWQyNGJjNTI3OTNjMzQ1OTlhMmE2MmQ5MmUzYTNmNmRmMmQ5IiwiaW50ZXJuYWxfc2VjcmV0IjoiZWFkYzM3NTYtMjA1Yi00MjM0LWIxNGItMGRjMDE0YjJjNDhmIn0.rQqjhZKvmJ4IEZwPzs8xNInnv6vHHjrswP-HmA-F5cI"
+```
+
+Or use direct PostgreSQL connection:
+```bash
+DATABASE_URL="postgres://29f4102baa8cb945571534373992ad24bc52793c34599a2a62d92e3a3f6df2d9:sk_CQTE8enXMYXLZmcdEu1d3@db.prisma.io:5432/postgres?sslmode=require"
 ```
 
 ## Garmin OAuth (Optional)
