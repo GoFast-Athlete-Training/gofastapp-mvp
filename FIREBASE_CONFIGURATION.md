@@ -116,8 +116,16 @@ if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.
 - ✅ Supports both JSON string and individual fields
 
 **Exported Functions**:
-- `adminAuth` - Firebase Admin Auth instance
+- `getAdminAuth()` - Get Firebase Admin Auth instance (lazy initialization)
 - `verifyFirebaseIdToken(token: string)` - Verifies Firebase ID tokens (server-only)
+- `adminAuth` - Backward compatibility export (may be null until initialized)
+
+**Initialization Pattern**:
+- Lazy initialization (matches backend pattern)
+- Only initializes when first used
+- Better error messages and logging
+- Handles both `project_id`/`projectId` field formats
+- Validates JSON parsing with clear error messages
 
 ---
 
