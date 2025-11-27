@@ -1,0 +1,1434 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Athlete {
+  id         String @id @default(cuid())
+  firebaseId String @unique
+
+  // Universal Profile (MVP1 Required)
+  firstName    String?
+  lastName     String?
+  email        String    @unique
+  phoneNumber  String? // Optional phone number
+  gofastHandle String?   @unique
+  birthday     DateTime?
+  gender       String?
+  city         String?
+  state        String?
+  primarySport String?
+  photoURL     String?
+  bio          String?
+  instagram    String?
+
+  // RunCrew Integration (MVP1) - Junction table handles multiple crews per athlete
+
+  // Training Profile (Future) - Identity-level fields
+  myCurrentPace       String?
+  myWeeklyMileage     Int?
+  myTrainingGoal      String?
+  myTargetRace        String?
+  myTrainingStartDate DateTime?
+
+  // Match Profile (Future) - Identity-level fields
+  preferredDistance String?
+  timePreference    String?
+  myPaceRange       String?
+  myRunningGoals    String?
+
+  // Garmin OAuth 2.0 PKCE Integration
+  garmin_user_id       String?   @unique // Garmin's unique user ID
+  garmin_access_token  String? // OAuth access token
+  garmin_refresh_token String? // OAuth refresh token
+  garmin_expires_in    Int? // Token expiration time in seconds
+  garmin_scope         String? // OAuth scope permissions
+  garmin_connected_at  DateTime? // When Garmin was connected
+  garmin_last_sync_at  DateTime? // Last data sync timestamp
+
+  // Garmin Permissions & Status
+  garmin_permissions     Json? // Store Garmin permission details
+  garmin_is_connected    Boolean   @default(false) // Simple connected status
+  garmin_disconnected_at DateTime? // When user disconnected
+
+  // STRAVA
+  strava_id            Int?    @unique
+  strava_access_token  String?
+  strava_refresh_token String?
+  strava_expires_at    Int?
+
+  // Garmin Rich User Data (from API)
+  garmin_user_profile     Json? // Store rich user profile data from Garmin API
+  garmin_user_sleep       Json? // Store sleep preferences
+  garmin_user_preferences Json? // Store user preferences and settings
+
+  // System fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  status    String? // Optional status field - no default
+
+  // Relations
+  activities AthleteActivity[]
+
+  // RunCrew Relations
+  // NOTE: Admin status is now determined via runCrewManagers with role='admin'
+  runCrewMemberships   RunCrewMembership[]   @relation("AthleteRunCrewMemberships") // Crew memberships (junction table - athlete can be in multiple crews)
+  runCrewMessages      RunCrewMessage[]      @relation // Messages authored by this athlete
+  runCrewAnnouncements RunCrewAnnouncement[] @relation("RunCrewAnnouncementAuthor") // Announcements authored by this athlete
+  runCrewRuns          RunCrewRun[]          @relation("RunCrewRunCreator") // Runs created by this athlete
+  runCrewRunRSVPs      RunCrewRunRSVP[]      @relation("RunCrewRunRSVP") // RSVPs to runs by this athlete
+  runCrewEvents        RunCrewEvent[]        @relation("RunCrewEventOrganizer") // Events organized by this athlete
+  runCrewEventRSVPs    RunCrewEventRSVP[]    @relation("RunCrewEventRSVP") // RSVPs to events by this athlete
+  runCrewManagers      RunCrewManager[]      @relation("RunCrewManager") // Source of truth for admin/manager roles
+
+  // Handle Registry (future use)
+  handleRegistry HandleRegistry? @relation // Registry entry for gofastHandle
+
+  // Training Relations
+  createdRaces  Race[]                @relation("RaceCreator") // Races this athlete created (optional)
+  trainingPlans TrainingPlan[]
+  plannedDays   TrainingDayPlanned[]
+  executedDays  TrainingDayExecuted[]
+
+  // Event Relations
+  events Event[] @relation("EventCreator") // Events created by this athlete
+
+  // Founder Relations
+  founder Founder?
+
+  @@map("athletes")
+}
+
+model AthleteActivity {
+  id        String @id @default(cuid())
+  athleteId String
+
+  // Source Information
+  sourceActivityId String @unique // Garmin's unique activity ID (join key)
+  source           String @default("garmin")
+
+  // Core Activity Data (Summary from /garmin/activity webhook)
+  activityType String? // running, cycling, swimming, etc.
+  activityName String? // "Morning Run", "Evening Bike Ride"
+  startTime    DateTime? // when activity started
+  duration     Int? // duration in seconds
+  distance     Float? // distance in meters
+  averageSpeed Float? // average speed in m/s
+  calories     Int? // calories burned
+
+  // Performance Metrics (Summary data)
+  averageHeartRate Int? // average heart rate
+  maxHeartRate     Int? // maximum heart rate
+  elevationGain    Float? // elevation gain in meters
+  steps            Int? // step count (if applicable)
+
+  // Location Data (Summary)
+  startLatitude   Float? // GPS start latitude
+  startLongitude  Float? // GPS start longitude
+  endLatitude     Float? // GPS end latitude
+  endLongitude    Float? // GPS end longitude
+  summaryPolyline String? // encoded route polyline
+
+  // Device Information
+  deviceName   String? // "Forerunner 255", "Edge 1040"
+  garminUserId String? // Garmin user GUID from webhook
+
+  // Hybrid Data Storage
+  summaryData Json? // Phase 1: Summary fields from /garmin/activity
+  detailData  Json? // Phase 2: Details from /garmin/details (laps, splits, HR zones, etc.)
+  hydratedAt  DateTime? // When details were hydrated
+
+  // Timestamps
+  syncedAt      DateTime @default(now())
+  lastUpdatedAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  athlete      Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  eventResults EventResult[] @relation("EventResultParentActivity") // Event results that claim this activity (legacy - parent's activity)
+
+  @@map("athlete_activities")
+}
+
+// RunCrew Models
+model RunCrew {
+  id          String  @id @default(cuid())
+  name        String
+  description String? // Optional crew description/motto
+  joinCode    String  @unique // Unique invite code for joining (backward compatibility)
+  logo        String? // Optional logo/image URL
+  icon        String? // Optional emoji/icon (alternative to logo)
+
+  // Status & Archive
+  isArchived Boolean   @default(false) // Soft delete - archive crew instead of deleting
+  archivedAt DateTime? // When crew was archived
+
+  // System fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  // NOTE: Admin is now determined via RunCrewManager with role='admin'
+  memberships   RunCrewMembership[] // Junction table for members
+  messages      RunCrewMessage[] // Simple chat messages (real-time via socket)
+  announcements RunCrewAnnouncement[] // Admin announcements
+  runs          RunCrewRun[] // Runs (MVP1: admin only)
+  events        RunCrewEvent[] // General events (future - happy hour, social, etc.)
+  managers      RunCrewManager[] // Source of truth for admin/manager roles
+  joinCodes     JoinCode[] // JoinCode registry (authoritative source for invites)
+
+  @@map("run_crews")
+}
+
+// JoinCode Registry - Authoritative source for crew invites
+model JoinCode {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  runCrewId String
+  runCrew   RunCrew   @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+  isActive  Boolean   @default(true)
+
+  @@map("join_codes")
+}
+
+// HandleRegistry - Authoritative source for gofastHandle uniqueness (future use)
+model HandleRegistry {
+  id        String   @id @default(cuid())
+  handle    String   @unique // Normalized lowercase handle (e.g., "adamgofast")
+  athleteId String   @unique // One-to-one relation with Athlete
+  athlete   Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  isActive  Boolean  @default(true)
+
+  // Future: Track handle changes, analytics, etc.
+  lastUsedAt DateTime?
+
+  @@map("handle_registry")
+}
+
+model RunCrewMembership {
+  id        String @id @default(cuid())
+  runCrewId String
+  athleteId String // ATHLETE-FIRST: Foreign key to Athlete
+
+  // Timestamps
+  joinedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations - ATHLETE-FIRST: Explicitly tied to athleteId
+  runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  athlete Athlete @relation("AthleteRunCrewMemberships", fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([runCrewId, athleteId]) // Prevent duplicate memberships
+  @@map("run_crew_memberships")
+}
+
+// RunCrew Messages - Simple chat box (real-time via socket)
+model RunCrewMessage {
+  id        String @id @default(cuid())
+  runCrewId String
+  athleteId String // Message author
+
+  content String // Message text (just content, no images/likes)
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@map("run_crew_messages")
+}
+
+// RunCrew Announcements - Admin announcements
+model RunCrewAnnouncement {
+  id        String @id @default(cuid())
+  runCrewId String
+  authorId  String // Admin who created it
+
+  title   String
+  content String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  author  Athlete @relation("RunCrewAnnouncementAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@map("run_crew_announcements")
+}
+
+// RunCrew Runs - MVP1
+model RunCrewRun {
+  id          String @id @default(cuid())
+  runCrewId   String
+  createdById String // Admin or manager who created the run (MVP1: admin only)
+
+  // Core presentation
+  title     String
+  runType   String   @default("single") // "single" | "recurring"
+  date      DateTime // Start date for single run or first occurrence
+  startTime String // "06:30 AM" – stored as human-readable string
+  timezone  String? // IANA tz ("America/Chicago") for clarity
+
+  // Meet-up logistics
+  meetUpPoint   String
+  meetUpAddress String?
+  meetUpPlaceId String?
+  meetUpLat     Float?
+  meetUpLng     Float?
+
+  // Recurrence metadata (future-ready)
+  recurrenceRule   String?
+  recurrenceEndsOn DateTime?
+  recurrenceNote   String?
+
+  // Run-specific fields
+  totalMiles   Float? // Total miles for the run
+  pace         String? // Target pace (e.g., "8:00-9:00 min/mile")
+  stravaMapUrl String? // Strava map URL for route visualization
+
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  runCrew   RunCrew          @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  createdBy Athlete          @relation("RunCrewRunCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  rsvps     RunCrewRunRSVP[]
+
+  @@map("run_crew_runs")
+}
+
+// RunCrew Run RSVP - MVP1
+model RunCrewRunRSVP {
+  id        String @id @default(cuid())
+  runId     String
+  athleteId String // RSVP tied to athleteId
+
+  status String // "going", "maybe", "not-going"
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  run     RunCrewRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  athlete Athlete    @relation("RunCrewRunRSVP", fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, athleteId]) // One RSVP per athlete per run
+  @@map("run_crew_run_rsvps")
+}
+
+// RunCrew Events - Future (General events like happy hour, social, etc.)
+// Note: Separate from runs - events are for non-run activities
+model RunCrewEvent {
+  id          String @id @default(cuid())
+  runCrewId   String
+  organizerId String // Athlete ID who created the event
+
+  title       String
+  date        DateTime
+  time        String // "6:00 PM"
+  location    String
+  address     String?
+  description String?
+  eventType   String? // "happy-hour", "social", "meetup", etc.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  runCrew   RunCrew            @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  organizer Athlete            @relation("RunCrewEventOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
+  rsvps     RunCrewEventRSVP[]
+
+  @@map("run_crew_events")
+}
+
+// RunCrew Event RSVP - Future
+model RunCrewEventRSVP {
+  id        String @id @default(cuid())
+  eventId   String
+  athleteId String // RSVP tied to athleteId
+
+  status String // "going", "maybe", "not-going"
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  event   RunCrewEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  athlete Athlete      @relation("RunCrewEventRSVP", fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, athleteId]) // One RSVP per athlete per event
+  @@map("run_crew_event_rsvps")
+}
+
+// =====================================================
+// EVENT MODEL - General Events (Races, Community Events, etc.)
+// =====================================================
+
+model Event {
+  id          String  @id @default(cuid())
+  title       String // "Boys Gotta Run – Discovery 5K (Final Run)"
+  description String?
+
+  // Event Details
+  date      DateTime
+  startTime String? // "7:55 AM"
+  location  String? // "Discovery Elementary"
+  address   String? // "5275 N 36th St, Arlington, VA 22207"
+
+  // Route Information
+  stravaRouteUrl String? // Strava route URL (users just paste the URL)
+  distance       String? // Distance (e.g., "5K", "3.1 miles", "10K")
+
+  // Athlete Relationship - Events are created by athletes
+  athleteId String // Links to Athlete.id (creator of the event)
+
+  // Future State: Registration
+  registrantId String? // Future: Links to athleteId for main UX registration (optional)
+
+  // Metadata
+  eventType String? // "race", "community-run", "training", etc.
+  isActive  Boolean @default(true)
+
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  athlete       Athlete             @relation("EventCreator", fields: [athleteId], references: [id], onDelete: Cascade)
+  volunteers    EventVolunteer[] // Volunteers linked via eventId (EventVolunteer.eventId)
+  registrations EventRegistration[] @relation("EventRegistrations") // Race participants
+
+  @@index([athleteId])
+  @@index([athleteId, title, date]) // For upsert lookup
+  @@map("events")
+}
+
+// =====================================================
+// EVENT VOLUNTEER SIGNUPS - Universal Event Volunteer Model
+// =====================================================
+
+model EventVolunteer {
+  id        String   @id @default(cuid())
+  eventId   String // Links to Event.id (primary identifier)
+  name      String
+  email     String
+  phone     String? // Optional phone number for group text communication
+  role      String
+  notes     String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@map("event_volunteers")
+}
+
+// =====================================================
+// EVENT REGISTRATION - Race Participants
+// =====================================================
+
+model EventRegistration {
+  id        String   @id @default(cuid())
+  eventId   String // Links to Event.id (primary identifier)
+  name      String
+  email     String
+  phone     String? // Optional phone number for communication
+  notes     String? // Optional notes (e.g., emergency contact, t-shirt size, etc.)
+  createdAt DateTime @default(now())
+
+  // Relations
+  event Event @relation("EventRegistrations", fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, email]) // One registration per email per event
+  @@index([eventId])
+  @@map("event_registrations")
+}
+
+// RunCrew Managers - Future (Delegated managers)
+model RunCrewManager {
+  id        String @id @default(cuid())
+  runCrewId String
+  athleteId String
+  role      String // "admin" or "manager"
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  athlete Athlete @relation("RunCrewManager", fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([runCrewId, athleteId])
+  @@map("run_crew_managers")
+}
+
+// =====================================================
+// RACE MODEL - Race Event Details
+// =====================================================
+
+model Race {
+  id String @id @default(cuid())
+
+  // Race Event Details (PUBLIC - like a hotel in travel)
+  raceName      String
+  raceType      String // 5k, 10k, 10m, half, marathon, other
+  raceDate      DateTime
+  location      String?
+  distanceMiles Float
+
+  // Optional metadata
+  registrationUrl String? // Link to register
+  description     String?
+  courseProfile   Json? // { elevationGain, difficulty, surface, weather }
+
+  // Optional: Creator/Admin relationship (for admin-created races)
+  createdByAthleteId String? // Optional - some races created by admins
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations (ALL OPTIONAL - race is independent)
+  createdByAthlete Athlete?       @relation("RaceCreator", fields: [createdByAthleteId], references: [id], onDelete: SetNull)
+  trainingPlans    TrainingPlan[]
+
+  @@map("races")
+}
+
+// =====================================================
+// TRAINING MODELS - MyTraining Container System
+// =====================================================
+
+model TrainingPhase {
+  id             String @id @default(cuid())
+  trainingPlanId String
+  phaseName      String // "base", "build", "peak", "taper"
+  phaseIndex     Int // 0,1,2,3
+  startWeek      Int
+  endWeek        Int
+  metadata       Json?
+
+  trainingPlan TrainingPlan         @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
+  plannedDays  TrainingDayPlanned[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("training_phases")
+}
+
+model TrainingPlan {
+  id        String @id @default(cuid())
+  athleteId String
+  raceId    String
+
+  // PLAN IDENTITY
+  trainingPlanName String // Required plan name
+
+  // CYCLE-LEVEL GOALS
+  trainingPlanGoalTime              String // "1:45:00"
+  trainingPlanGoalPace              String? // "8:00" per mile
+  trainingPlanBaseline5k            String // "24:30"
+  trainingPlanBaselineWeeklyMileage Int?
+
+  // PLAN STRUCTURE - Cycle-level metadata
+  trainingPlanStartDate  DateTime
+  trainingPlanTotalWeeks Int
+
+  // MONEY METRIC
+  trainingPlanAdaptive5kTime String? // Only persistent predictive metric!
+
+  // STATUS
+  status String @default("draft") // draft, active, completed, archived
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  athlete     Athlete                 @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  race        Race                    @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  phases      TrainingPhase[]
+  plannedDays TrainingDayPlanned[]
+  executions  TrainingPlanExecution[]
+
+  @@map("training_plans")
+}
+
+model TrainingDayPlanned {
+  id              String  @id @default(cuid())
+  trainingPlanId  String
+  trainingPhaseId String?
+  athleteId       String
+
+  // Day Identification
+  date      DateTime
+  weekIndex Int // 0-based
+  dayIndex  Int // 0-6 (Mon-Sun)
+  dayName   String? // "Monday", "Tuesday", etc.
+
+  // Training Context
+  phase String // base, build, peak, taper
+
+  // PLANNED WORKOUT (all the details)
+  plannedData Json // { type, mileage, duration, paceRange, targetPace, hrZone, hrRange, segments, label, description, coachNotes }
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  trainingPlan  TrainingPlan   @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
+  trainingPhase TrainingPhase? @relation(fields: [trainingPhaseId], references: [id], onDelete: SetNull)
+  athlete       Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([trainingPlanId, weekIndex, dayIndex]) // One planned day per position in plan
+  @@map("training_days_planned")
+}
+
+model TrainingPlanExecution {
+  id             String @id @default(cuid())
+  trainingPlanId String
+
+  // Execution metadata
+  startedAt DateTime
+  status    String   @default("active") // active, completed, cancelled
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  trainingPlan TrainingPlan          @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
+  executedDays TrainingDayExecuted[]
+
+  @@map("training_plan_executions")
+}
+
+model TrainingDayExecuted {
+  id          String @id @default(cuid())
+  executionId String
+  athleteId   String
+
+  // THE LINK - shell container for AthleteActivity
+  activityId String? @unique
+
+  // Optional metadata for context
+  weekIndex Int
+  dayIndex  Int
+  date      DateTime
+
+  // Snapshot/computed fields (can be derived from activityId)
+  plannedData Json? // Snapshot when executed
+  analysis    Json? // { workoutCompleted, hitTargetMileage, hitTargetPace, stayedInHRZone, mileageVariance, paceVariance, qualityScore, performanceNotes }
+  feedback    Json? // { mood, effort, injuryFlag, notes, submittedAt }
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  execution TrainingPlanExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  athlete   Athlete               @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([executionId, date]) // One execution per day per plan execution
+  @@map("training_days_executed")
+}
+
+// =====================================================
+// FOUNDER MODELS - Founder Stack System
+// =====================================================
+
+model Founder {
+  id        String @id @default(cuid())
+  athleteId String @unique // Links to Athlete - founder IS an athlete
+
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  athlete         Athlete          @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  tasks           FounderTask[]
+  crmContacts     CrmContact[]
+  roadmapItems    RoadmapItem[]
+  companyFounders CompanyFounder[] // Junction table for companies this founder is part of
+  unifiedTasks    Task[] // Unified tasks (polymorphic link via Task model)
+
+  @@map("founders")
+}
+
+model FounderTask {
+  id        String @id @default(cuid())
+  founderId String
+
+  // Task Details
+  title       String
+  description String?
+  status      String    @default("pending") // pending, in_progress, completed, cancelled
+  priority    String    @default("medium") // low, medium, high, urgent
+  dueDate     DateTime?
+
+  // Completion
+  completedAt DateTime?
+
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  founder Founder @relation(fields: [founderId], references: [id], onDelete: Cascade)
+
+  @@map("founder_tasks")
+}
+
+model CrmContact {
+  id        String @id @default(cuid())
+  founderId String
+
+  // Contact Info
+  name    String
+  role    String? // "Founder @ AcmeAI", "CTO @ BetaCo", "Angel", etc.
+  email   String?
+  company String?
+
+  // Pipeline Management
+  pipeline String // Founders, Collaborators, Funders, Advisors
+  status   String @default("New") // New, Warm, Active, Exploring, Cold
+
+  // Next Steps
+  nextStep String? // "Coffee chat Thu", "Send 1-pager", "Bi-weekly sync"
+
+  // Notes
+  notes String?
+
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  founder Founder @relation(fields: [founderId], references: [id], onDelete: Cascade)
+
+  @@map("crm_contacts")
+}
+
+model RoadmapItem {
+  id        String @id @default(cuid())
+  founderId String
+
+  // Roadmap Classification
+  roadmapType String // product, gtm, personal
+
+  // Product Roadmap Fields
+  quarter String? // "Q4 2025", "Q1 2026", "Q2 2026"
+
+  // Personal Roadmap Fields
+  category String? // Mindset, Habits, Networking
+
+  // Item Details
+  title       String
+  description String?
+  status      String  @default("pending") // pending, in_progress, completed, cancelled
+
+  // Dates
+  dueDate     DateTime?
+  completedAt DateTime?
+
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  founder Founder @relation(fields: [founderId], references: [id], onDelete: Cascade)
+
+  @@map("roadmap_items")
+}
+
+// =====================================================
+// COMPANY MODELS - Company Outlook System
+// =====================================================
+
+model Company {
+  id      String  @id @default(cuid())
+  name    String
+  address String?
+  website String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  founders             CompanyFounder[]
+  employees            CompanyEmployee[]
+  roadmapItems         CompanyRoadmapItem[]
+  tasks                Task[] // Company tasks (companyId set, founderId null)
+  crmContacts          CompanyCrmContact[]
+  financialSpends      CompanyFinancialSpend[] // Actual spending
+  financialProjections CompanyFinancialProjection[] // Projected spending
+
+  @@map("companies")
+}
+
+model CompanyFounder {
+  id        String @id @default(cuid())
+  companyId String
+  founderId String // Links to Founder.id → Athlete.id (for founders who test)
+
+  role     String? // "CEO", "Co-Founder"
+  joinedAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  founder Founder @relation(fields: [founderId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, founderId])
+  @@map("company_founders")
+}
+
+model CompanyEmployee {
+  id        String @id @default(cuid())
+  companyId String
+
+  // Employee Info (Email-Based, NO Athlete Required)
+  email       String
+  name        String
+  role        String? // "Engineer", "Designer", "PM"
+  department  String?
+  phoneNumber String?
+
+  joinedAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // NO athleteId - separate concern!
+  // If they want app, they sign up separately as Athlete
+
+  @@unique([companyId, email]) // One email per company
+  @@map("company_employees")
+}
+
+model CompanyRoadmapItem {
+  id        String  @id @default(cuid())
+  companyId String? // Legacy Company relation (nullable - using GoFastCompany instead)
+
+  // Item Classification
+  itemType    String  @default("Dev Work") // "Dev Work" or "Product Milestone"
+  primaryRepo String? // Primary repository (e.g., "mvp1", "eventslanding", "companystack")
+  category    String  @default("Core Feature") // "Core Feature", "Frontend Demo", "API Integration", "Backend Scaffolding"
+
+  // Core Details
+  title      String
+  whatItDoes String? // User value proposition
+  howItHelps String? // How it helps overall build
+
+  // Data & Integration
+  quickModelScaffolding String? // Quick model scaffolding - how does this fit into the architecture
+  relationalMapping     String? // Does this bolt on to athleteId? What's the relational mapping?
+  apiIntegration        String? // API-specific integration (e.g., "hit garmin backend with a token")
+  prerequisites         String? // Setup, research, account creation, auth (can include links)
+
+  // Planning
+  orderNumber Int? // Order in sequence (1, 2, 3...)
+
+  // Time Tracking
+  hoursEstimated Int? // Initial estimate
+  hoursSpent     Int? // Actual time spent
+
+  // Dates & Status
+  targetDate  DateTime?
+  dueDate     DateTime?
+  status      String    @default("Not Started") // Not Started, In Progress, Done
+  priority    String    @default("Enhanced User Feature") // Critical Path, Enhanced User Feature, Future Release, Revenue Builder
+  completedAt DateTime?
+
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company         Company?       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  GoFastCompany   GoFastCompany? @relation(fields: [goFastCompanyId], references: [id])
+  goFastCompanyId String?
+
+  @@map("company_roadmap_items")
+}
+
+model CompanyCrmContact {
+  id        String @id @default(cuid())
+  companyId String
+
+  // Contact Info
+  name        String
+  role        String? // "Club Director", "Partnership Lead", etc.
+  email       String?
+  companyName String? // Their company (club/organization name)
+
+  // Pipeline Management (BD Focus - Clubs, Partners, Integrations)
+  pipeline String @default("prospects") // prospects, warm, onboarding, active, churned
+  status   String @default("new") // new, warm, active, exploring, cold
+
+  // Next Steps
+  nextStep String? // "Onboarding call", "Contract review", "Integration setup"
+
+  // Notes
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("company_crm_contacts")
+}
+
+model CompanyFinancialSpend {
+  id        String @id @default(cuid())
+  companyId String
+
+  // INGESTED ITEM DATA - What we're ingesting per transaction
+  date        DateTime // When the spend occurred
+  amount      Float // Amount spent (negative for expenses)
+  category    String // "salaries", "marketing", "operations", "software", "office", etc.
+  description String? // Transaction description
+  vendor      String? // Who we paid
+
+  // Classification
+  department String? // Which department (if applicable)
+  project    String? // Which project (if applicable)
+
+  // Receipt/Proof
+  receiptUrl String? // Link to receipt/documentation
+
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company         Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  GoFastCompany   GoFastCompany? @relation(fields: [goFastCompanyId], references: [id])
+  goFastCompanyId String?
+
+  @@map("company_financial_spends")
+}
+
+model CompanyFinancialProjection {
+  id        String @id @default(cuid())
+  companyId String
+
+  // Projection Period
+  period      String // "monthly", "quarterly", "yearly"
+  periodStart DateTime // Start of projection period
+  periodEnd   DateTime // End of projection period
+
+  // TOTAL VALUES - Aggregated/Projected Amounts (NOT individual items)
+  projectedRevenue  Float? // Projected revenue for period (TOTAL)
+  projectedExpenses Float // Projected expenses for period (TOTAL)
+  projectedNet      Float? // Projected net (revenue - expenses) (TOTAL)
+
+  // Breakdown by Category (TOTAL VALUES per category)
+  categoryBreakdown Json? // { "salaries": 50000, "marketing": 10000, "operations": 5000 }
+
+  // Runway Calculation (TOTAL VALUES)
+  currentCash     Float? // Current cash on hand (TOTAL)
+  monthlyBurnRate Float? // Monthly burn (expenses) (TOTAL)
+  runwayMonths    Float? // Months of runway (calculated: cash / monthlyBurn)
+
+  // Assumptions
+  assumptions String? // Notes on assumptions for this projection
+
+  // Status
+  status String @default("draft") // draft, active, archived
+
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company         Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  GoFastCompany   GoFastCompany? @relation(fields: [goFastCompanyId], references: [id])
+  goFastCompanyId String?
+
+  @@map("company_financial_projections")
+}
+
+// =====================================================
+// UNIFIED TASK MODEL - Founder OR Company
+// =====================================================
+
+model Task {
+  id String @id @default(cuid())
+
+  // Polymorphic Link - ONE of these must be set
+  founderId String? // For founder personal tasks (Adam's tasks)
+  companyId String? // For company-wide tasks
+
+  // Task Details
+  title       String
+  description String?
+  status      String    @default("pending") // pending, in_progress, completed, cancelled
+  priority    String    @default("medium") // low, medium, high, urgent
+  dueDate     DateTime?
+
+  // Department (for company tasks)
+  department String? // "Engineering", "Design", "Marketing"
+
+  // Founder Priority Flag (for company tasks)
+  isTopPriority Boolean @default(false) // Founder can mark "most important now"
+
+  // Completion
+  completedAt DateTime?
+
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  founder         Founder?       @relation(fields: [founderId], references: [id], onDelete: Cascade)
+  company         Company?       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  GoFastCompany   GoFastCompany? @relation(fields: [goFastCompanyId], references: [id])
+  goFastCompanyId String?
+
+  @@map("tasks")
+}
+
+// =====================================================
+// MESSAGE MODEL - Group Wall Messaging
+// =====================================================
+
+model Message {
+  id        String   @id @default(cuid())
+  groupId   String // RunCrew ID
+  authorId  String // Athlete ID
+  author    String // Author name (denormalized for quick display)
+  content   String // Message content
+  createdAt DateTime @default(now())
+
+  @@index([groupId, createdAt]) // Efficient queries by group and time
+  @@map("messages")
+}
+
+// =====================================================
+// GOFAST COMPANY STACK MODELS - Single-Tenant Company Operations
+// =====================================================
+
+model GoFastCompany {
+  id String @id @default(cuid()) // Single tenant - hardcoded ID in config (cmhpqe7kl0000nw1uvcfhf2hs)
+
+  // Company Details (Upserted by any authenticated staff)
+  companyName String // "GoFast Inc"
+  address     String? // "2604 N. George Mason Dr."
+  city        String? // "Arlington"
+  state       String? // "VA"
+  website     String? // "gofastcrushgoals.com"
+  description String? // Company description
+
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations - All scoped to this single company
+  staff                CompanyStaff[] // Direct relation to staff (single-tenant, no junction needed)
+  contacts             Contact[] // CRM contacts (config-driven pipeline stages)
+  productPipelineItems ProductPipelineItem[] // Product Pipeline (product module, user-driven)
+  financialSpends      CompanyFinancialSpend[]
+  financialProjections CompanyFinancialProjection[]
+  roadmapItems         CompanyRoadmapItem[]
+  tasks                Task[]
+
+  @@map("gofast_company")
+}
+
+model CompanyStaff {
+  id         String @id @default(cuid())
+  firebaseId String @unique // Firebase auth ID (for authentication)
+
+  // Name fields (separate, not combined)
+  firstName String? // First name
+  lastName  String? // Last name
+  email     String // Email address (required)
+  photoURL  String? // Profile photo URL (from Firebase - stored for quick access)
+
+  // Company and Role (direct fields - single-tenant, no junction needed)
+  companyId String? // Links to GoFastCompany.id (single company) - nullable to allow staff creation before company
+  role      String // "Founder", "CFO", "Sales", "Marketing", "Community Manager" (from roleConfig.js - enum-like)
+
+  // Employment details (founder/CEO can fill in)
+  startDate DateTime? // Start date (when staff joined/started)
+  salary    Float? // Salary (optional, founder/CEO can set)
+
+  // Verification Code (for onboarding/re-authentication)
+  verificationCode String? // Unique code for employee onboarding (future: can be changed)
+
+  // Relations
+  company GoFastCompany? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("company_staff")
+}
+
+model Contact {
+  id        String @id @default(cuid())
+  companyId String // Links to GoFastCompany.id (single tenant - hardcoded in config)
+
+  // Core person data (aligned with Ignite pattern)
+  firstName String?
+  lastName  String?
+  goesBy    String? // Preferred name
+  email     String?
+  phone     String?
+  title     String?
+
+  // Pipeline Tracking (config-driven, not relational)
+  pipelineId    String? // Unique identifier for this contact's pipeline journey (for tracking/grouping)
+  audienceType  String? // e.g. "EliteRunner", "RunClub", "RunnerInfluencer", etc. (from pipelineConfig.js - enum-like)
+  pipelineStage String? // e.g. "Interest", "Meeting", "Agreement", "OnPlatform" (validated against config - enum-like)
+
+  // Conversion Path (Contact → Athlete)
+  athleteId String? // Links to Athlete.id if contact converted to athlete
+
+  // Notes
+  notes String?
+
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("contacts")
+}
+
+model ProductPipelineItem {
+  id        String @id @default(cuid())
+  companyId String // Links to GoFastCompany.id (single tenant - hardcoded in config)
+
+  // User-Driven Product Module Fields
+  name        String // Product feature/module name (user input)
+  description String? // Description (user input)
+  timeItTakes String? // Time it takes (e.g., "2 weeks", "1 month") (user input)
+
+  // Status
+  status   String @default("pending") // pending, in_progress, completed, cancelled
+  priority String @default("medium") // low, medium, high, urgent
+
+  // Dates
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("product_pipeline_items")
+}
+
+// =====================================================
+// PARENT MODEL - Universal Personhood for Parents
+// =====================================================
+
+model Parent {
+  id         String @id @default(cuid())
+  firebaseId String @unique // Firebase auth ID
+
+  // Universal Profile
+  firstName   String?
+  lastName    String?
+  email       String  @unique
+  phoneNumber String?
+  photoURL    String?
+
+  // Garmin OAuth 2.0 PKCE Integration (for claiming parent's activities as race results)
+  garmin_user_id         String?   @unique // Garmin's unique user ID
+  garmin_access_token    String?
+  garmin_refresh_token   String?
+  garmin_expires_in      Int?
+  garmin_scope           String?
+  garmin_connected_at    DateTime?
+  garmin_last_sync_at    DateTime?
+  garmin_permissions     Json?
+  garmin_is_connected    Boolean   @default(false)
+  garmin_disconnected_at DateTime?
+
+  // System fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  youngAthletes YoungAthlete[]
+
+  @@map("parents")
+}
+
+// =====================================================
+// YOUNG ATHLETE MODELS - Youth Participation System
+// =====================================================
+
+model YoungAthlete {
+  id            String   @id @default(cuid())
+  parentId      String // Parent ID (NOT athleteId)
+  eventCode     String // Event identifier
+  firstName     String
+  lastName      String
+  grade         String?
+  school        String?
+  profilePicUrl String?
+  createdAt     DateTime @default(now())
+
+  // Garmin OAuth 2.0 PKCE Integration (separate Garmin app for young athletes)
+  garmin_user_id         String?   @unique // Garmin's unique user ID for young athlete
+  garmin_access_token    String?
+  garmin_refresh_token   String?
+  garmin_expires_in      Int?
+  garmin_scope           String?
+  garmin_connected_at    DateTime?
+  garmin_last_sync_at    DateTime?
+  garmin_permissions     Json?
+  garmin_is_connected    Boolean   @default(false)
+  garmin_disconnected_at DateTime?
+
+  // Relations
+  parent     Parent                 @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  goals      EventGoal[]
+  results    EventResult[]
+  activities YoungAthleteActivity[] // Young athlete's own Garmin activities
+
+  @@index([parentId])
+  @@index([eventCode])
+  @@map("young_athletes")
+}
+
+model EventGoal {
+  id             String   @id @default(cuid())
+  youngAthleteId String
+  eventCode      String
+  targetDistance String?
+  targetPace     String?
+  motivation     String?
+  feeling        String?
+  createdAt      DateTime @default(now())
+
+  // Relations
+  youngAthlete YoungAthlete @relation(fields: [youngAthleteId], references: [id], onDelete: Cascade)
+
+  @@unique([youngAthleteId, eventCode]) // One goal per young athlete per event
+  @@index([eventCode])
+  @@map("event_goals")
+}
+
+model EventResult {
+  id               String   @id @default(cuid())
+  eventCode        String
+  youngAthleteId   String
+  parentId         String? // Parent who claimed this (optional - for legacy parent Garmin activities)
+  activityId       String? // Links to YoungAthleteActivity.id (primary - young athlete's own activity)
+  parentActivityId String? // Links to AthleteActivity.id (legacy - parent's Garmin activity claimed as result)
+  createdAt        DateTime @default(now())
+
+  // Relations
+  youngAthlete   YoungAthlete          @relation(fields: [youngAthleteId], references: [id], onDelete: Cascade)
+  activity       YoungAthleteActivity? @relation("EventResultYoungAthleteActivity", fields: [activityId], references: [id], onDelete: Cascade)
+  parentActivity AthleteActivity?      @relation("EventResultParentActivity", fields: [parentActivityId], references: [id], onDelete: Cascade)
+
+  @@unique([youngAthleteId, eventCode]) // One result per young athlete per event
+  @@index([eventCode])
+  @@index([activityId])
+  @@index([parentActivityId])
+  @@map("event_results")
+}
+
+// =====================================================
+// YOUNG ATHLETE ACTIVITY MODEL - Separate Garmin Feed
+// =====================================================
+
+model YoungAthleteActivity {
+  id             String @id @default(cuid())
+  youngAthleteId String
+
+  // Source Information
+  sourceActivityId String @unique // Garmin's unique activity ID (join key)
+  source           String @default("garmin")
+
+  // Core Activity Data (Summary from /garmin/activity webhook)
+  activityType String? // running, cycling, swimming, etc.
+  activityName String? // "Morning Run", "Evening Bike Ride"
+  startTime    DateTime? // when activity started
+  duration     Int? // duration in seconds
+  distance     Float? // distance in meters
+  averageSpeed Float? // average speed in m/s
+  calories     Int? // calories burned
+
+  // Performance Metrics (Summary data)
+  averageHeartRate Int? // average heart rate
+  maxHeartRate     Int? // maximum heart rate
+  elevationGain    Float? // elevation gain in meters
+  steps            Int? // step count (if applicable)
+
+  // Location Data (Summary)
+  startLatitude   Float? // GPS start latitude
+  startLongitude  Float? // GPS start longitude
+  endLatitude     Float? // GPS end latitude
+  endLongitude    Float? // GPS end longitude
+  summaryPolyline String? // encoded route polyline
+
+  // Device Information
+  deviceName   String? // "Forerunner 255", "Edge 1040"
+  garminUserId String? // Garmin user GUID from webhook
+
+  // Hybrid Data Storage
+  summaryData Json? // Phase 1: Summary fields from /garmin/activity
+  detailData  Json? // Phase 2: Details from /garmin/details (laps, splits, HR zones, etc.)
+  hydratedAt  DateTime? // When details were hydrated
+
+  // Timestamps
+  syncedAt      DateTime @default(now())
+  lastUpdatedAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  youngAthlete YoungAthlete  @relation(fields: [youngAthleteId], references: [id], onDelete: Cascade)
+  eventResults EventResult[] @relation("EventResultYoungAthleteActivity") // Event results that claim this activity
+
+  @@index([youngAthleteId])
+  @@index([garminUserId])
+  @@map("young_athlete_activities")
+}
+
+// =====================================================
+// F3 WORKOUT MODELS - Workout Builder & Backblast Generator
+// =====================================================
+
+model Workout {
+  workoutId String   @id @default(cuid())
+  date      DateTime
+  ao        String?
+  qId       String
+  warmup    WarmUp?
+  thang     Thang?
+  mary      Mary?
+  cot       String?
+  createdAt DateTime @default(now())
+
+  @@map("workouts")
+}
+
+model WarmUp {
+  warmupId  String       @id @default(cuid())
+  workout   Workout      @relation(fields: [workoutId], references: [workoutId], onDelete: Cascade)
+  workoutId String       @unique
+  moves     WarmUpMove[]
+
+  @@map("warm_ups")
+}
+
+model WarmUpMove {
+  warmUpMoveId String         @id @default(cuid())
+  warmup       WarmUp         @relation(fields: [warmupId], references: [warmupId], onDelete: Cascade)
+  warmupId     String
+  type         WarmUpMoveType
+  count        Int?
+
+  @@map("warm_up_moves")
+}
+
+enum WarmUpMoveType {
+  SSH
+  ImperialWalkers
+  ArmCircles
+  HighKnees
+  Windmills
+  Skaters
+  Mosey
+}
+
+model Thang {
+  thangId   String       @id @default(cuid())
+  workout   Workout      @relation(fields: [workoutId], references: [workoutId], onDelete: Cascade)
+  workoutId String       @unique
+  blocks    ThangBlock[]
+
+  @@map("thangs")
+}
+
+model ThangBlock {
+  thangBlockId String      @id @default(cuid())
+  thang        Thang       @relation(fields: [thangId], references: [thangId], onDelete: Cascade)
+  thangId      String
+  title        String?
+  description  String?
+  order        Int
+  moves        ThangMove[]
+
+  @@map("thang_blocks")
+}
+
+model ThangMove {
+  thangMoveId   String        @id @default(cuid())
+  thangBlock    ThangBlock    @relation(fields: [thangBlockId], references: [thangBlockId], onDelete: Cascade)
+  thangBlockId  String
+  type          ThangMoveType
+  distanceYards Int?
+  reps          Int?
+  durationSec   Int?
+  notes         String?
+  order         Int
+
+  @@map("thang_moves")
+}
+
+enum ThangMoveType {
+  Merkins
+  Squats
+  Burpees
+  BearCrawl
+  BroadJump
+  LungeWalk
+  ShoulderTap
+  JumpSquat
+  MountainClimber
+  RickyBobby
+  Sprint
+  Mosey
+  Karaoke
+}
+
+model Mary {
+  maryId    String     @id @default(cuid())
+  workout   Workout    @relation(fields: [workoutId], references: [workoutId], onDelete: Cascade)
+  workoutId String     @unique
+  moves     MaryMove[]
+
+  @@map("marys")
+}
+
+model MaryMove {
+  maryMoveId String   @id @default(cuid())
+  mary       Mary     @relation(fields: [maryId], references: [maryId], onDelete: Cascade)
+  maryId     String
+  type       MaryType
+  count      Int?
+
+  @@map("mary_moves")
+}
+
+enum MaryType {
+  FlutterKicks
+  LBCs
+  AmericanHammers
+  FreddieMercurys
+  BigBoySitups
+  HelloDollies
+  Plank
+}
