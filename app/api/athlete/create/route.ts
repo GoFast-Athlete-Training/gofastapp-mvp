@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { getAdminAuth } from '@/lib/firebaseAdmin';
+import { createAthlete } from '@/lib/domain-athlete';
 
 export async function POST(request: Request) {
   try {
@@ -32,13 +32,11 @@ export async function POST(request: Request) {
 
     let athlete;
     try {
-      athlete = await prisma.athlete.create({
-        data: {
-          firebaseId,
-          email: body.email,
-          firstName: body.firstName,
-          lastName: body.lastName,
-        },
+      athlete = await createAthlete({
+        firebaseId,
+        email: body.email,
+        firstName: body.firstName,
+        lastName: body.lastName,
       });
     } catch (err) {
       console.error('Prisma error:', err);

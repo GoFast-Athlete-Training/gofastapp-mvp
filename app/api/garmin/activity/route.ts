@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getAthleteByGarminUserId } from '@/lib/domain-garmin';
 
 export async function POST(request: Request) {
   try {
@@ -14,9 +14,7 @@ export async function POST(request: Request) {
 
     let athlete;
     try {
-      athlete = await prisma.athlete.findUnique({
-        where: { garmin_user_id: userId },
-      });
+      athlete = await getAthleteByGarminUserId(userId);
     } catch (err) {
       console.error('Prisma error:', err);
       return NextResponse.json({ error: 'DB error' }, { status: 500 });

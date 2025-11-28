@@ -45,3 +45,9 @@ export async function getGarminConnection(athleteId: string) {
   return athlete;
 }
 
+export async function getAthleteByGarminUserId(garminUserId: string) {
+  return prisma.athlete.findUnique({
+    where: { garmin_user_id: garminUserId },
+  });
+}
+
