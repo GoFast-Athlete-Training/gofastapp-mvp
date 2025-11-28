@@ -32,12 +32,38 @@ export default function HomePage() {
     // Show splash for 1 second, then check auth
     const timer = setTimeout(() => {
       setShowSplash(false);
-      unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe = onAuthStateChanged(auth, async (user) => {
         setIsAuthenticated(!!user);
         setIsLoading(false);
         
         if (user) {
-          router.push('/athlete-welcome');
+          // Verify token is valid for current Firebase project
+          try {
+            const token = await user.getIdToken();
+            // If token retrieval succeeds, user is valid for current project
+            console.log('✅ Root: Valid Firebase user detected, redirecting to welcome');
+            router.push('/athlete-welcome');
+          } catch (error: any) {
+            // Token invalid (likely from old Firebase project) - clear everything
+            console.warn('⚠️ Root: Invalid token detected, clearing stale auth state');
+            console.warn('⚠️ Root: Error:', error?.message);
+            
+            // Sign out to clear Firebase auth state
+            try {
+              await auth.signOut();
+            } catch (signOutError) {
+              console.error('Error signing out:', signOutError);
+            }
+            
+            // Clear localStorage
+            if (typeof window !== 'undefined') {
+              localStorage.clear();
+            }
+            
+            // Reset state to show sign-in UI
+            setIsAuthenticated(false);
+            setIsLoading(false);
+          }
         }
       });
     }, 1000);
