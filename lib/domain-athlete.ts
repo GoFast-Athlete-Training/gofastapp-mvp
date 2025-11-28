@@ -1,5 +1,22 @@
 import { prisma } from './prisma';
 
+// Lightweight types for type safety
+type ActivityLite = {
+  distance?: number;
+  duration?: number;
+};
+
+type MembershipLite = {
+  runCrewId: string;
+  joinedAt: Date;
+  runCrew: any; // Will be spread, so any is acceptable here
+};
+
+type ManagerLite = {
+  runCrewId: string;
+  role: string;
+};
+
 export async function getAthleteById(athleteId: string) {
   return prisma.athlete.findUnique({
     where: { id: athleteId },
@@ -72,34 +89,33 @@ export async function hydrateAthlete(athleteId: string) {
   }
 
   // Calculate weekly totals
-  type ActivitySummary = {
-    distance?: number;
-    duration?: number;
-  };
-
   const weeklyTotals = athlete.activities.reduce(
     (
       acc: { distance: number; duration: number; activities: number },
-      activity: ActivitySummary
-    ) => ({
-      distance: acc.distance + (activity.distance || 0),
-      duration: acc.duration + (activity.duration || 0),
-      activities: acc.activities + 1,
-    }),
+      activity: ActivityLite
+    ) => {
+      return {
+        distance: acc.distance + (activity.distance || 0),
+        duration: acc.duration + (activity.duration || 0),
+        activities: acc.activities + 1,
+      };
+    },
     { distance: 0, duration: 0, activities: 0 }
   );
 
   // Normalize crews with roles
-  const crews = athlete.runCrewMemberships.map((membership) => {
-    const managerRole = athlete.runCrewManagers.find(
-      (m) => m.runCrewId === membership.runCrewId
-    );
-    return {
-      ...membership.runCrew,
-      role: managerRole?.role || 'member',
-      joinedAt: membership.joinedAt,
-    };
-  });
+  const crews = athlete.runCrewMemberships.map(
+    (membership: MembershipLite) => {
+      const managerRole = athlete.runCrewManagers.find(
+        (m: ManagerLite) => m.runCrewId === membership.runCrewId
+      );
+      return {
+        ...membership.runCrew,
+        role: managerRole?.role || 'member',
+        joinedAt: membership.joinedAt,
+      };
+    }
+  );
 
   return {
     athlete: {
