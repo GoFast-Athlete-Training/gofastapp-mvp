@@ -1,38 +1,60 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyFirebaseIdToken } from '@/lib/firebaseAdmin';
+import { getAdminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteById, updateAthlete } from '@/lib/domain-athlete';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id?: string } }
 ) {
   try {
+    // 1️⃣ Prevent build-time errors: params undefined during static eval
     if (!params?.id) {
-      return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing athlete id' }, { status: 400 });
     }
+
+    // 2️⃣ Get admin auth (may be null during build)
+    const adminAuth = getAdminAuth();
+    if (!adminAuth) {
+      console.warn('⚠️ Firebase admin not initialized. Skipping auth.');
+      return NextResponse.json(
+        { error: 'Auth unavailable' },
+        { status: 500 }
+      );
+    }
+
+    // 3️⃣ Extract token
     const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const token = authHeader.substring(7);
-    const decodedToken = await verifyFirebaseIdToken(token);
-    if (!decodedToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // 4️⃣ Verify token safely
+    let decoded;
+    try {
+      decoded = await adminAuth.verifyIdToken(token);
+    } catch (err) {
+      console.error('❌ Token verification failed:', err);
+      return NextResponse.json(
+        { error: 'Invalid token' },
+        { status: 401 }
+      );
     }
 
+    // 5️⃣ Real DB query
     const athlete = await getAthleteById(params.id);
     if (!athlete) {
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
 
     return NextResponse.json({ success: true, athlete });
-  } catch (error: any) {
-    console.error('Error getting athlete:', error);
+  } catch (err: any) {
+    console.error('❌ API ERROR:', err);
     return NextResponse.json(
-      { error: error.message || 'Failed to get athlete' },
+      { error: 'Server error', detail: err.message },
       { status: 500 }
     );
   }
@@ -40,26 +62,47 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id?: string } }
 ) {
   try {
+    // 1️⃣ Prevent build-time errors: params undefined during static eval
     if (!params?.id) {
-      return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing athlete id' }, { status: 400 });
     }
+
+    // 2️⃣ Get admin auth (may be null during build)
+    const adminAuth = getAdminAuth();
+    if (!adminAuth) {
+      console.warn('⚠️ Firebase admin not initialized. Skipping auth.');
+      return NextResponse.json(
+        { error: 'Auth unavailable' },
+        { status: 500 }
+      );
+    }
+
+    // 3️⃣ Extract token
     const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const token = authHeader.substring(7);
-    const decodedToken = await verifyFirebaseIdToken(token);
-    if (!decodedToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // 4️⃣ Verify token safely
+    let decoded;
+    try {
+      decoded = await adminAuth.verifyIdToken(token);
+    } catch (err) {
+      console.error('❌ Token verification failed:', err);
+      return NextResponse.json(
+        { error: 'Invalid token' },
+        { status: 401 }
+      );
     }
 
     // Verify athlete owns this profile
     const athlete = await getAthleteById(params.id);
-    if (!athlete || athlete.firebaseId !== decodedToken.uid) {
+    if (!athlete || athlete.firebaseId !== decoded.uid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
@@ -67,12 +110,11 @@ export async function PUT(
     const updated = await updateAthlete(params.id, body);
 
     return NextResponse.json({ success: true, athlete: updated });
-  } catch (error: any) {
-    console.error('Error updating athlete:', error);
+  } catch (err: any) {
+    console.error('❌ API ERROR:', err);
     return NextResponse.json(
-      { error: error.message || 'Failed to update athlete' },
+      { error: 'Server error', detail: err.message },
       { status: 500 }
     );
   }
 }
-
