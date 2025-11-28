@@ -48,11 +48,10 @@ export default function AthleteWelcomePage() {
         }
 
         // Step 2: Create GoFastCompany (idempotent)
+        // Token is automatically injected by Axios interceptor - no need to pass manually
         console.log('🚀 ATHLETE WELCOME: Step 1 - Initializing company...');
         try {
-          await api.post('/company/init', {}, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
+          await api.post('/company/init', {});
           console.log('✅ ATHLETE WELCOME: Company initialized');
         } catch (companyError: any) {
           console.warn('⚠️ ATHLETE WELCOME: Company init failed:', companyError?.response?.status);
@@ -63,14 +62,13 @@ export default function AthleteWelcomePage() {
         }
 
         // Step 3: Create athlete (idempotent)
+        // Token is automatically injected by Axios interceptor - no need to pass manually
         console.log('🚀 ATHLETE WELCOME: Step 2 - Creating/finding athlete...');
         try {
           await api.post('/athlete/create', {
             email: user.email,
             firstName: user.displayName?.split(' ')[0] || null,
             lastName: user.displayName?.split(' ')[1] || null,
-          }, {
-            headers: { Authorization: `Bearer ${token}` }
           });
           console.log('✅ ATHLETE WELCOME: Athlete created/found');
         } catch (athleteError: any) {
@@ -82,11 +80,10 @@ export default function AthleteWelcomePage() {
         }
 
         // Step 4: Hydrate athlete (read-only)
+        // Token is automatically injected by Axios interceptor - no need to pass manually
         console.log('🚀 ATHLETE WELCOME: Step 3 - Hydrating athlete...');
         try {
-          const response = await api.post('/athlete/hydrate', {}, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
+          const response = await api.post('/athlete/hydrate', {});
           
           console.log('📡 ATHLETE WELCOME: Hydration response received:', response.status);
           

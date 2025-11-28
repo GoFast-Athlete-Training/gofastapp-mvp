@@ -59,13 +59,9 @@ export default function HomePage() {
     }
 
     try {
-      // Get token for authenticated request
-      const token = await user.getIdToken();
-      
+      // Token is automatically injected by Axios interceptor - no need to pass manually
       console.log('🚀 HOME: Calling runcrew/hydrate for:', runCrewId);
-      const response = await api.post('/runcrew/hydrate', { runCrewId }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.post('/runcrew/hydrate', { runCrewId });
       
       console.log('📡 HOME: RunCrew hydration response:', response.status);
       

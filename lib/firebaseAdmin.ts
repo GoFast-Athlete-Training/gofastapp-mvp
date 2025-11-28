@@ -46,7 +46,19 @@ export function initAdmin() {
   });
 
   adminAuth = getAuth(app);
-  console.log("✅ Firebase Admin initialized:", serviceAccount.projectId);
+  console.log("✅ Firebase Admin initialized with project:", serviceAccount.projectId);
+  console.log("🔍 Firebase Admin client email:", serviceAccount.clientEmail);
+  
+  // Verify project matches client
+  const expectedProjectId = "gofast-a5f94";
+  if (serviceAccount.projectId !== expectedProjectId) {
+    console.error("❌ FIREBASE PROJECT MISMATCH!");
+    console.error(`   Backend Admin project: ${serviceAccount.projectId}`);
+    console.error(`   Client project: ${expectedProjectId}`);
+    console.error("   ⚠️ These MUST match or token verification will fail!");
+  } else {
+    console.log("✅ Firebase project matches client (gofast-a5f94)");
+  }
 
   return app;
 }

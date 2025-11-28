@@ -16,12 +16,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Auth unavailable' }, { status: 500 });
     }
 
-    let decodedToken;
-    try {
-      decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    } catch {
-      return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 });
-    }
+        let decodedToken;
+        try {
+          decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
+          console.log('✅ COMPANY INIT: Token verified for UID:', decodedToken.uid);
+          console.log('✅ COMPANY INIT: Token project:', decodedToken.firebase?.project_id || 'unknown');
+        } catch (err: any) {
+          console.error('❌ COMPANY INIT: Token verification failed:', err?.message);
+          console.error('❌ COMPANY INIT: Error code:', err?.code);
+          return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 });
+        }
 
     // One-time UPSERT - Guarantee GoFastCompany exists
     const company = await prisma.goFastCompany.upsert({
