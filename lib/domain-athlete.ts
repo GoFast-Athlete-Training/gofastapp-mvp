@@ -57,6 +57,7 @@ export async function hydrateAthlete(athleteId: string) {
       activities: {
         where: {
           startTime: {
+            not: null,
             gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
           },
         },
