@@ -1,13 +1,13 @@
 export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from 'next/server';
-import { verifyFirebaseIdToken } from '@/lib/firebaseAdmin';
+import { NextResponse } from 'next/server';
+import { getAdminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
 import { updateGarminConnection } from '@/lib/domain-garmin';
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
-    const searchParams = request.nextUrl.searchParams;
+    const searchParams = new URL(request.url).searchParams;
     const code = searchParams.get('code');
     const state = searchParams.get('state');
 
@@ -24,9 +24,7 @@ export async function GET(request: NextRequest) {
     // TODO: Implement full OAuth token exchange
     // For now, redirect to success page
     return NextResponse.redirect(new URL('/settings/garmin/success', request.url));
-  } catch (error: any) {
-    console.error('Error in Garmin callback:', error);
+  } catch (err) {
     return NextResponse.redirect(new URL('/settings/garmin?error=callback_failed', request.url));
   }
 }
-
