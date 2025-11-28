@@ -78,12 +78,17 @@ export default function HomePage() {
 
   const handleGoogleSignUp = async () => {
     try {
+      console.log('🚀 Root: handleGoogleSignUp called');
       setIsSigningUp(true);
       setError('');
+      console.log('🚀 Root: Calling signInWithGoogle...');
       await signInWithGoogle();
+      console.log('✅ Root: signInWithGoogle completed, waiting for auth state change');
       // onAuthStateChanged will handle the redirect
     } catch (error: any) {
-      console.error('Sign up error:', error);
+      console.error('❌ Root: Sign up error:', error);
+      console.error('❌ Root: Error code:', error.code);
+      console.error('❌ Root: Error message:', error.message);
       setError(error.message || 'Failed to sign up with Google');
       setIsSigningUp(false);
     }
