@@ -19,7 +19,7 @@ export default function AthleteWelcomePage() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         console.log('❌ ATHLETE WELCOME: No Firebase user found → redirecting to signup');
-        router.push('/');
+        router.push('/signup');
         return;
       }
 
@@ -85,7 +85,7 @@ export default function AthleteWelcomePage() {
         // Only redirect on 401 (unauthorized)
         if (err.response?.status === 401) {
           console.log('🚫 ATHLETE WELCOME: Unauthorized (401) → redirecting to signup');
-          router.push('/');
+          router.push('/signup');
           return;
         }
         
