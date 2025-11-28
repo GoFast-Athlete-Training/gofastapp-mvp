@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
@@ -12,154 +11,130 @@ import { LocalStorageAPI } from '@/lib/localstorage';
 export default function AthleteWelcomePage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [isReady, setIsReady] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [warnings, setWarnings] = useState<string[]>([]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      // GLOBAL RULE: Never hydrate without a Firebase user
-      if (!user) {
-        console.log('❌ ATHLETE WELCOME: No Firebase user found → redirecting to signup');
-        router.replace('/signup');
-        return;
-      }
-
+    const hydrateAthlete = async () => {
       try {
-        console.log('🚀 ATHLETE WELCOME: ===== STARTING SETUP =====');
+        console.log('🚀 ATHLETE WELCOME: ===== STARTING HYDRATION =====');
         setIsLoading(true);
         setError(null);
-        setWarnings([]);
 
-        // Step 1: Get ID token (required for all backend calls)
+        // Get Firebase user to ensure we have auth
+        const user = auth.currentUser;
+        
+        if (!user) {
+          console.log('❌ ATHLETE WELCOME: No Firebase user found → redirecting to signup');
+          router.replace('/signup');
+          return;
+        }
+
         console.log('✅ ATHLETE WELCOME: Firebase user found');
         console.log('✅ ATHLETE WELCOME: Firebase UID:', user.uid);
         console.log('✅ ATHLETE WELCOME: Firebase Email:', user.email);
+        console.log('🚀 ATHLETE WELCOME: Calling hydration endpoint...');
         
-        let token: string;
-        try {
-          token = await user.getIdToken();
-          console.log('✅ ATHLETE WELCOME: Got Firebase token');
-        } catch (tokenError: any) {
-          console.error('❌ ATHLETE WELCOME: Failed to get token:', tokenError);
-          setError('Failed to authenticate. Please try signing in again.');
+        // Call hydration endpoint (token automatically added by api interceptor)
+        const response = await api.post('/athlete/hydrate');
+        
+        console.log('📡 ATHLETE WELCOME: Response received:', response.status);
+        
+        const { success, athlete } = response.data;
+
+        if (!success || !athlete) {
+          console.error('❌ ATHLETE WELCOME: Hydration failed:', response.data.error || 'Invalid response');
+          setError(response.data.error || 'Failed to load athlete data');
           setIsLoading(false);
           return;
         }
 
-        // Step 2: Create GoFastCompany (idempotent)
-        // Token is automatically injected by Axios interceptor - no need to pass manually
-        console.log('🚀 ATHLETE WELCOME: Step 1 - Initializing company...');
-        try {
-          await api.post('/company/init', {});
-          console.log('✅ ATHLETE WELCOME: Company initialized');
-        } catch (companyError: any) {
-          console.warn('⚠️ ATHLETE WELCOME: Company init failed:', companyError?.response?.status);
-          // Don't block - company might already exist
-          if (companyError?.response?.status !== 401) {
-            setWarnings(prev => [...prev, 'Could not initialize company (continuing anyway)']);
-          }
+        // Extract weeklyActivities and weeklyTotals from athlete object (backend puts them there)
+        const weeklyActivities = athlete.weeklyActivities || [];
+        const weeklyTotals = athlete.weeklyTotals || null;
+
+        console.log('✅ ATHLETE WELCOME: Athlete hydrated successfully');
+        console.log('✅ ATHLETE WELCOME: Athlete ID:', athlete.athleteId || athlete.id);
+        console.log('✅ ATHLETE WELCOME: Email:', athlete.email);
+        console.log('✅ ATHLETE WELCOME: Name:', athlete.firstName, athlete.lastName);
+        console.log('✅ ATHLETE WELCOME: RunCrews count:', athlete.runCrews?.length || 0);
+        console.log('✅ ATHLETE WELCOME: Weekly activities count:', weeklyActivities.length);
+        
+        if (athlete.runCrews && athlete.runCrews.length > 0) {
+          console.log('✅ ATHLETE WELCOME: RunCrews:', athlete.runCrews.map((c: any) => c.name).join(', '));
         }
 
-        // Step 3: Create athlete (idempotent)
-        // Token is automatically injected by Axios interceptor - no need to pass manually
-        console.log('🚀 ATHLETE WELCOME: Step 2 - Creating/finding athlete...');
-        try {
-          await api.post('/athlete/create', {
-            email: user.email,
-            firstName: user.displayName?.split(' ')[0] || null,
-            lastName: user.displayName?.split(' ')[1] || null,
-          });
-          console.log('✅ ATHLETE WELCOME: Athlete created/found');
-        } catch (athleteError: any) {
-          console.warn('⚠️ ATHLETE WELCOME: Athlete create failed:', athleteError?.response?.status);
-          // Don't block - athlete might already exist
-          if (athleteError?.response?.status !== 401) {
-            setWarnings(prev => [...prev, 'Could not create athlete (continuing anyway)']);
-          }
-        }
-
-        // Step 4: Hydrate athlete (read-only)
-        // Token is automatically injected by Axios interceptor - no need to pass manually
-        console.log('🚀 ATHLETE WELCOME: Step 3 - Hydrating athlete...');
-        try {
-          const response = await api.post('/athlete/hydrate', {});
-          
-          console.log('📡 ATHLETE WELCOME: Hydration response received:', response.status);
-          
-          if (response.data.success) {
-            const { athlete, weeklyActivities, weeklyTotals } = response.data;
-
-            console.log('✅ ATHLETE WELCOME: Athlete hydrated successfully');
-            console.log('✅ ATHLETE WELCOME: Athlete ID:', athlete?.id);
-            console.log('✅ ATHLETE WELCOME: Email:', athlete?.email);
-            console.log('✅ ATHLETE WELCOME: Name:', athlete?.firstName, athlete?.lastName);
-            console.log('✅ ATHLETE WELCOME: RunCrews count:', athlete?.runCrews?.length || 0);
-            console.log('✅ ATHLETE WELCOME: Weekly activities count:', weeklyActivities?.length || 0);
-
-            // Store the complete Prisma model
-            console.log('💾 ATHLETE WELCOME: Caching full hydration model to localStorage...');
-            LocalStorageAPI.setFullHydrationModel({
-              athlete,
-              weeklyActivities: weeklyActivities || [],
-              weeklyTotals: weeklyTotals || null
-            });
-            console.log('✅ ATHLETE WELCOME: Full hydration model cached');
-          } else {
-            console.warn('⚠️ ATHLETE WELCOME: Hydration returned success: false');
-            setWarnings(prev => [...prev, response.data.error || 'Could not fully load your account']);
-          }
-        } catch (hydrateError: any) {
-          console.warn('⚠️ ATHLETE WELCOME: Hydration failed:', hydrateError?.response?.status);
-          // GLOBAL RULE: Never auto-redirect on hydration error
-          // Show warning but allow user to continue
-          if (hydrateError?.response?.status === 401) {
-            // 401 means unauthorized - redirect to signup
-            console.log('🚫 ATHLETE WELCOME: Unauthorized (401) → redirecting to signup');
-            router.replace('/signup');
-            return;
-          } else {
-            // All other errors (404, 500, etc.) - show warning but continue
-            setWarnings(prev => [...prev, hydrateError?.response?.data?.error || 'Could not fully load your account']);
-          }
-        }
-
-        // Setup complete - show button
-        console.log('✅ ATHLETE WELCOME: ===== SETUP COMPLETE =====');
-        setIsReady(true);
+        // Store the complete Prisma model (athlete + all relations + activities)
+        console.log('💾 ATHLETE WELCOME: Caching full hydration model to localStorage...');
+        LocalStorageAPI.setFullHydrationModel({
+          athlete,
+          weeklyActivities: weeklyActivities,
+          weeklyTotals: weeklyTotals
+        });
+        
+        // Also store raw response as requested
+        localStorage.setItem('gofastHydration', JSON.stringify(response.data));
+        
+        console.log('✅ ATHLETE WELCOME: Full hydration model cached');
+        
+        // Hydration complete - show button for user to click
+        console.log('🎯 ATHLETE WELCOME: Hydration complete, ready for user action');
+        console.log('✅ ATHLETE WELCOME: ===== HYDRATION SUCCESS =====');
+        setIsHydrated(true);
         setIsLoading(false);
-      } catch (err: any) {
-        console.error('❌ ATHLETE WELCOME: Unexpected error:', err);
-        // GLOBAL RULE: Never auto-redirect on error
-        // Only redirect on 401 (unauthorized)
-        if (err?.response?.status === 401) {
+        
+      } catch (error: any) {
+        console.error('❌ ATHLETE WELCOME: ===== HYDRATION ERROR =====');
+        console.error('❌ ATHLETE WELCOME: Error message:', error.message);
+        console.error('❌ ATHLETE WELCOME: Error status:', error.response?.status);
+        console.error('❌ ATHLETE WELCOME: Error data:', error.response?.data);
+        
+        setError(error.response?.data?.message || error.message || 'Failed to load athlete data');
+        setIsLoading(false);
+        
+        // If 401, user not authenticated or token expired
+        if (error.response?.status === 401) {
           console.log('🚫 ATHLETE WELCOME: Unauthorized (401) → redirecting to signup');
           router.replace('/signup');
           return;
         }
-        setError(err?.message || 'An unexpected error occurred');
-        setIsReady(true);
-        setIsLoading(false);
+        
+        // If user not found, redirect to signup
+        if (error.response?.status === 404) {
+          console.log('👤 ATHLETE WELCOME: Athlete not found (404) → redirecting to signup');
+          router.replace('/signup');
+          return;
+        }
+        
+        console.error('❌ ATHLETE WELCOME: ===== END ERROR =====');
       }
-    });
+    };
 
-    return unsubscribe;
+    hydrateAthlete();
   }, [router]);
 
   const handleLetsTrain = () => {
-    const athlete = LocalStorageAPI.getAthlete();
-    
-    // Check if profile is complete (gofastHandle is the key indicator)
-    if (!athlete || !athlete.gofastHandle || athlete.gofastHandle.trim() === '') {
-      console.log('⚠️ ATHLETE WELCOME: Missing profile (no gofastHandle) → routing to profile setup');
-      router.push('/profile');
-      return;
-    }
-
-    // Profile complete - route to home
-    console.log('✅ ATHLETE WELCOME: Profile complete → routing to home');
-    router.push('/home');
+    console.log('🎯 ATHLETE WELCOME: User clicked "Let\'s Train!" → navigating to athlete-home');
+    router.push('/athlete-home');
   };
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center">
+        <div className="text-center bg-white rounded-xl shadow-lg p-8 max-w-md mx-4">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Error Loading Account</h1>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            onClick={() => router.replace('/signup')}
+            className="bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 transition"
+          >
+            Go to Signup
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center">
@@ -174,29 +149,12 @@ export default function AthleteWelcomePage() {
         {isLoading && (
           <div className="mt-8">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-            <p className="text-xl text-sky-100">Setting up your account...</p>
+            <p className="text-xl text-sky-100">Loading your account...</p>
           </div>
         )}
 
-        {isReady && !isLoading && (
+        {isHydrated && !isLoading && (
           <div className="mt-8">
-            {error && (
-              <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 mb-4 max-w-md mx-auto">
-                <p className="text-red-100 text-sm">{error}</p>
-              </div>
-            )}
-            
-            {warnings.length > 0 && (
-              <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 mb-4 max-w-md mx-auto">
-                <p className="text-yellow-100 text-sm font-semibold mb-2">⚠️ Warnings:</p>
-                <ul className="text-yellow-100 text-sm list-disc list-inside">
-                  {warnings.map((warning, idx) => (
-                    <li key={idx}>{warning}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            
             <button
               onClick={handleLetsTrain}
               className="bg-gradient-to-r from-orange-600 to-orange-500 text-white px-12 py-4 rounded-xl font-bold text-2xl hover:from-orange-700 hover:to-orange-600 transition shadow-2xl transform hover:scale-105"

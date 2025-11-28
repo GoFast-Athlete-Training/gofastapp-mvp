@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import api from '@/lib/api';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -32,12 +33,39 @@ export default function SignupPage() {
       const result = await signInWithPopup(auth, provider);
       console.log('✅ SIGNUP: Google sign-in successful');
 
-      const token = await result.user.getIdToken();
-      console.log('✅ SIGNUP: Got Firebase token');
+      // Get Firebase ID token for backend verification
+      const firebaseToken = await result.user.getIdToken();
+      console.log('🔐 SIGNUP: Firebase token obtained');
 
-      // NO backend calls here - that happens in /athlete-welcome
-      console.log('✅ SIGNUP: Redirecting to athlete-welcome');
-      router.replace('/athlete-welcome');
+      // Store Firebase token for API calls (Axios interceptor will use it)
+      localStorage.setItem('firebaseToken', firebaseToken);
+
+      // Call backend create athlete - empty body, token auto-injected
+      console.log('🌐 SIGNUP: Calling backend API: /athlete/create');
+      const res = await api.post('/athlete/create', {});
+      
+      console.log('✅ SIGNUP: Backend API response:', res.data);
+      
+      const athlete = res.data;
+
+      // CRITICAL: Validate backend response
+      if (!athlete || !athlete.success) {
+        throw new Error(`Backend API failed: ${athlete?.message || 'Invalid response'}`);
+      }
+
+      // Store auth data
+      localStorage.setItem('firebaseId', result.user.uid);
+      localStorage.setItem('athleteId', athlete.athleteId);
+      localStorage.setItem('email', athlete.data?.email || result.user.email || '');
+
+      // Route based on profile completion (check gofastHandle - key indicator)
+      if (athlete.data?.gofastHandle) {
+        console.log('✅ SIGNUP: Existing athlete with profile → Athlete Home');
+        router.replace('/athlete-home');
+      } else {
+        console.log('✅ SIGNUP: New athlete or incomplete profile → Profile setup');
+        router.replace('/athlete-create-profile');
+      }
     } catch (err: any) {
       console.error('❌ SIGNUP: Google signup error:', err);
       setError(err.message || 'Signup error');
@@ -73,12 +101,39 @@ export default function SignupPage() {
       }
       console.log('✅ SIGNUP: Email signup successful');
 
-      const token = await user.getIdToken();
-      console.log('✅ SIGNUP: Got Firebase token');
+      // Get Firebase ID token for backend verification
+      const firebaseToken = await user.getIdToken();
+      console.log('🔐 SIGNUP: Firebase token obtained');
 
-      // NO backend calls here - that happens in /athlete-welcome
-      console.log('✅ SIGNUP: Redirecting to athlete-welcome');
-      router.replace('/athlete-welcome');
+      // Store Firebase token for API calls
+      localStorage.setItem('firebaseToken', firebaseToken);
+
+      // Call backend create athlete - empty body, token auto-injected
+      console.log('🌐 SIGNUP: Calling backend API: /athlete/create');
+      const res = await api.post('/athlete/create', {});
+      
+      console.log('✅ SIGNUP: Backend API response:', res.data);
+      
+      const athlete = res.data;
+
+      // CRITICAL: Validate backend response
+      if (!athlete || !athlete.success) {
+        throw new Error(`Backend API failed: ${athlete?.message || 'Invalid response'}`);
+      }
+
+      // Store auth data
+      localStorage.setItem('firebaseId', user.uid);
+      localStorage.setItem('athleteId', athlete.athleteId);
+      localStorage.setItem('email', athlete.data?.email || user.email || '');
+
+      // Route based on profile completion (check gofastHandle - key indicator)
+      if (athlete.data?.gofastHandle) {
+        console.log('✅ SIGNUP: Existing athlete with profile → Athlete Home');
+        router.replace('/athlete-home');
+      } else {
+        console.log('✅ SIGNUP: New athlete or incomplete profile → Profile setup');
+        router.replace('/athlete-create-profile');
+      }
     } catch (err: any) {
       console.error('❌ SIGNUP: Email signup error:', err);
       if (err.code === 'auth/email-already-in-use') {
@@ -106,12 +161,39 @@ export default function SignupPage() {
         throw new Error('No user after sign-in');
       }
 
-      const token = await user.getIdToken();
-      console.log('✅ SIGNIN: Got Firebase token');
+      // Get Firebase ID token for backend verification
+      const firebaseToken = await user.getIdToken();
+      console.log('🔐 SIGNIN: Firebase token obtained');
 
-      // NO backend calls here - that happens in /athlete-welcome
-      console.log('✅ SIGNIN: Redirecting to athlete-welcome');
-      router.replace('/athlete-welcome');
+      // Store Firebase token for API calls
+      localStorage.setItem('firebaseToken', firebaseToken);
+
+      // Call backend create athlete - empty body, token auto-injected
+      console.log('🌐 SIGNIN: Calling backend API: /athlete/create');
+      const res = await api.post('/athlete/create', {});
+      
+      console.log('✅ SIGNIN: Backend API response:', res.data);
+      
+      const athlete = res.data;
+
+      // CRITICAL: Validate backend response
+      if (!athlete || !athlete.success) {
+        throw new Error(`Backend API failed: ${athlete?.message || 'Invalid response'}`);
+      }
+
+      // Store auth data
+      localStorage.setItem('firebaseId', user.uid);
+      localStorage.setItem('athleteId', athlete.athleteId);
+      localStorage.setItem('email', athlete.data?.email || user.email || '');
+
+      // Route based on profile completion (check gofastHandle - key indicator)
+      if (athlete.data?.gofastHandle) {
+        console.log('✅ SIGNIN: Existing athlete with profile → Athlete Welcome');
+        router.replace('/athlete-welcome');
+      } else {
+        console.log('✅ SIGNIN: New athlete or incomplete profile → Profile setup');
+        router.replace('/athlete-create-profile');
+      }
     } catch (err: any) {
       console.error('❌ SIGNIN: Email sign-in error:', err);
       setError(err.message || 'Failed to sign in. Please check your credentials.');

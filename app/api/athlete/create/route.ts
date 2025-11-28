@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
+import { GOFAST_COMPANY_ID } from '@/lib/goFastCompanyConfig';
 
 export async function POST(request: Request) {
   try {
@@ -25,30 +26,64 @@ export async function POST(request: Request) {
 
     const firebaseId = decodedToken.uid;
     const email = decodedToken.email || undefined;
+    const displayName = decodedToken.name || undefined;
+    const picture = decodedToken.picture || undefined;
 
-    // Fetch the company (slug: "gofast")
-    const company = await prisma.goFastCompany.findUnique({
-      where: { slug: 'gofast' },
-    });
+    // Parse displayName into firstName/lastName if available
+    const firstName = displayName?.split(' ')[0] || null;
+    const lastName = displayName?.split(' ').slice(1).join(' ') || null;
 
-    if (!company) {
-      return NextResponse.json({ success: false, error: 'Company not found' }, { status: 500 });
-    }
-
-    // Upsert the athlete with companyId attached
+    // Upsert athlete with companyId - ALWAYS ensure companyId is set
     const athlete = await prisma.athlete.upsert({
       where: { firebaseId },
-      update: {},
+      update: {
+        // Sync Firebase data on update
+        email: email || undefined,
+        firstName: firstName || undefined,
+        lastName: lastName || undefined,
+        photoURL: picture || undefined,
+        companyId: GOFAST_COMPANY_ID, // Ensure assignment even on existing users
+      },
       create: {
         firebaseId,
-        email: email ?? undefined,
-        companyId: company.id,
+        email: email || undefined,
+        firstName: firstName || undefined,
+        lastName: lastName || undefined,
+        photoURL: picture || undefined,
+        companyId: GOFAST_COMPANY_ID,
       },
     });
 
-    return NextResponse.json({ success: true, athlete });
+    // Format response like MVP1
+    return NextResponse.json({
+      success: true,
+      message: 'Athlete found or created',
+      athleteId: athlete.id,
+      data: {
+        id: athlete.id,
+        firebaseId: athlete.firebaseId,
+        email: athlete.email,
+        firstName: athlete.firstName,
+        lastName: athlete.lastName,
+        gofastHandle: athlete.gofastHandle,
+        birthday: athlete.birthday,
+        gender: athlete.gender,
+        city: athlete.city,
+        state: athlete.state,
+        primarySport: athlete.primarySport,
+        photoURL: athlete.photoURL,
+        bio: athlete.bio,
+        instagram: athlete.instagram,
+        createdAt: athlete.createdAt,
+        updatedAt: athlete.updatedAt,
+      },
+    });
   } catch (err: any) {
     console.error('❌ ATHLETE CREATE: Error:', err);
-    return NextResponse.json({ success: false, error: 'Server error', details: err?.message }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Server error', 
+      details: err?.message 
+    }, { status: 500 });
   }
 }

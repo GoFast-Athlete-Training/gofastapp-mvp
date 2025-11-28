@@ -88,17 +88,15 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
-    // Extract data safely
+    // Extract athlete data (already formatted by domain function)
     const athleteData = hydrated.athlete || {};
-    const weeklyActivities = athleteData.weeklyActivities || [];
-    const weeklyTotals = athleteData.weeklyTotals || null;
 
-    // Return success response
+    // Return success response matching MVP1 structure
     return NextResponse.json({ 
       success: true,
+      message: 'Athlete hydrated successfully',
       athlete: athleteData,
-      weeklyActivities,
-      weeklyTotals
+      timestamp: new Date().toISOString()
     });
 
   } catch (err: any) {

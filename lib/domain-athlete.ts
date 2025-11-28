@@ -100,18 +100,55 @@ export async function hydrateAthlete(athleteId: string) {
     };
   });
 
-  // Structure response to match gofastfrontend expectations
-  // athlete object should contain runCrews, weeklyActivities, weeklyTotals
-  return {
-    athlete: {
-      ...athlete,
-      runCrews: crews, // Map crews to runCrews for frontend compatibility
-      weeklyActivities: athlete.activities,
-      weeklyTotals,
+  // Format athlete data for frontend consumption (matching MVP1 backend structure)
+  const hydratedAthlete = {
+    athleteId: athlete.id, // MVP1 uses athleteId as central identifier
+    id: athlete.id,
+    firebaseId: athlete.firebaseId,
+    email: athlete.email,
+    firstName: athlete.firstName,
+    lastName: athlete.lastName,
+    gofastHandle: athlete.gofastHandle,
+    birthday: athlete.birthday,
+    gender: athlete.gender,
+    city: athlete.city,
+    state: athlete.state,
+    primarySport: athlete.primarySport,
+    photoURL: athlete.photoURL,
+    bio: athlete.bio,
+    instagram: athlete.instagram,
+    companyId: athlete.companyId,
+    createdAt: athlete.createdAt,
+    updatedAt: athlete.updatedAt,
+    
+    // RunCrew Memberships (hydrated)
+    runCrews: crews,
+    runCrewCount: crews.length,
+    runCrewManagers: athlete.runCrewManagers || [],
+    
+    // Weekly Activities (last 7 days)
+    weeklyActivities: athlete.activities || [],
+    weeklyActivityCount: athlete.activities.length,
+    weeklyTotals: {
+      totalDistance: weeklyTotals.distance,
+      totalDistanceMiles: (weeklyTotals.distance / 1609.34).toFixed(2), // Convert meters to miles
+      totalDuration: weeklyTotals.duration,
+      totalCalories: athlete.activities.reduce((sum, a) => sum + (a.calories ?? 0), 0),
+      activityCount: weeklyTotals.activities,
     },
-    crews, // Also return separately for backward compatibility
-    weeklyActivities: athlete.activities,
-    weeklyTotals,
+    
+    // Computed fields
+    fullName: athlete.firstName && athlete.lastName 
+      ? `${athlete.firstName} ${athlete.lastName}` 
+      : 'No Name Set',
+    profileComplete: !!(athlete.firstName && athlete.lastName),
+    hasLocation: !!(athlete.city && athlete.state),
+    hasSport: !!athlete.primarySport,
+    hasBio: !!athlete.bio,
+  };
+
+  return {
+    athlete: hydratedAthlete,
   };
 }
 
