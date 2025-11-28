@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import api from '@/lib/api';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -36,19 +35,7 @@ export default function SignupPage() {
       const token = await result.user.getIdToken();
       console.log('✅ SIGNUP: Got Firebase token');
 
-      // Backend setup (company + athlete)
-      console.log('🚀 SIGNUP: Initializing company...');
-      await api.post('/company/init', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      console.log('✅ SIGNUP: Company initialized');
-
-      console.log('🚀 SIGNUP: Creating/finding athlete...');
-      await api.post('/athlete/create', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      console.log('✅ SIGNUP: Athlete created/found');
-
+      // NO backend calls here - that happens in /athlete-welcome
       console.log('✅ SIGNUP: Redirecting to athlete-welcome');
       router.replace('/athlete-welcome');
     } catch (err: any) {
@@ -89,23 +76,7 @@ export default function SignupPage() {
       const token = await user.getIdToken();
       console.log('✅ SIGNUP: Got Firebase token');
 
-      // Backend setup (company + athlete)
-      console.log('🚀 SIGNUP: Initializing company...');
-      await api.post('/company/init', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      console.log('✅ SIGNUP: Company initialized');
-
-      console.log('🚀 SIGNUP: Creating/finding athlete...');
-      await api.post('/athlete/create', {
-        email: emailData.email,
-        firstName: emailData.firstName,
-        lastName: emailData.lastName,
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      console.log('✅ SIGNUP: Athlete created/found');
-
+      // NO backend calls here - that happens in /athlete-welcome
       console.log('✅ SIGNUP: Redirecting to athlete-welcome');
       router.replace('/athlete-welcome');
     } catch (err: any) {
@@ -138,19 +109,7 @@ export default function SignupPage() {
       const token = await user.getIdToken();
       console.log('✅ SIGNIN: Got Firebase token');
 
-      // Backend setup (company + athlete)
-      console.log('🚀 SIGNIN: Initializing company...');
-      await api.post('/company/init', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      console.log('✅ SIGNIN: Company initialized');
-
-      console.log('🚀 SIGNIN: Creating/finding athlete...');
-      await api.post('/athlete/create', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      console.log('✅ SIGNIN: Athlete created/found');
-
+      // NO backend calls here - that happens in /athlete-welcome
       console.log('✅ SIGNIN: Redirecting to athlete-welcome');
       router.replace('/athlete-welcome');
     } catch (err: any) {
@@ -340,4 +299,3 @@ export default function SignupPage() {
     </div>
   );
 }
-

@@ -12,10 +12,10 @@ export default function RootPage() {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        router.replace('/athlete-welcome');
-      } else {
+      if (user === null) {
         router.replace('/signup');
+      } else {
+        router.replace('/athlete-welcome');
       }
     });
 
