@@ -8,6 +8,7 @@ import Image from 'next/image';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { signInWithGoogle, signUpWithEmail, signInWithEmail } from '@/lib/auth';
+import api from '@/lib/api';
 
 export default function HomePage() {
   const router = useRouter();
@@ -41,7 +42,27 @@ export default function HomePage() {
           try {
             const token = await user.getIdToken();
             // If token retrieval succeeds, user is valid for current project
-            console.log('✅ Root: Valid Firebase user detected, redirecting to welcome');
+            console.log('✅ Root: Valid Firebase user detected');
+            
+            // Initialize company and create athlete BEFORE redirecting
+            try {
+              console.log('🚀 Root: Initializing company...');
+              await api.post('/company/init', {}, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              console.log('✅ Root: Company initialized');
+              
+              console.log('🚀 Root: Creating/finding athlete...');
+              await api.post('/athlete/create', {}, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              console.log('✅ Root: Athlete created/found');
+            } catch (initError: any) {
+              console.error('❌ Root: Error initializing company/athlete:', initError);
+              // Continue anyway - hydration will handle 404
+            }
+            
+            console.log('✅ Root: Redirecting to welcome');
             router.push('/athlete-welcome');
           } catch (error: any) {
             // Token invalid (likely from old Firebase project) - clear everything

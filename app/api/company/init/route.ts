@@ -6,11 +6,6 @@ import { prisma } from '@/lib/prisma';
 
 export async function POST(request: Request) {
   try {
-    let body: any = {};
-    try {
-      body = await request.json();
-    } catch {}
-
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
@@ -28,32 +23,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 });
     }
 
-    const firebaseId = decodedToken.uid;
-    const email = decodedToken.email || undefined;
-
-    // Fetch the company (slug: "gofast")
-    const company = await prisma.goFastCompany.findUnique({
+    // One-time UPSERT - Guarantee GoFastCompany exists
+    const company = await prisma.goFastCompany.upsert({
       where: { slug: 'gofast' },
-    });
-
-    if (!company) {
-      return NextResponse.json({ success: false, error: 'Company not found' }, { status: 500 });
-    }
-
-    // Upsert the athlete with companyId attached
-    const athlete = await prisma.athlete.upsert({
-      where: { firebaseId },
       update: {},
       create: {
-        firebaseId,
-        email: email ?? undefined,
-        companyId: company.id,
+        name: 'GoFast',
+        slug: 'gofast',
+        address: '2604 N. George Mason Dr.',
+        city: 'Arlington',
+        state: 'VA',
+        zip: '22207',
+        domain: 'gofastcrushgoals.com',
       },
     });
 
-    return NextResponse.json({ success: true, athlete });
+    return NextResponse.json({ success: true, company });
   } catch (err: any) {
-    console.error('❌ ATHLETE CREATE: Error:', err);
+    console.error('❌ COMPANY INIT: Error:', err);
     return NextResponse.json({ success: false, error: 'Server error', details: err?.message }, { status: 500 });
   }
 }
+

@@ -20,11 +20,11 @@ model Athlete {
 
   // Auth
   firebaseId   String   @unique
-  email        String   @unique
+  email        String?
 
   // Company Link (Single-tenant)
-  goFastCompanyId String?
-  goFastCompany   GoFastCompany? @relation(fields: [goFastCompanyId], references: [id])
+  companyId    String
+  company      GoFastCompany @relation(fields: [companyId], references: [id])
 
   // Universal profile
   firstName    String?
@@ -454,23 +454,16 @@ model TrainingDayExecuted {
 //////////////////////////////////////////////////////////
 
 model GoFastCompany {
-  id          String   @id // Custom ID: "GoFast" (single-tenant)
+  id           String      @id @default(cuid())
+  name         String
+  slug         String      @unique
+  address      String?
+  city         String?
+  state        String?
+  zip          String?
+  domain       String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
-  // Company Details
-  companyName String   // "GoFast"
-  address     String?  // "2604 N. George Mason Dr."
-  city        String?  // "Arlington"
-  state       String?  // "VA"
-  zipCode     String?  // "22207"
-  website     String?
-  description String?  // "Training and fitness social app"
-
-  // Relations
-  athletes    Athlete[]
-
-  // System
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("gofast_company")
+  athletes     Athlete[]
 }

@@ -14,9 +14,10 @@ export async function getAthleteByFirebaseId(firebaseId: string) {
 
 export async function createAthlete(data: {
   firebaseId: string;
-  email: string;
+  email?: string;
   firstName?: string;
   lastName?: string;
+  companyId: string;
 }) {
   return prisma.athlete.create({
     data,

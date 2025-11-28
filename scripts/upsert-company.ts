@@ -1,29 +1,20 @@
 import { prisma } from '../lib/prisma';
 
-const GOFAST_COMPANY_ID = 'GoFast';
-
 async function upsertGoFastCompany() {
   try {
     console.log('🚀 Upserting GoFast Company...');
 
     const company = await prisma.goFastCompany.upsert({
-      where: { id: GOFAST_COMPANY_ID },
-      update: {
-        companyName: 'GoFast',
-        description: 'Training and fitness social app',
-        address: '2604 N. George Mason Dr.',
-        city: 'Arlington',
-        state: 'VA',
-        zipCode: '22207',
-      },
+      where: { slug: 'gofast' },
+      update: {},
       create: {
-        id: GOFAST_COMPANY_ID,
-        companyName: 'GoFast',
-        description: 'Training and fitness social app',
+        name: 'GoFast',
+        slug: 'gofast',
         address: '2604 N. George Mason Dr.',
         city: 'Arlington',
         state: 'VA',
-        zipCode: '22207',
+        zip: '22207',
+        domain: 'gofastcrushgoals.com',
       },
     });
 
