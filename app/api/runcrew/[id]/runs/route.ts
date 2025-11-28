@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyFirebaseIdToken } from '@/lib/firebaseAdmin';
 import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
@@ -8,6 +10,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    if (!params?.id) {
+      return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+    }
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -39,6 +44,9 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    if (!params?.id) {
+      return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+    }
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

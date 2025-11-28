@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyFirebaseIdToken } from '@/lib/firebaseAdmin';
 import { getAthleteByFirebaseId, hydrateAthlete } from '@/lib/domain-athlete';
