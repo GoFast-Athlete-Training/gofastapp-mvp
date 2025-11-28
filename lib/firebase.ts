@@ -4,16 +4,43 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getAnalytics } from 'firebase/analytics';
 
-// Your web app's Firebase configuration
-// Using the same config as gofastfrontend-mvp1 (gofast-a5f94 project)
+// Firebase configuration - ONLY from environment variables
+// NO hardcoded fallbacks, NO defaults, NO old values
+// This will fail at runtime if env vars are not set (as intended)
+
+function validateFirebaseEnv() {
+  const required = [
+    'NEXT_PUBLIC_FIREBASE_API_KEY',
+    'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+    'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+    'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
+    'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
+    'NEXT_PUBLIC_FIREBASE_APP_ID',
+  ];
+
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0 && typeof window !== 'undefined') {
+    console.error('❌ FIREBASE: Missing required environment variables:');
+    missing.forEach(key => console.error(`   - ${key}`));
+    console.error('   Please set these in your .env.local file and Vercel environment variables');
+    throw new Error(`Missing Firebase environment variables: ${missing.join(', ')}`);
+  }
+}
+
+// Only validate in browser (not during build)
+if (typeof window !== 'undefined') {
+  validateFirebaseEnv();
+}
+
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCjpoH763y2GH4VDc181IUBaZHqE_ryZ1c",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "gofast-a5f94.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "gofast-a5f94",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "gofast-a5f94.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "500941094498",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:500941094498:web:4008d94b89a9e3a4889b3b",
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-CQ0GJCJLXX",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 // Initialize Firebase
