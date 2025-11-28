@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { getAdminAuth } from '@/lib/firebaseAdmin';
+import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(request: Request) {
@@ -11,21 +11,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const adminAuth = getAdminAuth();
-    if (!adminAuth) {
-      return NextResponse.json({ success: false, error: 'Auth unavailable' }, { status: 500 });
+    let decodedToken;
+    try {
+      decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
+      console.log('✅ COMPANY INIT: Token verified for UID:', decodedToken.uid);
+    } catch (err: any) {
+      console.error('❌ COMPANY INIT: Token verification failed:', err?.message);
+      return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 });
     }
-
-        let decodedToken;
-        try {
-          decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-          console.log('✅ COMPANY INIT: Token verified for UID:', decodedToken.uid);
-          console.log('✅ COMPANY INIT: Token project:', decodedToken.firebase?.project_id || 'unknown');
-        } catch (err: any) {
-          console.error('❌ COMPANY INIT: Token verification failed:', err?.message);
-          console.error('❌ COMPANY INIT: Error code:', err?.code);
-          return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 });
-        }
 
     // One-time UPSERT - Guarantee GoFastCompany exists
     const company = await prisma.goFastCompany.upsert({

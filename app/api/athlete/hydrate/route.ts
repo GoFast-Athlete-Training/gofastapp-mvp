@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { getAdminAuth } from '@/lib/firebaseAdmin';
+import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteByFirebaseId, hydrateAthlete } from '@/lib/domain-athlete';
 
 export async function POST(request: Request) {
@@ -24,16 +24,6 @@ export async function POST(request: Request) {
         success: false, 
         error: 'Unauthorized' 
       }, { status: 401 });
-    }
-
-    // Initialize Firebase Admin
-    const adminAuth = getAdminAuth();
-    if (!adminAuth) {
-      console.error(`❌ HYDRATE [${timestamp}]: Firebase Admin unavailable`);
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Auth unavailable' 
-      }, { status: 500 });
     }
 
     // Verify token

@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { getAdminAuth } from '@/lib/firebaseAdmin';
+import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(request: Request) {
@@ -14,11 +14,6 @@ export async function POST(request: Request) {
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const adminAuth = getAdminAuth();
-    if (!adminAuth) {
-      return NextResponse.json({ success: false, error: 'Auth unavailable' }, { status: 500 });
     }
 
     let decodedToken;

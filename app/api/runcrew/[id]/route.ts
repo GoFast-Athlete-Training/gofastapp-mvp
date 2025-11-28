@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { getAdminAuth } from '@/lib/firebaseAdmin';
+import { adminAuth } from '@/lib/firebaseAdmin';
 import { getCrewById } from '@/lib/domain-runcrew';
 
 export async function GET(
@@ -16,11 +16,6 @@ export async function GET(
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const adminAuth = getAdminAuth();
-    if (!adminAuth) {
-      return NextResponse.json({ error: 'Auth unavailable' }, { status: 500 });
     }
 
     let decodedToken;

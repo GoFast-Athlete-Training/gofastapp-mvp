@@ -1,37 +1,6 @@
-'use client';
-
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getAnalytics } from 'firebase/analytics';
-
-// Firebase configuration - ONLY from environment variables
-// NO hardcoded fallbacks, NO defaults, NO old values
-// This will fail at runtime if env vars are not set (as intended)
-
-function validateFirebaseEnv() {
-  const required = [
-    'NEXT_PUBLIC_FIREBASE_API_KEY',
-    'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
-    'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
-    'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
-    'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
-    'NEXT_PUBLIC_FIREBASE_APP_ID',
-  ];
-
-  const missing = required.filter(key => !process.env[key]);
-  
-  if (missing.length > 0 && typeof window !== 'undefined') {
-    console.error('❌ FIREBASE: Missing required environment variables:');
-    missing.forEach(key => console.error(`   - ${key}`));
-    console.error('   Please set these in your .env.local file and Vercel environment variables');
-    throw new Error(`Missing Firebase environment variables: ${missing.join(', ')}`);
-  }
-}
-
-// Only validate in browser (not during build)
-if (typeof window !== 'undefined') {
-  validateFirebaseEnv();
-}
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAnalytics, isSupported } from "firebase/analytics";
+import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
@@ -40,17 +9,19 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID!,
 };
 
-// Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+
 export const auth = getAuth(app);
 
-// Initialize Analytics (only in browser)
-if (typeof window !== 'undefined') {
-  getAnalytics(app);
+// Initialize Analytics (only in browser, async)
+let analytics: ReturnType<typeof getAnalytics> | null = null;
+if (typeof window !== "undefined") {
+  isSupported().then((yes) => {
+    if (yes) {
+      analytics = getAnalytics(app);
+    }
+  });
 }
-
-export default app;
-
