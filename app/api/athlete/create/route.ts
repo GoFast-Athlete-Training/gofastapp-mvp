@@ -1,15 +1,27 @@
+// ⛔ Prevent static evaluation (this is 100% required)
 export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 import { getAdminAuth } from '@/lib/firebaseAdmin';
-import { createAthlete, getAthleteByFirebaseId } from '@/lib/domain-athlete';
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    // 2️⃣ Get admin auth (may be null during build)
+    // 1️⃣ Read body safely
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON body' },
+        { status: 400 }
+      );
+    }
+
+    // 2️⃣ Safe server auth guard
     const adminAuth = getAdminAuth();
     if (!adminAuth) {
-      console.warn('⚠️ Firebase admin not initialized. Skipping auth.');
+      console.warn('⚠️ Firebase Admin not initialized – create route unavailable.');
       return NextResponse.json(
         { error: 'Auth unavailable' },
         { status: 500 }
@@ -31,33 +43,26 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       console.error('❌ Token verification failed:', err);
       return NextResponse.json(
-        { error: 'Invalid token' },
+        { error: 'Invalid or expired token' },
         { status: 401 }
       );
     }
 
     const firebaseId = decoded.uid;
 
-    const body = await request.json();
-    const { email, firstName, lastName } = body;
-
-    // Check if athlete already exists
-    const existing = await getAthleteByFirebaseId(firebaseId);
-    if (existing) {
-      return NextResponse.json({ success: true, athlete: existing });
-    }
-
-    // Create new athlete
-    const athlete = await createAthlete({
-      firebaseId,
-      email,
-      firstName,
-      lastName,
+    // 5️⃣ Create Athlete in DB
+    const athlete = await prisma.athlete.create({
+      data: {
+        firebaseId,
+        email: body.email,
+        firstName: body.firstName,
+        lastName: body.lastName,
+      },
     });
 
-    return NextResponse.json({ success: true, athlete });
+    return NextResponse.json({ athlete });
   } catch (err: any) {
-    console.error('❌ API ERROR:', err);
+    console.error('❌ Athlete CREATE error:', err);
     return NextResponse.json(
       { error: 'Server error', detail: err.message },
       { status: 500 }
