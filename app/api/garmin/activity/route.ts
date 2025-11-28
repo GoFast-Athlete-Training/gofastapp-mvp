@@ -3,22 +3,24 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-// This is a webhook endpoint for Garmin to send activity data
 export async function POST(request: Request) {
   try {
-    let body = {};
+    let body: any = {};
     try {
       body = await request.json();
     } catch {}
 
-    // Process Garmin webhook data
-    // This is a simplified version - you'll need to implement full webhook handling
-    const { activityId, userId, activityData } = body as any;
+    const { activityId, userId, activityData } = body;
 
-    // Find athlete by Garmin user ID
-    const athlete = await prisma.athlete.findUnique({
-      where: { garmin_user_id: userId },
-    });
+    let athlete;
+    try {
+      athlete = await prisma.athlete.findUnique({
+        where: { garmin_user_id: userId },
+      });
+    } catch (err) {
+      console.error('Prisma error:', err);
+      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    }
 
     if (!athlete) {
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });

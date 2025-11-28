@@ -20,7 +20,6 @@ export async function GET(
 
     const adminAuth = getAdminAuth();
     if (!adminAuth) {
-      console.warn('Firebase Admin not initialized');
       return NextResponse.json({ error: 'Auth unavailable' }, { status: 500 });
     }
 
@@ -31,7 +30,14 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const crew = await getCrewById(params.id);
+    let crew;
+    try {
+      crew = await getCrewById(params.id);
+    } catch (err) {
+      console.error('Prisma error:', err);
+      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    }
+
     if (!crew) {
       return NextResponse.json({ error: 'Crew not found' }, { status: 404 });
     }

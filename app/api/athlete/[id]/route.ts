@@ -20,7 +20,6 @@ export async function GET(
 
     const adminAuth = getAdminAuth();
     if (!adminAuth) {
-      console.warn('Firebase Admin not initialized');
       return NextResponse.json({ error: 'Auth unavailable' }, { status: 500 });
     }
 
@@ -31,7 +30,14 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const athlete = await getAthleteById(params.id);
+    let athlete;
+    try {
+      athlete = await getAthleteById(params.id);
+    } catch (err) {
+      console.error('Prisma error:', err);
+      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    }
+
     if (!athlete) {
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
@@ -51,7 +57,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Missing athlete id' }, { status: 400 });
     }
 
-    let body = {};
+    let body: any = {};
     try {
       body = await request.json();
     } catch {}
@@ -63,7 +69,6 @@ export async function PUT(
 
     const adminAuth = getAdminAuth();
     if (!adminAuth) {
-      console.warn('Firebase Admin not initialized');
       return NextResponse.json({ error: 'Auth unavailable' }, { status: 500 });
     }
 
@@ -74,13 +79,25 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Verify athlete owns this profile
-    const athlete = await getAthleteById(params.id);
+    let athlete;
+    try {
+      athlete = await getAthleteById(params.id);
+    } catch (err) {
+      console.error('Prisma error:', err);
+      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    }
+
     if (!athlete || athlete.firebaseId !== decodedToken.uid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const updated = await updateAthlete(params.id, body);
+    let updated;
+    try {
+      updated = await updateAthlete(params.id, body);
+    } catch (err) {
+      console.error('Prisma error:', err);
+      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true, athlete: updated });
   } catch (err) {

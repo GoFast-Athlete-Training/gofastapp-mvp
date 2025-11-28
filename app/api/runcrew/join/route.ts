@@ -7,7 +7,7 @@ import { joinCrew } from '@/lib/domain-runcrew';
 
 export async function POST(request: Request) {
   try {
-    let body = {};
+    let body: any = {};
     try {
       body = await request.json();
     } catch {}
@@ -19,7 +19,6 @@ export async function POST(request: Request) {
 
     const adminAuth = getAdminAuth();
     if (!adminAuth) {
-      console.warn('Firebase Admin not initialized');
       return NextResponse.json({ error: 'Auth unavailable' }, { status: 500 });
     }
 
@@ -32,13 +31,19 @@ export async function POST(request: Request) {
 
     const firebaseId = decodedToken.uid;
 
-    // Find athlete
-    const athlete = await getAthleteByFirebaseId(firebaseId);
+    let athlete;
+    try {
+      athlete = await getAthleteByFirebaseId(firebaseId);
+    } catch (err) {
+      console.error('Prisma error:', err);
+      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    }
+
     if (!athlete) {
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
 
-    const { joinCode } = body as any;
+    const { joinCode } = body;
 
     if (!joinCode) {
       return NextResponse.json(
@@ -47,7 +52,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const crew = await joinCrew(joinCode, athlete.id);
+    let crew;
+    try {
+      crew = await joinCrew(joinCode, athlete.id);
+    } catch (err) {
+      console.error('Prisma error:', err);
+      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true, runCrew: crew });
   } catch (err) {

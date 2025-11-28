@@ -21,7 +21,6 @@ export async function GET(
 
     const adminAuth = getAdminAuth();
     if (!adminAuth) {
-      console.warn('Firebase Admin not initialized');
       return NextResponse.json({ error: 'Auth unavailable' }, { status: 500 });
     }
 
@@ -32,7 +31,14 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const crew = await hydrateCrew(params.id);
+    let crew;
+    try {
+      crew = await hydrateCrew(params.id);
+    } catch (err) {
+      console.error('Prisma error:', err);
+      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    }
+
     if (!crew) {
       return NextResponse.json({ error: 'Crew not found' }, { status: 404 });
     }
@@ -52,7 +58,7 @@ export async function POST(
       return NextResponse.json({ error: 'Missing crew id' }, { status: 400 });
     }
 
-    let body = {};
+    let body: any = {};
     try {
       body = await request.json();
     } catch {}
@@ -64,7 +70,6 @@ export async function POST(
 
     const adminAuth = getAdminAuth();
     if (!adminAuth) {
-      console.warn('Firebase Admin not initialized');
       return NextResponse.json({ error: 'Auth unavailable' }, { status: 500 });
     }
 
@@ -77,14 +82,26 @@ export async function POST(
 
     const firebaseId = decodedToken.uid;
 
-    // Find athlete
-    const athlete = await getAthleteByFirebaseId(firebaseId);
+    let athlete;
+    try {
+      athlete = await getAthleteByFirebaseId(firebaseId);
+    } catch (err) {
+      console.error('Prisma error:', err);
+      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    }
+
     if (!athlete) {
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
 
-    // Verify athlete is admin/manager
-    const crew = await hydrateCrew(params.id, athlete.id);
+    let crew;
+    try {
+      crew = await hydrateCrew(params.id, athlete.id);
+    } catch (err) {
+      console.error('Prisma error:', err);
+      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    }
+
     if (!crew) {
       return NextResponse.json({ error: 'Crew not found' }, { status: 404 });
     }
@@ -93,7 +110,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const { title, content } = body as any;
+    const { title, content } = body;
 
     if (!title || !content) {
       return NextResponse.json(
@@ -102,12 +119,18 @@ export async function POST(
       );
     }
 
-    const announcement = await postAnnouncement({
-      runCrewId: params.id,
-      authorId: athlete.id,
-      title,
-      content,
-    });
+    let announcement;
+    try {
+      announcement = await postAnnouncement({
+        runCrewId: params.id,
+        authorId: athlete.id,
+        title,
+        content,
+      });
+    } catch (err) {
+      console.error('Prisma error:', err);
+      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true, announcement });
   } catch (err) {

@@ -21,7 +21,6 @@ export async function GET(
 
     const adminAuth = getAdminAuth();
     if (!adminAuth) {
-      console.warn('Firebase Admin not initialized');
       return NextResponse.json({ error: 'Auth unavailable' }, { status: 500 });
     }
 
@@ -32,7 +31,14 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const crew = await hydrateCrew(params.id);
+    let crew;
+    try {
+      crew = await hydrateCrew(params.id);
+    } catch (err) {
+      console.error('Prisma error:', err);
+      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    }
+
     if (!crew) {
       return NextResponse.json({ error: 'Crew not found' }, { status: 404 });
     }
@@ -52,7 +58,7 @@ export async function POST(
       return NextResponse.json({ error: 'Missing crew id' }, { status: 400 });
     }
 
-    let body = {};
+    let body: any = {};
     try {
       body = await request.json();
     } catch {}
@@ -64,7 +70,6 @@ export async function POST(
 
     const adminAuth = getAdminAuth();
     if (!adminAuth) {
-      console.warn('Firebase Admin not initialized');
       return NextResponse.json({ error: 'Auth unavailable' }, { status: 500 });
     }
 
@@ -77,13 +82,19 @@ export async function POST(
 
     const firebaseId = decodedToken.uid;
 
-    // Find athlete
-    const athlete = await getAthleteByFirebaseId(firebaseId);
+    let athlete;
+    try {
+      athlete = await getAthleteByFirebaseId(firebaseId);
+    } catch (err) {
+      console.error('Prisma error:', err);
+      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    }
+
     if (!athlete) {
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
 
-    const { content } = body as any;
+    const { content } = body;
 
     if (!content) {
       return NextResponse.json(
@@ -92,11 +103,17 @@ export async function POST(
       );
     }
 
-    const message = await postMessage({
-      runCrewId: params.id,
-      athleteId: athlete.id,
-      content,
-    });
+    let message;
+    try {
+      message = await postMessage({
+        runCrewId: params.id,
+        athleteId: athlete.id,
+        content,
+      });
+    } catch (err) {
+      console.error('Prisma error:', err);
+      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true, message });
   } catch (err) {
