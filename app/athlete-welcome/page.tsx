@@ -69,8 +69,10 @@ export default function AthleteWelcomePage() {
           // Hydration complete - show button for user to click
           console.log('🎯 ATHLETE WELCOME: Hydration complete, ready for user action');
           console.log('✅ ATHLETE WELCOME: ===== HYDRATION SUCCESS =====');
+          console.log('✅ ATHLETE WELCOME: Setting isHydrated=true, isLoading=false');
           setIsHydrated(true);
           setIsLoading(false);
+          console.log('✅ ATHLETE WELCOME: State updated - button should now be visible');
         } else {
           console.error('❌ ATHLETE WELCOME: Hydration failed:', response.data.error || 'Invalid response');
           setError(response.data.error || 'Failed to load athlete data');
@@ -95,8 +97,10 @@ export default function AthleteWelcomePage() {
         // If 404, athlete not found (new user) - show welcome but route to profile on click
         if (err.response?.status === 404) {
           console.log('👤 ATHLETE WELCOME: Athlete not found (404) → new user, will route to profile');
+          console.log('✅ ATHLETE WELCOME: Setting isHydrated=true, isLoading=false for new user');
           setIsHydrated(true);
           setIsLoading(false);
+          console.log('✅ ATHLETE WELCOME: State updated - button should now be visible for new user');
           return;
         }
         
@@ -165,6 +169,13 @@ export default function AthleteWelcomePage() {
             >
               Let's Train! →
             </button>
+          </div>
+        )}
+        
+        {/* Debug info - remove in production */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4 text-xs text-white/60">
+            Debug: isLoading={isLoading.toString()}, isHydrated={isHydrated.toString()}
           </div>
         )}
       </div>
