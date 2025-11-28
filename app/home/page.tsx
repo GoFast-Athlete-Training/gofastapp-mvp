@@ -20,7 +20,7 @@ export default function HomePage() {
     const storedCrews = LocalStorageAPI.getCrews();
 
     if (!storedAthlete) {
-      router.push('/welcome');
+      router.push('/athlete-welcome');
       return;
     }
 

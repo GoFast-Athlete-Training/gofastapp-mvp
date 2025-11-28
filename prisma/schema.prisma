@@ -4,6 +4,7 @@
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -20,6 +21,10 @@ model Athlete {
   // Auth
   firebaseId   String   @unique
   email        String   @unique
+
+  // Company Link (Single-tenant)
+  goFastCompanyId String?
+  goFastCompany   GoFastCompany? @relation(fields: [goFastCompanyId], references: [id])
 
   // Universal profile
   firstName    String?
@@ -442,4 +447,30 @@ model TrainingDayExecuted {
   updatedAt DateTime @updatedAt
 
   @@unique([executionId, date])
+}
+
+//////////////////////////////////////////////////////////
+//  GOFAST COMPANY (SINGLE-TENANT CONTAINER)
+//////////////////////////////////////////////////////////
+
+model GoFastCompany {
+  id          String   @id // Custom ID: "GoFast" (single-tenant)
+
+  // Company Details
+  companyName String   // "GoFast"
+  address     String?  // "2604 N. George Mason Dr."
+  city        String?  // "Arlington"
+  state       String?  // "VA"
+  zipCode     String?  // "22207"
+  website     String?
+  description String?  // "Training and fitness social app"
+
+  // Relations
+  athletes    Athlete[]
+
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("gofast_company")
 }

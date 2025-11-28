@@ -37,7 +37,7 @@ export default function HomePage() {
         setIsLoading(false);
         
         if (user) {
-          router.push('/welcome');
+          router.push('/athlete-welcome');
         }
       });
     }, 1000);
