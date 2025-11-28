@@ -1,11 +1,5 @@
 import { prisma } from './prisma';
 
-// Lightweight type for type safety
-type ManagerLite = {
-  athleteId: string;
-  role: string;
-};
-
 export async function createCrew(data: {
   name: string;
   description?: string;
@@ -175,7 +169,7 @@ export async function hydrateCrew(runCrewId: string, athleteId?: string) {
   let userRole = 'member';
   if (athleteId) {
     const manager = crew.managers.find(
-      (m: ManagerLite) => m.athleteId === athleteId
+      (m) => m.athleteId === athleteId
     );
     userRole = manager?.role || 'member';
   }
