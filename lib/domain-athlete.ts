@@ -2,8 +2,8 @@ import { prisma } from './prisma';
 
 // Lightweight types for type safety
 type ActivityLite = {
-  distance?: number;
-  duration?: number;
+  distance?: number | null;
+  duration?: number | null;
 };
 
 type MembershipLite = {
