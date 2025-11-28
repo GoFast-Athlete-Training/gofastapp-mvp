@@ -39,21 +39,17 @@ export default function AthleteWelcomePage() {
         console.log('📡 ATHLETE WELCOME: Response received:', response.status);
         
         if (response.data.success) {
-          const { athlete } = response.data;
-
-          // Extract weeklyActivities and weeklyTotals from athlete object (backend puts them there)
-          const weeklyActivities = athlete.weeklyActivities || [];
-          const weeklyTotals = athlete.weeklyTotals || null;
+          const { athlete, weeklyActivities, weeklyTotals } = response.data;
 
           console.log('✅ ATHLETE WELCOME: Athlete hydrated successfully');
-          console.log('✅ ATHLETE WELCOME: Athlete ID:', athlete.id);
-          console.log('✅ ATHLETE WELCOME: Email:', athlete.email);
-          console.log('✅ ATHLETE WELCOME: Name:', athlete.firstName, athlete.lastName);
-          console.log('✅ ATHLETE WELCOME: RunCrews count:', athlete.runCrews?.length || 0);
-          console.log('✅ ATHLETE WELCOME: Weekly activities count:', weeklyActivities.length);
+          console.log('✅ ATHLETE WELCOME: Athlete ID:', athlete?.id);
+          console.log('✅ ATHLETE WELCOME: Email:', athlete?.email);
+          console.log('✅ ATHLETE WELCOME: Name:', athlete?.firstName, athlete?.lastName);
+          console.log('✅ ATHLETE WELCOME: RunCrews count:', athlete?.runCrews?.length || 0);
+          console.log('✅ ATHLETE WELCOME: Weekly activities count:', weeklyActivities?.length || 0);
           console.log('✅ ATHLETE WELCOME: Weekly totals:', weeklyTotals);
           
-          if (athlete.runCrews && athlete.runCrews.length > 0) {
+          if (athlete?.runCrews && athlete.runCrews.length > 0) {
             console.log('✅ ATHLETE WELCOME: RunCrews:', athlete.runCrews.map((c: any) => c.name).join(', '));
           }
 
@@ -61,50 +57,43 @@ export default function AthleteWelcomePage() {
           console.log('💾 ATHLETE WELCOME: Caching full hydration model to localStorage...');
           LocalStorageAPI.setFullHydrationModel({
             athlete,
-            weeklyActivities: weeklyActivities,
-            weeklyTotals: weeklyTotals
+            weeklyActivities: weeklyActivities || [],
+            weeklyTotals: weeklyTotals || null
           });
           console.log('✅ ATHLETE WELCOME: Full hydration model cached');
           
           // Hydration complete - show button for user to click
           console.log('🎯 ATHLETE WELCOME: Hydration complete, ready for user action');
           console.log('✅ ATHLETE WELCOME: ===== HYDRATION SUCCESS =====');
-          console.log('✅ ATHLETE WELCOME: Setting isHydrated=true, isLoading=false');
           setIsHydrated(true);
           setIsLoading(false);
-          console.log('✅ ATHLETE WELCOME: State updated - button should now be visible');
         } else {
-          console.error('❌ ATHLETE WELCOME: Hydration failed:', response.data.error || 'Invalid response');
-          setError(response.data.error || 'Failed to load athlete data');
+          // Hydration failed but continue anyway
+          console.warn('⚠️ ATHLETE WELCOME: Hydration returned success: false');
+          console.warn('⚠️ ATHLETE WELCOME: Error:', response.data.error);
+          setError(response.data.error || 'Could not fully load your account');
+          setIsHydrated(true);
           setIsLoading(false);
         }
       } catch (err: any) {
+        // On any error, still allow user to continue
         console.error('❌ ATHLETE WELCOME: ===== HYDRATION ERROR =====');
         console.error('❌ ATHLETE WELCOME: Error message:', err.message);
         console.error('❌ ATHLETE WELCOME: Error status:', err.response?.status);
         console.error('❌ ATHLETE WELCOME: Error data:', err.response?.data);
         
-        setError(err.response?.data?.error || err.message || 'Failed to load athlete data');
-        setIsLoading(false);
-        
-        // If 401, user not authenticated
+        // Only redirect on 401 (unauthorized)
         if (err.response?.status === 401) {
           console.log('🚫 ATHLETE WELCOME: Unauthorized (401) → redirecting to signup');
           router.push('/');
           return;
         }
         
-        // If 404, athlete not found (new user) - show welcome but route to profile on click
-        if (err.response?.status === 404) {
-          console.log('👤 ATHLETE WELCOME: Athlete not found (404) → new user, will route to profile');
-          console.log('✅ ATHLETE WELCOME: Setting isHydrated=true, isLoading=false for new user');
-          setIsHydrated(true);
-          setIsLoading(false);
-          console.log('✅ ATHLETE WELCOME: State updated - button should now be visible for new user');
-          return;
-        }
-        
-        console.error('❌ ATHLETE WELCOME: ===== END ERROR =====');
+        // For all other errors (404, 500, etc.), show soft warning and continue
+        setError(err.response?.data?.error || err.message || 'Could not fully load your account');
+        setIsHydrated(true);
+        setIsLoading(false);
+        console.log('✅ ATHLETE WELCOME: Allowing user to continue despite error');
       }
     });
 
@@ -125,24 +114,6 @@ export default function AthleteWelcomePage() {
     console.log('✅ ATHLETE WELCOME: Profile complete → routing to home');
     router.push('/home');
   };
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center">
-        <div className="text-center bg-white rounded-xl shadow-lg p-8 max-w-md mx-4">
-          <div className="text-6xl mb-4">⚠️</div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Error Loading Account</h1>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <button
-            onClick={() => router.push('/')}
-            className="bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 transition"
-          >
-            Go to Signup
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center">
@@ -169,13 +140,12 @@ export default function AthleteWelcomePage() {
             >
               Let's Train! →
             </button>
-          </div>
-        )}
-        
-        {/* Debug info - remove in production */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mt-4 text-xs text-white/60">
-            Debug: isLoading={isLoading.toString()}, isHydrated={isHydrated.toString()}
+            
+            {error && (
+              <p className="text-white/80 text-sm mt-4">
+                ⚠️ Could not fully load your account — continuing anyway.
+              </p>
+            )}
           </div>
         )}
       </div>
