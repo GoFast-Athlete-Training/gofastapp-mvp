@@ -20,33 +20,47 @@ export default function HomePage() {
     const storedCrews = LocalStorageAPI.getCrews();
 
     if (!storedAthlete) {
+      console.log('❌ HOME: No athlete in localStorage → redirecting to welcome');
       router.push('/athlete-welcome');
       return;
     }
 
+    console.log('✅ HOME: Athlete found in localStorage');
     setAthlete(storedAthlete);
     setCrews(storedCrews || []);
 
-    // If we have crews, hydrate the first one
+    // If we have crews, hydrate the first one (second hydration call)
     if (storedCrews && storedCrews.length > 0) {
       const firstCrew = storedCrews[0];
+      console.log('🚀 HOME: Hydrating primary crew:', firstCrew.id, firstCrew.name);
       hydrateCrew(firstCrew.id);
     } else {
+      console.log('⚠️ HOME: No crews found, skipping crew hydration');
       setLoading(false);
     }
   }, [router]);
 
   const hydrateCrew = async (runCrewId: string) => {
     try {
+      console.log('🚀 HOME: Calling runcrew/hydrate for:', runCrewId);
       const response = await api.post('/runcrew/hydrate', { runCrewId });
+      
+      console.log('📡 HOME: RunCrew hydration response:', response.status);
       
       if (response.data.success) {
         const crew = response.data.runCrew;
+        console.log('✅ HOME: RunCrew hydrated successfully:', crew.name);
         LocalStorageAPI.setPrimaryCrew(crew);
         setPrimaryCrew(crew);
+      } else {
+        console.error('❌ HOME: RunCrew hydration failed:', response.data.error);
       }
-    } catch (error) {
-      console.error('Error hydrating crew:', error);
+    } catch (error: any) {
+      console.error('❌ HOME: RunCrew hydration error:', error);
+      console.error('❌ HOME: Error message:', error?.message);
+      console.error('❌ HOME: Error status:', error?.response?.status);
+      console.error('❌ HOME: Error data:', error?.response?.data);
+      // Don't block the UI if crew hydration fails - user can still see dashboard
     } finally {
       setLoading(false);
     }

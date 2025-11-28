@@ -39,24 +39,34 @@ export default function AthleteWelcomePage() {
         console.log('📡 ATHLETE WELCOME: Response received:', response.status);
         
         if (response.data.success) {
-          const { athlete, crews, weeklyActivities, weeklyTotals } = response.data;
+          const { athlete } = response.data;
+
+          // Extract weeklyActivities and weeklyTotals from athlete object (backend puts them there)
+          const weeklyActivities = athlete.weeklyActivities || [];
+          const weeklyTotals = athlete.weeklyTotals || null;
 
           console.log('✅ ATHLETE WELCOME: Athlete hydrated successfully');
           console.log('✅ ATHLETE WELCOME: Athlete ID:', athlete.id);
           console.log('✅ ATHLETE WELCOME: Email:', athlete.email);
           console.log('✅ ATHLETE WELCOME: Name:', athlete.firstName, athlete.lastName);
-          console.log('✅ ATHLETE WELCOME: RunCrews count:', crews?.length || 0);
-          console.log('✅ ATHLETE WELCOME: Weekly activities count:', weeklyActivities?.length || 0);
+          console.log('✅ ATHLETE WELCOME: RunCrews count:', athlete.runCrews?.length || 0);
+          console.log('✅ ATHLETE WELCOME: Weekly activities count:', weeklyActivities.length);
           console.log('✅ ATHLETE WELCOME: Weekly totals:', weeklyTotals);
+          
+          if (athlete.runCrews && athlete.runCrews.length > 0) {
+            console.log('✅ ATHLETE WELCOME: RunCrews:', athlete.runCrews.map((c: any) => c.name).join(', '));
+          }
 
-          // Store in localStorage
+          // Store the complete Prisma model (athlete + all relations + activities)
           console.log('💾 ATHLETE WELCOME: Caching full hydration model to localStorage...');
-          LocalStorageAPI.setAthlete(athlete);
-          LocalStorageAPI.setCrews(crews);
-          LocalStorageAPI.setHydrationTimestamp(Date.now());
+          LocalStorageAPI.setFullHydrationModel({
+            athlete,
+            weeklyActivities: weeklyActivities,
+            weeklyTotals: weeklyTotals
+          });
           console.log('✅ ATHLETE WELCOME: Full hydration model cached');
           
-          // Hydration complete - show welcome screen with button
+          // Hydration complete - show button for user to click
           console.log('🎯 ATHLETE WELCOME: Hydration complete, ready for user action');
           console.log('✅ ATHLETE WELCOME: ===== HYDRATION SUCCESS =====');
           setIsHydrated(true);

@@ -58,7 +58,12 @@ export async function POST(request: Request) {
     }
 
     try {
-      return NextResponse.json({ success: true, ...hydrated });
+      // Return structure matching gofastfrontend: { success, athlete }
+    // where athlete contains runCrews, weeklyActivities, weeklyTotals
+    return NextResponse.json({ 
+      success: true, 
+      athlete: hydrated.athlete 
+    });
     } catch (serializeErr: any) {
       console.error('❌ HYDRATE: JSON serialization error:', serializeErr);
       console.error('❌ HYDRATE: Serialization error message:', serializeErr?.message);

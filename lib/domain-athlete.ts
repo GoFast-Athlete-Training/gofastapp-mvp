@@ -99,9 +99,16 @@ export async function hydrateAthlete(athleteId: string) {
     };
   });
 
+  // Structure response to match gofastfrontend expectations
+  // athlete object should contain runCrews, weeklyActivities, weeklyTotals
   return {
-    athlete,
-    crews,
+    athlete: {
+      ...athlete,
+      runCrews: crews, // Map crews to runCrews for frontend compatibility
+      weeklyActivities: athlete.activities,
+      weeklyTotals,
+    },
+    crews, // Also return separately for backward compatibility
     weeklyActivities: athlete.activities,
     weeklyTotals,
   };

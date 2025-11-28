@@ -55,17 +55,27 @@ export async function POST(request: Request) {
     let crew;
     try {
       crew = await hydrateCrew(runCrewId, athlete.id);
-    } catch (err) {
-      console.error('Prisma error:', err);
-      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    } catch (err: any) {
+      console.error('❌ RUNCREW HYDRATE: Prisma error:', err);
+      console.error('❌ RUNCREW HYDRATE: Error message:', err?.message);
+      console.error('❌ RUNCREW HYDRATE: Error stack:', err?.stack);
+      return NextResponse.json({ error: 'DB error', details: err?.message }, { status: 500 });
     }
 
     if (!crew) {
+      console.error('❌ RUNCREW HYDRATE: Crew not found for runCrewId:', runCrewId);
       return NextResponse.json({ error: 'Crew not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, runCrew: crew });
-  } catch (err) {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    try {
+      return NextResponse.json({ success: true, runCrew: crew });
+    } catch (serializeErr: any) {
+      console.error('❌ RUNCREW HYDRATE: JSON serialization error:', serializeErr);
+      return NextResponse.json({ error: 'Serialization error', details: serializeErr?.message }, { status: 500 });
+    }
+  } catch (err: any) {
+    console.error('❌ RUNCREW HYDRATE: Unexpected error:', err);
+    console.error('❌ RUNCREW HYDRATE: Error message:', err?.message);
+    return NextResponse.json({ error: 'Server error', details: err?.message }, { status: 500 });
   }
 }
