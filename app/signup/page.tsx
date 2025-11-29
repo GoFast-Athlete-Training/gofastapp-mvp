@@ -13,6 +13,7 @@ export default function SignupPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const [authMode, setAuthMode] = useState<'signup' | 'signin'>('signup');
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [emailData, setEmailData] = useState({
@@ -27,6 +28,7 @@ export default function SignupPage() {
     try {
       setLoading(true);
       setError('');
+      setErrorMessage('');
 
       console.log('🚀 SIGNUP: Starting Google sign-in...');
       const provider = new GoogleAuthProvider();
@@ -69,14 +71,15 @@ export default function SignupPage() {
     } catch (err: any) {
       console.error('❌ SIGNUP: Google signup error:', err);
       
-      // STATE 3: Handle 401 from /api/athlete/create
+      // HARD STOP: 401 = server-side auth failure, show error, no redirect, no localStorage writes
       if (err?.response?.status === 401) {
-        const firebaseUser = auth.currentUser;
-        if (firebaseUser) {
-          console.log('🚫 SIGNUP: Unauthorized (401) but Firebase user exists → routing to profile creation');
-          router.push('/athlete-create-profile');
-          return;
-        }
+        console.error("❌ SIGNUP: Backend rejected token verification (401). Full stop.");
+        setErrorMessage(
+          "We couldn't complete your GoFast account setup. This is a server-side authentication issue — please try again in a few minutes."
+        );
+        setLoading(false);
+        // Ensure no redirect happens
+        return;
       }
       
       setError(err.message || 'Signup error');
@@ -100,6 +103,7 @@ export default function SignupPage() {
     try {
       setLoading(true);
       setError('');
+      setErrorMessage('');
 
       console.log('🚀 SIGNUP: Starting email signup...');
       const result = await createUserWithEmailAndPassword(auth, emailData.email, emailData.password);
@@ -122,13 +126,6 @@ export default function SignupPage() {
       // Call backend create athlete - empty body, token auto-injected
       console.log('🌐 SIGNUP: Calling backend API: /athlete/create');
       const res = await api.post('/athlete/create', {});
-      
-      // STATE 3: Handle 401 from /api/athlete/create (Firebase user exists but DB athlete missing)
-      if (res.status === 401) {
-        console.log('🚫 SIGNUP: Unauthorized (401) from /api/athlete/create → routing to profile creation');
-        router.push('/athlete-create-profile');
-        return;
-      }
       
       console.log('✅ SIGNUP: Backend API response:', res.data);
       
@@ -155,14 +152,15 @@ export default function SignupPage() {
     } catch (err: any) {
       console.error('❌ SIGNUP: Email signup error:', err);
       
-      // STATE 3: Handle 401 from /api/athlete/create
+      // HARD STOP: 401 = server-side auth failure, show error, no redirect, no localStorage writes
       if (err?.response?.status === 401) {
-        const firebaseUser = auth.currentUser;
-        if (firebaseUser) {
-          console.log('🚫 SIGNUP: Unauthorized (401) but Firebase user exists → routing to profile creation');
-          router.push('/athlete-create-profile');
-          return;
-        }
+        console.error("❌ SIGNUP: Backend rejected token verification (401). Full stop.");
+        setErrorMessage(
+          "We couldn't complete your GoFast account setup. This is a server-side authentication issue — please try again in a few minutes."
+        );
+        setLoading(false);
+        // Ensure no redirect happens
+        return;
       }
       
       if (err.code === 'auth/email-already-in-use') {
@@ -180,6 +178,7 @@ export default function SignupPage() {
     try {
       setLoading(true);
       setError('');
+      setErrorMessage('');
 
       console.log('🚀 SIGNIN: Starting email sign-in...');
       await signInWithEmailAndPassword(auth, emailData.email, emailData.password);
@@ -200,13 +199,6 @@ export default function SignupPage() {
       // Call backend create athlete - empty body, token auto-injected
       console.log('🌐 SIGNIN: Calling backend API: /athlete/create');
       const res = await api.post('/athlete/create', {});
-      
-      // STATE 3: Handle 401 from /api/athlete/create (Firebase user exists but DB athlete missing)
-      if (res.status === 401) {
-        console.log('🚫 SIGNIN: Unauthorized (401) from /api/athlete/create → routing to profile creation');
-        router.push('/athlete-create-profile');
-        return;
-      }
       
       console.log('✅ SIGNIN: Backend API response:', res.data);
       
@@ -233,14 +225,15 @@ export default function SignupPage() {
     } catch (err: any) {
       console.error('❌ SIGNIN: Email sign-in error:', err);
       
-      // STATE 3: Handle 401 from /api/athlete/create
+      // HARD STOP: 401 = server-side auth failure, show error, no redirect, no localStorage writes
       if (err?.response?.status === 401) {
-        const firebaseUser = auth.currentUser;
-        if (firebaseUser) {
-          console.log('🚫 SIGNIN: Unauthorized (401) but Firebase user exists → routing to profile creation');
-          router.push('/athlete-create-profile');
-          return;
-        }
+        console.error("❌ SIGNIN: Backend rejected token verification (401). Full stop.");
+        setErrorMessage(
+          "We couldn't complete your GoFast account setup. This is a server-side authentication issue — please try again in a few minutes."
+        );
+        setLoading(false);
+        // Ensure no redirect happens
+        return;
       }
       
       setError(err.message || 'Failed to sign in. Please check your credentials.');
@@ -271,6 +264,12 @@ export default function SignupPage() {
         {error && (
           <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-100 text-sm">
             {error}
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-100 text-sm">
+            {errorMessage}
           </div>
         )}
 
