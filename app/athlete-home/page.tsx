@@ -29,9 +29,10 @@ export default function HomePage() {
     const storedAthlete = LocalStorageAPI.getAthlete();
     const storedCrews = LocalStorageAPI.getCrews();
 
+    // Optional safety: If hydration is missing or athlete not found in localStorage
     if (!storedAthlete) {
       console.log('❌ HOME: No athlete in localStorage → redirecting to athlete-welcome');
-      router.replace('/athlete-welcome');
+      router.push('/athlete-welcome');
       return;
     }
 

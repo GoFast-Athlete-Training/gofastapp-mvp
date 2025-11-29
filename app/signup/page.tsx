@@ -68,6 +68,17 @@ export default function SignupPage() {
       }
     } catch (err: any) {
       console.error('❌ SIGNUP: Google signup error:', err);
+      
+      // STATE 3: Handle 401 from /api/athlete/create
+      if (err?.response?.status === 401) {
+        const firebaseUser = auth.currentUser;
+        if (firebaseUser) {
+          console.log('🚫 SIGNUP: Unauthorized (401) but Firebase user exists → routing to profile creation');
+          router.push('/athlete-create-profile');
+          return;
+        }
+      }
+      
       setError(err.message || 'Signup error');
       setLoading(false);
     }
@@ -112,6 +123,13 @@ export default function SignupPage() {
       console.log('🌐 SIGNUP: Calling backend API: /athlete/create');
       const res = await api.post('/athlete/create', {});
       
+      // STATE 3: Handle 401 from /api/athlete/create (Firebase user exists but DB athlete missing)
+      if (res.status === 401) {
+        console.log('🚫 SIGNUP: Unauthorized (401) from /api/athlete/create → routing to profile creation');
+        router.push('/athlete-create-profile');
+        return;
+      }
+      
       console.log('✅ SIGNUP: Backend API response:', res.data);
       
       const athlete = res.data;
@@ -136,6 +154,17 @@ export default function SignupPage() {
       }
     } catch (err: any) {
       console.error('❌ SIGNUP: Email signup error:', err);
+      
+      // STATE 3: Handle 401 from /api/athlete/create
+      if (err?.response?.status === 401) {
+        const firebaseUser = auth.currentUser;
+        if (firebaseUser) {
+          console.log('🚫 SIGNUP: Unauthorized (401) but Firebase user exists → routing to profile creation');
+          router.push('/athlete-create-profile');
+          return;
+        }
+      }
+      
       if (err.code === 'auth/email-already-in-use') {
         setError('This email is already registered. Please sign in instead.');
         setAuthMode('signin');
@@ -172,6 +201,13 @@ export default function SignupPage() {
       console.log('🌐 SIGNIN: Calling backend API: /athlete/create');
       const res = await api.post('/athlete/create', {});
       
+      // STATE 3: Handle 401 from /api/athlete/create (Firebase user exists but DB athlete missing)
+      if (res.status === 401) {
+        console.log('🚫 SIGNIN: Unauthorized (401) from /api/athlete/create → routing to profile creation');
+        router.push('/athlete-create-profile');
+        return;
+      }
+      
       console.log('✅ SIGNIN: Backend API response:', res.data);
       
       const athlete = res.data;
@@ -196,6 +232,17 @@ export default function SignupPage() {
       }
     } catch (err: any) {
       console.error('❌ SIGNIN: Email sign-in error:', err);
+      
+      // STATE 3: Handle 401 from /api/athlete/create
+      if (err?.response?.status === 401) {
+        const firebaseUser = auth.currentUser;
+        if (firebaseUser) {
+          console.log('🚫 SIGNIN: Unauthorized (401) but Firebase user exists → routing to profile creation');
+          router.push('/athlete-create-profile');
+          return;
+        }
+      }
+      
       setError(err.message || 'Failed to sign in. Please check your credentials.');
       setLoading(false);
     }

@@ -89,20 +89,36 @@ export default function AthleteWelcomePage() {
         console.error('❌ ATHLETE WELCOME: Error status:', error.response?.status);
         console.error('❌ ATHLETE WELCOME: Error data:', error.response?.data);
         
+        const errorStatus = error.response?.status;
+        const firebaseUser = auth.currentUser;
+        
         setError(error.response?.data?.message || error.message || 'Failed to load athlete data');
         setIsLoading(false);
         
-        // If 401, user not authenticated or token expired
-        if (error.response?.status === 401) {
-          console.log('🚫 ATHLETE WELCOME: Unauthorized (401) → redirecting to signup');
-          router.replace('/signup');
+        // STATE 3: Firebase user exists BUT DB athlete does NOT exist
+        // This is the dangerous "token-valid-but-athlete-missing" case
+        if (errorStatus === 401 && firebaseUser) {
+          console.log('🚫 ATHLETE WELCOME: Unauthorized (401) but Firebase user exists → routing to profile creation');
+          router.push('/athlete-create-profile');
           return;
         }
         
-        // If user not found, redirect to signup
-        if (error.response?.status === 404) {
-          console.log('👤 ATHLETE WELCOME: Athlete not found (404) → redirecting to signup');
-          router.replace('/signup');
+        // STATE 1: No Firebase user
+        if (errorStatus === 401 && !firebaseUser) {
+          console.log('🚫 ATHLETE WELCOME: Unauthorized (401) and no Firebase user → redirecting to signup');
+          router.push('/signup');
+          return;
+        }
+        
+        // If user not found (404), check Firebase user state
+        if (errorStatus === 404) {
+          if (firebaseUser) {
+            console.log('👤 ATHLETE WELCOME: Athlete not found (404) but Firebase user exists → routing to profile creation');
+            router.push('/athlete-create-profile');
+          } else {
+            console.log('👤 ATHLETE WELCOME: Athlete not found (404) and no Firebase user → redirecting to signup');
+            router.push('/signup');
+          }
           return;
         }
         
@@ -119,6 +135,7 @@ export default function AthleteWelcomePage() {
   };
 
   if (error) {
+    const firebaseUser = auth.currentUser;
     return (
       <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center">
         <div className="text-center bg-white rounded-xl shadow-lg p-8 max-w-md mx-4">
@@ -126,10 +143,17 @@ export default function AthleteWelcomePage() {
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Error Loading Account</h1>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
-            onClick={() => router.replace('/signup')}
+            onClick={() => {
+              // STATE 3: If Firebase user exists but DB athlete missing, go to profile creation
+              if (firebaseUser) {
+                router.push('/athlete-create-profile');
+              } else {
+                router.push('/signup');
+              }
+            }}
             className="bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 transition"
           >
-            Go to Signup
+            {firebaseUser ? 'Complete Profile' : 'Go to Signup'}
           </button>
         </div>
       </div>
