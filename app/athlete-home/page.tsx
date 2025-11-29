@@ -2,172 +2,202 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import useHydratedAthlete from '@/hooks/useHydratedAthlete';
+import useActivities from '@/hooks/useActivities';
 import api from '@/lib/api';
+import { Activity } from 'lucide-react';
+import AthleteHeader from '@/components/athlete/AthleteHeader';
+import ProfileCallout from '@/components/athlete/ProfileCallout';
+import CrewHero from '@/components/athlete/CrewHero';
+import WeeklyStats from '@/components/athlete/WeeklyStats';
+import LatestActivityCard from '@/components/athlete/LatestActivityCard';
+import RSVPCard from '@/components/athlete/RSVPCard';
 
-export default function HomePage() {
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://gofastbackendv2-fall2025.onrender.com/api';
+
+export default function AthleteHomePage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [athlete, setAthlete] = useState<any>(null);
-  const [crews, setCrews] = useState<any[]>([]);
-  const [primaryCrew, setPrimaryCrew] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
 
+  // Use hooks to get all hydrated data from localStorage
+  const { athlete: athleteProfile, athleteId, runCrewId, runCrewManagerId, runCrew } =
+    useHydratedAthlete();
+
+  // Fetch activities (with automatic refresh from backend if localStorage is empty)
+  const { activities: weeklyActivities, weeklyTotals, isLoading: activitiesLoading } =
+    useActivities(athleteId);
+
+  // Check if user is an admin of the current crew
+  const isCrewAdmin = useMemo(() => {
+    return Boolean(runCrewManagerId);
+  }, [runCrewManagerId]);
+
+  const [crew, setCrew] = useState(runCrew);
+  const [garminConnected, setGarminConnected] = useState(false);
+  const [checkingConnection, setCheckingConnection] = useState(true);
+  const [isHydratingCrew, setIsHydratingCrew] = useState(false);
+
+  // RUNCREW OR BUST: Redirect to join/create if no crew
   useEffect(() => {
-    // GLOBAL RULE: Never hydrate without a Firebase user
-    const user = auth.currentUser;
-    if (!user) {
-      console.log('❌ HOME: No Firebase user found → redirecting to athlete-welcome');
-      router.replace('/athlete-welcome');
+    if (athleteProfile && !runCrewId) {
+      console.log('🚨 ATHLETE HOME: No runcrew - redirecting to join/create (runcrew or bust)');
+      router.push('/runcrew');
       return;
     }
+  }, [athleteProfile, runCrewId, router]);
 
-    // Step 1: Load from cache first
-    const storedAthlete = LocalStorageAPI.getAthlete();
-    const storedCrews = LocalStorageAPI.getCrews();
-
-    // Optional safety: If hydration is missing or athlete not found in localStorage
-    if (!storedAthlete) {
-      console.log('❌ HOME: No athlete in localStorage → redirecting to athlete-welcome');
-      router.push('/athlete-welcome');
-      return;
-    }
-
-    console.log('✅ HOME: Athlete found in localStorage');
-    setAthlete(storedAthlete);
-    setCrews(storedCrews || []);
-
-    // Step 2: Only after cache is loaded, perform runcrew hydration (if needed)
-    if (storedCrews && storedCrews.length > 0) {
-      const firstCrew = storedCrews[0];
-      console.log('🚀 HOME: Hydrating primary crew:', firstCrew.id, firstCrew.name);
-      hydrateCrew(firstCrew.id, user);
-    } else {
-      console.log('⚠️ HOME: No crews found, skipping crew hydration');
-      setLoading(false);
-    }
-  }, [router]);
-
-  const hydrateCrew = async (runCrewId: string, user: any) => {
-    // GLOBAL RULE: Never hydrate without a Firebase user
-    if (!user) {
-      console.error('❌ HOME: Cannot hydrate crew - no Firebase user');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      // Token is automatically injected by Axios interceptor - no need to pass manually
-      console.log('🚀 HOME: Calling runcrew/hydrate for:', runCrewId);
-      const response = await api.post('/runcrew/hydrate', { runCrewId });
-      
-      console.log('📡 HOME: RunCrew hydration response:', response.status);
-      
-      if (response.data.success) {
-        const crew = response.data.runCrew;
-        console.log('✅ HOME: RunCrew hydrated successfully:', crew.name);
-        LocalStorageAPI.setPrimaryCrew(crew);
-        setPrimaryCrew(crew);
-      } else {
-        console.warn('⚠️ HOME: RunCrew hydration returned success: false');
-        // Don't block UI - show warning but continue
-        setError(response.data.error || 'Could not load crew data');
+  // Hydrate crew if we have runCrewId but no crew data
+  useEffect(() => {
+    const hydrateCrew = async () => {
+      if (runCrewId && athleteId && !crew && !isHydratingCrew) {
+        setIsHydratingCrew(true);
+        try {
+          const { data } = await api.post('/runcrew/hydrate', { runCrewId, athleteId });
+          if (data?.success && data.runCrew) {
+            LocalStorageAPI.setRunCrewData(data.runCrew);
+            setCrew(data.runCrew);
+          }
+        } catch (error) {
+          console.error('Failed to hydrate crew:', error);
+        } finally {
+          setIsHydratingCrew(false);
+        }
+      } else if (runCrew) {
+        setCrew(runCrew);
       }
-    } catch (error: any) {
-      console.error('❌ HOME: RunCrew hydration error:', error);
-      // GLOBAL RULE: Never auto-redirect on hydration error
-      // Show error but don't block the UI
-      if (error?.response?.status === 401) {
-        // 401 means unauthorized - redirect to signup
-        console.log('🚫 HOME: Unauthorized (401) → redirecting to signup');
-        router.replace('/signup');
+    };
+    hydrateCrew();
+  }, [runCrewId, athleteId, runCrew, isHydratingCrew]);
+
+  // Check Garmin connection status
+  useEffect(() => {
+    const checkGarminConnection = async () => {
+      if (!athleteId) {
+        setCheckingConnection(false);
         return;
-      } else {
-        // All other errors - show warning but continue
-        setError(error?.response?.data?.error || 'Could not load crew data');
       }
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  if (loading) {
+      try {
+        const response = await fetch(`${API_BASE}/garmin/status?athleteId=${athleteId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setGarminConnected(data.connected || false);
+        }
+      } catch (error) {
+        console.error('Error checking Garmin connection:', error);
+      } finally {
+        setCheckingConnection(false);
+      }
+    };
+
+    checkGarminConnection();
+  }, [athleteId]);
+
+  // Get next run from crew
+  const nextRun = useMemo(() => {
+    if (!crew?.runs || !Array.isArray(crew.runs)) return null;
+    const upcomingRuns = crew.runs
+      .filter((run) => {
+        const runDate = run.date || run.scheduledAt;
+        if (!runDate) return false;
+        return new Date(runDate) >= new Date();
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.date || a.scheduledAt);
+        const dateB = new Date(b.date || b.scheduledAt);
+        return dateA.getTime() - dateB.getTime();
+      });
+    return upcomingRuns[0] || null;
+  }, [crew]);
+
+  // Get attendees for next run (first 3)
+  const nextRunAttendees = useMemo(() => {
+    if (!nextRun?.rsvps) return [];
+    return nextRun.rsvps
+      .filter((rsvp: any) => rsvp.status === 'going')
+      .slice(0, 3)
+      .map((rsvp: any) => rsvp.athlete || rsvp);
+  }, [nextRun]);
+
+  // Get latest activity
+  const latestActivity = useMemo(() => {
+    if (!weeklyActivities || weeklyActivities.length === 0) return null;
+    return weeklyActivities[0]; // Already sorted by date desc
+  }, [weeklyActivities]);
+
+  // Profile setup logic
+  const profileIncomplete =
+    !athleteProfile?.firstName || !athleteProfile?.lastName || !athleteProfile?.primarySport;
+
+  // Render guard: redirect if no athlete data
+  if (!athleteProfile) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your profile...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">
-          Welcome back, {athlete?.firstName || 'Athlete'}!
-        </h1>
+    <div className="min-h-screen bg-gray-50">
+      <AthleteHeader />
 
-        {error && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-            <p className="text-yellow-800 text-sm">⚠️ {error}</p>
+      <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+        {profileIncomplete && <ProfileCallout athlete={athleteProfile} />}
+
+        <CrewHero
+          crew={crew}
+          nextRun={nextRun}
+          nextRunAttendees={nextRunAttendees}
+          isCrewAdmin={isCrewAdmin}
+          runCrewId={runCrewId}
+        />
+
+        {/* Weekly Stats - Only show if Garmin connected */}
+        {garminConnected && weeklyTotals && <WeeklyStats weeklyTotals={weeklyTotals} />}
+
+        {/* Garmin Connection Prompt */}
+        {!checkingConnection && !garminConnected && (
+          <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-orange-200">
+            <div className="flex items-center gap-4">
+              <Activity className="h-12 w-12 text-orange-500 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                  Connect Garmin to Track Activities
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Sync your runs automatically and see your stats on the leaderboard
+                </p>
+              </div>
+              <button
+                onClick={() => router.push('/settings')}
+                className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition whitespace-nowrap"
+              >
+                Connect →
+              </button>
+            </div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* RunCrew Section */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">RunCrew</h2>
-            {crews.length > 0 ? (
-              <div className="space-y-2">
-                {crews.map((crew) => (
-                  <button
-                    key={crew.id}
-                    onClick={() => router.push(`/runcrew/${crew.id}`)}
-                    className="block w-full text-left p-3 border rounded hover:bg-gray-50"
-                  >
-                    <div className="font-medium">{crew.name}</div>
-                    <div className="text-sm text-gray-500">{crew.role}</div>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <button
-                onClick={() => router.push('/runcrew')}
-                className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Join or Create Crew
-              </button>
-            )}
-          </div>
+        {/* Latest Activity Card */}
+        {latestActivity && <LatestActivityCard latestActivity={latestActivity} />}
 
-          {/* Activities Section */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Activities</h2>
-            <button
-              onClick={() => router.push('/activities')}
-              className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              View Activities
-            </button>
-          </div>
-
-          {/* Settings Section */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Settings</h2>
-            <button
-              onClick={() => router.push('/settings')}
-              className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Go to Settings
-            </button>
-          </div>
-        </div>
-      </div>
+        {/* RSVP CTA - Only if crew has upcoming run */}
+        {crew && nextRun && (
+          <RSVPCard
+            nextRun={nextRun}
+            crew={crew}
+            runCrewId={runCrewId}
+            isCrewAdmin={isCrewAdmin}
+          />
+        )}
+      </main>
     </div>
   );
 }

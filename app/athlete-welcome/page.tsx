@@ -77,6 +77,13 @@ export default function AthleteWelcomePage() {
         
         console.log('✅ ATHLETE WELCOME: Full hydration model cached');
         
+        // MVP1 EXACT BEHAVIOR: If profile complete (gofastHandle exists), redirect to /athlete-home
+        if (athlete.gofastHandle) {
+          console.log('✅ ATHLETE WELCOME: Profile complete (gofastHandle exists) → redirecting to /athlete-home');
+          router.push('/athlete-home');
+          return;
+        }
+        
         // Hydration complete - show button for user to click
         console.log('🎯 ATHLETE WELCOME: Hydration complete, ready for user action');
         console.log('✅ ATHLETE WELCOME: ===== HYDRATION SUCCESS =====');
