@@ -219,11 +219,7 @@ export default function AthleteCreateProfilePage() {
       console.log('✅ Step 2 - Profile updated:', profileData);
 
       // Store athlete data (EXACTLY like MVP1)
-      LocalStorageAPI.setAthleteId(athleteId);
-      LocalStorageAPI.setAthleteProfile(profileData.athlete);
       LocalStorageAPI.setAthlete(profileData.athlete);
-
-      // Store full hydration model (EXACTLY like MVP1)
       LocalStorageAPI.setFullHydrationModel({
         athlete: profileData.athlete,
         weeklyActivities: [],
