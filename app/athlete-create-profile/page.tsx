@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
-import { LocalStorageAPI } from '@/lib/localstorage';
 
 export default function AthleteCreateProfilePage() {
   const router = useRouter();
@@ -133,14 +132,10 @@ export default function AthleteCreateProfilePage() {
       
       const profileData = profileRes.data;
       console.log('✅ Step 2 - Profile updated:', profileData);
-      
-      // Store athlete data
-      LocalStorageAPI.setAthleteId(athleteId);
-      LocalStorageAPI.setAthlete(profileData.athlete);
 
       // Navigate to athlete home after profile setup
       console.log('🏠 Navigating to athlete home...');
-      router.replace('/athlete-home');
+      router.push('/athlete-home');
       
     } catch (err: any) {
       console.error('❌ Profile creation failed:', err);
