@@ -14,14 +14,28 @@ export async function POST(request: Request) {
 
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
+      console.error('❌ ATHLETE CREATE: Missing or invalid auth header');
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
+    const token = authHeader.substring(7);
+    console.log('🔑 ATHLETE CREATE: Received token (first 20 chars):', token.substring(0, 20) + '...');
+    
     let decodedToken;
     try {
-      decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    } catch {
-      return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 });
+      decodedToken = await adminAuth.verifyIdToken(token);
+      console.log('✅ ATHLETE CREATE: Token verified for UID:', decodedToken.uid);
+      console.log('✅ ATHLETE CREATE: Token project:', decodedToken.firebase?.project_id || 'unknown');
+    } catch (err: any) {
+      console.error('❌ ATHLETE CREATE: Token verification failed');
+      console.error('❌ ATHLETE CREATE: Error code:', err?.code);
+      console.error('❌ ATHLETE CREATE: Error message:', err?.message);
+      console.error('❌ ATHLETE CREATE: Token (first 50 chars):', token.substring(0, 50));
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Invalid token',
+        details: err?.message || 'Token verification failed'
+      }, { status: 401 });
     }
 
     const firebaseId = decodedToken.uid;

@@ -39,6 +39,18 @@ function getAdminApp() {
   _adminAuth = getAuth(adminApp);
   
   console.log("✅ Firebase Admin initialized with project:", projectId);
+  console.log("✅ Firebase Admin client email:", clientEmail);
+  
+  // Check for project mismatch
+  const expectedClientProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  if (expectedClientProjectId && projectId !== expectedClientProjectId) {
+    console.error("❌ FIREBASE PROJECT MISMATCH!");
+    console.error(`   Backend Admin project: ${projectId}`);
+    console.error(`   Client project (expected): ${expectedClientProjectId}`);
+    console.error("   ⚠️ These MUST match or token verification will fail!");
+  } else if (expectedClientProjectId) {
+    console.log(`✅ Firebase project matches client (${expectedClientProjectId})`);
+  }
   
   return adminApp;
 }
