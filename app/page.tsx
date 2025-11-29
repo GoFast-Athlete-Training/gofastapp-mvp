@@ -25,14 +25,14 @@ export default function RootPage() {
 
   useEffect(() => {
     if (!isLoading) {
-      // Show logo for 1500ms, then route
+      // Show logo for 2 seconds, then route
       const timer = setTimeout(() => {
         if (isAuthenticated) {
           router.replace('/athlete-welcome');
         } else {
           router.replace('/signup');
         }
-      }, 1500); // Logo shows for 1500ms, then route
+      }, 2000); // Logo shows for 2 seconds, then route
 
       return () => clearTimeout(timer);
     }
