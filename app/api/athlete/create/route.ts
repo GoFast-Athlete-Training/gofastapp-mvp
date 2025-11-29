@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
-import { GOFAST_COMPANY_ID } from '@/lib/goFastCompanyConfig';
 
 export async function POST(request: Request) {
   try {
@@ -47,7 +46,22 @@ export async function POST(request: Request) {
     const firstName = displayName?.split(' ')[0] || null;
     const lastName = displayName?.split(' ').slice(1).join(' ') || null;
 
-    // Upsert athlete with companyId - ALWAYS ensure companyId is set
+    // Ensure GoFast company exists (self-healing)
+    const gofastCompany = await prisma.goFastCompany.upsert({
+      where: { slug: "gofast" },
+      update: {},
+      create: {
+        name: "GoFast",
+        slug: "gofast",
+        address: "2604 N. George Mason Dr.",
+        city: "Arlington",
+        state: "VA",
+        zip: "22207",
+        domain: "gofastcrushgoals.com",
+      },
+    });
+
+    // Upsert athlete with dynamic company association
     const athlete = await prisma.athlete.upsert({
       where: { firebaseId },
       update: {
@@ -56,7 +70,7 @@ export async function POST(request: Request) {
         firstName: firstName || undefined,
         lastName: lastName || undefined,
         photoURL: picture || undefined,
-        companyId: GOFAST_COMPANY_ID, // Ensure assignment even on existing users
+        companyId: gofastCompany.id,
       },
       create: {
         firebaseId,
@@ -64,7 +78,7 @@ export async function POST(request: Request) {
         firstName: firstName || undefined,
         lastName: lastName || undefined,
         photoURL: picture || undefined,
-        companyId: GOFAST_COMPANY_ID,
+        companyId: gofastCompany.id,
       },
     });
 
