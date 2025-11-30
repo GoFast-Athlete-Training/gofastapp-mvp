@@ -18,10 +18,18 @@ export const auth = getAuth(app);
 
 // Set persistence to keep user logged in across page refreshes
 // This is critical for preventing logout on refresh
+// Only set persistence in browser, and only if auth is available
 if (typeof window !== "undefined") {
-  setPersistence(auth, browserLocalPersistence).catch((error) => {
-    console.error("Failed to set auth persistence:", error);
-  });
+  try {
+    setPersistence(auth, browserLocalPersistence).catch((error) => {
+      // Silently fail during build - will work at runtime
+      if (process.env.NODE_ENV !== "production" || typeof window !== "undefined") {
+        console.error("Failed to set auth persistence:", error);
+      }
+    });
+  } catch (error) {
+    // Ignore errors during build
+  }
 }
 
 // Initialize Analytics (only in browser, async)
