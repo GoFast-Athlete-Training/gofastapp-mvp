@@ -100,12 +100,12 @@ export default function AthleteHomePage() {
   const nextRun = useMemo(() => {
     if (!crew?.runs || !Array.isArray(crew.runs)) return null;
     const upcomingRuns = crew.runs
-      .filter((run) => {
+      .filter((run: any) => {
         const runDate = run.date || run.scheduledAt;
         if (!runDate) return false;
         return new Date(runDate) >= new Date();
       })
-      .sort((a, b) => {
+      .sort((a: any, b: any) => {
         const dateA = new Date(a.date || a.scheduledAt);
         const dateB = new Date(b.date || b.scheduledAt);
         return dateA.getTime() - dateB.getTime();

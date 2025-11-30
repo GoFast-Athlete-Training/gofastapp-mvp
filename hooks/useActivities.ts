@@ -21,7 +21,7 @@ const filterRunningActivities = (activities: any[]) => {
  * Calculate weekly totals for running activities only
  */
 const calculateRunTotals = (activities: any[]) => {
-  const totals = {
+  const totals: any = {
     totalDistance: 0,
     totalDuration: 0,
     totalCalories: 0,
