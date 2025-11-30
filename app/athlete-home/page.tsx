@@ -40,15 +40,6 @@ export default function AthleteHomePage() {
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [isHydratingCrew, setIsHydratingCrew] = useState(false);
 
-  // RUNCREW OR BUST: Redirect to join/create if no crew
-  useEffect(() => {
-    if (athleteProfile && !runCrewId) {
-      console.log('🚨 ATHLETE HOME: No runcrew - redirecting to join/create (runcrew or bust)');
-      router.push('/runcrew');
-      return;
-    }
-  }, [athleteProfile, runCrewId, router]);
-
   // Hydrate crew if we have runCrewId but no crew data
   useEffect(() => {
     const hydrateCrew = async () => {
