@@ -266,7 +266,6 @@ export default function AthleteEditProfilePage() {
                 type="text"
                 value={formData.firstName}
                 onChange={(e) => handleInputChange('firstName', e.target.value)}
-                placeholder="Enter your first name"
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 required
                 disabled={loading}
@@ -280,7 +279,6 @@ export default function AthleteEditProfilePage() {
                 type="text"
                 value={formData.lastName}
                 onChange={(e) => handleInputChange('lastName', e.target.value)}
-                placeholder="Enter your last name"
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 required
                 disabled={loading}
@@ -297,7 +295,6 @@ export default function AthleteEditProfilePage() {
               type="tel"
               value={formData.phoneNumber}
               onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-              placeholder="(555) 123-4567"
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               disabled={loading}
             />
@@ -311,7 +308,6 @@ export default function AthleteEditProfilePage() {
             <textarea
               value={formData.bio}
               onChange={(e) => handleInputChange('bio', e.target.value)}
-              placeholder="Tell us about your running goals, favorite routes, or what motivates you..."
               maxLength={250}
               rows={3}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
@@ -334,7 +330,6 @@ export default function AthleteEditProfilePage() {
                 type="text"
                 value={formData.gofastHandle}
                 onChange={(e) => handleInputChange('gofastHandle', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                placeholder="your_handle"
                 className="w-full pl-8 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 required
                 disabled={loading}
@@ -402,7 +397,6 @@ export default function AthleteEditProfilePage() {
                 type="text" 
                 value={formData.city} 
                 onChange={(e) => handleInputChange('city', e.target.value)}
-                placeholder="City"
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 required
                 disabled={loading}
@@ -416,7 +410,6 @@ export default function AthleteEditProfilePage() {
                 type="text" 
                 value={formData.state} 
                 onChange={(e) => handleInputChange('state', e.target.value)}
-                placeholder="State"
                 maxLength={2}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 required
@@ -460,7 +453,6 @@ export default function AthleteEditProfilePage() {
               type="text"
               value={formData.instagram}
               onChange={(e) => handleInputChange('instagram', e.target.value)}
-              placeholder="@your_handle"
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               disabled={loading}
             />

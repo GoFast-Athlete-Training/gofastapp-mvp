@@ -362,14 +362,13 @@ export default function AthleteCreateProfilePage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Phone Number
             </label>
-            <input
-              type="tel"
-              value={formData.phoneNumber}
-              onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-              placeholder="(555) 123-4567"
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              disabled={loading}
-            />
+              <input
+                type="tel"
+                value={formData.phoneNumber}
+                onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                disabled={loading}
+              />
           </div>
 
           {/* Short Bio */}
