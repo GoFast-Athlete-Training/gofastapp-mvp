@@ -69,9 +69,17 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
-          <p className="text-gray-600">Manage your account and device connections</p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
+            <p className="text-gray-600">Manage your account and device connections</p>
+          </div>
+          <button
+            onClick={() => router.push('/athlete-home')}
+            className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
+          >
+            ← Back to Home
+          </button>
         </div>
 
         {/* Profile Section */}
