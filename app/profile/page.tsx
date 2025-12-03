@@ -52,8 +52,23 @@ export default function ProfilePage() {
 
   const age = calculateAge(athleteProfile.birthday);
 
+  // Count how many profile fields are filled
+  const filledFields = [
+    athleteProfile?.bio,
+    athleteProfile?.city || athleteProfile?.state,
+    athleteProfile?.primarySport,
+    athleteProfile?.birthday,
+    athleteProfile?.gender,
+    athleteProfile?.instagram,
+    athleteProfile?.phoneNumber,
+    athleteProfile?.email,
+    athleteProfile?.gofastHandle,
+  ].filter(Boolean).length;
+
+  const isProfileSparse = filledFields <= 2;
+
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-6 py-4">
@@ -124,8 +139,33 @@ export default function ProfilePage() {
           </button>
         </div>
 
+        {/* Welcome Message for Sparse Profiles */}
+        {isProfileSparse && (
+          <div className="mb-8 bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 rounded-xl p-6 shadow-sm">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <span className="text-3xl">👋</span>
+              </div>
+              <div className="ml-4 flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Welcome to GoFast!</h3>
+                <p className="text-gray-700 mb-3">
+                  Complete your profile to connect with other athletes, join crews, and get the most out of GoFast. 
+                  Add your bio, location, sport preferences, and more!
+                </p>
+                <button
+                  onClick={() => router.push('/athlete-edit-profile')}
+                  className="text-orange-600 hover:text-orange-700 font-medium text-sm underline"
+                >
+                  Complete your profile →
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Profile Info - Beautiful Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {filledFields > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Bio Card */}
           {athleteProfile?.bio && (
             <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-md border border-gray-200 p-6 hover:shadow-lg transition-shadow">
@@ -258,7 +298,24 @@ export default function ProfilePage() {
               <p className="text-gray-700 text-lg pl-13">@{athleteProfile.gofastHandle}</p>
             </div>
           )}
-        </div>
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-md mx-auto">
+              <span className="text-5xl mb-4 block">📋</span>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Your Profile is Empty</h3>
+              <p className="text-gray-600 mb-6">
+                Add information about yourself to help other athletes find and connect with you.
+              </p>
+              <button
+                onClick={() => router.push('/athlete-edit-profile')}
+                className="bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-colors shadow-md hover:shadow-lg"
+              >
+                Add Profile Information
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
