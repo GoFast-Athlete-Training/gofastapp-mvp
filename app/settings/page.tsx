@@ -15,7 +15,6 @@ export default function SettingsPage() {
   const [athlete, setAthlete] = useState<any>(null);
   const [connections, setConnections] = useState({
     garmin: false,
-    strava: false,
   });
   const [loading, setLoading] = useState(true);
 
@@ -38,7 +37,6 @@ export default function SettingsPage() {
         const data = await response.json();
         setConnections({
           garmin: data.connected || false,
-          strava: false, // TODO: Add Strava check
         });
       }
     } catch (error) {
@@ -76,77 +74,81 @@ export default function SettingsPage() {
           <p className="text-gray-600">Manage your account and device connections</p>
         </div>
 
+        {/* Profile Section */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Profile</h2>
+          <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200 hover:border-gray-300 transition">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {athlete?.photoURL ? (
+                  <img
+                    src={athlete.photoURL}
+                    alt="Profile"
+                    className="h-10 w-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="h-10 w-10 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold text-sm">
+                    {athlete?.firstName ? athlete.firstName[0].toUpperCase() : 'A'}
+                  </div>
+                )}
+                <div>
+                  <h3 className="font-semibold text-gray-900">
+                    {athlete?.firstName && athlete?.lastName
+                      ? `${athlete.firstName} ${athlete.lastName}`
+                      : 'Your Profile'}
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    {athlete?.gofastHandle ? `@${athlete.gofastHandle}` : 'View and edit your profile'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => router.push('/profile')}
+                className="px-4 py-1.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition"
+              >
+                View Profile
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Device Connections */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Device Connections</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            
-            {/* Garmin Card - Compact */}
-            <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200 hover:border-gray-300 transition">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <img 
-                    src="/Garmin_Connect_app_1024x1024-02.png" 
-                    alt="Garmin Connect" 
-                    className="h-10 w-10 rounded"
-                  />
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Garmin Connect</h3>
-                    <p className="text-sm text-gray-500">Sync activities</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  {loading ? (
-                    <span className="text-sm text-gray-400">Checking...</span>
-                  ) : connections.garmin ? (
-                    <>
-                      <span className="text-sm text-green-600 font-medium">Connected</span>
-                      <button
-                        onClick={disconnectGarmin}
-                        className="px-4 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition"
-                      >
-                        Disconnect
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={connectGarmin}
-                      className="px-4 py-1.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition"
-                    >
-                      Connect
-                    </button>
-                  )}
+          <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200 hover:border-gray-300 transition">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <img 
+                  src="/Garmin_Connect_app_1024x1024-02.png" 
+                  alt="Garmin Connect" 
+                  className="h-10 w-10 rounded"
+                />
+                <div>
+                  <h3 className="font-semibold text-gray-900">Garmin Connect</h3>
+                  <p className="text-sm text-gray-500">Sync activities</p>
                 </div>
               </div>
-            </div>
-
-            {/* Strava Card - Compact */}
-            <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200 hover:border-gray-300 transition">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded bg-orange-100 flex items-center justify-center text-2xl">
-                    🏃
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Strava</h3>
-                    <p className="text-sm text-gray-500">Import activities</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className={`text-sm font-medium ${
-                    connections.strava ? 'text-green-600' : 'text-gray-500'
-                  }`}>
-                    {connections.strava ? 'Connected' : 'Not Connected'}
-                  </span>
-                  {!connections.strava && (
+              <div className="flex items-center gap-3">
+                {loading ? (
+                  <span className="text-sm text-gray-400">Checking...</span>
+                ) : connections.garmin ? (
+                  <>
+                    <span className="text-sm text-green-600 font-medium">Connected</span>
                     <button
-                      onClick={() => alert('Strava connection coming soon')}
-                      className="px-4 py-1.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition"
+                      onClick={disconnectGarmin}
+                      className="px-4 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition"
                     >
-                      Connect
+                      Disconnect
                     </button>
-                  )}
-                </div>
+                  </>
+                ) : (
+                  <button
+                    onClick={connectGarmin}
+                    className="px-4 py-1.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition"
+                  >
+                    Connect
+                  </button>
+                )}
               </div>
             </div>
           </div>
