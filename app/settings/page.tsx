@@ -283,12 +283,7 @@ export default function SettingsPage() {
                   </>
                 ) : (
                   <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      console.log('🔵 Connect button clicked');
-                      connectGarmin();
-                    }}
+                    onClick={connectGarmin}
                     className="px-4 py-1.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition"
                   >
                     Connect
