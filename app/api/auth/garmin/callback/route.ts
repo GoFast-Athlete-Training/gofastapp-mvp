@@ -61,10 +61,7 @@ export async function GET(request: Request) {
             </div>
             <script>
               if (window.opener) {
-                window.opener.postMessage({
-                  type: 'GARMIN_OAUTH_ERROR',
-                  error: '${errorMsg.replace(/'/g, "\\'")}'
-                }, window.location.origin);
+                window.opener.postMessage('garmin-oauth-error', window.location.origin);
                 setTimeout(() => window.close(), 2000);
               } else {
                 setTimeout(() => {
@@ -188,15 +185,13 @@ export async function GET(request: Request) {
           <script>
             // Send success message to parent window if in popup
             if (window.opener) {
-              window.opener.postMessage({
-                type: 'GARMIN_OAUTH_SUCCESS',
-                athleteId: '${athleteId}'
-              }, window.location.origin);
+              console.log('✅ Sending success message to parent window');
+              window.opener.postMessage('garmin-oauth-success', window.location.origin);
               setTimeout(() => window.close(), 1000);
             } else {
               // Fallback: redirect if not in popup
               setTimeout(() => {
-                window.location.href = '/settings/integrations?connected=garmin';
+                window.location.href = '/settings?connected=garmin';
               }, 1500);
             }
           </script>
@@ -250,10 +245,7 @@ export async function GET(request: Request) {
           </div>
           <script>
             if (window.opener) {
-              window.opener.postMessage({
-                type: 'GARMIN_OAUTH_ERROR',
-                error: '${errorMessage}'
-              }, window.location.origin);
+                window.opener.postMessage('garmin-oauth-error', window.location.origin);
               setTimeout(() => window.close(), 2000);
             } else {
               setTimeout(() => {

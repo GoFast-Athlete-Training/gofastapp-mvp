@@ -82,7 +82,13 @@ export default function SettingsPage() {
   };
 
   const connectGarmin = async () => {
-    console.log('🔵 Connect Garmin button clicked');
+    console.log('🔵 Connect Garmin - starting OAuth');
+    
+    // Check if already connected (only check garmin_user_id from athlete data)
+    if (athlete?.garmin_user_id) {
+      console.log('⚠️ Already connected to Garmin');
+      return;
+    }
     
     if (!athlete?.id) {
       alert('Please sign in to connect Garmin');
@@ -101,79 +107,105 @@ export default function SettingsPage() {
       }
       const firebaseToken = await currentUser.getIdToken();
       
-      console.log('🔵 Calling /api/auth/garmin/authorize?popup=true');
+      console.log('🔵 Calling /api/auth/garmin/authorize');
       
-      // Call authorize endpoint to get auth URL (with popup flag)
-      const response = await fetch('/api/auth/garmin/authorize?popup=true', {
+      // Call authorize endpoint - it will return a 302 redirect
+      // Use redirect: 'manual' to get the redirect URL without following it
+      const res = await fetch('/api/auth/garmin/authorize', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${firebaseToken}`
-        }
+        },
+        redirect: 'manual' // Don't follow redirect, get the URL instead
       });
-      
-      console.log('🔵 Authorize response status:', response.status);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+      console.log('🔵 Authorize response status:', res.status);
+
+      if (res.status === 401 || res.status === 404 || res.status === 500) {
+        const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to get auth URL');
       }
 
-      const data = await response.json();
-      if (!data.success || !data.authUrl) {
-        throw new Error('Invalid response from server');
-      }
-
-      // Open popup window
-      const popup = window.open(
-        data.authUrl,
-        'garmin-oauth',
-        'width=600,height=700,scrollbars=yes,resizable=yes'
-      );
-
-      if (!popup) {
-        alert('Popup blocked. Please allow popups for this site.');
-        setLoading(false);
-        return;
-      }
-
-      // Listen for popup to close or send message
-      const checkPopup = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(checkPopup);
-          setLoading(false);
-          // Check connection status after popup closes
-          if (athlete?.id) {
-            checkGarminConnection(athlete.id);
-          }
+      // If we got a redirect (302), get the Location header
+      if (res.status === 302 || res.status === 0) {
+        // Status 0 can happen with CORS redirects
+        const redirectUrl = res.headers.get('Location') || res.url;
+        
+        if (!redirectUrl) {
+          throw new Error('No redirect URL received from server');
         }
-      }, 500);
 
-      // Listen for postMessage from callback
-      const messageHandler = async (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) return;
-        if (event.data.type === 'GARMIN_OAUTH_SUCCESS') {
-          clearInterval(checkPopup);
-          if (!popup.closed) popup.close();
+        console.log('🔵 Got redirect URL:', redirectUrl);
+        console.log('🔵 Opening Garmin OAuth page in popup');
+
+        // Open popup window with the Garmin OAuth URL
+        const popup = window.open(
+          redirectUrl,
+          'garmin-oauth',
+          'width=600,height=800,scrollbars=yes,resizable=yes'
+        );
+
+        if (!popup) {
+          alert('Popup blocked. Please allow popups for this site.');
           setLoading(false);
+          return;
+        }
+
+        console.log('✅ Popup opened, waiting for OAuth completion...');
+
+        // Listen for popup to close or send message
+        const checkPopup = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(checkPopup);
+            setLoading(false);
+            console.log('🔵 Popup closed, checking connection status');
+            // Check connection status after popup closes
+            if (athlete?.id) {
+              refreshAthleteData().then(() => {
+                checkGarminConnection(athlete.id);
+              });
+            }
+          }
+        }, 500);
+
+        // Listen for postMessage from callback
+        const messageHandler = async (event: MessageEvent) => {
+          // Security: only accept messages from same origin
+          if (event.origin !== window.location.origin) {
+            console.warn('⚠️ Ignoring message from different origin:', event.origin);
+            return;
+          }
           
-          // Refresh athlete data from backend to get updated Garmin connection status
-          if (athlete?.id) {
-            await refreshAthleteData();
-            checkGarminConnection(athlete.id);
+          console.log('🔵 Received message from popup:', event.data);
+          
+          if (event.data === 'garmin-oauth-success') {
+            clearInterval(checkPopup);
+            if (!popup.closed) popup.close();
+            setLoading(false);
+            console.log('✅ Garmin OAuth success, refreshing athlete data');
+            
+            // Refresh athlete data from backend to get updated Garmin connection status
+            if (athlete?.id) {
+              await refreshAthleteData();
+              checkGarminConnection(athlete.id);
+            }
+            window.removeEventListener('message', messageHandler);
+          } else if (event.data === 'garmin-oauth-error') {
+            clearInterval(checkPopup);
+            if (!popup.closed) popup.close();
+            setLoading(false);
+            console.error('❌ Garmin OAuth error');
+            alert('Failed to connect Garmin. Please try again.');
+            window.removeEventListener('message', messageHandler);
           }
-          window.removeEventListener('message', messageHandler);
-        } else if (event.data.type === 'GARMIN_OAUTH_ERROR') {
-          clearInterval(checkPopup);
-          if (!popup.closed) popup.close();
-          setLoading(false);
-          alert('Failed to connect Garmin: ' + (event.data.error || 'Unknown error'));
-          window.removeEventListener('message', messageHandler);
-        }
-      };
-      window.addEventListener('message', messageHandler);
+        };
+        window.addEventListener('message', messageHandler);
+      } else {
+        throw new Error('Unexpected response from authorize endpoint');
+      }
 
     } catch (error: any) {
-      console.error('Error connecting Garmin:', error);
+      console.error('❌ Error connecting Garmin:', error);
       alert('Failed to connect Garmin: ' + (error.message || 'Unknown error'));
       setLoading(false);
     }

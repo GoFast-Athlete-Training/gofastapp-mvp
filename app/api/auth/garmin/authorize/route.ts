@@ -11,30 +11,40 @@ import { cookies } from 'next/headers';
  * 
  * Starts OAuth handshake with Garmin using PKCE flow.
  * Requires Firebase authentication.
+ * ALWAYS returns a 302 redirect to Garmin's OAuth page.
  */
 export async function GET(request: Request) {
   try {
+    console.log('🔵 Garmin authorize endpoint called');
+    
     // 1. Authenticate user via Firebase
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
+      console.error('❌ No authorization header');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     let decodedToken;
     try {
       decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    } catch {
+      console.log('✅ Firebase token verified for UID:', decodedToken.uid);
+    } catch (error: any) {
+      console.error('❌ Invalid Firebase token:', error.message);
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
     // 2. Get athlete from database
     const athlete = await getAthleteByFirebaseId(decodedToken.uid);
     if (!athlete) {
+      console.error('❌ Athlete not found for UID:', decodedToken.uid);
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
 
+    console.log('✅ Athlete found:', athlete.id);
+
     // 3. Generate PKCE parameters
     const { codeVerifier, codeChallenge, state } = generatePKCE();
+    console.log('✅ PKCE generated - code_verifier length:', codeVerifier.length, 'code_challenge length:', codeChallenge.length, 'state:', state);
     
     // 4. Store code verifier in HTTP-only cookie (expires in 10 minutes)
     const cookieStore = await cookies();
@@ -54,9 +64,20 @@ export async function GET(request: Request) {
       maxAge: 600,
       path: '/'
     });
+    
+    // Store state in cookie for verification
+    cookieStore.set('garmin_oauth_state', state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 600,
+      path: '/'
+    });
+
+    console.log('✅ Cookies set: garmin_code_verifier, garmin_athlete_id, garmin_oauth_state');
 
     // 5. Build Garmin authorization URL
-    // Note: redirect URI must match Garmin Developer Portal exactly
+    // Use ONLY environment variable - NO fallbacks
     const redirectUri = process.env.GARMIN_REDIRECT_URI;
     
     if (!redirectUri) {
@@ -69,30 +90,23 @@ export async function GET(request: Request) {
     
     const authUrl = buildGarminAuthUrl(codeChallenge, state, redirectUri);
 
-    console.log(`✅ Garmin OAuth authorization URL generated for athlete: ${athlete.id}`);
+    console.log('✅ Garmin OAuth authorization URL generated');
+    console.log('🔵 Auth URL:', authUrl);
+    console.log('🔵 Redirect URI:', redirectUri);
+    console.log('🔵 Client ID:', process.env.GARMIN_CLIENT_ID ? 'Set' : 'Missing');
+    console.log('🔵 Code Challenge:', codeChallenge.substring(0, 20) + '...');
+    console.log('🔵 State:', state);
 
-    // 6. Check if this is a popup request (via query param or header)
-    const url = new URL(request.url);
-    const isPopup = url.searchParams.get('popup') === 'true' || 
-                    request.headers.get('x-popup-request') === 'true';
-
-    if (isPopup) {
-      // Return JSON with auth URL for popup flow
-      return NextResponse.json({
-        success: true,
-        authUrl: authUrl
-      });
-    }
-
-    // 6. Redirect user to Garmin (normal flow)
+    // 6. ALWAYS return a redirect - no popup detection, just redirect
+    console.log('✅ Returning 302 redirect to Garmin OAuth page');
     return NextResponse.redirect(authUrl);
 
   } catch (error: any) {
     console.error('❌ Garmin authorize error:', error);
+    console.error('❌ Stack:', error.stack);
     return NextResponse.json(
       { error: 'Failed to initiate Garmin OAuth' },
       { status: 500 }
     );
   }
 }
-
