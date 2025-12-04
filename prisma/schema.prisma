@@ -350,7 +350,7 @@ model Race {
 model TrainingPlan {
   id                     String   @id @default(cuid())
   athleteId              String
-  raceId                 String
+  raceId                 String?  // Made optional to support existing plans without raceId
 
   trainingPlanName       String
   trainingPlanGoalTime   String
@@ -365,7 +365,7 @@ model TrainingPlan {
   status                 String @default("draft")
 
   athlete Athlete @relation(fields:[athleteId], references:[id])
-  race    Race    @relation(fields:[raceId], references:[id])
+  race    Race?   @relation(fields:[raceId], references:[id])
 
   phases      TrainingPhase[]
   plannedDays TrainingDayPlanned[]
