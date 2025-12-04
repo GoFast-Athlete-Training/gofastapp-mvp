@@ -30,6 +30,41 @@ export default function SettingsPage() {
     }
   }, []);
 
+  const refreshAthleteData = async () => {
+    try {
+      const { auth } = await import('@/lib/firebase');
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+
+      const firebaseToken = await currentUser.getIdToken();
+      
+      // Hydrate athlete to get fresh data including Garmin connection status
+      const response = await fetch(`${API_BASE}/athlete/hydrate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${firebaseToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.athlete) {
+          // Update localStorage with fresh athlete data
+          LocalStorageAPI.setAthlete(data.athlete);
+          setAthlete(data.athlete);
+          
+          // Update connection status from fresh data
+          setConnections({
+            garmin: data.athlete.garmin_is_connected || false,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing athlete data:', error);
+    }
+  };
+
   const checkGarminConnection = async (athleteId: string) => {
     try {
       const response = await fetch(`${API_BASE}/garmin/status?athleteId=${athleteId}`);
@@ -108,13 +143,16 @@ export default function SettingsPage() {
       }, 500);
 
       // Listen for postMessage from callback
-      const messageHandler = (event: MessageEvent) => {
+      const messageHandler = async (event: MessageEvent) => {
         if (event.origin !== window.location.origin) return;
         if (event.data.type === 'GARMIN_OAUTH_SUCCESS') {
           clearInterval(checkPopup);
           if (!popup.closed) popup.close();
           setLoading(false);
+          
+          // Refresh athlete data from backend to get updated Garmin connection status
           if (athlete?.id) {
+            await refreshAthleteData();
             checkGarminConnection(athlete.id);
           }
           window.removeEventListener('message', messageHandler);

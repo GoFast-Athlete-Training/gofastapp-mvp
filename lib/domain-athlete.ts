@@ -137,6 +137,11 @@ export async function hydrateAthlete(athleteId: string) {
       activityCount: weeklyTotals.activities,
     },
     
+    // Garmin connection status
+    garmin_is_connected: athlete.garmin_is_connected || false,
+    garmin_user_id: athlete.garmin_user_id,
+    garmin_connected_at: athlete.garmin_connected_at,
+    
     // Computed fields
     fullName: athlete.firstName && athlete.lastName 
       ? `${athlete.firstName} ${athlete.lastName}` 
