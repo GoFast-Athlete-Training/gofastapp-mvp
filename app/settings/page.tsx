@@ -82,6 +82,8 @@ export default function SettingsPage() {
   };
 
   const connectGarmin = async () => {
+    console.log('🔵 Connect Garmin button clicked');
+    
     if (!athlete?.id) {
       alert('Please sign in to connect Garmin');
       return;
@@ -99,6 +101,8 @@ export default function SettingsPage() {
       }
       const firebaseToken = await currentUser.getIdToken();
       
+      console.log('🔵 Calling /api/auth/garmin/authorize?popup=true');
+      
       // Call authorize endpoint to get auth URL (with popup flag)
       const response = await fetch('/api/auth/garmin/authorize?popup=true', {
         method: 'GET',
@@ -106,6 +110,8 @@ export default function SettingsPage() {
           'Authorization': `Bearer ${firebaseToken}`
         }
       });
+      
+      console.log('🔵 Authorize response status:', response.status);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -274,7 +280,12 @@ export default function SettingsPage() {
                   </>
                 ) : (
                   <button
-                    onClick={connectGarmin}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log('🔵 Connect button clicked');
+                      connectGarmin();
+                    }}
                     className="px-4 py-1.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition"
                   >
                     Connect
