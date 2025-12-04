@@ -18,6 +18,9 @@ export async function GET(request: Request) {
     const state = searchParams.get('state');
     const error = searchParams.get('error');
 
+    // Get cookies early
+    const cookieStore = await cookies();
+
     // Helper function to return error HTML
     const returnErrorHtml = (errorMsg: string) => {
       const html = `
@@ -90,8 +93,10 @@ export async function GET(request: Request) {
     }
 
     // 3. Get code verifier and athleteId from cookies
-    const codeVerifier = cookieStore.get('garmin_code_verifier')?.value;
-    const athleteId = cookieStore.get('garmin_athlete_id')?.value;
+    const codeVerifierCookie = await cookieStore.get('garmin_code_verifier');
+    const athleteIdCookie = await cookieStore.get('garmin_athlete_id');
+    const codeVerifier = codeVerifierCookie?.value;
+    const athleteId = athleteIdCookie?.value;
 
     if (!codeVerifier || !athleteId) {
       console.error('❌ Missing code verifier or athleteId in cookies');
@@ -136,8 +141,8 @@ export async function GET(request: Request) {
     console.log(`✅ Garmin tokens saved for athleteId: ${athleteId}`);
 
     // 7. Clean up cookies
-    cookieStore.delete('garmin_code_verifier');
-    cookieStore.delete('garmin_athlete_id');
+    await cookieStore.delete('garmin_code_verifier');
+    await cookieStore.delete('garmin_athlete_id');
 
     // 8. Return HTML page that works for both popup and normal redirect
     // The JavaScript will detect if it's in a popup and handle accordingly
