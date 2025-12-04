@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import api from '@/lib/api';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://gofastbackendv2-fall2025.onrender.com/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 export default function SettingsPage() {
   const router = useRouter();

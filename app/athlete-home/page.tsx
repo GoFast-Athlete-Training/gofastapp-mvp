@@ -17,7 +17,7 @@ import WeeklyStats from '@/components/athlete/WeeklyStats';
 import LatestActivityCard from '@/components/athlete/LatestActivityCard';
 import RSVPCard from '@/components/athlete/RSVPCard';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://gofastbackendv2-fall2025.onrender.com/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 export default function AthleteHomePage() {
   const router = useRouter();

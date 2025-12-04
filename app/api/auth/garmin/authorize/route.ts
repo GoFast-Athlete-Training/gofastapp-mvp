@@ -56,9 +56,16 @@ export async function GET(request: Request) {
     });
 
     // 5. Build Garmin authorization URL
-    // Note: redirect URI must match Garmin Developer Portal exactly (no popup param)
-    const redirectUri = process.env.GARMIN_REDIRECT_URI || 
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/garmin/callback`;
+    // Note: redirect URI must match Garmin Developer Portal exactly
+    const redirectUri = process.env.GARMIN_REDIRECT_URI;
+    
+    if (!redirectUri) {
+      console.error('❌ GARMIN_REDIRECT_URI is not configured');
+      return NextResponse.json(
+        { error: 'Garmin redirect URI not configured' },
+        { status: 500 }
+      );
+    }
     
     const authUrl = buildGarminAuthUrl(codeChallenge, state, redirectUri);
 

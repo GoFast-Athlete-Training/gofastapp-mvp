@@ -104,8 +104,12 @@ export async function GET(request: Request) {
     }
 
     // 4. Exchange authorization code for tokens
-    const redirectUri = process.env.GARMIN_REDIRECT_URI || 
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/garmin/callback`;
+    const redirectUri = process.env.GARMIN_REDIRECT_URI;
+    
+    if (!redirectUri) {
+      console.error('❌ GARMIN_REDIRECT_URI is not configured');
+      return returnErrorHtml('Garmin redirect URI not configured');
+    }
     
     console.log(`🔍 Exchanging code for tokens for athleteId: ${athleteId}`);
     const tokenResult = await exchangeCodeForTokens(code, codeVerifier, redirectUri);
