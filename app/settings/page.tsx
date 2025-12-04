@@ -46,8 +46,93 @@ export default function SettingsPage() {
     }
   };
 
-  const connectGarmin = () => {
-    router.push('/settings/garmin');
+  const connectGarmin = async () => {
+    if (!athlete?.id) {
+      alert('Please sign in to connect Garmin');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Get Firebase token
+      const { auth } = await import('@/lib/firebase');
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        alert('Please sign in to connect Garmin');
+        setLoading(false);
+        return;
+      }
+      const firebaseToken = await currentUser.getIdToken();
+      
+      // Call authorize endpoint to get auth URL (with popup flag)
+      const response = await fetch('/api/auth/garmin/authorize?popup=true', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${firebaseToken}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to get auth URL');
+      }
+
+      const data = await response.json();
+      if (!data.success || !data.authUrl) {
+        throw new Error('Invalid response from server');
+      }
+
+      // Open popup window
+      const popup = window.open(
+        data.authUrl,
+        'garmin-oauth',
+        'width=600,height=700,scrollbars=yes,resizable=yes'
+      );
+
+      if (!popup) {
+        alert('Popup blocked. Please allow popups for this site.');
+        setLoading(false);
+        return;
+      }
+
+      // Listen for popup to close or send message
+      const checkPopup = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkPopup);
+          setLoading(false);
+          // Check connection status after popup closes
+          if (athlete?.id) {
+            checkGarminConnection(athlete.id);
+          }
+        }
+      }, 500);
+
+      // Listen for postMessage from callback
+      const messageHandler = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return;
+        if (event.data.type === 'GARMIN_OAUTH_SUCCESS') {
+          clearInterval(checkPopup);
+          if (!popup.closed) popup.close();
+          setLoading(false);
+          if (athlete?.id) {
+            checkGarminConnection(athlete.id);
+          }
+          window.removeEventListener('message', messageHandler);
+        } else if (event.data.type === 'GARMIN_OAUTH_ERROR') {
+          clearInterval(checkPopup);
+          if (!popup.closed) popup.close();
+          setLoading(false);
+          alert('Failed to connect Garmin: ' + (event.data.error || 'Unknown error'));
+          window.removeEventListener('message', messageHandler);
+        }
+      };
+      window.addEventListener('message', messageHandler);
+
+    } catch (error: any) {
+      console.error('Error connecting Garmin:', error);
+      alert('Failed to connect Garmin: ' + (error.message || 'Unknown error'));
+      setLoading(false);
+    }
   };
 
   const disconnectGarmin = async () => {

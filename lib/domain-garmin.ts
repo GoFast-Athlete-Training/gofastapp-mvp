@@ -51,3 +51,52 @@ export async function getAthleteByGarminUserId(garminUserId: string) {
   });
 }
 
+/**
+ * Fetch and save Garmin user info after OAuth token exchange
+ */
+export async function fetchAndSaveGarminUserInfo(
+  athleteId: string,
+  accessToken: string
+) {
+  try {
+    // Fetch user info from Garmin API
+    const userInfoUrl = 'https://apis.garmin.com/wellness-api/rest/user/id';
+    const response = await fetch(userInfoUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Garmin user info fetch failed:', response.status, errorText);
+      return { success: false, error: `Failed to fetch user info: ${response.status}` };
+    }
+
+    const userData = await response.json();
+    const garminUserId = userData.userId || userData.id || null;
+
+    if (garminUserId) {
+      // Update athlete with Garmin user ID and profile
+      await prisma.athlete.update({
+        where: { id: athleteId },
+        data: {
+          garmin_user_id: garminUserId,
+          garmin_user_profile: userData,
+          garmin_last_sync_at: new Date()
+        }
+      });
+      console.log(`✅ Garmin user ID saved: ${garminUserId}`);
+      return { success: true, garminUserId, userData };
+    } else {
+      console.warn('⚠️ No userId found in Garmin user data response');
+      return { success: false, error: 'No userId in response' };
+    }
+  } catch (error: any) {
+    console.error('❌ Error fetching Garmin user info:', error);
+    return { success: false, error: error.message };
+  }
+}
+

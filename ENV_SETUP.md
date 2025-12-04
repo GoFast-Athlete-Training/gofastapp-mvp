@@ -50,13 +50,33 @@ Or use direct PostgreSQL connection:
 DATABASE_URL="postgres://29f4102baa8cb945571534373992ad24bc52793c34599a2a62d92e3a3f6df2d9:sk_CQTE8enXMYXLZmcdEu1d3@db.prisma.io:5432/postgres?sslmode=require"
 ```
 
-## Garmin OAuth (Optional)
+## Garmin OAuth (Required for Garmin Integration)
+
+### Production Credentials (GoFast Render Stack)
 
 ```bash
-GARMIN_CLIENT_ID=your_client_id
-GARMIN_CLIENT_SECRET=your_client_secret
-GARMIN_REDIRECT_URI=http://localhost:3000/settings/garmin/callback
+# Production Garmin OAuth 2.0 Credentials
+GARMIN_CLIENT_ID="PRODUCTION_CLIENT_ID"
+GARMIN_CLIENT_SECRET="PRODUCTION_CLIENT_SECRET"
+
+# OAuth Callback URL (must match Garmin Developer Portal settings)
+GARMIN_REDIRECT_URI="https://gofast.gofastcrushgoals.com/api/auth/garmin/callback"
+
+# Webhook URL for Garmin activity data push
+GARMIN_WEBHOOK_URI="https://gofast.gofastcrushgoals.com/api/garmin/webhook"
+
+# Debug mode (set to "true" to enable detailed webhook logging)
+GARMIN_DEBUG="false"
+
+# Optional: Token secrets for additional security (if needed)
+GARMIN_USER_ACCESS_TOKEN_SECRET=""
+GARMIN_USER_REFRESH_TOKEN_SECRET=""
 ```
+
+**Important**: 
+- The `GARMIN_REDIRECT_URI` and `GARMIN_WEBHOOK_URI` must be registered in your Garmin Developer Portal.
+- Use production credentials from the "GoFast Render Stack" Garmin application.
+- Set `GARMIN_DEBUG="true"` in development to see detailed webhook payloads.
 
 ## App URL
 
