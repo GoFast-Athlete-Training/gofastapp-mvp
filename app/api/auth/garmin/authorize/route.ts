@@ -97,7 +97,17 @@ export async function GET(request: Request) {
     console.log('🔵 Code Challenge:', codeChallenge.substring(0, 20) + '...');
     console.log('🔵 State:', state);
 
-    // 6. ALWAYS return a redirect - no popup detection, just redirect
+    // 6. Check if this is a popup request
+    const url = new URL(request.url);
+    const isPopup = url.searchParams.get('popup') === 'true';
+
+    if (isPopup) {
+      // Return JSON with URL for popup flow
+      console.log('✅ Returning JSON with auth URL for popup');
+      return NextResponse.json({ url: authUrl });
+    }
+
+    // 7. Otherwise, return redirect for normal flow
     console.log('✅ Returning 302 redirect to Garmin OAuth page');
     return NextResponse.redirect(authUrl);
 

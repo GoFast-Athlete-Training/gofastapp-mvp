@@ -82,7 +82,7 @@ export default function SettingsPage() {
   };
 
   const connectGarmin = async () => {
-    console.log('🔵 Connect Garmin - starting OAuth');
+    console.log('🔵 Connect Garmin button clicked');
     
     // Check if already connected (only check garmin_user_id from athlete data)
     if (athlete?.garmin_user_id) {
@@ -107,51 +107,48 @@ export default function SettingsPage() {
       }
       const firebaseToken = await currentUser.getIdToken();
       
-      console.log('🔵 Calling /api/auth/garmin/authorize');
+      console.log('🔵 Calling /api/auth/garmin/authorize?popup=true');
       
-      // Call authorize endpoint - it will return a 302 redirect
-      // Use redirect: 'manual' to get the redirect URL without following it
-      const res = await fetch('/api/auth/garmin/authorize', {
+      // Call authorize endpoint to get OAuth URL as JSON
+      const res = await fetch('/api/auth/garmin/authorize?popup=true', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${firebaseToken}`
-        },
-        redirect: 'manual' // Don't follow redirect, get the URL instead
+        }
       });
 
       console.log('🔵 Authorize response status:', res.status);
 
-      if (res.status === 401 || res.status === 404 || res.status === 500) {
+      if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to get auth URL');
       }
 
-      // If we got a redirect (302), get the Location header
-      if (res.status === 302 || res.status === 0) {
-        // Status 0 can happen with CORS redirects
-        const redirectUrl = res.headers.get('Location') || res.url;
-        
-        if (!redirectUrl) {
-          throw new Error('No redirect URL received from server');
-        }
+      // Get the URL from JSON response
+      const data = await res.json();
+      const authUrl = data.url;
 
-        console.log('🔵 Got redirect URL:', redirectUrl);
-        console.log('🔵 Opening Garmin OAuth page in popup');
+      if (!authUrl) {
+        throw new Error('No auth URL received from server');
+      }
 
-        // Open popup window with the Garmin OAuth URL
-        const popup = window.open(
-          redirectUrl,
-          'garmin-oauth',
-          'width=600,height=800,scrollbars=yes,resizable=yes'
-        );
+      console.log('🔵 Got auth URL from server:', authUrl);
+      console.log('🔵 Opening Garmin OAuth page in popup');
 
-        if (!popup) {
-          alert('Popup blocked. Please allow popups for this site.');
-          setLoading(false);
-          return;
-        }
+      // Open popup window with the Garmin OAuth URL (DO NOT fetch it)
+      const popup = window.open(
+        authUrl,
+        'garmin-oauth',
+        'width=600,height=800,scrollbars=yes,resizable=yes'
+      );
 
-        console.log('✅ Popup opened, waiting for OAuth completion...');
+      if (!popup) {
+        alert('Popup blocked. Please allow popups for this site.');
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ Popup opened, waiting for OAuth completion...');
 
         // Listen for popup to close or send message
         const checkPopup = setInterval(() => {
@@ -200,9 +197,6 @@ export default function SettingsPage() {
           }
         };
         window.addEventListener('message', messageHandler);
-      } else {
-        throw new Error('Unexpected response from authorize endpoint');
-      }
 
     } catch (error: any) {
       console.error('❌ Error connecting Garmin:', error);
