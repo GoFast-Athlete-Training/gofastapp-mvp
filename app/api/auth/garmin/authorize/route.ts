@@ -45,17 +45,32 @@ export async function GET(request: Request) {
     console.log('✅ Code verifier stored in cookie');
 
     // 4. Build server callback URL (production must use SERVER_URL)
-    const serverUrl = process.env.SERVER_URL || process.env.NEXT_PUBLIC_APP_URL || `https://${process.env.VERCEL_URL}`;
-    if (!serverUrl) {
+    // Priority: SERVER_URL > NEXT_PUBLIC_APP_URL > VERCEL_URL (preview deployments only)
+    let serverUrl = process.env.SERVER_URL || process.env.NEXT_PUBLIC_APP_URL || `https://${process.env.VERCEL_URL}`;
+    
+    // CRITICAL: In production, ALWAYS use production URL regardless of env vars
+    // This ensures redirect_uri always matches: https://gofast.gofastcrushgoals.com/api/auth/garmin/callback
+    if (process.env.NODE_ENV === 'production') {
+      serverUrl = 'https://gofast.gofastcrushgoals.com';
+      console.log('✅ Production mode: Using production URL:', serverUrl);
+    } else if (!serverUrl) {
       console.error('❌ SERVER_URL or NEXT_PUBLIC_APP_URL must be set');
       return NextResponse.json(
         { error: 'Server URL not configured' },
         { status: 500 }
       );
     }
+    
     const redirectUri = `${serverUrl}/api/auth/garmin/callback`;
     
+    // Validate redirect URI contains production domain
+    if (!redirectUri.includes('gofast.gofastcrushgoals.com')) {
+      console.warn('⚠️ Redirect URI does not contain production domain:', redirectUri);
+    }
+    
     console.log('🔵 Redirect URI:', redirectUri);
+    console.log('🔵 Server URL:', serverUrl);
+    console.log('✅ Redirect URI validated:', redirectUri.includes('gofast.gofastcrushgoals.com') ? 'Production URL' : 'Preview/Dev URL');
 
     // 5. Build Garmin authorization URL with athleteId as state
     const authUrl = buildGarminAuthUrl(codeChallenge, athleteId, redirectUri);
@@ -63,6 +78,7 @@ export async function GET(request: Request) {
     console.log('✅ Garmin OAuth authorization URL generated');
     console.log('🔵 Auth URL:', authUrl);
     console.log('🔵 State (athleteId):', athleteId);
+    console.log('🔵 Redirect URI in auth URL:', redirectUri);
 
     // 6. Return JSON with authUrl (client opens popup)
     return NextResponse.json({ authUrl });
