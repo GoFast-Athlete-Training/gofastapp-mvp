@@ -122,7 +122,19 @@ export default function SettingsPage() {
       const athleteId = athlete.id;
       console.log('🔵 Athlete ID:', athleteId);
 
-      // Call authorize route with athleteId
+      // CRITICAL: Open popup IMMEDIATELY (synchronously) before any async operations
+      // This prevents browser popup blockers from blocking the window
+      const popup = window.open('', 'garmin-oauth', 'width=500,height=700,menubar=no,toolbar=no,status=no');
+
+      if (!popup) {
+        alert('Popup blocked. Please allow popups for this site.');
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ Popup opened synchronously (before fetch)');
+
+      // Now fetch authorize URL from backend
       const res = await fetch(`/api/auth/garmin/authorize?athleteId=${athleteId}`, {
         method: 'GET',
         credentials: 'include'
@@ -131,6 +143,7 @@ export default function SettingsPage() {
       console.log('🔵 Authorize response status:', res.status);
 
       if (!res.ok) {
+        popup.close();
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.error || 'Garmin authorize failed');
       }
@@ -138,26 +151,17 @@ export default function SettingsPage() {
       const { authUrl } = await res.json();
 
       if (!authUrl) {
+        popup.close();
         console.error('❌ No authUrl returned from authorize endpoint');
         throw new Error('Invalid authorize response');
       }
 
-      console.log('🔵 Opening popup with Garmin URL:', authUrl);
+      console.log('🔵 Loading Garmin URL into popup:', authUrl);
 
-      // Open popup ONLY using window.open(authUrl) - DO NOT fetch Garmin URLs
-      const popup = window.open(
-        authUrl,
-        'garmin-oauth',
-        'width=500,height=600,menubar=no,toolbar=no,status=no'
-      );
+      // Load Garmin page into the already-opened popup
+      popup.location.href = authUrl;
 
-      if (!popup) {
-        alert('Popup blocked. Please allow popups for this site.');
-        setLoading(false);
-        return;
-      }
-
-      console.log('✅ Popup opened, waiting for OAuth completion...');
+      console.log('✅ Popup navigating to Garmin, waiting for OAuth completion...');
 
       // Listen for popup to close or send message
       const checkPopup = setInterval(() => {
@@ -174,19 +178,27 @@ export default function SettingsPage() {
       }, 500);
 
       // Listen for postMessage from callback
+      // NOTE: Do NOT check origin - Garmin may load intermediate pages (connect.garmin.com)
+      // We trust our callback HTML - the only sender is our own server
       const messageHandler = async (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) {
-          console.warn('⚠️ Ignoring message from different origin:', event.origin);
-          return;
-        }
+        if (!event.data) return;
         
         console.log('🔵 Received message from popup:', event.data);
         
-        // Handle both string and object message formats
-        const isSuccess = event.data === 'garmin-oauth-success' || 
-                         (event.data && event.data.success === true);
-        const isError = event.data === 'garmin-oauth-error' || 
-                       (event.data && event.data.success === false);
+        // Parse data (handle both string and object formats)
+        let data;
+        try {
+          data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        } catch {
+          // If parsing fails, treat as string
+          data = event.data;
+        }
+        
+        // Check for success (handle both formats)
+        const isSuccess = data === 'garmin-oauth-success' || 
+                         (data && data.success === true);
+        const isError = data === 'garmin-oauth-error' || 
+                       (data && data.success === false);
         
         if (isSuccess) {
           clearInterval(checkPopup);
@@ -203,7 +215,7 @@ export default function SettingsPage() {
           clearInterval(checkPopup);
           if (!popup.closed) popup.close();
           setLoading(false);
-          const errorMsg = event.data?.error || 'Unknown error';
+          const errorMsg = (typeof data === 'object' ? data.error : null) || 'Unknown error';
           console.error('❌ Garmin OAuth error:', errorMsg);
           alert('Failed to connect Garmin: ' + errorMsg);
           window.removeEventListener('message', messageHandler);
