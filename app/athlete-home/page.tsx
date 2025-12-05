@@ -42,6 +42,14 @@ export default function AthleteHomePage() {
 
   // NO REDIRECT - Users stay on athlete-home to see activities
   // Removed RunCrew or Bust redirect - let users see their activities!
+  useEffect(() => {
+    console.log('🏠 ATHLETE HOME: Page loaded, staying on athlete-home');
+    console.log('🏠 ATHLETE HOME: athleteProfile:', !!athleteProfile);
+    console.log('🏠 ATHLETE HOME: runCrewId:', runCrewId);
+    console.log('🏠 ATHLETE HOME: weeklyActivities:', weeklyActivities?.length || 0);
+    console.log('🏠 ATHLETE HOME: weeklyTotals:', weeklyTotals);
+    console.log('🏠 ATHLETE HOME: garminConnected:', garminConnected);
+  }, [athleteProfile, runCrewId, weeklyActivities, weeklyTotals, garminConnected]);
 
   // Hydrate crew if we have runCrewId but no crew data
   useEffect(() => {
