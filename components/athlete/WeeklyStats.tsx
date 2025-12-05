@@ -4,9 +4,10 @@ import { useRouter } from 'next/navigation';
 
 interface WeeklyStatsProps {
   weeklyTotals: any;
+  activities?: any[];
 }
 
-export default function WeeklyStats({ weeklyTotals }: WeeklyStatsProps) {
+export default function WeeklyStats({ weeklyTotals, activities }: WeeklyStatsProps) {
   const router = useRouter();
 
   if (!weeklyTotals) return null;
@@ -32,7 +33,7 @@ export default function WeeklyStats({ weeklyTotals }: WeeklyStatsProps) {
         </div>
         <div className="text-center">
           <p className="text-2xl font-bold text-orange-600">
-            {weeklyTotals.activityCount || 0}
+            {weeklyTotals.activityCount || activities?.length || 0}
           </p>
           <p className="text-sm text-gray-600">Activities</p>
         </div>

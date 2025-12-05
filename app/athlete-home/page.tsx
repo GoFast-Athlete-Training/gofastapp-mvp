@@ -40,6 +40,15 @@ export default function AthleteHomePage() {
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [isHydratingCrew, setIsHydratingCrew] = useState(false);
 
+  // RUNCREW OR BUST: Redirect to join/create if no crew
+  useEffect(() => {
+    if (athleteProfile && !runCrewId) {
+      console.log('🚨 ATHLETE HOME: No runcrew - redirecting to join/create (runcrew or bust)');
+      router.replace('/runcrew/join-or-start');
+      return;
+    }
+  }, [athleteProfile, runCrewId, router]);
+
   // Hydrate crew if we have runCrewId but no crew data
   useEffect(() => {
     const hydrateCrew = async () => {
@@ -151,7 +160,9 @@ export default function AthleteHomePage() {
         />
 
         {/* Weekly Stats - Only show if Garmin connected */}
-        {garminConnected && weeklyTotals && <WeeklyStats weeklyTotals={weeklyTotals} />}
+        {garminConnected && weeklyTotals && (
+          <WeeklyStats weeklyTotals={weeklyTotals} activities={weeklyActivities} />
+        )}
 
         {/* Garmin Connection Prompt */}
         {!checkingConnection && !garminConnected && (
