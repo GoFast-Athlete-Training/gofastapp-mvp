@@ -2,23 +2,25 @@ import crypto from 'crypto';
 
 /**
  * Generate PKCE code verifier and challenge for Garmin OAuth 2.0
+ * Note: state is NOT generated here - it will be the athleteId
  */
 export function generatePKCE() {
   const codeVerifier = crypto.randomBytes(32).toString('base64url');
   const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
-  const state = crypto.randomBytes(16).toString('hex');
   
   return {
     codeVerifier,
-    codeChallenge,
-    state
+    codeChallenge
   };
 }
 
 /**
  * Build Garmin authorization URL with PKCE parameters
+ * @param codeChallenge - SHA-256 hash of code verifier
+ * @param athleteId - Athlete ID used as state parameter (matches legacy pattern)
+ * @param redirectUri - Server callback URL
  */
-export function buildGarminAuthUrl(codeChallenge: string, state: string, redirectUri: string) {
+export function buildGarminAuthUrl(codeChallenge: string, athleteId: string, redirectUri: string) {
   const clientId = process.env.GARMIN_CLIENT_ID;
   if (!clientId) {
     throw new Error('GARMIN_CLIENT_ID is not configured');
@@ -37,7 +39,7 @@ export function buildGarminAuthUrl(codeChallenge: string, state: string, redirec
     response_type: 'code',
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
-    state: state,
+    state: athleteId,  // Use athleteId as state (legacy pattern)
     scope: scopes,
     redirect_uri: redirectUri
   });

@@ -6,20 +6,17 @@ import { exchangeCodeForTokens } from '@/lib/garmin-pkce';
 import { updateGarminConnection, fetchAndSaveGarminUserInfo } from '@/lib/domain-garmin';
 
 /**
- * GET /api/auth/garmin/callback
+ * GET /api/auth/garmin/callback?code=XXX&state=athleteId
  * 
- * Handles OAuth callback from Garmin.
+ * Handles OAuth callback from Garmin (server-only).
  * Exchanges authorization code for access tokens and saves to database.
  */
 export async function GET(request: Request) {
   try {
     const searchParams = new URL(request.url).searchParams;
     const code = searchParams.get('code');
-    const state = searchParams.get('state');
+    const state = searchParams.get('state');  // state = athleteId
     const error = searchParams.get('error');
-
-    // Get cookies early
-    const cookieStore = await cookies();
 
     // Helper function to return error HTML
     const returnErrorHtml = (errorMsg: string) => {
@@ -28,45 +25,14 @@ export async function GET(request: Request) {
         <html>
           <head>
             <title>Garmin Connection Failed</title>
-            <style>
-              body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                min-height: 100vh;
-                margin: 0;
-                background: #f3f4f6;
-              }
-              .container {
-                text-align: center;
-                padding: 2rem;
-                background: white;
-                border-radius: 8px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-              }
-              .error {
-                color: #ef4444;
-                font-size: 1.5rem;
-                margin-bottom: 1rem;
-              }
-            </style>
           </head>
           <body>
-            <div class="container">
-              <div class="error">✗</div>
-              <h1>Connection Failed</h1>
-              <p>${errorMsg}</p>
-              <p style="font-size: 0.875rem; color: #6b7280; margin-top: 1rem;">This window will close automatically...</p>
-            </div>
+            <h1>Connection Failed</h1>
+            <p>${errorMsg}</p>
             <script>
               if (window.opener) {
-                window.opener.postMessage('garmin-oauth-error', window.location.origin);
-                setTimeout(() => window.close(), 2000);
-              } else {
-                setTimeout(() => {
-                  window.location.href = '/settings/garmin?error=${encodeURIComponent(errorMsg)}';
-                }, 2000);
+                window.opener.postMessage({ success: false, error: '${errorMsg.replace(/'/g, "\\'")}' }, '*');
+                window.close();
               }
             </script>
           </body>
@@ -83,31 +49,37 @@ export async function GET(request: Request) {
       return returnErrorHtml(`OAuth error: ${error}`);
     }
 
-    // 2. Validate required parameters
-    if (!code || !state) {
-      console.error('❌ Missing required parameters:', { code: !!code, state: !!state });
-      return returnErrorHtml('Missing required parameters');
+    // 2. Extract athleteId from state parameter
+    const athleteId = state;  // state IS the athleteId (legacy pattern)
+    
+    if (!athleteId) {
+      console.error('❌ Missing state parameter (athleteId)');
+      return returnErrorHtml('Missing athlete ID');
     }
 
-    // 3. Get code verifier and athleteId from cookies
-    const codeVerifierCookie = await cookieStore.get('garmin_code_verifier');
-    const athleteIdCookie = await cookieStore.get('garmin_athlete_id');
-    const codeVerifier = codeVerifierCookie?.value;
-    const athleteId = athleteIdCookie?.value;
+    // 3. Extract code
+    if (!code) {
+      console.error('❌ Missing code parameter');
+      return returnErrorHtml('Missing authorization code');
+    }
 
-    if (!codeVerifier || !athleteId) {
-      console.error('❌ Missing code verifier or athleteId in cookies');
+    console.log(`🔍 Processing callback for athleteId: ${athleteId}`);
+
+    // 4. Retrieve codeVerifier from cookie storage
+    const cookieStore = await cookies();
+    const codeVerifierCookie = await cookieStore.get(`garmin_code_verifier_${athleteId}`);
+    const codeVerifier = codeVerifierCookie?.value;
+
+    if (!codeVerifier) {
+      console.error(`❌ No code verifier found for athleteId: ${athleteId}`);
       return returnErrorHtml('Session expired. Please try again.');
     }
 
-    // 4. Exchange authorization code for tokens
-    const redirectUri = process.env.GARMIN_REDIRECT_URI;
-    
-    if (!redirectUri) {
-      console.error('❌ GARMIN_REDIRECT_URI is not configured');
-      return returnErrorHtml('Garmin redirect URI not configured');
-    }
-    
+    // 5. Build redirect URI (must match authorize route)
+    const serverUrl = process.env.SERVER_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://gofast.gofastcrushgoals.com';
+    const redirectUri = `${serverUrl}/api/auth/garmin/callback`;
+
+    // 6. Exchange code for tokens
     console.log(`🔍 Exchanging code for tokens for athleteId: ${athleteId}`);
     const tokenResult = await exchangeCodeForTokens(code, codeVerifier, redirectUri);
 
@@ -119,20 +91,20 @@ export async function GET(request: Request) {
     const { tokens } = tokenResult;
     console.log(`✅ Tokens received for athleteId: ${athleteId}`);
 
-    // 5. Fetch Garmin user info to get user ID
-    const userInfoResult = await fetchAndSaveGarminUserInfo(
-      athleteId,
-      tokens.access_token
-    );
+    // 7. Fetch Garmin user ID and save to database
+    console.log(`🔍 Fetching Garmin user ID for athleteId: ${athleteId}`);
+    const userInfoResult = await fetchAndSaveGarminUserInfo(athleteId, tokens.access_token);
 
-    if (!userInfoResult.success) {
+    let garminUserId = userInfoResult.garminUserId || 'pending';
+    if (userInfoResult.success) {
+      console.log(`✅ Garmin user ID fetched and saved: ${garminUserId}`);
+    } else {
       console.warn(`⚠️ Could not fetch Garmin user info: ${userInfoResult.error}`);
-      // Continue anyway - we'll try to get user ID later
     }
 
-    // 6. Save tokens to database
+    // 8. Save tokens to database
     await updateGarminConnection(athleteId, {
-      garmin_user_id: userInfoResult.garminUserId || 'pending',
+      garmin_user_id: garminUserId,
       garmin_access_token: tokens.access_token,
       garmin_refresh_token: tokens.refresh_token,
       garmin_expires_in: tokens.expires_in || 3600,
@@ -141,12 +113,10 @@ export async function GET(request: Request) {
 
     console.log(`✅ Garmin tokens saved for athleteId: ${athleteId}`);
 
-    // 7. Clean up cookies
-    await cookieStore.delete('garmin_code_verifier');
-    await cookieStore.delete('garmin_athlete_id');
+    // 9. Clean up cookie
+    await cookieStore.delete(`garmin_code_verifier_${athleteId}`);
 
-    // 8. Return HTML page that works for both popup and normal redirect
-    // The JavaScript will detect if it's in a popup and handle accordingly
+    // 10. Return HTML page that closes popup and notifies parent
     const html = `
       <!DOCTYPE html>
       <html>
@@ -183,13 +153,10 @@ export async function GET(request: Request) {
             <p>This window will close automatically...</p>
           </div>
           <script>
-            // Send success message to parent window if in popup
             if (window.opener) {
-              console.log('✅ Sending success message to parent window');
-              window.opener.postMessage('garmin-oauth-success', window.location.origin);
-              setTimeout(() => window.close(), 1000);
+              window.opener.postMessage({ success: true }, '*');
+              window.close();
             } else {
-              // Fallback: redirect if not in popup
               setTimeout(() => {
                 window.location.href = '/settings?connected=garmin';
               }, 1500);
@@ -205,52 +172,20 @@ export async function GET(request: Request) {
   } catch (err: any) {
     console.error('❌ Garmin callback error:', err);
     
-    // Return error HTML that works for both popup and normal flow
     const errorMessage = (err.message || 'Callback failed').replace(/'/g, "\\'");
     const html = `
       <!DOCTYPE html>
       <html>
         <head>
           <title>Garmin Connection Failed</title>
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              min-height: 100vh;
-              margin: 0;
-              background: #f3f4f6;
-            }
-            .container {
-              text-align: center;
-              padding: 2rem;
-              background: white;
-              border-radius: 8px;
-              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            }
-            .error {
-              color: #ef4444;
-              font-size: 1.5rem;
-              margin-bottom: 1rem;
-            }
-          </style>
         </head>
         <body>
-          <div class="container">
-            <div class="error">✗</div>
-            <h1>Connection Failed</h1>
-            <p>${errorMessage}</p>
-            <p style="font-size: 0.875rem; color: #6b7280; margin-top: 1rem;">This window will close automatically...</p>
-          </div>
+          <h1>Connection Failed</h1>
+          <p>${errorMessage}</p>
           <script>
             if (window.opener) {
-                window.opener.postMessage('garmin-oauth-error', window.location.origin);
-              setTimeout(() => window.close(), 2000);
-            } else {
-              setTimeout(() => {
-                window.location.href = '/settings/garmin?error=callback_failed';
-              }, 2000);
+              window.opener.postMessage({ success: false, error: '${errorMessage}' }, '*');
+              window.close();
             }
           </script>
         </body>
