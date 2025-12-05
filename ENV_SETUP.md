@@ -84,3 +84,26 @@ GARMIN_USER_REFRESH_TOKEN_SECRET=""
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
+## Server URL (Required for Garmin OAuth)
+
+**CRITICAL**: This must be set in Vercel production environment variables.
+
+```bash
+# Production (Vercel)
+SERVER_URL=https://gofast.gofastcrushgoals.com
+
+# Development (optional - falls back to NEXT_PUBLIC_APP_URL)
+SERVER_URL=http://localhost:3000
+```
+
+**Why it's needed:**
+- Used to build the `redirect_uri` for Garmin OAuth callback
+- Must match exactly what's registered in Garmin Developer Portal
+- Falls back to `NEXT_PUBLIC_APP_URL` if not set, but `SERVER_URL` should be explicitly set in production
+
+**Vercel Setup:**
+1. Go to Vercel Dashboard → Your Project → Settings → Environment Variables
+2. Add: `SERVER_URL` = `https://gofast.gofastcrushgoals.com`
+3. Ensure it's set for Production environment
+4. Redeploy if needed
+
