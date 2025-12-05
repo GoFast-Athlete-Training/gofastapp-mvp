@@ -40,11 +40,8 @@ export default function AthleteHomePage() {
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [isHydratingCrew, setIsHydratingCrew] = useState(false);
 
-  // DISABLED: RunCrew or Bust redirect - Let users stay on athlete-home
-  // Users can manually navigate to join/create if they want
-  // useEffect(() => {
-  //   // Don't redirect - let users stay on athlete-home
-  // }, []);
+  // NO REDIRECT - Users stay on athlete-home to see activities
+  // Removed RunCrew or Bust redirect - let users see their activities!
 
   // Hydrate crew if we have runCrewId but no crew data
   useEffect(() => {
