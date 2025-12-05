@@ -41,13 +41,25 @@ export default function AthleteHomePage() {
   const [isHydratingCrew, setIsHydratingCrew] = useState(false);
 
   // RUNCREW OR BUST: Redirect to join/create if no crew
+  // Only redirect if we have athlete data AND confirmed no runCrewId (not just loading)
   useEffect(() => {
-    if (athleteProfile && !runCrewId) {
-      console.log('🚨 ATHLETE HOME: No runcrew - redirecting to join/create (runcrew or bust)');
-      router.replace('/runcrew/join-or-start');
+    // Don't redirect if we're already on the join-or-start page
+    if (typeof window !== 'undefined' && window.location.pathname === '/runcrew/join-or-start') {
       return;
     }
-  }, [athleteProfile, runCrewId, router]);
+
+    // Wait a bit to ensure localStorage has been read and hydration is complete
+    const timer = setTimeout(() => {
+      // Only redirect if we have athlete data but NO runCrewId
+      // This means the user is authenticated but not in a crew
+      if (athleteProfile && athleteId && !runCrewId && !isHydratingCrew) {
+        console.log('🚨 ATHLETE HOME: No runcrew - redirecting to join/create (runcrew or bust)');
+        router.replace('/runcrew/join-or-start');
+      }
+    }, 200); // Small delay to allow localStorage and hydration to complete
+
+    return () => clearTimeout(timer);
+  }, [athleteProfile, athleteId, runCrewId, isHydratingCrew, router]);
 
   // Hydrate crew if we have runCrewId but no crew data
   useEffect(() => {
