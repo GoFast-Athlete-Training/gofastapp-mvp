@@ -81,23 +81,6 @@ export default function SettingsPage() {
     }
   };
 
-  // TEMPORARY TEST FUNCTION - Remove after debugging
-  const connectGarminTest = () => {
-    console.log('🧪 Opening Garmin test popup');
-
-    const url =
-      'https://connect.garmin.com/oauthConfirm?client_id=83be27fa-331c-4c02-acb6-37cce6c358a7&response_type=code&redirect_uri=https%3A%2F%2Fgofast.gofastcrushgoals.com%2Fapi%2Fauth%2Fgarmin%2Fcallback';
-
-    const popup = window.open(
-      url,
-      'garmin-test',
-      'width=600,height=800,menubar=no,toolbar=no,status=no'
-    );
-
-    if (!popup) {
-      console.error('❌ Popup blocked by browser');
-    }
-  };
 
   const connectGarmin = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -330,21 +313,12 @@ export default function SettingsPage() {
                     </button>
                   </>
                 ) : (
-                  <>
-                    {/* TEMPORARY TEST BUTTON - Remove after debugging */}
-                    <button
-                      onClick={connectGarminTest}
-                      className="px-4 py-1.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition mr-2"
-                    >
-                      Test Popup
-                    </button>
-                    <button
-                      onClick={connectGarmin}
-                      className="px-4 py-1.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition"
-                    >
-                      Connect
-                    </button>
-                  </>
+                  <button
+                    onClick={connectGarmin}
+                    className="px-4 py-1.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition"
+                  >
+                    Connect
+                  </button>
                 )}
               </div>
             </div>
