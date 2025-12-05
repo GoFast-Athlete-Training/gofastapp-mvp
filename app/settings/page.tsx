@@ -81,17 +81,15 @@ export default function SettingsPage() {
     }
   };
 
-  const connectGarmin = async (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
+  const connectGarmin = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
 
     console.log('🔵 Connect Garmin button clicked');
 
     setLoading(true);
     try {
-      // Get Firebase token for authorization
+      // Get Firebase token for authorization (backend requires it)
       const { auth } = await import('@/lib/firebase');
       const currentUser = auth.currentUser;
       if (!currentUser) {
@@ -101,7 +99,7 @@ export default function SettingsPage() {
       }
       const firebaseToken = await currentUser.getIdToken();
 
-      // Fetch authorize endpoint to get OAuth URL
+      // Call authorize endpoint
       const res = await fetch('/api/auth/garmin/authorize?popup=true', {
         method: 'GET',
         headers: {
@@ -110,17 +108,30 @@ export default function SettingsPage() {
         credentials: 'include'
       });
 
-      const data = await res.json();
-      const authUrl = data.url;
-
-      if (!authUrl) {
-        throw new Error(data.error || 'No auth URL received from server');
+      if (!res.ok) {
+        console.error('❌ Authorize endpoint returned error', res.status);
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Garmin authorize failed');
       }
 
-      console.log('🔵 Received auth URL:', authUrl);
+      // Expect JSON, not redirect
+      const data = await res.json();
 
-      // OPEN POPUP (not fetch!) - let window.open() navigate to it
-      const popup = window.open(authUrl, 'garmin-oauth', 'width=600,height=800');
+      if (!data.url) {
+        console.error('❌ No URL returned from authorize endpoint', data);
+        throw new Error('Invalid response from server');
+      }
+
+      const authUrl = data.url;
+
+      console.log('🔵 Opening popup:', authUrl);
+
+      // IMPORTANT: Open popup directly instead of fetching Garmin URL
+      const popup = window.open(
+        authUrl,
+        'garmin-oauth',
+        'width=600,height=800,menubar=no,toolbar=no,status=no'
+      );
 
       if (!popup) {
         alert('Popup blocked. Please allow popups for this site.');
