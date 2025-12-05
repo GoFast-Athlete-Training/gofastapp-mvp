@@ -81,6 +81,24 @@ export default function SettingsPage() {
     }
   };
 
+  // TEMPORARY TEST FUNCTION - Remove after debugging
+  const connectGarminTest = () => {
+    console.log('🧪 Opening Garmin test popup');
+
+    const url =
+      'https://connect.garmin.com/oauthConfirm?client_id=83be27fa-331c-4c02-acb6-37cce6c358a7&response_type=code&redirect_uri=https%3A%2F%2Fgofast.gofastcrushgoals.com%2Fapi%2Fauth%2Fgarmin%2Fcallback';
+
+    const popup = window.open(
+      url,
+      'garmin-test',
+      'width=600,height=800,menubar=no,toolbar=no,status=no'
+    );
+
+    if (!popup) {
+      console.error('❌ Popup blocked by browser');
+    }
+  };
+
   const connectGarmin = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -89,17 +107,34 @@ export default function SettingsPage() {
 
     setLoading(true);
     try {
-      // Get Firebase token for authorization (backend requires it)
+      // STEP 1: Open popup immediately — MUST be synchronous (before any await)
+      const popup = window.open(
+        '',
+        'garmin-oauth',
+        'width=600,height=800,menubar=no,toolbar=no,status=no'
+      );
+
+      if (!popup) {
+        console.error('❌ Popup blocked by browser');
+        alert('Please allow popups for this site to connect Garmin.');
+        setLoading(false);
+        return;
+      }
+
+      console.log('🔵 Placeholder popup opened');
+
+      // STEP 2: Get Firebase token for authorization (backend requires it)
       const { auth } = await import('@/lib/firebase');
       const currentUser = auth.currentUser;
       if (!currentUser) {
+        popup.close();
         alert('Please sign in to connect Garmin');
         setLoading(false);
         return;
       }
       const firebaseToken = await currentUser.getIdToken();
 
-      // Call authorize endpoint
+      // STEP 3: Fetch authorize URL from backend
       const res = await fetch('/api/auth/garmin/authorize?popup=true', {
         method: 'GET',
         headers: {
@@ -108,36 +143,26 @@ export default function SettingsPage() {
         credentials: 'include'
       });
 
+      console.log('🔵 Authorize response status:', res.status);
+
       if (!res.ok) {
-        console.error('❌ Authorize endpoint returned error', res.status);
+        popup.close();
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.error || 'Garmin authorize failed');
       }
 
-      // Expect JSON, not redirect
       const data = await res.json();
 
       if (!data.url) {
+        popup.close();
         console.error('❌ No URL returned from authorize endpoint', data);
-        throw new Error('Invalid response from server');
+        throw new Error('Invalid authorize response');
       }
 
-      const authUrl = data.url;
+      console.log('🔵 Navigating popup to Garmin:', data.url);
 
-      console.log('🔵 Opening popup:', authUrl);
-
-      // IMPORTANT: Open popup directly instead of fetching Garmin URL
-      const popup = window.open(
-        authUrl,
-        'garmin-oauth',
-        'width=600,height=800,menubar=no,toolbar=no,status=no'
-      );
-
-      if (!popup) {
-        alert('Popup blocked. Please allow popups for this site.');
-        setLoading(false);
-        return;
-      }
+      // STEP 4: Only now load Garmin login URL into the already-open popup
+      popup.location.href = data.url;
 
       console.log('✅ Popup opened, waiting for OAuth completion...');
 
@@ -293,12 +318,21 @@ export default function SettingsPage() {
                     </button>
                   </>
                 ) : (
-                  <button
-                    onClick={connectGarmin}
-                    className="px-4 py-1.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition"
-                  >
-                    Connect
-                  </button>
+                  <>
+                    {/* TEMPORARY TEST BUTTON - Remove after debugging */}
+                    <button
+                      onClick={connectGarminTest}
+                      className="px-4 py-1.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition mr-2"
+                    >
+                      Test Popup
+                    </button>
+                    <button
+                      onClick={connectGarmin}
+                      className="px-4 py-1.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition"
+                    >
+                      Connect
+                    </button>
+                  </>
                 )}
               </div>
             </div>
