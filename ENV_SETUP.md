@@ -89,21 +89,26 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 **CRITICAL**: This must be set in Vercel production environment variables.
 
 ```bash
-# Production (Vercel)
+# Production (Vercel) - REQUIRED
 SERVER_URL=https://gofast.gofastcrushgoals.com
-
-# Development (optional - falls back to NEXT_PUBLIC_APP_URL)
-SERVER_URL=http://localhost:3000
 ```
 
 **Why it's needed:**
-- Used to build the `redirect_uri` for Garmin OAuth callback
+- Used to build the `redirect_uri` for Garmin OAuth callback: `${SERVER_URL}/api/auth/garmin/callback`
+- Used to build the webhook URL: `${SERVER_URL}/api/garmin/webhook`
 - Must match exactly what's registered in Garmin Developer Portal
-- Falls back to `NEXT_PUBLIC_APP_URL` if not set, but `SERVER_URL` should be explicitly set in production
+- Production must ALWAYS use `SERVER_URL` (no localhost fallbacks)
+
+**Fallback Priority (for Vercel preview deployments only):**
+1. `SERVER_URL` (production must set this)
+2. `NEXT_PUBLIC_APP_URL` (fallback for preview deployments)
+3. `https://${VERCEL_URL}` (automatic Vercel preview URL)
 
 **Vercel Setup:**
 1. Go to Vercel Dashboard → Your Project → Settings → Environment Variables
 2. Add: `SERVER_URL` = `https://gofast.gofastcrushgoals.com`
-3. Ensure it's set for Production environment
+3. Ensure it's set for **Production** environment
 4. Redeploy if needed
+
+**Important**: Production deployments will fail if `SERVER_URL` is not set.
 

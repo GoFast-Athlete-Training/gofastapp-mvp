@@ -75,8 +75,12 @@ export async function GET(request: Request) {
       return returnErrorHtml('Session expired. Please try again.');
     }
 
-    // 5. Build redirect URI (must match authorize route)
-    const serverUrl = process.env.SERVER_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://gofast.gofastcrushgoals.com';
+    // 5. Build redirect URI (must match authorize route - production must use SERVER_URL)
+    const serverUrl = process.env.SERVER_URL || process.env.NEXT_PUBLIC_APP_URL || `https://${process.env.VERCEL_URL}`;
+    if (!serverUrl) {
+      console.error('❌ SERVER_URL or NEXT_PUBLIC_APP_URL must be set');
+      return returnErrorHtml('Server URL not configured');
+    }
     const redirectUri = `${serverUrl}/api/auth/garmin/callback`;
 
     // 6. Exchange code for tokens

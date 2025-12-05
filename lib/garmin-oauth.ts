@@ -69,17 +69,31 @@ export async function completeGarminOAuth(
 }
 
 /**
- * Generate PKCE parameters and build auth URL
+ * Get server URL for building redirect URIs
+ * Production must use SERVER_URL environment variable
  */
-export function initiateGarminOAuth(redirectUri: string) {
-  const { codeVerifier, codeChallenge, state } = generatePKCE();
-  const authUrl = buildGarminAuthUrl(codeChallenge, state, redirectUri);
-  
-  return {
-    codeVerifier,
-    state,
-    authUrl
-  };
+export function getServerUrl(): string {
+  const serverUrl = process.env.SERVER_URL || process.env.NEXT_PUBLIC_APP_URL || `https://${process.env.VERCEL_URL}`;
+  if (!serverUrl) {
+    throw new Error('SERVER_URL or NEXT_PUBLIC_APP_URL must be set');
+  }
+  return serverUrl;
+}
+
+/**
+ * Get Garmin redirect URI (callback URL)
+ */
+export function getGarminRedirectUri(): string {
+  const serverUrl = getServerUrl();
+  return `${serverUrl}/api/auth/garmin/callback`;
+}
+
+/**
+ * Get Garmin webhook URI
+ */
+export function getGarminWebhookUri(): string {
+  const serverUrl = getServerUrl();
+  return `${serverUrl}/api/garmin/webhook`;
 }
 
 export { generatePKCE, buildGarminAuthUrl, exchangeCodeForTokens, fetchGarminUserInfo };
