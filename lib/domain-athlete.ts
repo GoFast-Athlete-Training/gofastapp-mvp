@@ -60,17 +60,7 @@ export async function hydrateAthlete(athleteId: string) {
             runCrew: true,
           },
         },
-        activities: {
-          where: {
-            startTime: {
-              not: null,
-              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
-            },
-          },
-          orderBy: {
-            startTime: 'desc',
-          },
-        },
+        // TODO: activities will be reintroduced in Schema Phase 3
       },
     });
   } catch (error: any) {
@@ -82,17 +72,7 @@ export async function hydrateAthlete(athleteId: string) {
       athlete = await prisma.athlete.findUnique({
         where: { id: athleteId },
         include: {
-          activities: {
-            where: {
-              startTime: {
-                not: null,
-                gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
-              },
-            },
-            orderBy: {
-              startTime: 'desc',
-            },
-          },
+          // TODO: activities will be reintroduced in Schema Phase 3
         },
       });
     } else {
@@ -105,20 +85,9 @@ export async function hydrateAthlete(athleteId: string) {
     return null;
   }
 
+  // TODO: Activities will be reintroduced in Schema Phase 3
   // Calculate weekly totals
-  const weeklyTotals = (athlete.activities || []).reduce(
-    (
-      acc: { distance: number; duration: number; activities: number },
-      activity: any
-    ) => {
-      return {
-        distance: acc.distance + (activity.distance ?? 0),
-        duration: acc.duration + (activity.duration ?? 0),
-        activities: acc.activities + 1,
-      };
-    },
-    { distance: 0, duration: 0, activities: 0 }
-  );
+  const weeklyTotals = { distance: 0, duration: 0, activities: 0 };
 
   // Normalize crews with roles (handle case where tables don't exist)
   const crews = hasRunCrewTables && athlete.runCrewMemberships
@@ -160,15 +129,16 @@ export async function hydrateAthlete(athleteId: string) {
     runCrewCount: crews.length,
     runCrewManagers: (hasRunCrewTables ? athlete.runCrewManagers : []) || [],
     
+    // TODO: Activities will be reintroduced in Schema Phase 3
     // Weekly Activities (last 7 days)
-    weeklyActivities: athlete.activities || [],
-    weeklyActivityCount: (athlete.activities || []).length,
+    weeklyActivities: [],
+    weeklyActivityCount: 0,
     weeklyTotals: {
-      totalDistance: weeklyTotals.distance,
-      totalDistanceMiles: (weeklyTotals.distance / 1609.34).toFixed(2), // Convert meters to miles
-      totalDuration: weeklyTotals.duration,
-      totalCalories: (athlete.activities || []).reduce((sum: number, a: any) => sum + (a.calories ?? 0), 0),
-      activityCount: weeklyTotals.activities,
+      totalDistance: 0,
+      totalDistanceMiles: '0.00',
+      totalDuration: 0,
+      totalCalories: 0,
+      activityCount: 0,
     },
     
     // Garmin connection status

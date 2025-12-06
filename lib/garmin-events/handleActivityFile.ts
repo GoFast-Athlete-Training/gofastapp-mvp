@@ -59,43 +59,45 @@ export async function handleActivityFile(
         continue;
       }
 
+      // TODO: Activities will be reintroduced in Schema Phase 3
       // Update activity with file data
-      const activity = await prisma.athleteActivity.findUnique({
-        where: { sourceActivityId: activityId }
-      });
+      // const activity = await prisma.athleteActivity.findUnique({
+      //   where: { sourceActivityId: activityId }
+      // });
 
-      if (!activity) {
-        console.warn(`⚠️ Activity ${activityId} not found for file processing`);
-        skipped++;
-        continue;
-      }
+      // if (!activity) {
+      //   console.warn(`⚠️ Activity ${activityId} not found for file processing`);
+      //   skipped++;
+      //   continue;
+      // }
 
-      const detailData = (activity.detailData || {}) as any;
-      const files = detailData.files || [];
+      // const detailData = (activity.detailData || {}) as any;
+      // const files = detailData.files || [];
 
-      // Add file to files array
-      files.push({
-        type: fileType,
-        url: file.fileUrl,
-        data: file.fileData,
-        processedAt: new Date().toISOString()
-      });
+      // // Add file to files array
+      // files.push({
+      //   type: fileType,
+      //   url: file.fileUrl,
+      //   data: file.fileData,
+      //   processedAt: new Date().toISOString()
+      // });
 
-      await prisma.athleteActivity.update({
-        where: { sourceActivityId: activityId },
-        data: {
-          detailData: {
-            ...detailData,
-            files
-          }
-        }
-      });
+      // await prisma.athleteActivity.update({
+      //   where: { sourceActivityId: activityId },
+      //   data: {
+      //     detailData: {
+      //       ...detailData,
+      //       files
+      //     }
+      //   }
+      // });
 
-      // Mark as processed
-      await markActivityFileProcessed(activityId, fileType);
+      // // Mark as processed
+      // await markActivityFileProcessed(activityId, fileType);
 
-      processed++;
-      console.log(`✅ Activity file ${fileType} for ${activityId} processed`);
+      // processed++;
+      // console.log(`✅ Activity file ${fileType} for ${activityId} processed`);
+      skipped++;
 
     } catch (error: any) {
       errors++;

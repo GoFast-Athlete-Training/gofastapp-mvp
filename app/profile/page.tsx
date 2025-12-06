@@ -5,21 +5,48 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import useHydratedAthlete from '@/hooks/useHydratedAthlete';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [athleteProfile, setAthleteProfile] = useState<any>(null);
+  const { athlete: athleteProfile } = useHydratedAthlete();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load athlete profile from localStorage (hydrated from athlete home)
-    const stored = LocalStorageAPI.getAthlete();
-    if (stored) {
-      setAthleteProfile(stored);
-    }
-    setLoading(false);
-  }, []);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        router.push('/signup');
+        return;
+      }
+
+      // LOCAL-FIRST: Use localStorage immediately (from useHydratedAthlete hook)
+      // Only fetch from API if localStorage is empty
+      const stored = LocalStorageAPI.getAthlete();
+      if (!stored && !athleteProfile) {
+        try {
+          // Only fetch if localStorage is empty
+          const token = await user.getIdToken();
+          const response = await api.post('/athlete/hydrate', {}, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+
+          if (response.data.success && response.data.athlete) {
+            LocalStorageAPI.setAthlete(response.data.athlete);
+          }
+        } catch (err: any) {
+          console.error('Error loading athlete:', err);
+        }
+      }
+      
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [router, athleteProfile]);
 
   if (loading) {
     return (
@@ -29,6 +56,7 @@ export default function ProfilePage() {
     );
   }
 
+  // LOCAL-FIRST: Use athleteProfile from useHydratedAthlete hook (reads from localStorage)
   if (!athleteProfile) {
     return (
       <div className="min-h-screen bg-gray-50 p-8">

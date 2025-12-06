@@ -46,25 +46,27 @@ export async function handleActivityDetail(
         continue;
       }
 
+      // TODO: Activities will be reintroduced in Schema Phase 3
       // Update existing activity with detail data
-      const updateResult = await prisma.athleteActivity.updateMany({
-        where: {
-          athleteId: athlete.id,
-          sourceActivityId: activityId
-        },
-        data: {
-          detailData: detail,
-          hydratedAt: new Date()
-        }
-      });
+      // const updateResult = await prisma.athleteActivity.updateMany({
+      //   where: {
+      //     athleteId: athlete.id,
+      //     sourceActivityId: activityId
+      //   },
+      //   data: {
+      //     detailData: detail,
+      //     hydratedAt: new Date()
+      //   }
+      // });
 
-      if (updateResult.count > 0) {
-        processed++;
-        console.log(`✅ Activity detail ${activityId} updated for athlete ${athlete.id}`);
-      } else {
-        skipped++;
-        console.warn(`⚠️ Activity ${activityId} not found, skipping detail update`);
-      }
+      // if (updateResult.count > 0) {
+      //   processed++;
+      //   console.log(`✅ Activity detail ${activityId} updated for athlete ${athlete.id}`);
+      // } else {
+      //   skipped++;
+      //   console.warn(`⚠️ Activity ${activityId} not found, skipping detail update`);
+      // }
+      skipped++;
 
     } catch (error: any) {
       errors++;

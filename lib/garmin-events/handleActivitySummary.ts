@@ -59,38 +59,41 @@ export async function handleActivitySummary(
         continue;
       }
 
+      // TODO: Activities will be reintroduced in Schema Phase 3
       // Check for duplicates
-      if (await activityExists(sourceActivityId)) {
-        console.log(`⏭️ Activity ${sourceActivityId} already exists, skipping`);
-        skipped++;
-        continue;
-      }
+      // if (await activityExists(sourceActivityId)) {
+      //   console.log(`⏭️ Activity ${sourceActivityId} already exists, skipping`);
+      //   skipped++;
+      //   continue;
+      // }
 
+      // TODO: Re-enable activity saving when AthleteActivity model is reintroduced
       // Create activity record
-      await prisma.athleteActivity.create({
-        data: {
-          athleteId: athlete.id,
-          sourceActivityId,
-          source: 'garmin',
-          activityType: activity.activityType,
-          activityName: activity.activityName,
-          startTime: activity.startTime 
-            ? new Date(typeof activity.startTime === 'string' ? activity.startTime : activity.startTime * 1000)
-            : null,
-          duration: activity.duration,
-          distance: activity.distance,
-          calories: activity.calories,
-          averageSpeed: activity.averageSpeed,
-          averageHeartRate: activity.averageHeartRate,
-          maxHeartRate: activity.maxHeartRate,
-          elevationGain: activity.elevationGain,
-          steps: activity.steps,
-          summaryData: activity
-        }
-      });
+      // await prisma.athleteActivity.create({
+      //   data: {
+      //     athleteId: athlete.id,
+      //     sourceActivityId,
+      //     source: 'garmin',
+      //     activityType: activity.activityType,
+      //     activityName: activity.activityName,
+      //     startTime: activity.startTime 
+      //       ? new Date(typeof activity.startTime === 'string' ? activity.startTime : activity.startTime * 1000)
+      //       : null,
+      //     duration: activity.duration,
+      //     distance: activity.distance,
+      //     calories: activity.calories,
+      //     averageSpeed: activity.averageSpeed,
+      //     averageHeartRate: activity.averageHeartRate,
+      //     maxHeartRate: activity.maxHeartRate,
+      //     elevationGain: activity.elevationGain,
+      //     steps: activity.steps,
+      //     summaryData: activity
+      //   }
+      // });
 
-      processed++;
-      console.log(`✅ Activity ${sourceActivityId} saved for athlete ${athlete.id}`);
+      // processed++;
+      // console.log(`✅ Activity ${sourceActivityId} saved for athlete ${athlete.id}`);
+      skipped++;
 
     } catch (error: any) {
       errors++;

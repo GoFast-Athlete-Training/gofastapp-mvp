@@ -1,5 +1,5 @@
 // ------------------------------------------------------
-// Datasource + Generator
+// Datasource + Generator (authoritative)
 // ------------------------------------------------------
 
 datasource db {
@@ -12,8 +12,25 @@ generator client {
 }
 
 //////////////////////////////////////////////////////////
-//  ATHLETE (CORE IDENTITY)
+//  CORE CANON — ATHLETE + COMPANY (v1.0)
 //////////////////////////////////////////////////////////
+
+model GoFastCompany {
+  id        String   @id @default(cuid())
+  name      String?
+  slug      String?  @unique
+  address   String?
+  city      String?
+  state     String?
+  zip       String?
+  domain    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  athletes Athlete[]
+
+  @@map("go_fast_companies")
+}
 
 model Athlete {
   id String @id @default(cuid())
@@ -22,11 +39,11 @@ model Athlete {
   firebaseId String  @unique
   email      String?
 
-  // Company Link (Single-tenant)
+  // Tenancy — core container
   companyId String
-  company   GoFastCompany @relation(fields: [companyId], references: [id])
+  company   GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  // Universal profile
+  // Profile
   firstName    String?
   lastName     String?
   gofastHandle String?   @unique
@@ -40,18 +57,10 @@ model Athlete {
   bio          String?
   instagram    String?
 
-  // Training profile (future)
-  myCurrentPace       String?
-  myWeeklyMileage     Int?
-  myTrainingGoal      String?
-  myTrainingStartDate DateTime?
-  myTargetRace        String?
-  preferredDistance   String?
-  myPaceRange         String?
-  timePreference      String?
-  myRunningGoals      String?
+  // Canon Fitness Baseline (source of truth for all training)
+  fiveKPace String? // mm:ss
 
-  // Garmin PKCE Integration
+  // Garmin
   garmin_user_id          String?   @unique
   garmin_access_token     String?
   garmin_refresh_token    String?
@@ -72,69 +81,24 @@ model Athlete {
   strava_refresh_token String?
   strava_expires_at    Int?
 
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
-  activities           AthleteActivity[]
-  runCrewMemberships   RunCrewMembership[]   @relation("AthleteRunCrewMemberships")
-  runCrewManagers      RunCrewManager[]      @relation("RunCrewManager")
+  runCrewMemberships   RunCrewMembership[]
+  runCrewManagers      RunCrewManager[]
   runCrewMessages      RunCrewMessage[]
-  runCrewAnnouncements RunCrewAnnouncement[] @relation("RunCrewAnnouncementAuthor")
-  runCrewRuns          RunCrewRun[]          @relation("RunCrewRunCreator")
-  runCrewRunRSVPs      RunCrewRunRSVP[]      @relation("RunCrewRunRSVP")
-  runCrewEvents        RunCrewEvent[]        @relation("RunCrewEventOrganizer")
-  runCrewEventRSVPs    RunCrewEventRSVP[]    @relation("RunCrewEventRSVP")
-
-  // Training relations
-  trainingPlans TrainingPlan[]
-  plannedDays   TrainingDayPlanned[]
-  executedDays  TrainingDayExecuted[]
-  createdRaces  Race[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("athletes")
+  runCrewAnnouncements RunCrewAnnouncement[]
+  runCrewRuns          RunCrewRun[]
+  runCrewRunRSVPs      RunCrewRunRSVP[]
+  runCrewEvents        RunCrewEvent[]
+  runCrewEventRSVPs    RunCrewEventRSVP[]
 }
 
 //////////////////////////////////////////////////////////
-//  ATHLETE ACTIVITIES (GARMIN)
+//  PHASE 2: GOFAST RUNCREW SUITE
 //////////////////////////////////////////////////////////
-
-model AthleteActivity {
-  id               String @id @default(cuid())
-  athleteId        String
-  sourceActivityId String @unique
-  source           String @default("garmin")
-
-  activityType     String?
-  activityName     String?
-  startTime        DateTime?
-  duration         Int?
-  distance         Float?
-  calories         Int?
-  averageSpeed     Float?
-  averageHeartRate Int?
-  maxHeartRate     Int?
-  elevationGain    Float?
-  steps            Int?
-
-  // Location + Polyline
-  startLatitude   Float?
-  startLongitude  Float?
-  endLatitude     Float?
-  endLongitude    Float?
-  summaryPolyline String?
-
-  summaryData Json?
-  detailData  Json?
-  hydratedAt  DateTime?
-
-  athlete Athlete @relation(fields: [athleteId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("athlete_activities")
-}
 
 //////////////////////////////////////////////////////////
 //  RUNCREW — CORE MODELS
@@ -167,18 +131,16 @@ model RunCrew {
 model RunCrewMembership {
   id        String @id @default(cuid())
   runCrewId String
-  athleteId String // ATHLETE-FIRST: Foreign key to Athlete
+  athleteId String
 
-  // Timestamps
   joinedAt  DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations - ATHLETE-FIRST: Explicitly tied to athleteId
   runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  athlete Athlete @relation("AthleteRunCrewMemberships", fields: [athleteId], references: [id], onDelete: Cascade)
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
-  @@unique([runCrewId, athleteId]) // Prevent duplicate memberships
+  @@unique([runCrewId, athleteId])
   @@map("run_crew_memberships")
 }
 
@@ -190,9 +152,8 @@ model RunCrewManager {
 
   createdAt DateTime @default(now())
 
-  // Relations
   runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  athlete Athlete @relation("RunCrewManager", fields: [athleteId], references: [id], onDelete: Cascade)
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
   @@unique([runCrewId, athleteId])
   @@map("run_crew_managers")
@@ -205,13 +166,11 @@ model RunCrewManager {
 model RunCrewMessage {
   id        String @id @default(cuid())
   runCrewId String
-  athleteId String // Message author
+  athleteId String
 
-  content String // Message text (just content, no images/likes)
-
+  content   String
   createdAt DateTime @default(now())
 
-  // Relations
   runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
   athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
@@ -221,7 +180,7 @@ model RunCrewMessage {
 model RunCrewAnnouncement {
   id        String @id @default(cuid())
   runCrewId String
-  authorId  String // Admin who created it
+  authorId  String
 
   title   String
   content String
@@ -229,54 +188,47 @@ model RunCrewAnnouncement {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
   runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  author  Athlete @relation("RunCrewAnnouncementAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  author  Athlete @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   @@map("run_crew_announcements")
 }
 
 //////////////////////////////////////////////////////////
-//  RUNCREW RUNS + RSVPs
+//  RUNS (GROUP RUNS) + RSVPs
 //////////////////////////////////////////////////////////
 
 model RunCrewRun {
   id          String @id @default(cuid())
   runCrewId   String
-  createdById String // Admin or manager who created the run (MVP1: admin only)
+  createdById String
 
-  // Core presentation
   title     String
   runType   String   @default("single") // "single" | "recurring"
-  date      DateTime // Start date for single run or first occurrence
-  startTime String // "06:30 AM" – stored as human-readable string
-  timezone  String? // IANA tz ("America/Chicago") for clarity
+  date      DateTime
+  startTime String
+  timezone  String?
 
-  // Meet-up logistics
   meetUpPoint   String
   meetUpAddress String?
   meetUpPlaceId String?
   meetUpLat     Float?
   meetUpLng     Float?
 
-  // Recurrence metadata (future-ready)
   recurrenceRule   String?
   recurrenceEndsOn DateTime?
   recurrenceNote   String?
 
-  // Run-specific fields
-  totalMiles   Float? // Total miles for the run
-  pace         String? // Target pace (e.g., "8:00-9:00 min/mile")
-  stravaMapUrl String? // Strava map URL for route visualization
-
-  description String?
+  totalMiles   Float?
+  pace         String?
+  stravaMapUrl String?
+  description  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
   runCrew   RunCrew          @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  createdBy Athlete          @relation("RunCrewRunCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy Athlete          @relation(fields: [createdById], references: [id], onDelete: Cascade)
   rsvps     RunCrewRunRSVP[]
 
   @@map("run_crew_runs")
@@ -285,43 +237,40 @@ model RunCrewRun {
 model RunCrewRunRSVP {
   id        String @id @default(cuid())
   runId     String
-  athleteId String // RSVP tied to athleteId
+  athleteId String
 
-  status String // "going", "maybe", "not-going"
-
+  status    String // "going" | "maybe" | "not-going"
   createdAt DateTime @default(now())
 
-  // Relations
   run     RunCrewRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  athlete Athlete    @relation("RunCrewRunRSVP", fields: [athleteId], references: [id], onDelete: Cascade)
+  athlete Athlete    @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
-  @@unique([runId, athleteId]) // One RSVP per athlete per run
+  @@unique([runId, athleteId])
   @@map("run_crew_run_rsvps")
 }
 
 //////////////////////////////////////////////////////////
-//  RUNCREW EVENTS + RSVPs
+//  EVENTS + RSVPs
 //////////////////////////////////////////////////////////
 
 model RunCrewEvent {
   id          String @id @default(cuid())
   runCrewId   String
-  organizerId String // Athlete ID who created the event
+  organizerId String
 
   title       String
   date        DateTime
-  time        String // "6:00 PM"
+  time        String
   location    String
   address     String?
   description String?
-  eventType   String? // "happy-hour", "social", "meetup", etc.
+  eventType   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
   runCrew   RunCrew            @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  organizer Athlete            @relation("RunCrewEventOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
+  organizer Athlete            @relation(fields: [organizerId], references: [id], onDelete: Cascade)
   rsvps     RunCrewEventRSVP[]
 
   @@map("run_crew_events")
@@ -330,176 +279,31 @@ model RunCrewEvent {
 model RunCrewEventRSVP {
   id        String @id @default(cuid())
   eventId   String
-  athleteId String // RSVP tied to athleteId
+  athleteId String
 
-  status String // "going", "maybe", "not-going"
-
+  status    String
   createdAt DateTime @default(now())
 
-  // Relations
   event   RunCrewEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  athlete Athlete      @relation("RunCrewEventRSVP", fields: [athleteId], references: [id], onDelete: Cascade)
+  athlete Athlete      @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
-  @@unique([eventId, athleteId]) // One RSVP per athlete per event
+  @@unique([eventId, athleteId])
   @@map("run_crew_event_rsvps")
 }
 
 //////////////////////////////////////////////////////////
-//  AUTHORITATIVE INVITE CODES
+//  INVITE CODES
 //////////////////////////////////////////////////////////
 
 model JoinCode {
   id        String    @id @default(cuid())
   code      String    @unique
   runCrewId String
-  runCrew   RunCrew   @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  createdAt DateTime  @default(now())
-  expiresAt DateTime?
   isActive  Boolean   @default(true)
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
 
   @@map("join_codes")
-}
-
-//////////////////////////////////////////////////////////
-//  TRAINING — KEEPING IT (as requested)
-//////////////////////////////////////////////////////////
-
-model Race {
-  id                 String   @id @default(cuid())
-  raceName           String
-  raceType           String
-  raceDate           DateTime
-  location           String?
-  distanceMiles      Float
-  registrationUrl    String?
-  description        String?
-  createdByAthleteId String?
-
-  createdByAthlete Athlete? @relation(fields: [createdByAthleteId], references: [id])
-
-  trainingPlans TrainingPlan[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model TrainingPlan {
-  id        String  @id @default(cuid())
-  athleteId String
-  raceId    String? // Made optional to support existing plans without raceId
-
-  trainingPlanName                  String
-  trainingPlanGoalTime              String
-  trainingPlanGoalPace              String?
-  trainingPlanBaseline5k            String
-  trainingPlanBaselineWeeklyMileage Int?
-  trainingPlanStartDate             DateTime
-  trainingPlanTotalWeeks            Int
-
-  trainingPlanAdaptive5kTime String?
-
-  status String @default("draft")
-
-  athlete Athlete @relation(fields: [athleteId], references: [id])
-  race    Race?   @relation(fields: [raceId], references: [id])
-
-  phases      TrainingPhase[]
-  plannedDays TrainingDayPlanned[]
-  executions  TrainingPlanExecution[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model TrainingPhase {
-  id             String @id @default(cuid())
-  trainingPlanId String
-  phaseName      String
-  phaseIndex     Int
-  startWeek      Int
-  endWeek        Int
-  metadata       Json?
-
-  trainingPlan TrainingPlan         @relation(fields: [trainingPlanId], references: [id])
-  plannedDays  TrainingDayPlanned[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model TrainingDayPlanned {
-  id              String  @id @default(cuid())
-  trainingPlanId  String
-  trainingPhaseId String?
-  athleteId       String
-
-  date        DateTime
-  weekIndex   Int
-  dayIndex    Int
-  dayName     String?
-  phase       String
-  plannedData Json
-
-  trainingPlan  TrainingPlan   @relation(fields: [trainingPlanId], references: [id])
-  trainingPhase TrainingPhase? @relation(fields: [trainingPhaseId], references: [id])
-  athlete       Athlete        @relation(fields: [athleteId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([trainingPlanId, weekIndex, dayIndex])
-}
-
-model TrainingPlanExecution {
-  id             String   @id @default(cuid())
-  trainingPlanId String
-  startedAt      DateTime
-  status         String   @default("active")
-
-  trainingPlan TrainingPlan          @relation(fields: [trainingPlanId], references: [id])
-  executedDays TrainingDayExecuted[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model TrainingDayExecuted {
-  id          String  @id @default(cuid())
-  executionId String
-  athleteId   String
-  activityId  String? @unique
-
-  weekIndex   Int
-  dayIndex    Int
-  date        DateTime
-  plannedData Json?
-  analysis    Json?
-  feedback    Json?
-
-  execution TrainingPlanExecution @relation(fields: [executionId], references: [id])
-  athlete   Athlete               @relation(fields: [athleteId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([executionId, date])
-}
-
-//////////////////////////////////////////////////////////
-//  GOFAST COMPANY (SINGLE-TENANT CONTAINER)
-//////////////////////////////////////////////////////////
-
-model GoFastCompany {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  address   String?
-  city      String?
-  state     String?
-  zip       String?
-  domain    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  athletes Athlete[]
 }
