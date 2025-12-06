@@ -25,23 +25,29 @@ export async function createAthlete(data: {
 }
 
 export async function hydrateAthlete(athleteId: string) {
-  const athlete = await prisma.athlete.findUnique({
-    where: { id: athleteId },
-    include: {
-      runCrewMemberships: {
-        include: {
-          runCrew: {
-            include: {
-              managers: true,
-              memberships: {
-                include: {
-                  athlete: {
-                    select: {
-                      id: true,
-                      firstName: true,
-                      lastName: true,
-                      email: true,
-                      photoURL: true,
+  // Try to hydrate with RunCrew includes, but fallback if tables don't exist
+  let athlete: any;
+  let hasRunCrewTables = true;
+  
+  try {
+    athlete = await prisma.athlete.findUnique({
+      where: { id: athleteId },
+      include: {
+        runCrewMemberships: {
+          include: {
+            runCrew: {
+              include: {
+                managers: true,
+                memberships: {
+                  include: {
+                    athlete: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        photoURL: true,
+                      },
                     },
                   },
                 },
@@ -49,32 +55,58 @@ export async function hydrateAthlete(athleteId: string) {
             },
           },
         },
-      },
-      runCrewManagers: {
-        include: {
-          runCrew: true,
-        },
-      },
-      activities: {
-        where: {
-          startTime: {
-            not: null,
-            gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
+        runCrewManagers: {
+          include: {
+            runCrew: true,
           },
         },
-        orderBy: {
-          startTime: 'desc',
+        activities: {
+          where: {
+            startTime: {
+              not: null,
+              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
+            },
+          },
+          orderBy: {
+            startTime: 'desc',
+          },
         },
       },
-    },
-  });
+    });
+  } catch (error: any) {
+    // If the error is about missing RunCrew tables, retry without them
+    if (error?.message?.includes('RunCrewMembership') || 
+        error?.message?.includes('does not exist')) {
+      console.warn('RunCrew tables not found, hydrating without RunCrew data');
+      hasRunCrewTables = false;
+      athlete = await prisma.athlete.findUnique({
+        where: { id: athleteId },
+        include: {
+          activities: {
+            where: {
+              startTime: {
+                not: null,
+                gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
+              },
+            },
+            orderBy: {
+              startTime: 'desc',
+            },
+          },
+        },
+      });
+    } else {
+      // Re-throw if it's a different error
+      throw error;
+    }
+  }
 
   if (!athlete) {
     return null;
   }
 
   // Calculate weekly totals
-  const weeklyTotals = athlete.activities.reduce(
+  const weeklyTotals = (athlete.activities || []).reduce(
     (
       acc: { distance: number; duration: number; activities: number },
       activity
@@ -88,17 +120,19 @@ export async function hydrateAthlete(athleteId: string) {
     { distance: 0, duration: 0, activities: 0 }
   );
 
-  // Normalize crews with roles
-  const crews = athlete.runCrewMemberships.map((membership) => {
-    const managerRole = athlete.runCrewManagers.find(
-      (m) => m.runCrewId === membership.runCrewId
-    );
-    return {
-      ...membership.runCrew,
-      role: managerRole?.role || 'member',
-      joinedAt: membership.joinedAt,
-    };
-  });
+  // Normalize crews with roles (handle case where tables don't exist)
+  const crews = hasRunCrewTables && athlete.runCrewMemberships
+    ? athlete.runCrewMemberships.map((membership: any) => {
+        const managerRole = (athlete.runCrewManagers || []).find(
+          (m: any) => m.runCrewId === membership.runCrewId
+        );
+        return {
+          ...membership.runCrew,
+          role: managerRole?.role || 'member',
+          joinedAt: membership.joinedAt,
+        };
+      })
+    : [];
 
   // Format athlete data for frontend consumption (matching MVP1 backend structure)
   const hydratedAthlete = {
@@ -121,19 +155,19 @@ export async function hydrateAthlete(athleteId: string) {
     createdAt: athlete.createdAt,
     updatedAt: athlete.updatedAt,
     
-    // RunCrew Memberships (hydrated)
+    // RunCrew Memberships (hydrated) - empty if tables don't exist
     runCrews: crews,
     runCrewCount: crews.length,
-    runCrewManagers: athlete.runCrewManagers || [],
+    runCrewManagers: (hasRunCrewTables ? athlete.runCrewManagers : []) || [],
     
     // Weekly Activities (last 7 days)
     weeklyActivities: athlete.activities || [],
-    weeklyActivityCount: athlete.activities.length,
+    weeklyActivityCount: (athlete.activities || []).length,
     weeklyTotals: {
       totalDistance: weeklyTotals.distance,
       totalDistanceMiles: (weeklyTotals.distance / 1609.34).toFixed(2), // Convert meters to miles
       totalDuration: weeklyTotals.duration,
-      totalCalories: athlete.activities.reduce((sum, a) => sum + (a.calories ?? 0), 0),
+      totalCalories: (athlete.activities || []).reduce((sum: number, a: any) => sum + (a.calories ?? 0), 0),
       activityCount: weeklyTotals.activities,
     },
     
