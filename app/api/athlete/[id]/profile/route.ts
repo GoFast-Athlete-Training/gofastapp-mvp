@@ -7,7 +7,7 @@ import { updateAthlete } from '@/lib/domain-athlete';
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     let body: any = {};
@@ -28,7 +28,7 @@ export async function PUT(
     }
 
     const firebaseId = decodedToken.uid;
-    const athleteId = params?.id;
+    const { id: athleteId } = await params;
 
     if (!athleteId) {
       return NextResponse.json({ success: false, error: 'Athlete ID required' }, { status: 400 });

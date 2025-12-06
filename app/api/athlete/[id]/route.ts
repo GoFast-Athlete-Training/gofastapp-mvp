@@ -6,10 +6,11 @@ import { getAthleteById, updateAthlete } from '@/lib/domain-athlete';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id?: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    if (!params?.id) {
+    const { id } = await params;
+    if (!id) {
       return NextResponse.json({ error: 'Missing athlete id' }, { status: 400 });
     }
 
@@ -27,7 +28,7 @@ export async function GET(
 
     let athlete;
     try {
-      athlete = await getAthleteById(params.id);
+      athlete = await getAthleteById(id);
     } catch (err) {
       console.error('Prisma error:', err);
       return NextResponse.json({ error: 'DB error' }, { status: 500 });
@@ -45,10 +46,11 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id?: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    if (!params?.id) {
+    const { id } = await params;
+    if (!id) {
       return NextResponse.json({ error: 'Missing athlete id' }, { status: 400 });
     }
 
@@ -71,7 +73,7 @@ export async function PUT(
 
     let athlete;
     try {
-      athlete = await getAthleteById(params.id);
+      athlete = await getAthleteById(id);
     } catch (err) {
       console.error('Prisma error:', err);
       return NextResponse.json({ error: 'DB error' }, { status: 500 });
@@ -83,7 +85,7 @@ export async function PUT(
 
     let updated;
     try {
-      updated = await updateAthlete(params.id, body);
+      updated = await updateAthlete(id, body);
     } catch (err) {
       console.error('Prisma error:', err);
       return NextResponse.json({ error: 'DB error' }, { status: 500 });

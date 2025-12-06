@@ -6,10 +6,11 @@ import { getCrewById } from '@/lib/domain-runcrew';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id?: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    if (!params?.id) {
+    const { id } = await params;
+    if (!id) {
       return NextResponse.json({ error: 'Missing crew id' }, { status: 400 });
     }
 
@@ -27,7 +28,7 @@ export async function GET(
 
     let crew;
     try {
-      crew = await getCrewById(params.id);
+      crew = await getCrewById(id);
     } catch (err) {
       console.error('Prisma error:', err);
       return NextResponse.json({ error: 'DB error' }, { status: 500 });
