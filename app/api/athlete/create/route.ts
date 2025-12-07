@@ -46,22 +46,10 @@ export async function POST(request: Request) {
     const firstName = displayName?.split(' ')[0] || null;
     const lastName = displayName?.split(' ').slice(1).join(' ') || null;
 
-    // Ensure GoFast company exists (self-healing)
-    const gofastCompany = await prisma.goFastCompany.upsert({
-      where: { slug: "gofast" },
-      update: {},
-      create: {
-        name: "GoFast",
-        slug: "gofast",
-        address: "2604 N. George Mason Dr.",
-        city: "Arlington",
-        state: "VA",
-        zip: "22207",
-        domain: "gofastcrushgoals.com",
-      },
-    });
+    // Master GoFast Company ID - all athletes are assigned to this company
+    const GOFAST_COMPANY_ID = "cmiu1z4dq0000nw4zfzd974uy";
 
-    // Upsert athlete with dynamic company association
+    // Upsert athlete with automatic company assignment
     const athlete = await prisma.athlete.upsert({
       where: { firebaseId },
       update: {
@@ -70,7 +58,7 @@ export async function POST(request: Request) {
         firstName: firstName || undefined,
         lastName: lastName || undefined,
         photoURL: picture || undefined,
-        companyId: gofastCompany.id,
+        companyId: GOFAST_COMPANY_ID, // Always assign to master GoFast company
       },
       create: {
         firebaseId,
@@ -78,7 +66,7 @@ export async function POST(request: Request) {
         firstName: firstName || undefined,
         lastName: lastName || undefined,
         photoURL: picture || undefined,
-        companyId: gofastCompany.id,
+        companyId: GOFAST_COMPANY_ID, // Automatically assign to master GoFast company
       },
     });
 
