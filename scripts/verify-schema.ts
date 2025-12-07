@@ -7,7 +7,7 @@ async function verifySchema() {
     console.log('🔍 Verifying database schema alignment...\n');
 
     // Test all main models
-    const checks = [
+    const checks: Array<{ name: string; model: { count: () => Promise<number> } }> = [
       { name: 'Athlete', model: prisma.athlete },
       // TODO: Training models will be reintroduced in Schema Phase 3
       // TODO: AthleteActivity will be reintroduced in Schema Phase 3
