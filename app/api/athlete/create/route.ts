@@ -29,6 +29,19 @@ export async function POST(request: Request) {
       console.error('❌ ATHLETE CREATE: Token verification failed');
       console.error('❌ ATHLETE CREATE: Error code:', err?.code);
       console.error('❌ ATHLETE CREATE: Error message:', err?.message);
+      console.error('❌ ATHLETE CREATE: Error name:', err?.name);
+      
+      // Check if it's a Firebase Admin initialization error
+      if (err?.message?.includes('Firebase Admin env vars missing') || err?.message?.includes('Firebase Admin')) {
+        console.error('❌ ATHLETE CREATE: Firebase Admin initialization failed');
+        console.error('❌ ATHLETE CREATE: Check FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY env vars');
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Firebase Admin initialization failed',
+          details: err?.message || 'Check Firebase environment variables'
+        }, { status: 500 });
+      }
+      
       console.error('❌ ATHLETE CREATE: Token (first 50 chars):', token.substring(0, 50));
       return NextResponse.json({ 
         success: false, 
@@ -50,25 +63,35 @@ export async function POST(request: Request) {
     const GOFAST_COMPANY_ID = "cmiu1z4dq0000nw4zfzd974uy";
 
     // Upsert athlete with automatic company assignment
-    const athlete = await prisma.athlete.upsert({
-      where: { firebaseId },
-      update: {
-        // Sync Firebase data on update
-        email: email || undefined,
-        firstName: firstName || undefined,
-        lastName: lastName || undefined,
-        photoURL: picture || undefined,
-        companyId: GOFAST_COMPANY_ID, // Always assign to master GoFast company
-      },
-      create: {
-        firebaseId,
-        email: email || undefined,
-        firstName: firstName || undefined,
-        lastName: lastName || undefined,
-        photoURL: picture || undefined,
-        companyId: GOFAST_COMPANY_ID, // Automatically assign to master GoFast company
-      },
-    });
+    let athlete;
+    try {
+      athlete = await prisma.athlete.upsert({
+        where: { firebaseId },
+        update: {
+          // Sync Firebase data on update
+          email: email || undefined,
+          firstName: firstName || undefined,
+          lastName: lastName || undefined,
+          photoURL: picture || undefined,
+          companyId: GOFAST_COMPANY_ID, // Always assign to master GoFast company
+        },
+        create: {
+          firebaseId,
+          email: email || undefined,
+          firstName: firstName || undefined,
+          lastName: lastName || undefined,
+          photoURL: picture || undefined,
+          companyId: GOFAST_COMPANY_ID, // Automatically assign to master GoFast company
+        },
+      });
+      console.log('✅ ATHLETE CREATE: Athlete upserted successfully:', athlete.id);
+    } catch (err: any) {
+      console.error('❌ ATHLETE CREATE: Prisma upsert failed');
+      console.error('❌ ATHLETE CREATE: Error code:', err?.code);
+      console.error('❌ ATHLETE CREATE: Error message:', err?.message);
+      console.error('❌ ATHLETE CREATE: Error meta:', err?.meta);
+      throw err; // Re-throw to be caught by outer catch
+    }
 
     // Format response like MVP1
     return NextResponse.json({
@@ -96,10 +119,26 @@ export async function POST(request: Request) {
     });
   } catch (err: any) {
     console.error('❌ ATHLETE CREATE: Error:', err);
+    console.error('❌ ATHLETE CREATE: Error code:', err?.code);
+    console.error('❌ ATHLETE CREATE: Error name:', err?.name);
+    console.error('❌ ATHLETE CREATE: Error stack:', err?.stack);
+    
+    // Check for Prisma unique constraint violations (email already exists)
+    if (err?.code === 'P2002') {
+      console.error('❌ ATHLETE CREATE: Unique constraint violation');
+      console.error('❌ ATHLETE CREATE: Meta:', err?.meta);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Email already exists',
+        details: err?.meta?.target ? `Field ${err.meta.target.join(', ')} already exists` : err?.message
+      }, { status: 409 });
+    }
+    
     return NextResponse.json({ 
       success: false, 
       error: 'Server error', 
-      details: err?.message 
+      details: err?.message || 'Unknown error',
+      code: err?.code
     }, { status: 500 });
   }
 }

@@ -34,9 +34,23 @@ export async function POST(request: Request) {
       console.log(`✅ HYDRATE [${timestamp}]: Token verified for UID: ${firebaseId}`);
     } catch (err: any) {
       console.error(`❌ HYDRATE [${timestamp}]: Token verification failed:`, err?.message);
+      console.error(`❌ HYDRATE [${timestamp}]: Error code:`, err?.code);
+      console.error(`❌ HYDRATE [${timestamp}]: Error name:`, err?.name);
+      
+      // Check if it's a Firebase Admin initialization error
+      if (err?.message?.includes('Firebase Admin env vars missing') || err?.message?.includes('Firebase Admin')) {
+        console.error(`❌ HYDRATE [${timestamp}]: Firebase Admin initialization failed`);
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Firebase Admin initialization failed',
+          details: err?.message || 'Check Firebase environment variables'
+        }, { status: 500 });
+      }
+      
       return NextResponse.json({ 
         success: false, 
-        error: 'Invalid token' 
+        error: 'Invalid token',
+        details: err?.message
       }, { status: 401 });
     }
 
