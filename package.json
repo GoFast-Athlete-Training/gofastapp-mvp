@@ -4,16 +4,17 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate --schema=../packages/shared-prisma-schema/schema.prisma && next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "prisma generate",
-    "db:generate": "prisma generate",
+    "postinstall": "prisma generate --schema=../packages/shared-prisma-schema/schema.prisma",
+    "db:generate": "prisma generate --schema=../packages/shared-prisma-schema/schema.prisma",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:upsert-company": "tsx scripts/upsert-company.ts"
   },
   "dependencies": {
+    "@adam/shared-prisma-schema": "file:../packages/shared-prisma-schema",
     "@prisma/client": "6.16.3",
     "axios": "^1.9.0",
     "firebase": "^10.7.1",
