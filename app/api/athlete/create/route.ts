@@ -62,20 +62,67 @@ export async function POST(request: Request) {
     // Master GoFast Company ID - all athletes are assigned to this company
     const GOFAST_COMPANY_ID = "cmiu1z4dq0000nw4zfzd974uy";
 
-    // Upsert athlete with automatic company assignment
+    console.log('🔍 ATHLETE CREATE: Looking up athlete with firebaseId:', firebaseId);
+
+    // First check if athlete exists by firebaseId
+    // NOTE: After DB switch, Firebase users may exist but have no DB records
+    let existing = await prisma.athlete.findUnique({
+      where: { firebaseId },
+    });
+
+    // If not found by firebaseId, check by email (handles case where Firebase user was recreated)
+    // Note: email is not unique in schema, so use findFirst
+    if (!existing && email) {
+      console.log('🔍 ATHLETE CREATE: Not found by firebaseId, checking by email:', email);
+      existing = await prisma.athlete.findFirst({
+        where: { email },
+      });
+      
+      if (existing) {
+        console.log('⚠️ ATHLETE CREATE: Found athlete by email with different firebaseId. Updating firebaseId to match current Firebase user.');
+      }
+    }
+
     let athlete;
-    try {
-      athlete = await prisma.athlete.upsert({
-        where: { firebaseId },
-        update: {
-          // Sync Firebase data on update
-          email: email || undefined,
-          firstName: firstName || undefined,
-          lastName: lastName || undefined,
-          photoURL: picture || undefined,
-          companyId: GOFAST_COMPANY_ID, // Always assign to master GoFast company
-        },
-        create: {
+    if (existing) {
+      console.log('✅ ATHLETE CREATE: Athlete exists in DB, updating:', existing.id);
+      // Update existing athlete - sync Firebase data and update firebaseId if different
+      const updateData: any = {};
+      
+      // CRITICAL: Update firebaseId if it's different (handles Firebase user recreation)
+      if (existing.firebaseId !== firebaseId) {
+        updateData.firebaseId = firebaseId;
+        console.log('🔄 ATHLETE CREATE: Updating firebaseId from', existing.firebaseId, 'to', firebaseId);
+      }
+      
+      // Sync Firebase data on update
+      if (email) updateData.email = email;
+      if (firstName !== undefined) updateData.firstName = firstName || null;
+      if (lastName !== undefined) updateData.lastName = lastName || null;
+      if (picture !== undefined) updateData.photoURL = picture || null;
+      
+      // Ensure companyId is set (in case it wasn't before)
+      if (!existing.companyId) {
+        updateData.companyId = GOFAST_COMPANY_ID;
+      }
+
+      // Use the existing athlete's unique identifier for the update
+      const whereClause = existing.firebaseId === firebaseId 
+        ? { firebaseId } 
+        : { id: existing.id };
+
+      athlete = await prisma.athlete.update({
+        where: whereClause,
+        data: updateData,
+      });
+      console.log('✅ ATHLETE CREATE: Athlete updated successfully:', athlete.id);
+    } else {
+      // Firebase user exists but no DB record (common after DB switch without migration)
+      console.log('🆕 ATHLETE CREATE: No DB record found for Firebase user. Creating new athlete record.');
+      console.log('   This is expected after DB switch - Firebase user exists but DB record doesn\'t.');
+      // Create new athlete - automatically assign to GoFast company
+      athlete = await prisma.athlete.create({
+        data: {
           firebaseId,
           email: email || undefined,
           firstName: firstName || undefined,
@@ -84,13 +131,7 @@ export async function POST(request: Request) {
           companyId: GOFAST_COMPANY_ID, // Automatically assign to master GoFast company
         },
       });
-      console.log('✅ ATHLETE CREATE: Athlete upserted successfully:', athlete.id);
-    } catch (err: any) {
-      console.error('❌ ATHLETE CREATE: Prisma upsert failed');
-      console.error('❌ ATHLETE CREATE: Error code:', err?.code);
-      console.error('❌ ATHLETE CREATE: Error message:', err?.message);
-      console.error('❌ ATHLETE CREATE: Error meta:', err?.meta);
-      throw err; // Re-throw to be caught by outer catch
+      console.log('✅ ATHLETE CREATE: New athlete record created successfully:', athlete.id);
     }
 
     // Format response like MVP1
@@ -122,6 +163,20 @@ export async function POST(request: Request) {
     console.error('❌ ATHLETE CREATE: Error code:', err?.code);
     console.error('❌ ATHLETE CREATE: Error name:', err?.name);
     console.error('❌ ATHLETE CREATE: Error stack:', err?.stack);
+    
+    // Check for table doesn't exist error (P2021)
+    if (err?.code === 'P2021') {
+      console.error('❌ ATHLETE CREATE: Database table does not exist');
+      console.error('❌ ATHLETE CREATE: Table:', err?.meta?.table);
+      console.error('❌ ATHLETE CREATE: This usually means migrations need to be run');
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Database table does not exist',
+        details: `Table ${err?.meta?.table || 'Athlete'} does not exist. Please run database migrations: npx prisma db push or npx prisma migrate deploy`,
+        code: err?.code,
+        table: err?.meta?.table
+      }, { status: 500 });
+    }
     
     // Check for Prisma unique constraint violations (email already exists)
     if (err?.code === 'P2002') {
