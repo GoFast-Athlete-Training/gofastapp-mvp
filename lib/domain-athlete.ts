@@ -103,6 +103,28 @@ export async function hydrateAthlete(athleteId: string) {
       })
     : [];
 
+  // Determine MyCrew (primary crew) - first crew or most recent, prioritizing admin crews
+  let MyCrew = '';
+  let MyCrewManagerId = '';
+  
+  if (crews.length > 0) {
+    // Prioritize admin crews, then most recent
+    const adminCrew = crews.find((c: any) => c.role === 'admin');
+    if (adminCrew) {
+      MyCrew = adminCrew.id;
+      const manager = athlete.runCrewManagers?.find((m: any) => m.runCrewId === adminCrew.id);
+      MyCrewManagerId = manager?.id || '';
+    } else {
+      // Use most recent crew
+      const mostRecent = crews.sort((a: any, b: any) => 
+        new Date(b.joinedAt || 0).getTime() - new Date(a.joinedAt || 0).getTime()
+      )[0];
+      MyCrew = mostRecent.id;
+      const manager = athlete.runCrewManagers?.find((m: any) => m.runCrewId === mostRecent.id);
+      MyCrewManagerId = manager?.id || '';
+    }
+  }
+
   // Format athlete data for frontend consumption (matching MVP1 backend structure)
   const hydratedAthlete = {
     athleteId: athlete.id, // MVP1 uses athleteId as central identifier
@@ -128,6 +150,11 @@ export async function hydrateAthlete(athleteId: string) {
     runCrews: crews,
     runCrewCount: crews.length,
     runCrewManagers: (hasRunCrewTables ? athlete.runCrewManagers : []) || [],
+    runCrewMemberships: (hasRunCrewTables ? athlete.runCrewMemberships : []) || [],
+    
+    // Primary crew context (for localStorage)
+    MyCrew: MyCrew,
+    MyCrewManagerId: MyCrewManagerId,
     
     // TODO: Activities will be reintroduced in Schema Phase 3
     // Weekly Activities (last 7 days)

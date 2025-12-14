@@ -168,12 +168,28 @@ export const LocalStorageAPI = {
     console.log('✅ LocalStorageAPI: Full hydration model stored');
   },
 
-  // HYDRATION V2: Getters for new keys
+  // HYDRATION V2: Setters and getters for new keys
+  setMyCrew(crewId: string) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('MyCrew', crewId);
+      // Also set legacy key for backward compatibility
+      localStorage.setItem('runCrewId', crewId);
+    }
+  },
+
   getMyCrew() {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('MyCrew');
     }
     return null;
+  },
+
+  setMyCrewManagerId(managerId: string) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('MyCrewManagerId', managerId);
+      // Also set legacy key for backward compatibility
+      localStorage.setItem('runCrewManagerId', managerId);
+    }
   },
 
   getMyCrewManagerId() {
@@ -184,11 +200,27 @@ export const LocalStorageAPI = {
   },
 
   // Legacy keys for backward compatibility
+  setRunCrewId(crewId: string) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('runCrewId', crewId);
+      // Also set V2 key
+      localStorage.setItem('MyCrew', crewId);
+    }
+  },
+
   getRunCrewId() {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('runCrewId');
     }
     return null;
+  },
+
+  setRunCrewManagerId(managerId: string) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('runCrewManagerId', managerId);
+      // Also set V2 key
+      localStorage.setItem('MyCrewManagerId', managerId);
+    }
   },
 
   getRunCrewManagerId() {

@@ -152,6 +152,14 @@ export default function CreateCrewPage() {
         };
         localStorage.setItem('currentCrew', JSON.stringify(crewData));
         
+        // CRITICAL: Set crew ID immediately so athlete-home can find it
+        LocalStorageAPI.setRunCrewId(createdCrew.id);
+        LocalStorageAPI.setMyCrew(createdCrew.id);
+        
+        // If user is admin (they just created it), set manager ID
+        // We'll get the actual manager ID from hydration, but set a flag for now
+        LocalStorageAPI.setRunCrewData(createdCrew);
+        
         // CRITICAL: Hydrate athlete to update localStorage with new crew membership
         try {
           console.log('🔄 CREATING CREW: Hydrating athlete to update localStorage...');
@@ -160,21 +168,33 @@ export default function CreateCrewPage() {
           if (hydrateResponse.data.success && hydrateResponse.data.athlete) {
             const { athlete } = hydrateResponse.data;
             
-            // Store full hydration model (includes crew memberships)
+            // Store full hydration model (includes crew memberships and MyCrew)
             LocalStorageAPI.setFullHydrationModel({
               athlete,
               weeklyActivities: hydrateResponse.data.weeklyActivities || [],
               weeklyTotals: hydrateResponse.data.weeklyTotals || null,
             });
             
-            // Also store crew data directly
-            LocalStorageAPI.setRunCrewData(createdCrew);
+            // Also store crew data directly (hydration might have more complete data)
+            if (athlete.MyCrew && athlete.runCrewMemberships) {
+              const crewMembership = athlete.runCrewMemberships.find(
+                (m: any) => m.runCrew?.id === athlete.MyCrew || m.runCrewId === athlete.MyCrew
+              );
+              if (crewMembership?.runCrew) {
+                LocalStorageAPI.setRunCrewData(crewMembership.runCrew);
+              }
+            } else {
+              LocalStorageAPI.setRunCrewData(createdCrew);
+            }
             
-            console.log('✅ CREATING CREW: Athlete hydrated, crew should now appear on athlete-home');
+            console.log('✅ CREATING CREW: Athlete hydrated');
+            console.log('✅ CREATING CREW: MyCrew:', athlete.MyCrew);
+            console.log('✅ CREATING CREW: MyCrewManagerId:', athlete.MyCrewManagerId);
+            console.log('✅ CREATING CREW: Crew should now appear on athlete-home');
           }
         } catch (hydrateError) {
           console.error('⚠️ CREATING CREW: Failed to hydrate athlete:', hydrateError);
-          // Continue anyway - crew is created, user can refresh
+          // Continue anyway - crew is created and ID is set, user can refresh
         }
         
         // Route to success page, then admin dashboard
