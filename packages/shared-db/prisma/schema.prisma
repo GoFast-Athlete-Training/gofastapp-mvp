@@ -393,14 +393,14 @@ model ReturnJsonFormat {
 
 model PromptInstruction {
   id        String   @id @default(cuid())
-  promptId  String
+  promptId  String?
   title     String   // Short descriptive title for the instruction
   content   String   // Execution guardrail or completeness guarantee
   order     Int      @default(0) // Order for assembling instructions
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  prompt    TrainingGenPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  prompt    TrainingGenPrompt? @relation(fields: [promptId], references: [id], onDelete: Cascade)
 
   @@map("prompt_instructions")
   @@index([promptId, order])
