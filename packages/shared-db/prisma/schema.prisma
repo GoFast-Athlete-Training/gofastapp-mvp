@@ -389,6 +389,17 @@ model ReturnJsonFormat {
   @@map("return_json_formats")
 }
 
+model TrainingSchema {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  description String?
+  schemaJson Json
+  createdAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("training_schemas")
+}
+
 //
 // ─── RUNCREW MODELS ───────────────────────────────────────────────────────────
 //

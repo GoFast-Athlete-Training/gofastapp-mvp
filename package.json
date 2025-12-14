@@ -13,7 +13,8 @@
     "db:generate": "prisma generate --schema=packages/shared-db/prisma/schema.prisma",
     "db:push": "prisma db push --schema=packages/shared-db/prisma/schema.prisma",
     "db:studio": "prisma studio --schema=packages/shared-db/prisma/schema.prisma",
-    "db:upsert-company": "tsx scripts/upsert-company.ts"
+    "db:upsert-company": "tsx scripts/upsert-company.ts",
+    "db:upsert-training-schema": "tsx scripts/upsert-training-schema.ts"
   },
   "dependencies": {
     "@gofast/shared-db": "file:./packages/shared-db",
