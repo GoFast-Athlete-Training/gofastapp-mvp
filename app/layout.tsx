@@ -5,6 +5,7 @@ import ClientProviders from '@/components/ClientProviders';
 export const metadata: Metadata = {
   title: 'GoFast',
   description: 'GoFast Running App',
+  manifest: '/manifest.json',
   icons: {
     icon: '/logo.jpg',
     shortcut: '/logo.jpg',

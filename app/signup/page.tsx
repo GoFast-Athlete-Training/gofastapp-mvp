@@ -2,10 +2,10 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 
@@ -16,6 +16,7 @@ export default function SignupPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [authMode, setAuthMode] = useState<'signup' | 'signin'>('signup');
   const [showEmailForm, setShowEmailForm] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [emailData, setEmailData] = useState({
     firstName: '',
     lastName: '',
@@ -23,6 +24,77 @@ export default function SignupPage() {
     password: '',
     confirmPassword: '',
   });
+
+  // Check if user is already authenticated on page load
+  useEffect(() => {
+    console.log('🔍 SIGNUP PAGE: Checking authentication state...');
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        console.log('✅ SIGNUP PAGE: User already authenticated, checking athlete...');
+        try {
+          // Get fresh token
+          const firebaseToken = await user.getIdToken();
+          localStorage.setItem('firebaseToken', firebaseToken);
+
+          // Try to hydrate existing athlete
+          try {
+            const hydrateRes = await api.post('/athlete/hydrate');
+            if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
+              const athlete = hydrateRes.data.athlete;
+              console.log('✅ SIGNUP PAGE: Existing athlete found, redirecting...');
+              
+              // Store auth data
+              localStorage.setItem('firebaseId', user.uid);
+              localStorage.setItem('athleteId', athlete.athleteId || athlete.id);
+              localStorage.setItem('email', athlete.email || user.email || '');
+
+              // Route based on profile completion
+              if (athlete.gofastHandle) {
+                console.log('✅ SIGNUP PAGE: Profile complete → redirecting to athlete-home');
+                router.replace('/athlete-home');
+              } else {
+                console.log('✅ SIGNUP PAGE: Profile incomplete → redirecting to athlete-welcome');
+                router.replace('/athlete-welcome');
+              }
+              return;
+            }
+          } catch (hydrateErr: any) {
+            console.log('⚠️ SIGNUP PAGE: Hydrate failed, trying create...', hydrateErr.response?.status);
+            // If hydrate fails, try create (might be a new user)
+            try {
+              const createRes = await api.post('/athlete/create', {});
+              if (createRes.data?.success) {
+                const athlete = createRes.data;
+                console.log('✅ SIGNUP PAGE: Athlete created/found via create endpoint');
+                
+                localStorage.setItem('firebaseId', user.uid);
+                localStorage.setItem('athleteId', athlete.athleteId);
+                localStorage.setItem('email', athlete.data?.email || user.email || '');
+
+                if (athlete.data?.gofastHandle) {
+                  router.replace('/athlete-home');
+                } else {
+                  router.replace('/athlete-welcome');
+                }
+                return;
+              }
+            } catch (createErr: any) {
+              console.error('❌ SIGNUP PAGE: Both hydrate and create failed', createErr.response?.status);
+              // Stay on signup page, let user try again
+            }
+          }
+        } catch (err: any) {
+          console.error('❌ SIGNUP PAGE: Error checking athlete:', err);
+          // Stay on signup page
+        }
+      } else {
+        console.log('ℹ️ SIGNUP PAGE: No authenticated user - showing signup form');
+      }
+      setCheckingAuth(false);
+    });
+
+    return () => unsubscribe();
+  }, [router]);
 
   const handleGoogle = async () => {
     try {
@@ -42,13 +114,39 @@ export default function SignupPage() {
       // Store Firebase token for API calls (Axios interceptor will use it)
       localStorage.setItem('firebaseToken', firebaseToken);
 
-      // Call backend create athlete - empty body, token auto-injected
+      // Try to create/get athlete - empty body, token auto-injected
       console.log('🌐 SIGNUP: Calling backend API: /athlete/create');
-      const res = await api.post('/athlete/create', {});
+      let res;
+      let athlete;
       
-      console.log('✅ SIGNUP: Backend API response:', res.data);
-      
-      const athlete = res.data;
+      try {
+        res = await api.post('/athlete/create', {});
+        console.log('✅ SIGNUP: Backend API response:', res.data);
+        athlete = res.data;
+      } catch (createErr: any) {
+        // If create fails with 500, try hydrate instead (user might already exist)
+        if (createErr?.response?.status === 500) {
+          console.log('⚠️ SIGNUP: Create failed with 500, trying hydrate...');
+          try {
+            const hydrateRes = await api.post('/athlete/hydrate');
+            if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
+              console.log('✅ SIGNUP: Hydrate succeeded, using hydrated athlete');
+              athlete = {
+                success: true,
+                athleteId: hydrateRes.data.athlete.athleteId || hydrateRes.data.athlete.id,
+                data: hydrateRes.data.athlete
+              };
+            } else {
+              throw createErr; // Re-throw original error if hydrate also fails
+            }
+          } catch (hydrateErr: any) {
+            console.error('❌ SIGNUP: Both create and hydrate failed');
+            throw createErr; // Throw original create error
+          }
+        } else {
+          throw createErr; // Re-throw if not a 500 error
+        }
+      }
 
       // CRITICAL: Validate backend response
       if (!athlete || !athlete.success) {
@@ -65,8 +163,8 @@ export default function SignupPage() {
         console.log('✅ SIGNUP: Existing athlete with profile → Athlete Home');
         router.replace('/athlete-home');
       } else {
-        console.log('✅ SIGNUP: New athlete or incomplete profile → Profile setup');
-        router.replace('/athlete-create-profile');
+        console.log('✅ SIGNUP: New athlete or incomplete profile → Welcome');
+        router.replace('/athlete-welcome');
       }
     } catch (err: any) {
       console.error('❌ SIGNUP: Google signup error:', err);
@@ -123,13 +221,39 @@ export default function SignupPage() {
       // Store Firebase token for API calls
       localStorage.setItem('firebaseToken', firebaseToken);
 
-      // Call backend create athlete - empty body, token auto-injected
+      // Try to create/get athlete - empty body, token auto-injected
       console.log('🌐 SIGNUP: Calling backend API: /athlete/create');
-      const res = await api.post('/athlete/create', {});
+      let res;
+      let athlete;
       
-      console.log('✅ SIGNUP: Backend API response:', res.data);
-      
-      const athlete = res.data;
+      try {
+        res = await api.post('/athlete/create', {});
+        console.log('✅ SIGNUP: Backend API response:', res.data);
+        athlete = res.data;
+      } catch (createErr: any) {
+        // If create fails with 500, try hydrate instead (user might already exist)
+        if (createErr?.response?.status === 500) {
+          console.log('⚠️ SIGNUP: Create failed with 500, trying hydrate...');
+          try {
+            const hydrateRes = await api.post('/athlete/hydrate');
+            if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
+              console.log('✅ SIGNUP: Hydrate succeeded, using hydrated athlete');
+              athlete = {
+                success: true,
+                athleteId: hydrateRes.data.athlete.athleteId || hydrateRes.data.athlete.id,
+                data: hydrateRes.data.athlete
+              };
+            } else {
+              throw createErr; // Re-throw original error if hydrate also fails
+            }
+          } catch (hydrateErr: any) {
+            console.error('❌ SIGNUP: Both create and hydrate failed');
+            throw createErr; // Throw original create error
+          }
+        } else {
+          throw createErr; // Re-throw if not a 500 error
+        }
+      }
 
       // CRITICAL: Validate backend response
       if (!athlete || !athlete.success) {
@@ -146,8 +270,8 @@ export default function SignupPage() {
         console.log('✅ SIGNUP: Existing athlete with profile → Athlete Home');
         router.replace('/athlete-home');
       } else {
-        console.log('✅ SIGNUP: New athlete or incomplete profile → Profile setup');
-        router.replace('/athlete-create-profile');
+        console.log('✅ SIGNUP: New athlete or incomplete profile → Welcome');
+        router.replace('/athlete-welcome');
       }
     } catch (err: any) {
       console.error('❌ SIGNUP: Email signup error:', err);
@@ -196,13 +320,39 @@ export default function SignupPage() {
       // Store Firebase token for API calls
       localStorage.setItem('firebaseToken', firebaseToken);
 
-      // Call backend create athlete - empty body, token auto-injected
+      // Try to create/get athlete - empty body, token auto-injected
       console.log('🌐 SIGNIN: Calling backend API: /athlete/create');
-      const res = await api.post('/athlete/create', {});
+      let res;
+      let athlete;
       
-      console.log('✅ SIGNIN: Backend API response:', res.data);
-      
-      const athlete = res.data;
+      try {
+        res = await api.post('/athlete/create', {});
+        console.log('✅ SIGNIN: Backend API response:', res.data);
+        athlete = res.data;
+      } catch (createErr: any) {
+        // If create fails with 500, try hydrate instead (user might already exist)
+        if (createErr?.response?.status === 500) {
+          console.log('⚠️ SIGNIN: Create failed with 500, trying hydrate...');
+          try {
+            const hydrateRes = await api.post('/athlete/hydrate');
+            if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
+              console.log('✅ SIGNIN: Hydrate succeeded, using hydrated athlete');
+              athlete = {
+                success: true,
+                athleteId: hydrateRes.data.athlete.athleteId || hydrateRes.data.athlete.id,
+                data: hydrateRes.data.athlete
+              };
+            } else {
+              throw createErr; // Re-throw original error if hydrate also fails
+            }
+          } catch (hydrateErr: any) {
+            console.error('❌ SIGNIN: Both create and hydrate failed');
+            throw createErr; // Throw original create error
+          }
+        } else {
+          throw createErr; // Re-throw if not a 500 error
+        }
+      }
 
       // CRITICAL: Validate backend response
       if (!athlete || !athlete.success) {
@@ -216,11 +366,11 @@ export default function SignupPage() {
 
       // Route based on profile completion (check gofastHandle - key indicator)
       if (athlete.data?.gofastHandle) {
-        console.log('✅ SIGNIN: Existing athlete with profile → Athlete Welcome');
-        router.replace('/athlete-welcome');
+        console.log('✅ SIGNIN: Existing athlete with profile → Athlete Home');
+        router.replace('/athlete-home');
       } else {
-        console.log('✅ SIGNIN: New athlete or incomplete profile → Profile setup');
-        router.replace('/athlete-create-profile');
+        console.log('✅ SIGNIN: New athlete or incomplete profile → Welcome');
+        router.replace('/athlete-welcome');
       }
     } catch (err: any) {
       console.error('❌ SIGNIN: Email sign-in error:', err);
@@ -240,6 +390,18 @@ export default function SignupPage() {
       setLoading(false);
     }
   };
+
+  // Show loading state while checking authentication
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-xl text-sky-100">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center p-4">

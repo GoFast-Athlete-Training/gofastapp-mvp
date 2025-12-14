@@ -309,6 +309,7 @@ model TrainingGenPrompt {
   ruleSet        RuleSet?         @relation(fields: [ruleSetId], references: [id])
   mustHaves      MustHaves        @relation(fields: [mustHavesId], references: [id])
   returnFormat   ReturnJsonFormat @relation(fields: [returnFormatId], references: [id])
+  instructions   PromptInstruction[]
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -381,12 +382,28 @@ model ReturnJsonFormat {
   id        String   @id @default(cuid())
   name      String
   schema    Json
+  example   Json?    // Complete example JSON showing correct structure with all required fields
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   prompts   TrainingGenPrompt[]
 
   @@map("return_json_formats")
+}
+
+model PromptInstruction {
+  id        String   @id @default(cuid())
+  promptId  String
+  title     String   // Short descriptive title for the instruction
+  content   String   // Execution guardrail or completeness guarantee
+  order     Int      @default(0) // Order for assembling instructions
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  prompt    TrainingGenPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+
+  @@map("prompt_instructions")
+  @@index([promptId, order])
 }
 
 model TrainingSchema {
