@@ -18,7 +18,7 @@ export async function GET(request: Request) {
       console.error('❌ TRAINING SCHEMA: Token verification failed:', err?.message);
       return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 });
     }
-  try {
+
     const trainingSchemas = await prisma.trainingSchema.findMany({
       orderBy: { createdAt: 'desc' },
     });
