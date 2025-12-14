@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { X, ImageIcon } from 'lucide-react';
 import api from '@/lib/api';
+import { LocalStorageAPI } from '@/lib/localstorage';
 
 // Common running emojis for quick selection
 const RUNNING_EMOJIS = [
@@ -138,19 +139,46 @@ export default function CreateCrewPage() {
       });
       
       if (response.data.success) {
+        const createdCrew = response.data.runCrew;
+        
         // Store crew data for success page
         const crewData = {
-          id: response.data.runCrew.id,
-          name: response.data.runCrew.name,
-          joinCode: response.data.runCrew.joinCode || normalizedCode,
-          description: response.data.runCrew.description,
-          logo: response.data.runCrew.logo || logo,
-          icon: response.data.runCrew.icon || icon,
+          id: createdCrew.id,
+          name: createdCrew.name,
+          joinCode: createdCrew.joinCode || normalizedCode,
+          description: createdCrew.description,
+          logo: createdCrew.logo || logo,
+          icon: createdCrew.icon || icon,
         };
         localStorage.setItem('currentCrew', JSON.stringify(crewData));
         
+        // CRITICAL: Hydrate athlete to update localStorage with new crew membership
+        try {
+          console.log('🔄 CREATING CREW: Hydrating athlete to update localStorage...');
+          const hydrateResponse = await api.post('/athlete/hydrate');
+          
+          if (hydrateResponse.data.success && hydrateResponse.data.athlete) {
+            const { athlete } = hydrateResponse.data;
+            
+            // Store full hydration model (includes crew memberships)
+            LocalStorageAPI.setFullHydrationModel({
+              athlete,
+              weeklyActivities: hydrateResponse.data.weeklyActivities || [],
+              weeklyTotals: hydrateResponse.data.weeklyTotals || null,
+            });
+            
+            // Also store crew data directly
+            LocalStorageAPI.setRunCrewData(createdCrew);
+            
+            console.log('✅ CREATING CREW: Athlete hydrated, crew should now appear on athlete-home');
+          }
+        } catch (hydrateError) {
+          console.error('⚠️ CREATING CREW: Failed to hydrate athlete:', hydrateError);
+          // Continue anyway - crew is created, user can refresh
+        }
+        
         // Route to success page, then admin dashboard
-        router.push(`/runcrew/success?crewId=${response.data.runCrew.id}`);
+        router.push(`/runcrew/success?crewId=${createdCrew.id}`);
       }
     } catch (error: any) {
       console.error('Error creating crew:', error);
