@@ -138,7 +138,19 @@ export default function CreateCrewPage() {
       });
       
       if (response.data.success) {
-        router.push(`/runcrew/${response.data.runCrew.id}`);
+        // Store crew data for success page
+        const crewData = {
+          id: response.data.runCrew.id,
+          name: response.data.runCrew.name,
+          joinCode: response.data.runCrew.joinCode || normalizedCode,
+          description: response.data.runCrew.description,
+          logo: response.data.runCrew.logo || logo,
+          icon: response.data.runCrew.icon || icon,
+        };
+        localStorage.setItem('currentCrew', JSON.stringify(crewData));
+        
+        // Route to success page, then admin dashboard
+        router.push(`/runcrew/success?crewId=${response.data.runCrew.id}`);
       }
     } catch (error: any) {
       console.error('Error creating crew:', error);
