@@ -19,6 +19,7 @@
   "dependencies": {
     "@gofast/shared-db": "file:./packages/shared-db",
     "@prisma/client": "6.16.3",
+    "@vercel/blob": "^2.0.0",
     "axios": "^1.9.0",
     "firebase": "^10.7.1",
     "firebase-admin": "^12.7.0",

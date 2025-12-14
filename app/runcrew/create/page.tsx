@@ -2,20 +2,101 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { X, ImageIcon } from 'lucide-react';
 import api from '@/lib/api';
+
+// Common running emojis for quick selection
+const RUNNING_EMOJIS = [
+  '🏃', '🏃‍♀️', '🏃‍♂️', '🏔️', '⛰️', '🌄', '🌅', '🌆',
+  '🔥', '⚡', '💪', '🏆', '🎯', '🚀', '⭐', '🌟',
+  '🌲', '🌳', '🌿', '🌊', '☀️', '🌙', '⭐', '💫',
+  '👟', '🎽', '🏅', '🥇', '🥈', '🥉', '🎖️', '🏵️'
+];
 
 export default function CreateCrewPage() {
   const router = useRouter();
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logo, setLogo] = useState<string>('');
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [icon, setIcon] = useState<string>('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     joinCode: '',
   });
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file');
+      return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image size must be less than 5MB');
+      return;
+    }
+
+    setUploadingLogo(true);
+    setError(null);
+
+    try {
+      // Create preview
+      const previewUrl = URL.createObjectURL(file);
+      setLogoPreview(previewUrl);
+
+      // Upload to Vercel Blob via our API
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
+
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: uploadFormData,
+      });
+
+      const uploadData = await uploadResponse.json();
+      
+      if (uploadResponse.ok && uploadData.url) {
+        setLogo(uploadData.url);
+        // Clear icon if logo is set
+        setIcon('');
+      } else {
+        throw new Error(uploadData.error || 'Failed to upload logo');
+      }
+    } catch (err: any) {
+      console.error('Logo upload error:', err);
+      setError(err.message || 'Failed to upload logo. Please try again.');
+      setLogoPreview(null);
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogo('');
+    setLogoPreview(null);
+    if (logoFileInputRef.current) {
+      logoFileInputRef.current.value = '';
+    }
+  };
+
+  const handleEmojiSelect = (emoji: string) => {
+    setIcon(emoji);
+    setShowEmojiPicker(false);
+    // Clear logo if icon is selected
+    if (logo) {
+      handleRemoveLogo();
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +133,8 @@ export default function CreateCrewPage() {
       const response = await api.post('/runcrew/create', {
         ...formData,
         joinCode: normalizedCode,
+        logo: logo || null,
+        icon: icon || null,
       });
       
       if (response.data.success) {
@@ -69,7 +152,7 @@ export default function CreateCrewPage() {
     <div className="min-h-screen bg-gradient-to-br from-sky-50 to-sky-100">
       {/* Header */}
       <div className="bg-white shadow-sm">
-        <div className="max-w-lg mx-auto px-6 py-4">
+        <div className="max-w-2xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <button 
               onClick={() => router.push('/runcrew')} 
@@ -94,7 +177,7 @@ export default function CreateCrewPage() {
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-6 py-12">
+      <div className="max-w-2xl mx-auto px-6 py-12">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-sky-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -140,6 +223,133 @@ export default function CreateCrewPage() {
               required
             />
             <p className="text-xs text-gray-500 mt-1">Pick something your crew will remember and get excited about</p>
+          </div>
+
+          {/* Logo or Icon */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Logo or Icon <span className="text-gray-400 text-xs">(Optional - Choose One)</span>
+            </label>
+            
+            {/* Logo Upload Section */}
+            <div className="mb-3">
+              <div className="flex items-center space-x-3">
+                <div className="relative w-20 h-20 bg-gray-50 border-2 border-gray-300 rounded-lg flex items-center justify-center overflow-hidden">
+                  {logoPreview ? (
+                    <>
+                      <img src={logoPreview} alt="Logo preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogo}
+                        className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                        disabled={uploadingLogo || loading}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </>
+                  ) : logo ? (
+                    <>
+                      <img src={logo} alt="Logo" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogo}
+                        className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                        disabled={uploadingLogo || loading}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </>
+                  ) : (
+                    <ImageIcon className="w-8 h-8 text-gray-400" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <button
+                    type="button"
+                    onClick={() => logoFileInputRef.current?.click()}
+                    disabled={uploadingLogo || loading || !!icon}
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg hover:border-sky-500 transition text-sm font-medium text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
+                  </button>
+                  <input
+                    ref={logoFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                    disabled={uploadingLogo || loading || !!icon}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Upload a logo image (JPG, PNG - max 5MB)</p>
+            </div>
+
+            {/* Divider */}
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">OR</span>
+              </div>
+            </div>
+
+            {/* Icon/Emoji Section */}
+            <div>
+              <div className="flex items-center space-x-3 mb-2">
+                <div className="w-20 h-20 bg-gray-50 border-2 border-gray-300 rounded-lg flex items-center justify-center text-4xl">
+                  {icon || '🏃'}
+                </div>
+                <div className="flex-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEmojiPicker(!showEmojiPicker);
+                      if (logo) handleRemoveLogo();
+                    }}
+                    disabled={loading}
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg hover:border-sky-500 transition text-sm font-medium text-gray-700 disabled:opacity-50"
+                  >
+                    {showEmojiPicker ? 'Hide Emoji Picker' : 'Choose Emoji'}
+                  </button>
+                </div>
+              </div>
+              
+              {showEmojiPicker && (
+                <div className="mt-3 p-4 bg-gray-50 border-2 border-gray-200 rounded-lg">
+                  <p className="text-xs font-semibold text-gray-700 mb-3">Select an emoji:</p>
+                  <div className="grid grid-cols-8 gap-2">
+                    {RUNNING_EMOJIS.map((emoji, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleEmojiSelect(emoji)}
+                        className="w-10 h-10 text-2xl hover:bg-white hover:scale-110 rounded transition cursor-pointer flex items-center justify-center"
+                        disabled={loading}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-3">Or type your own emoji below:</p>
+                  <input
+                    type="text"
+                    value={icon}
+                    onChange={(e) => {
+                      setIcon(e.target.value);
+                      setError(null);
+                      if (logo) handleRemoveLogo();
+                    }}
+                    className="w-full mt-2 p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition text-2xl text-center"
+                    placeholder="🏃"
+                    maxLength={2}
+                    disabled={loading}
+                  />
+                </div>
+              )}
+              <p className="text-xs text-gray-500 mt-1">Choose an emoji icon for your crew</p>
+            </div>
           </div>
 
           <div>
