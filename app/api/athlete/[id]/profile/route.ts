@@ -60,6 +60,9 @@ export async function PUT(
       }, { status: 400 });
     }
 
+    // Store handle value for error handling
+    const handleValue = body.gofastHandle;
+
     // Check if gofastHandle is unique (if changed)
     if (body.gofastHandle && body.gofastHandle !== athlete.gofastHandle) {
       const existing = await prisma.athlete.findUnique({
@@ -105,11 +108,13 @@ export async function PUT(
     if (err?.code === 'P2002') {
       const target = err?.meta?.target;
       if (Array.isArray(target) && target.includes('gofastHandle')) {
+        // Get handle from error meta if available, otherwise use generic message
+        const handleFromError = err?.meta?.targetValue || 'this handle';
         return NextResponse.json({ 
           success: false, 
           error: 'Handle taken',
           field: 'gofastHandle',
-          message: `Handle "@${body.gofastHandle}" is already taken`
+          message: `Handle "@${handleFromError}" is already taken`
         }, { status: 400 });
       }
     }
