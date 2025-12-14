@@ -80,20 +80,24 @@ export default function ProfilePage() {
 
   const age = calculateAge(athleteProfile.birthday);
 
-  // Count how many profile fields are filled
+  // Check if profile has required fields (matching athlete-home logic)
+  // Required fields: firstName, lastName, gofastHandle, birthday, gender, city, state, primarySport
+  const hasRequiredFields = 
+    athleteProfile?.firstName && 
+    athleteProfile?.lastName && 
+    athleteProfile?.gofastHandle &&
+    athleteProfile?.birthday &&
+    athleteProfile?.gender &&
+    athleteProfile?.city &&
+    athleteProfile?.state &&
+    athleteProfile?.primarySport;
+
+  // Count optional fields for display purposes
   const filledFields = [
     athleteProfile?.bio,
-    athleteProfile?.city || athleteProfile?.state,
-    athleteProfile?.primarySport,
-    athleteProfile?.birthday,
-    athleteProfile?.gender,
     athleteProfile?.instagram,
     athleteProfile?.phoneNumber,
-    athleteProfile?.email,
-    athleteProfile?.gofastHandle,
   ].filter(Boolean).length;
-
-  const isProfileSparse = filledFields <= 2;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -167,29 +171,6 @@ export default function ProfilePage() {
           </button>
         </div>
 
-        {/* Welcome Message for Sparse Profiles */}
-        {isProfileSparse && (
-          <div className="mb-8 bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 rounded-xl p-6 shadow-sm">
-            <div className="flex items-start">
-              <div className="flex-shrink-0">
-                <span className="text-3xl">👋</span>
-              </div>
-              <div className="ml-4 flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Welcome to GoFast!</h3>
-                <p className="text-gray-700 mb-3">
-                  Complete your profile to connect with other athletes, join crews, and get the most out of GoFast. 
-                  Add your bio, location, sport preferences, and more!
-                </p>
-                <button
-                  onClick={() => router.push('/athlete-edit-profile')}
-                  className="text-orange-600 hover:text-orange-700 font-medium text-sm underline"
-                >
-                  Complete your profile →
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Profile Info - Beautiful Cards */}
         {filledFields > 0 ? (

@@ -55,14 +55,21 @@ export async function POST(request: Request) {
     const displayName = decodedToken.name || undefined;
     const picture = decodedToken.picture || undefined;
     
+    console.log('👤 ATHLETE CREATE: Firebase token name:', displayName || 'missing');
     console.log('📸 ATHLETE CREATE: Firebase token picture:', picture ? 'present' : 'missing');
     if (picture) {
       console.log('📸 ATHLETE CREATE: Picture URL:', picture.substring(0, 50) + '...');
     }
+    
+    // Log all available token fields for debugging
+    console.log('🔍 ATHLETE CREATE: Available token fields:', Object.keys(decodedToken).filter(k => ['name', 'email', 'picture', 'displayName'].includes(k)));
 
     // Parse displayName into firstName/lastName if available
     const firstName = displayName?.split(' ')[0] || null;
     const lastName = displayName?.split(' ').slice(1).join(' ') || null;
+    
+    console.log('👤 ATHLETE CREATE: Parsed firstName:', firstName);
+    console.log('👤 ATHLETE CREATE: Parsed lastName:', lastName);
 
     // Step 1: Resolve Canonical Company (DB Source of Truth)
     // Use ordering to ensure consistent selection if multiple companies exist
@@ -90,13 +97,16 @@ export async function POST(request: Request) {
       updateData.email = email || undefined;
       createData.email = email || undefined;
     }
-    if (firstName !== undefined) {
+    // Sync name fields if displayName was present in the token
+    // Note: firstName/lastName will be null if displayName was undefined/null
+    if (displayName !== undefined) {
       updateData.firstName = firstName || null;
       createData.firstName = firstName || null;
-    }
-    if (lastName !== undefined) {
       updateData.lastName = lastName || null;
       createData.lastName = lastName || null;
+      console.log('👤 ATHLETE CREATE: Syncing name fields - firstName:', firstName, 'lastName:', lastName);
+    } else {
+      console.log('👤 ATHLETE CREATE: No displayName in token, skipping name sync');
     }
     if (picture !== undefined) {
       updateData.photoURL = picture || undefined;

@@ -100,6 +100,20 @@ export async function PUT(
     });
   } catch (err: any) {
     console.error('❌ PROFILE UPDATE: Error:', err);
+    
+    // Handle Prisma unique constraint violations (P2002)
+    if (err?.code === 'P2002') {
+      const target = err?.meta?.target;
+      if (Array.isArray(target) && target.includes('gofastHandle')) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Handle taken',
+          field: 'gofastHandle',
+          message: `Handle "@${body.gofastHandle}" is already taken`
+        }, { status: 400 });
+      }
+    }
+    
     return NextResponse.json({ 
       success: false, 
       error: 'Server error', 

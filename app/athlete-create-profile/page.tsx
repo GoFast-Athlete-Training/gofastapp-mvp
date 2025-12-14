@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { auth } from '@/lib/firebase';
@@ -32,43 +32,80 @@ export default function AthleteCreateProfilePage() {
   const [error, setError] = useState('');
   const [handleStatus, setHandleStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [handleError, setHandleError] = useState('');
+  const handleCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Prefill from Firebase and LocalStorage (EXACTLY like MVP1)
   // Rules: LocalStorage takes precedence, then Firebase, then defaults
   useEffect(() => {
-    const firebaseUser = auth.currentUser;
-    const existingAthlete = LocalStorageAPI.getAthlete();
+    const loadAthleteData = async () => {
+      const firebaseUser = auth.currentUser;
+      const existingAthlete = LocalStorageAPI.getAthlete();
 
-    if (firebaseUser) {
-      // Parse Firebase displayName
-      const displayName = firebaseUser.displayName || '';
-      const firstNameFromFirebase = displayName.split(' ')[0] || '';
-      const lastNameFromFirebase = displayName.split(' ').slice(1).join(' ') || '';
+      if (firebaseUser) {
+        // Parse Firebase displayName as fallback
+        const displayName = firebaseUser.displayName || '';
+        const firstNameFromFirebase = displayName.split(' ')[0] || '';
+        const lastNameFromFirebase = displayName.split(' ').slice(1).join(' ') || '';
 
-      setFormData(prev => ({
-        ...prev,
-        // Email: Always from Firebase (read-only)
-        email: firebaseUser.email || '',
-        // Name: LocalStorage first, then Firebase, then keep existing
-        firstName: existingAthlete?.firstName || firstNameFromFirebase || prev.firstName,
-        lastName: existingAthlete?.lastName || lastNameFromFirebase || prev.lastName,
-        // Phone: LocalStorage first, then keep existing
-        phoneNumber: existingAthlete?.phoneNumber || prev.phoneNumber,
-        // Photo: Firebase first, then LocalStorage, then keep existing
-        profilePhotoPreview: firebaseUser.photoURL || existingAthlete?.photoURL || prev.profilePhotoPreview,
-        // Profile fields: LocalStorage first, then keep existing
-        gofastHandle: existingAthlete?.gofastHandle || prev.gofastHandle,
-        birthday: existingAthlete?.birthday 
-          ? new Date(existingAthlete.birthday).toISOString().split('T')[0] 
-          : prev.birthday,
-        gender: existingAthlete?.gender || prev.gender,
-        city: existingAthlete?.city || prev.city,
-        state: existingAthlete?.state || prev.state,
-        primarySport: existingAthlete?.primarySport || prev.primarySport,
-        bio: existingAthlete?.bio || prev.bio,
-        instagram: existingAthlete?.instagram || prev.instagram,
-      }));
-    }
+        // Sync Firebase data by calling /athlete/create to get synced data from database
+        let syncedPhotoURL = firebaseUser.photoURL || existingAthlete?.photoURL;
+        let syncedFirstName = firstNameFromFirebase;
+        let syncedLastName = lastNameFromFirebase;
+        try {
+          console.log('🔄 PROFILE CREATE: Syncing athlete data from Firebase token...');
+          console.log('🔄 PROFILE CREATE: Firebase user displayName:', firebaseUser.displayName);
+          console.log('🔄 PROFILE CREATE: Firebase user photoURL:', firebaseUser.photoURL);
+          const res = await api.post('/athlete/create', {});
+          const athleteData = res.data;
+          console.log('🔄 PROFILE CREATE: Athlete data response:', athleteData);
+          
+          // Use synced data from database response (synced from Firebase token)
+          if (athleteData?.data) {
+            if (athleteData.data.photoURL) {
+              syncedPhotoURL = athleteData.data.photoURL;
+              console.log('📸 PROFILE CREATE: Using synced photoURL from database:', syncedPhotoURL);
+            }
+            if (athleteData.data.firstName) {
+              syncedFirstName = athleteData.data.firstName;
+              console.log('👤 PROFILE CREATE: Using synced firstName from database:', syncedFirstName);
+            }
+            if (athleteData.data.lastName) {
+              syncedLastName = athleteData.data.lastName;
+              console.log('👤 PROFILE CREATE: Using synced lastName from database:', syncedLastName);
+            }
+          }
+        } catch (err) {
+          console.error('❌ PROFILE CREATE: Failed to sync athlete data on mount:', err);
+          // Continue with Firebase/LocalStorage values if sync fails
+        }
+
+        setFormData(prev => ({
+          ...prev,
+          // Email: Always from Firebase (read-only)
+          email: firebaseUser.email || '',
+          // Name: LocalStorage first, then synced from database, then Firebase fallback, then keep existing
+          firstName: existingAthlete?.firstName || syncedFirstName || prev.firstName,
+          lastName: existingAthlete?.lastName || syncedLastName || prev.lastName,
+          // Phone: LocalStorage first, then keep existing
+          phoneNumber: existingAthlete?.phoneNumber || prev.phoneNumber,
+          // Photo: Database synced photoURL first, then Firebase, then LocalStorage, then keep existing
+          profilePhotoPreview: syncedPhotoURL || prev.profilePhotoPreview,
+          // Profile fields: LocalStorage first, then keep existing
+          gofastHandle: existingAthlete?.gofastHandle || prev.gofastHandle,
+          birthday: existingAthlete?.birthday 
+            ? new Date(existingAthlete.birthday).toISOString().split('T')[0] 
+            : prev.birthday,
+          gender: existingAthlete?.gender || prev.gender,
+          city: existingAthlete?.city || prev.city,
+          state: existingAthlete?.state || prev.state,
+          primarySport: existingAthlete?.primarySport || prev.primarySport,
+          bio: existingAthlete?.bio || prev.bio,
+          instagram: existingAthlete?.instagram || prev.instagram,
+        }));
+      }
+    };
+
+    loadAthleteData();
   }, []);
 
   const handleInputChange = (field: string, value: string) => {
@@ -105,24 +142,11 @@ export default function AthleteCreateProfilePage() {
     fileInputRef.current?.click();
   };
 
-  // Handle uniqueness check (EXACTLY like MVP1)
-  const handleHandleBlur = async () => {
-    const handle = formData.gofastHandle.trim().toLowerCase();
+  // Inline handle verification (debounced, like join code checking)
+  const checkHandleAvailability = useCallback(async (handle: string) => {
+    const normalized = handle.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
     
-    if (!handle) {
-      setHandleStatus('idle');
-      setHandleError('');
-      return;
-    }
-
-    // Normalize handle (remove @, lowercase, alphanumeric + underscore only)
-    const normalized = handle.replace(/[^a-z0-9_]/g, '');
-    
-    if (normalized !== handle) {
-      setFormData(prev => ({ ...prev, gofastHandle: normalized }));
-    }
-
-    if (normalized.length < 2) {
+    if (!normalized || normalized.length < 2) {
       setHandleStatus('idle');
       setHandleError('');
       return;
@@ -148,7 +172,57 @@ export default function AthleteCreateProfilePage() {
       setHandleStatus('idle');
       // Don't show error on check failure, just allow submission
     }
+  }, []);
+
+  // Handle input change with inline verification (debounced)
+  const handleHandleChange = (value: string) => {
+    // Normalize handle (remove @, lowercase, alphanumeric + underscore only)
+    const normalized = value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    
+    setFormData(prev => ({ ...prev, gofastHandle: normalized }));
+    
+    // Clear existing timeout
+    if (handleCheckTimeoutRef.current) {
+      clearTimeout(handleCheckTimeoutRef.current);
+    }
+    
+    // Reset status if handle is empty
+    if (!normalized) {
+      setHandleStatus('idle');
+      setHandleError('');
+      return;
+    }
+    
+    // Debounce the check (wait 500ms after user stops typing)
+    handleCheckTimeoutRef.current = setTimeout(() => {
+      checkHandleAvailability(normalized);
+    }, 500);
   };
+
+  // Handle blur for final validation
+  const handleHandleBlur = () => {
+    const handle = formData.gofastHandle.trim().toLowerCase();
+    
+    // Clear timeout if still pending
+    if (handleCheckTimeoutRef.current) {
+      clearTimeout(handleCheckTimeoutRef.current);
+      handleCheckTimeoutRef.current = null;
+    }
+    
+    // If handle exists and we haven't checked yet, check now
+    if (handle && handleStatus === 'idle') {
+      checkHandleAvailability(handle);
+    }
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (handleCheckTimeoutRef.current) {
+        clearTimeout(handleCheckTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -267,9 +341,6 @@ export default function AthleteCreateProfilePage() {
           />
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome to GoFast!</h1>
           <p className="text-gray-600 mb-4">At GoFast, we believe in community. The more info you provide here, the more it fosters connections with other athletes looking to GoFast and PR.</p>
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-            <p className="text-orange-800 text-sm font-medium">💡 <strong>Community Tip:</strong> Complete profiles get 3x more crew invites and running partner matches!</p>
-          </div>
         </div>
 
         {error && (
@@ -401,7 +472,7 @@ export default function AthleteCreateProfilePage() {
               <input
                 type="text"
                 value={formData.gofastHandle}
-                onChange={(e) => handleInputChange('gofastHandle', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                onChange={(e) => handleHandleChange(e.target.value)}
                 onBlur={handleHandleBlur}
                 placeholder="your_handle"
                 className={`w-full pl-8 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
@@ -410,7 +481,7 @@ export default function AthleteCreateProfilePage() {
                   'border-gray-300'
                 }`}
                 required
-                disabled={loading || handleStatus === 'checking'}
+                disabled={loading}
               />
             </div>
             {handleStatus === 'checking' && (
