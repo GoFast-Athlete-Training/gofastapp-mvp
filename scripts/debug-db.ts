@@ -1,4 +1,4 @@
-import { prisma } from '../packages/shared-prisma-schema';
+import { prisma } from '../lib/prisma';
 
 async function debugDatabase() {
   try {

@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../../node_modules/@adam/shared-prisma-client"
 }
 
 datasource db {
@@ -584,3 +583,4 @@ model RunCrewEventRSVP {
   @@unique([eventId, athleteId])
   @@map("run_crew_event_rsvps")
 }
+

@@ -3,7 +3,7 @@
  * Usage: npx tsx scripts/check-garmin-tokens.ts <athleteId>
  */
 
-import { prisma } from '../packages/shared-prisma-schema';
+import { prisma } from '../lib/prisma';
 
 async function checkGarminTokens(athleteId: string) {
   try {

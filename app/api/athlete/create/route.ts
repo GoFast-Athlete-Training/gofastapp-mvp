@@ -59,8 +59,13 @@ export async function POST(request: Request) {
     const firstName = displayName?.split(' ')[0] || null;
     const lastName = displayName?.split(' ').slice(1).join(' ') || null;
 
-    // Master GoFast Company ID - all athletes are assigned to this company
-    const GOFAST_COMPANY_ID = "cmiu1z4dq0000nw4zfzd974uy";
+    // Step 1: Resolve Canonical Company (DB Source of Truth)
+    const company = await prisma.goFastCompany.findFirst();
+    if (!company) {
+      console.error("❌ ATHLETE CREATE: No GoFastCompany found");
+      throw new Error("No GoFastCompany found. Athlete creation requires a company.");
+    }
+    console.log('✅ ATHLETE CREATE: Using company:', company.id, company.name || company.slug);
 
     console.log('🔍 ATHLETE CREATE: Looking up athlete with firebaseId:', firebaseId);
 
@@ -101,10 +106,8 @@ export async function POST(request: Request) {
       if (lastName !== undefined) updateData.lastName = lastName || null;
       if (picture !== undefined) updateData.photoURL = picture || null;
       
-      // Ensure companyId is set (in case it wasn't before)
-      if (!existing.companyId) {
-        updateData.companyId = GOFAST_COMPANY_ID;
-      }
+      // companyId is always derived from GoFastCompany (ultra container)
+      updateData.companyId = company.id;
 
       // Use the existing athlete's unique identifier for the update
       const whereClause = existing.firebaseId === firebaseId 
@@ -121,6 +124,7 @@ export async function POST(request: Request) {
       console.log('🆕 ATHLETE CREATE: No DB record found for Firebase user. Creating new athlete record.');
       console.log('   This is expected after DB switch - Firebase user exists but DB record doesn\'t.');
       // Create new athlete - automatically assign to GoFast company
+      // companyId is always derived from GoFastCompany (ultra container)
       athlete = await prisma.athlete.create({
         data: {
           firebaseId,
@@ -128,7 +132,7 @@ export async function POST(request: Request) {
           firstName: firstName || undefined,
           lastName: lastName || undefined,
           photoURL: picture || undefined,
-          companyId: GOFAST_COMPANY_ID, // Automatically assign to master GoFast company
+          companyId: company.id,
         },
       });
       console.log('✅ ATHLETE CREATE: New athlete record created successfully:', athlete.id);
