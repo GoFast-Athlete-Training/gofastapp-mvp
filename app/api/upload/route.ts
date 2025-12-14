@@ -30,9 +30,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Upload to Vercel Blob
+    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!token) {
+      return NextResponse.json(
+        { error: 'BLOB_READ_WRITE_TOKEN not configured' },
+        { status: 500 }
+      );
+    }
+
     const blob = await put(file.name, file, {
       access: 'public',
       addRandomSuffix: true, // Prevents filename conflicts
+      token, // Explicitly pass token
     });
 
     return NextResponse.json({
