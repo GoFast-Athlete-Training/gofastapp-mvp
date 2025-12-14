@@ -25,7 +25,7 @@ export default function JoinCrewPage() {
     }
   }, [searchParams]);
 
-  const validateJoinCode = (code: string) => {
+  const validateJoinCode = (code: string): { valid: false; message: string } | { valid: true; normalized: string } => {
     const normalized = code.toUpperCase().trim();
     if (!normalized || normalized.length < 3) {
       return { valid: false, message: 'Join code must be at least 3 characters' };
