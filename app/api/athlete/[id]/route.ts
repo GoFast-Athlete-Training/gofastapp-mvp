@@ -38,6 +38,11 @@ export async function GET(
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
 
+    // Verify user can only access their own athlete data
+    if (athlete.firebaseId !== decodedToken.uid) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     return NextResponse.json({ success: true, athlete });
   } catch (err) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

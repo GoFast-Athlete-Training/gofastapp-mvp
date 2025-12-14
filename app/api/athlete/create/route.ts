@@ -54,13 +54,21 @@ export async function POST(request: Request) {
     const email = decodedToken.email || undefined;
     const displayName = decodedToken.name || undefined;
     const picture = decodedToken.picture || undefined;
+    
+    console.log('📸 ATHLETE CREATE: Firebase token picture:', picture ? 'present' : 'missing');
+    if (picture) {
+      console.log('📸 ATHLETE CREATE: Picture URL:', picture.substring(0, 50) + '...');
+    }
 
     // Parse displayName into firstName/lastName if available
     const firstName = displayName?.split(' ')[0] || null;
     const lastName = displayName?.split(' ').slice(1).join(' ') || null;
 
     // Step 1: Resolve Canonical Company (DB Source of Truth)
-    const company = await prisma.goFastCompany.findFirst();
+    // Use ordering to ensure consistent selection if multiple companies exist
+    const company = await prisma.goFastCompany.findFirst({
+      orderBy: { createdAt: 'asc' },
+    });
     if (!company) {
       console.error("❌ ATHLETE CREATE: No GoFastCompany found");
       throw new Error("No GoFastCompany found. Athlete creation requires a company.");
@@ -69,72 +77,43 @@ export async function POST(request: Request) {
 
     console.log('🔍 ATHLETE CREATE: Looking up athlete with firebaseId:', firebaseId);
 
-    // First check if athlete exists by firebaseId
-    // NOTE: After DB switch, Firebase users may exist but have no DB records
-    let existing = await prisma.athlete.findUnique({
+    // Use upsert pattern to atomically handle create/update and prevent race conditions
+    // This ensures only one athlete record exists per firebaseId
+    const updateData: any = {};
+    const createData: any = {
+      firebaseId,
+      companyId: company.id,
+    };
+
+    // Sync Firebase data - only include fields that are defined
+    if (email !== undefined) {
+      updateData.email = email || undefined;
+      createData.email = email || undefined;
+    }
+    if (firstName !== undefined) {
+      updateData.firstName = firstName || null;
+      createData.firstName = firstName || null;
+    }
+    if (lastName !== undefined) {
+      updateData.lastName = lastName || null;
+      createData.lastName = lastName || null;
+    }
+    if (picture !== undefined) {
+      updateData.photoURL = picture || undefined;
+      createData.photoURL = picture || undefined;
+    }
+    // companyId is always derived from GoFastCompany (ultra container)
+    updateData.companyId = company.id;
+
+    const athlete = await prisma.athlete.upsert({
       where: { firebaseId },
+      update: updateData,
+      create: createData,
     });
 
-    // If not found by firebaseId, check by email (handles case where Firebase user was recreated)
-    // Note: email is not unique in schema, so use findFirst
-    if (!existing && email) {
-      console.log('🔍 ATHLETE CREATE: Not found by firebaseId, checking by email:', email);
-      existing = await prisma.athlete.findFirst({
-        where: { email },
-      });
-      
-      if (existing) {
-        console.log('⚠️ ATHLETE CREATE: Found athlete by email with different firebaseId. Updating firebaseId to match current Firebase user.');
-      }
-    }
-
-    let athlete;
-    if (existing) {
-      console.log('✅ ATHLETE CREATE: Athlete exists in DB, updating:', existing.id);
-      // Update existing athlete - sync Firebase data and update firebaseId if different
-      const updateData: any = {};
-      
-      // CRITICAL: Update firebaseId if it's different (handles Firebase user recreation)
-      if (existing.firebaseId !== firebaseId) {
-        updateData.firebaseId = firebaseId;
-        console.log('🔄 ATHLETE CREATE: Updating firebaseId from', existing.firebaseId, 'to', firebaseId);
-      }
-      
-      // Sync Firebase data on update
-      if (email) updateData.email = email;
-      if (firstName !== undefined) updateData.firstName = firstName || null;
-      if (lastName !== undefined) updateData.lastName = lastName || null;
-      if (picture !== undefined) updateData.photoURL = picture || null;
-      
-      // companyId is always derived from GoFastCompany (ultra container)
-      updateData.companyId = company.id;
-
-      // Use the existing athlete's unique identifier for the update
-      const whereClause = existing.firebaseId === firebaseId 
-        ? { firebaseId } 
-        : { id: existing.id };
-
-      athlete = await prisma.athlete.update({
-        where: whereClause,
-        data: updateData,
-      });
-      console.log('✅ ATHLETE CREATE: Athlete updated successfully:', athlete.id);
+    if (athlete.firebaseId === firebaseId && athlete.companyId === company.id) {
+      console.log('✅ ATHLETE CREATE: Athlete record synced successfully:', athlete.id);
     } else {
-      // Firebase user exists but no DB record (common after DB switch without migration)
-      console.log('🆕 ATHLETE CREATE: No DB record found for Firebase user. Creating new athlete record.');
-      console.log('   This is expected after DB switch - Firebase user exists but DB record doesn\'t.');
-      // Create new athlete - automatically assign to GoFast company
-      // companyId is always derived from GoFastCompany (ultra container)
-      athlete = await prisma.athlete.create({
-        data: {
-          firebaseId,
-          email: email || undefined,
-          firstName: firstName || undefined,
-          lastName: lastName || undefined,
-          photoURL: picture || undefined,
-          companyId: company.id,
-        },
-      });
       console.log('✅ ATHLETE CREATE: New athlete record created successfully:', athlete.id);
     }
 
