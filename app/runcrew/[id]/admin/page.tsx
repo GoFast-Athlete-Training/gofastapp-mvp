@@ -34,10 +34,22 @@ export default function RunCrewAdminPage() {
       const response = await api.post('/runcrew/hydrate', { runCrewId: crewId });
       
       if (response.data.success) {
-        setCrew(response.data.runCrew);
+        const crewData = response.data.runCrew;
+        // Verify user is an admin/manager before allowing access
+        const isAdmin = crewData.userRole === 'admin' || crewData.userRole === 'manager';
+        if (!isAdmin) {
+          console.error('User is not an admin, redirecting to crew page');
+          router.push(`/runcrew/${crewId}`);
+          return;
+        }
+        setCrew(crewData);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading crew:', error);
+      // If user is not a member (403) or not found (404), redirect appropriately
+      if (error.response?.status === 403 || error.response?.status === 404) {
+        router.push('/runcrew');
+      }
     } finally {
       setLoading(false);
     }

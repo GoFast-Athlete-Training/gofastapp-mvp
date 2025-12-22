@@ -28,8 +28,12 @@ export default function RunCrewDetailPage() {
         LocalStorageAPI.setPrimaryCrew(crewData);
         setCrew(crewData);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading crew:', error);
+      // If user is not a member (403), redirect to runcrew list
+      if (error.response?.status === 403) {
+        router.push('/runcrew');
+      }
     } finally {
       setLoading(false);
     }

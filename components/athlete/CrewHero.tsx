@@ -14,13 +14,32 @@ interface CrewHeroProps {
 export default function CrewHero({ crew, nextRun, nextRunAttendees, isCrewAdmin, runCrewId }: CrewHeroProps) {
   const router = useRouter();
 
-  const handleGoToCrew = () => {
-    if (!runCrewId) {
-      router.push('/runcrew');
-      return;
+  // Determine admin status from crew.userRole if available (more reliable than localStorage)
+  const actualIsAdmin = crew?.userRole === 'admin' || crew?.userRole === 'manager' || isCrewAdmin;
+
+  const handleGoToCrew = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    
+    console.log('🔵 View Crew button clicked');
+    console.log('🔵 runCrewId:', runCrewId);
+    console.log('🔵 isCrewAdmin (prop):', isCrewAdmin);
+    console.log('🔵 crew.userRole:', crew?.userRole);
+    console.log('🔵 actualIsAdmin:', actualIsAdmin);
+    
+    try {
+      if (!runCrewId) {
+        console.log('🔵 No runCrewId, navigating to /runcrew');
+        router.push('/runcrew');
+        return;
+      }
+      // Use actualIsAdmin which checks crew.userRole first
+      const targetRoute = actualIsAdmin ? `/runcrew/${runCrewId}/admin` : `/runcrew/${runCrewId}`;
+      console.log('🔵 Navigating to:', targetRoute);
+      router.push(targetRoute);
+    } catch (error) {
+      console.error('🔴 Error navigating to crew:', error);
     }
-    const targetRoute = isCrewAdmin ? `/runcrew/${runCrewId}/admin` : `/runcrew/${runCrewId}`;
-    router.push(targetRoute);
   };
 
   if (crew && runCrewId) {
@@ -99,6 +118,7 @@ export default function CrewHero({ crew, nextRun, nextRunAttendees, isCrewAdmin,
         )}
 
         <button
+          type="button"
           onClick={handleGoToCrew}
           className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition shadow-lg"
         >
@@ -118,6 +138,7 @@ export default function CrewHero({ crew, nextRun, nextRunAttendees, isCrewAdmin,
         coordinate runs, and stay accountable.
       </p>
       <button
+        type="button"
         onClick={() => router.push('/runcrew')}
         className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-lg font-semibold transition shadow-md"
       >

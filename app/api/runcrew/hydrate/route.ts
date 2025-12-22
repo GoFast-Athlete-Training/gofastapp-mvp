@@ -62,6 +62,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Crew not found' }, { status: 404 });
     }
 
+    // Verify user is a member of the crew
+    const isMember = crew.memberships?.some(
+      (membership: any) => membership.athleteId === athlete.id
+    );
+    if (!isMember) {
+      console.error('❌ RUNCREW HYDRATE: User is not a member of crew:', runCrewId, 'athleteId:', athlete.id);
+      return NextResponse.json({ error: 'Forbidden - You are not a member of this crew' }, { status: 403 });
+    }
+
     try {
       return NextResponse.json({ success: true, runCrew: crew });
     } catch (serializeErr: any) {
