@@ -41,14 +41,13 @@ const calculateRunTotals = (activities: any[]) => {
 };
 
 /**
- * useActivities - Fetches and manages activities for a specific period (RUNS ONLY)
+ * useActivities - LOCAL-FIRST hook for activities (RUNS ONLY)
  *
  * Behavior:
- * 1. For 'current' period: First tries to load from localStorage (fast)
- * 2. If empty or stale, fetches from backend
- * 3. Filters to only running activities (safety net)
- * 4. Recalculates totals for runs only
- * 5. Updates localStorage with fresh data (only for 'current' period)
+ * 1. Loads from localStorage ONLY (local-first app)
+ * 2. Filters to only running activities
+ * 3. Recalculates totals for runs only
+ * 4. NO API calls unless forceRefresh is explicitly true
  */
 export default function useActivities(
   athleteId: string | null,
@@ -62,52 +61,45 @@ export default function useActivities(
   const [periodLabel, setPeriodLabel] = useState('This Week');
 
   const fetchFromBackend = async (athleteIdParam: string, periodParam: string = period) => {
-    try {
-      console.log('🔄 ACTIVITIES: Fetching from backend for athleteId:', athleteIdParam, 'period:', periodParam);
+    console.log('🔄 ACTIVITIES: Fetching from backend for athleteId:', athleteIdParam, 'period:', periodParam);
 
-      const response = await api.get(`/athlete/${athleteIdParam}/activities/weekly`, {
-        params: { period: periodParam },
+    const response = await api.get(`/athlete/${athleteIdParam}/activities/weekly`, {
+      params: { period: periodParam },
+    });
+
+    if (!response.data?.success) {
+      throw new Error(response.data?.error || 'Failed to fetch activities');
+    }
+
+    const fetchedActivities = response.data.activities || [];
+    const fetchedTotals = response.data.weeklyTotals || null;
+    const fetchedPeriodLabel = response.data.periodLabel || 'This Week';
+
+    // Filter to runs only and recalculate totals
+    const filteredRuns = filterRunningActivities(fetchedActivities);
+    const recalculatedTotals = calculateRunTotals(filteredRuns);
+
+    console.log(
+      '✅ ACTIVITIES: Fetched from backend:',
+      fetchedActivities.length,
+      'total activities,',
+      filteredRuns.length,
+      'runs'
+    );
+
+    setActivities(filteredRuns);
+    setWeeklyTotals(recalculatedTotals);
+    setPeriodLabel(fetchedPeriodLabel);
+
+    // Update localStorage cache only for 'current' period
+    if (periodParam === 'current') {
+      const model = LocalStorageAPI.getFullHydrationModel();
+      LocalStorageAPI.setFullHydrationModel({
+        ...model,
+        weeklyActivities: filteredRuns,
+        weeklyTotals: recalculatedTotals,
       });
-
-      if (response.data?.success) {
-        const fetchedActivities = response.data.activities || [];
-        const fetchedTotals = response.data.weeklyTotals || null;
-        const fetchedPeriodLabel = response.data.periodLabel || 'This Week';
-
-        // Filter to runs only and recalculate totals (safety net - backend should already filter, but ensure consistency)
-        const filteredRuns = filterRunningActivities(fetchedActivities);
-        const recalculatedTotals = calculateRunTotals(filteredRuns);
-
-        console.log(
-          '✅ ACTIVITIES: Fetched from backend:',
-          fetchedActivities.length,
-          'total activities,',
-          filteredRuns.length,
-          'runs'
-        );
-
-        setActivities(filteredRuns);
-        setWeeklyTotals(recalculatedTotals);
-        setPeriodLabel(fetchedPeriodLabel);
-
-        // Update localStorage cache only for 'current' period
-        if (periodParam === 'current') {
-          const model = LocalStorageAPI.getFullHydrationModel();
-          LocalStorageAPI.setFullHydrationModel({
-            ...model,
-            weeklyActivities: filteredRuns,
-            weeklyTotals: recalculatedTotals,
-          });
-          console.log('✅ ACTIVITIES: Updated localStorage cache with', filteredRuns.length, 'runs');
-        }
-      } else {
-        throw new Error(response.data?.error || 'Failed to fetch activities');
-      }
-    } catch (err: any) {
-      console.error('❌ ACTIVITIES: Backend fetch error:', err);
-      throw err;
-    } finally {
-      setIsLoading(false);
+      console.log('✅ ACTIVITIES: Updated localStorage cache with', filteredRuns.length, 'runs');
     }
   };
 
@@ -122,14 +114,14 @@ export default function useActivities(
       setIsLoading(true);
       setError(null);
 
-      // Try localStorage first (only for 'current' period and unless force refresh)
-      if (period === 'current' && !forceRefresh) {
+      // LOCAL-FIRST: Always try localStorage first (only fetch if forceRefresh is true)
+      if (!forceRefresh) {
         const model = LocalStorageAPI.getFullHydrationModel();
         const cachedActivities = model?.weeklyActivities || [];
         const cachedTotals = model?.weeklyTotals || null;
 
         if (cachedActivities.length > 0) {
-          // Filter to runs only and recalculate totals (safety net)
+          // Filter to runs only and recalculate totals
           const filteredRuns = filterRunningActivities(cachedActivities);
           const recalculatedTotals = calculateRunTotals(filteredRuns);
 
@@ -144,21 +136,18 @@ export default function useActivities(
           setWeeklyTotals(recalculatedTotals);
           setPeriodLabel('This Week');
           setIsLoading(false);
-
-          // Still fetch in background to update cache
-          fetchFromBackend(athleteId, period).catch((err) => {
-            console.warn('⚠️ ACTIVITIES: Background fetch failed (non-critical):', err);
-          });
-          return;
+          return; // LOCAL-FIRST: Return immediately, no API call
         }
       }
 
-      // Fetch from backend
+      // Only fetch from backend if forceRefresh is true OR localStorage is empty
       await fetchFromBackend(athleteId, period);
+      setIsLoading(false);
     } catch (err: any) {
       console.error('❌ ACTIVITIES: Error fetching activities:', err);
-      setError(err.message);
+      setError(err.message || 'Failed to load activities');
       setIsLoading(false);
+      // Error is set in state - component will handle redirect via error prop
     }
   };
 

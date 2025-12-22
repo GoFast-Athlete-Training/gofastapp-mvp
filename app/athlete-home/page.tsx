@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import useHydratedAthlete from '@/hooks/useHydratedAthlete';
 import useActivities from '@/hooks/useActivities';
@@ -17,8 +16,6 @@ import WeeklyStats from '@/components/athlete/WeeklyStats';
 import LatestActivityCard from '@/components/athlete/LatestActivityCard';
 import RSVPCard from '@/components/athlete/RSVPCard';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
-
 export default function AthleteHomePage() {
   const router = useRouter();
 
@@ -26,8 +23,8 @@ export default function AthleteHomePage() {
   const { athlete: athleteProfile, athleteId, runCrewId, runCrewManagerId, runCrew } =
     useHydratedAthlete();
 
-  // Fetch activities (with automatic refresh from backend if localStorage is empty)
-  const { activities: weeklyActivities, weeklyTotals, isLoading: activitiesLoading } =
+  // Fetch activities from localStorage only (local-first)
+  const { activities: weeklyActivities, weeklyTotals, isLoading: activitiesLoading, error: activitiesError } =
     useActivities(athleteId);
 
   // Check if user is an admin of the current crew
@@ -36,22 +33,32 @@ export default function AthleteHomePage() {
   }, [runCrewManagerId]);
 
   const [crew, setCrew] = useState(runCrew);
-  const [garminConnected, setGarminConnected] = useState(false);
-  const [checkingConnection, setCheckingConnection] = useState(true);
+  const [garminConnected, setGarminConnected] = useState(() => {
+    // LOCAL-FIRST: Load from localStorage
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('garminConnected');
+      return stored === 'true';
+    }
+    return false;
+  });
+  const [checkingConnection, setCheckingConnection] = useState(false);
   const [isHydratingCrew, setIsHydratingCrew] = useState(false);
 
   // NO REDIRECT - Users stay on athlete-home to see activities
   // Removed RunCrew or Bust redirect - let users see their activities!
+  // Log only once on mount and when key values change (not arrays/objects that recreate)
   useEffect(() => {
     console.log('🏠 ATHLETE HOME: Page loaded, staying on athlete-home');
     console.log('🏠 ATHLETE HOME: athleteProfile:', !!athleteProfile);
     console.log('🏠 ATHLETE HOME: runCrewId:', runCrewId);
-    console.log('🏠 ATHLETE HOME: weeklyActivities:', weeklyActivities?.length || 0);
+    console.log('🏠 ATHLETE HOME: weeklyActivities count:', weeklyActivities?.length || 0);
     console.log('🏠 ATHLETE HOME: weeklyTotals:', weeklyTotals);
     console.log('🏠 ATHLETE HOME: garminConnected:', garminConnected);
-  }, [athleteProfile, runCrewId, weeklyActivities, weeklyTotals, garminConnected]);
+    // Only depend on primitive values to prevent infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [athleteProfile, runCrewId, garminConnected]);
 
-  // Hydrate crew if we have runCrewId but no crew data
+  // Hydrate crew if we have runCrewId but no crew data (local-first: only fetch if missing)
   useEffect(() => {
     const hydrateCrew = async () => {
       if (runCrewId && athleteId && !crew && !isHydratingCrew) {
@@ -61,9 +68,15 @@ export default function AthleteHomePage() {
           if (data?.success && data.runCrew) {
             LocalStorageAPI.setRunCrewData(data.runCrew);
             setCrew(data.runCrew);
+          } else {
+            // No fallback - redirect on error
+            console.error('❌ ATHLETE HOME: Crew hydration failed, redirecting');
+            router.push('/athlete-welcome');
           }
-        } catch (error) {
-          console.error('Failed to hydrate crew:', error);
+        } catch (error: any) {
+          console.error('❌ ATHLETE HOME: Failed to hydrate crew:', error);
+          // No fallback - redirect on error
+          router.push('/athlete-welcome');
         } finally {
           setIsHydratingCrew(false);
         }
@@ -72,31 +85,11 @@ export default function AthleteHomePage() {
       }
     };
     hydrateCrew();
-  }, [runCrewId, athleteId, runCrew, isHydratingCrew]);
+  }, [runCrewId, athleteId, runCrew, isHydratingCrew, router]);
 
-  // Check Garmin connection status
-  useEffect(() => {
-    const checkGarminConnection = async () => {
-      if (!athleteId) {
-        setCheckingConnection(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(`${API_BASE}/garmin/status?athleteId=${athleteId}`);
-        if (response.ok) {
-          const data = await response.json();
-          setGarminConnected(data.connected || false);
-        }
-      } catch (error) {
-        console.error('Error checking Garmin connection:', error);
-      } finally {
-        setCheckingConnection(false);
-      }
-    };
-
-    checkGarminConnection();
-  }, [athleteId]);
+  // LOCAL-FIRST: Garmin connection status is loaded from localStorage on mount
+  // Only check API if explicitly needed (e.g., user clicks "Connect Garmin")
+  // No automatic API calls on page load
 
   // Get next run from crew
   const nextRun = useMemo(() => {
@@ -134,16 +127,18 @@ export default function AthleteHomePage() {
   const profileIncomplete =
     !athleteProfile?.firstName || !athleteProfile?.lastName || !athleteProfile?.primarySport;
 
+  // Error handling: redirect to welcome/home on errors (no fallbacks)
+  useEffect(() => {
+    if (activitiesError) {
+      console.error('❌ ATHLETE HOME: Activities error, redirecting to welcome:', activitiesError);
+      router.push('/athlete-welcome');
+    }
+  }, [activitiesError, router]);
+
   // Render guard: redirect if no athlete data
   if (!athleteProfile) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your profile...</p>
-        </div>
-      </div>
-    );
+    router.push('/athlete-welcome');
+    return null;
   }
 
   return (
@@ -167,7 +162,7 @@ export default function AthleteHomePage() {
         )}
 
         {/* Garmin Connection Prompt */}
-        {!checkingConnection && !garminConnected && (
+        {!garminConnected && (
           <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-orange-200">
             <div className="flex items-center gap-4">
               <Activity className="h-12 w-12 text-orange-500 flex-shrink-0" />
