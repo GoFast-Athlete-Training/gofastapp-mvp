@@ -186,6 +186,78 @@ export async function getCrewById(runCrewId: string) {
   });
 }
 
+/**
+ * Get public crew metadata - returns only safe, public information
+ * No memberships, messages, or sensitive data
+ */
+export async function getCrewPublicMetadata(runCrewId: string) {
+  const crew = await prisma.runCrew.findUnique({
+    where: { id: runCrewId },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      logo: true,
+      icon: true,
+      joinCode: true,
+      // Exclude: memberships, messages, announcements, runs, managers, etc.
+    },
+  });
+
+  if (!crew) {
+    return null;
+  }
+
+  // Return only public fields
+  return {
+    id: crew.id,
+    name: crew.name,
+    description: crew.description,
+    logo: crew.logo,
+    icon: crew.icon,
+    joinCode: crew.joinCode, // Include for manual join fallback
+  };
+}
+
+/**
+ * Join crew by crewId (instead of joinCode)
+ * This is the new InviteLink flow
+ */
+export async function joinCrewById(runCrewId: string, athleteId: string) {
+  // Find crew by id
+  const crew = await prisma.runCrew.findUnique({
+    where: { id: runCrewId },
+  });
+
+  if (!crew) {
+    throw new Error('Crew not found');
+  }
+
+  // Check if already a member
+  const existingMembership = await prisma.runCrewMembership.findUnique({
+    where: {
+      runCrewId_athleteId: {
+        runCrewId: crew.id,
+        athleteId,
+      },
+    },
+  });
+
+  if (existingMembership) {
+    return crew;
+  }
+
+  // Create membership
+  await prisma.runCrewMembership.create({
+    data: {
+      runCrewId: crew.id,
+      athleteId,
+    },
+  });
+
+  return crew;
+}
+
 export async function createRun(data: {
   runCrewId: string;
   createdById: string;

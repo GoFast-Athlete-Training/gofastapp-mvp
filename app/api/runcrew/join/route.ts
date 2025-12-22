@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
-import { joinCrew } from '@/lib/domain-runcrew';
+import { joinCrew, joinCrewById } from '@/lib/domain-runcrew';
 
 export async function POST(request: Request) {
   try {
@@ -38,20 +38,45 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
 
-    const { joinCode } = body;
+    const { joinCode, crewId } = body;
 
-    if (!joinCode) {
+    // Support both joinCode (legacy) and crewId (new InviteLink flow)
+    if (!joinCode && !crewId) {
       return NextResponse.json(
-        { error: 'joinCode is required' },
+        { error: 'Either joinCode or crewId is required' },
+        { status: 400 }
+      );
+    }
+
+    // Cannot provide both
+    if (joinCode && crewId) {
+      return NextResponse.json(
+        { error: 'Provide either joinCode or crewId, not both' },
         { status: 400 }
       );
     }
 
     let crew;
     try {
-      crew = await joinCrew(joinCode, athlete.id);
-    } catch (err) {
+      if (crewId) {
+        // New InviteLink flow - join by crewId
+        crew = await joinCrewById(crewId, athlete.id);
+      } else {
+        // Legacy flow - join by joinCode
+        crew = await joinCrew(joinCode, athlete.id);
+      }
+    } catch (err: any) {
       console.error('Prisma error:', err);
+      const errorMessage = err.message || 'DB error';
+      
+      // Handle "Crew not found" errors specifically
+      if (errorMessage.includes('not found')) {
+        return NextResponse.json(
+          { error: errorMessage },
+          { status: 404 }
+        );
+      }
+      
       return NextResponse.json({ error: 'DB error' }, { status: 500 });
     }
 
