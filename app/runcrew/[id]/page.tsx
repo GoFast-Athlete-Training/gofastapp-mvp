@@ -2,6 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { LocalStorageAPI } from '@/lib/localstorage';
 
@@ -10,8 +11,26 @@ export default function RunCrewDetailPage() {
   const router = useRouter();
   const crewId = params.id as string;
   
-  // LOCAL-FIRST: Load from localStorage only - no API calls, no useEffect, no state, NO REDIRECTS
-  const crew = LocalStorageAPI.getPrimaryCrew() || LocalStorageAPI.getRunCrewData();
+  // LOCAL-FIRST: Load from localStorage only - but defer until client-side to avoid hydration mismatch
+  const [crew, setCrew] = useState<any>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+    const loadedCrew = LocalStorageAPI.getPrimaryCrew() || LocalStorageAPI.getRunCrewData();
+    setCrew(loadedCrew);
+  }, []);
+
+  // Don't render until client-side hydration is complete
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="animate-pulse">Loading...</div>
+        </div>
+      </div>
+    );
+  }
 
   // NO REDIRECTS - Just render what we have, even if incomplete
   if (!crew || crew.id !== crewId) {

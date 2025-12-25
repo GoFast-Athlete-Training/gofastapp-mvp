@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Users, Calendar, Clock, MapPin } from 'lucide-react';
-import api from '@/lib/api';
-import { LocalStorageAPI } from '@/lib/localstorage';
+import useHydratedAthlete from '@/hooks/useHydratedAthlete';
 
 interface CrewHeroProps {
   crew: any;
@@ -18,115 +17,62 @@ export default function CrewHero({ crew, nextRun, nextRunAttendees, isCrewAdmin,
   const router = useRouter();
   const [showCrewSelector, setShowCrewSelector] = useState(false);
   const [adminCrews, setAdminCrews] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  
+  // READ-ONLY: Get identity data from hook (NO API calls)
+  const { athlete } = useHydratedAthlete();
 
-  // Determine admin status from crew.userRole if available (more reliable than localStorage)
-  const actualIsAdmin = crew?.userRole === 'admin' || crew?.userRole === 'manager' || isCrewAdmin;
+  // Determine admin status from prop (passed from parent)
+  const actualIsAdmin = isCrewAdmin;
 
-  const handleGoToCrew = async (e?: React.MouseEvent) => {
+  const handleGoToCrew = (e?: React.MouseEvent) => {
     e?.preventDefault();
     e?.stopPropagation();
     
-    console.log('🔵 View Crew button clicked');
+    console.log('🔵 View Crew button clicked - navigating (NO hydration)');
     
-    try {
-      if (!runCrewId) {
-        console.log('🔵 No runCrewId, navigating to /runcrew');
-        router.push('/runcrew');
-        return;
-      }
+    // NAVIGATION ONLY - No API calls, no hydration
+    // Route pages will handle crew context hydration
+    
+    if (!runCrewId) {
+      console.log('🔵 No runCrewId, navigating to /runcrew');
+      router.push('/runcrew');
+      return;
+    }
 
-      // Hydrate athlete to get fresh memberships with roles
-      setLoading(true);
-      console.log('🔵 Hydrating athlete to check crew memberships...');
-      
-      const hydrateResponse = await api.post('/athlete/hydrate');
-      
-      if (hydrateResponse.data.success && hydrateResponse.data.athlete) {
-        const { athlete } = hydrateResponse.data;
-        
-        // Update localStorage with fresh data
-        LocalStorageAPI.setFullHydrationModel({
-          athlete,
-          weeklyActivities: hydrateResponse.data.weeklyActivities || [],
-          weeklyTotals: hydrateResponse.data.weeklyTotals || null,
-        });
+    // Check if user is admin/manager from identity data (already in localStorage)
+    const crews = athlete?.runCrewMemberships || [];
+    const adminCrewsList = crews
+      .map((membership: any) => {
+        const managerRole = (athlete.runCrewManagers || []).find(
+          (m: any) => m.runCrewId === membership.runCrewId
+        );
+        return {
+          ...membership.runCrew,
+          role: managerRole?.role || 'member',
+        };
+      })
+      .filter((c: any) => c.role === 'admin' || c.role === 'manager');
 
-        // Get all crews where user is admin/manager
-        const crews = athlete.runCrewMemberships || [];
-        const adminCrewsList = crews
-          .map((membership: any) => {
-            const managerRole = (athlete.runCrewManagers || []).find(
-              (m: any) => m.runCrewId === membership.runCrewId
-            );
-            const role = managerRole?.role || 'member';
-            return {
-              ...membership.runCrew,
-              role,
-              joinedAt: membership.joinedAt,
-            };
-          })
-          .filter((c: any) => c.role === 'admin' || c.role === 'manager');
+    console.log('🔵 Admin/Manager crews found:', adminCrewsList.length);
 
-        console.log('🔵 Admin/Manager crews found:', adminCrewsList.length);
-
-        if (adminCrewsList.length === 0) {
-          // No admin crews, go to regular crew page
-          console.log('🔵 No admin crews, navigating to regular crew page');
-          router.push(`/runcrew/${runCrewId}`);
-        } else if (adminCrewsList.length === 1) {
-          // Single admin crew, go directly to admin page
-          const adminCrew = adminCrewsList[0];
-          console.log('🔵 Single admin crew, navigating to admin page:', adminCrew.id);
-          
-          // Hydrate the crew to get full data
-          const crewHydrateResponse = await api.post('/runcrew/hydrate', { runCrewId: adminCrew.id });
-          if (crewHydrateResponse.data.success && crewHydrateResponse.data.runCrew) {
-            LocalStorageAPI.setRunCrewData(crewHydrateResponse.data.runCrew);
-            LocalStorageAPI.setPrimaryCrew(crewHydrateResponse.data.runCrew);
-          }
-          
-          router.push(`/runcrew/${adminCrew.id}/admin`);
-        } else {
-          // Multiple admin crews, show selector
-          console.log('🔵 Multiple admin crews, showing selector');
-          setAdminCrews(adminCrewsList);
-          setShowCrewSelector(true);
-        }
-      } else {
-        // Fallback: use existing logic
-        console.log('🔵 Hydrate failed, using fallback logic');
-        const targetRoute = actualIsAdmin ? `/runcrew/${runCrewId}/admin` : `/runcrew/${runCrewId}`;
-        router.push(targetRoute);
-      }
-    } catch (error: any) {
-      console.error('🔴 Error navigating to crew:', error);
-      // Fallback: use existing logic
-      const targetRoute = actualIsAdmin ? `/runcrew/${runCrewId}/admin` : `/runcrew/${runCrewId}`;
-      router.push(targetRoute);
-    } finally {
-      setLoading(false);
+    if (adminCrewsList.length === 0) {
+      // No admin crews, go to regular crew page
+      router.push(`/runcrew/${runCrewId}`);
+    } else if (adminCrewsList.length === 1) {
+      // Single admin crew, go directly to admin page
+      const adminCrew = adminCrewsList[0];
+      router.push(`/runcrew/${adminCrew.id}/admin`);
+    } else {
+      // Multiple admin crews, show selector
+      setAdminCrews(adminCrewsList);
+      setShowCrewSelector(true);
     }
   };
 
-  const handleSelectCrew = async (selectedCrewId: string) => {
-    try {
-      setLoading(true);
-      
-      // Hydrate the selected crew
-      const crewHydrateResponse = await api.post('/runcrew/hydrate', { runCrewId: selectedCrewId });
-      if (crewHydrateResponse.data.success && crewHydrateResponse.data.runCrew) {
-        LocalStorageAPI.setRunCrewData(crewHydrateResponse.data.runCrew);
-        LocalStorageAPI.setPrimaryCrew(crewHydrateResponse.data.runCrew);
-      }
-      
-      router.push(`/runcrew/${selectedCrewId}/admin`);
-      setShowCrewSelector(false);
-    } catch (error) {
-      console.error('🔴 Error selecting crew:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleSelectCrew = (selectedCrewId: string) => {
+    // NAVIGATION ONLY - Route page will hydrate crew context
+    router.push(`/runcrew/${selectedCrewId}/admin`);
+    setShowCrewSelector(false);
   };
 
   if (crew && runCrewId) {
@@ -207,10 +153,9 @@ export default function CrewHero({ crew, nextRun, nextRunAttendees, isCrewAdmin,
         <button
           type="button"
           onClick={handleGoToCrew}
-          disabled={loading}
-          className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition shadow-lg"
         >
-          {loading ? 'Loading...' : 'View Crew →'}
+          View Crew →
         </button>
 
         {/* Crew Selector Modal */}
@@ -228,8 +173,7 @@ export default function CrewHero({ crew, nextRun, nextRunAttendees, isCrewAdmin,
                   <button
                     key={adminCrew.id}
                     onClick={() => handleSelectCrew(adminCrew.id)}
-                    disabled={loading}
-                    className="w-full text-left p-4 border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:bg-orange-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full text-left p-4 border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:bg-orange-50 transition"
                   >
                     <div className="flex items-center justify-between">
                       <div>

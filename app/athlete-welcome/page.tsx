@@ -57,17 +57,25 @@ export default function AthleteWelcomePage() {
       }
 
       // Store the complete Prisma model (athlete + all relations + activities)
-      console.log('💾 ATHLETE WELCOME: Caching full hydration model to localStorage...');
+      // IDENTITY HYDRATION ONLY - No crew context hydration here
+      console.log('💾 ATHLETE WELCOME: Caching identity hydration model to localStorage...');
       LocalStorageAPI.setFullHydrationModel({
         athlete,
         weeklyActivities: weeklyActivities,
         weeklyTotals: weeklyTotals
       });
       
+      // Store Garmin connection status if available
+      if (athlete.garminConnected !== undefined) {
+        localStorage.setItem('garminConnected', String(athlete.garminConnected));
+      }
+      
       // Also store raw response as requested
       localStorage.setItem('gofastHydration', JSON.stringify(response.data));
       
-      console.log('✅ ATHLETE WELCOME: Full hydration model cached');
+      console.log('✅ ATHLETE WELCOME: Identity hydration model cached');
+      console.log('✅ ATHLETE WELCOME: MyCrew ID:', athlete.MyCrew || 'none');
+      console.log('✅ ATHLETE WELCOME: Crew context will hydrate on /runcrew/* routes');
       
       // Hydration complete - show button for user to click
       console.log('🎯 ATHLETE WELCOME: Hydration complete, ready for user action');

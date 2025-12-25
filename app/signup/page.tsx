@@ -79,17 +79,19 @@ export default function SignupPage() {
           const firebaseToken = await user.getIdToken();
           localStorage.setItem('firebaseToken', firebaseToken);
 
-          // Try to hydrate existing athlete
+          // Check if athlete exists - redirect to welcome (welcome will hydrate)
           try {
             const hydrateRes = await api.post('/athlete/hydrate');
             if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
-              const athlete = hydrateRes.data.athlete;
-              console.log('✅ SIGNUP PAGE: Existing athlete found, redirecting...');
+              console.log('✅ SIGNUP PAGE: Existing athlete found, redirecting to welcome...');
               
-              // Store auth data
+              // Store auth data only
               localStorage.setItem('firebaseId', user.uid);
-              localStorage.setItem('athleteId', athlete.athleteId || athlete.id);
-              localStorage.setItem('email', athlete.email || user.email || '');
+              localStorage.setItem('email', user.email || '');
+              
+              // Redirect to welcome - it will handle hydration
+              router.push('/athlete-welcome');
+              return;
 
               // Check for pending crew join first
               const joinedCrew = await handlePendingCrewJoin(router);
@@ -182,22 +184,10 @@ export default function SignupPage() {
         // If create fails with 500, try hydrate instead (user might already exist)
         if (createErr?.response?.status === 500) {
           console.log('⚠️ SIGNUP: Create failed with 500, trying hydrate...');
-          try {
-            const hydrateRes = await api.post('/athlete/hydrate');
-            if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
-              console.log('✅ SIGNUP: Hydrate succeeded, using hydrated athlete');
-              athlete = {
-                success: true,
-                athleteId: hydrateRes.data.athlete.athleteId || hydrateRes.data.athlete.id,
-                data: hydrateRes.data.athlete
-              };
-            } else {
-              throw createErr; // Re-throw original error if hydrate also fails
-            }
-          } catch (hydrateErr: any) {
-            console.error('❌ SIGNUP: Both create and hydrate failed');
-            throw createErr; // Throw original create error
-          }
+          // Athlete might exist - redirect to welcome (welcome will hydrate)
+          console.log('✅ SIGNUP: Athlete might exist, redirecting to welcome');
+          router.push('/athlete-welcome');
+          return;
         } else {
           throw createErr; // Re-throw if not a 500 error
         }
@@ -295,22 +285,10 @@ export default function SignupPage() {
         // If create fails with 500, try hydrate instead (user might already exist)
         if (createErr?.response?.status === 500) {
           console.log('⚠️ SIGNUP: Create failed with 500, trying hydrate...');
-          try {
-            const hydrateRes = await api.post('/athlete/hydrate');
-            if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
-              console.log('✅ SIGNUP: Hydrate succeeded, using hydrated athlete');
-              athlete = {
-                success: true,
-                athleteId: hydrateRes.data.athlete.athleteId || hydrateRes.data.athlete.id,
-                data: hydrateRes.data.athlete
-              };
-            } else {
-              throw createErr; // Re-throw original error if hydrate also fails
-            }
-          } catch (hydrateErr: any) {
-            console.error('❌ SIGNUP: Both create and hydrate failed');
-            throw createErr; // Throw original create error
-          }
+          // Athlete might exist - redirect to welcome (welcome will hydrate)
+          console.log('✅ SIGNUP: Athlete might exist, redirecting to welcome');
+          router.push('/athlete-welcome');
+          return;
         } else {
           throw createErr; // Re-throw if not a 500 error
         }

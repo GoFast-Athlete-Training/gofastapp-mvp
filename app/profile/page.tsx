@@ -23,23 +23,11 @@ export default function ProfilePage() {
         return;
       }
 
-      // LOCAL-FIRST: Use localStorage immediately (from useHydratedAthlete hook)
-      // Only fetch from API if localStorage is empty
-      const stored = LocalStorageAPI.getAthlete();
-      if (!stored && !athleteProfile) {
-        try {
-          // Only fetch if localStorage is empty
-          const token = await user.getIdToken();
-          const response = await api.post('/athlete/hydrate', {}, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-
-          if (response.data.success && response.data.athlete) {
-            LocalStorageAPI.setAthlete(response.data.athlete);
-          }
-        } catch (err: any) {
-          console.error('Error loading athlete:', err);
-        }
+      // READ-ONLY: Use hook data only - NO hydration API calls
+      // If no athlete data, redirect to welcome (welcome will hydrate)
+      if (!athleteProfile) {
+        router.push('/athlete-welcome');
+        return;
       }
       
       setLoading(false);

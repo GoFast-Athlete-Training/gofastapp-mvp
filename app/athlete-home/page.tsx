@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic';
 
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { LocalStorageAPI } from '@/lib/localstorage';
 import useHydratedAthlete from '@/hooks/useHydratedAthlete';
 import { Activity } from 'lucide-react';
 import AthleteHeader from '@/components/athlete/AthleteHeader';
@@ -17,51 +16,48 @@ import RSVPCard from '@/components/athlete/RSVPCard';
 export default function AthleteHomePage() {
   const router = useRouter();
 
-  // Use hooks to get all hydrated data from localStorage
-  const { athlete: athleteProfile, runCrewId, runCrewManagerId, runCrew } =
-    useHydratedAthlete();
+  // READ-ONLY: Use hook exclusively - NO direct localStorage reads, NO API calls
+  const { 
+    athlete: athleteProfile, 
+    runCrewId, 
+    runCrewManagerId,
+    weeklyActivities,
+    weeklyTotals,
+    garminConnected,
+    loading,
+    hydrated
+  } = useHydratedAthlete();
 
-  // Load activities from localStorage ONLY - no API calls, no useEffect
-  const model = LocalStorageAPI.getFullHydrationModel();
-  const weeklyActivities = model?.weeklyActivities || [];
-  const weeklyTotals = model?.weeklyTotals || null;
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your account...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect if not hydrated
+  if (!hydrated || !athleteProfile) {
+    router.push('/athlete-welcome');
+    return null;
+  }
 
   // Check if user is an admin of the current crew
   const isCrewAdmin = Boolean(runCrewManagerId);
 
-  // Use crew from localStorage
-  const crew = runCrew;
+  // NOTE: Crew context is NOT hydrated on athlete-home
+  // Crew data will hydrate when user navigates to /runcrew/* routes
+  // For now, we only use runCrewId for navigation
+  const crew = null; // Explicitly null - crew context not available here
 
-  // Load Garmin connection status from localStorage
-  const garminConnected = typeof window !== 'undefined' 
-    ? localStorage.getItem('garminConnected') === 'true'
-    : false;
-
-  // Get next run from crew
-  const nextRun = useMemo(() => {
-    if (!crew?.runs || !Array.isArray(crew.runs)) return null;
-    const upcomingRuns = crew.runs
-      .filter((run: any) => {
-        const runDate = run.date || run.scheduledAt;
-        if (!runDate) return false;
-        return new Date(runDate) >= new Date();
-      })
-      .sort((a: any, b: any) => {
-        const dateA = new Date(a.date || a.scheduledAt);
-        const dateB = new Date(b.date || b.scheduledAt);
-        return dateA.getTime() - dateB.getTime();
-      });
-    return upcomingRuns[0] || null;
-  }, [crew]);
-
-  // Get attendees for next run (first 3)
-  const nextRunAttendees = useMemo(() => {
-    if (!nextRun?.rsvps) return [];
-    return nextRun.rsvps
-      .filter((rsvp: any) => rsvp.status === 'going')
-      .slice(0, 3)
-      .map((rsvp: any) => rsvp.athlete || rsvp);
-  }, [nextRun]);
+  // NOTE: Crew context not available on athlete-home
+  // These will be null until user navigates to crew routes
+  const nextRun = null;
+  const nextRunAttendees: any[] = [];
 
   // Get latest activity
   const latestActivity = useMemo(() => {
@@ -86,10 +82,11 @@ export default function AthleteHomePage() {
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
         {profileIncomplete && <ProfileCallout athlete={athleteProfile} />}
 
+        {/* CrewHero - crew context not available, will show empty state or join prompt */}
         <CrewHero
-          crew={crew}
-          nextRun={nextRun}
-          nextRunAttendees={nextRunAttendees}
+          crew={null}
+          nextRun={null}
+          nextRunAttendees={[]}
           isCrewAdmin={isCrewAdmin}
           runCrewId={runCrewId}
         />
@@ -125,15 +122,7 @@ export default function AthleteHomePage() {
         {/* Latest Activity Card */}
         {latestActivity && <LatestActivityCard latestActivity={latestActivity} />}
 
-        {/* RSVP CTA - Only if crew has upcoming run */}
-        {crew && nextRun && (
-          <RSVPCard
-            nextRun={nextRun}
-            crew={crew}
-            runCrewId={runCrewId}
-            isCrewAdmin={isCrewAdmin}
-          />
-        )}
+        {/* RSVP CTA - Not available on athlete-home (crew context not hydrated) */}
       </main>
     </div>
   );

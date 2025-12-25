@@ -38,28 +38,10 @@ export default function SettingsPage() {
 
       const firebaseToken = await currentUser.getIdToken();
       
-      // Hydrate athlete to get fresh data including Garmin connection status
-      const response = await fetch(`${API_BASE}/athlete/hydrate`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${firebaseToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.athlete) {
-          // Update localStorage with fresh athlete data
-          LocalStorageAPI.setAthlete(data.athlete);
-          setAthlete(data.athlete);
-          
-          // Update connection status from fresh data
-          setConnections({
-            garmin: data.athlete.garmin_is_connected || false,
-          });
-        }
-      }
+      // READ-ONLY: Use hook data only - NO hydration API calls
+      // Settings page should read from useHydratedAthlete hook
+      // If data needs refresh, user should navigate to welcome page
+      console.log('Settings: Data refresh not available - use welcome page to refresh');
     } catch (error) {
       console.error('Error refreshing athlete data:', error);
     }
