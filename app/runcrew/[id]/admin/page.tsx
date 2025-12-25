@@ -4,6 +4,8 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
 import useHydratedAthlete from '@/hooks/useHydratedAthlete';
@@ -17,6 +19,8 @@ export default function RunCrewAdminPage() {
   // LOCAL-FIRST: Load from localStorage only - but defer until client-side to avoid hydration mismatch
   const [crew, setCrew] = useState<any>(null);
   const [isClient, setIsClient] = useState(false);
+  const [authInitialized, setAuthInitialized] = useState(false);
+  const [firebaseUser, setFirebaseUser] = useState<any>(null);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
   const [announcementsError, setAnnouncementsError] = useState<string | null>(null);
@@ -57,6 +61,22 @@ export default function RunCrewAdminPage() {
     }
   };
 
+  // Wait for Firebase auth to initialize
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      setAuthInitialized(true);
+      
+      if (!user) {
+        console.log('⚠️ RunCrewAdmin: No authenticated user - may need to sign in');
+      } else {
+        console.log('✅ RunCrewAdmin: Firebase auth initialized, user:', user.email);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   // Load crew from localStorage
   useEffect(() => {
     setIsClient(true);
@@ -73,6 +93,18 @@ export default function RunCrewAdminPage() {
   // Load announcements from API
   const loadAnnouncements = useCallback(async () => {
     if (!crewId) return;
+    
+    // Wait for auth to initialize before making API calls
+    if (!authInitialized) {
+      console.log('⏳ RunCrewAdmin: Waiting for auth to initialize before loading announcements');
+      return;
+    }
+
+    if (!firebaseUser && !auth.currentUser) {
+      console.warn('⚠️ RunCrewAdmin: No Firebase user available for announcements request');
+      setAnnouncementsError('Please sign in to view announcements');
+      return;
+    }
     
     try {
       setLoadingAnnouncements(true);
@@ -91,11 +123,23 @@ export default function RunCrewAdminPage() {
     } finally {
       setLoadingAnnouncements(false);
     }
-  }, [crewId]);
+  }, [crewId, authInitialized, firebaseUser]);
 
   // Load runs from API
   const loadRuns = useCallback(async () => {
     if (!crewId) return;
+    
+    // Wait for auth to initialize before making API calls
+    if (!authInitialized) {
+      console.log('⏳ RunCrewAdmin: Waiting for auth to initialize before loading runs');
+      return;
+    }
+
+    if (!firebaseUser && !auth.currentUser) {
+      console.warn('⚠️ RunCrewAdmin: No Firebase user available for runs request');
+      setRunsError('Please sign in to view runs');
+      return;
+    }
     
     try {
       setLoadingRuns(true);
@@ -114,15 +158,15 @@ export default function RunCrewAdminPage() {
     } finally {
       setLoadingRuns(false);
     }
-  }, [crewId]);
+  }, [crewId, authInitialized, firebaseUser]);
 
-  // Load data on mount
+  // Load data on mount (only after auth is initialized)
   useEffect(() => {
-    if (isClient && crewId) {
+    if (isClient && crewId && authInitialized && (firebaseUser || auth.currentUser)) {
       loadAnnouncements();
       loadRuns();
     }
-  }, [isClient, crewId, loadAnnouncements, loadRuns]);
+  }, [isClient, crewId, authInitialized, firebaseUser, loadAnnouncements, loadRuns]);
 
   const handleResync = useCallback(async () => {
     if (!crewId) {
@@ -147,13 +191,15 @@ export default function RunCrewAdminPage() {
     }
   }, [crewId, loadAnnouncements, loadRuns]);
 
-  // Don't render until client-side hydration is complete
-  if (!isClient) {
+  // Don't render until client-side hydration and auth initialization are complete
+  if (!isClient || !authInitialized) {
     return (
       <main className="min-h-screen bg-gray-50 flex items-center justify-center px-6 py-12">
         <div className="max-w-xl w-full bg-white border border-gray-200 rounded-xl shadow-sm p-8 text-center space-y-6">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
-          <p className="text-gray-600 text-sm">Loading crew data...</p>
+          <p className="text-gray-600 text-sm">
+            {!authInitialized ? 'Initializing authentication...' : 'Loading crew data...'}
+          </p>
         </div>
       </main>
     );
@@ -210,6 +256,17 @@ export default function RunCrewAdminPage() {
   const handleCreateRun = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Ensure auth is initialized before making API call
+    if (!authInitialized) {
+      showToast('Loading authentication...');
+      return;
+    }
+
+    if (!firebaseUser && !auth.currentUser) {
+      showToast('Please sign in to create runs');
+      return;
+    }
+    
     try {
       const response = await api.post(`/runcrew/${crewId}/runs`, {
         ...runForm,
@@ -246,6 +303,17 @@ export default function RunCrewAdminPage() {
     
     if (!trimmedTitle || !trimmedContent) {
       showToast('Please provide both title and content');
+      return;
+    }
+
+    // Ensure auth is initialized before making API call
+    if (!authInitialized) {
+      showToast('Loading authentication...');
+      return;
+    }
+
+    if (!firebaseUser && !auth.currentUser) {
+      showToast('Please sign in to post announcements');
       return;
     }
 
