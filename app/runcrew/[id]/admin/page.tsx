@@ -2,8 +2,9 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
 
 export default function RunCrewAdminPage() {
@@ -11,8 +12,9 @@ export default function RunCrewAdminPage() {
   const router = useRouter();
   const crewId = params.id as string;
   
-  const [crew, setCrew] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  // LOCAL-FIRST: Load from localStorage only - no useEffect, no automatic API calls, NO REDIRECTS
+  const crew = LocalStorageAPI.getPrimaryCrew() || LocalStorageAPI.getRunCrewData();
+  
   const [showRunForm, setShowRunForm] = useState(false);
   const [runForm, setRunForm] = useState({
     title: '',
@@ -25,35 +27,43 @@ export default function RunCrewAdminPage() {
     description: '',
   });
 
-  useEffect(() => {
-    loadCrew();
-  }, [crewId]);
-
-  const loadCrew = async () => {
-    try {
-      const response = await api.post('/runcrew/hydrate', { runCrewId: crewId });
-      
-      if (response.data.success) {
-        const crewData = response.data.runCrew;
-        // Verify user is an admin/manager before allowing access
-        const isAdmin = crewData.userRole === 'admin' || crewData.userRole === 'manager';
-        if (!isAdmin) {
-          console.error('User is not an admin, redirecting to crew page');
-          router.push(`/runcrew/${crewId}`);
-          return;
-        }
-        setCrew(crewData);
-      }
-    } catch (error: any) {
-      console.error('Error loading crew:', error);
-      // If user is not a member (403) or not found (404), redirect appropriately
-      if (error.response?.status === 403 || error.response?.status === 404) {
-        router.push('/runcrew');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Verify user is an admin/manager before allowing access
+  const isAdmin = crew?.userRole === 'admin' || crew?.userRole === 'manager';
+  
+  // NO REDIRECTS - Just render what we have, even if incomplete
+  // If crew doesn't exist or ID doesn't match, show error
+  if (!crew || crew.id !== crewId) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-7xl mx-auto">
+          <p className="text-red-600">Crew not found in localStorage. Please navigate from your crew page.</p>
+          <button
+            onClick={() => router.push('/runcrew')}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Go to Crew List
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
+  // If not admin, show message instead of redirecting
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-7xl mx-auto">
+          <p className="text-red-600">You must be an admin to access this page.</p>
+          <button
+            onClick={() => router.push(`/runcrew/${crewId}`)}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Go to Crew Page
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleCreateRun = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +87,8 @@ export default function RunCrewAdminPage() {
           pace: '',
           description: '',
         });
-        loadCrew();
+        // Reload page to get fresh data (or refresh localStorage)
+        window.location.reload();
       }
     } catch (error: any) {
       console.error('Error creating run:', error);
@@ -99,21 +110,14 @@ export default function RunCrewAdminPage() {
       
       if (response.data.success) {
         (e.target as HTMLFormElement).reset();
-        loadCrew();
+        // Reload page to get fresh data (or refresh localStorage)
+        window.location.reload();
       }
     } catch (error: any) {
       console.error('Error posting announcement:', error);
       alert(error.response?.data?.error || 'Failed to post announcement');
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">

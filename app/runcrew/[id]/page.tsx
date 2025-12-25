@@ -2,9 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 
 export default function RunCrewDetailPage() {
@@ -12,45 +10,22 @@ export default function RunCrewDetailPage() {
   const router = useRouter();
   const crewId = params.id as string;
   
-  const [crew, setCrew] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  // LOCAL-FIRST: Load from localStorage only - no API calls, no useEffect, no state, NO REDIRECTS
+  const crew = LocalStorageAPI.getPrimaryCrew() || LocalStorageAPI.getRunCrewData();
 
-  useEffect(() => {
-    loadCrew();
-  }, [crewId]);
-
-  const loadCrew = async () => {
-    try {
-      const response = await api.post('/runcrew/hydrate', { runCrewId: crewId });
-      
-      if (response.data.success) {
-        const crewData = response.data.runCrew;
-        LocalStorageAPI.setPrimaryCrew(crewData);
-        setCrew(crewData);
-      }
-    } catch (error: any) {
-      console.error('Error loading crew:', error);
-      // If user is not a member (403), redirect to runcrew list
-      if (error.response?.status === 403) {
-        router.push('/runcrew');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-      </div>
-    );
-  }
-
-  if (!crew) {
+  // NO REDIRECTS - Just render what we have, even if incomplete
+  if (!crew || crew.id !== crewId) {
     return (
       <div className="min-h-screen bg-gray-50 p-8">
-        <p className="text-red-600">Crew not found</p>
+        <div className="max-w-7xl mx-auto">
+          <p className="text-red-600">Crew not found in localStorage. Please navigate from your crew page.</p>
+          <button
+            onClick={() => router.push('/runcrew')}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Go to Crew List
+          </button>
+        </div>
       </div>
     );
   }

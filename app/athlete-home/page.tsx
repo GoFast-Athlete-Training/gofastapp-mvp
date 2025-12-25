@@ -2,12 +2,10 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import useHydratedAthlete from '@/hooks/useHydratedAthlete';
-import useActivities from '@/hooks/useActivities';
-import api from '@/lib/api';
 import { Activity } from 'lucide-react';
 import AthleteHeader from '@/components/athlete/AthleteHeader';
 import ProfileCallout from '@/components/athlete/ProfileCallout';
@@ -20,76 +18,24 @@ export default function AthleteHomePage() {
   const router = useRouter();
 
   // Use hooks to get all hydrated data from localStorage
-  const { athlete: athleteProfile, athleteId, runCrewId, runCrewManagerId, runCrew } =
+  const { athlete: athleteProfile, runCrewId, runCrewManagerId, runCrew } =
     useHydratedAthlete();
 
-  // Fetch activities from localStorage only (local-first)
-  const { activities: weeklyActivities, weeklyTotals, isLoading: activitiesLoading, error: activitiesError } =
-    useActivities(athleteId);
+  // Load activities from localStorage ONLY - no API calls, no useEffect
+  const model = LocalStorageAPI.getFullHydrationModel();
+  const weeklyActivities = model?.weeklyActivities || [];
+  const weeklyTotals = model?.weeklyTotals || null;
 
   // Check if user is an admin of the current crew
-  const isCrewAdmin = useMemo(() => {
-    return Boolean(runCrewManagerId);
-  }, [runCrewManagerId]);
+  const isCrewAdmin = Boolean(runCrewManagerId);
 
-  const [crew, setCrew] = useState(runCrew);
-  const [garminConnected, setGarminConnected] = useState(() => {
-    // LOCAL-FIRST: Load from localStorage
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('garminConnected');
-      return stored === 'true';
-    }
-    return false;
-  });
-  const [checkingConnection, setCheckingConnection] = useState(false);
-  const [isHydratingCrew, setIsHydratingCrew] = useState(false);
+  // Use crew from localStorage
+  const crew = runCrew;
 
-  // NO REDIRECT - Users stay on athlete-home to see activities
-  // Removed RunCrew or Bust redirect - let users see their activities!
-  // Log only once on mount and when key values change (not arrays/objects that recreate)
-  useEffect(() => {
-    console.log('🏠 ATHLETE HOME: Page loaded, staying on athlete-home');
-    console.log('🏠 ATHLETE HOME: athleteProfile:', !!athleteProfile);
-    console.log('🏠 ATHLETE HOME: runCrewId:', runCrewId);
-    console.log('🏠 ATHLETE HOME: weeklyActivities count:', weeklyActivities?.length || 0);
-    console.log('🏠 ATHLETE HOME: weeklyTotals:', weeklyTotals);
-    console.log('🏠 ATHLETE HOME: garminConnected:', garminConnected);
-    // Only depend on primitive values to prevent infinite loops
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [athleteProfile, runCrewId, garminConnected]);
-
-  // Hydrate crew if we have runCrewId but no crew data (local-first: only fetch if missing)
-  useEffect(() => {
-    const hydrateCrew = async () => {
-      if (runCrewId && athleteId && !crew && !isHydratingCrew) {
-        setIsHydratingCrew(true);
-        try {
-          const { data } = await api.post('/runcrew/hydrate', { runCrewId, athleteId });
-          if (data?.success && data.runCrew) {
-            LocalStorageAPI.setRunCrewData(data.runCrew);
-            setCrew(data.runCrew);
-          } else {
-            // No fallback - redirect on error
-            console.error('❌ ATHLETE HOME: Crew hydration failed, redirecting');
-            router.push('/athlete-welcome');
-          }
-        } catch (error: any) {
-          console.error('❌ ATHLETE HOME: Failed to hydrate crew:', error);
-          // No fallback - redirect on error
-          router.push('/athlete-welcome');
-        } finally {
-          setIsHydratingCrew(false);
-        }
-      } else if (runCrew) {
-        setCrew(runCrew);
-      }
-    };
-    hydrateCrew();
-  }, [runCrewId, athleteId, runCrew, isHydratingCrew, router]);
-
-  // LOCAL-FIRST: Garmin connection status is loaded from localStorage on mount
-  // Only check API if explicitly needed (e.g., user clicks "Connect Garmin")
-  // No automatic API calls on page load
+  // Load Garmin connection status from localStorage
+  const garminConnected = typeof window !== 'undefined' 
+    ? localStorage.getItem('garminConnected') === 'true'
+    : false;
 
   // Get next run from crew
   const nextRun = useMemo(() => {
@@ -126,14 +72,6 @@ export default function AthleteHomePage() {
   // Profile setup logic
   const profileIncomplete =
     !athleteProfile?.firstName || !athleteProfile?.lastName || !athleteProfile?.primarySport;
-
-  // Error handling: redirect to welcome/home on errors (no fallbacks)
-  useEffect(() => {
-    if (activitiesError) {
-      console.error('❌ ATHLETE HOME: Activities error, redirecting to welcome:', activitiesError);
-      router.push('/athlete-welcome');
-    }
-  }, [activitiesError, router]);
 
   // Render guard: redirect if no athlete data
   if (!athleteProfile) {

@@ -241,6 +241,9 @@ model training_plan_weeks {
   weekNumber           Int
   miles                Float?
 
+  // NEW — planning-only, used during initial generation
+  planningDays         Json?    // [{ dayOfWeek, type, miles }]
+
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
