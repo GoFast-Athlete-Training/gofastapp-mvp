@@ -23,10 +23,8 @@ export default function RunCrewAdminPage() {
   const [firebaseUser, setFirebaseUser] = useState<any>(null);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
-  const [announcementsError, setAnnouncementsError] = useState<string | null>(null);
   const [runs, setRuns] = useState<any[]>([]);
   const [loadingRuns, setLoadingRuns] = useState(false);
-  const [runsError, setRunsError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   
@@ -61,145 +59,88 @@ export default function RunCrewAdminPage() {
     }
   };
 
-  // Wait for Firebase auth to initialize
+  // Wait for Firebase auth to initialize (needed for POST operations only)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
       setAuthInitialized(true);
-      
-      if (!user) {
-        console.log('⚠️ RunCrewAdmin: No authenticated user - may need to sign in');
-      } else {
-        console.log('✅ RunCrewAdmin: Firebase auth initialized, user:', user.email);
-      }
     });
 
     return () => unsubscribe();
   }, []);
 
-  // Load crew from localStorage
+  // LOCAL-FIRST: Load crew data from localStorage only (no API calls on mount)
   useEffect(() => {
     setIsClient(true);
     const loadedCrew = LocalStorageAPI.getPrimaryCrew() || LocalStorageAPI.getRunCrewData();
     setCrew(loadedCrew);
-    if (loadedCrew?.runs) {
-      setRuns(loadedCrew.runs);
-    }
+    
+    // Read announcements and runs from localStorage (already hydrated by welcome page)
     if (loadedCrew?.announcements) {
       setAnnouncements(loadedCrew.announcements);
     }
+    if (loadedCrew?.runs) {
+      setRuns(loadedCrew.runs);
+    }
   }, []);
 
-  // Load announcements from API
-  const loadAnnouncements = useCallback(async () => {
-    if (!crewId) return;
-    
-    // Wait for auth to initialize before making API calls
-    if (!authInitialized) {
-      console.log('⏳ RunCrewAdmin: Waiting for auth to initialize before loading announcements');
-      return;
-    }
-
-    if (!firebaseUser && !auth.currentUser) {
-      console.warn('⚠️ RunCrewAdmin: No Firebase user available for announcements request');
-      setAnnouncementsError('Please sign in to view announcements');
-      return;
-    }
-    
-    try {
-      setLoadingAnnouncements(true);
-      setAnnouncementsError(null);
-      
-      const response = await api.get(`/runcrew/${crewId}/announcements`);
-      
-      if (response.data?.success && Array.isArray(response.data.announcements)) {
-        setAnnouncements(response.data.announcements);
-      } else {
-        throw new Error(response.data?.error || 'Failed to load announcements');
-      }
-    } catch (error: any) {
-      console.error('Failed to load announcements:', error);
-      setAnnouncementsError(error.response?.data?.error || error.message || 'Failed to load announcements');
-    } finally {
-      setLoadingAnnouncements(false);
-    }
-  }, [crewId, authInitialized, firebaseUser]);
-
-  // Load runs from API
-  const loadRuns = useCallback(async () => {
-    if (!crewId) return;
-    
-    // Wait for auth to initialize before making API calls
-    if (!authInitialized) {
-      console.log('⏳ RunCrewAdmin: Waiting for auth to initialize before loading runs');
-      return;
-    }
-
-    if (!firebaseUser && !auth.currentUser) {
-      console.warn('⚠️ RunCrewAdmin: No Firebase user available for runs request');
-      setRunsError('Please sign in to view runs');
-      return;
-    }
-    
-    try {
-      setLoadingRuns(true);
-      setRunsError(null);
-      
-      const response = await api.get(`/runcrew/${crewId}/runs`);
-      
-      if (response.data?.success && Array.isArray(response.data.runs)) {
-        setRuns(response.data.runs);
-      } else {
-        throw new Error(response.data?.error || 'Failed to load runs');
-      }
-    } catch (error: any) {
-      console.error('Failed to load runs:', error);
-      setRunsError(error.response?.data?.error || error.message || 'Failed to load runs');
-    } finally {
-      setLoadingRuns(false);
-    }
-  }, [crewId, authInitialized, firebaseUser]);
-
-  // Load data on mount (only after auth is initialized)
-  useEffect(() => {
-    if (isClient && crewId && authInitialized && (firebaseUser || auth.currentUser)) {
-      loadAnnouncements();
-      loadRuns();
-    }
-  }, [isClient, crewId, authInitialized, firebaseUser, loadAnnouncements, loadRuns]);
-
+  // Manual refresh function (user-initiated - OK to call API)
   const handleResync = useCallback(async () => {
     if (!crewId) {
       showToast('Missing crew context');
       return;
     }
 
+    if (!authInitialized || (!firebaseUser && !auth.currentUser)) {
+      showToast('Please sign in to refresh data');
+      return;
+    }
+
     try {
       setSyncing(true);
+      setLoadingAnnouncements(true);
+      setLoadingRuns(true);
       
-      await Promise.all([
-        loadAnnouncements(),
-        loadRuns()
+      // User-initiated refresh - OK to call APIs
+      const [announcementsResponse, runsResponse] = await Promise.all([
+        api.get(`/runcrew/${crewId}/announcements`),
+        api.get(`/runcrew/${crewId}/runs`)
       ]);
       
+      if (announcementsResponse.data?.success && Array.isArray(announcementsResponse.data.announcements)) {
+        setAnnouncements(announcementsResponse.data.announcements);
+        // Update localStorage with fresh data
+        const updatedCrew = { ...crew, announcements: announcementsResponse.data.announcements };
+        LocalStorageAPI.setRunCrewData(updatedCrew);
+        LocalStorageAPI.setPrimaryCrew(updatedCrew);
+      }
+      
+      if (runsResponse.data?.success && Array.isArray(runsResponse.data.runs)) {
+        setRuns(runsResponse.data.runs);
+        // Update localStorage with fresh data
+        const updatedCrew = { ...crew, runs: runsResponse.data.runs };
+        LocalStorageAPI.setRunCrewData(updatedCrew);
+        LocalStorageAPI.setPrimaryCrew(updatedCrew);
+      }
+      
       showToast('Crew data refreshed');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to sync crew:', error);
-      showToast('Failed to refresh crew data');
+      showToast(error.response?.data?.error || 'Failed to refresh crew data');
     } finally {
       setSyncing(false);
+      setLoadingAnnouncements(false);
+      setLoadingRuns(false);
     }
-  }, [crewId, loadAnnouncements, loadRuns]);
+  }, [crewId, crew, authInitialized, firebaseUser]);
 
-  // Don't render until client-side hydration and auth initialization are complete
-  if (!isClient || !authInitialized) {
+  // Don't render until client-side hydration is complete
+  if (!isClient) {
     return (
       <main className="min-h-screen bg-gray-50 flex items-center justify-center px-6 py-12">
         <div className="max-w-xl w-full bg-white border border-gray-200 rounded-xl shadow-sm p-8 text-center space-y-6">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
-          <p className="text-gray-600 text-sm">
-            {!authInitialized ? 'Initializing authentication...' : 'Loading crew data...'}
-          </p>
+          <p className="text-gray-600 text-sm">Loading crew data...</p>
         </div>
       </main>
     );
@@ -287,7 +228,15 @@ export default function RunCrewAdminPage() {
           description: '',
         });
         showToast('Run created successfully');
-        await loadRuns();
+        
+        // Update local state with new run
+        const newRun = response.data.data || response.data.run;
+        setRuns([newRun, ...runs]);
+        
+        // Update localStorage
+        const updatedCrew = { ...crew, runs: [newRun, ...runs] };
+        LocalStorageAPI.setRunCrewData(updatedCrew);
+        LocalStorageAPI.setPrimaryCrew(updatedCrew);
       }
     } catch (error: any) {
       console.error('Error creating run:', error);
@@ -327,7 +276,15 @@ export default function RunCrewAdminPage() {
         setAnnouncementTitle('');
         setAnnouncementContent('');
         showToast('Announcement posted successfully');
-        await loadAnnouncements();
+        
+        // Update local state with new announcement
+        const newAnnouncement = response.data.announcement;
+        setAnnouncements([newAnnouncement, ...announcements]);
+        
+        // Update localStorage
+        const updatedCrew = { ...crew, announcements: [newAnnouncement, ...announcements] };
+        LocalStorageAPI.setRunCrewData(updatedCrew);
+        LocalStorageAPI.setPrimaryCrew(updatedCrew);
       }
     } catch (error: any) {
       console.error('Error posting announcement:', error);
@@ -480,23 +437,11 @@ export default function RunCrewAdminPage() {
               </form>
 
               {loadingAnnouncements && (
-                <div className="text-center py-4 text-sm text-gray-500">Loading announcements...</div>
-              )}
-
-              {announcementsError && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                  <p className="text-yellow-800 text-sm mb-2">{announcementsError}</p>
-                  <button 
-                    onClick={loadAnnouncements}
-                    className="text-yellow-600 text-sm underline"
-                  >
-                    Retry
-                  </button>
-                </div>
+                <div className="text-center py-4 text-sm text-gray-500">Refreshing announcements...</div>
               )}
 
               <div className="space-y-4">
-                {!loadingAnnouncements && !announcementsError && announcements.length === 0 && (
+                {!loadingAnnouncements && announcements.length === 0 && (
                   <p className="text-sm text-gray-500">No announcements yet. Be the first to post one.</p>
                 )}
                 {announcements.map((announcement) => (
