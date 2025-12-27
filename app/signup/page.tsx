@@ -92,22 +92,6 @@ export default function SignupPage() {
               // Redirect to welcome - it will handle hydration
               router.push('/athlete-welcome');
               return;
-
-              // Check for pending crew join first
-              const joinedCrew = await handlePendingCrewJoin(router);
-              if (joinedCrew) {
-                return; // Already redirected
-              }
-
-              // Route based on profile completion
-              if (athlete.gofastHandle) {
-                console.log('✅ SIGNUP PAGE: Profile complete → redirecting to athlete-home');
-                router.replace('/athlete-home');
-              } else {
-                console.log('✅ SIGNUP PAGE: Profile incomplete → redirecting to athlete-welcome');
-                router.replace('/athlete-welcome');
-              }
-              return;
             }
           } catch (hydrateErr: any) {
             console.log('⚠️ SIGNUP PAGE: Hydrate failed, trying create...', hydrateErr.response?.status);
