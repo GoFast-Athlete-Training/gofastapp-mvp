@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -16,26 +16,18 @@ export default function AthleteWelcomePage() {
   const [error, setError] = useState<string | null>(null);
   const [authInitialized, setAuthInitialized] = useState(false);
 
-  const hydrateAthlete = async (firebaseUser: any) => {
+  const hydrateAthlete = useCallback(async (firebaseUser: any) => {
     try {
-      console.log('🚀 ATHLETE WELCOME: ===== STARTING HYDRATION =====');
       setIsLoading(true);
       setError(null);
-
-      console.log('✅ ATHLETE WELCOME: Firebase user found');
-      console.log('✅ ATHLETE WELCOME: Firebase UID:', firebaseUser.uid);
-      console.log('✅ ATHLETE WELCOME: Firebase Email:', firebaseUser.email);
-      console.log('🚀 ATHLETE WELCOME: Calling hydration endpoint...');
 
       // Call hydration endpoint (token automatically added by api interceptor)
       const response = await api.post('/athlete/hydrate');
       
-      console.log('📡 ATHLETE WELCOME: Response received:', response.status);
-      
       const { success, athlete } = response.data;
 
       if (!success || !athlete) {
-        console.error('❌ ATHLETE WELCOME: Hydration failed:', response.data.error || 'Invalid response');
+        console.error('❌ Hydration failed:', response.data.error || 'Invalid response');
         setError(response.data.error || 'Failed to load athlete data');
         setIsLoading(false);
         return;
@@ -45,20 +37,8 @@ export default function AthleteWelcomePage() {
       const weeklyActivities = athlete.weeklyActivities || [];
       const weeklyTotals = athlete.weeklyTotals || null;
 
-      console.log('✅ ATHLETE WELCOME: Athlete hydrated successfully');
-      console.log('✅ ATHLETE WELCOME: Athlete ID:', athlete.athleteId || athlete.id);
-      console.log('✅ ATHLETE WELCOME: Email:', athlete.email);
-      console.log('✅ ATHLETE WELCOME: Name:', athlete.firstName, athlete.lastName);
-      console.log('✅ ATHLETE WELCOME: RunCrews count:', athlete.runCrews?.length || 0);
-      console.log('✅ ATHLETE WELCOME: Weekly activities count:', weeklyActivities.length);
-      
-      if (athlete.runCrews && athlete.runCrews.length > 0) {
-        console.log('✅ ATHLETE WELCOME: RunCrews:', athlete.runCrews.map((c: any) => c.name).join(', '));
-      }
-
       // Store the complete Prisma model (athlete + all relations + activities)
       // IDENTITY HYDRATION ONLY - No crew context hydration here
-      console.log('💾 ATHLETE WELCOME: Caching identity hydration model to localStorage...');
       LocalStorageAPI.setFullHydrationModel({
         athlete,
         weeklyActivities: weeklyActivities,
@@ -73,21 +53,12 @@ export default function AthleteWelcomePage() {
       // Also store raw response as requested
       localStorage.setItem('gofastHydration', JSON.stringify(response.data));
       
-      console.log('✅ ATHLETE WELCOME: Identity hydration model cached');
-      console.log('✅ ATHLETE WELCOME: MyCrew ID:', athlete.MyCrew || 'none');
-      console.log('✅ ATHLETE WELCOME: Crew context will hydrate on /runcrew/* routes');
-      
       // Hydration complete - show button for user to click
-      console.log('🎯 ATHLETE WELCOME: Hydration complete, ready for user action');
-      console.log('✅ ATHLETE WELCOME: ===== HYDRATION SUCCESS =====');
       setIsHydrated(true);
       setIsLoading(false);
       
     } catch (error: any) {
-      console.error('❌ ATHLETE WELCOME: ===== HYDRATION ERROR =====');
-      console.error('❌ ATHLETE WELCOME: Error message:', error.message);
-      console.error('❌ ATHLETE WELCOME: Error status:', error.response?.status);
-      console.error('❌ ATHLETE WELCOME: Error data:', error.response?.data);
+      console.error('❌ Hydration error:', error.message);
       
       const errorStatus = error.response?.status;
       
@@ -97,14 +68,12 @@ export default function AthleteWelcomePage() {
       // STATE 3: Firebase user exists BUT DB athlete does NOT exist
       // This is the dangerous "token-valid-but-athlete-missing" case
       if (errorStatus === 401 && firebaseUser) {
-        console.log('🚫 ATHLETE WELCOME: Unauthorized (401) but Firebase user exists → routing to profile creation');
         router.push('/athlete-create-profile');
         return;
       }
       
       // STATE 1: No Firebase user
       if (errorStatus === 401 && !firebaseUser) {
-        console.log('🚫 ATHLETE WELCOME: Unauthorized (401) and no Firebase user → redirecting to signup');
         router.push('/signup');
         return;
       }
@@ -112,18 +81,14 @@ export default function AthleteWelcomePage() {
       // If user not found (404), check Firebase user state
       if (errorStatus === 404) {
         if (firebaseUser) {
-          console.log('👤 ATHLETE WELCOME: Athlete not found (404) but Firebase user exists → routing to profile creation');
           router.push('/athlete-create-profile');
         } else {
-          console.log('👤 ATHLETE WELCOME: Athlete not found (404) and no Firebase user → redirecting to signup');
           router.push('/signup');
         }
         return;
       }
-      
-      console.error('❌ ATHLETE WELCOME: ===== END ERROR =====');
     }
-  };
+  }, [router]);
 
   useEffect(() => {
     // CRITICAL: Wait for Firebase auth to initialize using onAuthStateChanged
@@ -132,7 +97,6 @@ export default function AthleteWelcomePage() {
       setAuthInitialized(true);
 
       if (!firebaseUser) {
-        console.log('❌ ATHLETE WELCOME: No Firebase user found → redirecting to signup');
         router.replace('/signup');
         setIsLoading(false);
         return;
@@ -143,10 +107,9 @@ export default function AthleteWelcomePage() {
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, [router, hydrateAthlete]);
 
   const handleLetsTrain = () => {
-    console.log('🎯 ATHLETE WELCOME: User clicked "Let\'s Train!" → navigating to athlete-home');
     router.push('/athlete-home');
   };
 
@@ -202,7 +165,8 @@ export default function AthleteWelcomePage() {
           <div className="mt-8">
             <button
               onClick={handleLetsTrain}
-              className="bg-gradient-to-r from-orange-600 to-orange-500 text-white px-12 py-4 rounded-xl font-bold text-2xl hover:from-orange-700 hover:to-orange-600 transition shadow-2xl transform hover:scale-105"
+              disabled={isLoading}
+              className="bg-gradient-to-r from-orange-600 to-orange-500 text-white px-12 py-4 rounded-xl font-bold text-2xl hover:from-orange-700 hover:to-orange-600 transition shadow-2xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
               Let's Train! →
             </button>

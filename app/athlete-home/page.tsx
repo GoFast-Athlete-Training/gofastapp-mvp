@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import useHydratedAthlete from '@/hooks/useHydratedAthlete';
 import { Activity } from 'lucide-react';
@@ -15,6 +15,7 @@ import RSVPCard from '@/components/athlete/RSVPCard';
 
 export default function AthleteHomePage() {
   const router = useRouter();
+  const hasRedirected = useRef(false);
 
   // READ-ONLY: Use hook exclusively - NO direct localStorage reads, NO API calls
   const { 
@@ -28,6 +29,14 @@ export default function AthleteHomePage() {
     hydrated
   } = useHydratedAthlete();
 
+  // Redirect if not hydrated - use useEffect to prevent render-time redirects
+  useEffect(() => {
+    if (!loading && (!hydrated || !athleteProfile) && !hasRedirected.current) {
+      hasRedirected.current = true;
+      router.replace('/athlete-welcome');
+    }
+  }, [loading, hydrated, athleteProfile, router]);
+
   // Show loading state
   if (loading) {
     return (
@@ -40,10 +49,16 @@ export default function AthleteHomePage() {
     );
   }
 
-  // Redirect if not hydrated
+  // Show loading while redirecting
   if (!hydrated || !athleteProfile) {
-    router.push('/athlete-welcome');
-    return null;
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Redirecting...</p>
+        </div>
+      </div>
+    );
   }
 
   // Check if user is an admin of the current crew
@@ -68,12 +83,6 @@ export default function AthleteHomePage() {
   // Profile setup logic
   const profileIncomplete =
     !athleteProfile?.firstName || !athleteProfile?.lastName || !athleteProfile?.primarySport;
-
-  // Render guard: redirect if no athlete data
-  if (!athleteProfile) {
-    router.push('/athlete-welcome');
-    return null;
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">

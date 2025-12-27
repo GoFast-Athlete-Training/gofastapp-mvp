@@ -15,13 +15,10 @@ api.interceptors.request.use(async (config) => {
       // Force refresh to get the latest token
       const token = await user.getIdToken(true);
       config.headers['Authorization'] = `Bearer ${token}`;
-      console.log('🔑 API: Token injected into request:', config.url);
     } catch (error) {
-      console.error('❌ API: Failed to get token in interceptor:', error);
+      console.error('❌ API: Failed to get token:', error);
       // Don't block the request, but log the error
     }
-  } else {
-    console.warn('⚠️ API: No Firebase user in interceptor for request:', config.url);
   }
   return config;
 });
