@@ -5,26 +5,28 @@ export const dynamic = 'force-dynamic';
 import { useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import useHydratedAthlete from '@/hooks/useHydratedAthlete';
-import { Activity } from 'lucide-react';
+// PHASE 1: Activities temporarily disabled (MVP2)
+// import { Activity } from 'lucide-react';
 import AthleteHeader from '@/components/athlete/AthleteHeader';
 import ProfileCallout from '@/components/athlete/ProfileCallout';
 import CrewHero from '@/components/athlete/CrewHero';
-import WeeklyStats from '@/components/athlete/WeeklyStats';
-import LatestActivityCard from '@/components/athlete/LatestActivityCard';
-import RSVPCard from '@/components/athlete/RSVPCard';
+// import WeeklyStats from '@/components/athlete/WeeklyStats';
+// import LatestActivityCard from '@/components/athlete/LatestActivityCard';
+// import RSVPCard from '@/components/athlete/RSVPCard';
 
 export default function AthleteHomePage() {
   const router = useRouter();
   const hasRedirected = useRef(false);
 
   // READ-ONLY: Use hook exclusively - NO direct localStorage reads, NO API calls
+  // PHASE 1: Activities/Garmin deprecated - only using athlete profile and crew context
   const { 
     athlete: athleteProfile, 
     runCrewId, 
     runCrewManagerId,
-    weeklyActivities,
-    weeklyTotals,
-    garminConnected,
+    // weeklyActivities, // DEPRECATED: MVP2
+    // weeklyTotals, // DEPRECATED: MVP2
+    // garminConnected, // DEPRECATED: MVP2
     loading,
     hydrated
   } = useHydratedAthlete();
@@ -74,11 +76,13 @@ export default function AthleteHomePage() {
   const nextRun = null;
   const nextRunAttendees: any[] = [];
 
+  // PHASE 1: Activities temporarily disabled (MVP2)
   // Get latest activity
-  const latestActivity = useMemo(() => {
-    if (!weeklyActivities || weeklyActivities.length === 0) return null;
-    return weeklyActivities[0]; // Already sorted by date desc
-  }, [weeklyActivities]);
+  // const latestActivity = useMemo(() => {
+  //   if (!weeklyActivities || weeklyActivities.length === 0) return null;
+  //   return weeklyActivities[0]; // Already sorted by date desc
+  // }, [weeklyActivities]);
+  const latestActivity = null;
 
   // Profile setup logic
   const profileIncomplete =
@@ -100,13 +104,14 @@ export default function AthleteHomePage() {
           runCrewId={runCrewId}
         />
 
+        {/* PHASE 1: Activities/Garmin/Leaderboard temporarily disabled (MVP2) */}
         {/* Weekly Stats - Only show if Garmin connected */}
-        {garminConnected && weeklyTotals && (
+        {/* {garminConnected && weeklyTotals && (
           <WeeklyStats weeklyTotals={weeklyTotals} activities={weeklyActivities} />
-        )}
+        )} */}
 
         {/* Garmin Connection Prompt */}
-        {!garminConnected && (
+        {/* {!garminConnected && (
           <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-orange-200">
             <div className="flex items-center gap-4">
               <Activity className="h-12 w-12 text-orange-500 flex-shrink-0" />
@@ -126,10 +131,10 @@ export default function AthleteHomePage() {
               </button>
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Latest Activity Card */}
-        {latestActivity && <LatestActivityCard latestActivity={latestActivity} />}
+        {/* {latestActivity && <LatestActivityCard latestActivity={latestActivity} />} */}
 
         {/* RSVP CTA - Not available on athlete-home (crew context not hydrated) */}
       </main>

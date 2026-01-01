@@ -28,7 +28,7 @@ export default function RootPage() {
       // Show logo for 2 seconds, then route
       const timer = setTimeout(() => {
         if (isAuthenticated) {
-          router.replace('/athlete-welcome');
+          router.replace('/welcome');
         } else {
           router.replace('/signup');
         }

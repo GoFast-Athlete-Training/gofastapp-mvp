@@ -3,60 +3,21 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-//
-// ─── COMPANY / ORGANIZATION ─────────────────────────────────────────────────────
-//
-
-model GoFastCompany {
-  id        String     @id @default(cuid())
-  name      String?
-  slug      String?    @unique
-  address   String?
-  city      String?
-  state     String?
-  zip       String?
-  domain    String?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-
-  athletes  Athlete[]
-  builders  GoFastBuilder[]
-
-  @@map("go_fast_companies")
-}
-
-model GoFastBuilder {
-  id         String         @id @default(cuid())
-  firebaseId String         @unique
-  email      String         @unique
-
-  firstName  String?
-  lastName   String?
-  photoURL   String?
-  role       String         @default("builder")
-
-  companyId  String?
-  company    GoFastCompany? @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-
-  @@map("gofast_builders")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 //
 // ─── ATHLETE & ACTIVITY TRACKING ───────────────────────────────────────────────
 //
+// ARCHITECTURAL RESET: GoFast identity spine is athleteId ONLY
+// No companyId, no staffId, no other identities
 
 model Athlete {
   id                      String   @id @default(cuid())
   firebaseId              String   @unique
   email                   String?
-  companyId               String
 
   firstName               String?
   lastName                String?
@@ -99,11 +60,10 @@ model Athlete {
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 
-  company                 GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
   activities              athlete_activities[]
-  executedDays            training_days_executed[]
-  trainingPlans           training_plans[]
+  // TRAINING PLANS FROZEN - MVP-1 does not include training plans
+  // executedDays            training_days_executed[]
+  // trainingPlans           training_plans[]
 
   // RunCrew Relations
   runCrewMemberships      RunCrewMembership[] @relation("AthleteRunCrewMemberships")

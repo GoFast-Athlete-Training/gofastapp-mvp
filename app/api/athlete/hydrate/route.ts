@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteByFirebaseId, hydrateAthlete } from '@/lib/domain-athlete';
+import { setAthleteIdCookie } from '@/lib/server/cookies';
 
 export async function POST(request: Request) {
   const timestamp = new Date().toISOString();
@@ -104,6 +105,10 @@ export async function POST(request: Request) {
 
     // Extract athlete data (already formatted by domain function)
     const athleteData = hydrated.athlete || {};
+
+    // PHASE 1: Set athleteId cookie
+    await setAthleteIdCookie(athlete.id);
+    console.log(`✅ HYDRATE [${timestamp}]: Set athleteId cookie:`, athlete.id);
 
     // Return success response matching MVP1 structure
     return NextResponse.json({ 

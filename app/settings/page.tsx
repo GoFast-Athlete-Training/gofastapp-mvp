@@ -13,21 +13,24 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 export default function SettingsPage() {
   const router = useRouter();
   const [athlete, setAthlete] = useState<any>(null);
-  const [connections, setConnections] = useState({
-    garmin: false,
-  });
+  // PHASE 1: Garmin connections deprecated
+  // const [connections, setConnections] = useState({
+  //   garmin: false,
+  // });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const stored = LocalStorageAPI.getAthlete();
     setAthlete(stored);
     
+    // PHASE 1: Garmin connection check disabled
     // Check Garmin connection status
-    if (stored?.id) {
-      checkGarminConnection(stored.id);
-    } else {
-      setLoading(false);
-    }
+    // if (stored?.id) {
+    //   checkGarminConnection(stored.id);
+    // } else {
+    //   setLoading(false);
+    // }
+    setLoading(false);
   }, []);
 
   const refreshAthleteData = async () => {
@@ -47,7 +50,12 @@ export default function SettingsPage() {
     }
   };
 
+  // PHASE 1: Garmin functions DEPRECATED - Commented out but code preserved
+  /* eslint-disable @typescript-eslint/no-unused-vars */
   const checkGarminConnection = async (athleteId: string) => {
+    // DEPRECATED: Garmin connections disabled for MVP1
+    // Code preserved for future use
+    /*
     try {
       const response = await fetch(`${API_BASE}/garmin/status?athleteId=${athleteId}`);
       if (response.ok) {
@@ -61,10 +69,15 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
+    */
+    setLoading(false);
   };
 
-
+  // PHASE 1: Garmin connection function DEPRECATED - Code preserved below
   const connectGarmin = async (e: React.MouseEvent) => {
+    // DEPRECATED: Garmin connections disabled for MVP1
+    return;
+    /*
     e.preventDefault();
     e.stopPropagation();
 
@@ -193,9 +206,14 @@ export default function SettingsPage() {
       alert('Failed to connect Garmin: ' + (error.message || 'Unknown error'));
       setLoading(false);
     }
+    */
   };
 
   const disconnectGarmin = async () => {
+    // DEPRECATED: Garmin connections disabled for MVP1
+    // Code preserved for future use
+    return;
+    /*
     if (!athlete?.id) return;
     
     if (confirm('Are you sure you want to disconnect Garmin Connect?')) {
@@ -208,7 +226,9 @@ export default function SettingsPage() {
         alert('Failed to disconnect Garmin');
       }
     }
+    */
   };
+  /* eslint-enable @typescript-eslint/no-unused-vars */
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -265,8 +285,9 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Device Connections */}
-        <div className="mb-8">
+        {/* PHASE 1: Garmin/Device Connections DEPRECATED - Commented out but code preserved */}
+        {/* Device Connections - DEPRECATED FOR MVP1 */}
+        {/* <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Device Connections</h2>
           <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200 hover:border-gray-300 transition">
             <div className="flex items-center justify-between">
@@ -305,15 +326,12 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* Info Section - Compact */}
         <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
           <p className="text-sm text-gray-600">
-            Connect your devices to automatically sync activities and track your runs. 
-            <span className="text-xs text-gray-500 block mt-2">
-              Garmin Connect is a trademark of Garmin Ltd. GoFast is not affiliated with Garmin Ltd.
-            </span>
+            Profile settings only. Device connections are deprecated for MVP1.
           </p>
         </div>
       </div>
