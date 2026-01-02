@@ -8,6 +8,7 @@ import Image from 'next/image';
 import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
+import { LocalStorageAPI } from '@/lib/localstorage';
 
 const PENDING_CREW_ID_KEY = 'pendingCrewId';
 
