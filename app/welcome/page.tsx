@@ -70,15 +70,40 @@ export default function WelcomePage() {
       try {
         // Ensure athlete exists - try hydrate first (athlete might already exist)
         let athleteId: string | null = null;
+        let hydrateResponse: any = null;
+        
         try {
           // Add timeout to prevent hanging
-          const hydrateResponse = await Promise.race([
+          hydrateResponse = await Promise.race([
             api.post('/athlete/hydrate'),
             new Promise((_, reject) => 
               setTimeout(() => reject(new Error('Hydrate request timeout')), 10000)
             )
           ]) as any;
           athleteId = hydrateResponse.data?.athlete?.id || hydrateResponse.data?.athleteId;
+          
+          // CRITICAL: Store full hydration model including RunCrew data
+          if (hydrateResponse.data?.success && hydrateResponse.data?.athlete) {
+            const athlete = hydrateResponse.data.athlete;
+            const weeklyActivities = athlete.weeklyActivities || [];
+            const weeklyTotals = athlete.weeklyTotals || null;
+            
+            // Store the complete Prisma model (athlete + all relations including RunCrew)
+            LocalStorageAPI.setFullHydrationModel({
+              athlete,
+              weeklyActivities,
+              weeklyTotals
+            });
+            
+            // Store Garmin connection status if available
+            if (athlete.garminConnected !== undefined) {
+              localStorage.setItem('garminConnected', String(athlete.garminConnected));
+            }
+            
+            console.log('✅ Welcome: Stored full hydration model with RunCrew data');
+            console.log(`   MyCrew: ${athlete.MyCrew || 'none'}`);
+            console.log(`   RunCrewCount: ${athlete.runCrewCount || 0}`);
+          }
         } catch (hydrateError: any) {
           console.log('⚠️ Welcome: Hydrate failed, trying create:', hydrateError?.response?.status || hydrateError?.message);
           // If hydrate fails (404), try create
@@ -92,6 +117,25 @@ export default function WelcomePage() {
                 )
               ]) as any;
               athleteId = createResponse.data?.athleteId || createResponse.data?.data?.id;
+              
+              // After creating, we need to hydrate to get full data including RunCrew structure
+              if (athleteId) {
+                try {
+                  hydrateResponse = await api.post('/athlete/hydrate') as any;
+                  if (hydrateResponse.data?.success && hydrateResponse.data?.athlete) {
+                    const athlete = hydrateResponse.data.athlete;
+                    LocalStorageAPI.setFullHydrationModel({
+                      athlete,
+                      weeklyActivities: athlete.weeklyActivities || [],
+                      weeklyTotals: athlete.weeklyTotals || null
+                    });
+                    console.log('✅ Welcome: Stored hydration model after create');
+                  }
+                } catch (postCreateHydrateError: any) {
+                  console.warn('⚠️ Welcome: Failed to hydrate after create:', postCreateHydrateError?.message);
+                  // Continue anyway - at least we have athleteId
+                }
+              }
             } catch (createError: any) {
               console.error('❌ Welcome: Create also failed:', createError?.response?.status || createError?.message);
               throw createError;
