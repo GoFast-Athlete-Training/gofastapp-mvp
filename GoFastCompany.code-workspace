@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../trainingmvp"
+		},
+		{
+			"path": "../../Ignite/IgniteBd-Next-combine"
 		}
 	],
 	"settings": {}

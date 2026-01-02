@@ -76,25 +76,10 @@ export async function POST(request: Request) {
       },
     });
 
-    // 5. Get admin roles for this athlete
-    const managerRecords = await prisma.runCrewManager.findMany({
-      where: { athleteId },
-      select: {
-        runCrewId: true,
-        role: true,
-      },
-    });
-
-    // 6. Format response - explicitly set 'MEMBER' for all non-admin members
+    // 5. Format response - use membership.role directly
     const runCrews = memberships.map((membership) => {
-      const managerRecord = managerRecords.find(
-        (m) => m.runCrewId === membership.runCrewId
-      );
-      
-      // Explicitly set role: 'ADMIN' only if manager record exists AND role is 'admin', otherwise 'MEMBER'
-      const role: 'MEMBER' | 'ADMIN' = (managerRecord && managerRecord.role === 'admin')
-        ? 'ADMIN'
-        : 'MEMBER';
+      // Convert enum to uppercase string for API response
+      const role: 'MEMBER' | 'ADMIN' = membership.role === 'admin' ? 'ADMIN' : 'MEMBER';
 
       return {
         membershipId: membership.id,

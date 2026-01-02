@@ -9,28 +9,30 @@ import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
-import useHydratedAthlete from '@/hooks/useHydratedAthlete';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { athlete: athleteProfile } = useHydratedAthlete();
+  const [athleteProfile, setAthleteProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const athlete = LocalStorageAPI.getAthleteProfile();
+      setAthleteProfile(athlete);
+      setLoading(false);
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         router.push('/signup');
         return;
       }
 
-      // READ-ONLY: Use hook data only - NO hydration API calls
       // If no athlete data, redirect to welcome (welcome will hydrate)
       if (!athleteProfile) {
         router.push('/welcome');
         return;
       }
-      
-      setLoading(false);
     });
 
     return () => unsubscribe();

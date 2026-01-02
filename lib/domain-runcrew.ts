@@ -15,16 +15,8 @@ export async function createCrew(data: {
     },
   });
 
-  // Create membership
+  // Create membership with admin role
   await prisma.runCrewMembership.create({
-    data: {
-      runCrewId: crew.id,
-      athleteId: data.athleteId,
-    },
-  });
-
-  // Create admin role
-  await prisma.runCrewManager.create({
     data: {
       runCrewId: crew.id,
       athleteId: data.athleteId,
@@ -59,11 +51,12 @@ export async function joinCrew(joinCode: string, athleteId: string) {
     return crew;
   }
 
-  // Create membership
+  // Create membership with member role
   await prisma.runCrewMembership.create({
     data: {
       runCrewId: crew.id,
       athleteId,
+      role: 'member',
     },
   });
 
@@ -75,19 +68,6 @@ export async function hydrateCrew(runCrewId: string, athleteId?: string) {
     where: { id: runCrewId },
     include: {
       memberships: {
-        include: {
-          athlete: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              photoURL: true,
-            },
-          },
-        },
-      },
-      managers: {
         include: {
           athlete: {
             select: {
@@ -165,13 +145,13 @@ export async function hydrateCrew(runCrewId: string, athleteId?: string) {
     return null;
   }
 
-  // Determine user's role
+  // Determine user's role from membership
   let userRole = 'member';
   if (athleteId) {
-    const manager = crew.managers.find(
+    const membership = crew.memberships.find(
       (m) => m.athleteId === athleteId
     );
-    userRole = manager?.role || 'member';
+    userRole = membership?.role || 'member';
   }
 
   return {
@@ -247,11 +227,12 @@ export async function joinCrewById(runCrewId: string, athleteId: string) {
     return crew;
   }
 
-  // Create membership
+  // Create membership with member role
   await prisma.runCrewMembership.create({
     data: {
       runCrewId: crew.id,
       athleteId,
+      role: 'member',
     },
   });
 

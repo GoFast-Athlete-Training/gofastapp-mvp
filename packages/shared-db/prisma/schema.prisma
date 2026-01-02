@@ -407,6 +407,12 @@ model TrainingSchema {
 // ─── RUNCREW MODELS ───────────────────────────────────────────────────────────
 //
 
+enum RunCrewRole {
+  member
+  admin
+  manager
+}
+
 model RunCrew {
   id          String  @id @default(cuid())
   name        String
@@ -445,9 +451,10 @@ model JoinCode {
 }
 
 model RunCrewMembership {
-  id        String @id @default(cuid())
+  id        String      @id @default(cuid())
   runCrewId String
   athleteId String
+  role      RunCrewRole @default(member)
 
   joinedAt  DateTime @default(now())
   createdAt DateTime @default(now())
@@ -457,9 +464,13 @@ model RunCrewMembership {
   athlete Athlete @relation("AthleteRunCrewMemberships", fields: [athleteId], references: [id], onDelete: Cascade)
 
   @@unique([runCrewId, athleteId])
+  @@index([runCrewId, role])
   @@map("run_crew_memberships")
 }
 
+// DEPRECATED — do not write new data
+// Role information is now stored in RunCrewMembership.role
+// This table is kept for migration purposes only
 model RunCrewManager {
   id        String @id @default(cuid())
   runCrewId String

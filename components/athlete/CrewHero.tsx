@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Users, Calendar, Clock, MapPin } from 'lucide-react';
-import useHydratedAthlete from '@/hooks/useHydratedAthlete';
+import { LocalStorageAPI } from '@/lib/localstorage';
 
 interface CrewHeroProps {
   crew: any;
@@ -17,9 +17,14 @@ export default function CrewHero({ crew, nextRun, nextRunAttendees, isCrewAdmin,
   const router = useRouter();
   const [showCrewSelector, setShowCrewSelector] = useState(false);
   const [adminCrews, setAdminCrews] = useState<any[]>([]);
-  
-  // READ-ONLY: Get identity data from hook (NO API calls)
-  const { athlete } = useHydratedAthlete();
+  const [athlete, setAthlete] = useState<any>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const model = LocalStorageAPI.getFullHydrationModel();
+      setAthlete(model);
+    }
+  }, []);
 
   // Determine admin status from prop (passed from parent)
   const actualIsAdmin = isCrewAdmin;
@@ -40,15 +45,14 @@ export default function CrewHero({ crew, nextRun, nextRunAttendees, isCrewAdmin,
     }
 
     // Check if user is admin/manager from identity data (already in localStorage)
-    const crews = athlete?.runCrewMemberships || [];
-    const adminCrewsList = crews
+    const model = LocalStorageAPI.getFullHydrationModel();
+    const memberships = model?.runCrewMemberships || [];
+    
+    const adminCrewsList = memberships
       .map((membership: any) => {
-        const managerRole = (athlete.runCrewManagers || []).find(
-          (m: any) => m.runCrewId === membership.runCrewId
-        );
         return {
           ...membership.runCrew,
-          role: managerRole?.role || 'member',
+          role: membership.role || 'member',
         };
       })
       .filter((c: any) => c.role === 'admin' || c.role === 'manager');

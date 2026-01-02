@@ -41,8 +41,7 @@ export default function SettingsPage() {
 
       const firebaseToken = await currentUser.getIdToken();
       
-      // READ-ONLY: Use hook data only - NO hydration API calls
-      // Settings page should read from useHydratedAthlete hook
+      // READ-ONLY: Read from localStorage only - NO hydration API calls
       // If data needs refresh, user should navigate to welcome page
       console.log('Settings: Data refresh not available - use welcome page to refresh');
     } catch (error) {

@@ -41,7 +41,7 @@ export default async function RunCrewAdminPage({
     );
   }
 
-  // Check membership
+  // Check membership and role
   const membership = await prisma.runCrewMembership.findUnique({
     where: {
       runCrewId_athleteId: {
@@ -56,16 +56,7 @@ export default async function RunCrewAdminPage({
   }
 
   // Check if user is admin
-  const managerRecord = await prisma.runCrewManager.findUnique({
-    where: {
-      runCrewId_athleteId: {
-        runCrewId,
-        athleteId,
-      },
-    },
-  });
-
-  const isAdmin = managerRecord?.role === 'admin';
+  const isAdmin = membership.role === 'admin';
 
   // If not admin, show not authorized
   if (!isAdmin) {

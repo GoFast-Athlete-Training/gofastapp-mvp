@@ -5,11 +5,18 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import { Settings } from 'lucide-react';
-import useHydratedAthlete from '@/hooks/useHydratedAthlete';
+import { useState, useEffect } from 'react';
 
 export default function AthleteHeader() {
   const router = useRouter();
-  const { athlete: athleteProfile } = useHydratedAthlete();
+  const [athleteProfile, setAthleteProfile] = useState<any>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const athlete = LocalStorageAPI.getAthleteProfile();
+      setAthleteProfile(athlete);
+    }
+  }, []);
 
   const handleSignOut = async () => {
     try {

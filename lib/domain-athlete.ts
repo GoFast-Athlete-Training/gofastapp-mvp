@@ -45,7 +45,6 @@ export async function hydrateAthlete(athleteId: string) {
           include: {
             runCrew: {
               include: {
-                managers: true,
                 memberships: {
                   include: {
                     athlete: {
@@ -63,11 +62,6 @@ export async function hydrateAthlete(athleteId: string) {
             },
           },
         },
-        runCrewManagers: {
-          include: {
-            runCrew: true,
-          },
-        },
         // TODO: activities will be reintroduced in Schema Phase 3
       },
     });
@@ -76,7 +70,6 @@ export async function hydrateAthlete(athleteId: string) {
     if (athlete) {
       console.log('✅ HYDRATE ATHLETE: Athlete loaded successfully');
       console.log(`   RunCrew Memberships: ${athlete.runCrewMemberships?.length || 0}`);
-      console.log(`   RunCrew Managers: ${athlete.runCrewManagers?.length || 0}`);
       
       // If athlete loaded but runCrewMemberships is undefined, tables might not exist
       if (athlete.runCrewMemberships === undefined) {
@@ -143,12 +136,9 @@ export async function hydrateAthlete(athleteId: string) {
           console.warn('⚠️ HYDRATE ATHLETE: Invalid membership structure:', membership);
           return null;
         }
-        const managerRole = (athlete.runCrewManagers || []).find(
-          (m: any) => m.runCrewId === membership.runCrewId
-        );
         return {
           ...membership.runCrew,
-          role: managerRole?.role || 'member',
+          role: membership.role || 'member',
           joinedAt: membership.joinedAt,
         };
       }).filter((crew: any) => crew !== null) // Filter out any null entries
@@ -158,23 +148,18 @@ export async function hydrateAthlete(athleteId: string) {
 
   // Determine MyCrew (primary crew) - first crew or most recent, prioritizing admin crews
   let MyCrew = '';
-  let MyCrewManagerId = '';
   
   if (crews.length > 0) {
     // Prioritize admin crews, then most recent
     const adminCrew = crews.find((c: any) => c.role === 'admin');
     if (adminCrew) {
       MyCrew = adminCrew.id;
-      const manager = athlete.runCrewManagers?.find((m: any) => m.runCrewId === adminCrew.id);
-      MyCrewManagerId = manager?.id || '';
     } else {
       // Use most recent crew
       const mostRecent = crews.sort((a: any, b: any) => 
         new Date(b.joinedAt || 0).getTime() - new Date(a.joinedAt || 0).getTime()
       )[0];
       MyCrew = mostRecent.id;
-      const manager = athlete.runCrewManagers?.find((m: any) => m.runCrewId === mostRecent.id);
-      MyCrewManagerId = manager?.id || '';
     }
   }
 
@@ -202,12 +187,10 @@ export async function hydrateAthlete(athleteId: string) {
     // RunCrew Memberships (hydrated) - empty if tables don't exist
     runCrews: crews,
     runCrewCount: crews.length,
-    runCrewManagers: (hasRunCrewTables ? athlete.runCrewManagers : []) || [],
     runCrewMemberships: (hasRunCrewTables ? athlete.runCrewMemberships : []) || [],
     
     // Primary crew context (for localStorage)
     MyCrew: MyCrew,
-    MyCrewManagerId: MyCrewManagerId,
     
     // TODO: Activities will be reintroduced in Schema Phase 3
     // Weekly Activities (last 7 days)

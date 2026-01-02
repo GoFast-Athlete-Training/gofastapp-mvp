@@ -111,36 +111,27 @@ export const LocalStorageAPI = {
     if (athlete.runCrews) {
       this.setCrews(athlete.runCrews);
     } else if (athlete.runCrewMemberships) {
-      // Extract crews from memberships
+      // Extract crews from memberships (role is now in membership)
       const crews = athlete.runCrewMemberships.map((m: any) => ({
         ...m.runCrew,
-        role: athlete.runCrewManagers?.find((mg: any) => mg.runCrewId === m.runCrewId)?.role || 'member',
+        role: m.role || 'member',
         joinedAt: m.joinedAt,
       }));
       this.setCrews(crews);
     }
 
-    // Cache run crews, managers, and admin crews if they exist
+    // Cache run crew memberships (with embedded roles)
     if (athlete.runCrewMemberships) {
       localStorage.setItem('runCrewMemberships', JSON.stringify(athlete.runCrewMemberships));
-    }
-    if (athlete.runCrewManagers) {
-      localStorage.setItem('runCrewManagers', JSON.stringify(athlete.runCrewManagers));
-    }
-    if (athlete.adminRunCrews) {
-      localStorage.setItem('adminRunCrews', JSON.stringify(athlete.adminRunCrews));
     }
 
     // HYDRATION V2: Use clean crew context from backend
     const MyCrew = athlete.MyCrew || '';
-    const MyCrewManagerId = athlete.MyCrewManagerId || '';
 
     localStorage.setItem('MyCrew', MyCrew);
-    localStorage.setItem('MyCrewManagerId', MyCrewManagerId);
 
     // Legacy keys for backward compatibility
     localStorage.setItem('runCrewId', MyCrew);
-    localStorage.setItem('runCrewManagerId', MyCrewManagerId);
 
     // Store full crew data if MyCrew ID exists and we have runCrewMemberships
     if (MyCrew && athlete.runCrewMemberships) {
@@ -255,11 +246,7 @@ export const LocalStorageAPI = {
       localStorage.removeItem('runCrewData');
       localStorage.removeItem('runCrewId');
       localStorage.removeItem('MyCrew');
-      localStorage.removeItem('runCrewManagerId');
-      localStorage.removeItem('MyCrewManagerId');
       localStorage.removeItem('runCrewMemberships');
-      localStorage.removeItem('runCrewManagers');
-      localStorage.removeItem('adminRunCrews');
 
       // Also clear any crew-specific hydration caches
       const keysToRemove: string[] = [];
@@ -285,8 +272,6 @@ export const LocalStorageAPI = {
         weeklyActivities: [],
         weeklyTotals: null,
         runCrewMemberships: [],
-        runCrewManagers: [],
-        adminRunCrews: [],
       };
     }
 
@@ -295,16 +280,12 @@ export const LocalStorageAPI = {
       const weeklyActivities = JSON.parse(localStorage.getItem('weeklyActivities') || '[]');
       const weeklyTotals = JSON.parse(localStorage.getItem('weeklyTotals') || 'null');
       const runCrewMemberships = JSON.parse(localStorage.getItem('runCrewMemberships') || '[]');
-      const runCrewManagers = JSON.parse(localStorage.getItem('runCrewManagers') || '[]');
-      const adminRunCrews = JSON.parse(localStorage.getItem('adminRunCrews') || '[]');
 
       return {
         athlete,
         weeklyActivities,
         weeklyTotals,
         runCrewMemberships,
-        runCrewManagers,
-        adminRunCrews,
       };
     } catch (error) {
       console.error('❌ LocalStorageAPI: Failed to parse hydration model', error);
@@ -313,8 +294,6 @@ export const LocalStorageAPI = {
         weeklyActivities: [],
         weeklyTotals: null,
         runCrewMemberships: [],
-        runCrewManagers: [],
-        adminRunCrews: [],
       };
     }
   },
