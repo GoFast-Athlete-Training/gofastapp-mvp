@@ -10,184 +10,85 @@ import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 
 /**
- * Welcome Page - PHASE 1
+ * Welcome Page - Simplified
  * 
- * Purpose: Bootstrap identity and store in localStorage
+ * Purpose: Hydrate athlete data and store in localStorage
  * Behavior:
- * - Hydrate athlete (or create if doesn't exist)
- * - Store athleteId in localStorage
+ * - Wait for Firebase auth
+ * - Call /api/athlete/hydrate once
+ * - Store athlete data in localStorage
  * - Redirect to /athlete/[athleteId]
  */
 export default function WelcomePage() {
   const router = useRouter();
-  const isProcessingRef = useRef(false);
-  const hasRedirectedRef = useRef(false);
+  const hasProcessedRef = useRef(false);
 
   useEffect(() => {
-    // Check if we already have athleteId in localStorage - redirect immediately
-    const existingAthleteId = LocalStorageAPI.getAthleteId();
-    if (existingAthleteId && !hasRedirectedRef.current) {
-      hasRedirectedRef.current = true;
-      const redirectPath = `/athlete/${existingAthleteId}`;
-      console.log('🔄 Welcome: Found existing athleteId, redirecting to:', redirectPath);
-      router.replace(redirectPath);
-      // Force navigation if router.replace doesn't work
-      setTimeout(() => {
-        if (window.location.pathname === '/welcome') {
-          window.location.href = redirectPath;
-        }
-      }, 100);
-      return;
-    }
-
-    // Prevent multiple simultaneous executions
-    if (isProcessingRef.current || hasRedirectedRef.current) {
+    // Prevent multiple executions
+    if (hasProcessedRef.current) {
       return;
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      // Prevent processing if already redirected
-      if (hasRedirectedRef.current) {
+      // Already processed, ignore
+      if (hasProcessedRef.current) {
         return;
       }
 
-      // Prevent multiple simultaneous calls
-      if (isProcessingRef.current) {
-        return;
-      }
-
-      isProcessingRef.current = true;
+      // No Firebase user - redirect to signup
       if (!firebaseUser) {
-        // Not authenticated - redirect to signup
-        if (!hasRedirectedRef.current) {
-          hasRedirectedRef.current = true;
-          isProcessingRef.current = false;
-          window.location.href = '/signup';
-        }
+        hasProcessedRef.current = true;
+        router.replace('/signup');
         return;
       }
+
+      // Mark as processing immediately to prevent re-runs
+      hasProcessedRef.current = true;
 
       try {
-        // Ensure athlete exists - try hydrate first (athlete might already exist)
-        let athleteId: string | null = null;
-        let hydrateResponse: any = null;
+        // Call hydrate endpoint once
+        const response = await api.post('/athlete/hydrate');
         
-        try {
-          // Add timeout to prevent hanging
-          hydrateResponse = await Promise.race([
-            api.post('/athlete/hydrate'),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Hydrate request timeout')), 10000)
-            )
-          ]) as any;
-          athleteId = hydrateResponse.data?.athlete?.id || hydrateResponse.data?.athleteId;
+        if (response.data?.success && response.data?.athlete) {
+          const athlete = response.data.athlete;
           
-          // CRITICAL: Store full hydration model including RunCrew data
-          if (hydrateResponse.data?.success && hydrateResponse.data?.athlete) {
-            const athlete = hydrateResponse.data.athlete;
-            const weeklyActivities = athlete.weeklyActivities || [];
-            const weeklyTotals = athlete.weeklyTotals || null;
-            
-            // Store the complete Prisma model (athlete + all relations including RunCrew)
-            LocalStorageAPI.setFullHydrationModel({
-              athlete,
-              weeklyActivities,
-              weeklyTotals
-            });
-            
-            // Store Garmin connection status if available
-            if (athlete.garminConnected !== undefined) {
-              localStorage.setItem('garminConnected', String(athlete.garminConnected));
-            }
-            
-            console.log('✅ Welcome: Stored full hydration model with RunCrew data');
-            console.log(`   MyCrew: ${athlete.MyCrew || 'none'}`);
-            console.log(`   RunCrewCount: ${athlete.runCrewCount || 0}`);
-          }
-        } catch (hydrateError: any) {
-          console.log('⚠️ Welcome: Hydrate failed, trying create:', hydrateError?.response?.status || hydrateError?.message);
-          // If hydrate fails (404), try create
-          if (hydrateError?.response?.status === 404 || hydrateError?.message?.includes('timeout')) {
-            try {
-              // Add timeout to create request as well
-              const createResponse = await Promise.race([
-                api.post('/athlete/create', {}),
-                new Promise((_, reject) => 
-                  setTimeout(() => reject(new Error('Create request timeout')), 10000)
-                )
-              ]) as any;
-              athleteId = createResponse.data?.athleteId || createResponse.data?.data?.id;
-              
-              // After creating, we need to hydrate to get full data including RunCrew structure
-              if (athleteId) {
-                try {
-                  hydrateResponse = await api.post('/athlete/hydrate') as any;
-                  if (hydrateResponse.data?.success && hydrateResponse.data?.athlete) {
-                    const athlete = hydrateResponse.data.athlete;
-                    LocalStorageAPI.setFullHydrationModel({
-                      athlete,
-                      weeklyActivities: athlete.weeklyActivities || [],
-                      weeklyTotals: athlete.weeklyTotals || null
-                    });
-                    console.log('✅ Welcome: Stored hydration model after create');
-                  }
-                } catch (postCreateHydrateError: any) {
-                  console.warn('⚠️ Welcome: Failed to hydrate after create:', postCreateHydrateError?.message);
-                  // Continue anyway - at least we have athleteId
-                }
-              }
-            } catch (createError: any) {
-              console.error('❌ Welcome: Create also failed:', createError?.response?.status || createError?.message);
-              throw createError;
-            }
-          } else {
-            throw hydrateError;
-          }
-        }
+          // Store full hydration model
+          LocalStorageAPI.setFullHydrationModel({
+            athlete,
+            weeklyActivities: athlete.weeklyActivities || [],
+            weeklyTotals: athlete.weeklyTotals || null,
+          });
 
-        // Store athleteId in localStorage (pattern: use this for all API calls)
-        if (athleteId) {
-          LocalStorageAPI.setAthleteId(athleteId);
-          console.log('✅ Welcome: Stored athleteId in localStorage:', athleteId);
-          
-          // Mark as redirected IMMEDIATELY to prevent any further processing
-          hasRedirectedRef.current = true;
-          isProcessingRef.current = false;
-          
-          // Use window.location for immediate redirect - more reliable than router
-          const redirectPath = `/athlete/${athleteId}`;
-          console.log('🔄 Welcome: Redirecting to:', redirectPath);
-          
-          // Use window.location.href for immediate, guaranteed redirect
-          window.location.href = redirectPath;
-          
-          // Fallback to router if window.location somehow doesn't work
-          router.replace(redirectPath);
+          // Store Garmin connection status if available
+          if (athlete.garminConnected !== undefined) {
+            localStorage.setItem('garminConnected', String(athlete.garminConnected));
+          }
+
+          const athleteId = athlete.id || athlete.athleteId;
+          if (athleteId) {
+            console.log('✅ Welcome: Athlete hydrated, redirecting to:', `/athlete/${athleteId}`);
+            router.replace(`/athlete/${athleteId}`);
+          } else {
+            console.error('❌ Welcome: No athleteId in response');
+            router.replace('/signup');
+          }
         } else {
-          console.error('❌ Welcome: No athleteId in response');
-          hasRedirectedRef.current = true;
-          isProcessingRef.current = false;
-          window.location.href = '/signup';
+          console.error('❌ Welcome: Invalid response from hydrate');
+          router.replace('/signup');
         }
       } catch (error: any) {
-        console.error('❌ Welcome: Failed to bootstrap identity:', error);
-        console.error('❌ Welcome: Error details:', {
-          message: error?.message,
-          status: error?.response?.status,
-          data: error?.response?.data
-        });
-        hasRedirectedRef.current = true;
-        isProcessingRef.current = false;
+        console.error('❌ Welcome: Hydrate failed:', error?.response?.status || error?.message);
         
-        // Only redirect to signup if it's not a quota error (which is temporary)
-        if (!error?.message?.includes('quota-exceeded')) {
-          window.location.href = '/signup';
+        // 404 = athlete not found, redirect to signup
+        if (error?.response?.status === 404) {
+          router.replace('/signup');
+        } else if (error?.response?.status === 401) {
+          // 401 = unauthorized, redirect to signup
+          router.replace('/signup');
         } else {
-          console.error('⚠️ Welcome: Firebase quota exceeded - please wait and try again');
-          // Don't redirect, just show error
+          // Other errors, redirect to signup
+          router.replace('/signup');
         }
-      } finally {
-        isProcessingRef.current = false;
       }
     });
 
@@ -204,4 +105,3 @@ export default function WelcomePage() {
     </div>
   );
 }
-
