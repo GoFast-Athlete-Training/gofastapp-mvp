@@ -90,7 +90,7 @@ export default function SignupPage() {
               localStorage.setItem('firebaseId', user.uid);
               localStorage.setItem('email', user.email || '');
               
-              // Store hydration data and redirect to athlete-home
+              // Store hydration data and redirect to welcome (welcome will show RunCrew selector)
               if (hydrateRes.data?.athlete) {
                 LocalStorageAPI.setFullHydrationModel({
                   athlete: hydrateRes.data.athlete,
@@ -98,7 +98,7 @@ export default function SignupPage() {
                   weeklyTotals: hydrateRes.data.athlete.weeklyTotals || null,
                 });
               }
-              router.push('/athlete-home');
+              router.push('/welcome');
               return;
             }
           } catch (hydrateErr: any) {
@@ -120,7 +120,7 @@ export default function SignupPage() {
                   return; // Already redirected
                 }
 
-                  router.replace('/athlete-home');
+                  router.replace('/welcome');
                 return;
               }
             } catch (createErr: any) {
@@ -174,7 +174,7 @@ export default function SignupPage() {
           console.log('⚠️ SIGNUP: Create failed with 500, trying hydrate...');
           // Athlete might exist - redirect to athlete-home
           console.log('✅ SIGNUP: Athlete might exist, redirecting to athlete-home');
-          router.push('/athlete-home');
+          router.push('/welcome');
           return;
         } else {
           throw createErr; // Re-throw if not a 500 error
@@ -200,10 +200,10 @@ export default function SignupPage() {
       // Route based on profile completion (check gofastHandle - key indicator)
       if (athlete.data?.gofastHandle) {
         console.log('✅ SIGNUP: Existing athlete with profile → Athlete Home');
-        router.replace('/athlete-home');
+        router.replace('/welcome');
       } else {
         console.log('✅ SIGNUP: New athlete or incomplete profile → Athlete Home');
-        router.replace('/athlete-home');
+        router.replace('/welcome');
       }
     } catch (err: any) {
       console.error('❌ SIGNUP: Google signup error:', err);
@@ -275,7 +275,7 @@ export default function SignupPage() {
           console.log('⚠️ SIGNUP: Create failed with 500, trying hydrate...');
           // Athlete might exist - redirect to athlete-home
           console.log('✅ SIGNUP: Athlete might exist, redirecting to athlete-home');
-          router.push('/athlete-home');
+          router.push('/welcome');
           return;
         } else {
           throw createErr; // Re-throw if not a 500 error
@@ -301,10 +301,10 @@ export default function SignupPage() {
       // Route based on profile completion (check gofastHandle - key indicator)
       if (athlete.data?.gofastHandle) {
         console.log('✅ SIGNUP: Existing athlete with profile → Athlete Home');
-        router.replace('/athlete-home');
+        router.replace('/welcome');
       } else {
         console.log('✅ SIGNUP: New athlete or incomplete profile → Athlete Home');
-        router.replace('/athlete-home');
+        router.replace('/welcome');
       }
     } catch (err: any) {
       console.error('❌ SIGNUP: Email signup error:', err);
@@ -406,10 +406,10 @@ export default function SignupPage() {
       // Route based on profile completion (check gofastHandle - key indicator)
       if (athlete.data?.gofastHandle) {
         console.log('✅ SIGNIN: Existing athlete with profile → Athlete Home');
-        router.replace('/athlete-home');
+        router.replace('/welcome');
       } else {
         console.log('✅ SIGNIN: New athlete or incomplete profile → Athlete Home');
-        router.replace('/athlete-home');
+        router.replace('/welcome');
       }
     } catch (err: any) {
       console.error('❌ SIGNIN: Email sign-in error:', err);
