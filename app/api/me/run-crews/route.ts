@@ -3,14 +3,16 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
-import { getAthleteIdFromCookie } from '@/lib/server/cookies';
 import { prisma } from '@/lib/prisma';
 
 /**
- * GET /api/me/run-crews
+ * POST /api/me/run-crews
  * 
  * Returns all RunCrew memberships for the current athlete.
- * Uses athleteId from cookie (Phase 1 pattern).
+ * Accepts athleteId from request body (client sends from localStorage).
+ * Verifies athleteId matches Firebase token for authorization.
+ * 
+ * Request body: { athleteId: string }
  * 
  * Returns:
  * {
@@ -25,9 +27,20 @@ import { prisma } from '@/lib/prisma';
  *   ]
  * }
  */
-export async function GET(request: Request) {
+export async function POST(request: Request) {
   try {
-    // 1. Verify Firebase token (for authentication)
+    // 1. Parse request body to get athleteId
+    let body: any = {};
+    try {
+      body = await request.json();
+    } catch {}
+    
+    const { athleteId } = body;
+    if (!athleteId) {
+      return NextResponse.json({ error: 'athleteId is required in request body' }, { status: 400 });
+    }
+
+    // 2. Verify Firebase token (for authentication)
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -40,13 +53,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // 2. Get athleteId from cookie
-    const athleteId = await getAthleteIdFromCookie();
-    if (!athleteId) {
-      return NextResponse.json({ error: 'Athlete ID not found in cookie' }, { status: 401 });
-    }
-
-    // 3. Verify athlete exists and Firebase ID matches (authorization)
+    // 3. Verify athlete exists and athleteId matches Firebase token (authorization)
     const athlete = await getAthleteByFirebaseId(decodedToken.uid);
     if (!athlete) {
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });

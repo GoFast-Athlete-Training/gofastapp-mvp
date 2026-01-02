@@ -24,6 +24,14 @@ async function checkAthletes() {
         lastName: true,
         firebaseId: true,
         gofastHandle: true,
+        companyId: true,
+        company: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
         garmin_user_id: true,
         garmin_is_connected: true,
         createdAt: true,
@@ -38,6 +46,10 @@ async function checkAthletes() {
       console.log(`   ID: ${athlete.id}`);
       console.log(`   Firebase ID: ${athlete.firebaseId}`);
       console.log(`   Handle: ${athlete.gofastHandle || 'none'}`);
+      console.log(`   Company: ${athlete.company?.name || 'Unknown'} (${athlete.companyId || 'MISSING'})`);
+      if (!athlete.companyId) {
+        console.log(`   ⚠️  WARNING: This athlete has no companyId! Run backfill script.`);
+      }
       console.log(`   Garmin: ${athlete.garmin_is_connected ? '✅ Connected' : '❌ Not connected'} (${athlete.garmin_user_id || 'no ID'})`);
       console.log(`   Created: ${athlete.createdAt}`);
       console.log(`   Updated: ${athlete.updatedAt}`);

@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
+import { GOFAST_COMPANY_ID } from '@/lib/goFastCompanyConfig';
 
 export async function POST(request: Request) {
   try {
@@ -20,20 +21,48 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 });
     }
 
-    // One-time UPSERT - Guarantee GoFastCompany exists
-    const company = await prisma.goFastCompany.upsert({
+    // Check if company exists by slug or ID
+    let company = await prisma.goFastCompany.findUnique({
       where: { slug: 'gofast' },
-      update: {},
-      create: {
-        name: 'GoFast',
-        slug: 'gofast',
-        address: '2604 N. George Mason Dr.',
-        city: 'Arlington',
-        state: 'VA',
-        zip: '22207',
-        domain: 'gofastcrushgoals.com',
-      },
     });
+
+    if (!company) {
+      company = await prisma.goFastCompany.findUnique({
+        where: { id: GOFAST_COMPANY_ID },
+      });
+    }
+
+    if (!company) {
+      // Create new company with hardcoded ID
+      company = await prisma.goFastCompany.create({
+        data: {
+          id: GOFAST_COMPANY_ID,
+          name: 'GoFast',
+          slug: 'gofast',
+          address: '2604 N. George Mason Dr.',
+          city: 'Arlington',
+          state: 'VA',
+          zip: '22207',
+          domain: 'gofastcrushgoals.com',
+        },
+      });
+      console.log('✅ COMPANY INIT: Created new company');
+    } else {
+      // Update existing company to ensure all fields are correct
+      company = await prisma.goFastCompany.update({
+        where: { id: company.id },
+        data: {
+          name: 'GoFast',
+          slug: 'gofast',
+          address: '2604 N. George Mason Dr.',
+          city: 'Arlington',
+          state: 'VA',
+          zip: '22207',
+          domain: 'gofastcrushgoals.com',
+        },
+      });
+      console.log('✅ COMPANY INIT: Updated existing company');
+    }
 
     return NextResponse.json({ success: true, company });
   } catch (err: any) {

@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
-import { setAthleteIdCookie } from '@/lib/server/cookies';
 
 export async function POST(request: Request) {
   try {
@@ -127,10 +126,6 @@ export async function POST(request: Request) {
     } else {
       console.log('✅ ATHLETE CREATE: New athlete record created successfully:', athlete.id);
     }
-
-    // PHASE 1: Set athleteId cookie
-    await setAthleteIdCookie(athlete.id);
-    console.log('✅ ATHLETE CREATE: Set athleteId cookie:', athlete.id);
 
     // Format response like MVP1
     const response = NextResponse.json({

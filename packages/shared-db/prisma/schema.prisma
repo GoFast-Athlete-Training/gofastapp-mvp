@@ -9,15 +9,35 @@ datasource db {
 }
 
 //
+// ─── COMPANY / ORGANIZATION ─────────────────────────────────────────────────────
+//
+
+model GoFastCompany {
+  id        String   @id @default(cuid())
+  name      String?
+  slug      String?  @unique
+  address   String?
+  city      String?
+  state     String?
+  zip       String?
+  domain    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  athletes Athlete[]
+
+  @@map("go_fast_companies")
+}
+
+//
 // ─── ATHLETE & ACTIVITY TRACKING ───────────────────────────────────────────────
 //
-// ARCHITECTURAL RESET: GoFast identity spine is athleteId ONLY
-// No companyId, no staffId, no other identities
 
 model Athlete {
   id         String  @id @default(cuid())
   firebaseId String  @unique
   email      String?
+  companyId  String
 
   firstName    String?
   lastName     String?
@@ -59,6 +79,8 @@ model Athlete {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  company GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   activities    athlete_activities[]
   // TRAINING PLANS FROZEN - MVP-1 does not include training plans (routes/UI disabled, schema intact)

@@ -7,15 +7,16 @@ import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
+import { LocalStorageAPI } from '@/lib/localstorage';
 
 /**
  * Welcome Page - PHASE 1
  * 
- * Purpose: Bootstrap identity
+ * Purpose: Bootstrap identity and store in localStorage
  * Behavior:
- * - Ensure athleteId cookie exists
- * - Redirect to /athlete
- * - No other logic
+ * - Hydrate athlete (or create if doesn't exist)
+ * - Store athleteId in localStorage
+ * - Redirect to /athlete/[athleteId]
  */
 export default function WelcomePage() {
   const router = useRouter();
@@ -29,24 +30,25 @@ export default function WelcomePage() {
       }
 
       try {
-        // Ensure athlete exists (this will set the cookie if not already set)
-        // Try hydrate first (athlete might already exist)
+        // Ensure athlete exists - try hydrate first (athlete might already exist)
         let athleteId: string | null = null;
         try {
           const hydrateResponse = await api.post('/athlete/hydrate');
-          athleteId = hydrateResponse.data?.athlete?.athleteId || hydrateResponse.data?.athlete?.id;
+          athleteId = hydrateResponse.data?.athlete?.id || hydrateResponse.data?.athleteId;
         } catch (hydrateError: any) {
           // If hydrate fails (404), try create
           if (hydrateError?.response?.status === 404) {
             const createResponse = await api.post('/athlete/create', {});
-            athleteId = createResponse.data?.athleteId;
+            athleteId = createResponse.data?.athleteId || createResponse.data?.data?.id;
           } else {
             throw hydrateError;
           }
         }
 
-        // Redirect to /athlete/[athleteId] using param
+        // Store athleteId in localStorage (pattern: use this for all API calls)
         if (athleteId) {
+          LocalStorageAPI.setAthleteId(athleteId);
+          console.log('✅ Welcome: Stored athleteId in localStorage:', athleteId);
           router.replace(`/athlete/${athleteId}`);
         } else {
           console.error('❌ Welcome: No athleteId in response');
