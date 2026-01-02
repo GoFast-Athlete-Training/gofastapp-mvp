@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -20,12 +20,34 @@ import { LocalStorageAPI } from '@/lib/localstorage';
  */
 export default function WelcomePage() {
   const router = useRouter();
+  const isProcessingRef = useRef(false);
+  const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
+    // Prevent multiple simultaneous executions
+    if (isProcessingRef.current || hasRedirectedRef.current) {
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Prevent processing if already redirected
+      if (hasRedirectedRef.current) {
+        return;
+      }
+
+      // Prevent multiple simultaneous calls
+      if (isProcessingRef.current) {
+        return;
+      }
+
+      isProcessingRef.current = true;
       if (!firebaseUser) {
         // Not authenticated - redirect to signup
-        router.replace('/signup');
+        if (!hasRedirectedRef.current) {
+          hasRedirectedRef.current = true;
+          router.replace('/signup');
+        }
+        isProcessingRef.current = false;
         return;
       }
 
@@ -67,9 +89,24 @@ export default function WelcomePage() {
         if (athleteId) {
           LocalStorageAPI.setAthleteId(athleteId);
           console.log('✅ Welcome: Stored athleteId in localStorage:', athleteId);
-          router.replace(`/athlete/${athleteId}`);
+          
+          // Mark as redirected before navigation
+          hasRedirectedRef.current = true;
+          
+          // Use replace with force refresh if needed
+          const redirectPath = `/athlete/${athleteId}`;
+          console.log('🔄 Welcome: Redirecting to:', redirectPath);
+          router.replace(redirectPath);
+          
+          // Force navigation if replace doesn't work immediately
+          setTimeout(() => {
+            if (window.location.pathname === '/welcome') {
+              window.location.href = redirectPath;
+            }
+          }, 100);
         } else {
           console.error('❌ Welcome: No athleteId in response');
+          hasRedirectedRef.current = true;
           router.replace('/signup');
         }
       } catch (error: any) {
@@ -79,7 +116,10 @@ export default function WelcomePage() {
           status: error?.response?.status,
           data: error?.response?.data
         });
+        hasRedirectedRef.current = true;
         router.replace('/signup');
+      } finally {
+        isProcessingRef.current = false;
       }
     });
 
