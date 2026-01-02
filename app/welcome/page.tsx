@@ -24,6 +24,22 @@ export default function WelcomePage() {
   const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
+    // Check if we already have athleteId in localStorage - redirect immediately
+    const existingAthleteId = LocalStorageAPI.getAthleteId();
+    if (existingAthleteId && !hasRedirectedRef.current) {
+      hasRedirectedRef.current = true;
+      const redirectPath = `/athlete/${existingAthleteId}`;
+      console.log('🔄 Welcome: Found existing athleteId, redirecting to:', redirectPath);
+      router.replace(redirectPath);
+      // Force navigation if router.replace doesn't work
+      setTimeout(() => {
+        if (window.location.pathname === '/welcome') {
+          window.location.href = redirectPath;
+        }
+      }, 100);
+      return;
+    }
+
     // Prevent multiple simultaneous executions
     if (isProcessingRef.current || hasRedirectedRef.current) {
       return;
@@ -45,9 +61,9 @@ export default function WelcomePage() {
         // Not authenticated - redirect to signup
         if (!hasRedirectedRef.current) {
           hasRedirectedRef.current = true;
-          router.replace('/signup');
+          isProcessingRef.current = false;
+          window.location.href = '/signup';
         }
-        isProcessingRef.current = false;
         return;
       }
 
@@ -90,24 +106,24 @@ export default function WelcomePage() {
           LocalStorageAPI.setAthleteId(athleteId);
           console.log('✅ Welcome: Stored athleteId in localStorage:', athleteId);
           
-          // Mark as redirected before navigation
+          // Mark as redirected IMMEDIATELY to prevent any further processing
           hasRedirectedRef.current = true;
+          isProcessingRef.current = false;
           
-          // Use replace with force refresh if needed
+          // Use window.location for immediate redirect - more reliable than router
           const redirectPath = `/athlete/${athleteId}`;
           console.log('🔄 Welcome: Redirecting to:', redirectPath);
-          router.replace(redirectPath);
           
-          // Force navigation if replace doesn't work immediately
-          setTimeout(() => {
-            if (window.location.pathname === '/welcome') {
-              window.location.href = redirectPath;
-            }
-          }, 100);
+          // Use window.location.href for immediate, guaranteed redirect
+          window.location.href = redirectPath;
+          
+          // Fallback to router if window.location somehow doesn't work
+          router.replace(redirectPath);
         } else {
           console.error('❌ Welcome: No athleteId in response');
           hasRedirectedRef.current = true;
-          router.replace('/signup');
+          isProcessingRef.current = false;
+          window.location.href = '/signup';
         }
       } catch (error: any) {
         console.error('❌ Welcome: Failed to bootstrap identity:', error);
@@ -117,7 +133,15 @@ export default function WelcomePage() {
           data: error?.response?.data
         });
         hasRedirectedRef.current = true;
-        router.replace('/signup');
+        isProcessingRef.current = false;
+        
+        // Only redirect to signup if it's not a quota error (which is temporary)
+        if (!error?.message?.includes('quota-exceeded')) {
+          window.location.href = '/signup';
+        } else {
+          console.error('⚠️ Welcome: Firebase quota exceeded - please wait and try again');
+          // Don't redirect, just show error
+        }
       } finally {
         isProcessingRef.current = false;
       }
