@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
+import { GOFAST_COMPANY_ID } from '@/lib/goFastCompanyConfig';
 
 export async function POST(request: Request) {
   try {
@@ -72,13 +73,45 @@ export async function POST(request: Request) {
     console.log('👤 ATHLETE CREATE: Parsed lastName:', lastName);
 
     // Step 1: Resolve Canonical Company (DB Source of Truth)
-    // Use ordering to ensure consistent selection if multiple companies exist
-    const company = await prisma.goFastCompany.findFirst({
-      orderBy: { createdAt: 'asc' },
+    // Try to find company by ID first (fastest), then by slug, then create if needed
+    let company = await prisma.goFastCompany.findUnique({
+      where: { id: GOFAST_COMPANY_ID },
     });
+    
     if (!company) {
-      console.error("❌ ATHLETE CREATE: No GoFastCompany found");
-      throw new Error("No GoFastCompany found. Athlete creation requires a company.");
+      company = await prisma.goFastCompany.findUnique({
+        where: { slug: 'gofast' },
+      });
+    }
+    
+    // If no company exists, create the default one
+    if (!company) {
+      console.log("⚠️ ATHLETE CREATE: No GoFastCompany found, creating default company...");
+      try {
+        company = await prisma.goFastCompany.create({
+          data: {
+            id: GOFAST_COMPANY_ID,
+            name: 'GoFast',
+            slug: 'gofast',
+            address: '2604 N. George Mason Dr.',
+            city: 'Arlington',
+            state: 'VA',
+            zip: '22207',
+            domain: 'gofastcrushgoals.com',
+          },
+        });
+        console.log('✅ ATHLETE CREATE: Created default company:', company.id);
+      } catch (createError: any) {
+        console.error("❌ ATHLETE CREATE: Failed to create company:", createError.message);
+        console.error("❌ ATHLETE CREATE: Error code:", createError.code);
+        // If create fails, try findFirst as last resort
+        company = await prisma.goFastCompany.findFirst({
+          orderBy: { createdAt: 'asc' },
+        });
+        if (!company) {
+          throw new Error("No GoFastCompany found and failed to create one. Please run setup script or check database migrations.");
+        }
+      }
     }
     console.log('✅ ATHLETE CREATE: Using company:', company.id, company.name || company.slug);
 

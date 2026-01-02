@@ -33,13 +33,31 @@ export default function WelcomePage() {
         // Ensure athlete exists - try hydrate first (athlete might already exist)
         let athleteId: string | null = null;
         try {
-          const hydrateResponse = await api.post('/athlete/hydrate');
+          // Add timeout to prevent hanging
+          const hydrateResponse = await Promise.race([
+            api.post('/athlete/hydrate'),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Hydrate request timeout')), 10000)
+            )
+          ]) as any;
           athleteId = hydrateResponse.data?.athlete?.id || hydrateResponse.data?.athleteId;
         } catch (hydrateError: any) {
+          console.log('⚠️ Welcome: Hydrate failed, trying create:', hydrateError?.response?.status || hydrateError?.message);
           // If hydrate fails (404), try create
-          if (hydrateError?.response?.status === 404) {
-            const createResponse = await api.post('/athlete/create', {});
-            athleteId = createResponse.data?.athleteId || createResponse.data?.data?.id;
+          if (hydrateError?.response?.status === 404 || hydrateError?.message?.includes('timeout')) {
+            try {
+              // Add timeout to create request as well
+              const createResponse = await Promise.race([
+                api.post('/athlete/create', {}),
+                new Promise((_, reject) => 
+                  setTimeout(() => reject(new Error('Create request timeout')), 10000)
+                )
+              ]) as any;
+              athleteId = createResponse.data?.athleteId || createResponse.data?.data?.id;
+            } catch (createError: any) {
+              console.error('❌ Welcome: Create also failed:', createError?.response?.status || createError?.message);
+              throw createError;
+            }
           } else {
             throw hydrateError;
           }
@@ -56,6 +74,11 @@ export default function WelcomePage() {
         }
       } catch (error: any) {
         console.error('❌ Welcome: Failed to bootstrap identity:', error);
+        console.error('❌ Welcome: Error details:', {
+          message: error?.message,
+          status: error?.response?.status,
+          data: error?.response?.data
+        });
         router.replace('/signup');
       }
     });
