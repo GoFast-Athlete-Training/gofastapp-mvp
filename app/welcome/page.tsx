@@ -166,22 +166,24 @@ export default function WelcomePage() {
         </div>
 
         {runCrewCards.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-lg p-8 text-center max-w-md mx-auto">
+          <div className="bg-white rounded-xl shadow-lg p-8 text-center max-w-2xl mx-auto">
             <div className="text-6xl mb-4">🏃</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">No RunCrews Yet</h2>
-            <p className="text-gray-600 mb-6">You're not a member of any RunCrews yet.</p>
-            <div className="flex gap-4 justify-center">
-              <Link
-                href="/runcrew/create"
-                className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition"
-              >
-                Create RunCrew
-              </Link>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Get Started with a RunCrew</h2>
+            <p className="text-xl text-gray-600 mb-8">
+              Join an existing RunCrew or create your own to start training with others!
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/runcrew/join"
-                className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition"
+                className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition shadow-lg hover:shadow-xl"
               >
-                Join RunCrew
+                Join a RunCrew
+              </Link>
+              <Link
+                href="/runcrew/create"
+                className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition shadow-lg hover:shadow-xl"
+              >
+                Create RunCrew
               </Link>
             </div>
           </div>
@@ -246,21 +248,21 @@ export default function WelcomePage() {
           </div>
         )}
 
-        {/* Create/Join Options */}
+        {/* Create/Join Options (only show if user has crews) */}
         {runCrewCards.length > 0 && (
           <div className="mt-12 text-center">
             <div className="inline-flex gap-4">
               <Link
-                href="/runcrew/create"
-                className="bg-white hover:bg-gray-50 text-gray-900 px-6 py-3 rounded-lg font-semibold transition shadow-md"
-              >
-                + Create Another RunCrew
-              </Link>
-              <Link
                 href="/runcrew/join"
                 className="bg-white hover:bg-gray-50 text-gray-900 px-6 py-3 rounded-lg font-semibold transition shadow-md"
               >
-                + Join RunCrew
+                + Join Another RunCrew
+              </Link>
+              <Link
+                href="/runcrew/create"
+                className="bg-white hover:bg-gray-50 text-gray-900 px-6 py-3 rounded-lg font-semibold transition shadow-md"
+              >
+                + Create RunCrew
               </Link>
             </div>
           </div>
