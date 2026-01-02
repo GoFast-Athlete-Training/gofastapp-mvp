@@ -297,6 +297,44 @@ export async function postAnnouncement(data: {
   });
 }
 
+export async function createEvent(data: {
+  runCrewId: string;
+  organizerId: string;
+  title: string;
+  date: Date;
+  time: string;
+  location: string;
+  address?: string;
+  description?: string;
+  eventType?: string;
+}) {
+  return prisma.runCrewEvent.create({
+    data,
+    include: {
+      organizer: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          photoURL: true,
+        },
+      },
+      rsvps: {
+        include: {
+          athlete: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              photoURL: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
 export async function rsvpToRun(data: {
   runId: string;
   athleteId: string;

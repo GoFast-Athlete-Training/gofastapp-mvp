@@ -40,8 +40,8 @@ export default function AthleteEditProfilePage() {
         const storedAthleteId = LocalStorageAPI.getAthleteId();
 
         if (!stored || !storedAthleteId) {
-          console.warn('⚠️ EDIT PROFILE: Missing profile or athleteId, routing to welcome');
-          router.replace('/welcome');
+          console.warn('⚠️ EDIT PROFILE: Missing profile or athleteId, routing to signup');
+          router.replace('/signup');
           return;
         }
 

@@ -28,9 +28,9 @@ export default function ProfilePage() {
         return;
       }
 
-      // If no athlete data, redirect to welcome (welcome will hydrate)
+      // If no athlete data, redirect to signup
       if (!athleteProfile) {
-        router.push('/welcome');
+        router.push('/signup');
         return;
       }
     });
