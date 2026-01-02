@@ -90,7 +90,7 @@ export default function SignupPage() {
               localStorage.setItem('email', user.email || '');
               
               // Redirect to welcome - it will handle hydration
-              router.push('/athlete-welcome');
+              router.push('/welcome');
               return;
             }
           } catch (hydrateErr: any) {
@@ -115,7 +115,7 @@ export default function SignupPage() {
                 if (athlete.data?.gofastHandle) {
                   router.replace('/athlete-home');
                 } else {
-                  router.replace('/athlete-welcome');
+                  router.replace('/welcome');
                 }
                 return;
               }
@@ -170,7 +170,7 @@ export default function SignupPage() {
           console.log('⚠️ SIGNUP: Create failed with 500, trying hydrate...');
           // Athlete might exist - redirect to welcome (welcome will hydrate)
           console.log('✅ SIGNUP: Athlete might exist, redirecting to welcome');
-          router.push('/athlete-welcome');
+          router.push('/welcome');
           return;
         } else {
           throw createErr; // Re-throw if not a 500 error
@@ -199,7 +199,7 @@ export default function SignupPage() {
         router.replace('/athlete-home');
       } else {
         console.log('✅ SIGNUP: New athlete or incomplete profile → Welcome');
-        router.replace('/athlete-welcome');
+        router.replace('/welcome');
       }
     } catch (err: any) {
       console.error('❌ SIGNUP: Google signup error:', err);
@@ -271,7 +271,7 @@ export default function SignupPage() {
           console.log('⚠️ SIGNUP: Create failed with 500, trying hydrate...');
           // Athlete might exist - redirect to welcome (welcome will hydrate)
           console.log('✅ SIGNUP: Athlete might exist, redirecting to welcome');
-          router.push('/athlete-welcome');
+          router.push('/welcome');
           return;
         } else {
           throw createErr; // Re-throw if not a 500 error
@@ -300,7 +300,7 @@ export default function SignupPage() {
         router.replace('/athlete-home');
       } else {
         console.log('✅ SIGNUP: New athlete or incomplete profile → Welcome');
-        router.replace('/athlete-welcome');
+        router.replace('/welcome');
       }
     } catch (err: any) {
       console.error('❌ SIGNUP: Email signup error:', err);
@@ -405,7 +405,7 @@ export default function SignupPage() {
         router.replace('/athlete-home');
       } else {
         console.log('✅ SIGNIN: New athlete or incomplete profile → Welcome');
-        router.replace('/athlete-welcome');
+        router.replace('/welcome');
       }
     } catch (err: any) {
       console.error('❌ SIGNIN: Email sign-in error:', err);

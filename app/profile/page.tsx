@@ -26,7 +26,7 @@ export default function ProfilePage() {
       // READ-ONLY: Use hook data only - NO hydration API calls
       // If no athlete data, redirect to welcome (welcome will hydrate)
       if (!athleteProfile) {
-        router.push('/athlete-welcome');
+        router.push('/welcome');
         return;
       }
       

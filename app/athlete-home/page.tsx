@@ -35,7 +35,7 @@ export default function AthleteHomePage() {
   useEffect(() => {
     if (!loading && (!hydrated || !athleteProfile) && !hasRedirected.current) {
       hasRedirected.current = true;
-      router.replace('/athlete-welcome');
+      router.replace('/welcome');
     }
   }, [loading, hydrated, athleteProfile, router]);
 

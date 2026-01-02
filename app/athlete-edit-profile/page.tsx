@@ -41,7 +41,7 @@ export default function AthleteEditProfilePage() {
 
         if (!stored || !storedAthleteId) {
           console.warn('⚠️ EDIT PROFILE: Missing profile or athleteId, routing to welcome');
-          router.replace('/athlete-welcome');
+          router.replace('/welcome');
           return;
         }
 

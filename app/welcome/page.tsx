@@ -46,7 +46,7 @@ export default function WelcomePage() {
       hasProcessedRef.current = true;
 
       try {
-        // Call hydrate endpoint once
+        // Call hydrate endpoint once (Firebase token automatically added by api interceptor)
         const response = await api.post('/athlete/hydrate');
         
         if (response.data?.success && response.data?.athlete) {
