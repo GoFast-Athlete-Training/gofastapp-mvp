@@ -271,41 +271,41 @@ export default function RunCrewMemberPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-4 min-w-0 flex-1">
               {crew.meta?.logo ? (
                 <img
                   src={crew.meta.logo}
                   alt={crew.name}
-                  className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200"
+                  className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl object-cover border-2 border-gray-200 flex-shrink-0"
                 />
               ) : crew.meta?.icon ? (
-                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-3xl border-2 border-gray-200">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-2xl sm:text-3xl border-2 border-gray-200 flex-shrink-0">
                   {crew.meta.icon}
                 </div>
               ) : null}
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">{crew.name}</h1>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">{crew.name}</h1>
                 {crew.description && (
-                  <p className="text-gray-600 mt-2">{crew.description}</p>
+                  <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">{crew.description}</p>
                 )}
               </div>
             </div>
-            <div className="flex gap-4">
+            <div className="flex gap-2 sm:gap-4 flex-shrink-0">
               {isAdmin && (
                 <Link
                   href={`/runcrew/${runCrewId}/admin`}
-                  className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100"
+                  className="text-sm sm:text-base text-gray-600 hover:text-gray-900 px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-100 whitespace-nowrap"
                 >
                   View as Admin
                 </Link>
               )}
               <Link
                 href="/welcome"
-                className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100"
+                className="text-sm sm:text-base text-gray-600 hover:text-gray-900 px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-100 whitespace-nowrap"
               >
                 ← Back to RunCrews
               </Link>
@@ -314,9 +314,9 @@ export default function RunCrewMemberPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         {/* 3-Column Layout: Members (Left) | Main Content (Center) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
           {/* LEFT SIDEBAR: Members */}
           <aside className="lg:col-span-3 space-y-6">
             <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sticky top-6">
@@ -377,7 +377,7 @@ export default function RunCrewMemberPage() {
                         type="text"
                         value={inviteUrl}
                         readOnly
-                        className="flex-1 px-3 py-2 text-xs border border-gray-300 rounded-lg bg-gray-50 font-mono"
+                        className="flex-1 px-3 py-2 text-xs border border-gray-300 rounded-lg bg-gray-50 font-mono truncate min-w-0"
                       />
                       <button
                         onClick={handleCopyLink}
@@ -409,7 +409,7 @@ export default function RunCrewMemberPage() {
                         type="text"
                         value={joinCode}
                         readOnly
-                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 font-mono font-bold text-center"
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 font-mono font-bold text-center truncate min-w-0"
                       />
                       <button
                         onClick={handleCopyCode}
@@ -435,23 +435,9 @@ export default function RunCrewMemberPage() {
             )}
           </aside>
 
-          {/* MAIN CONTENT: Messages and Announcements */}
+          {/* MAIN CONTENT: Announcements First (Important!), then Messages */}
           <div className="lg:col-span-8 space-y-6">
-            {/* Messages Section */}
-            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">RunCrew Chatter</h2>
-                <p className="text-xs text-gray-500">Chat with your crew</p>
-              </div>
-              <MessageFeed 
-                crewId={runCrewId}
-                topics={crew.meta?.messageTopics || ['general', 'runs', 'social']}
-                selectedTopic="general"
-                isAdmin={isAdmin}
-              />
-            </section>
-
-            {/* Announcements Section */}
+            {/* Announcements Section - TOP PRIORITY */}
             <section className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border-2 border-orange-200 shadow-md p-5 space-y-4">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">{crew.name} Announcements</h2>
@@ -493,6 +479,20 @@ export default function RunCrewMemberPage() {
                   </div>
                 )}
               </div>
+            </section>
+
+            {/* Messages Section */}
+            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">RunCrew Chatter</h2>
+                <p className="text-xs text-gray-500">Chat with your crew</p>
+              </div>
+              <MessageFeed 
+                crewId={runCrewId}
+                topics={crew.meta?.messageTopics || ['general', 'runs', 'social']}
+                selectedTopic="general"
+                isAdmin={isAdmin}
+              />
             </section>
           </div>
         </div>
