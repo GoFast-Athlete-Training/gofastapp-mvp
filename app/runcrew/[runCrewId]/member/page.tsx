@@ -2,9 +2,11 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
 import MessageFeed from '@/components/RunCrew/MessageFeed';
@@ -16,15 +18,17 @@ import MessageFeed from '@/components/RunCrew/MessageFeed';
  * 
  * Pattern:
  * - runCrewId from URL PARAMS (not localStorage)
- * - athleteId from localStorage (authorization only)
- * - Fetch crew data via API
+ * - Wait for Firebase auth to be ready before making API calls
+ * - Fetch crew data via API (API uses Firebase token from interceptor)
  */
 export default function RunCrewMemberPage() {
   const params = useParams();
   const router = useRouter();
   const runCrewId = params.runCrewId as string;
+  const hasFetchedRef = useRef(false);
 
   const [crew, setCrew] = useState<any>(null);
+  const [membership, setMembership] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,16 +39,33 @@ export default function RunCrewMemberPage() {
       return;
     }
 
-    // Get athleteId from localStorage (authorization)
-    const athleteId = LocalStorageAPI.getAthleteId();
-    if (!athleteId) {
-      router.push('/signup');
+    // Prevent multiple fetches
+    if (hasFetchedRef.current) {
       return;
     }
 
-    const fetchCrewData = async () => {
+    // Wait for Firebase auth to be ready before making API calls
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Already fetched, ignore
+      if (hasFetchedRef.current) {
+        return;
+      }
+
+      // No Firebase user - redirect to signup
+      if (!firebaseUser) {
+        hasFetchedRef.current = true;
+        console.warn('⚠️ MEMBER PAGE: No Firebase user - redirecting to signup');
+        router.push('/signup');
+        return;
+      }
+
+      // Mark as fetched immediately to prevent re-runs
+      hasFetchedRef.current = true;
+
+      // Get athleteId from localStorage (for reference, but API uses Firebase token)
       const athleteId = LocalStorageAPI.getAthleteId();
       if (!athleteId) {
+        console.warn('⚠️ MEMBER PAGE: No athleteId in localStorage - redirecting to signup');
         router.push('/signup');
         return;
       }
@@ -52,6 +73,8 @@ export default function RunCrewMemberPage() {
       try {
         setLoading(true);
         setError(null);
+
+        console.log(`🔍 MEMBER PAGE: Fetching crew ${runCrewId}...`);
 
         // Fetch crew data via API (API uses Firebase token from interceptor)
         const response = await api.get(`/runcrew/${runCrewId}`);
@@ -63,12 +86,20 @@ export default function RunCrewMemberPage() {
         const crewData = response.data.runCrew;
         setCrew(crewData);
 
-        // API already verified membership (returns 403 if not member)
-        // If we got here, user is a member - just render the page
+        // Find current user's membership to check if they're admin
+        const currentMembership = crewData.membershipsBox?.memberships?.find(
+          (m: any) => m.athleteId === athleteId
+        );
+        setMembership(currentMembership);
+
+        console.log(`✅ MEMBER PAGE: Crew loaded successfully: ${crewData.name}`);
         setLoading(false);
       } catch (err: any) {
-        console.error('Error fetching crew:', err);
-        if (err.response?.status === 404) {
+        console.error('❌ MEMBER PAGE: Error fetching crew:', err);
+        if (err.response?.status === 401) {
+          // 401 is handled by API interceptor (redirects to signup)
+          setError('unauthorized');
+        } else if (err.response?.status === 404) {
           setError('not_found');
         } else if (err.response?.status === 403) {
           setError('forbidden');
@@ -77,9 +108,12 @@ export default function RunCrewMemberPage() {
         }
         setLoading(false);
       }
-    };
+    });
 
-    fetchCrewData();
+    // Cleanup subscription on unmount
+    return () => {
+      unsubscribe();
+    };
   }, [runCrewId, router]);
 
   // Loading state
@@ -95,6 +129,23 @@ export default function RunCrewMemberPage() {
   }
 
   // Error states
+  if (error === 'unauthorized') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md w-full bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Authentication Required</h2>
+          <p className="text-gray-600 mb-4">Please sign in to view this RunCrew.</p>
+          <Link
+            href="/signup"
+            className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+          >
+            Sign In
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (error === 'not_found') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -146,10 +197,14 @@ export default function RunCrewMemberPage() {
     );
   }
 
+  // Check if user is admin
+  const isAdmin = membership?.role === 'admin';
+  const memberships = crew.membershipsBox?.memberships || [];
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-6xl mx-auto px-6 py-6">
+        <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">{crew.name}</h1>
@@ -157,23 +212,81 @@ export default function RunCrewMemberPage() {
                 <p className="text-gray-600 mt-2">{crew.description}</p>
               )}
             </div>
-            <Link
-              href="/athlete-home"
-              className="text-gray-600 hover:text-gray-900"
-            >
-              ← Back to RunCrews
-            </Link>
+            <div className="flex gap-4">
+              {isAdmin && (
+                <Link
+                  href={`/runcrew/${runCrewId}/admin`}
+                  className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100"
+                >
+                  Admin View
+                </Link>
+              )}
+              <Link
+                href="/welcome"
+                className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                ← Back to RunCrews
+              </Link>
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content: Messages and Announcements */}
-          <div className="lg:col-span-2 space-y-6">
+      <main className="max-w-7xl mx-auto px-6 py-10">
+        {/* 3-Column Layout: Members (Left) | Main Content (Center) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* LEFT SIDEBAR: Members */}
+          <aside className="lg:col-span-3 space-y-6">
+            <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sticky top-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900">Members</h2>
+                <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{memberships.length}</span>
+              </div>
+
+              {memberships.length === 0 ? (
+                <div className="border border-dashed border-gray-300 rounded-xl p-6 text-center text-sm text-gray-500">
+                  <p className="mb-2">No members yet.</p>
+                  <p>Share your invite code to build the crew.</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {memberships.map((membershipItem: any) => {
+                    const athlete = membershipItem.athlete || {};
+                    return (
+                      <div key={membershipItem.id} className="flex items-center gap-2 p-2 border border-gray-200 rounded hover:bg-gray-50 transition">
+                        {athlete.photoURL ? (
+                          <img
+                            src={athlete.photoURL}
+                            alt={`${athlete.firstName} ${athlete.lastName}`}
+                            className="w-8 h-8 rounded-full object-cover border border-gray-200"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white font-semibold text-xs">
+                            {(athlete.firstName?.[0] || 'A').toUpperCase()}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-gray-900 truncate">
+                            {athlete.firstName || 'Athlete'} {athlete.lastName || ''}
+                            {membershipItem.role === 'admin' && <span className="text-orange-600 text-xs font-bold ml-1">Admin</span>}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          </aside>
+
+          {/* MAIN CONTENT: Messages and Announcements */}
+          <div className="lg:col-span-8 space-y-6">
             {/* Messages Section */}
-            <section className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Crew Messages</h2>
+            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Crew Messages</h2>
+                <p className="text-xs text-gray-500">Chat with your crew</p>
+              </div>
               <MessageFeed 
                 crewId={runCrewId}
                 topics={crew.meta?.messageTopics || ['general', 'runs', 'social']}
@@ -181,74 +294,45 @@ export default function RunCrewMemberPage() {
               />
             </section>
 
-            {/* Announcements */}
-            <section className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Announcements</h3>
-              {crew.announcementsBox?.announcements && crew.announcementsBox.announcements.length > 0 ? (
-                <div className="space-y-4">
-                  {crew.announcementsBox.announcements.map((announcement: any) => (
-                    <div key={announcement.id} className="border-b pb-4 last:border-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="font-medium text-gray-900">{announcement.title}</div>
-                        <div className="text-xs text-gray-500">
-                          {new Date(announcement.createdAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                      <div className="text-sm text-gray-600">{announcement.content}</div>
-                      {announcement.author && (
-                        <div className="text-xs text-gray-500 mt-2">
-                          by {announcement.author.firstName} {announcement.author.lastName}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500">No announcements yet.</p>
-              )}
-            </section>
-          </div>
+            {/* Announcements Section (Read-Only) */}
+            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Announcements</h2>
+                <p className="text-xs text-gray-500">Updates from your crew</p>
+              </div>
 
-          {/* Sidebar: Members */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Members</h3>
-            {crew.membershipsBox?.memberships && crew.membershipsBox.memberships.length > 0 ? (
               <div className="space-y-3">
-                {crew.membershipsBox.memberships.slice(0, 10).map((membership: any) => {
-                  const athlete = membership.athlete || {};
-                  return (
-                    <div key={membership.id} className="flex items-center gap-3">
-                      {athlete.photoURL ? (
-                        <img
-                          src={athlete.photoURL}
-                          alt={`${athlete.firstName} ${athlete.lastName}`}
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-semibold text-sm">
-                          {(athlete.firstName?.[0] || 'A').toUpperCase()}
-                        </div>
-                      )}
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {athlete.firstName || 'Athlete'} {athlete.lastName || ''}
-                        </div>
-                        {membership.role === 'admin' && (
-                          <div className="text-xs text-orange-600 font-semibold">Admin</div>
-                        )}
+                {crew.announcementsBox?.announcements && crew.announcementsBox.announcements.length > 0 ? (
+                  crew.announcementsBox.announcements.map((announcement: any) => (
+                    <div key={announcement.id} className="border border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
+                      <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                        <span>
+                          {announcement.author?.firstName
+                            ? `${announcement.author.firstName}${announcement.author.lastName ? ` ${announcement.author.lastName}` : ''}`
+                            : 'Admin'}
+                        </span>
+                        <span>
+                          {announcement.createdAt
+                            ? new Date(announcement.createdAt).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit'
+                              })
+                            : 'Just now'}
+                        </span>
                       </div>
+                      {announcement.title && (
+                        <h4 className="text-sm font-semibold text-gray-900 mb-1">{announcement.title}</h4>
+                      )}
+                      <p className="text-xs text-gray-800 whitespace-pre-line">{announcement.content || announcement.text}</p>
                     </div>
-                  );
-                })}
-                {crew.membershipsBox.memberships.length > 10 && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    +{crew.membershipsBox.memberships.length - 10} more members
-                  </p>
+                  ))
+                ) : (
+                  <p className="text-xs text-gray-500">No announcements yet. Be the first to post one.</p>
                 )}
               </div>
-            ) : (
-              <p className="text-gray-500">No members yet.</p>
-            )}
+            </section>
           </div>
         </div>
       </main>

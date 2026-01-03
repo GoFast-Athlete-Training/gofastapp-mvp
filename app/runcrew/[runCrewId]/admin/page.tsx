@@ -2,9 +2,11 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
 
@@ -23,6 +25,7 @@ export default function RunCrewAdminPage() {
   const params = useParams();
   const router = useRouter();
   const runCrewId = params.runCrewId as string;
+  const hasFetchedRef = useRef(false);
 
   const [crew, setCrew] = useState<any>(null);
   const [membership, setMembership] = useState<any>(null);
@@ -78,7 +81,7 @@ export default function RunCrewAdminPage() {
     if (!runCrewId) return;
 
     const athleteId = LocalStorageAPI.getAthleteId();
-  if (!athleteId) {
+    if (!athleteId) {
       router.push('/signup');
       return;
     }
@@ -86,6 +89,8 @@ export default function RunCrewAdminPage() {
     try {
       setLoading(true);
       setError(null);
+
+      console.log(`🔍 ADMIN PAGE: Fetching crew ${runCrewId}...`);
 
       const response = await api.get(`/runcrew/${runCrewId}`);
       
@@ -115,13 +120,14 @@ export default function RunCrewAdminPage() {
 
       setMembership(currentMembership);
 
-      // Welcome page is the gate - if they clicked "View as Admin", let them through
-      // No extra role checks needed here
-
+      console.log(`✅ ADMIN PAGE: Crew loaded successfully: ${crewData.name}`);
       setLoading(false);
     } catch (err: any) {
-      console.error('Error fetching crew:', err);
-      if (err.response?.status === 404) {
+      console.error('❌ ADMIN PAGE: Error fetching crew:', err);
+      if (err.response?.status === 401) {
+        // 401 is handled by API interceptor (redirects to signup)
+        setError('unauthorized');
+      } else if (err.response?.status === 404) {
         setError('not_found');
       } else if (err.response?.status === 403) {
         setError('not_authorized');
@@ -133,8 +139,44 @@ export default function RunCrewAdminPage() {
   }, [runCrewId, router]);
 
   useEffect(() => {
-    loadCrewData();
-  }, [loadCrewData]);
+    if (!runCrewId) {
+      setError('Missing runCrewId');
+      setLoading(false);
+      return;
+    }
+
+    // Prevent multiple fetches
+    if (hasFetchedRef.current) {
+      return;
+    }
+
+    // Wait for Firebase auth to be ready before making API calls
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Already fetched, ignore
+      if (hasFetchedRef.current) {
+        return;
+      }
+
+      // No Firebase user - redirect to signup
+      if (!firebaseUser) {
+        hasFetchedRef.current = true;
+        console.warn('⚠️ ADMIN PAGE: No Firebase user - redirecting to signup');
+        router.push('/signup');
+        return;
+      }
+
+      // Mark as fetched immediately to prevent re-runs
+      hasFetchedRef.current = true;
+
+      // Load crew data now that auth is ready
+      await loadCrewData();
+    });
+
+    // Cleanup subscription on unmount
+    return () => {
+      unsubscribe();
+    };
+  }, [runCrewId, router, loadCrewData]);
 
   const handleAnnouncementSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -325,6 +367,23 @@ export default function RunCrewAdminPage() {
   }
 
   // Error states
+  if (error === 'unauthorized') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md w-full bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Authentication Required</h2>
+          <p className="text-gray-600 mb-4">Please sign in to view this RunCrew.</p>
+          <Link
+            href="/signup"
+            className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+          >
+            Sign In
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (error === 'not_found') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -386,7 +445,7 @@ export default function RunCrewAdminPage() {
     );
   }
 
-  const memberships = crew.memberships || [];
+  const memberships = crew.membershipsBox?.memberships || [];
 
   return (
     <div className="min-h-screen bg-gray-50">
