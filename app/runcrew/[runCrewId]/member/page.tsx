@@ -42,6 +42,12 @@ export default function RunCrewMemberPage() {
     }
 
     const fetchCrewData = async () => {
+      const athleteId = LocalStorageAPI.getAthleteId();
+      if (!athleteId) {
+        router.push('/signup');
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
