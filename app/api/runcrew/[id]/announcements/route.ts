@@ -50,7 +50,7 @@ export async function POST(
 
     let crew;
     try {
-      crew = await hydrateCrew(id, athlete.id);
+      crew = await hydrateCrew(id);
     } catch (err) {
       console.error('Prisma error:', err);
       return NextResponse.json({ error: 'DB error' }, { status: 500 });

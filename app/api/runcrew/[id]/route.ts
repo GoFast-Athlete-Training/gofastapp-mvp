@@ -44,7 +44,7 @@ export async function GET(
     // Just hydrate - welcome page is the gate, let it through
     let crew;
     try {
-      crew = await hydrateCrew(id, athlete.id);
+      crew = await hydrateCrew(id);
     } catch (err: any) {
       console.error('❌ RUNCREW GET: Prisma error:', err);
       console.error('❌ RUNCREW GET: Error message:', err?.message);
@@ -130,7 +130,7 @@ export async function PUT(
 
     let crew;
     try {
-      crew = await hydrateCrew(id, athlete.id);
+      crew = await hydrateCrew(id);
     } catch (err) {
       console.error('Prisma error:', err);
       return NextResponse.json({ error: 'DB error' }, { status: 500 });

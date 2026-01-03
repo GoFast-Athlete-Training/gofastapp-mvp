@@ -95,7 +95,7 @@ runCrew: {
 
 ### 1. Do we need to query athlete in hydrateCrew?
 
-**Current:** `hydrateCrew(runCrewId, athleteId?)` - athleteId is optional and not used
+**Current:** `hydrateCrew(runCrewId)` - athleteId removed (was unused, messages are runCrewId-scoped)
 
 **Answer:** No, we don't query athlete in hydrateCrew. The `athleteId` parameter is unused.
 

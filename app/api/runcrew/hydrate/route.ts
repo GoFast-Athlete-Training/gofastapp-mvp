@@ -49,7 +49,7 @@ export async function POST(request: Request) {
 
     let crew;
     try {
-      crew = await hydrateCrew(runCrewId, athlete.id);
+      crew = await hydrateCrew(runCrewId);
     } catch (err: any) {
       console.error('❌ RUNCREW HYDRATE: Prisma error:', err);
       console.error('❌ RUNCREW HYDRATE: Error message:', err?.message);
