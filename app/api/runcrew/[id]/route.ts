@@ -169,7 +169,7 @@ export async function PUT(
     }
 
     // Reload crew data
-    const updatedCrew = await hydrateCrew(id, athlete.id);
+    const updatedCrew = await hydrateCrew(id);
     return NextResponse.json({ success: true, runCrew: updatedCrew });
   } catch (err) {
     console.error('Error updating crew:', err);
