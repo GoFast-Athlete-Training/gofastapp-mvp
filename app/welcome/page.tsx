@@ -160,7 +160,7 @@ export default function WelcomePage() {
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
             Welcome to GoFast
           </h1>
-          <p className="text-lg md:text-xl text-sky-100 max-w-3xl mx-auto px-4">
+          <p className="text-lg md:text-xl text-sky-100/90 max-w-3xl mx-auto px-4 italic font-light">
             Where you can run with people at your pace group and PR. Check in with your RunCrew to see what they're up to.
           </p>
         </div>

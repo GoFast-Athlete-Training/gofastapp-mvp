@@ -32,7 +32,7 @@ export default function RootPage() {
         } else {
           router.replace('/signup');
         }
-      }, 2000); // Logo shows for 2 seconds, then route
+      }, 1500); // Logo shows for 1.5 seconds, then route
 
       return () => clearTimeout(timer);
     }
