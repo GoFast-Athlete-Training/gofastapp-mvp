@@ -200,8 +200,10 @@ export default function RunCrewMemberPage() {
     );
   }
 
-  // Check if user is admin
+  // Check if user is admin or manager (can post announcements)
   const isAdmin = membership?.role === 'admin';
+  const isManager = membership?.role === 'manager';
+  const canPostAnnouncements = isAdmin || isManager;
   const memberships = crew.membershipsBox?.memberships || [];
   const joinCode = crew.meta?.joinCode || '';
   const inviteUrl = joinCode ? `${typeof window !== 'undefined' ? window.location.origin : ''}/runcrew/join?code=${joinCode}` : '';
@@ -296,6 +298,7 @@ export default function RunCrewMemberPage() {
                           <p className="text-xs font-semibold text-gray-900 truncate">
                             {athlete.firstName || 'Athlete'} {athlete.lastName || ''}
                             {membershipItem.role === 'admin' && <span className="text-orange-600 text-xs font-bold ml-1">Admin</span>}
+                            {membershipItem.role === 'manager' && <span className="text-blue-600 text-xs font-bold ml-1">Manager</span>}
                           </p>
                         </div>
                       </div>
@@ -444,7 +447,9 @@ export default function RunCrewMemberPage() {
             <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 space-y-4">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Announcements</h2>
-                <p className="text-xs text-gray-500">Updates from your crew</p>
+                <p className="text-xs text-gray-500">
+                  Updates from your crew {canPostAnnouncements && '(Only admins and managers can post)'}
+                </p>
               </div>
 
               <div className="space-y-3">
@@ -477,7 +482,11 @@ export default function RunCrewMemberPage() {
                 ) : (
                   <div className="border border-dashed border-gray-300 rounded-lg p-6 text-center">
                     <p className="text-xs text-gray-500">No announcements yet.</p>
-                    <p className="text-xs text-gray-400 mt-1">Be the first to post one.</p>
+                    {canPostAnnouncements ? (
+                      <p className="text-xs text-gray-400 mt-1">Be the first to post one.</p>
+                    ) : (
+                      <p className="text-xs text-gray-400 mt-1">Only admins and managers can post announcements.</p>
+                    )}
                   </div>
                 )}
               </div>
