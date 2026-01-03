@@ -151,12 +151,21 @@ export async function PUT(
     // Update message topics if provided
     if (body.messageTopics && Array.isArray(body.messageTopics)) {
       const { prisma } = await import('@/lib/prisma');
-      await prisma.runCrew.update({
-        where: { id },
-        data: {
-          messageTopics: body.messageTopics,
-        },
-      });
+      try {
+        await prisma.runCrew.update({
+          where: { id },
+          data: {
+            messageTopics: body.messageTopics,
+          },
+        });
+      } catch (err: any) {
+        // If messageTopics column doesn't exist, log warning but don't fail
+        if (err?.code === 'P2022' || err?.message?.includes('messageTopics')) {
+          console.warn('⚠️ RUNCREW PUT: messageTopics column not found, skipping update. Run migration to add column.');
+        } else {
+          throw err; // Re-throw if it's a different error
+        }
+      }
     }
 
     // Reload crew data

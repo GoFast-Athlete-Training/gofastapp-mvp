@@ -64,9 +64,41 @@ export async function joinCrew(joinCode: string, athleteId: string) {
 }
 
 export async function hydrateCrew(runCrewId: string, athleteId?: string) {
+  // First, try to get messageTopics safely using raw query (column may not exist)
+  let messageTopics = ['general', 'runs', 'social'];
+  try {
+    const crewWithTopics = await prisma.$queryRaw<Array<{ messageTopics: any }>>`
+      SELECT messageTopics FROM run_crews WHERE id = ${runCrewId} LIMIT 1
+    `;
+    if (crewWithTopics && crewWithTopics[0]?.messageTopics) {
+      const topics = crewWithTopics[0].messageTopics;
+      if (Array.isArray(topics)) {
+        messageTopics = topics;
+      } else if (typeof topics === 'string') {
+        try {
+          messageTopics = JSON.parse(topics);
+        } catch {
+          // Use default if parsing fails
+        }
+      }
+    }
+  } catch (err: any) {
+    // Column doesn't exist or query failed - use default
+    // This is expected if migration hasn't been run yet
+    console.log('ℹ️ messageTopics column not available, using default topics');
+  }
+
+  // Use select to explicitly choose fields, excluding messageTopics to avoid Prisma error
   const crew = await prisma.runCrew.findUnique({
     where: { id: runCrewId },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      joinCode: true,
+      logo: true,
+      icon: true,
+      // Explicitly exclude messageTopics to avoid column not found error
       memberships: {
         include: {
           athlete: {
@@ -155,7 +187,7 @@ export async function hydrateCrew(runCrewId: string, athleteId?: string) {
       joinCode: crew.joinCode,
       logo: crew.logo,
       icon: crew.icon,
-      messageTopics: crew.messageTopics || ['general', 'runs', 'social'],
+      messageTopics,
     },
     membershipsBox: {
       memberships: crew.memberships,
