@@ -387,7 +387,7 @@ export default function RunCrewMemberPage() {
             {/* Messages Section */}
             <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 space-y-4">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Crew Messages</h2>
+                <h2 className="text-lg font-semibold text-gray-900">RunCrew Chatter</h2>
                 <p className="text-xs text-gray-500">Chat with your crew</p>
               </div>
               <MessageFeed 
@@ -446,9 +446,9 @@ export default function RunCrewMemberPage() {
             {/* Announcements Section (Read-Only) */}
             <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 space-y-4">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Announcements</h2>
+                <h2 className="text-lg font-semibold text-gray-900">{crew.name} Announcements</h2>
                 <p className="text-xs text-gray-500">
-                  Updates from your crew {canPostAnnouncements && '(Only admins and managers can post)'}
+                  Official updates from your crew
                 </p>
               </div>
 
@@ -482,11 +482,6 @@ export default function RunCrewMemberPage() {
                 ) : (
                   <div className="border border-dashed border-gray-300 rounded-lg p-6 text-center">
                     <p className="text-xs text-gray-500">No announcements yet.</p>
-                    {canPostAnnouncements ? (
-                      <p className="text-xs text-gray-400 mt-1">Be the first to post one.</p>
-                    ) : (
-                      <p className="text-xs text-gray-400 mt-1">Only admins and managers can post announcements.</p>
-                    )}
                   </div>
                 )}
               </div>
