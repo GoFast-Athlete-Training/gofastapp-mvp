@@ -28,7 +28,6 @@ export default function RunCrewAdminPage() {
   const [membership, setMembership] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   // Announcements state
@@ -116,13 +115,6 @@ export default function RunCrewAdminPage() {
       setLoading(false);
     }
   }, [runCrewId, router]);
-
-  const handleResync = useCallback(async () => {
-    setSyncing(true);
-    await loadCrewData();
-    setSyncing(false);
-    showToast('Crew data refreshed');
-  }, [loadCrewData]);
 
   useEffect(() => {
     loadCrewData();
@@ -352,13 +344,6 @@ export default function RunCrewAdminPage() {
               >
                 ← Back to RunCrews
               </Link>
-              <button
-                onClick={handleResync}
-                disabled={syncing}
-                className="bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-sky-700 transition disabled:opacity-60"
-              >
-                {syncing ? 'Syncing…' : 'Re-sync Crew Data'}
-              </button>
             </div>
           </div>
         </div>
