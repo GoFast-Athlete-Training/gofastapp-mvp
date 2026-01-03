@@ -120,7 +120,8 @@ export async function hydrateCrew(runCrewId: string) {
           content: true,
           topic: true,
           createdAt: true,
-          updatedAt: true, // Track when message was edited
+          // updatedAt excluded until migration runs - will add back after migration
+          // updatedAt: true, // Track when message was edited
           athlete: {
             select: {
               id: true,
