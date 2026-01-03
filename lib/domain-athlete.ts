@@ -44,7 +44,15 @@ export async function hydrateAthlete(athleteId: string) {
         runCrewMemberships: {
           include: {
             runCrew: {
-              include: {
+              select: {
+                // Explicitly select fields, excluding messageTopics to avoid column not found error
+                id: true,
+                name: true,
+                description: true,
+                joinCode: true,
+                logo: true,
+                icon: true,
+                // messageTopics excluded - column may not exist in database
                 memberships: {
                   include: {
                     athlete: {
@@ -89,8 +97,10 @@ export async function hydrateAthlete(athleteId: string) {
     if (
       errorMessage.includes('RunCrewMembership') || 
       errorMessage.includes('does not exist') ||
+      errorMessage.includes('messageTopics') ||
       errorMessage.includes('Unknown arg') ||
       errorCode === 'P2021' || // Table does not exist
+      errorCode === 'P2022' || // Column does not exist
       errorCode === 'P2009'    // Query validation error
     ) {
       console.warn('⚠️ HYDRATE ATHLETE: RunCrew tables not accessible, hydrating without RunCrew data');
