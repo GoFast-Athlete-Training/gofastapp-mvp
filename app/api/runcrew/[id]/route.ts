@@ -41,13 +41,7 @@ export async function GET(
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
 
-    // Validate athleteId from query param matches Firebase token's athlete (authorization from localStorage)
-    const { searchParams } = new URL(request.url);
-    const athleteIdFromQuery = searchParams.get('athleteId');
-    if (athleteIdFromQuery && athleteIdFromQuery !== athlete.id) {
-      return NextResponse.json({ error: 'Forbidden - athleteId mismatch' }, { status: 403 });
-    }
-
+    // Just hydrate - welcome page is the gate, let it through
     let crew;
     try {
       crew = await hydrateCrew(id, athlete.id);
@@ -58,14 +52,6 @@ export async function GET(
 
     if (!crew) {
       return NextResponse.json({ error: 'Crew not found' }, { status: 404 });
-    }
-
-    // Verify user is a member of the crew (using box structure)
-    const isMember = crew.membershipsBox?.memberships?.some(
-      (membership: any) => membership.athleteId === athlete.id
-    );
-    if (!isMember) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     return NextResponse.json({ success: true, runCrew: crew });
