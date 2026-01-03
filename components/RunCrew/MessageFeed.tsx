@@ -16,7 +16,7 @@ interface Message {
   createdAt: string;
   athlete: {
     firstName: string;
-    lastName: string;
+    gofastHandle?: string;
     photoURL?: string;
   };
 }
@@ -112,7 +112,7 @@ export default function MessageFeed({ crewId, topics = ['general'], selectedTopi
                 {message.athlete.photoURL ? (
                   <img
                     src={message.athlete.photoURL}
-                    alt={`${message.athlete.firstName} ${message.athlete.lastName}`}
+                    alt={message.athlete.gofastHandle ? `@${message.athlete.gofastHandle}` : message.athlete.firstName}
                     className="w-6 h-6 rounded-full object-cover"
                   />
                 ) : (
@@ -121,7 +121,10 @@ export default function MessageFeed({ crewId, topics = ['general'], selectedTopi
                   </div>
                 )}
                 <span className="font-semibold text-sm text-gray-900">
-                  {message.athlete.firstName} {message.athlete.lastName}
+                  {message.athlete.firstName}
+                  {message.athlete.gofastHandle && (
+                    <span className="text-gray-500 font-normal"> @{message.athlete.gofastHandle}</span>
+                  )}
                 </span>
                 <span className="text-xs text-gray-500">
                   {new Date(message.createdAt).toLocaleString('en-US', {

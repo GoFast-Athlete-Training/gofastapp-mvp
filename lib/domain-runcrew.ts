@@ -118,7 +118,7 @@ export async function hydrateCrew(runCrewId: string) {
             select: {
               id: true,
               firstName: true,
-              lastName: true,
+              gofastHandle: true,
               photoURL: true,
             },
           },
@@ -321,7 +321,7 @@ export async function postMessage(data: {
         select: {
           id: true,
           firstName: true,
-          lastName: true,
+          gofastHandle: true,
           photoURL: true,
         },
       },
