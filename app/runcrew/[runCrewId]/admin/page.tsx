@@ -467,12 +467,6 @@ export default function RunCrewAdminPage() {
             </div>
             <div className="flex gap-4">
               <Link
-                href={`/runcrew/${runCrewId}`}
-                className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100"
-              >
-                ← Home
-              </Link>
-              <Link
                 href={`/runcrew/${runCrewId}/member`}
                 className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100"
               >
@@ -482,7 +476,7 @@ export default function RunCrewAdminPage() {
                 href="/welcome"
                 className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100"
               >
-                Back to RunCrews
+                ← Back to RunCrews
               </Link>
             </div>
           </div>
