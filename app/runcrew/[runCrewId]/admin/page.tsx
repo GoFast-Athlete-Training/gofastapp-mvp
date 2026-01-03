@@ -83,7 +83,7 @@ export default function RunCrewAdminPage() {
       setLoading(true);
       setError(null);
 
-      const response = await api.get(`/runcrew/${runCrewId}?athleteId=${athleteId}`);
+      const response = await api.get(`/runcrew/${runCrewId}`);
       
       if (!response.data.success || !response.data.runCrew) {
         throw new Error('RunCrew not found');

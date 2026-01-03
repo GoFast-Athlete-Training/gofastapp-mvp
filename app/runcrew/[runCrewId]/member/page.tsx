@@ -53,7 +53,7 @@ export default function RunCrewMemberPage() {
         setError(null);
 
         // Fetch crew data via API (API uses Firebase token from interceptor)
-        const response = await api.get(`/runcrew/${runCrewId}?athleteId=${athleteId}`);
+        const response = await api.get(`/runcrew/${runCrewId}`);
         
         if (!response.data.success || !response.data.runCrew) {
           throw new Error('RunCrew not found');
