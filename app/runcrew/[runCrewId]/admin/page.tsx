@@ -74,7 +74,7 @@ export default function RunCrewAdminPage() {
     if (!runCrewId) return;
 
     const athleteId = LocalStorageAPI.getAthleteId();
-    if (!athleteId) {
+  if (!athleteId) {
       router.push('/signup');
       return;
     }
@@ -83,7 +83,7 @@ export default function RunCrewAdminPage() {
       setLoading(true);
       setError(null);
 
-      const response = await api.get(`/runcrew/${runCrewId}`);
+      const response = await api.get(`/runcrew/${runCrewId}?athleteId=${athleteId}`);
       
       if (!response.data.success || !response.data.runCrew) {
         throw new Error('RunCrew not found');
@@ -289,10 +289,10 @@ export default function RunCrewAdminPage() {
           </p>
           <div className="flex gap-4">
             <Link
-              href={`/runcrew/${runCrewId}/member`}
-              className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
-            >
-              Go to Member View
+            href={`/runcrew/${runCrewId}/member`}
+            className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+          >
+            Go to Member View
             </Link>
             <Link
               href="/welcome"
@@ -376,8 +376,8 @@ export default function RunCrewAdminPage() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">Members</h2>
                 <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{memberships.length}</span>
-              </div>
-              
+        </div>
+
               {memberships.length === 0 ? (
                 <div className="border border-dashed border-gray-300 rounded-xl p-6 text-center text-sm text-gray-500">
                   <p className="mb-2">No members yet.</p>
@@ -426,7 +426,7 @@ export default function RunCrewAdminPage() {
 
           {/* MAIN CONTENT: Announcements & Runs */}
           <div className="lg:col-span-6 space-y-6">
-            {/* Announcements */}
+          {/* Announcements */}
             <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -685,8 +685,8 @@ export default function RunCrewAdminPage() {
                       <option key={pace} value={pace}>{pace}</option>
                     ))}
                   </select>
-                </div>
-              </div>
+                      </div>
+                    </div>
 
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Description</label>
@@ -697,7 +697,7 @@ export default function RunCrewAdminPage() {
                   rows={3}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                 />
-              </div>
+                  </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
                 <button

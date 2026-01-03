@@ -41,6 +41,13 @@ export async function GET(
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
 
+    // Validate athleteId from query param matches Firebase token's athlete (authorization from localStorage)
+    const { searchParams } = new URL(request.url);
+    const athleteIdFromQuery = searchParams.get('athleteId');
+    if (athleteIdFromQuery && athleteIdFromQuery !== athlete.id) {
+      return NextResponse.json({ error: 'Forbidden - athleteId mismatch' }, { status: 403 });
+    }
+
     let crew;
     try {
       crew = await hydrateCrew(id, athlete.id);
