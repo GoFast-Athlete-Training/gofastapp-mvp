@@ -1,8 +1,19 @@
 import { prisma } from '../lib/prisma';
 
+/**
+ * MIGRATION SCRIPT - Historical Only
+ * 
+ * This script was used to migrate role data from the deprecated RunCrewManager table
+ * to the RunCrewMembership.role field. The RunCrewManager table has since been removed.
+ * 
+ * This script is kept for historical reference only and should not be run again.
+ * If you need to verify migration status, check run_crew_memberships.role directly.
+ */
 async function migrateRunCrewRoles() {
   try {
     console.log('🔄 Starting RunCrew role migration...\n');
+    console.log('⚠️  NOTE: This script is for historical migration only.\n');
+    console.log('⚠️  The RunCrewManager table has been deprecated and removed.\n');
 
     // Step 0: Check if role column exists, if not add it
     console.log('Step 0: Checking if role column exists...');
@@ -51,18 +62,42 @@ async function migrateRunCrewRoles() {
 
     // Step 2: Copy roles from run_crew_managers into run_crew_memberships.role
     console.log('Step 2: Copying roles from RunCrewManager table...');
-    const update2 = await prisma.$executeRaw`
-      UPDATE run_crew_memberships m
-      SET role = CASE 
-        WHEN rm.role = 'admin' THEN 'admin'::run_crew_role
-        WHEN rm.role = 'manager' THEN 'manager'::run_crew_role
-        ELSE 'member'::run_crew_role
-      END
-      FROM run_crew_managers rm
-      WHERE m."runCrewId" = rm."runCrewId"
-        AND m."athleteId" = rm."athleteId";
-    `;
-    console.log(`✅ Updated ${update2} memberships from RunCrewManager roles\n`);
+    try {
+      // Check if run_crew_managers table exists
+      const tableExists = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+        SELECT EXISTS (
+          SELECT 1 
+          FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'run_crew_managers'
+        ) as exists;
+      `;
+
+      if (!tableExists[0].exists) {
+        console.log('   ⚠️  run_crew_managers table does not exist (already dropped)');
+        console.log('   ✅ Skipping role copy - migration already complete\n');
+      } else {
+        const update2 = await prisma.$executeRaw`
+          UPDATE run_crew_memberships m
+          SET role = CASE 
+            WHEN rm.role = 'admin' THEN 'admin'::run_crew_role
+            WHEN rm.role = 'manager' THEN 'manager'::run_crew_role
+            ELSE 'member'::run_crew_role
+          END
+          FROM run_crew_managers rm
+          WHERE m."runCrewId" = rm."runCrewId"
+            AND m."athleteId" = rm."athleteId";
+        `;
+        console.log(`✅ Updated ${update2} memberships from RunCrewManager roles\n`);
+      }
+    } catch (error: any) {
+      if (error.message?.includes('does not exist') || error.message?.includes('relation') && error.message?.includes('run_crew_managers')) {
+        console.log('   ⚠️  run_crew_managers table does not exist (already dropped)');
+        console.log('   ✅ Skipping role copy - migration already complete\n');
+      } else {
+        throw error;
+      }
+    }
 
     // Step 3: Verify no NULL roles remain
     console.log('Step 3: Verifying no NULL roles remain...');
@@ -94,6 +129,7 @@ async function migrateRunCrewRoles() {
 
     // Step 5: Update Adam's record specifically (find by email or first name)
     console.log('Step 5: Updating Adam\'s record...');
+    // Note: runCrewManagers relation removed from schema, using memberships.role instead
     const adam = await prisma.athlete.findFirst({
       where: {
         OR: [
@@ -103,7 +139,6 @@ async function migrateRunCrewRoles() {
       },
       include: {
         runCrewMemberships: true,
-        runCrewManagers: true,
       },
     });
 
@@ -111,30 +146,21 @@ async function migrateRunCrewRoles() {
       console.log(`✅ Found athlete: ${adam.firstName} ${adam.lastName} (${adam.email})`);
       console.log(`   ID: ${adam.id}`);
       console.log(`   Memberships: ${adam.runCrewMemberships.length}`);
-      console.log(`   Manager records: ${adam.runCrewManagers.length}`);
 
-      // Update all of Adam's memberships to ensure they have correct roles (using raw SQL)
+      // Update all of Adam's memberships to ensure they have correct roles
+      // Note: Roles are now stored in membership.role, not in separate RunCrewManager table
       for (const membership of adam.runCrewMemberships) {
-        const managerRecord = adam.runCrewManagers.find(
-          (m) => m.runCrewId === membership.runCrewId
-        );
-
-        if (managerRecord) {
-          const role = managerRecord.role === 'admin' ? 'admin' : managerRecord.role === 'manager' ? 'manager' : 'member';
-          await prisma.$executeRaw`
-            UPDATE run_crew_memberships
-            SET role = ${role}::run_crew_role
-            WHERE id = ${membership.id};
-          `;
-          console.log(`   ✅ Updated membership ${membership.id} to role: ${role}`);
-        } else {
-          // Ensure member role is set if no manager record
+        const role = membership.role || 'member';
+        if (!membership.role) {
+          // Ensure role is set if missing
           await prisma.$executeRaw`
             UPDATE run_crew_memberships
             SET role = 'member'::run_crew_role
             WHERE id = ${membership.id};
           `;
-          console.log(`   ✅ Set membership ${membership.id} to role: member (no manager record)`);
+          console.log(`   ✅ Set membership ${membership.id} to role: member (was missing)`);
+        } else {
+          console.log(`   ✅ Membership ${membership.id} already has role: ${role}`);
         }
       }
     } else {

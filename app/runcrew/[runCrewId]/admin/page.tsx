@@ -9,6 +9,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
+import MessageFeed from '@/components/RunCrew/MessageFeed';
 
 /**
  * Admin Page - CLIENT-SIDE
@@ -466,6 +467,12 @@ export default function RunCrewAdminPage() {
             </div>
             <div className="flex gap-4">
               <Link
+                href={`/runcrew/${runCrewId}`}
+                className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                ← Home
+              </Link>
+              <Link
                 href={`/runcrew/${runCrewId}/member`}
                 className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100"
               >
@@ -475,7 +482,7 @@ export default function RunCrewAdminPage() {
                 href="/welcome"
                 className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100"
               >
-                ← Back to RunCrews
+                Back to RunCrews
               </Link>
             </div>
           </div>
@@ -595,6 +602,20 @@ export default function RunCrewAdminPage() {
                   </div>
                 ))}
               </div>
+            </section>
+
+            {/* Messages Management Section */}
+            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Crew Messages</h2>
+                <p className="text-xs text-gray-500">View and manage all crew messages (admin can edit/delete any)</p>
+              </div>
+              <MessageFeed 
+                crewId={runCrewId}
+                topics={topics}
+                selectedTopic="general"
+                isAdmin={true}
+              />
             </section>
 
             {/* Message Topics Configuration */}

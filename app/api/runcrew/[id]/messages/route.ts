@@ -95,3 +95,5 @@ export async function POST(
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
+
+// Note: PUT and DELETE for individual messages are handled in /api/runcrew/[id]/messages/[messageId]/route.ts

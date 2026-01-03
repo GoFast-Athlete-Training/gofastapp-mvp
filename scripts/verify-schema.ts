@@ -11,7 +11,6 @@ async function verifySchema() {
       // TODO: AthleteActivity will be reintroduced in Schema Phase 3
       { name: 'RunCrew', model: prisma.runCrew },
       { name: 'RunCrewMembership', model: prisma.runCrewMembership },
-      { name: 'RunCrewManager', model: prisma.runCrewManager },
       { name: 'RunCrewMessage', model: prisma.runCrewMessage },
       { name: 'RunCrewAnnouncement', model: prisma.runCrewAnnouncement },
       { name: 'RunCrewRun', model: prisma.runCrewRun },
@@ -43,7 +42,6 @@ async function verifySchema() {
         include: {
           // TODO: activities will be reintroduced in Schema Phase 3
           runCrewMemberships: true,
-          runCrewManagers: true,
           company: true,
         },
       });

@@ -295,6 +295,12 @@ export default function RunCrewMemberPage() {
               </div>
             </div>
             <div className="flex gap-4">
+              <Link
+                href={`/runcrew/${runCrewId}`}
+                className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                ← Home
+              </Link>
               {isAdmin && (
                 <Link
                   href={`/runcrew/${runCrewId}/admin`}
@@ -307,7 +313,7 @@ export default function RunCrewMemberPage() {
                 href="/welcome"
                 className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100"
               >
-                ← Back to RunCrews
+                Back to RunCrews
               </Link>
             </div>
           </div>
@@ -437,7 +443,21 @@ export default function RunCrewMemberPage() {
 
           {/* MAIN CONTENT: Messages and Announcements */}
           <div className="lg:col-span-8 space-y-6">
-            {/* Announcements Section (Moved to Top, Styled) */}
+            {/* Messages Section */}
+            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">RunCrew Chatter</h2>
+                <p className="text-xs text-gray-500">Chat with your crew</p>
+              </div>
+              <MessageFeed 
+                crewId={runCrewId}
+                topics={crew.meta?.messageTopics || ['general', 'runs', 'social']}
+                selectedTopic="general"
+                isAdmin={isAdmin}
+              />
+            </section>
+
+            {/* Announcements Section */}
             <section className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border-2 border-orange-200 shadow-md p-5 space-y-4">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">{crew.name} Announcements</h2>

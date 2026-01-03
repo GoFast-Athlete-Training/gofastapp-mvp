@@ -89,7 +89,6 @@ model Athlete {
 
   // RunCrew Relations
   runCrewMemberships   RunCrewMembership[]   @relation("AthleteRunCrewMemberships")
-  runCrewManagers      RunCrewManager[]      @relation("RunCrewManager")
   runCrewMessages      RunCrewMessage[]
   runCrewAnnouncements RunCrewAnnouncement[] @relation("RunCrewAnnouncementAuthor")
   runCrewRuns          RunCrewRun[]          @relation("RunCrewRunCreator")
@@ -436,7 +435,6 @@ model RunCrew {
   announcements RunCrewAnnouncement[]
   runs          RunCrewRun[]
   events        RunCrewEvent[]
-  managers      RunCrewManager[]
   joinCodes     JoinCode[]
 
   @@map("run_crews")
@@ -472,24 +470,6 @@ model RunCrewMembership {
   @@map("run_crew_memberships")
 }
 
-// DEPRECATED — do not write new data
-// Role information is now stored in RunCrewMembership.role
-// This table is kept for migration purposes only
-model RunCrewManager {
-  id        String @id @default(cuid())
-  runCrewId String
-  athleteId String
-  role      String
-
-  createdAt DateTime @default(now())
-
-  runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  athlete Athlete @relation("RunCrewManager", fields: [athleteId], references: [id], onDelete: Cascade)
-
-  @@unique([runCrewId, athleteId])
-  @@map("run_crew_managers")
-}
-
 model RunCrewMessage {
   id        String @id @default(cuid())
   runCrewId String
@@ -499,6 +479,7 @@ model RunCrewMessage {
   topic   String @default("general") // Message topic/channel
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt // Track when message was last edited
 
   runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
   athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
