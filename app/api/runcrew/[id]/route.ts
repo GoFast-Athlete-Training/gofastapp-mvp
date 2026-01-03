@@ -45,18 +45,45 @@ export async function GET(
     let crew;
     try {
       crew = await hydrateCrew(id, athlete.id);
-    } catch (err) {
-      console.error('Prisma error:', err);
-      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    } catch (err: any) {
+      console.error('❌ RUNCREW GET: Prisma error:', err);
+      console.error('❌ RUNCREW GET: Error message:', err?.message);
+      console.error('❌ RUNCREW GET: Error stack:', err?.stack);
+      return NextResponse.json({ error: 'DB error', details: err?.message }, { status: 500 });
     }
 
     if (!crew) {
+      console.error('❌ RUNCREW GET: Crew not found for id:', id);
       return NextResponse.json({ error: 'Crew not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, runCrew: crew });
-  } catch (err) {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    try {
+      // Ensure proper JSON serialization by converting Date objects
+      const serializedCrew = JSON.parse(JSON.stringify(crew, (key, value) => {
+        // Convert Date objects to ISO strings
+        if (value instanceof Date) {
+          return value.toISOString();
+        }
+        // Handle BigInt if present
+        if (typeof value === 'bigint') {
+          return value.toString();
+        }
+        return value;
+      }));
+      
+      return NextResponse.json({ success: true, runCrew: serializedCrew });
+    } catch (serializeErr: any) {
+      console.error('❌ RUNCREW GET: JSON serialization error:', serializeErr);
+      console.error('❌ RUNCREW GET: Serialization error message:', serializeErr?.message);
+      console.error('❌ RUNCREW GET: Crew data type:', typeof crew);
+      console.error('❌ RUNCREW GET: Crew keys:', crew ? Object.keys(crew) : 'null');
+      return NextResponse.json({ error: 'Serialization error', details: serializeErr?.message }, { status: 500 });
+    }
+  } catch (err: any) {
+    console.error('❌ RUNCREW GET: Unexpected error:', err);
+    console.error('❌ RUNCREW GET: Error message:', err?.message);
+    console.error('❌ RUNCREW GET: Error stack:', err?.stack);
+    return NextResponse.json({ error: 'Server error', details: err?.message }, { status: 500 });
   }
 }
 
