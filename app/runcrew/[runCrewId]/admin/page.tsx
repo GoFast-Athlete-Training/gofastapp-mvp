@@ -366,91 +366,78 @@ export default function RunCrewAdminPage() {
                   <p>Share your invite code to build the crew.</p>
                 </div>
               ) : (
-                <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
                   {memberships.map((membership: any) => {
                     const athlete = membership.athlete || {};
                     return (
-                      <div key={membership.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+                      <div key={membership.id} className="flex items-center gap-2 p-2 border border-gray-200 rounded hover:bg-gray-50 transition">
                         {athlete.photoURL ? (
                           <img
                             src={athlete.photoURL}
                             alt={`${athlete.firstName} ${athlete.lastName}`}
-                            className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                            className="w-8 h-8 rounded-full object-cover border border-gray-200"
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white font-semibold text-sm">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white font-semibold text-xs">
                             {(athlete.firstName?.[0] || 'A').toUpperCase()}
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 truncate">
+                          <p className="text-xs font-semibold text-gray-900 truncate">
                             {athlete.firstName || 'Athlete'} {athlete.lastName || ''}
                             {membership.role === 'admin' && <span className="text-orange-600 text-xs font-bold ml-1">Admin</span>}
                           </p>
-                          {athlete.email && (
-                            <p className="text-xs text-gray-500 truncate">{athlete.email}</p>
-                          )}
                         </div>
                       </div>
                     );
                   })}
                 </div>
               )}
-
-              {crew.joinCode && (
-                <div className="mt-6 border border-dashed border-orange-300 rounded-xl px-4 py-3 bg-orange-50/60 text-sm text-gray-700">
-                  <p className="font-semibold text-orange-600 mb-1">Invite Code:</p>
-                  <code className="text-xs text-gray-600">{crew.joinCode}</code>
-                </div>
-              )}
             </section>
           </aside>
 
-          {/* MAIN CONTENT: Announcements & Runs */}
-          <div className="lg:col-span-6 space-y-6">
-          {/* Announcements */}
-            <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">Announcements</h2>
-                  <p className="text-sm text-gray-500">Share updates with your crew</p>
-                </div>
+          {/* MAIN CONTENT: Announcements */}
+          <div className="lg:col-span-8">
+            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Announcements</h2>
+                <p className="text-xs text-gray-500">Share updates with your crew</p>
               </div>
 
-              <form onSubmit={handleAnnouncementSubmit} className="space-y-4">
+              <form onSubmit={handleAnnouncementSubmit} className="space-y-3">
                 <div>
                   <input
                     type="text"
                     value={announcementTitle}
                     onChange={(e) => setAnnouncementTitle(e.target.value)}
                     placeholder="Announcement title"
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 mb-3"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 mb-2"
                   />
                   <textarea
                     value={announcementContent}
                     onChange={(e) => setAnnouncementContent(e.target.value)}
                     placeholder="What's happening next?"
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 min-h-[100px]"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 min-h-[80px]"
                   />
                 </div>
                 <div className="flex justify-end">
                   <button
                     type="submit"
                     disabled={loadingAnnouncements || !announcementTitle.trim() || !announcementContent.trim()}
-                    className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg text-sm font-semibold transition"
+                    className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-1.5 rounded-lg text-sm font-semibold transition"
                   >
-                    {loadingAnnouncements ? 'Posting...' : 'Post Announcement'}
+                    {loadingAnnouncements ? 'Posting...' : 'Post'}
                   </button>
                 </div>
               </form>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {announcements.length === 0 && (
-                  <p className="text-sm text-gray-500">No announcements yet. Be the first to post one.</p>
+                  <p className="text-xs text-gray-500">No announcements yet. Be the first to post one.</p>
                 )}
                 {announcements.map((announcement: any) => (
-                  <div key={announcement.id} className="border border-gray-200 rounded-xl px-4 py-3 bg-gray-50">
-                    <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                  <div key={announcement.id} className="border border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
+                    <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
                       <span>
                         {announcement.author?.firstName
                           ? `${announcement.author.firstName}${announcement.author.lastName ? ` ${announcement.author.lastName}` : ''}`
@@ -470,96 +457,12 @@ export default function RunCrewAdminPage() {
                     {announcement.title && (
                       <h4 className="text-sm font-semibold text-gray-900 mb-1">{announcement.title}</h4>
                     )}
-                    <p className="text-sm text-gray-800 whitespace-pre-line">{announcement.content || announcement.text}</p>
+                    <p className="text-xs text-gray-800 whitespace-pre-line">{announcement.content || announcement.text}</p>
                   </div>
                 ))}
               </div>
             </section>
-
-            {/* Runs Module */}
-            <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">Upcoming Runs</h3>
-                  <button
-                    onClick={() => {
-                      const tomorrow = new Date();
-                      tomorrow.setDate(tomorrow.getDate() + 1);
-                      setRunForm({
-                        title: '',
-                        date: tomorrow.toISOString().split('T')[0],
-                        time: '',
-                        meetUpPoint: '',
-                        meetUpAddress: '',
-                        totalMiles: '',
-                        pace: '',
-                        description: '',
-                      });
-                      setShowRunModal(true);
-                    }}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition shadow-sm hover:shadow flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Create Run
-                  </button>
-                </div>
-                {runs.length === 0 && (
-                  <div className="border border-dashed border-gray-300 rounded-xl p-6 text-center text-sm text-gray-500">
-                    <p className="mb-2">No runs yet.</p>
-                    <p>Click "Create Run" above to schedule the first run.</p>
-                  </div>
-                )}
-                <div className="space-y-3">
-                  {runs.map((run: any) => {
-                    const rsvpCount = run.rsvps?.length || run._count?.rsvps || 0;
-                    const goingCount = run.rsvps?.filter((r: any) => r.status === 'going').length || rsvpCount;
-                    
-                    return (
-                      <div key={run.id} className="border border-gray-200 rounded-xl bg-gray-50 overflow-hidden">
-                        <div className="px-4 py-3">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <p className="font-semibold text-gray-900">{run.title || 'Untitled Run'}</p>
-                              <p className="text-xs text-gray-500">{formatRunDate(run)}</p>
-                              {run.meetUpPoint && (
-                                <p className="text-xs text-gray-500 mt-1">📍 {run.meetUpPoint}</p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-500">
-                                {goingCount} going
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </section>
           </div>
-
-          {/* RIGHT SIDEBAR: Stats */}
-          <aside className="lg:col-span-3 space-y-6">
-            <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
-              <h3 className="text-lg font-bold text-gray-900">Crew Stats</h3>
-              <div className="space-y-3">
-                <div className="border border-gray-200 rounded-xl p-4 bg-gradient-to-br from-emerald-50 to-emerald-100">
-                  <p className="text-xs uppercase tracking-wide text-gray-600 font-semibold">Upcoming Runs</p>
-                  <p className="text-3xl font-bold text-emerald-700 mt-1">{runs.length}</p>
-                  <p className="text-xs text-gray-600 mt-1">Keep the calendar full</p>
-                </div>
-                <div className="border border-gray-200 rounded-xl p-4 bg-gradient-to-br from-blue-50 to-blue-100">
-                  <p className="text-xs uppercase tracking-wide text-gray-600 font-semibold">Announcements</p>
-                  <p className="text-3xl font-bold text-blue-700 mt-1">{announcements.length}</p>
-                  <p className="text-xs text-gray-600 mt-1">Crew updates</p>
-                </div>
-              </div>
-            </section>
-          </aside>
         </div>
       </main>
 
