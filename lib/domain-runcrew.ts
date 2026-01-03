@@ -113,7 +113,14 @@ export async function hydrateCrew(runCrewId: string) {
         },
       },
       messages: {
-        include: {
+        select: {
+          id: true,
+          runCrewId: true,
+          athleteId: true,
+          content: true,
+          topic: true,
+          createdAt: true,
+          // Explicitly exclude updatedAt to avoid column not found error until migration runs
           athlete: {
             select: {
               id: true,
