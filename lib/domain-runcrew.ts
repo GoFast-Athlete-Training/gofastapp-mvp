@@ -155,6 +155,7 @@ export async function hydrateCrew(runCrewId: string, athleteId?: string) {
       joinCode: crew.joinCode,
       logo: crew.logo,
       icon: crew.icon,
+      messageTopics: crew.messageTopics || ['general', 'runs', 'social'],
     },
     membershipsBox: {
       memberships: crew.memberships,
@@ -274,9 +275,15 @@ export async function postMessage(data: {
   runCrewId: string;
   athleteId: string;
   content: string;
+  topic?: string;
 }) {
   return prisma.runCrewMessage.create({
-    data,
+    data: {
+      runCrewId: data.runCrewId,
+      athleteId: data.athleteId,
+      content: data.content,
+      topic: data.topic || 'general',
+    },
     include: {
       athlete: {
         select: {

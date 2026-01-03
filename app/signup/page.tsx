@@ -104,24 +104,29 @@ export default function SignupPage() {
           } catch (hydrateErr: any) {
             console.log('⚠️ SIGNUP PAGE: Hydrate failed, trying create...', hydrateErr.response?.status);
             // If hydrate fails, try create (might be a new user)
-            try {
-              const createRes = await api.post('/athlete/create', {});
-              if (createRes.data?.success) {
-                const athlete = createRes.data;
-                console.log('✅ SIGNUP PAGE: Athlete created/found via create endpoint');
-                
-                localStorage.setItem('firebaseId', user.uid);
-                localStorage.setItem('athleteId', athlete.athleteId);
-                localStorage.setItem('email', athlete.data?.email || user.email || '');
+          try {
+            const createRes = await api.post('/athlete/create', {});
+            if (createRes.data?.success) {
+              const athlete = createRes.data;
+              console.log('✅ SIGNUP PAGE: Athlete created/found via create endpoint');
+              
+              localStorage.setItem('firebaseId', user.uid);
+              localStorage.setItem('athleteId', athlete.athleteId);
+              localStorage.setItem('email', athlete.data?.email || user.email || '');
 
-                // Check for pending crew join first
-                const joinedCrew = await handlePendingCrewJoin(router);
-                if (joinedCrew) {
-                  return; // Already redirected
-                }
+              // Check for pending crew join first
+              const joinedCrew = await handlePendingCrewJoin(router);
+              if (joinedCrew) {
+                return; // Already redirected
+              }
 
-                  router.replace('/welcome');
-                return;
+              // Route based on profile completion
+              if (athlete.data?.gofastHandle) {
+                router.replace('/welcome');
+              } else {
+                router.replace('/athlete-create-profile');
+              }
+              return;
               }
             } catch (createErr: any) {
               console.error('❌ SIGNUP PAGE: Both hydrate and create failed', createErr.response?.status);
@@ -199,11 +204,11 @@ export default function SignupPage() {
 
       // Route based on profile completion (check gofastHandle - key indicator)
       if (athlete.data?.gofastHandle) {
-        console.log('✅ SIGNUP: Existing athlete with profile → Athlete Home');
+        console.log('✅ SIGNUP: Existing athlete with profile → Welcome');
         router.replace('/welcome');
       } else {
-        console.log('✅ SIGNUP: New athlete or incomplete profile → Athlete Home');
-        router.replace('/welcome');
+        console.log('✅ SIGNUP: New athlete or incomplete profile → Create Profile');
+        router.replace('/athlete-create-profile');
       }
     } catch (err: any) {
       console.error('❌ SIGNUP: Google signup error:', err);
@@ -273,9 +278,9 @@ export default function SignupPage() {
         // If create fails with 500, try hydrate instead (user might already exist)
         if (createErr?.response?.status === 500) {
           console.log('⚠️ SIGNUP: Create failed with 500, trying hydrate...');
-          // Athlete might exist - redirect to athlete-home
-          console.log('✅ SIGNUP: Athlete might exist, redirecting to athlete-home');
-          router.push('/welcome');
+          // Athlete might exist - redirect to profile creation
+          console.log('✅ SIGNUP: Athlete might exist, redirecting to create profile');
+          router.push('/athlete-create-profile');
           return;
         } else {
           throw createErr; // Re-throw if not a 500 error
@@ -300,11 +305,11 @@ export default function SignupPage() {
 
       // Route based on profile completion (check gofastHandle - key indicator)
       if (athlete.data?.gofastHandle) {
-        console.log('✅ SIGNUP: Existing athlete with profile → Athlete Home');
+        console.log('✅ SIGNUP: Existing athlete with profile → Welcome');
         router.replace('/welcome');
       } else {
-        console.log('✅ SIGNUP: New athlete or incomplete profile → Athlete Home');
-        router.replace('/welcome');
+        console.log('✅ SIGNUP: New athlete or incomplete profile → Create Profile');
+        router.replace('/athlete-create-profile');
       }
     } catch (err: any) {
       console.error('❌ SIGNUP: Email signup error:', err);
@@ -405,11 +410,11 @@ export default function SignupPage() {
 
       // Route based on profile completion (check gofastHandle - key indicator)
       if (athlete.data?.gofastHandle) {
-        console.log('✅ SIGNIN: Existing athlete with profile → Athlete Home');
+        console.log('✅ SIGNIN: Existing athlete with profile → Welcome');
         router.replace('/welcome');
       } else {
-        console.log('✅ SIGNIN: New athlete or incomplete profile → Athlete Home');
-        router.replace('/welcome');
+        console.log('✅ SIGNIN: New athlete or incomplete profile → Create Profile');
+        router.replace('/athlete-create-profile');
       }
     } catch (err: any) {
       console.error('❌ SIGNIN: Email sign-in error:', err);

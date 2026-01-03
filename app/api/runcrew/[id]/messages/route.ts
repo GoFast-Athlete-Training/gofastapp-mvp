@@ -68,7 +68,7 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { content } = body;
+    const { content, topic } = body;
 
     if (!content) {
       return NextResponse.json(
@@ -83,6 +83,7 @@ export async function POST(
         runCrewId: id,
         athleteId: athlete.id,
         content,
+        topic: topic || 'general', // Default to 'general' if not provided
       });
     } catch (err) {
       console.error('Prisma error:', err);

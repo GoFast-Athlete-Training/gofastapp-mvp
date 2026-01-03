@@ -7,6 +7,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
+import MessageFeed from '@/components/RunCrew/MessageFeed';
 
 /**
  * Member Page - CLIENT-SIDE
@@ -167,50 +168,83 @@ export default function RunCrewMemberPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-8">
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Member View</h2>
-          <p className="text-gray-600">
-            This is the member view for {crew.name}. More features coming soon.
-          </p>
-        </div>
-
-        {/* Basic member view - placeholder for Phase 1 */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Announcements */}
-          <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Announcements</h3>
-            {crew.announcements && crew.announcements.length > 0 ? (
-              <div className="space-y-4">
-                {crew.announcements.map((announcement: any) => (
-                  <div key={announcement.id} className="border-b pb-4 last:border-0">
-                    <div className="font-medium text-gray-900">{announcement.title}</div>
-                    <div className="text-sm text-gray-600 mt-1">{announcement.content}</div>
-                    <div className="text-xs text-gray-500 mt-2">
-                      {new Date(announcement.createdAt).toLocaleDateString()}
+          {/* Main Content: Messages and Announcements */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Messages Section */}
+            <section className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Crew Messages</h2>
+              <MessageFeed 
+                crewId={runCrewId}
+                topics={crew.meta?.messageTopics || ['general', 'runs', 'social']}
+                selectedTopic="general"
+              />
+            </section>
+
+            {/* Announcements */}
+            <section className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Announcements</h3>
+              {crew.announcementsBox?.announcements && crew.announcementsBox.announcements.length > 0 ? (
+                <div className="space-y-4">
+                  {crew.announcementsBox.announcements.map((announcement: any) => (
+                    <div key={announcement.id} className="border-b pb-4 last:border-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="font-medium text-gray-900">{announcement.title}</div>
+                        <div className="text-xs text-gray-500">
+                          {new Date(announcement.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <div className="text-sm text-gray-600">{announcement.content}</div>
+                      {announcement.author && (
+                        <div className="text-xs text-gray-500 mt-2">
+                          by {announcement.author.firstName} {announcement.author.lastName}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500">No announcements yet.</p>
-            )}
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500">No announcements yet.</p>
+              )}
+            </section>
           </div>
 
-          {/* Members */}
+          {/* Sidebar: Members */}
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Members</h3>
-            {crew.memberships && crew.memberships.length > 0 ? (
-              <div className="space-y-2">
-                {crew.memberships.slice(0, 10).map((membership: any) => (
-                  <div key={membership.id} className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-gray-300 rounded-full"></div>
-                    <div>
-                      <div className="text-sm font-medium">
-                        {membership.athlete?.firstName} {membership.athlete?.lastName}
+            {crew.membershipsBox?.memberships && crew.membershipsBox.memberships.length > 0 ? (
+              <div className="space-y-3">
+                {crew.membershipsBox.memberships.slice(0, 10).map((membership: any) => {
+                  const athlete = membership.athlete || {};
+                  return (
+                    <div key={membership.id} className="flex items-center gap-3">
+                      {athlete.photoURL ? (
+                        <img
+                          src={athlete.photoURL}
+                          alt={`${athlete.firstName} ${athlete.lastName}`}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-semibold text-sm">
+                          {(athlete.firstName?.[0] || 'A').toUpperCase()}
+                        </div>
+                      )}
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {athlete.firstName || 'Athlete'} {athlete.lastName || ''}
+                        </div>
+                        {membership.role === 'admin' && (
+                          <div className="text-xs text-orange-600 font-semibold">Admin</div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
+                {crew.membershipsBox.memberships.length > 10 && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    +{crew.membershipsBox.memberships.length - 10} more members
+                  </p>
+                )}
               </div>
             ) : (
               <p className="text-gray-500">No members yet.</p>

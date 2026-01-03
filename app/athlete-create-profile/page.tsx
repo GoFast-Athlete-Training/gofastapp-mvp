@@ -300,10 +300,9 @@ export default function AthleteCreateProfilePage() {
         weeklyTotals: {},
       });
 
-      // Navigate to athlete home after profile setup (EXACTLY like MVP1)
-      // If profile complete (gofastHandle exists), always redirect to /athlete-home
-      console.log('🏠 Navigating to athlete home...');
-      router.push('/athlete-home');
+      // Navigate to runcrew explainer page after profile setup
+      console.log('🏃 Navigating to runcrew explainer page...');
+      router.push('/runcrew');
       
     } catch (err: any) {
       console.error('❌ Profile creation failed:', err);
