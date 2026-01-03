@@ -10,6 +10,7 @@ import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
 import MessageFeed from '@/components/RunCrew/MessageFeed';
+import { Copy, Check, Link as LinkIcon } from 'lucide-react';
 
 /**
  * Member Page - CLIENT-SIDE
@@ -31,6 +32,8 @@ export default function RunCrewMemberPage() {
   const [membership, setMembership] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   useEffect(() => {
     if (!runCrewId) {
@@ -200,6 +203,30 @@ export default function RunCrewMemberPage() {
   // Check if user is admin
   const isAdmin = membership?.role === 'admin';
   const memberships = crew.membershipsBox?.memberships || [];
+  const joinCode = crew.meta?.joinCode || '';
+  const inviteUrl = joinCode ? `${typeof window !== 'undefined' ? window.location.origin : ''}/runcrew/join?code=${joinCode}` : '';
+
+  const handleCopyLink = async () => {
+    if (!inviteUrl) return;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy link:', err);
+    }
+  };
+
+  const handleCopyCode = async () => {
+    if (!joinCode) return;
+    try {
+      await navigator.clipboard.writeText(joinCode);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy code:', err);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -277,6 +304,79 @@ export default function RunCrewMemberPage() {
                 </div>
               )}
             </section>
+
+            {/* Invite Section */}
+            {joinCode && (
+              <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sticky top-6 mt-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Invite Teammates</h2>
+                
+                <div className="space-y-4">
+                  {/* Invite URL */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
+                      Invite URL
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={inviteUrl}
+                        readOnly
+                        className="flex-1 px-3 py-2 text-xs border border-gray-300 rounded-lg bg-gray-50 font-mono"
+                      />
+                      <button
+                        onClick={handleCopyLink}
+                        className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2"
+                      >
+                        {copiedLink ? (
+                          <>
+                            <Check className="w-4 h-4" />
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <LinkIcon className="w-4 h-4" />
+                            Copy
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Share this URL to invite members</p>
+                  </div>
+
+                  {/* Join Code */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
+                      Join Code
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={joinCode}
+                        readOnly
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 font-mono font-bold text-center"
+                      />
+                      <button
+                        onClick={handleCopyCode}
+                        className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2"
+                      >
+                        {copiedCode ? (
+                          <>
+                            <Check className="w-4 h-4" />
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-4 h-4" />
+                            Copy
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Or share just the code</p>
+                  </div>
+                </div>
+              </section>
+            )}
           </aside>
 
           {/* MAIN CONTENT: Messages and Announcements */}
@@ -292,6 +392,52 @@ export default function RunCrewMemberPage() {
                 topics={crew.meta?.messageTopics || ['general', 'runs', 'social']}
                 selectedTopic="general"
               />
+            </section>
+
+            {/* Upcoming Runs Section */}
+            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Upcoming Runs</h2>
+                <p className="text-xs text-gray-500">Scheduled runs with your crew</p>
+              </div>
+
+              <div className="space-y-3">
+                {crew.runsBox?.runs && crew.runsBox.runs.length > 0 ? (
+                  crew.runsBox.runs.slice(0, 5).map((run: any) => {
+                    const runDate = run.date ? new Date(run.date) : null;
+                    const formattedDate = runDate ? runDate.toLocaleDateString('en-US', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                    }) : 'Date TBD';
+                    const formattedTime = run.startTime || 'Time TBD';
+                    
+                    return (
+                      <div key={run.id} className="border border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
+                        <div className="flex items-start justify-between mb-1">
+                          <div className="flex-1">
+                            <h4 className="text-sm font-semibold text-gray-900">{run.title || 'Untitled Run'}</h4>
+                            <p className="text-xs text-gray-600 mt-1">
+                              {formattedDate} at {formattedTime}
+                            </p>
+                            {run.meetUpPoint && (
+                              <p className="text-xs text-gray-500 mt-1">📍 {run.meetUpPoint}</p>
+                            )}
+                            {run.totalMiles && (
+                              <p className="text-xs text-gray-500 mt-1">🏃 {run.totalMiles} miles</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="border border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <p className="text-xs text-gray-500">No upcoming runs yet.</p>
+                    <p className="text-xs text-gray-400 mt-1">Ping your captain to schedule the next meetup.</p>
+                  </div>
+                )}
+              </div>
             </section>
 
             {/* Announcements Section (Read-Only) */}
@@ -329,7 +475,10 @@ export default function RunCrewMemberPage() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-xs text-gray-500">No announcements yet. Be the first to post one.</p>
+                  <div className="border border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <p className="text-xs text-gray-500">No announcements yet.</p>
+                    <p className="text-xs text-gray-400 mt-1">Be the first to post one.</p>
+                  </div>
                 )}
               </div>
             </section>
