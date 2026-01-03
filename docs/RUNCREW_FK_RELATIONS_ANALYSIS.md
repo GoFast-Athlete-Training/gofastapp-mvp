@@ -304,6 +304,27 @@ meta: {
 
 ---
 
+## Reference Implementation (gofastfrontend-mvp1) Usage
+
+### RunCrewCentralAdmin.jsx
+- Uses: `crew.runs`, `crew.memberships`, `crew.announcements`, `crew.joinCode`
+- Also loads: `leaderboard` (separate API call - not FK relation)
+- Pattern: Single `/runcrew/${runCrewId}` call + separate `/runcrew/${runCrewId}/announcements` + `/runcrew/${runCrewId}/leaderboard`
+
+### RunCrewCentral.jsx (Member View)
+- Uses: `crew.runs`, `crew.announcements`, `crew.messages`, `crew.memberships`, `crew.joinCode`
+- Also uses: `crew.leaderboardDynamic` (computed, not FK relation)
+- Pattern: Single hydrate call returns all data
+
+### Key Observations
+1. ✅ `runs`, `announcements`, `messages`, `memberships` are all used in UI
+2. ✅ `joinCode` is used (but it's a scalar field on RunCrew, not a box)
+3. ❌ `events` - Not used in reference implementation
+4. ❌ `joinCodes` (plural) - Not used (only `joinCode` scalar is used)
+5. ❌ `leaderboard` - Not an FK relation, computed separately
+
+---
+
 ## Notes
 
 - All boxes are derived directly from Prisma FK relation names
@@ -311,4 +332,7 @@ meta: {
 - `managers` is explicitly excluded as deprecated
 - No invented abstractions or renamed relations
 - Each box maps cleanly to one FK relation (or FK + immediate children)
+- Reference implementation uses: `runs`, `announcements`, `messages`, `memberships`
+- Reference implementation does NOT use: `events`, `joinCodes` (plural)
+- `joinCode` (singular, scalar) belongs in `meta`, not a box
 
