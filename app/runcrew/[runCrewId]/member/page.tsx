@@ -449,7 +449,7 @@ export default function RunCrewMemberPage() {
               <div className="space-y-3">
                 {crew.announcementsBox?.announcements && crew.announcementsBox.announcements.length > 0 ? (
                   crew.announcementsBox.announcements.map((announcement: any) => (
-                    <div key={announcement.id} className="border border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
+                    <div key={announcement.id} className="border border-orange-200 rounded-lg px-3 py-2 bg-white shadow-sm">
                       <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
                         <span>
                           {announcement.author?.firstName
@@ -474,8 +474,8 @@ export default function RunCrewMemberPage() {
                     </div>
                   ))
                 ) : (
-                  <div className="border border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <p className="text-xs text-gray-500">No announcements yet.</p>
+                  <div className="border border-dashed border-orange-300 rounded-lg p-6 text-center bg-white/50">
+                    <p className="text-xs text-gray-600 font-medium">No announcements yet.</p>
                   </div>
                 )}
               </div>
