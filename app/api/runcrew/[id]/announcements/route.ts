@@ -53,15 +53,15 @@ export async function GET(
       return NextResponse.json({ error: 'Crew not found' }, { status: 404 });
     }
 
-    // Verify user is a member of the crew
-    const isMember = crew.memberships?.some(
+    // Verify user is a member of the crew (using box structure)
+    const isMember = crew.membershipsBox?.memberships?.some(
       (membership: any) => membership.athleteId === athlete.id
     );
     if (!isMember) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    return NextResponse.json({ success: true, announcements: crew.announcements });
+    return NextResponse.json({ success: true, announcements: crew.announcementsBox.announcements });
   } catch (err) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
@@ -120,7 +120,11 @@ export async function POST(
       return NextResponse.json({ error: 'Crew not found' }, { status: 404 });
     }
 
-    if (crew.userRole !== 'admin' && crew.userRole !== 'manager') {
+    // Check role from membership (using box structure)
+    const membership = crew.membershipsBox?.memberships?.find(
+      (m: any) => m.athleteId === athlete.id
+    );
+    if (!membership || (membership.role !== 'admin' && membership.role !== 'manager')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 

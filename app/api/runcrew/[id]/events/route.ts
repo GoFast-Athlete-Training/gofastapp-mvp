@@ -54,9 +54,9 @@ export async function GET(
       return NextResponse.json({ error: 'Crew not found' }, { status: 404 });
     }
 
-    // Verify user is a member of the crew
-    const isMember = crew.memberships?.some(
-      (membership: any) => membership.athleteId === athlete.id
+    // Verify user is a member of the crew (using box structure)
+    const isMember = crew.membershipsBox?.memberships?.some(
+      (m: any) => m.athleteId === athlete.id
     );
     if (!isMember) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -152,8 +152,11 @@ export async function POST(
       return NextResponse.json({ error: 'Crew not found' }, { status: 404 });
     }
 
-    // Only admin/manager can create events
-    if (crew.userRole !== 'admin' && crew.userRole !== 'manager') {
+    // Check role from membership (using box structure)
+    const membership = crew.membershipsBox?.memberships?.find(
+      (m: any) => m.athleteId === athlete.id
+    );
+    if (!membership || (membership.role !== 'admin' && membership.role !== 'manager')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 

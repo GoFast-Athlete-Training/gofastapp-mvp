@@ -62,8 +62,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Crew not found' }, { status: 404 });
     }
 
-    // Verify user is a member of the crew
-    const isMember = crew.memberships?.some(
+    // Verify user is a member of the crew (using box structure)
+    const isMember = crew.membershipsBox?.memberships?.some(
       (membership: any) => membership.athleteId === athlete.id
     );
     if (!isMember) {
