@@ -211,22 +211,62 @@ export default function RunCrewMemberPage() {
   const handleCopyLink = async () => {
     if (!inviteUrl) return;
     try {
-      await navigator.clipboard.writeText(inviteUrl);
+      // Try modern clipboard API first
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(inviteUrl);
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = inviteUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
     } catch (err) {
       console.error('Failed to copy link:', err);
+      // Fallback: select the input text
+      const input = document.querySelector('input[value*="runcrew/join"]') as HTMLInputElement;
+      if (input) {
+        input.select();
+        input.setSelectionRange(0, 99999);
+      }
     }
   };
 
   const handleCopyCode = async () => {
     if (!joinCode) return;
     try {
-      await navigator.clipboard.writeText(joinCode);
+      // Try modern clipboard API first
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(joinCode);
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = joinCode;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
       setCopiedCode(true);
       setTimeout(() => setCopiedCode(false), 2000);
     } catch (err) {
       console.error('Failed to copy code:', err);
+      // Fallback: select the input text
+      const input = document.querySelector(`input[value="${joinCode}"]`) as HTMLInputElement;
+      if (input) {
+        input.select();
+        input.setSelectionRange(0, 99999);
+      }
     }
   };
 
@@ -235,11 +275,24 @@ export default function RunCrewMemberPage() {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">{crew.name}</h1>
-              {crew.description && (
-                <p className="text-gray-600 mt-2">{crew.description}</p>
-              )}
+            <div className="flex items-center gap-4">
+              {crew.meta?.logo ? (
+                <img
+                  src={crew.meta.logo}
+                  alt={crew.name}
+                  className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200"
+                />
+              ) : crew.meta?.icon ? (
+                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-3xl border-2 border-gray-200">
+                  {crew.meta.icon}
+                </div>
+              ) : null}
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">{crew.name}</h1>
+                {crew.description && (
+                  <p className="text-gray-600 mt-2">{crew.description}</p>
+                )}
+              </div>
             </div>
             <div className="flex gap-4">
               {isAdmin && (
@@ -384,70 +437,11 @@ export default function RunCrewMemberPage() {
 
           {/* MAIN CONTENT: Messages and Announcements */}
           <div className="lg:col-span-8 space-y-6">
-            {/* Messages Section */}
-            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">RunCrew Chatter</h2>
-                <p className="text-xs text-gray-500">Chat with your crew</p>
-              </div>
-              <MessageFeed 
-                crewId={runCrewId}
-                topics={crew.meta?.messageTopics || ['general', 'runs', 'social']}
-                selectedTopic="general"
-              />
-            </section>
-
-            {/* Upcoming Runs Section */}
-            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Upcoming Runs</h2>
-                <p className="text-xs text-gray-500">Scheduled runs with your crew</p>
-              </div>
-
-              <div className="space-y-3">
-                {crew.runsBox?.runs && crew.runsBox.runs.length > 0 ? (
-                  crew.runsBox.runs.slice(0, 5).map((run: any) => {
-                    const runDate = run.date ? new Date(run.date) : null;
-                    const formattedDate = runDate ? runDate.toLocaleDateString('en-US', {
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric',
-                    }) : 'Date TBD';
-                    const formattedTime = run.startTime || 'Time TBD';
-                    
-                    return (
-                      <div key={run.id} className="border border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
-                        <div className="flex items-start justify-between mb-1">
-                          <div className="flex-1">
-                            <h4 className="text-sm font-semibold text-gray-900">{run.title || 'Untitled Run'}</h4>
-                            <p className="text-xs text-gray-600 mt-1">
-                              {formattedDate} at {formattedTime}
-                            </p>
-                            {run.meetUpPoint && (
-                              <p className="text-xs text-gray-500 mt-1">📍 {run.meetUpPoint}</p>
-                            )}
-                            {run.totalMiles && (
-                              <p className="text-xs text-gray-500 mt-1">🏃 {run.totalMiles} miles</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="border border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <p className="text-xs text-gray-500">No upcoming runs yet.</p>
-                    <p className="text-xs text-gray-400 mt-1">Ping your captain to schedule the next meetup.</p>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* Announcements Section (Read-Only) */}
-            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 space-y-4">
+            {/* Announcements Section (Moved to Top, Styled) */}
+            <section className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border-2 border-orange-200 shadow-md p-5 space-y-4">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">{crew.name} Announcements</h2>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-600 font-medium">
                   Official updates from your crew
                 </p>
               </div>
