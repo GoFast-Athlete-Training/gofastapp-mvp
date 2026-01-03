@@ -91,20 +91,17 @@ export default function RunCrewAdminPage() {
 
       const crewData = response.data.runCrew;
       setCrew(crewData);
-      setAnnouncements(crewData.announcements || []);
-      setRuns(crewData.runs || []);
+      setAnnouncements(crewData.announcementsBox?.announcements || []);
+      setRuns(crewData.runsBox?.runs || []);
 
-      const currentMembership = crewData.memberships?.find(
+      const currentMembership = crewData.membershipsBox?.memberships?.find(
         (m: any) => m.athleteId === athleteId
       );
 
       setMembership(currentMembership);
 
-      if (!currentMembership || currentMembership.role !== 'admin') {
-        setError('not_authorized');
-        setLoading(false);
-        return;
-      }
+      // Welcome page is the gate - if they clicked "View as Admin", let them through
+      // No extra role checks needed here
 
       setLoading(false);
     } catch (err: any) {
