@@ -120,7 +120,7 @@ export async function hydrateCrew(runCrewId: string) {
           content: true,
           topic: true,
           createdAt: true,
-          // Explicitly exclude updatedAt to avoid column not found error until migration runs
+          updatedAt: true, // Track when message was edited
           athlete: {
             select: {
               id: true,
