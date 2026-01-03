@@ -94,7 +94,7 @@ export async function hydrateCrew(runCrewId: string, athleteId?: string) {
         orderBy: {
           createdAt: 'desc',
         },
-        take: 50, // Last 50 messages
+        take: 50,
       },
       announcements: {
         include: {
@@ -110,7 +110,7 @@ export async function hydrateCrew(runCrewId: string, athleteId?: string) {
         orderBy: {
           createdAt: 'desc',
         },
-        take: 10, // Last 10 announcements
+        take: 10,
       },
       runs: {
         include: {
@@ -138,6 +138,7 @@ export async function hydrateCrew(runCrewId: string, athleteId?: string) {
           date: 'asc',
         },
       },
+      joinCodes: true,
     },
   });
 
@@ -145,18 +146,31 @@ export async function hydrateCrew(runCrewId: string, athleteId?: string) {
     return null;
   }
 
-  // Determine user's role from membership
-  let userRole = 'member';
-  if (athleteId) {
-    const membership = crew.memberships.find(
-      (m) => m.athleteId === athleteId
-    );
-    userRole = membership?.role || 'member';
-  }
-
+  // Map Prisma result to box-grouped response
   return {
-    ...crew,
-    userRole,
+    meta: {
+      runCrewId: crew.id,
+      name: crew.name,
+      description: crew.description,
+      joinCode: crew.joinCode,
+      logo: crew.logo,
+      icon: crew.icon,
+    },
+    membershipsBox: {
+      memberships: crew.memberships,
+    },
+    messagesBox: {
+      messages: crew.messages,
+    },
+    announcementsBox: {
+      announcements: crew.announcements,
+    },
+    runsBox: {
+      runs: crew.runs,
+    },
+    joinCodesBox: {
+      joinCodes: crew.joinCodes,
+    },
   };
 }
 
