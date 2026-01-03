@@ -26,8 +26,9 @@ model RunCrew {
   announcements RunCrewAnnouncement[]
   runs          RunCrewRun[]
   events        RunCrewEvent[]
-  managers      RunCrewManager[]      // DEPRECATED
   joinCodes     JoinCode[]
+  
+  // NOTE: managers relation removed - deprecated table
 }
 ```
 
@@ -187,30 +188,7 @@ model RunCrewEvent {
 
 ---
 
-### 6. `managers` → RunCrewManager[] (DEPRECATED)
-
-**FK Field:** `runCrewId` in `RunCrewManager`
-
-```prisma
-// DEPRECATED — do not write new data
-// Role information is now stored in RunCrewMembership.role
-model RunCrewManager {
-  id        String @id @default(cuid())
-  runCrewId String // FK to RunCrew
-  athleteId String // FK to Athlete
-  role      String
-  createdAt DateTime @default(now())
-
-  runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  athlete Athlete @relation("RunCrewManager", fields: [athleteId], references: [id], onDelete: Cascade)
-}
-```
-
-**Status:** ❌ DEPRECATED - Should NOT be included in hydrate boxes
-
----
-
-### 7. `joinCodes` → JoinCode[]
+### 6. `joinCodes` → JoinCode[]
 
 **FK Field:** `runCrewId` in `JoinCode`
 
@@ -230,6 +208,8 @@ model JoinCode {
 
 **Box Name:** `joinCodesBox`
 
+**Note:** This is separate from the `joinCode` scalar field on RunCrew. The `joinCode` (singular, scalar) is used for sharing/joining. The `joinCodes` (plural, relation) may be for link management (to be reviewed separately).
+
 ---
 
 ## Summary: Valid Hydrate Boxes
@@ -242,7 +222,9 @@ Based on FK relations, the valid boxes are:
 4. ✅ **runsBox** → `RunCrewRun[]` (includes `createdBy` + `rsvps` with `athlete`)
 5. ✅ **eventsBox** → `RunCrewEvent[]` (includes `organizer` + `rsvps` with `athlete`)
 6. ✅ **joinCodesBox** → `JoinCode[]` (scalar fields only)
-7. ❌ **managersBox** → DEPRECATED, do not include
+
+**Excluded:**
+- ❌ `managers` - Table removed/deprecated, role info now in `memberships.role`
 
 ---
 
@@ -253,7 +235,7 @@ meta: {
   runCrewId: string,
   name: string,
   description?: string,
-  joinCode: string,
+  joinCode: string,        // Scalar field for sharing/joining (separate from joinCodes relation)
   logo?: string,
   icon?: string,
   createdAt: DateTime,
@@ -262,6 +244,8 @@ meta: {
   archivedAt?: DateTime
 }
 ```
+
+**Note:** `joinCode` (singular, scalar) is on the RunCrew model itself and used for sharing/joining. This is different from `joinCodes` (plural, relation) which may be for link/param management (to be reviewed separately).
 
 ---
 
@@ -329,10 +313,11 @@ meta: {
 
 - All boxes are derived directly from Prisma FK relation names
 - Child relations (like `rsvps` on runs/events) are included within the parent box
-- `managers` is explicitly excluded as deprecated
+- `managers` relation removed - table deprecated, role info now in `memberships.role`
 - No invented abstractions or renamed relations
 - Each box maps cleanly to one FK relation (or FK + immediate children)
 - Reference implementation uses: `runs`, `announcements`, `messages`, `memberships`
 - Reference implementation does NOT use: `events`, `joinCodes` (plural)
-- `joinCode` (singular, scalar) belongs in `meta`, not a box
+- `joinCode` (singular, scalar field on RunCrew) belongs in `meta`, not a box
+- `joinCodes` (plural, relation) is separate - may be for link/param management (to review separately)
 
