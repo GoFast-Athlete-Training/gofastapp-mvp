@@ -481,8 +481,90 @@ export default function RunCrewMemberPage() {
               </div>
             </section>
 
+            {/* Upcoming Runs Section - View Only */}
+            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-5 space-y-4 min-w-0">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Upcoming Runs</h2>
+                <p className="text-xs text-gray-500">See what's coming up</p>
+              </div>
+
+              <div className="space-y-3">
+                {crew.runsBox?.runs && crew.runsBox.runs.length > 0 ? (
+                  crew.runsBox.runs.map((run: any) => {
+                    const formatRunDate = (run: any) => {
+                      const date = run.date || run.scheduledAt;
+                      if (!date) return 'Date TBD';
+                      try {
+                        return new Date(date).toLocaleString('en-US', {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit'
+                        });
+                      } catch {
+                        return date;
+                      }
+                    };
+
+                    return (
+                      <Link
+                        key={run.id}
+                        href={`/runcrew/${runCrewId}/runs/${run.id}`}
+                        className="block border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-semibold text-gray-900 mb-1">{run.title || 'Untitled Run'}</h3>
+                            <div className="text-xs text-gray-600 space-y-1">
+                              <p className="flex items-center gap-1">
+                                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <span className="truncate">{formatRunDate(run)}</span>
+                              </p>
+                              {run.meetUpPoint && (
+                                <p className="flex items-center gap-1">
+                                  <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  </svg>
+                                  <span className="truncate">{run.meetUpPoint}</span>
+                                </p>
+                              )}
+                              {(run.totalMiles || run.pace) && (
+                                <p className="flex items-center gap-1">
+                                  <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                  </svg>
+                                  <span className="truncate">
+                                    {run.totalMiles ? `${run.totalMiles} miles` : ''}
+                                    {run.totalMiles && run.pace ? ' • ' : ''}
+                                    {run.pace ? `${run.pace} pace` : ''}
+                                  </span>
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="ml-4 flex-shrink-0">
+                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })
+                ) : (
+                  <div className="border border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <p className="text-sm text-gray-500">No runs scheduled yet.</p>
+                  </div>
+                )}
+              </div>
+            </section>
+
             {/* Messages Section */}
-            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-5 overflow-hidden">
+            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-5 overflow-hidden min-w-0">
               <div className="mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">RunCrew Chatter</h2>
                 <p className="text-xs text-gray-500">Chat with your crew</p>

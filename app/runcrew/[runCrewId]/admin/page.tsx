@@ -609,7 +609,7 @@ export default function RunCrewAdminPage() {
             </section>
 
             {/* Runs Section */}
-            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 space-y-4">
+            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 space-y-4 min-w-0">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">Upcoming Runs</h2>
