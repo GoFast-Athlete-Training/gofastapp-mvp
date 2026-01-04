@@ -393,7 +393,7 @@ export default function RunCrewSettingsPage() {
       </header>
 
       <main className="w-full min-w-0">
-        <div className="w-full px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-6">
           {/* General Settings */}
           <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 w-full min-w-0">
             <div className="flex items-center gap-2 mb-6">
