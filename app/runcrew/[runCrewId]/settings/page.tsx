@@ -9,7 +9,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
-import { Settings, Users, Trash2, Save, X, Pencil, ArrowLeft } from 'lucide-react';
+import { Settings, Users, Trash2, Save, ArrowLeft } from 'lucide-react';
 
 /**
  * RunCrew Settings Page - CLIENT-SIDE
@@ -41,12 +41,6 @@ export default function RunCrewSettingsPage() {
   const [crewIcon, setCrewIcon] = useState('');
   const [crewLogo, setCrewLogo] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  
-  // Edit mode state for inline editing
-  const [editingField, setEditingField] = useState<string | null>(null);
-  const [tempName, setTempName] = useState('');
-  const [tempDescription, setTempDescription] = useState('');
-  const [tempIcon, setTempIcon] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -108,9 +102,6 @@ export default function RunCrewSettingsPage() {
         setCrewDescription(crewData.runCrewBaseInfo?.description || '');
         setCrewIcon(crewData.runCrewBaseInfo?.icon || '');
         setCrewLogo(crewData.runCrewBaseInfo?.logo || '');
-        setTempName(crewData.runCrewBaseInfo?.name || '');
-        setTempDescription(crewData.runCrewBaseInfo?.description || '');
-        setTempIcon(crewData.runCrewBaseInfo?.icon || '');
 
         // Find membership to check admin status
         const currentMembership = crewData.membershipsBox?.memberships?.find(
@@ -161,10 +152,6 @@ export default function RunCrewSettingsPage() {
           setCrewDescription(refreshedCrew.runCrewBaseInfo?.description || '');
           setCrewIcon(refreshedCrew.runCrewBaseInfo?.icon || '');
           setCrewLogo(refreshedCrew.runCrewBaseInfo?.logo || '');
-          // Update temp values too
-          setTempName(refreshedCrew.runCrewBaseInfo?.name || '');
-          setTempDescription(refreshedCrew.runCrewBaseInfo?.description || '');
-          setTempIcon(refreshedCrew.runCrewBaseInfo?.icon || '');
         }
       }
     } catch (err: any) {
@@ -386,172 +373,60 @@ export default function RunCrewSettingsPage() {
                 </div>
               </div>
 
-              {/* Crew Name - Inline Edit */}
+              {/* Crew Name */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Crew Name
-                  </label>
-                  {editingField !== 'name' ? (
-                    <button
-                      onClick={() => {
-                        setEditingField('name');
-                        setTempName(crewName);
-                      }}
-                      className="p-1 text-gray-400 hover:text-gray-600 transition"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={async () => {
-                          setCrewName(tempName);
-                          setEditingField(null);
-                          await handleSave();
-                        }}
-                        className="p-1 text-green-600 hover:text-green-700 transition"
-                      >
-                        <Save className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setTempName(crewName);
-                          setEditingField(null);
-                        }}
-                        className="p-1 text-gray-400 hover:text-gray-600 transition"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {editingField === 'name' ? (
-                  <input
-                    type="text"
-                    value={tempName}
-                    onChange={(e) => setTempName(e.target.value)}
-                    className="w-full min-w-0 px-4 py-2 border-2 border-orange-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    autoFocus
-                  />
-                ) : (
-                  <div className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 min-h-[42px] flex items-center">
-                    {crewName || <span className="text-gray-400">No name set</span>}
-                  </div>
-                )}
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Crew Name
+                </label>
+                <input
+                  type="text"
+                  value={crewName}
+                  onChange={(e) => setCrewName(e.target.value)}
+                  className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  placeholder="Enter crew name"
+                />
               </div>
 
-              {/* Description - Inline Edit */}
+              {/* Description */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Description
-                  </label>
-                  {editingField !== 'description' ? (
-                    <button
-                      onClick={() => {
-                        setEditingField('description');
-                        setTempDescription(crewDescription);
-                      }}
-                      className="p-1 text-gray-400 hover:text-gray-600 transition"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={async () => {
-                          setCrewDescription(tempDescription);
-                          setEditingField(null);
-                          await handleSave();
-                        }}
-                        className="p-1 text-green-600 hover:text-green-700 transition"
-                      >
-                        <Save className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setTempDescription(crewDescription);
-                          setEditingField(null);
-                        }}
-                        className="p-1 text-gray-400 hover:text-gray-600 transition"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {editingField === 'description' ? (
-                  <textarea
-                    value={tempDescription}
-                    onChange={(e) => setTempDescription(e.target.value)}
-                    rows={4}
-                    className="w-full min-w-0 px-4 py-2 border-2 border-orange-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-y"
-                    autoFocus
-                  />
-                ) : (
-                  <div className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 min-h-[100px] flex items-start">
-                    {crewDescription || <span className="text-gray-400">No description set</span>}
-                  </div>
-                )}
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={crewDescription}
+                  onChange={(e) => setCrewDescription(e.target.value)}
+                  rows={4}
+                  className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-y"
+                  placeholder="Enter crew description (optional)"
+                />
               </div>
 
-              {/* Icon - Inline Edit */}
+              {/* Icon */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Icon (Emoji) - Fallback if no logo
-                  </label>
-                  {editingField !== 'icon' ? (
-                    <button
-                      onClick={() => {
-                        setEditingField('icon');
-                        setTempIcon(crewIcon);
-                      }}
-                      className="p-1 text-gray-400 hover:text-gray-600 transition"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={async () => {
-                          setCrewIcon(tempIcon);
-                          setEditingField(null);
-                          await handleSave();
-                        }}
-                        className="p-1 text-green-600 hover:text-green-700 transition"
-                      >
-                        <Save className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setTempIcon(crewIcon);
-                          setEditingField(null);
-                        }}
-                        className="p-1 text-gray-400 hover:text-gray-600 transition"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {editingField === 'icon' ? (
-                  <input
-                    type="text"
-                    value={tempIcon}
-                    onChange={(e) => setTempIcon(e.target.value)}
-                    placeholder="🏃"
-                    maxLength={2}
-                    className="w-full min-w-0 px-4 py-2 border-2 border-orange-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-2xl"
-                    autoFocus
-                  />
-                ) : (
-                  <div className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 min-h-[42px] flex items-center text-2xl">
-                    {crewIcon || <span className="text-gray-400 text-sm">No icon set</span>}
-                  </div>
-                )}
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Icon (Emoji) - Fallback if no logo
+                </label>
+                <input
+                  type="text"
+                  value={crewIcon}
+                  onChange={(e) => setCrewIcon(e.target.value)}
+                  placeholder="🏃"
+                  maxLength={2}
+                  className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-2xl"
+                />
                 <p className="text-xs text-gray-500 mt-1">Single emoji character (shown if no logo is uploaded)</p>
+              </div>
+
+              {/* Save Button */}
+              <div className="flex justify-end pt-4 border-t border-gray-200">
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving || !crewName.trim()}
+                  className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+                >
+                  <Save className="w-5 h-5" />
+                  {isSaving ? 'Saving...' : 'Save Changes'}
+                </button>
               </div>
             </div>
           </section>
