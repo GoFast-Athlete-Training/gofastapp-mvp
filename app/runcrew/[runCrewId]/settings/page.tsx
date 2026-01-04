@@ -200,7 +200,7 @@ export default function RunCrewSettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="fixed inset-0 bg-gray-50 flex items-center justify-center z-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading settings...</p>
@@ -262,8 +262,8 @@ export default function RunCrewSettingsPage() {
         </div>
       )}
 
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+      <header className="bg-white shadow-sm border-b w-full">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 w-full">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-4">
               {crew.runCrewBaseInfo?.logo ? (
@@ -294,8 +294,8 @@ export default function RunCrewSettingsPage() {
         </div>
       </header>
 
-      <main className="px-4 sm:px-6 lg:px-8 py-8 w-full min-w-0">
-        <div className="space-y-6 max-w-4xl">
+      <main className="w-full min-w-0">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
           {/* General Settings */}
           <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 w-full min-w-0">
             <div className="flex items-center gap-2 mb-6">
