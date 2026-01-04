@@ -74,6 +74,7 @@ export default function RunCrewSettingsPage() {
 
       hasFetchedRef.current = true;
 
+      // NEW CANON: athleteId from localStorage only
       const athleteId = LocalStorageAPI.getAthleteId();
       if (!athleteId) {
         router.push('/signup');
@@ -84,6 +85,7 @@ export default function RunCrewSettingsPage() {
         setLoading(true);
         setError(null);
 
+        // NEW CANON: runCrewId from params, fetch crew scoped to that ID
         const response = await api.get(`/runcrew/${runCrewId}`);
         
         if (!response.data.success || !response.data.runCrew) {
@@ -91,11 +93,15 @@ export default function RunCrewSettingsPage() {
         }
 
         const crewData = response.data.runCrew;
+        
+        // NEW CANON: Settings only scopes to basic info (meta level)
+        // meta contains: name, description, icon, logo, joinCode, messageTopics
         setCrew(crewData);
-        setCrewName(crewData.meta?.name || crewData.name || '');
-        setCrewDescription(crewData.meta?.description || crewData.description || '');
+        setCrewName(crewData.meta?.name || '');
+        setCrewDescription(crewData.meta?.description || '');
         setCrewIcon(crewData.meta?.icon || '');
 
+        // Find membership to check admin status
         const currentMembership = crewData.membershipsBox?.memberships?.find(
           (m: any) => m.athleteId === athleteId
         );
@@ -133,13 +139,14 @@ export default function RunCrewSettingsPage() {
 
       if (response.data.success) {
         showToast('Settings saved successfully');
-        // Reload crew data
+        // Reload crew data (NEW CANON: scoped to runCrewId param)
         const refreshResponse = await api.get(`/runcrew/${runCrewId}`);
         if (refreshResponse.data.success) {
           const refreshedCrew = refreshResponse.data.runCrew;
           setCrew(refreshedCrew);
-          setCrewName(refreshedCrew.meta?.name || refreshedCrew.name || '');
-          setCrewDescription(refreshedCrew.meta?.description || refreshedCrew.description || '');
+          // NEW CANON: Settings only handles meta level (basic info)
+          setCrewName(refreshedCrew.meta?.name || '');
+          setCrewDescription(refreshedCrew.meta?.description || '');
           setCrewIcon(refreshedCrew.meta?.icon || '');
         }
       }
@@ -268,7 +275,7 @@ export default function RunCrewSettingsPage() {
               ) : null}
               <div>
                 <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">RunCrew Settings</h1>
-                <p className="text-sm sm:text-base text-gray-600 mt-1">{crew.meta?.name || crew.name}</p>
+                <p className="text-sm sm:text-base text-gray-600 mt-1">{crew.meta?.name}</p>
               </div>
             </div>
             <div className="flex gap-2 sm:gap-4 flex-shrink-0">
