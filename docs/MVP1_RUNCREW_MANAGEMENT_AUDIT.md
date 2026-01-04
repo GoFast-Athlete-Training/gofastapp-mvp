@@ -5,6 +5,20 @@
 
 ---
 
+## ⚠️ Current Status: Run Detail Page Missing
+
+**Issue**: `RunCard` component navigates to `/runcrew/${crewId}/runs/${run.id}` but this route **does not exist**.
+
+**Impact**: Clicking on a run card will result in a 404 error.
+
+**Files Affected:**
+- `components/RunCrew/RunCard.tsx` (line 26) - tries to navigate to missing route
+- Missing: `app/runcrew/[runCrewId]/runs/[runId]/page.tsx`
+
+**Priority**: 🔴 **High** - Broken navigation, users can't view run details
+
+---
+
 ## Features to Implement
 
 ### 1. Add Member as Manager
