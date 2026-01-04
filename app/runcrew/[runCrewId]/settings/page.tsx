@@ -39,6 +39,7 @@ export default function RunCrewSettingsPage() {
   const [crewName, setCrewName] = useState('');
   const [crewDescription, setCrewDescription] = useState('');
   const [crewIcon, setCrewIcon] = useState('');
+  const [crewLogo, setCrewLogo] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -100,6 +101,7 @@ export default function RunCrewSettingsPage() {
         setCrewName(crewData.runCrewBaseInfo?.name || '');
         setCrewDescription(crewData.runCrewBaseInfo?.description || '');
         setCrewIcon(crewData.runCrewBaseInfo?.icon || '');
+        setCrewLogo(crewData.runCrewBaseInfo?.logo || '');
 
         // Find membership to check admin status
         const currentMembership = crewData.membershipsBox?.memberships?.find(
@@ -135,6 +137,7 @@ export default function RunCrewSettingsPage() {
         name: crewName.trim(),
         description: crewDescription.trim() || null,
         icon: crewIcon.trim() || null,
+        logo: crewLogo.trim() || null,
       });
 
       if (response.data.success) {
@@ -148,6 +151,7 @@ export default function RunCrewSettingsPage() {
           setCrewName(refreshedCrew.runCrewBaseInfo?.name || '');
           setCrewDescription(refreshedCrew.runCrewBaseInfo?.description || '');
           setCrewIcon(refreshedCrew.runCrewBaseInfo?.icon || '');
+          setCrewLogo(refreshedCrew.runCrewBaseInfo?.logo || '');
         }
       }
     } catch (err: any) {
@@ -251,7 +255,7 @@ export default function RunCrewSettingsPage() {
   const memberships = crew.membershipsBox?.memberships || [];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       {toast && (
         <div className="fixed top-6 right-6 bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg z-50">
           {toast}
@@ -290,16 +294,51 @@ export default function RunCrewSettingsPage() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 w-full min-w-0">
         <div className="space-y-6">
           {/* General Settings */}
-          <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+          <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 w-full min-w-0">
             <div className="flex items-center gap-2 mb-6">
-              <Settings className="w-5 h-5 text-gray-600" />
+              <Settings className="w-5 h-5 text-gray-600 flex-shrink-0" />
               <h2 className="text-xl font-bold text-gray-900">General Settings</h2>
             </div>
 
             <div className="space-y-4">
+              {/* Logo Display/Upload */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Logo
+                </label>
+                <div className="flex items-center gap-4 mb-2">
+                  {crewLogo ? (
+                    <img
+                      src={crewLogo}
+                      alt="Crew logo"
+                      className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200 flex-shrink-0"
+                    />
+                  ) : crewIcon ? (
+                    <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-3xl border-2 border-gray-200 flex-shrink-0">
+                      {crewIcon}
+                    </div>
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl bg-gray-200 border-2 border-gray-300 flex items-center justify-center text-gray-400 flex-shrink-0">
+                      No logo
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <input
+                      type="url"
+                      value={crewLogo}
+                      onChange={(e) => setCrewLogo(e.target.value)}
+                      disabled={!isAdmin}
+                      placeholder="https://example.com/logo.png"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Enter logo image URL</p>
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Crew Name
@@ -309,7 +348,7 @@ export default function RunCrewSettingsPage() {
                   value={crewName}
                   onChange={(e) => setCrewName(e.target.value)}
                   disabled={!isAdmin}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -322,7 +361,7 @@ export default function RunCrewSettingsPage() {
                   onChange={(e) => setCrewDescription(e.target.value)}
                   disabled={!isAdmin}
                   rows={4}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed resize-y"
                 />
               </div>
 
@@ -337,34 +376,36 @@ export default function RunCrewSettingsPage() {
                   disabled={!isAdmin}
                   placeholder="🏃"
                   maxLength={2}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-2xl"
+                  className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-2xl"
                 />
-                <p className="text-xs text-gray-500 mt-1">Single emoji character</p>
+                <p className="text-xs text-gray-500 mt-1">Single emoji character (shown if no logo)</p>
               </div>
 
               {isAdmin && (
                 <div className="flex justify-end pt-4 border-t border-gray-200">
                   <button
                     onClick={handleSave}
-                    disabled={isSaving}
-                    className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isSaving || (!crewName.trim())}
+                    className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
                   >
-                    <Save className="w-4 h-4" />
+                    <Save className="w-5 h-5" />
                     {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               )}
 
               {!isAdmin && (
-                <p className="text-sm text-gray-500 italic">Only admins can edit crew settings</p>
+                <div className="pt-4 border-t border-gray-200">
+                  <p className="text-sm text-gray-500 italic">Only admins can edit crew settings</p>
+                </div>
               )}
             </div>
           </section>
 
           {/* Members */}
-          <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+          <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 w-full min-w-0">
             <div className="flex items-center gap-2 mb-6">
-              <Users className="w-5 h-5 text-gray-600" />
+              <Users className="w-5 h-5 text-gray-600 flex-shrink-0" />
               <h2 className="text-xl font-bold text-gray-900">Members ({memberships.length})</h2>
             </div>
 
@@ -372,15 +413,15 @@ export default function RunCrewSettingsPage() {
               {memberships.map((membershipItem: any) => {
                 const athlete = membershipItem.athlete || {};
                 return (
-                  <div key={membershipItem.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                  <div key={membershipItem.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 min-w-0">
                     {athlete.photoURL ? (
                       <img
                         src={athlete.photoURL}
                         alt={`${athlete.firstName} ${athlete.lastName}`}
-                        className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                        className="w-10 h-10 rounded-full object-cover border border-gray-200 flex-shrink-0"
                       />
                     ) : (
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white font-semibold">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
                         {(athlete.firstName?.[0] || 'A').toUpperCase()}
                       </div>
                     )}
@@ -401,7 +442,7 @@ export default function RunCrewSettingsPage() {
                       </div>
                     </div>
                     {isAdmin && membershipItem.athleteId !== membership?.athleteId && (
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-shrink-0">
                         {membershipItem.role !== 'manager' && (
                           <button
                             onClick={async () => {
@@ -424,7 +465,7 @@ export default function RunCrewSettingsPage() {
                                 }
                               }
                             }}
-                            className="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded-lg"
+                            className="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded-lg whitespace-nowrap"
                           >
                             Promote to Manager
                           </button>
@@ -451,7 +492,7 @@ export default function RunCrewSettingsPage() {
                                 }
                               }
                             }}
-                            className="px-3 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
+                            className="px-3 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white rounded-lg whitespace-nowrap"
                           >
                             Demote to Member
                           </button>
@@ -465,7 +506,7 @@ export default function RunCrewSettingsPage() {
           </section>
 
           {/* Danger Zone */}
-          <section className="bg-white rounded-lg border-2 border-red-200 shadow-sm p-6">
+          <section className="bg-white rounded-lg border-2 border-red-200 shadow-sm p-6 w-full min-w-0">
             <h2 className="text-xl font-bold text-red-900 mb-6">Danger Zone</h2>
 
             <div className="space-y-6">
