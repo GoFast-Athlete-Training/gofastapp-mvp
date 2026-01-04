@@ -485,76 +485,72 @@ export default function RunCrewSettingsPage() {
                   
                   <div className="border border-gray-200 rounded-lg p-4">
                     <h3 className="text-sm font-semibold text-gray-900 mb-3">Select Emoji</h3>
-                    <div className="max-w-md">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={crewIcon}
-                          onChange={(e) => setCrewIcon(e.target.value)}
-                          placeholder="🏃"
-                          maxLength={2}
-                          className="w-20 text-center px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-2xl"
-                        />
-                        <button
-                          onClick={async () => {
-                            setCrewLogo('');
-                            await handleSaveIcon();
-                            setGraphicMode('view');
-                          }}
-                          disabled={savingIcon || !crewIcon.trim()}
-                          className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                        >
-                          <Save className="w-3 h-3" />
-                          {savingIcon ? 'Saving...' : 'Save'}
-                        </button>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={crewIcon}
+                        onChange={(e) => setCrewIcon(e.target.value)}
+                        placeholder="🏃"
+                        maxLength={2}
+                        className="w-20 text-center px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-2xl flex-shrink-0"
+                      />
+                      <button
+                        onClick={async () => {
+                          setCrewLogo('');
+                          await handleSaveIcon();
+                          setGraphicMode('view');
+                        }}
+                        disabled={savingIcon || !crewIcon.trim()}
+                        className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap flex-shrink-0"
+                      >
+                        <Save className="w-3 h-3" />
+                        {savingIcon ? 'Saving...' : 'Save'}
+                      </button>
                     </div>
                   </div>
 
                   <div className="border border-gray-200 rounded-lg p-4">
                     <h3 className="text-sm font-semibold text-gray-900 mb-3">Add Logo</h3>
-                    <div className="max-w-md">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          
+                          try {
+                            setSavingLogo(true);
+                            const formData = new FormData();
+                            formData.append('file', file);
                             
-                            try {
-                              setSavingLogo(true);
-                              const formData = new FormData();
-                              formData.append('file', file);
-                              
-                              const uploadResponse = await api.post('/upload', formData, {
-                                headers: { 'Content-Type': 'multipart/form-data' },
-                              });
-                              
-                              if (uploadResponse.data.success && uploadResponse.data.url) {
-                                setCrewLogo(uploadResponse.data.url);
-                                setCrewIcon('');
-                                await handleSaveLogo();
-                                setGraphicMode('view');
-                              } else {
-                                showToast('Failed to upload logo');
-                                setSavingLogo(false);
-                              }
-                            } catch (err: any) {
-                              console.error('Error uploading logo:', err);
-                              showToast(err.response?.data?.error || 'Failed to upload logo');
+                            const uploadResponse = await api.post('/upload', formData, {
+                              headers: { 'Content-Type': 'multipart/form-data' },
+                            });
+                            
+                            if (uploadResponse.data.success && uploadResponse.data.url) {
+                              setCrewLogo(uploadResponse.data.url);
+                              setCrewIcon('');
+                              await handleSaveLogo();
+                              setGraphicMode('view');
+                            } else {
+                              showToast('Failed to upload logo');
                               setSavingLogo(false);
                             }
-                            
-                            e.target.value = '';
-                          }}
-                          disabled={savingLogo}
-                          className="flex-1 min-w-0 max-w-sm px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        />
-                        {savingLogo && (
-                          <span className="text-xs text-orange-600 whitespace-nowrap flex-shrink-0">Saving...</span>
-                        )}
-                      </div>
+                          } catch (err: any) {
+                            console.error('Error uploading logo:', err);
+                            showToast(err.response?.data?.error || 'Failed to upload logo');
+                            setSavingLogo(false);
+                          }
+                          
+                          e.target.value = '';
+                        }}
+                        disabled={savingLogo}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                      {savingLogo && (
+                        <span className="text-xs text-orange-600 whitespace-nowrap flex-shrink-0">Saving...</span>
+                      )}
                     </div>
                   </div>
                 </div>
