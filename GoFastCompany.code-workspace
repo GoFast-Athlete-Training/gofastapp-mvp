@@ -11,6 +11,9 @@
 		},
 		{
 			"path": "../gofastfrontend-mvp1"
+		},
+		{
+			"path": "../GoFast-Events"
 		}
 	],
 	"settings": {}

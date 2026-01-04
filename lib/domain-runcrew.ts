@@ -308,6 +308,7 @@ export async function createRun(data: {
   meetUpAddress?: string;
   totalMiles?: number;
   pace?: string;
+  stravaMapUrl?: string;
   description?: string;
 }) {
   return prisma.runCrewRun.create({

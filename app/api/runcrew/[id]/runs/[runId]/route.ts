@@ -98,6 +98,9 @@ export async function PUT(
     if (body.pace !== undefined) {
       updateData.pace = body.pace?.trim() || null;
     }
+    if (body.stravaMapUrl !== undefined) {
+      updateData.stravaMapUrl = body.stravaMapUrl?.trim() || null;
+    }
     if (body.description !== undefined) {
       updateData.description = body.description?.trim() || null;
     }

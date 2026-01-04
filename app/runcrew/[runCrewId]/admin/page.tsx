@@ -53,6 +53,7 @@ export default function RunCrewAdminPage() {
     meetUpAddress: '',
     totalMiles: '',
     pace: '',
+    stravaMapUrl: '',
     description: '',
   });
   const [loadingRuns, setLoadingRuns] = useState(false);
@@ -260,6 +261,7 @@ export default function RunCrewAdminPage() {
           meetUpAddress: runForm.meetUpAddress.trim() || null,
           totalMiles: runForm.totalMiles ? parseFloat(runForm.totalMiles) : null,
           pace: runForm.pace || null,
+          stravaMapUrl: runForm.stravaMapUrl.trim() || null,
           description: runForm.description.trim() || null,
         });
 
@@ -272,6 +274,7 @@ export default function RunCrewAdminPage() {
             meetUpAddress: '',
             totalMiles: '',
             pace: '',
+            stravaMapUrl: '',
             description: '',
           });
           setEditingRunId(null);
@@ -289,6 +292,7 @@ export default function RunCrewAdminPage() {
           meetUpAddress: runForm.meetUpAddress.trim() || null,
           totalMiles: runForm.totalMiles ? parseFloat(runForm.totalMiles) : null,
           pace: runForm.pace || null,
+          stravaMapUrl: runForm.stravaMapUrl.trim() || null,
           description: runForm.description.trim() || null,
         });
 
@@ -301,6 +305,7 @@ export default function RunCrewAdminPage() {
             meetUpAddress: '',
             totalMiles: '',
             pace: '',
+            stravaMapUrl: '',
             description: '',
           });
           setShowRunModal(false);
@@ -352,6 +357,7 @@ export default function RunCrewAdminPage() {
       meetUpAddress: run.meetUpAddress || '',
       totalMiles: run.totalMiles ? run.totalMiles.toString() : '',
       pace: run.pace || '',
+      stravaMapUrl: run.stravaMapUrl || '',
       description: run.description || '',
     });
     setShowRunModal(true);
@@ -889,6 +895,7 @@ export default function RunCrewAdminPage() {
                     meetUpAddress: '',
                     totalMiles: '',
                     pace: '',
+                    stravaMapUrl: '',
                     description: '',
                   });
                 }} 
@@ -999,6 +1006,18 @@ export default function RunCrewAdminPage() {
                   </select>
                       </div>
                     </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Strava Route URL (Optional)</label>
+                <input
+                  type="url"
+                  value={runForm.stravaMapUrl}
+                  onChange={(e) => setRunForm({ ...runForm, stravaMapUrl: e.target.value })}
+                  placeholder="https://www.strava.com/routes/..."
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                />
+                <p className="text-xs text-gray-500">Paste the Strava route URL to link to the route map</p>
+              </div>
 
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Description</label>
