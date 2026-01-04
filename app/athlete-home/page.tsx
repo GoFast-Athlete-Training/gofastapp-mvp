@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import AthleteHeader from '@/components/athlete/AthleteHeader';
 import ProfileCallout from '@/components/athlete/ProfileCallout';
+import TopNav from '@/components/shared/TopNav';
 
 interface RunCrew {
   membershipId: string;
@@ -80,7 +81,7 @@ export default function AthleteHomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AthleteHeader />
+      <TopNav />
 
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
         {profileIncomplete && <ProfileCallout athlete={athleteProfile} />}

@@ -7,6 +7,7 @@ import { LocalStorageAPI } from '@/lib/localstorage';
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import api from '@/lib/api';
+import TopNav from '@/components/shared/TopNav';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 
@@ -230,41 +231,34 @@ export default function SettingsPage() {
   /* eslint-enable @typescript-eslint/no-unused-vars */
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gray-50">
+      <TopNav />
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
-            <p className="text-gray-600">Manage your account and device connections</p>
-          </div>
-          <button
-            onClick={() => router.push('/athlete-home')}
-            className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
-          >
-            ← Back to Home
-          </button>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
+          <p className="text-gray-600">Manage your profile and account</p>
         </div>
 
         {/* Profile Section */}
-        <div className="mb-8">
+        <div className="mb-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Profile</h2>
-          <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200 hover:border-gray-300 transition">
+          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 {athlete?.photoURL ? (
                   <img
                     src={athlete.photoURL}
                     alt="Profile"
-                    className="h-10 w-10 rounded-full object-cover"
+                    className="h-16 w-16 rounded-full object-cover border-2 border-gray-200"
                   />
                 ) : (
-                  <div className="h-10 w-10 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold text-sm">
+                  <div className="h-16 w-16 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold text-xl border-2 border-gray-200">
                     {athlete?.firstName ? athlete.firstName[0].toUpperCase() : 'A'}
                   </div>
                 )}
                 <div>
-                  <h3 className="font-semibold text-gray-900">
+                  <h3 className="text-lg font-semibold text-gray-900">
                     {athlete?.firstName && athlete?.lastName
                       ? `${athlete.firstName} ${athlete.lastName}`
                       : 'Your Profile'}
@@ -274,63 +268,28 @@ export default function SettingsPage() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => router.push('/profile')}
-                className="px-4 py-1.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition"
-              >
-                View Profile
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => router.push('/profile')}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                >
+                  View Profile
+                </button>
+                <button
+                  onClick={() => router.push('/athlete-edit-profile')}
+                  className="px-4 py-2 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition"
+                >
+                  Edit Profile
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* PHASE 1: Garmin/Device Connections DEPRECATED - Commented out but code preserved */}
-        {/* Device Connections - DEPRECATED FOR MVP1 */}
-        {/* <div className="mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Device Connections</h2>
-          <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200 hover:border-gray-300 transition">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <img 
-                  src="/Garmin_Connect_app_1024x1024-02.png" 
-                  alt="Garmin Connect" 
-                  className="h-10 w-10 rounded"
-                />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Garmin Connect</h3>
-                  <p className="text-sm text-gray-500">Sync activities</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                {loading ? (
-                  <span className="text-sm text-gray-400">Checking...</span>
-                ) : connections.garmin ? (
-                  <>
-                    <span className="text-sm text-green-600 font-medium">Connected</span>
-                    <button
-                      onClick={disconnectGarmin}
-                      className="px-4 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition"
-                    >
-                      Disconnect
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={connectGarmin}
-                    className="px-4 py-1.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition"
-                  >
-                    Connect
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div> */}
-
-        {/* Info Section - Compact */}
-        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-          <p className="text-sm text-gray-600">
-            Profile settings only. Device connections are deprecated for MVP1.
+        {/* Info Section */}
+        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+          <p className="text-sm text-blue-800">
+            <strong>MVP1:</strong> Profile settings only. Activities, events, and device connections are planned for MVP2.
           </p>
         </div>
       </div>

@@ -9,6 +9,7 @@ import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import TopNav from '@/components/shared/TopNav';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -91,37 +92,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header */}
-      <div className="bg-white shadow-sm">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Image
-                src="/logo.jpg"
-                alt="GoFast"
-                width={32}
-                height={32}
-                className="w-8 h-8 rounded-full"
-              />
-              <span className="text-xl font-bold text-gray-900">Profile</span>
-            </div>
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={() => router.push('/settings')}
-                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
-              >
-                Settings
-              </button>
-              <button
-                onClick={() => router.push('/athlete-home')}
-                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
-              >
-                ← Back to Home
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <TopNav showBack backUrl="/athlete-home" backLabel="Back to Home" />
 
       <div className="max-w-4xl mx-auto px-6 py-8">
         {/* Profile Header */}
