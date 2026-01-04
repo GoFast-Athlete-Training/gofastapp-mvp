@@ -95,7 +95,7 @@ export default function RunCrewMemberPage() {
         );
         setMembership(currentMembership);
 
-        console.log(`✅ MEMBER PAGE: Crew loaded successfully: ${crewData.name}`);
+        console.log(`✅ MEMBER PAGE: Crew loaded successfully: ${crewData.meta?.name}`);
         setLoading(false);
       } catch (err: any) {
         console.error('❌ MEMBER PAGE: Error fetching crew:', err);
@@ -279,7 +279,7 @@ export default function RunCrewMemberPage() {
               {crew.meta?.logo ? (
                 <img
                   src={crew.meta.logo}
-                  alt={crew.name}
+                  alt={crew.meta?.name || 'RunCrew'}
                   className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl object-cover border-2 border-gray-200 flex-shrink-0"
                 />
               ) : crew.meta?.icon ? (
@@ -288,7 +288,7 @@ export default function RunCrewMemberPage() {
                 </div>
               ) : null}
               <div className="min-w-0 flex-1">
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">{crew.name}</h1>
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">{crew.meta?.name}</h1>
                 {crew.description && (
                   <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">{crew.description}</p>
                 )}
@@ -450,7 +450,7 @@ export default function RunCrewMemberPage() {
             {/* Announcements Section - TOP PRIORITY */}
             <section className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border-2 border-orange-200 shadow-md p-4 sm:p-5 space-y-4 overflow-hidden">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">{crew.name} Announcements</h2>
+                <h2 className="text-lg font-semibold text-gray-900">{crew.meta?.name} Announcements</h2>
                 <p className="text-xs text-gray-600 font-medium">
                   Official updates from your crew
                 </p>

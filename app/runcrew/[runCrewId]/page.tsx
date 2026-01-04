@@ -91,7 +91,7 @@ export default function RunCrewHomePage() {
         );
         setMembership(currentMembership);
 
-        console.log(`✅ RUNCREW HOME: Crew loaded successfully: ${crewData.name}`);
+        console.log(`✅ RUNCREW HOME: Crew loaded successfully: ${crewData.meta?.name}`);
         setLoading(false);
       } catch (err: any) {
         console.error('❌ RUNCREW HOME: Error fetching crew:', err);
@@ -217,7 +217,7 @@ export default function RunCrewHomePage() {
               {crew.meta?.logo ? (
                 <img
                   src={crew.meta.logo}
-                  alt={crew.name}
+                  alt={crew.meta?.name || 'RunCrew'}
                   className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200"
                 />
               ) : crew.meta?.icon ? (
@@ -230,7 +230,7 @@ export default function RunCrewHomePage() {
                 </div>
               )}
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">{crew.name}</h1>
+                <h1 className="text-3xl font-bold text-gray-900">{crew.meta?.name}</h1>
                 {crew.description && (
                   <p className="text-gray-600 mt-2">{crew.description}</p>
                 )}
@@ -253,7 +253,7 @@ export default function RunCrewHomePage() {
         <div className="bg-white rounded-2xl shadow-lg p-8 mb-8 border border-gray-200">
           <div className="text-center mb-8">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Welcome to {crew.name}!
+              Welcome to {crew.meta?.name}!
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
               {crew.description || 'Get ready to run with your crew and achieve your goals together.'}

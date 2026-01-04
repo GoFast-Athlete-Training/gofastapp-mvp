@@ -265,7 +265,7 @@ export default function RunCrewSettingsPage() {
               {crew.meta?.logo ? (
                 <img
                   src={crew.meta.logo}
-                  alt={crew.name}
+                  alt={crew.meta?.name || 'RunCrew'}
                   className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl object-cover border-2 border-gray-200 flex-shrink-0"
                 />
               ) : crew.meta?.icon ? (
@@ -447,7 +447,7 @@ export default function RunCrewSettingsPage() {
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Delete RunCrew?</h3>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete <strong>{crew.name}</strong>? This action cannot be undone and all data will be permanently deleted.
+              Are you sure you want to delete <strong>{crew.meta?.name}</strong>? This action cannot be undone and all data will be permanently deleted.
             </p>
             <div className="flex gap-4 justify-end">
               <button

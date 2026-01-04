@@ -121,7 +121,7 @@ export default function RunCrewAdminPage() {
 
       setMembership(currentMembership);
 
-      console.log(`✅ ADMIN PAGE: Crew loaded successfully: ${crewData.name}`);
+      console.log(`✅ ADMIN PAGE: Crew loaded successfully: ${crewData.meta?.name}`);
       setLoading(false);
     } catch (err: any) {
       console.error('❌ ADMIN PAGE: Error fetching crew:', err);
@@ -460,7 +460,7 @@ export default function RunCrewAdminPage() {
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">{crew.name} - Admin</h1>
+              <h1 className="text-3xl font-bold text-gray-900">{crew.meta?.name} - Admin</h1>
               {crew.description && (
                 <p className="text-gray-600 mt-2">{crew.description}</p>
               )}
