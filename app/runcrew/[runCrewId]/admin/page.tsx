@@ -105,7 +105,7 @@ export default function RunCrewAdminPage() {
       setRuns(crewData.runsBox?.runs || []);
       // Load topics from crew metadata (stored in messageTopics JSON field)
       // Parse from JSON if it's a string, otherwise use as-is
-      let messageTopics = crewData.meta?.messageTopics;
+      let messageTopics = crewData.runCrewBaseInfo?.messageTopics;
       if (typeof messageTopics === 'string') {
         try {
           messageTopics = JSON.parse(messageTopics);
@@ -121,7 +121,7 @@ export default function RunCrewAdminPage() {
 
       setMembership(currentMembership);
 
-      console.log(`✅ ADMIN PAGE: Crew loaded successfully: ${crewData.meta?.name}`);
+      console.log(`✅ ADMIN PAGE: Crew loaded successfully: ${crewData.runCrewBaseInfo?.name}`);
       setLoading(false);
     } catch (err: any) {
       console.error('❌ ADMIN PAGE: Error fetching crew:', err);
@@ -460,9 +460,9 @@ export default function RunCrewAdminPage() {
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">{crew.meta?.name} - Admin</h1>
-              {crew.meta?.description && (
-                <p className="text-gray-600 mt-2">{crew.meta.description}</p>
+              <h1 className="text-3xl font-bold text-gray-900">{crew.runCrewBaseInfo?.name} - Admin</h1>
+              {crew.runCrewBaseInfo?.description && (
+                <p className="text-gray-600 mt-2">{crew.runCrewBaseInfo.description}</p>
               )}
             </div>
             <div className="flex gap-4">

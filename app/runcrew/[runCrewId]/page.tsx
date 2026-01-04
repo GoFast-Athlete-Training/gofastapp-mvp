@@ -91,7 +91,7 @@ export default function RunCrewHomePage() {
         );
         setMembership(currentMembership);
 
-        console.log(`✅ RUNCREW HOME: Crew loaded successfully: ${crewData.meta?.name}`);
+        console.log(`✅ RUNCREW HOME: Crew loaded successfully: ${crewData.runCrewBaseInfo?.name}`);
         setLoading(false);
       } catch (err: any) {
         console.error('❌ RUNCREW HOME: Error fetching crew:', err);
@@ -214,15 +214,15 @@ export default function RunCrewHomePage() {
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              {crew.meta?.logo ? (
+              {crew.runCrewBaseInfo?.logo ? (
                 <img
-                  src={crew.meta.logo}
-                  alt={crew.meta?.name || 'RunCrew'}
+                  src={crew.runCrewBaseInfo.logo}
+                  alt={crew.runCrewBaseInfo?.name || 'RunCrew'}
                   className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200"
                 />
-              ) : crew.meta?.icon ? (
+              ) : crew.runCrewBaseInfo?.icon ? (
                 <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-3xl border-2 border-gray-200">
-                  {crew.meta.icon}
+                  {crew.runCrewBaseInfo.icon}
                 </div>
               ) : (
                 <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-3xl border-2 border-gray-200">
@@ -230,9 +230,9 @@ export default function RunCrewHomePage() {
                 </div>
               )}
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">{crew.meta?.name}</h1>
-                {crew.meta?.description && (
-                  <p className="text-gray-600 mt-2">{crew.meta.description}</p>
+                <h1 className="text-3xl font-bold text-gray-900">{crew.runCrewBaseInfo?.name}</h1>
+                {crew.runCrewBaseInfo?.description && (
+                  <p className="text-gray-600 mt-2">{crew.runCrewBaseInfo.description}</p>
                 )}
               </div>
             </div>
@@ -253,10 +253,10 @@ export default function RunCrewHomePage() {
         <div className="bg-white rounded-2xl shadow-lg p-8 mb-8 border border-gray-200">
           <div className="text-center mb-8">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Welcome to {crew.meta?.name}!
+              Welcome to {crew.runCrewBaseInfo?.name}!
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              {crew.meta?.description || 'Get ready to run with your crew and achieve your goals together.'}
+              {crew.runCrewBaseInfo?.description || 'Get ready to run with your crew and achieve your goals together.'}
             </p>
           </div>
 

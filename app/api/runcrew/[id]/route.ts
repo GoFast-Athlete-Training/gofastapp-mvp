@@ -197,19 +197,19 @@ export async function PUT(
 
       // Update the hydrated crew object with new values (single hydrate, no re-fetch)
       if (updateData.name !== undefined) {
-        crew.meta.name = updateData.name;
+        crew.runCrewBaseInfo.name = updateData.name;
       }
       if (updateData.description !== undefined) {
-        crew.meta.description = updateData.description;
+        crew.runCrewBaseInfo.description = updateData.description;
       }
       if (updateData.icon !== undefined) {
-        crew.meta.icon = updateData.icon;
+        crew.runCrewBaseInfo.icon = updateData.icon;
       }
       if (updateData.logo !== undefined) {
-        crew.meta.logo = updateData.logo;
+        crew.runCrewBaseInfo.logo = updateData.logo;
       }
       if (updateData.messageTopics !== undefined) {
-        crew.meta.messageTopics = updateData.messageTopics;
+        crew.runCrewBaseInfo.messageTopics = updateData.messageTopics;
       }
     }
 

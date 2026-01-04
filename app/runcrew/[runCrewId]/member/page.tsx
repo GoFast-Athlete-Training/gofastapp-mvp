@@ -95,7 +95,7 @@ export default function RunCrewMemberPage() {
         );
         setMembership(currentMembership);
 
-        console.log(`✅ MEMBER PAGE: Crew loaded successfully: ${crewData.meta?.name}`);
+        console.log(`✅ MEMBER PAGE: Crew loaded successfully: ${crewData.runCrewBaseInfo?.name}`);
         setLoading(false);
       } catch (err: any) {
         console.error('❌ MEMBER PAGE: Error fetching crew:', err);
@@ -205,7 +205,7 @@ export default function RunCrewMemberPage() {
   const isManager = membership?.role === 'manager';
   const canPostAnnouncements = isAdmin || isManager;
   const memberships = crew.membershipsBox?.memberships || [];
-  const joinCode = crew.meta?.joinCode || '';
+  const joinCode = crew.runCrewBaseInfo?.joinCode || '';
   const inviteUrl = joinCode ? `${typeof window !== 'undefined' ? window.location.origin : ''}/runcrew/join?code=${joinCode}` : '';
 
   const handleCopyLink = async () => {
@@ -276,21 +276,21 @@ export default function RunCrewMemberPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-4 min-w-0 flex-1">
-              {crew.meta?.logo ? (
+              {crew.runCrewBaseInfo?.logo ? (
                 <img
-                  src={crew.meta.logo}
-                  alt={crew.meta?.name || 'RunCrew'}
+                  src={crew.runCrewBaseInfo.logo}
+                  alt={crew.runCrewBaseInfo?.name || 'RunCrew'}
                   className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl object-cover border-2 border-gray-200 flex-shrink-0"
                 />
-              ) : crew.meta?.icon ? (
+              ) : crew.runCrewBaseInfo?.icon ? (
                 <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-2xl sm:text-3xl border-2 border-gray-200 flex-shrink-0">
-                  {crew.meta.icon}
+                  {crew.runCrewBaseInfo.icon}
                 </div>
               ) : null}
               <div className="min-w-0 flex-1">
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">{crew.meta?.name}</h1>
-                {crew.meta?.description && (
-                  <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">{crew.meta.description}</p>
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">{crew.runCrewBaseInfo?.name}</h1>
+                {crew.runCrewBaseInfo?.description && (
+                  <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">{crew.runCrewBaseInfo.description}</p>
                 )}
               </div>
             </div>
@@ -450,7 +450,7 @@ export default function RunCrewMemberPage() {
             {/* Announcements Section - TOP PRIORITY */}
             <section className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border-2 border-orange-200 shadow-md p-4 sm:p-5 space-y-4 overflow-hidden">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">{crew.meta?.name} Announcements</h2>
+                <h2 className="text-lg font-semibold text-gray-900">{crew.runCrewBaseInfo?.name} Announcements</h2>
                 <p className="text-xs text-gray-600 font-medium">
                   Official updates from your crew
                 </p>
@@ -499,7 +499,7 @@ export default function RunCrewMemberPage() {
               </div>
               <MessageFeed 
                 crewId={runCrewId}
-                topics={crew.meta?.messageTopics || ['general', 'runs', 'social']}
+                topics={crew.runCrewBaseInfo?.messageTopics || ['general', 'runs', 'social']}
                 selectedTopic="general"
                 isAdmin={isAdmin}
               />

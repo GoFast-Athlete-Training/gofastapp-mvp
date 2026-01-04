@@ -97,9 +97,9 @@ export default function RunCrewSettingsPage() {
         // NEW CANON: Settings only scopes to basic info (meta level)
         // meta contains: name, description, icon, logo, joinCode, messageTopics
         setCrew(crewData);
-        setCrewName(crewData.meta?.name || '');
-        setCrewDescription(crewData.meta?.description || '');
-        setCrewIcon(crewData.meta?.icon || '');
+        setCrewName(crewData.runCrewBaseInfo?.name || '');
+        setCrewDescription(crewData.runCrewBaseInfo?.description || '');
+        setCrewIcon(crewData.runCrewBaseInfo?.icon || '');
 
         // Find membership to check admin status
         const currentMembership = crewData.membershipsBox?.memberships?.find(
@@ -145,9 +145,9 @@ export default function RunCrewSettingsPage() {
           const refreshedCrew = refreshResponse.data.runCrew;
           setCrew(refreshedCrew);
           // NEW CANON: Settings only handles meta level (basic info)
-          setCrewName(refreshedCrew.meta?.name || '');
-          setCrewDescription(refreshedCrew.meta?.description || '');
-          setCrewIcon(refreshedCrew.meta?.icon || '');
+          setCrewName(refreshedCrew.runCrewBaseInfo?.name || '');
+          setCrewDescription(refreshedCrew.runCrewBaseInfo?.description || '');
+          setCrewIcon(refreshedCrew.runCrewBaseInfo?.icon || '');
         }
       }
     } catch (err: any) {
@@ -262,20 +262,20 @@ export default function RunCrewSettingsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-4">
-              {crew.meta?.logo ? (
+              {crew.runCrewBaseInfo?.logo ? (
                 <img
-                  src={crew.meta.logo}
-                  alt={crew.meta?.name || 'RunCrew'}
+                  src={crew.runCrewBaseInfo.logo}
+                  alt={crew.runCrewBaseInfo?.name || 'RunCrew'}
                   className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl object-cover border-2 border-gray-200 flex-shrink-0"
                 />
-              ) : crew.meta?.icon ? (
+              ) : crew.runCrewBaseInfo?.icon ? (
                 <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-2xl sm:text-3xl border-2 border-gray-200 flex-shrink-0">
-                  {crew.meta.icon}
+                  {crew.runCrewBaseInfo.icon}
                 </div>
               ) : null}
               <div>
                 <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">RunCrew Settings</h1>
-                <p className="text-sm sm:text-base text-gray-600 mt-1">{crew.meta?.name}</p>
+                <p className="text-sm sm:text-base text-gray-600 mt-1">{crew.runCrewBaseInfo?.name}</p>
               </div>
             </div>
             <div className="flex gap-2 sm:gap-4 flex-shrink-0">
@@ -447,7 +447,7 @@ export default function RunCrewSettingsPage() {
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Delete RunCrew?</h3>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete <strong>{crew.meta?.name}</strong>? This action cannot be undone and all data will be permanently deleted.
+              Are you sure you want to delete <strong>{crew.runCrewBaseInfo?.name}</strong>? This action cannot be undone and all data will be permanently deleted.
             </p>
             <div className="flex gap-4 justify-end">
               <button

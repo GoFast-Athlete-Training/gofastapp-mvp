@@ -188,7 +188,7 @@ export async function hydrateCrew(runCrewId: string) {
 
   // Map Prisma result to box-grouped response
   return {
-    meta: {
+    runCrewBaseInfo: {
       runCrewId: crew.id,
       name: crew.name,
       description: crew.description,
