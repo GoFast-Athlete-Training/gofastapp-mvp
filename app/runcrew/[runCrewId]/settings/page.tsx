@@ -577,13 +577,13 @@ export default function RunCrewSettingsPage() {
                   </button>
                 )}
               </div>
-              <input
-                type="text"
-                value={crewName}
-                onChange={(e) => setCrewName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                placeholder="Enter crew name"
-              />
+                <input
+                  type="text"
+                  value={crewName}
+                  onChange={(e) => setCrewName(e.target.value)}
+                  className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  placeholder="Enter crew name"
+                />
             </div>
 
             {/* Description */}
@@ -603,13 +603,13 @@ export default function RunCrewSettingsPage() {
                   </button>
                 )}
               </div>
-              <textarea
-                value={crewDescription}
-                onChange={(e) => setCrewDescription(e.target.value)}
-                rows={4}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-y"
-                placeholder="Enter crew description (optional)"
-              />
+                <textarea
+                  value={crewDescription}
+                  onChange={(e) => setCrewDescription(e.target.value)}
+                  rows={4}
+                  className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-y"
+                  placeholder="Enter crew description (optional)"
+                />
             </div>
           </div>
         );

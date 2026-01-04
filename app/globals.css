@@ -12,12 +12,24 @@ body {
   margin: 0;
   padding: 0;
   width: 100%;
+  max-width: 100vw;
   overflow-x: hidden;
 }
 
 body {
   position: relative;
   min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Prevent any element from causing horizontal overflow */
+* {
+  max-width: 100%;
+}
+
+/* Ensure flex children can shrink */
+.flex > * {
+  min-width: 0;
 }
 
 /* Ensure proper centering for loading states */
