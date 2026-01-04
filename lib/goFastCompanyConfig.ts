@@ -7,7 +7,7 @@
  * This companyId is set once when the company is first created and lives forever.
  */
 
-export const GOFAST_COMPANY_ID = 'cmhpqe7kl0000nw1uvcfhf2hs';
+export const GOFAST_COMPANY_ID = 'cmiw6rva2000004jmdjya4foj';
 
 /**
  * Get GoFast Company ID (single tenant - hardcoded)

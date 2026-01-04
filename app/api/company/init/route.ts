@@ -21,48 +21,53 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 });
     }
 
-    // Check if company exists by slug or ID
+    // Always use the first company (oldest by createdAt) as the single source of truth
     let company = await prisma.goFastCompany.findUnique({
-      where: { slug: 'gofast' },
+      where: { id: GOFAST_COMPANY_ID },
     });
 
+    // If company doesn't exist with the configured ID, find the first company by creation date
     if (!company) {
-      company = await prisma.goFastCompany.findUnique({
-        where: { id: GOFAST_COMPANY_ID },
+      console.log("⚠️ COMPANY INIT: Configured company ID not found, finding first company by createdAt...");
+      company = await prisma.goFastCompany.findFirst({
+        orderBy: { createdAt: 'asc' },
       });
+      
+      if (!company) {
+        // Create new company with hardcoded ID if no company exists
+        company = await prisma.goFastCompany.create({
+          data: {
+            id: GOFAST_COMPANY_ID,
+            name: 'GoFast',
+            slug: 'gofast',
+            address: '2604 N. George Mason Dr.',
+            city: 'Arlington',
+            state: 'VA',
+            zip: '22207',
+            domain: 'gofastcrushgoals.com',
+          },
+        });
+        console.log('✅ COMPANY INIT: Created new company');
+        return NextResponse.json({ success: true, company });
+      }
+      
+      console.log(`⚠️ COMPANY INIT: Using first company (${company.id}) instead of configured ID. Update config to match.`);
     }
 
-    if (!company) {
-      // Create new company with hardcoded ID
-      company = await prisma.goFastCompany.create({
-        data: {
-          id: GOFAST_COMPANY_ID,
-          name: 'GoFast',
-          slug: 'gofast',
-          address: '2604 N. George Mason Dr.',
-          city: 'Arlington',
-          state: 'VA',
-          zip: '22207',
-          domain: 'gofastcrushgoals.com',
-        },
-      });
-      console.log('✅ COMPANY INIT: Created new company');
-    } else {
-      // Update existing company to ensure all fields are correct
-      company = await prisma.goFastCompany.update({
-        where: { id: company.id },
-        data: {
-          name: 'GoFast',
-          slug: 'gofast',
-          address: '2604 N. George Mason Dr.',
-          city: 'Arlington',
-          state: 'VA',
-          zip: '22207',
-          domain: 'gofastcrushgoals.com',
-        },
-      });
-      console.log('✅ COMPANY INIT: Updated existing company');
-    }
+    // Update existing company to ensure all fields are correct
+    company = await prisma.goFastCompany.update({
+      where: { id: company.id },
+      data: {
+        name: 'GoFast',
+        slug: 'gofast',
+        address: '2604 N. George Mason Dr.',
+        city: 'Arlington',
+        state: 'VA',
+        zip: '22207',
+        domain: 'gofastcrushgoals.com',
+      },
+    });
+    console.log('✅ COMPANY INIT: Updated existing company');
 
     return NextResponse.json({ success: true, company });
   } catch (err: any) {
