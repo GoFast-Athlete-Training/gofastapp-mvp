@@ -294,8 +294,8 @@ export default function RunCrewSettingsPage() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 w-full min-w-0">
-        <div className="space-y-6">
+      <main className="px-4 sm:px-6 lg:px-8 py-8 w-full min-w-0">
+        <div className="space-y-6 max-w-4xl">
           {/* General Settings */}
           <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 w-full min-w-0">
             <div className="flex items-center gap-2 mb-6">
@@ -304,12 +304,13 @@ export default function RunCrewSettingsPage() {
             </div>
 
             <div className="space-y-4">
-              {/* Logo Display/Upload */}
+              {/* Logo/Icon Display - Interchangeable */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Logo
+                  Logo or Icon
                 </label>
                 <div className="flex items-center gap-4 mb-2">
+                  {/* Show logo if exists, otherwise show icon */}
                   {crewLogo ? (
                     <img
                       src={crewLogo}
@@ -322,19 +323,26 @@ export default function RunCrewSettingsPage() {
                     </div>
                   ) : (
                     <div className="w-16 h-16 rounded-xl bg-gray-200 border-2 border-gray-300 flex items-center justify-center text-gray-400 flex-shrink-0">
-                      No logo
+                      No logo/icon
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
                     <input
-                      type="url"
-                      value={crewLogo}
-                      onChange={(e) => setCrewLogo(e.target.value)}
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file || !isAdmin) return;
+                        
+                        // TODO: Upload to blob storage when installed
+                        // For now, show placeholder
+                        showToast('Logo upload coming soon - blob storage installation in progress');
+                        e.target.value = '';
+                      }}
                       disabled={!isAdmin}
-                      placeholder="https://example.com/logo.png"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-sm"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Enter logo image URL</p>
+                    <p className="text-xs text-gray-500 mt-1">Upload logo image (will replace icon if set)</p>
                   </div>
                 </div>
               </div>
@@ -367,7 +375,7 @@ export default function RunCrewSettingsPage() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Icon (Emoji)
+                  Icon (Emoji) - Fallback if no logo
                 </label>
                 <input
                   type="text"
@@ -378,7 +386,7 @@ export default function RunCrewSettingsPage() {
                   maxLength={2}
                   className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-2xl"
                 />
-                <p className="text-xs text-gray-500 mt-1">Single emoji character (shown if no logo)</p>
+                <p className="text-xs text-gray-500 mt-1">Single emoji character (shown if no logo is uploaded)</p>
               </div>
 
               {isAdmin && (
@@ -403,7 +411,7 @@ export default function RunCrewSettingsPage() {
           </section>
 
           {/* Members */}
-          <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 w-full min-w-0">
+          <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 w-full min-w-0 max-w-4xl">
             <div className="flex items-center gap-2 mb-6">
               <Users className="w-5 h-5 text-gray-600 flex-shrink-0" />
               <h2 className="text-xl font-bold text-gray-900">Members ({memberships.length})</h2>
@@ -506,7 +514,7 @@ export default function RunCrewSettingsPage() {
           </section>
 
           {/* Danger Zone */}
-          <section className="bg-white rounded-lg border-2 border-red-200 shadow-sm p-6 w-full min-w-0">
+          <section className="bg-white rounded-lg border-2 border-red-200 shadow-sm p-6 w-full min-w-0 max-w-4xl">
             <h2 className="text-xl font-bold text-red-900 mb-6">Danger Zone</h2>
 
             <div className="space-y-6">
