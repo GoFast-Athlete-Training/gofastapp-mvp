@@ -10,6 +10,7 @@ import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
 import MessageFeed from '@/components/RunCrew/MessageFeed';
+import GooglePlacesAutocomplete from '@/components/RunCrew/GooglePlacesAutocomplete';
 
 /**
  * Admin Page - CLIENT-SIDE
@@ -832,12 +833,15 @@ export default function RunCrewAdminPage() {
 
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Meetup Address</label>
-                <input
-                  type="text"
+                <GooglePlacesAutocomplete
                   value={runForm.meetUpAddress}
                   onChange={(e) => setRunForm({ ...runForm, meetUpAddress: e.target.value })}
+                  onPlaceSelected={(placeData) => {
+                    setRunForm({ ...runForm, meetUpAddress: placeData.address });
+                  }}
                   placeholder="Start typing address..."
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                  disabled={loadingRuns}
                 />
               </div>
 
