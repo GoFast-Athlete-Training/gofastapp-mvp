@@ -33,6 +33,8 @@ export default function RunDetailPage() {
   const [membership, setMembership] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentRSVP, setCurrentRSVP] = useState<string | null>(null);
+  const [rsvpLoading, setRsvpLoading] = useState(false);
 
   useEffect(() => {
     if (!runCrewId || !runId) {
@@ -103,6 +105,10 @@ export default function RunDetailPage() {
         }
 
         setRun(foundRun);
+
+        // Find current user's RSVP
+        const userRSVP = foundRun.rsvps?.find((r: any) => r.athleteId === athleteId);
+        setCurrentRSVP(userRSVP?.status || null);
 
         console.log(`✅ RUN DETAIL: Run loaded successfully: ${foundRun.title}`);
         setLoading(false);
@@ -212,11 +218,35 @@ export default function RunDetailPage() {
   const isManager = membership?.role === 'manager';
   const canEdit = isAdmin || isManager;
 
-  // Group RSVPs by status
+  // Group RSVPs by status (handle both 'not_going' and 'not-going' for compatibility)
   const rsvps = run.rsvps || [];
   const going = rsvps.filter((r: any) => r.status === 'going');
-  const notGoing = rsvps.filter((r: any) => r.status === 'not_going');
+  const notGoing = rsvps.filter((r: any) => r.status === 'not-going' || r.status === 'not_going');
   const maybe = rsvps.filter((r: any) => r.status === 'maybe');
+
+  // Handle RSVP
+  const handleRSVP = async (status: 'going' | 'maybe' | 'not-going') => {
+    setRsvpLoading(true);
+    try {
+      const response = await api.post(`/runcrew/${runCrewId}/runs/${runId}/rsvp`, { status });
+      if (response.data.success) {
+        setCurrentRSVP(status);
+        // Refresh run data to get updated RSVPs
+        const crewResponse = await api.get(`/runcrew/${runCrewId}`);
+        if (crewResponse.data.success && crewResponse.data.runCrew) {
+          const updatedRun = crewResponse.data.runCrew.runsBox?.runs?.find((r: any) => r.id === runId);
+          if (updatedRun) {
+            setRun(updatedRun);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('Error RSVPing:', err);
+      alert(err.response?.data?.error || 'Failed to RSVP');
+    } finally {
+      setRsvpLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -240,18 +270,25 @@ export default function RunDetailPage() {
                 <button
                   className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm"
                   onClick={() => {
-                    // TODO: Implement edit functionality
-                    alert('Edit run - coming soon');
+                    // TODO: Implement edit modal/form
+                    alert('Edit run - modal coming soon. For now, use the admin page to edit runs.');
                   }}
                 >
                   Edit Run
                 </button>
                 <button
                   className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm"
-                  onClick={() => {
-                    // TODO: Implement delete functionality
-                    if (confirm('Are you sure you want to delete this run?')) {
-                      alert('Delete run - coming soon');
+                  onClick={async () => {
+                    if (confirm('Are you sure you want to delete this run? This action cannot be undone.')) {
+                      try {
+                        const response = await api.delete(`/runcrew/${runCrewId}/runs/${runId}`);
+                        if (response.data.success) {
+                          router.push(`/runcrew/${runCrewId}/member`);
+                        }
+                      } catch (err: any) {
+                        console.error('Error deleting run:', err);
+                        alert(err.response?.data?.error || 'Failed to delete run');
+                      }
                     }
                   }}
                 >
@@ -377,9 +414,44 @@ export default function RunDetailPage() {
             </div>
           )}
 
-          {/* TODO: Add RSVP button for current user */}
+          {/* RSVP Section */}
           <div className="mt-6 pt-6 border-t">
-            <p className="text-sm text-gray-500">RSVP functionality - coming soon</p>
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Your RSVP</h3>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleRSVP('going')}
+                disabled={rsvpLoading}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  currentRSVP === 'going'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                Going
+              </button>
+              <button
+                onClick={() => handleRSVP('maybe')}
+                disabled={rsvpLoading}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  currentRSVP === 'maybe'
+                    ? 'bg-yellow-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                Maybe
+              </button>
+              <button
+                onClick={() => handleRSVP('not-going')}
+                disabled={rsvpLoading}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  currentRSVP === 'not-going' || currentRSVP === 'not_going'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                Not Going
+              </button>
+            </div>
           </div>
         </div>
       </main>

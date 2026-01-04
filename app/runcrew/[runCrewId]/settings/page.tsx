@@ -388,13 +388,76 @@ export default function RunCrewSettingsPage() {
                       <p className="text-sm font-semibold text-gray-900 truncate">
                         {athlete.firstName || 'Athlete'} {athlete.lastName || ''}
                       </p>
-                      {membershipItem.role === 'admin' && (
-                        <span className="text-xs text-orange-600 font-bold">Admin</span>
-                      )}
-                      {membershipItem.role === 'manager' && (
-                        <span className="text-xs text-blue-600 font-bold">Manager</span>
-                      )}
+                      <div className="flex items-center gap-2 mt-1">
+                        {membershipItem.role === 'admin' && (
+                          <span className="text-xs text-orange-600 font-bold">Admin</span>
+                        )}
+                        {membershipItem.role === 'manager' && (
+                          <span className="text-xs text-blue-600 font-bold">Manager</span>
+                        )}
+                        {membershipItem.role === 'member' && (
+                          <span className="text-xs text-gray-500">Member</span>
+                        )}
+                      </div>
                     </div>
+                    {isAdmin && membershipItem.athleteId !== membership?.athleteId && (
+                      <div className="flex gap-2">
+                        {membershipItem.role !== 'manager' && (
+                          <button
+                            onClick={async () => {
+                              if (confirm(`Promote ${athlete.firstName} ${athlete.lastName} to manager?`)) {
+                                try {
+                                  const response = await api.put(`/runcrew/${runCrewId}/members/${membershipItem.id}/role`, {
+                                    role: 'manager',
+                                  });
+                                  if (response.data.success) {
+                                    showToast('Member promoted to manager');
+                                    // Refresh crew data
+                                    const crewResponse = await api.get(`/runcrew/${runCrewId}`);
+                                    if (crewResponse.data.success && crewResponse.data.runCrew) {
+                                      setCrew(crewResponse.data.runCrew);
+                                    }
+                                  }
+                                } catch (err: any) {
+                                  console.error('Error promoting member:', err);
+                                  showToast(err.response?.data?.error || 'Failed to promote member');
+                                }
+                              }
+                            }}
+                            className="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded-lg"
+                          >
+                            Promote to Manager
+                          </button>
+                        )}
+                        {membershipItem.role === 'manager' && (
+                          <button
+                            onClick={async () => {
+                              if (confirm(`Demote ${athlete.firstName} ${athlete.lastName} to member?`)) {
+                                try {
+                                  const response = await api.put(`/runcrew/${runCrewId}/members/${membershipItem.id}/role`, {
+                                    role: 'member',
+                                  });
+                                  if (response.data.success) {
+                                    showToast('Manager demoted to member');
+                                    // Refresh crew data
+                                    const crewResponse = await api.get(`/runcrew/${runCrewId}`);
+                                    if (crewResponse.data.success && crewResponse.data.runCrew) {
+                                      setCrew(crewResponse.data.runCrew);
+                                    }
+                                  }
+                                } catch (err: any) {
+                                  console.error('Error demoting member:', err);
+                                  showToast(err.response?.data?.error || 'Failed to demote member');
+                                }
+                              }
+                            }}
+                            className="px-3 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
+                          >
+                            Demote to Member
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -405,13 +468,89 @@ export default function RunCrewSettingsPage() {
           <section className="bg-white rounded-lg border-2 border-red-200 shadow-sm p-6">
             <h2 className="text-xl font-bold text-red-900 mb-6">Danger Zone</h2>
 
-            <div className="space-y-4">
+            <div className="space-y-6">
               {isAdmin ? (
                 <>
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Delete RunCrew</h3>
+                  {/* Transfer Ownership */}
+                  <div className="border-b border-red-200 pb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Transfer Ownership</h3>
                     <p className="text-sm text-gray-600 mb-4">
-                      Permanently delete this RunCrew. This action cannot be undone.
+                      Transfer ownership of this RunCrew to another member. You will become a regular member.
+                    </p>
+                    <select
+                      value=""
+                      onChange={async (e) => {
+                        const newOwnerMembershipId = e.target.value;
+                        if (!newOwnerMembershipId) return;
+                        
+                        const newOwner = memberships.find((m: any) => m.id === newOwnerMembershipId);
+                        if (!newOwner) return;
+                        
+                        const athlete = newOwner.athlete || {};
+                        if (confirm(`Transfer ownership to ${athlete.firstName} ${athlete.lastName}? You will become a regular member.`)) {
+                          try {
+                            const response = await api.post(`/runcrew/${runCrewId}/transfer-ownership`, {
+                              newOwnerMembershipId,
+                            });
+                            if (response.data.success) {
+                              showToast('Ownership transferred successfully');
+                              router.push(`/runcrew/${runCrewId}/member`);
+                            }
+                          } catch (err: any) {
+                            console.error('Error transferring ownership:', err);
+                            showToast(err.response?.data?.error || 'Failed to transfer ownership');
+                          }
+                        }
+                        e.target.value = '';
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 mb-2"
+                    >
+                      <option value="">Select a member...</option>
+                      {memberships
+                        .filter((m: any) => m.athleteId !== membership?.athleteId)
+                        .map((m: any) => {
+                          const athlete = m.athlete || {};
+                          return (
+                            <option key={m.id} value={m.id}>
+                              {athlete.firstName} {athlete.lastName} {m.role === 'manager' ? '(Manager)' : ''}
+                            </option>
+                          );
+                        })}
+                    </select>
+                  </div>
+
+                  {/* Archive RunCrew */}
+                  <div className="border-b border-red-200 pb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Archive RunCrew</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Archive this RunCrew. Members can still view history, but no new activity can be created.
+                    </p>
+                    <button
+                      onClick={async () => {
+                        if (confirm(`Archive "${crew.runCrewBaseInfo?.name}"? Members can still view history, but no new runs, announcements, or messages can be created.`)) {
+                          try {
+                            const response = await api.post(`/runcrew/${runCrewId}/archive`);
+                            if (response.data.success) {
+                              showToast('RunCrew archived successfully');
+                              router.push('/welcome');
+                            }
+                          } catch (err: any) {
+                            console.error('Error archiving crew:', err);
+                            showToast(err.response?.data?.error || 'Failed to archive RunCrew');
+                          }
+                        }
+                      }}
+                      className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold"
+                    >
+                      Archive RunCrew
+                    </button>
+                  </div>
+
+                  {/* Delete RunCrew */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete RunCrew</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Permanently delete this RunCrew. This action cannot be undone and all data will be lost.
                     </p>
                     <button
                       onClick={() => setShowDeleteConfirm(true)}
