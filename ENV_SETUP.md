@@ -78,6 +78,14 @@ GARMIN_USER_REFRESH_TOKEN_SECRET=""
 - Use production credentials from the "GoFast Render Stack" Garmin application.
 - Set `GARMIN_DEBUG="true"` in development to see detailed webhook payloads.
 
+## Google Maps API (Required for Address Autocomplete)
+
+```bash
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyBj7tM40doX13BZJ6PqaiRkBinDD4K1MH4
+```
+
+**Note**: This is already configured in Vercel production. Add to `.env.local` for local development.
+
 ## App URL
 
 ```bash
