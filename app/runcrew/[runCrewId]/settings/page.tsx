@@ -807,7 +807,7 @@ export default function RunCrewSettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
       {toast && (
         <div className="fixed top-6 right-6 bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg z-50">
           {toast}
@@ -932,6 +932,6 @@ export default function RunCrewSettingsPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
