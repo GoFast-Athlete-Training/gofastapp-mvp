@@ -334,9 +334,28 @@ export default function RunCrewSettingsPage() {
                         const file = e.target.files?.[0];
                         if (!file || !isAdmin) return;
                         
-                        // TODO: Upload to blob storage when installed
-                        // For now, show placeholder
-                        showToast('Logo upload coming soon - blob storage installation in progress');
+                        try {
+                          // Upload to blob storage
+                          const formData = new FormData();
+                          formData.append('file', file);
+                          
+                          const uploadResponse = await api.post('/upload', formData, {
+                            headers: {
+                              'Content-Type': 'multipart/form-data',
+                            },
+                          });
+                          
+                          if (uploadResponse.data.success && uploadResponse.data.url) {
+                            setCrewLogo(uploadResponse.data.url);
+                            showToast('Logo uploaded successfully - click Save Changes to apply');
+                          } else {
+                            showToast('Failed to upload logo');
+                          }
+                        } catch (err: any) {
+                          console.error('Error uploading logo:', err);
+                          showToast(err.response?.data?.error || 'Failed to upload logo');
+                        }
+                        
                         e.target.value = '';
                       }}
                       disabled={!isAdmin}
