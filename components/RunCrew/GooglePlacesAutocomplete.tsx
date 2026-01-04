@@ -9,7 +9,7 @@ const loadGoogleMaps = (apiKey: string): Promise<any> => {
   if ((window as any).google && (window as any).google.maps) {
     return Promise.resolve((window as any).google.maps);
   }
-  if (loaderCache[apiKey]) return loaderCache[apiKey];
+  if (apiKey in loaderCache) return loaderCache[apiKey];
 
   loaderCache[apiKey] = new Promise((resolve, reject) => {
     const existing = document.querySelector('script[data-google-maps-loader="true"]');
