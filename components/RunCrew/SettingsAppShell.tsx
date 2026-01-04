@@ -12,8 +12,8 @@ interface SettingsAppShellProps {
   onSectionChange: (section: SettingsSection) => void;
   crewName: string;
   crewGraphic: ReactNode;
-}
   runCrewId: string;
+}
 
 export default function SettingsAppShell({
   children,
