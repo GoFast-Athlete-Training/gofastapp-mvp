@@ -819,6 +819,7 @@ export default function RunCrewSettingsPage() {
         onSectionChange={setActiveSection}
         crewName={crew.runCrewBaseInfo?.name || 'RunCrew'}
         crewGraphic={crewGraphic}
+        runCrewId={runCrewId}
       >
         {renderSectionContent()}
       </SettingsAppShell>
