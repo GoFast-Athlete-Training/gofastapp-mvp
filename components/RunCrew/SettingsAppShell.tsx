@@ -2,6 +2,7 @@
 
 import { Info, Users, Archive } from 'lucide-react';
 import { ReactNode } from 'react';
+import Link from 'next/link';
 
 type SettingsSection = 'info' | 'manager' | 'lifecycle';
 
@@ -13,6 +14,7 @@ interface SettingsAppShellProps {
   crewGraphic: ReactNode;
 }
 
+  runCrewId: string;
 export default function SettingsAppShell({
   children,
   activeSection,
