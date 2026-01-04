@@ -40,7 +40,19 @@ export default function RunCrewSettingsPage() {
   const [crewDescription, setCrewDescription] = useState('');
   const [crewIcon, setCrewIcon] = useState('');
   const [crewLogo, setCrewLogo] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+  
+  // Original values for comparison (to show save buttons)
+  const [originalName, setOriginalName] = useState('');
+  const [originalDescription, setOriginalDescription] = useState('');
+  const [originalIcon, setOriginalIcon] = useState('');
+  const [originalLogo, setOriginalLogo] = useState('');
+  
+  // Individual field saving states
+  const [savingName, setSavingName] = useState(false);
+  const [savingDescription, setSavingDescription] = useState(false);
+  const [savingIcon, setSavingIcon] = useState(false);
+  const [savingLogo, setSavingLogo] = useState(false);
+  
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -98,10 +110,21 @@ export default function RunCrewSettingsPage() {
         // NEW CANON: Settings only scopes to basic info (meta level)
         // meta contains: name, description, icon, logo, joinCode, messageTopics
         setCrew(crewData);
-        setCrewName(crewData.runCrewBaseInfo?.name || '');
-        setCrewDescription(crewData.runCrewBaseInfo?.description || '');
-        setCrewIcon(crewData.runCrewBaseInfo?.icon || '');
-        setCrewLogo(crewData.runCrewBaseInfo?.logo || '');
+        const name = crewData.runCrewBaseInfo?.name || '';
+        const description = crewData.runCrewBaseInfo?.description || '';
+        const icon = crewData.runCrewBaseInfo?.icon || '';
+        const logo = crewData.runCrewBaseInfo?.logo || '';
+        
+        setCrewName(name);
+        setCrewDescription(description);
+        setCrewIcon(icon);
+        setCrewLogo(logo);
+        
+        // Set original values for comparison
+        setOriginalName(name);
+        setOriginalDescription(description);
+        setOriginalIcon(icon);
+        setOriginalLogo(logo);
 
         // Find membership to check admin status
         const currentMembership = crewData.membershipsBox?.memberships?.find(
@@ -128,37 +151,104 @@ export default function RunCrewSettingsPage() {
     return () => unsubscribe();
   }, [runCrewId, router]);
 
-  const handleSave = async () => {
+  // Individual field save functions
+  const handleSaveName = async () => {
     if (!crew) return;
-
     try {
-      setIsSaving(true);
+      setSavingName(true);
       const response = await api.put(`/runcrew/${runCrewId}`, {
         name: crewName.trim(),
-        description: crewDescription.trim() || null,
-        icon: crewIcon.trim() || null,
-        logo: crewLogo.trim() || null,
       });
-
       if (response.data.success) {
-        showToast('Settings saved successfully');
-        // Reload crew data (NEW CANON: scoped to runCrewId param)
+        showToast('Crew name saved');
+        setOriginalName(crewName.trim());
+        // Refresh crew data
         const refreshResponse = await api.get(`/runcrew/${runCrewId}`);
         if (refreshResponse.data.success) {
           const refreshedCrew = refreshResponse.data.runCrew;
           setCrew(refreshedCrew);
-          // NEW CANON: Settings only handles meta level (basic info)
-          setCrewName(refreshedCrew.runCrewBaseInfo?.name || '');
-          setCrewDescription(refreshedCrew.runCrewBaseInfo?.description || '');
-          setCrewIcon(refreshedCrew.runCrewBaseInfo?.icon || '');
-          setCrewLogo(refreshedCrew.runCrewBaseInfo?.logo || '');
         }
       }
     } catch (err: any) {
-      console.error('Error saving settings:', err);
-      showToast(err.response?.data?.error || 'Failed to save settings');
+      console.error('Error saving name:', err);
+      showToast(err.response?.data?.error || 'Failed to save name');
     } finally {
-      setIsSaving(false);
+      setSavingName(false);
+    }
+  };
+
+  const handleSaveDescription = async () => {
+    if (!crew) return;
+    try {
+      setSavingDescription(true);
+      const response = await api.put(`/runcrew/${runCrewId}`, {
+        description: crewDescription.trim() || null,
+      });
+      if (response.data.success) {
+        showToast('Description saved');
+        setOriginalDescription(crewDescription.trim() || '');
+        // Refresh crew data
+        const refreshResponse = await api.get(`/runcrew/${runCrewId}`);
+        if (refreshResponse.data.success) {
+          const refreshedCrew = refreshResponse.data.runCrew;
+          setCrew(refreshedCrew);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error saving description:', err);
+      showToast(err.response?.data?.error || 'Failed to save description');
+    } finally {
+      setSavingDescription(false);
+    }
+  };
+
+  const handleSaveIcon = async () => {
+    if (!crew) return;
+    try {
+      setSavingIcon(true);
+      const response = await api.put(`/runcrew/${runCrewId}`, {
+        icon: crewIcon.trim() || null,
+      });
+      if (response.data.success) {
+        showToast('Icon saved');
+        setOriginalIcon(crewIcon.trim() || '');
+        // Refresh crew data
+        const refreshResponse = await api.get(`/runcrew/${runCrewId}`);
+        if (refreshResponse.data.success) {
+          const refreshedCrew = refreshResponse.data.runCrew;
+          setCrew(refreshedCrew);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error saving icon:', err);
+      showToast(err.response?.data?.error || 'Failed to save icon');
+    } finally {
+      setSavingIcon(false);
+    }
+  };
+
+  const handleSaveLogo = async () => {
+    if (!crew) return;
+    try {
+      setSavingLogo(true);
+      const response = await api.put(`/runcrew/${runCrewId}`, {
+        logo: crewLogo.trim() || null,
+      });
+      if (response.data.success) {
+        showToast('Logo saved');
+        setOriginalLogo(crewLogo.trim() || '');
+        // Refresh crew data
+        const refreshResponse = await api.get(`/runcrew/${runCrewId}`);
+        if (refreshResponse.data.success) {
+          const refreshedCrew = refreshResponse.data.runCrew;
+          setCrew(refreshedCrew);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error saving logo:', err);
+      showToast(err.response?.data?.error || 'Failed to save logo');
+    } finally {
+      setSavingLogo(false);
     }
   };
 
@@ -303,7 +393,7 @@ export default function RunCrewSettingsPage() {
       </header>
 
       <main className="w-full min-w-0">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-8 space-y-6">
           {/* General Settings */}
           <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 w-full min-w-0">
             <div className="flex items-center gap-2 mb-6">
@@ -311,13 +401,13 @@ export default function RunCrewSettingsPage() {
               <h2 className="text-xl font-bold text-gray-900">General Settings</h2>
             </div>
 
-            <div className="space-y-4">
-              {/* Logo/Icon Display - Interchangeable */}
+            <div className="space-y-6">
+              {/* Logo or Icon */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Logo or Icon
                 </label>
-                <div className="flex items-center gap-4 mb-2">
+                <div className="flex items-start gap-4">
                   {/* Show logo if exists, otherwise show icon */}
                   {crewLogo ? (
                     <img
@@ -334,7 +424,7 @@ export default function RunCrewSettingsPage() {
                       No logo/icon
                     </div>
                   )}
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 space-y-2">
                     <input
                       type="file"
                       accept="image/*"
@@ -343,6 +433,7 @@ export default function RunCrewSettingsPage() {
                         if (!file) return;
                         
                         try {
+                          setSavingLogo(true);
                           // Upload to blob storage
                           const formData = new FormData();
                           formData.append('file', file);
@@ -355,29 +446,47 @@ export default function RunCrewSettingsPage() {
                           
                           if (uploadResponse.data.success && uploadResponse.data.url) {
                             setCrewLogo(uploadResponse.data.url);
-                            showToast('Logo uploaded successfully - click Save Changes to apply');
+                            await handleSaveLogo();
                           } else {
                             showToast('Failed to upload logo');
+                            setSavingLogo(false);
                           }
                         } catch (err: any) {
                           console.error('Error uploading logo:', err);
                           showToast(err.response?.data?.error || 'Failed to upload logo');
+                          setSavingLogo(false);
                         }
                         
                         e.target.value = '';
                       }}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+                      disabled={savingLogo}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Upload logo image (will replace icon if set)</p>
+                    <p className="text-xs text-gray-500">Upload a logo image or set an icon below</p>
+                    {savingLogo && (
+                      <p className="text-xs text-orange-600">Saving logo...</p>
+                    )}
                   </div>
                 </div>
               </div>
 
               {/* Crew Name */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Crew Name
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-semibold text-gray-700">
+                    Crew Name
+                  </label>
+                  {crewName.trim() !== originalName && (
+                    <button
+                      onClick={handleSaveName}
+                      disabled={savingName || !crewName.trim()}
+                      className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Save className="w-3 h-3" />
+                      {savingName ? 'Saving...' : 'Save'}
+                    </button>
+                  )}
+                </div>
                 <input
                   type="text"
                   value={crewName}
@@ -389,9 +498,21 @@ export default function RunCrewSettingsPage() {
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Description
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-semibold text-gray-700">
+                    Description
+                  </label>
+                  {(crewDescription.trim() || '') !== originalDescription && (
+                    <button
+                      onClick={handleSaveDescription}
+                      disabled={savingDescription}
+                      className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Save className="w-3 h-3" />
+                      {savingDescription ? 'Saving...' : 'Save'}
+                    </button>
+                  )}
+                </div>
                 <textarea
                   value={crewDescription}
                   onChange={(e) => setCrewDescription(e.target.value)}
@@ -403,9 +524,21 @@ export default function RunCrewSettingsPage() {
 
               {/* Icon */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Icon (Emoji) - Fallback if no logo
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-semibold text-gray-700">
+                    Icon (Emoji)
+                  </label>
+                  {crewIcon.trim() !== originalIcon && (
+                    <button
+                      onClick={handleSaveIcon}
+                      disabled={savingIcon}
+                      className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Save className="w-3 h-3" />
+                      {savingIcon ? 'Saving...' : 'Save'}
+                    </button>
+                  )}
+                </div>
                 <input
                   type="text"
                   value={crewIcon}
@@ -414,25 +547,13 @@ export default function RunCrewSettingsPage() {
                   maxLength={2}
                   className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-2xl"
                 />
-                <p className="text-xs text-gray-500 mt-1">Single emoji character (shown if no logo is uploaded)</p>
-              </div>
-
-              {/* Save Button */}
-              <div className="flex justify-end pt-4 border-t border-gray-200">
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving || !crewName.trim()}
-                  className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
-                >
-                  <Save className="w-5 h-5" />
-                  {isSaving ? 'Saving...' : 'Save Changes'}
-                </button>
+                <p className="text-xs text-gray-500 mt-1">Single emoji character (shown if no logo is set)</p>
               </div>
             </div>
           </section>
 
           {/* Members */}
-          <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 w-full min-w-0 max-w-4xl">
+          <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 w-full min-w-0">
             <div className="flex items-center gap-2 mb-6">
               <Users className="w-5 h-5 text-gray-600 flex-shrink-0" />
               <h2 className="text-xl font-bold text-gray-900">Members ({memberships.length})</h2>
@@ -535,7 +656,7 @@ export default function RunCrewSettingsPage() {
           </section>
 
           {/* Danger Zone */}
-          <section className="bg-white rounded-lg border-2 border-red-200 shadow-sm p-6 w-full min-w-0 max-w-4xl">
+          <section className="bg-white rounded-lg border-2 border-red-200 shadow-sm p-6 w-full min-w-0">
             <h2 className="text-xl font-bold text-red-900 mb-6">Danger Zone</h2>
 
             <div className="space-y-6">
