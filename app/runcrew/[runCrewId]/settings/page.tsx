@@ -55,6 +55,12 @@ export default function RunCrewSettingsPage() {
   
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Add Admin/Manager modal state
+  const [showAddManagerModal, setShowAddManagerModal] = useState(false);
+  const [selectedMemberId, setSelectedMemberId] = useState('');
+  const [selectedRole, setSelectedRole] = useState<'admin' | 'manager'>('manager');
+  const [isAddingManager, setIsAddingManager] = useState(false);
 
   const showToast = (message: string) => {
     setToast(message);
@@ -351,6 +357,52 @@ export default function RunCrewSettingsPage() {
   // If user can access this page, they can edit (admin-only page)
   const memberships = crew.membershipsBox?.memberships || [];
   const currentAthleteId = membership?.athleteId;
+  
+  // Filter admins and managers
+  const adminsAndManagers = memberships.filter((m: any) => 
+    m.role === 'admin' || m.role === 'manager'
+  );
+  
+  // Get available members (not already admin/manager) for the picker
+  const availableMembers = memberships.filter((m: any) => 
+    m.role === 'member' && m.athleteId !== currentAthleteId
+  );
+  
+  // Handle adding admin/manager
+  const handleAddManager = async () => {
+    if (!selectedMemberId || !crew) return;
+    
+    try {
+      setIsAddingManager(true);
+      const membershipToPromote = memberships.find((m: any) => m.athleteId === selectedMemberId);
+      if (!membershipToPromote) {
+        showToast('Member not found');
+        return;
+      }
+      
+      const response = await api.put(`/runcrew/${runCrewId}/members/${membershipToPromote.id}/role`, {
+        role: selectedRole,
+      });
+      
+      if (response.data.success) {
+        showToast(`${selectedRole === 'admin' ? 'Admin' : 'Manager'} added successfully`);
+        // Refresh crew data
+        const refreshResponse = await api.get(`/runcrew/${runCrewId}`);
+        if (refreshResponse.data.success && refreshResponse.data.runCrew) {
+          setCrew(refreshResponse.data.runCrew);
+        }
+        // Close modal and reset
+        setShowAddManagerModal(false);
+        setSelectedMemberId('');
+        setSelectedRole('manager');
+      }
+    } catch (err: any) {
+      console.error('Error adding admin/manager:', err);
+      showToast(err.response?.data?.error || 'Failed to add admin/manager');
+    } finally {
+      setIsAddingManager(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
@@ -585,15 +637,27 @@ export default function RunCrewSettingsPage() {
             </div>
           </section>
 
-          {/* Members */}
+          {/* Admin/Managers */}
           <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 w-full min-w-0">
-            <div className="flex items-center gap-2 mb-6">
-              <Users className="w-5 h-5 text-gray-600 flex-shrink-0" />
-              <h2 className="text-xl font-bold text-gray-900">Members ({memberships.length})</h2>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-gray-600 flex-shrink-0" />
+                <h2 className="text-xl font-bold text-gray-900">Admin/Managers ({adminsAndManagers.length})</h2>
+              </div>
+              <button
+                onClick={() => setShowAddManagerModal(true)}
+                className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-semibold transition"
+              >
+                <Users className="w-4 h-4" />
+                Add Admin/Manager
+              </button>
             </div>
 
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {memberships.map((membershipItem: any) => {
+              {adminsAndManagers.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">No admins or managers yet</p>
+              ) : (
+                adminsAndManagers.map((membershipItem: any) => {
                 const athlete = membershipItem.athlete || {};
                 return (
                   <div key={membershipItem.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 min-w-0">
@@ -788,6 +852,87 @@ export default function RunCrewSettingsPage() {
           </section>
         </div>
       </main>
+
+      {/* Add Admin/Manager Modal */}
+      {showAddManagerModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Add Admin/Manager</h3>
+            <p className="text-gray-600 mb-6">
+              Select a member to grant admin or manager permissions.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Member
+                </label>
+                <select
+                  value={selectedMemberId}
+                  onChange={(e) => setSelectedMemberId(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                >
+                  <option value="">Choose a member...</option>
+                  {availableMembers.map((membership: any) => {
+                    const athlete = membership.athlete || {};
+                    return (
+                      <option key={membership.id} value={membership.athleteId}>
+                        {athlete.firstName} {athlete.lastName}
+                        {athlete.email ? ` (${athlete.email})` : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+                {availableMembers.length === 0 && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    All members are already admins or managers.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Role
+                </label>
+                <select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value as 'admin' | 'manager')}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                >
+                  <option value="manager">Manager</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {selectedRole === 'admin'
+                    ? 'Admins have full control over the crew'
+                    : 'Managers can help manage runs and announcements'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 mt-6">
+              <button
+                onClick={() => {
+                  setShowAddManagerModal(false);
+                  setSelectedMemberId('');
+                  setSelectedRole('manager');
+                }}
+                disabled={isAddingManager}
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 rounded-lg transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddManager}
+                disabled={isAddingManager || !selectedMemberId}
+                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded-lg transition disabled:opacity-50"
+              >
+                {isAddingManager ? 'Adding...' : 'Add'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
