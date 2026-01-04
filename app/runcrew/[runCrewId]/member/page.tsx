@@ -328,8 +328,8 @@ export default function RunCrewMemberPage() {
         {/* 3-Column Layout: Members (Left) | Main Content (Center) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
           {/* LEFT SIDEBAR: Members */}
-          <aside className="lg:col-span-3 space-y-6">
-            <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sticky top-6">
+          <aside className="lg:col-span-3 space-y-6 min-w-0">
+            <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 sticky top-6 overflow-hidden">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">Members</h2>
                 <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{memberships.length}</span>
@@ -373,7 +373,7 @@ export default function RunCrewMemberPage() {
 
             {/* Invite Section */}
             {joinCode && (
-              <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sticky top-6 mt-6">
+              <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 sticky top-6 mt-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Invite Teammates</h2>
                 
                 <div className="space-y-4">
@@ -382,16 +382,16 @@ export default function RunCrewMemberPage() {
                     <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
                       Invite URL
                     </label>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                       <input
                         type="text"
                         value={inviteUrl}
                         readOnly
-                        className="flex-1 px-3 py-2 text-xs border border-gray-300 rounded-lg bg-gray-50 font-mono truncate min-w-0"
+                        className="flex-1 min-w-0 px-3 py-2 text-xs border border-gray-300 rounded-lg bg-gray-50 font-mono truncate"
                       />
                       <button
                         onClick={handleCopyLink}
-                        className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2"
+                        className="px-3 sm:px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-xs sm:text-sm font-semibold transition flex items-center gap-1 sm:gap-2 flex-shrink-0"
                       >
                         {copiedLink ? (
                           <>
@@ -414,16 +414,16 @@ export default function RunCrewMemberPage() {
                     <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
                       Join Code
                     </label>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                       <input
                         type="text"
                         value={joinCode}
                         readOnly
-                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 font-mono font-bold text-center truncate min-w-0"
+                        className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 font-mono font-bold text-center truncate"
                       />
                       <button
                         onClick={handleCopyCode}
-                        className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2"
+                        className="px-3 sm:px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-xs sm:text-sm font-semibold transition flex items-center gap-1 sm:gap-2 flex-shrink-0"
                       >
                         {copiedCode ? (
                           <>
@@ -446,9 +446,9 @@ export default function RunCrewMemberPage() {
           </aside>
 
           {/* MAIN CONTENT: Announcements First (Important!), then Messages */}
-          <div className="lg:col-span-8 space-y-6">
+          <div className="lg:col-span-8 space-y-6 min-w-0">
             {/* Announcements Section - TOP PRIORITY */}
-            <section className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border-2 border-orange-200 shadow-md p-5 space-y-4">
+            <section className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border-2 border-orange-200 shadow-md p-4 sm:p-5 space-y-4 overflow-hidden">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">{crew.name} Announcements</h2>
                 <p className="text-xs text-gray-600 font-medium">
@@ -492,7 +492,7 @@ export default function RunCrewMemberPage() {
             </section>
 
             {/* Messages Section */}
-            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
+            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-5 overflow-hidden">
               <div className="mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">RunCrew Chatter</h2>
                 <p className="text-xs text-gray-500">Chat with your crew</p>

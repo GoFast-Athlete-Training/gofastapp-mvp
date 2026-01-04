@@ -92,8 +92,8 @@ export default function RunCrewSettingsPage() {
 
         const crewData = response.data.runCrew;
         setCrew(crewData);
-        setCrewName(crewData.name || '');
-        setCrewDescription(crewData.description || '');
+        setCrewName(crewData.meta?.name || crewData.name || '');
+        setCrewDescription(crewData.meta?.description || crewData.description || '');
         setCrewIcon(crewData.meta?.icon || '');
 
         const currentMembership = crewData.membershipsBox?.memberships?.find(
@@ -136,7 +136,11 @@ export default function RunCrewSettingsPage() {
         // Reload crew data
         const refreshResponse = await api.get(`/runcrew/${runCrewId}`);
         if (refreshResponse.data.success) {
-          setCrew(refreshResponse.data.runCrew);
+          const refreshedCrew = refreshResponse.data.runCrew;
+          setCrew(refreshedCrew);
+          setCrewName(refreshedCrew.meta?.name || refreshedCrew.name || '');
+          setCrewDescription(refreshedCrew.meta?.description || refreshedCrew.description || '');
+          setCrewIcon(refreshedCrew.meta?.icon || '');
         }
       }
     } catch (err: any) {
@@ -263,8 +267,8 @@ export default function RunCrewSettingsPage() {
                 </div>
               ) : null}
               <div>
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Settings</h1>
-                <p className="text-sm sm:text-base text-gray-600 mt-1">{crew.name}</p>
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">RunCrew Settings</h1>
+                <p className="text-sm sm:text-base text-gray-600 mt-1">{crew.meta?.name || crew.name}</p>
               </div>
             </div>
             <div className="flex gap-2 sm:gap-4 flex-shrink-0">

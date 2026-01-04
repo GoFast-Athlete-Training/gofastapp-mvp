@@ -128,6 +128,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
 
+    // Single hydrate call - get crew data once
     let crew;
     try {
       crew = await hydrateCrew(id);
@@ -148,29 +149,72 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden - Admin only' }, { status: 403 });
     }
 
+    // Build update data object
+    const { prisma } = await import('@/lib/prisma');
+    const updateData: any = {};
+
+    // Update name if provided
+    if (body.name !== undefined) {
+      updateData.name = body.name.trim() || null;
+    }
+
+    // Update description if provided
+    if (body.description !== undefined) {
+      updateData.description = body.description?.trim() || null;
+    }
+
+    // Update icon if provided
+    if (body.icon !== undefined) {
+      updateData.icon = body.icon?.trim() || null;
+    }
+
+    // Update logo if provided
+    if (body.logo !== undefined) {
+      updateData.logo = body.logo?.trim() || null;
+    }
+
     // Update message topics if provided
     if (body.messageTopics && Array.isArray(body.messageTopics)) {
-      const { prisma } = await import('@/lib/prisma');
       try {
-        await prisma.runCrew.update({
-          where: { id },
-          data: {
-            messageTopics: body.messageTopics,
-          },
-        });
+        updateData.messageTopics = body.messageTopics;
       } catch (err: any) {
         // If messageTopics column doesn't exist, log warning but don't fail
         if (err?.code === 'P2022' || err?.message?.includes('messageTopics')) {
           console.warn('⚠️ RUNCREW PUT: messageTopics column not found, skipping update. Run migration to add column.');
+          delete updateData.messageTopics;
         } else {
           throw err; // Re-throw if it's a different error
         }
       }
     }
 
-    // Reload crew data
-    const updatedCrew = await hydrateCrew(id);
-    return NextResponse.json({ success: true, runCrew: updatedCrew });
+    // Perform update if there's data to update
+    if (Object.keys(updateData).length > 0) {
+      await prisma.runCrew.update({
+        where: { id },
+        data: updateData,
+      });
+
+      // Update the hydrated crew object with new values (single hydrate, no re-fetch)
+      if (updateData.name !== undefined) {
+        crew.meta.name = updateData.name;
+      }
+      if (updateData.description !== undefined) {
+        crew.meta.description = updateData.description;
+      }
+      if (updateData.icon !== undefined) {
+        crew.meta.icon = updateData.icon;
+      }
+      if (updateData.logo !== undefined) {
+        crew.meta.logo = updateData.logo;
+      }
+      if (updateData.messageTopics !== undefined) {
+        crew.meta.messageTopics = updateData.messageTopics;
+      }
+    }
+
+    // Return the updated crew object (single hydrate, manually updated)
+    return NextResponse.json({ success: true, runCrew: crew });
   } catch (err) {
     console.error('Error updating crew:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
