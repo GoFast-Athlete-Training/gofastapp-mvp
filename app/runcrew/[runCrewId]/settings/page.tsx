@@ -11,6 +11,7 @@ import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
 import { Settings, Users, Trash2, Save, ArrowLeft, Info, Archive } from 'lucide-react';
 import SettingsAppShell from '@/components/RunCrew/SettingsAppShell';
+import TopNav from '@/components/shared/TopNav';
 
 /**
  * RunCrew Settings Page - CLIENT-SIDE
@@ -548,10 +549,10 @@ export default function RunCrewSettingsPage() {
                             e.target.value = '';
                           }}
                           disabled={savingLogo}
-                          className="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex-1 min-w-0 max-w-sm px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                         {savingLogo && (
-                          <span className="text-xs text-orange-600 whitespace-nowrap">Saving...</span>
+                          <span className="text-xs text-orange-600 whitespace-nowrap flex-shrink-0">Saving...</span>
                         )}
                       </div>
                     </div>
@@ -807,9 +808,10 @@ export default function RunCrewSettingsPage() {
   };
 
   return (
-    <>
+    <div className="min-h-screen bg-gray-50">
+      <TopNav />
       {toast && (
-        <div className="fixed top-6 right-6 bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg z-50">
+        <div className="fixed top-20 right-6 bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg z-50">
           {toast}
         </div>
       )}
@@ -932,6 +934,6 @@ export default function RunCrewSettingsPage() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
