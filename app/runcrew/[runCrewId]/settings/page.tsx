@@ -658,66 +658,35 @@ export default function RunCrewSettingsPage() {
                 <p className="text-gray-500 text-center py-4">No admins or managers yet</p>
               ) : (
                 adminsAndManagers.map((membershipItem: any) => {
-                const athlete = membershipItem.athlete || {};
-                return (
-                  <div key={membershipItem.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 min-w-0">
-                    {athlete.photoURL ? (
-                      <img
-                        src={athlete.photoURL}
-                        alt={`${athlete.firstName} ${athlete.lastName}`}
-                        className="w-10 h-10 rounded-full object-cover border border-gray-200 flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
-                        {(athlete.firstName?.[0] || 'A').toUpperCase()}
+                  const athlete = membershipItem.athlete || {};
+                  return (
+                    <div key={membershipItem.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 min-w-0">
+                      {athlete.photoURL ? (
+                        <img
+                          src={athlete.photoURL}
+                          alt={`${athlete.firstName} ${athlete.lastName}`}
+                          className="w-10 h-10 rounded-full object-cover border border-gray-200 flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
+                          {(athlete.firstName?.[0] || 'A').toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {athlete.firstName || 'Athlete'} {athlete.lastName || ''}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {membershipItem.role === 'admin' && (
+                            <span className="text-xs text-orange-600 font-bold">Admin</span>
+                          )}
+                          {membershipItem.role === 'manager' && (
+                            <span className="text-xs text-blue-600 font-bold">Manager</span>
+                          )}
+                        </div>
                       </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate">
-                        {athlete.firstName || 'Athlete'} {athlete.lastName || ''}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        {membershipItem.role === 'admin' && (
-                          <span className="text-xs text-orange-600 font-bold">Admin</span>
-                        )}
-                        {membershipItem.role === 'manager' && (
-                          <span className="text-xs text-blue-600 font-bold">Manager</span>
-                        )}
-                        {membershipItem.role === 'member' && (
-                          <span className="text-xs text-gray-500">Member</span>
-                        )}
-                      </div>
-                    </div>
-                    {membershipItem.athleteId !== currentAthleteId && (
-                      <div className="flex gap-2 flex-shrink-0">
-                        {membershipItem.role !== 'manager' && (
-                          <button
-                            onClick={async () => {
-                              if (confirm(`Promote ${athlete.firstName} ${athlete.lastName} to manager?`)) {
-                                try {
-                                  const response = await api.put(`/runcrew/${runCrewId}/members/${membershipItem.id}/role`, {
-                                    role: 'manager',
-                                  });
-                                  if (response.data.success) {
-                                    showToast('Member promoted to manager');
-                                    // Refresh crew data
-                                    const crewResponse = await api.get(`/runcrew/${runCrewId}`);
-                                    if (crewResponse.data.success && crewResponse.data.runCrew) {
-                                      setCrew(crewResponse.data.runCrew);
-                                    }
-                                  }
-                                } catch (err: any) {
-                                  console.error('Error promoting member:', err);
-                                  showToast(err.response?.data?.error || 'Failed to promote member');
-                                }
-                              }
-                            }}
-                            className="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded-lg whitespace-nowrap"
-                          >
-                            Promote to Manager
-                          </button>
-                        )}
-                        {membershipItem.role === 'manager' && (
+                      {membershipItem.athleteId !== currentAthleteId && (
+                        <div className="flex gap-2 flex-shrink-0">
                           <button
                             onClick={async () => {
                               if (confirm(`Demote ${athlete.firstName} ${athlete.lastName} to member?`)) {
@@ -726,7 +695,7 @@ export default function RunCrewSettingsPage() {
                                     role: 'member',
                                   });
                                   if (response.data.success) {
-                                    showToast('Manager demoted to member');
+                                    showToast(`${membershipItem.role === 'admin' ? 'Admin' : 'Manager'} demoted to member`);
                                     // Refresh crew data
                                     const crewResponse = await api.get(`/runcrew/${runCrewId}`);
                                     if (crewResponse.data.success && crewResponse.data.runCrew) {
@@ -734,8 +703,8 @@ export default function RunCrewSettingsPage() {
                                     }
                                   }
                                 } catch (err: any) {
-                                  console.error('Error demoting member:', err);
-                                  showToast(err.response?.data?.error || 'Failed to demote member');
+                                  console.error('Error demoting:', err);
+                                  showToast(err.response?.data?.error || 'Failed to demote');
                                 }
                               }
                             }}
@@ -743,12 +712,12 @@ export default function RunCrewSettingsPage() {
                           >
                             Demote to Member
                           </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </section>
 
