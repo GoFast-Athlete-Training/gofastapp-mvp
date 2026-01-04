@@ -231,8 +231,8 @@ export default function RunCrewHomePage() {
               )}
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">{crew.meta?.name}</h1>
-                {crew.description && (
-                  <p className="text-gray-600 mt-2">{crew.description}</p>
+                {crew.meta?.description && (
+                  <p className="text-gray-600 mt-2">{crew.meta.description}</p>
                 )}
               </div>
             </div>
