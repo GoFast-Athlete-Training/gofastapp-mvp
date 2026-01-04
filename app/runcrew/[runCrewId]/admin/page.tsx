@@ -58,10 +58,8 @@ export default function RunCrewAdminPage() {
   });
   const [loadingRuns, setLoadingRuns] = useState(false);
 
-  // Message Topics state
-  const [topics, setTopics] = useState<string[]>([]);
-  const [newTopic, setNewTopic] = useState('');
-  const [loadingTopics, setLoadingTopics] = useState(false);
+  // Message Topics (read-only for MVP1 - fixed defaults)
+  const defaultTopics = ['general', 'runs', 'social'];
 
   const timeOptions = [
     '5:00 AM', '5:30 AM', '6:00 AM', '6:30 AM', '7:00 AM', '7:30 AM', '8:00 AM', '8:30 AM', '9:00 AM', '9:30 AM',
@@ -106,17 +104,7 @@ export default function RunCrewAdminPage() {
       setCrew(crewData);
       setAnnouncements(crewData.announcementsBox?.announcements || []);
       setRuns(crewData.runsBox?.runs || []);
-      // Load topics from crew metadata (stored in messageTopics JSON field)
-      // Parse from JSON if it's a string, otherwise use as-is
-      let messageTopics = crewData.runCrewBaseInfo?.messageTopics;
-      if (typeof messageTopics === 'string') {
-        try {
-          messageTopics = JSON.parse(messageTopics);
-        } catch {
-          messageTopics = ['general', 'runs', 'social'];
-        }
-      }
-      setTopics(Array.isArray(messageTopics) ? messageTopics : ['general', 'runs', 'social']);
+      // Topics are fixed defaults for MVP1 (no add/remove functionality)
 
       const currentMembership = crewData.membershipsBox?.memberships?.find(
         (m: any) => m.athleteId === athleteId
@@ -383,63 +371,7 @@ export default function RunCrewAdminPage() {
     }
   };
 
-  const handleAddTopic = async () => {
-    const topic = newTopic.trim().toLowerCase();
-    if (!topic || topics.includes(topic)) return;
-    
-    const updated = [...topics, topic];
-    setTopics(updated);
-    setNewTopic('');
-    
-    try {
-      setLoadingTopics(true);
-      const response = await api.put(`/runcrew/${runCrewId}`, {
-        messageTopics: updated,
-      });
-      
-      if (response.data.success) {
-        showToast(`Topic "${topic}" added`);
-        await loadCrewData(); // Reload to get updated data
-      }
-    } catch (err: any) {
-      console.error('Error adding topic:', err);
-      showToast(err.response?.data?.error || 'Failed to add topic');
-      // Revert on error
-      setTopics(topics);
-    } finally {
-      setLoadingTopics(false);
-    }
-  };
-
-  const handleRemoveTopic = async (index: number) => {
-    const topic = topics[index];
-    if (topic === 'general') {
-      showToast('Cannot remove default "general" topic');
-      return;
-    }
-    
-    const updated = topics.filter((_, i) => i !== index);
-    setTopics(updated);
-    
-    try {
-      setLoadingTopics(true);
-      const response = await api.put(`/runcrew/${runCrewId}`, {
-        messageTopics: updated,
-      });
-      
-      if (response.data.success) {
-        showToast(`Topic "${topic}" removed`);
-        await loadCrewData(); // Reload to get updated data
-      }
-    } catch (err: any) {
-      console.error('Error removing topic:', err);
-      showToast(err.response?.data?.error || 'Failed to remove topic');
-      // Revert on error
-      setTopics(topics);
-    } finally {
-      setLoadingTopics(false);
-    }
-  };
+  // Topic add/remove removed for MVP1 - using fixed defaults
 
   // Loading state
   if (loading) {
@@ -811,68 +743,12 @@ export default function RunCrewAdminPage() {
               </div>
               <MessageFeed 
                 crewId={runCrewId}
-                topics={topics}
+                topics={defaultTopics}
                 selectedTopic="general"
                 isAdmin={true}
               />
             </section>
 
-            {/* Message Topics Configuration */}
-            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 space-y-4 min-w-0">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Message Topics</h2>
-                <p className="text-xs text-gray-500">Configure topics for crew messaging</p>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newTopic}
-                    onChange={(e) => setNewTopic(e.target.value)}
-                    placeholder="Add a topic (e.g., 'general', 'runs', 'social')"
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddTopic();
-                      }
-                    }}
-                  />
-                  <button
-                    onClick={handleAddTopic}
-                    disabled={loadingTopics || !newTopic.trim() || topics.includes(newTopic.trim().toLowerCase())}
-                    className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold transition"
-                  >
-                    Add
-                  </button>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {topics.map((topic, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-1.5"
-                    >
-                      <span className="text-sm font-medium text-orange-900">{topic}</span>
-                      {topic !== 'general' && (
-                        <button
-                          onClick={() => handleRemoveTopic(index)}
-                          className="text-orange-600 hover:text-orange-800 text-xs"
-                          disabled={loadingTopics}
-                        >
-                          ×
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {topics.length === 0 && (
-                  <p className="text-xs text-gray-500">No topics configured. Add topics to organize crew messages.</p>
-                )}
-              </div>
-            </section>
           </div>
         </div>
       </main>
