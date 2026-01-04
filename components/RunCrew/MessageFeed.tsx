@@ -25,7 +25,7 @@ interface Message {
   };
 }
 
-export default function MessageFeed({ crewId, topics = ['general'], selectedTopic = 'general', onTopicChange, isAdmin = false }: MessageFeedProps) {
+export default function MessageFeed({ crewId, topics = ['#general', '#runs', '#training tips', '#myvictories', '#social'], selectedTopic = '#general', onTopicChange, isAdmin = false }: MessageFeedProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
