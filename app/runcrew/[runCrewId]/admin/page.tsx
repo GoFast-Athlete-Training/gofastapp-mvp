@@ -58,8 +58,8 @@ export default function RunCrewAdminPage() {
   });
   const [loadingRuns, setLoadingRuns] = useState(false);
 
-  // Message Topics (read-only for MVP1 - fixed defaults)
-  const defaultTopics = ['general', 'runs', 'social'];
+  // Message Topics (read-only for MVP1 - fixed defaults, Slack-style with # prefix)
+  const defaultTopics = ['#general', '#runs', '#training tips', '#myvictories', '#social'];
 
   const timeOptions = [
     '5:00 AM', '5:30 AM', '6:00 AM', '6:30 AM', '7:00 AM', '7:30 AM', '8:00 AM', '8:30 AM', '9:00 AM', '9:30 AM',
@@ -744,7 +744,7 @@ export default function RunCrewAdminPage() {
               <MessageFeed 
                 crewId={runCrewId}
                 topics={defaultTopics}
-                selectedTopic="general"
+                selectedTopic="#general"
                 isAdmin={true}
               />
             </section>

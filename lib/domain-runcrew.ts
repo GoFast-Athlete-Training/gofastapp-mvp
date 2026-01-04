@@ -65,7 +65,7 @@ export async function joinCrew(joinCode: string, athleteId: string) {
 
 export async function hydrateCrew(runCrewId: string) {
   // First, try to get messageTopics safely using raw query (column may not exist)
-  let messageTopics = ['general', 'runs', 'social'];
+  let messageTopics = ['#general', '#runs', '#training tips', '#myvictories', '#social'];
   try {
     const crewWithTopics = await prisma.$queryRaw<Array<{ messageTopics: any }>>`
       SELECT messageTopics FROM run_crews WHERE id = ${runCrewId} LIMIT 1

@@ -571,8 +571,8 @@ export default function RunCrewMemberPage() {
               </div>
               <MessageFeed 
                 crewId={runCrewId}
-                topics={crew.runCrewBaseInfo?.messageTopics || ['general', 'runs', 'social']}
-                selectedTopic="general"
+                topics={crew.runCrewBaseInfo?.messageTopics || ['#general', '#runs', '#training tips', '#myvictories', '#social']}
+                selectedTopic="#general"
                 isAdmin={isAdmin}
               />
             </section>

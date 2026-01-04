@@ -83,7 +83,7 @@ export async function POST(
         runCrewId: id,
         athleteId: athlete.id,
         content,
-        topic: topic || 'general', // Default to 'general' if not provided
+        topic: topic || '#general', // Default to '#general' if not provided
       });
     } catch (err) {
       console.error('Prisma error:', err);
