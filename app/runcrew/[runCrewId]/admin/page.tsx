@@ -44,6 +44,7 @@ export default function RunCrewAdminPage() {
   // Runs state
   const [runs, setRuns] = useState<any[]>([]);
   const [showRunModal, setShowRunModal] = useState(false);
+  const [editingRunId, setEditingRunId] = useState<string | null>(null);
   const [runForm, setRunForm] = useState({
     title: '',
     date: '',
@@ -248,35 +249,68 @@ export default function RunCrewAdminPage() {
 
     try {
       setLoadingRuns(true);
-      const response = await api.post(`/runcrew/${runCrewId}/runs`, {
-        title: runForm.title.trim(),
-        date: isoDate,
-        startTime: runForm.time,
-        meetUpPoint: runForm.meetUpPoint.trim(),
-        meetUpAddress: runForm.meetUpAddress.trim() || null,
-        totalMiles: runForm.totalMiles ? parseFloat(runForm.totalMiles) : null,
-        pace: runForm.pace || null,
-        description: runForm.description.trim() || null,
-      });
-
-      if (response.data.success) {
-        setRunForm({
-          title: '',
-          date: '',
-          time: '',
-          meetUpPoint: '',
-          meetUpAddress: '',
-          totalMiles: '',
-          pace: '',
-          description: '',
+      
+      if (editingRunId) {
+        // Update existing run
+        const response = await api.put(`/runcrew/${runCrewId}/runs/${editingRunId}`, {
+          title: runForm.title.trim(),
+          date: isoDate,
+          startTime: runForm.time,
+          meetUpPoint: runForm.meetUpPoint.trim(),
+          meetUpAddress: runForm.meetUpAddress.trim() || null,
+          totalMiles: runForm.totalMiles ? parseFloat(runForm.totalMiles) : null,
+          pace: runForm.pace || null,
+          description: runForm.description.trim() || null,
         });
-        setShowRunModal(false);
-        await loadCrewData(); // Reload to get updated runs
-        showToast('Run created successfully');
+
+        if (response.data.success) {
+          setRunForm({
+            title: '',
+            date: '',
+            time: '',
+            meetUpPoint: '',
+            meetUpAddress: '',
+            totalMiles: '',
+            pace: '',
+            description: '',
+          });
+          setEditingRunId(null);
+          setShowRunModal(false);
+          await loadCrewData(); // Reload to get updated runs
+          showToast('Run updated successfully');
+        }
+      } else {
+        // Create new run
+        const response = await api.post(`/runcrew/${runCrewId}/runs`, {
+          title: runForm.title.trim(),
+          date: isoDate,
+          startTime: runForm.time,
+          meetUpPoint: runForm.meetUpPoint.trim(),
+          meetUpAddress: runForm.meetUpAddress.trim() || null,
+          totalMiles: runForm.totalMiles ? parseFloat(runForm.totalMiles) : null,
+          pace: runForm.pace || null,
+          description: runForm.description.trim() || null,
+        });
+
+        if (response.data.success) {
+          setRunForm({
+            title: '',
+            date: '',
+            time: '',
+            meetUpPoint: '',
+            meetUpAddress: '',
+            totalMiles: '',
+            pace: '',
+            description: '',
+          });
+          setShowRunModal(false);
+          await loadCrewData(); // Reload to get updated runs
+          showToast('Run created successfully');
+        }
       }
     } catch (err: any) {
-      console.error('Error creating run:', err);
-      showToast(err.response?.data?.error || 'Failed to create run');
+      console.error('Error saving run:', err);
+      showToast(err.response?.data?.error || `Failed to ${editingRunId ? 'update' : 'create'} run`);
     } finally {
       setLoadingRuns(false);
     }
@@ -295,6 +329,51 @@ export default function RunCrewAdminPage() {
       });
     } catch {
       return date;
+    }
+  };
+
+  const formatDateForInput = (dateString: string) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+    } catch {
+      return '';
+    }
+  };
+
+  const handleEditRun = (run: any) => {
+    setEditingRunId(run.id);
+    setRunForm({
+      title: run.title || '',
+      date: formatDateForInput(run.date || run.scheduledAt),
+      time: run.startTime || '',
+      meetUpPoint: run.meetUpPoint || '',
+      meetUpAddress: run.meetUpAddress || '',
+      totalMiles: run.totalMiles ? run.totalMiles.toString() : '',
+      pace: run.pace || '',
+      description: run.description || '',
+    });
+    setShowRunModal(true);
+  };
+
+  const handleDeleteRun = async (runId: string, runTitle: string) => {
+    if (!confirm(`Are you sure you want to delete "${runTitle}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setLoadingRuns(true);
+      const response = await api.delete(`/runcrew/${runCrewId}/runs/${runId}`);
+      if (response.data.success) {
+        showToast('Run deleted successfully');
+        await loadCrewData(); // Reload to get updated runs
+      }
+    } catch (err: any) {
+      console.error('Error deleting run:', err);
+      showToast(err.response?.data?.error || 'Failed to delete run');
+    } finally {
+      setLoadingRuns(false);
     }
   };
 
@@ -640,49 +719,79 @@ export default function RunCrewAdminPage() {
                   </div>
                 ) : (
                   runs.map((run: any) => (
-                    <Link
+                    <div
                       key={run.id}
-                      href={`/runcrew/${runCrewId}/runs/${run.id}`}
-                      className="block border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition"
+                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition"
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-semibold text-gray-900 mb-1">{run.title || 'Untitled Run'}</h3>
+                      <div className="flex items-start justify-between gap-4">
+                        <Link
+                          href={`/runcrew/${runCrewId}/runs/${run.id}`}
+                          className="flex-1 min-w-0"
+                        >
+                          <h3 className="text-sm font-semibold text-gray-900 mb-1 hover:text-orange-600">{run.title || 'Untitled Run'}</h3>
                           <div className="text-xs text-gray-600 space-y-1">
                             <p className="flex items-center gap-1">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>
-                              {formatRunDate(run)}
+                              <span className="truncate">{formatRunDate(run)}</span>
                             </p>
                             {run.meetUpPoint && (
                               <p className="flex items-center gap-1">
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
-                                {run.meetUpPoint}
+                                <span className="truncate">{run.meetUpPoint}</span>
+                              </p>
+                            )}
+                            {run.meetUpAddress && (
+                              <p className="flex items-center gap-1 text-gray-500">
+                                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                <span className="truncate">{run.meetUpAddress}</span>
                               </p>
                             )}
                             {(run.totalMiles || run.pace) && (
                               <p className="flex items-center gap-1">
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                 </svg>
-                                {run.totalMiles ? `${run.totalMiles} miles` : ''}
-                                {run.totalMiles && run.pace ? ' • ' : ''}
-                                {run.pace ? `${run.pace} pace` : ''}
+                                <span className="truncate">
+                                  {run.totalMiles ? `${run.totalMiles} miles` : ''}
+                                  {run.totalMiles && run.pace ? ' • ' : ''}
+                                  {run.pace ? `${run.pace} pace` : ''}
+                                </span>
                               </p>
                             )}
                           </div>
-                        </div>
-                        <div className="ml-4 flex-shrink-0">
-                          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
+                        </Link>
+                        <div className="flex gap-2 flex-shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleEditRun(run);
+                            }}
+                            className="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-xs font-semibold transition"
+                            disabled={loadingRuns}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleDeleteRun(run.id, run.title);
+                            }}
+                            className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-semibold transition"
+                            disabled={loadingRuns}
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
-                    </Link>
+                    </div>
                   ))
                 )}
               </div>
@@ -767,9 +876,22 @@ export default function RunCrewAdminPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">Create Run</h2>
+              <h2 className="text-xl font-bold text-gray-900">{editingRunId ? 'Edit Run' : 'Create Run'}</h2>
               <button 
-                onClick={() => setShowRunModal(false)} 
+                onClick={() => {
+                  setShowRunModal(false);
+                  setEditingRunId(null);
+                  setRunForm({
+                    title: '',
+                    date: '',
+                    time: '',
+                    meetUpPoint: '',
+                    meetUpAddress: '',
+                    totalMiles: '',
+                    pace: '',
+                    description: '',
+                  });
+                }} 
                 className="text-gray-400 hover:text-gray-600 transition"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -902,7 +1024,7 @@ export default function RunCrewAdminPage() {
                   disabled={loadingRuns}
                   className="bg-orange-500 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-orange-600 transition disabled:opacity-50"
                 >
-                  {loadingRuns ? 'Creating...' : 'Create Run'}
+                  {loadingRuns ? (editingRunId ? 'Updating...' : 'Creating...') : (editingRunId ? 'Update Run' : 'Create Run')}
                 </button>
               </div>
             </form>

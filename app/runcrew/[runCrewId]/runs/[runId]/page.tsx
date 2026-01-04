@@ -214,10 +214,6 @@ export default function RunDetailPage() {
     );
   }
 
-  const isAdmin = membership?.role === 'admin';
-  const isManager = membership?.role === 'manager';
-  const canEdit = isAdmin || isManager;
-
   // Group RSVPs by status (handle both 'not_going' and 'not-going' for compatibility)
   const rsvps = run.rsvps || [];
   const going = rsvps.filter((r: any) => r.status === 'going');
@@ -265,37 +261,6 @@ export default function RunDetailPage() {
                 <p className="text-sm text-gray-600 mt-1">{crew.runCrewBaseInfo?.name}</p>
               </div>
             </div>
-            {canEdit && (
-              <div className="flex gap-2">
-                <button
-                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm"
-                  onClick={() => {
-                    // TODO: Implement edit modal/form
-                    alert('Edit run - modal coming soon. For now, use the admin page to edit runs.');
-                  }}
-                >
-                  Edit Run
-                </button>
-                <button
-                  className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm"
-                  onClick={async () => {
-                    if (confirm('Are you sure you want to delete this run? This action cannot be undone.')) {
-                      try {
-                        const response = await api.delete(`/runcrew/${runCrewId}/runs/${runId}`);
-                        if (response.data.success) {
-                          router.push(`/runcrew/${runCrewId}/member`);
-                        }
-                      } catch (err: any) {
-                        console.error('Error deleting run:', err);
-                        alert(err.response?.data?.error || 'Failed to delete run');
-                      }
-                    }
-                  }}
-                >
-                  Delete Run
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </header>
