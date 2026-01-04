@@ -80,14 +80,20 @@ export default function GooglePlacesAutocomplete({
         autocompleteRef.current.addListener('place_changed', () => {
           const place = autocompleteRef.current.getPlace();
 
-          if (place && place.geometry) {
+          // Only process if place has geometry (valid selection)
+          if (place && place.geometry && place.formatted_address) {
             const placeData = {
-              address: place.formatted_address || '',
+              address: place.formatted_address,
               name: place.name || '',
               placeId: place.place_id || '',
               lat: place.geometry.location.lat(),
               lng: place.geometry.location.lng(),
             };
+
+            // Update the input value directly to avoid conflicts
+            if (inputRef.current) {
+              inputRef.current.value = place.formatted_address;
+            }
 
             if (onPlaceSelected) {
               onPlaceSelected(placeData);
