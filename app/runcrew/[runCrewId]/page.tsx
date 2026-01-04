@@ -256,7 +256,7 @@ export default function RunCrewHomePage() {
               Welcome to {crew.meta?.name}!
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              {crew.description || 'Get ready to run with your crew and achieve your goals together.'}
+              {crew.meta?.description || 'Get ready to run with your crew and achieve your goals together.'}
             </p>
           </div>
 
