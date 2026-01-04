@@ -9,7 +9,8 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
-import { Settings, Users, Trash2, Save, ArrowLeft } from 'lucide-react';
+import { Settings, Users, Trash2, Save, ArrowLeft, Info, Archive } from 'lucide-react';
+import SettingsAppShell from '@/components/RunCrew/SettingsAppShell';
 
 /**
  * RunCrew Settings Page - CLIENT-SIDE
@@ -55,6 +56,9 @@ export default function RunCrewSettingsPage() {
   
   // RunCrew Graphic UX mode
   const [graphicMode, setGraphicMode] = useState<'view' | 'edit'>('view');
+  
+  // Settings navigation
+  const [activeSection, setActiveSection] = useState<'info' | 'manager' | 'lifecycle'>('info');
   
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -412,261 +416,209 @@ export default function RunCrewSettingsPage() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {toast && (
-        <div className="fixed top-6 right-6 bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg z-50">
-          {toast}
-        </div>
-      )}
+  // Render crew graphic for sidebar
+  const crewGraphic = crew.runCrewBaseInfo?.logo ? (
+    <img
+      src={crew.runCrewBaseInfo.logo}
+      alt={crew.runCrewBaseInfo?.name || 'RunCrew'}
+      className="w-12 h-12 rounded-xl object-cover border-2 border-gray-200 flex-shrink-0"
+    />
+  ) : (
+    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-2xl border-2 border-gray-200 flex-shrink-0">
+      {crew.runCrewBaseInfo?.icon || '🏃'}
+    </div>
+  );
 
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              {/* Always render graphic - emoji OR logo, never missing */}
-              {crew.runCrewBaseInfo?.logo ? (
-                <img
-                  src={crew.runCrewBaseInfo.logo}
-                  alt={crew.runCrewBaseInfo?.name || 'RunCrew'}
-                  className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl object-cover border-2 border-gray-200 flex-shrink-0"
-                />
-              ) : (
-                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-2xl sm:text-3xl border-2 border-gray-200 flex-shrink-0">
-                  {crew.runCrewBaseInfo?.icon || '🏃'}
-                </div>
-              )}
-              <div>
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">{crew.runCrewBaseInfo?.name || 'RunCrew'}</h1>
-                <p className="text-sm sm:text-base text-gray-600 mt-1">Settings</p>
-              </div>
-            </div>
-            <div className="flex gap-2 sm:gap-4 flex-shrink-0">
-              <Link
-                href={`/runcrew/${runCrewId}/admin`}
-                className="flex items-center gap-2 text-sm sm:text-base text-gray-600 hover:text-gray-900 px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-100 whitespace-nowrap"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Return as Manager
-              </Link>
-              <Link
-                href={`/runcrew/${runCrewId}/member`}
-                className="flex items-center gap-2 text-sm sm:text-base text-gray-600 hover:text-gray-900 px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-100 whitespace-nowrap"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Return as Member
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-6 py-10">
-        <div className="space-y-6">
-          {/* General Settings */}
-          <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 w-full min-w-0">
-            <div className="flex items-center gap-2 mb-6">
-              <Settings className="w-5 h-5 text-gray-600 flex-shrink-0" />
-              <h2 className="text-xl font-bold text-gray-900">General Settings</h2>
-            </div>
-
-            <div className="space-y-6">
-              {/* RunCrew Graphic - Identity Editor */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  RunCrew Graphic
-                </label>
-                
-                {graphicMode === 'view' ? (
-                  /* DEFAULT MODE: Identity Confirmation */
-                  <div className="flex items-center gap-4">
-                    {/* Always render graphic - emoji OR logo, never missing */}
-                    {crewLogo ? (
-                      <img
-                        src={crewLogo}
-                        alt={crew.runCrewBaseInfo?.name || 'RunCrew'}
-                        className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200 flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-3xl border-2 border-gray-200 flex-shrink-0">
-                        {crewIcon || '🏃'}
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900">{crew.runCrewBaseInfo?.name || 'RunCrew'}</p>
+  // Render section content
+  const renderSectionContent = () => {
+    switch (activeSection) {
+      case 'info':
+        return (
+          <div className="space-y-6">
+            <h1 className="text-2xl font-bold text-gray-900">Info</h1>
+            
+            {/* RunCrew Graphic */}
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
+                RunCrew Graphic
+              </label>
+              
+              {graphicMode === 'view' ? (
+                <div className="flex items-center gap-4">
+                  {crewLogo ? (
+                    <img
+                      src={crewLogo}
+                      alt={crew.runCrewBaseInfo?.name || 'RunCrew'}
+                      className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200 flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-3xl border-2 border-gray-200 flex-shrink-0">
+                      {crewIcon || '🏃'}
                     </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">{crew.runCrewBaseInfo?.name || 'RunCrew'}</p>
+                  </div>
+                  <button
+                    onClick={() => setGraphicMode('edit')}
+                    className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition whitespace-nowrap"
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-sm text-gray-600">Choose how your RunCrew appears</p>
                     <button
-                      onClick={() => setGraphicMode('edit')}
-                      className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition whitespace-nowrap"
+                      onClick={() => {
+                        setGraphicMode('view');
+                        setCrewIcon(originalIcon);
+                        setCrewLogo(originalLogo);
+                      }}
+                      className="text-sm text-gray-600 hover:text-gray-900"
                     >
-                      Change
+                      Cancel
                     </button>
                   </div>
-                ) : (
-                  /* CHANGE MODE: Forked Choice */
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <p className="text-sm text-gray-600">Choose how your RunCrew appears</p>
-                      <button
-                        onClick={() => {
-                          setGraphicMode('view');
-                          // Reset to original values on cancel
-                          setCrewIcon(originalIcon);
-                          setCrewLogo(originalLogo);
-                        }}
-                        className="text-sm text-gray-600 hover:text-gray-900"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                    
-                    {/* Card 1: Select Emoji */}
-                    <div className="border border-gray-200 rounded-lg p-4">
-                      <h3 className="text-sm font-semibold text-gray-900 mb-3">Select Emoji</h3>
-                      <div className="max-w-md">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={crewIcon}
-                            onChange={(e) => setCrewIcon(e.target.value)}
-                            placeholder="🏃"
-                            maxLength={2}
-                            className="w-20 text-center px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-2xl"
-                          />
-                          <button
-                            onClick={async () => {
-                              // Set emoji - this replaces logo (logo goes away)
-                              setCrewLogo('');
-                              await handleSaveIcon();
-                              setGraphicMode('view');
-                            }}
-                            disabled={savingIcon || !crewIcon.trim()}
-                            className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                          >
-                            <Save className="w-3 h-3" />
-                            {savingIcon ? 'Saving...' : 'Save'}
-                          </button>
-                        </div>
+                  
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Select Emoji</h3>
+                    <div className="max-w-md">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={crewIcon}
+                          onChange={(e) => setCrewIcon(e.target.value)}
+                          placeholder="🏃"
+                          maxLength={2}
+                          className="w-20 text-center px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-2xl"
+                        />
+                        <button
+                          onClick={async () => {
+                            setCrewLogo('');
+                            await handleSaveIcon();
+                            setGraphicMode('view');
+                          }}
+                          disabled={savingIcon || !crewIcon.trim()}
+                          className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        >
+                          <Save className="w-3 h-3" />
+                          {savingIcon ? 'Saving...' : 'Save'}
+                        </button>
                       </div>
                     </div>
+                  </div>
 
-                    {/* Card 2: Add Logo */}
-                    <div className="border border-gray-200 rounded-lg p-4">
-                      <h3 className="text-sm font-semibold text-gray-900 mb-3">Add Logo</h3>
-                      <div className="max-w-md">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Add Logo</h3>
+                    <div className="max-w-md">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            
+                            try {
+                              setSavingLogo(true);
+                              const formData = new FormData();
+                              formData.append('file', file);
                               
-                              try {
-                                setSavingLogo(true);
-                                // Upload to blob storage
-                                const formData = new FormData();
-                                formData.append('file', file);
-                                
-                                const uploadResponse = await api.post('/upload', formData, {
-                                  headers: {
-                                    'Content-Type': 'multipart/form-data',
-                                  },
-                                });
-                                
-                                if (uploadResponse.data.success && uploadResponse.data.url) {
-                                  // Upload logo - this replaces icon (icon goes away)
-                                  setCrewLogo(uploadResponse.data.url);
-                                  setCrewIcon('');
-                                  await handleSaveLogo();
-                                  setGraphicMode('view');
-                                } else {
-                                  showToast('Failed to upload logo');
-                                  setSavingLogo(false);
-                                }
-                              } catch (err: any) {
-                                console.error('Error uploading logo:', err);
-                                showToast(err.response?.data?.error || 'Failed to upload logo');
+                              const uploadResponse = await api.post('/upload', formData, {
+                                headers: { 'Content-Type': 'multipart/form-data' },
+                              });
+                              
+                              if (uploadResponse.data.success && uploadResponse.data.url) {
+                                setCrewLogo(uploadResponse.data.url);
+                                setCrewIcon('');
+                                await handleSaveLogo();
+                                setGraphicMode('view');
+                              } else {
+                                showToast('Failed to upload logo');
                                 setSavingLogo(false);
                               }
-                              
-                              e.target.value = '';
-                            }}
-                            disabled={savingLogo}
-                            className="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                          />
-                          {savingLogo && (
-                            <span className="text-xs text-orange-600 whitespace-nowrap">Saving...</span>
-                          )}
-                        </div>
+                            } catch (err: any) {
+                              console.error('Error uploading logo:', err);
+                              showToast(err.response?.data?.error || 'Failed to upload logo');
+                              setSavingLogo(false);
+                            }
+                            
+                            e.target.value = '';
+                          }}
+                          disabled={savingLogo}
+                          className="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                        {savingLogo && (
+                          <span className="text-xs text-orange-600 whitespace-nowrap">Saving...</span>
+                        )}
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Crew Name */}
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Crew Name
+                </label>
+                {crewName.trim() !== originalName && (
+                  <button
+                    onClick={handleSaveName}
+                    disabled={savingName || !crewName.trim()}
+                    className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Save className="w-3 h-3" />
+                    {savingName ? 'Saving...' : 'Save'}
+                  </button>
                 )}
               </div>
-
-              {/* Crew Name */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Crew Name
-                  </label>
-                  {crewName.trim() !== originalName && (
-                    <button
-                      onClick={handleSaveName}
-                      disabled={savingName || !crewName.trim()}
-                      className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Save className="w-3 h-3" />
-                      {savingName ? 'Saving...' : 'Save'}
-                    </button>
-                  )}
-                </div>
-                <input
-                  type="text"
-                  value={crewName}
-                  onChange={(e) => setCrewName(e.target.value)}
-                  className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  placeholder="Enter crew name"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Description
-                  </label>
-                  {(crewDescription.trim() || '') !== originalDescription && (
-                    <button
-                      onClick={handleSaveDescription}
-                      disabled={savingDescription}
-                      className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Save className="w-3 h-3" />
-                      {savingDescription ? 'Saving...' : 'Save'}
-                    </button>
-                  )}
-                </div>
-                <textarea
-                  value={crewDescription}
-                  onChange={(e) => setCrewDescription(e.target.value)}
-                  rows={4}
-                  className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-y"
-                  placeholder="Enter crew description (optional)"
-                />
-              </div>
-
+              <input
+                type="text"
+                value={crewName}
+                onChange={(e) => setCrewName(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                placeholder="Enter crew name"
+              />
             </div>
-          </section>
 
-          {/* Admin/Managers */}
-          <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 w-full min-w-0">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-gray-600 flex-shrink-0" />
-                <h2 className="text-xl font-bold text-gray-900">Admin/Managers ({adminsAndManagers.length})</h2>
+            {/* Description */}
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Description
+                </label>
+                {(crewDescription.trim() || '') !== originalDescription && (
+                  <button
+                    onClick={handleSaveDescription}
+                    disabled={savingDescription}
+                    className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Save className="w-3 h-3" />
+                    {savingDescription ? 'Saving...' : 'Save'}
+                  </button>
+                )}
               </div>
+              <textarea
+                value={crewDescription}
+                onChange={(e) => setCrewDescription(e.target.value)}
+                rows={4}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-y"
+                placeholder="Enter crew description (optional)"
+              />
+            </div>
+          </div>
+        );
+
+      case 'manager':
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h1 className="text-2xl font-bold text-gray-900">Manager</h1>
               <button
                 onClick={() => setShowAddManagerModal(true)}
                 className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-semibold transition"
@@ -676,40 +628,42 @@ export default function RunCrewSettingsPage() {
               </button>
             </div>
 
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {adminsAndManagers.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">No admins or managers yet</p>
-              ) : (
-                adminsAndManagers.map((membershipItem: any) => {
-                  const athlete = membershipItem.athlete || {};
-                  return (
-                    <div key={membershipItem.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 min-w-0">
-                      {athlete.photoURL ? (
-                        <img
-                          src={athlete.photoURL}
-                          alt={`${athlete.firstName} ${athlete.lastName}`}
-                          className="w-10 h-10 rounded-full object-cover border border-gray-200 flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
-                          {(athlete.firstName?.[0] || 'A').toUpperCase()}
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">Admin/Managers ({adminsAndManagers.length})</h2>
+              
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {adminsAndManagers.length === 0 ? (
+                  <p className="text-gray-500 text-center py-4">No admins or managers yet</p>
+                ) : (
+                  adminsAndManagers.map((membershipItem: any) => {
+                    const athlete = membershipItem.athlete || {};
+                    return (
+                      <div key={membershipItem.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                        {athlete.photoURL ? (
+                          <img
+                            src={athlete.photoURL}
+                            alt={`${athlete.firstName} ${athlete.lastName}`}
+                            className="w-10 h-10 rounded-full object-cover border border-gray-200 flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
+                            {(athlete.firstName?.[0] || 'A').toUpperCase()}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">
+                            {athlete.firstName || 'Athlete'} {athlete.lastName || ''}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            {membershipItem.role === 'admin' && (
+                              <span className="text-xs text-orange-600 font-bold">Admin</span>
+                            )}
+                            {membershipItem.role === 'manager' && (
+                              <span className="text-xs text-blue-600 font-bold">Manager</span>
+                            )}
+                          </div>
                         </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">
-                          {athlete.firstName || 'Athlete'} {athlete.lastName || ''}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          {membershipItem.role === 'admin' && (
-                            <span className="text-xs text-orange-600 font-bold">Admin</span>
-                          )}
-                          {membershipItem.role === 'manager' && (
-                            <span className="text-xs text-blue-600 font-bold">Manager</span>
-                          )}
-                        </div>
-                      </div>
-                      {membershipItem.athleteId !== currentAthleteId && (
-                        <div className="flex gap-2 flex-shrink-0">
+                        {membershipItem.athleteId !== currentAthleteId && (
                           <button
                             onClick={async () => {
                               if (confirm(`Demote ${athlete.firstName} ${athlete.lastName} to member?`)) {
@@ -719,7 +673,6 @@ export default function RunCrewSettingsPage() {
                                   });
                                   if (response.data.success) {
                                     showToast(`${membershipItem.role === 'admin' ? 'Admin' : 'Manager'} demoted to member`);
-                                    // Refresh crew data
                                     const crewResponse = await api.get(`/runcrew/${runCrewId}`);
                                     if (crewResponse.data.success && crewResponse.data.runCrew) {
                                       setCrew(crewResponse.data.runCrew);
@@ -735,115 +688,140 @@ export default function RunCrewSettingsPage() {
                           >
                             Demote to Member
                           </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </section>
+          </div>
+        );
 
-          {/* Danger Zone */}
-          <section className="bg-white rounded-lg border-2 border-red-200 shadow-sm p-6 w-full min-w-0">
-            <h2 className="text-xl font-bold text-red-900 mb-6">Danger Zone</h2>
+      case 'lifecycle':
+        return (
+          <div className="space-y-6">
+            <h1 className="text-2xl font-bold text-gray-900">Page Lifecycle</h1>
+            
+            <div className="bg-white rounded-lg border-2 border-red-200 p-6">
+              <h2 className="text-lg font-bold text-red-900 mb-6">Danger Zone</h2>
 
-            <div className="space-y-6">
-              <>
-                  {/* Transfer Ownership */}
-                  <div className="border-b border-red-200 pb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Transfer Ownership</h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Transfer ownership of this RunCrew to another member. You will become a regular member.
-                    </p>
-                    <select
-                      value=""
-                      onChange={async (e) => {
-                        const newOwnerMembershipId = e.target.value;
-                        if (!newOwnerMembershipId) return;
-                        
-                        const newOwner = memberships.find((m: any) => m.id === newOwnerMembershipId);
-                        if (!newOwner) return;
-                        
-                        const athlete = newOwner.athlete || {};
-                        if (confirm(`Transfer ownership to ${athlete.firstName} ${athlete.lastName}? You will become a regular member.`)) {
-                          try {
-                            const response = await api.post(`/runcrew/${runCrewId}/transfer-ownership`, {
-                              newOwnerMembershipId,
-                            });
-                            if (response.data.success) {
-                              showToast('Ownership transferred successfully');
-                              router.push(`/runcrew/${runCrewId}/member`);
-                            }
-                          } catch (err: any) {
-                            console.error('Error transferring ownership:', err);
-                            showToast(err.response?.data?.error || 'Failed to transfer ownership');
+              <div className="space-y-6">
+                {/* Transfer Ownership */}
+                <div className="border-b border-red-200 pb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Transfer Ownership</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Transfer ownership of this RunCrew to another member. You will become a regular member.
+                  </p>
+                  <select
+                    value=""
+                    onChange={async (e) => {
+                      const newOwnerMembershipId = e.target.value;
+                      if (!newOwnerMembershipId) return;
+                      
+                      const newOwner = memberships.find((m: any) => m.id === newOwnerMembershipId);
+                      if (!newOwner) return;
+                      
+                      const athlete = newOwner.athlete || {};
+                      if (confirm(`Transfer ownership to ${athlete.firstName} ${athlete.lastName}? You will become a regular member.`)) {
+                        try {
+                          const response = await api.post(`/runcrew/${runCrewId}/transfer-ownership`, {
+                            newOwnerMembershipId,
+                          });
+                          if (response.data.success) {
+                            showToast('Ownership transferred successfully');
+                            router.push(`/runcrew/${runCrewId}/member`);
                           }
+                        } catch (err: any) {
+                          console.error('Error transferring ownership:', err);
+                          showToast(err.response?.data?.error || 'Failed to transfer ownership');
                         }
-                        e.target.value = '';
-                      }}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 mb-2"
-                    >
-                      <option value="">Select a member...</option>
-                      {memberships
-                        .filter((m: any) => m.athleteId !== membership?.athleteId)
-                        .map((m: any) => {
-                          const athlete = m.athlete || {};
-                          return (
-                            <option key={m.id} value={m.id}>
-                              {athlete.firstName} {athlete.lastName} {m.role === 'manager' ? '(Manager)' : ''}
-                            </option>
-                          );
-                        })}
-                    </select>
-                  </div>
+                      }
+                      e.target.value = '';
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 mb-2"
+                  >
+                    <option value="">Select a member...</option>
+                    {memberships
+                      .filter((m: any) => m.athleteId !== membership?.athleteId)
+                      .map((m: any) => {
+                        const athlete = m.athlete || {};
+                        return (
+                          <option key={m.id} value={m.id}>
+                            {athlete.firstName} {athlete.lastName} {m.role === 'manager' ? '(Manager)' : ''}
+                          </option>
+                        );
+                      })}
+                  </select>
+                </div>
 
-                  {/* Archive RunCrew */}
-                  <div className="border-b border-red-200 pb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Archive RunCrew</h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Archive this RunCrew. Members can still view history, but no new activity can be created.
-                    </p>
-                    <button
-                      onClick={async () => {
-                        if (confirm(`Archive "${crew.runCrewBaseInfo?.name}"? Members can still view history, but no new runs, announcements, or messages can be created.`)) {
-                          try {
-                            const response = await api.post(`/runcrew/${runCrewId}/archive`);
-                            if (response.data.success) {
-                              showToast('RunCrew archived successfully');
-                              router.push('/welcome');
-                            }
-                          } catch (err: any) {
-                            console.error('Error archiving crew:', err);
-                            showToast(err.response?.data?.error || 'Failed to archive RunCrew');
+                {/* Archive RunCrew */}
+                <div className="border-b border-red-200 pb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Archive RunCrew</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Archive this RunCrew. Members can still view history, but no new activity can be created.
+                  </p>
+                  <button
+                    onClick={async () => {
+                      if (confirm(`Archive "${crew.runCrewBaseInfo?.name}"? Members can still view history, but no new runs, announcements, or messages can be created.`)) {
+                        try {
+                          const response = await api.post(`/runcrew/${runCrewId}/archive`);
+                          if (response.data.success) {
+                            showToast('RunCrew archived successfully');
+                            router.push('/welcome');
                           }
+                        } catch (err: any) {
+                          console.error('Error archiving crew:', err);
+                          showToast(err.response?.data?.error || 'Failed to archive RunCrew');
                         }
-                      }}
-                      className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold"
-                    >
-                      Archive RunCrew
-                    </button>
-                  </div>
+                      }
+                    }}
+                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold"
+                  >
+                    Archive RunCrew
+                  </button>
+                </div>
 
-                  {/* Delete RunCrew */}
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete RunCrew</h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Permanently delete this RunCrew. This action cannot be undone and all data will be lost.
-                    </p>
-                    <button
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Delete RunCrew
-                    </button>
-                  </div>
-                </>
+                {/* Delete RunCrew */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete RunCrew</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Permanently delete this RunCrew. This action cannot be undone and all data will be lost.
+                  </p>
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete RunCrew
+                  </button>
+                </div>
+              </div>
             </div>
-          </section>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {toast && (
+        <div className="fixed top-6 right-6 bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg z-50">
+          {toast}
         </div>
-      </main>
+      )}
+
+      <SettingsAppShell
+        activeSection={activeSection}
+        onSectionChange={setActiveSection}
+        crewName={crew.runCrewBaseInfo?.name || 'RunCrew'}
+        crewGraphic={crewGraphic}
+      >
+        {renderSectionContent()}
+      </SettingsAppShell>
 
       {/* Add Admin/Manager Modal */}
       {showAddManagerModal && (
@@ -956,4 +934,3 @@ export default function RunCrewSettingsPage() {
     </div>
   );
 }
-
