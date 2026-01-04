@@ -108,14 +108,21 @@ export default function GooglePlacesAutocomplete({
           });
 
           setAutocompleteEnabled(true);
-        } catch (error) {
-          console.error('Failed to initialize Google Places Autocomplete:', error);
+        } catch (error: any) {
+          console.warn('Failed to initialize Google Places Autocomplete:', error?.message || error);
           // Fallback: input still works, just without autocomplete
+          // This can happen if:
+          // - API key restrictions block this domain
+          // - Places API not enabled for this project
         }
       })
       .catch((error) => {
-        console.error('Failed to load Google Maps autocomplete:', error);
+        console.warn('Google Maps autocomplete unavailable:', error.message || error);
         // Fallback: input still works, just without autocomplete
+        // Common errors:
+        // - RefererNotAllowedMapError: Domain not authorized in Google Cloud Console
+        // - Missing API key: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY not set
+        // - Network error: Failed to load Google Maps script
       });
 
     return () => {
