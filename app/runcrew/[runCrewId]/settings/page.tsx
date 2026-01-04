@@ -413,15 +413,15 @@ export default function RunCrewSettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
+    <div className="min-h-screen bg-gray-50">
       {toast && (
         <div className="fixed top-6 right-6 bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg z-50">
           {toast}
         </div>
       )}
 
-      <header className="bg-white shadow-sm border-b w-full">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 w-full">
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-4">
               {/* Always render graphic - emoji OR logo, never missing */}
@@ -461,8 +461,8 @@ export default function RunCrewSettingsPage() {
         </div>
       </header>
 
-      <main className="w-full min-w-0 overflow-x-hidden">
-        <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="max-w-7xl mx-auto px-6 py-10">
+        <div className="space-y-6">
           {/* General Settings */}
           <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 w-full min-w-0">
             <div className="flex items-center gap-2 mb-6">
