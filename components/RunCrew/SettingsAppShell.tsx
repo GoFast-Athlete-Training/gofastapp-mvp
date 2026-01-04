@@ -13,8 +13,8 @@ interface SettingsAppShellProps {
   crewName: string;
   crewGraphic: ReactNode;
 }
-
   runCrewId: string;
+
 export default function SettingsAppShell({
   children,
   activeSection,
