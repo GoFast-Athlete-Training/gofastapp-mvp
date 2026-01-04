@@ -129,7 +129,7 @@ export default function RunCrewSettingsPage() {
   }, [runCrewId, router]);
 
   const handleSave = async () => {
-    if (!crew || !isAdmin) return;
+    if (!crew) return;
 
     try {
       setIsSaving(true);
@@ -163,7 +163,7 @@ export default function RunCrewSettingsPage() {
   };
 
   const handleDelete = async () => {
-    if (!crew || !isAdmin) return;
+    if (!crew) return;
 
     try {
       setIsDeleting(true);
@@ -183,7 +183,7 @@ export default function RunCrewSettingsPage() {
   };
 
   const handleLeave = async () => {
-    if (!crew || isAdmin) return; // Admins can't leave, must delete or transfer
+    if (!crew) return; // Only members can leave (admins use delete/transfer)
 
     try {
       // TODO: Implement leave endpoint
@@ -250,9 +250,9 @@ export default function RunCrewSettingsPage() {
     );
   }
 
-  const isAdmin = membership?.role === 'admin';
-  const isManager = membership?.role === 'manager';
+  // If user can access this page, they can edit (admin-only page)
   const memberships = crew.membershipsBox?.memberships || [];
+  const currentAthleteId = membership?.athleteId;
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
@@ -332,7 +332,7 @@ export default function RunCrewSettingsPage() {
                       accept="image/*"
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
-                        if (!file || !isAdmin) return;
+                        if (!file) return;
                         
                         try {
                           // Upload to blob storage
@@ -358,8 +358,7 @@ export default function RunCrewSettingsPage() {
                         
                         e.target.value = '';
                       }}
-                      disabled={!isAdmin}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-sm"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
                     />
                     <p className="text-xs text-gray-500 mt-1">Upload logo image (will replace icon if set)</p>
                   </div>
@@ -374,8 +373,7 @@ export default function RunCrewSettingsPage() {
                   type="text"
                   value={crewName}
                   onChange={(e) => setCrewName(e.target.value)}
-                  disabled={!isAdmin}
-                  className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 />
               </div>
 
@@ -386,9 +384,8 @@ export default function RunCrewSettingsPage() {
                 <textarea
                   value={crewDescription}
                   onChange={(e) => setCrewDescription(e.target.value)}
-                  disabled={!isAdmin}
                   rows={4}
-                  className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed resize-y"
+                  className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-y"
                 />
               </div>
 
@@ -400,32 +397,23 @@ export default function RunCrewSettingsPage() {
                   type="text"
                   value={crewIcon}
                   onChange={(e) => setCrewIcon(e.target.value)}
-                  disabled={!isAdmin}
                   placeholder="🏃"
                   maxLength={2}
-                  className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-2xl"
+                  className="w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-2xl"
                 />
                 <p className="text-xs text-gray-500 mt-1">Single emoji character (shown if no logo is uploaded)</p>
               </div>
 
-              {isAdmin && (
-                <div className="flex justify-end pt-4 border-t border-gray-200">
-                  <button
-                    onClick={handleSave}
-                    disabled={isSaving || (!crewName.trim())}
-                    className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
-                  >
-                    <Save className="w-5 h-5" />
-                    {isSaving ? 'Saving...' : 'Save Changes'}
-                  </button>
-                </div>
-              )}
-
-              {!isAdmin && (
-                <div className="pt-4 border-t border-gray-200">
-                  <p className="text-sm text-gray-500 italic">Only admins can edit crew settings</p>
-                </div>
-              )}
+              <div className="flex justify-end pt-4 border-t border-gray-200">
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving || (!crewName.trim())}
+                  className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+                >
+                  <Save className="w-5 h-5" />
+                  {isSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
             </div>
           </section>
 
@@ -468,7 +456,7 @@ export default function RunCrewSettingsPage() {
                         )}
                       </div>
                     </div>
-                    {isAdmin && membershipItem.athleteId !== membership?.athleteId && (
+                    {membershipItem.athleteId !== currentAthleteId && (
                       <div className="flex gap-2 flex-shrink-0">
                         {membershipItem.role !== 'manager' && (
                           <button
@@ -537,8 +525,7 @@ export default function RunCrewSettingsPage() {
             <h2 className="text-xl font-bold text-red-900 mb-6">Danger Zone</h2>
 
             <div className="space-y-6">
-              {isAdmin ? (
-                <>
+              <>
                   {/* Transfer Ownership */}
                   <div className="border-b border-red-200 pb-4">
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">Transfer Ownership</h3>
@@ -629,20 +616,6 @@ export default function RunCrewSettingsPage() {
                     </button>
                   </div>
                 </>
-              ) : (
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Leave RunCrew</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Leave this RunCrew. You can rejoin later if you have the join code.
-                  </p>
-                  <button
-                    onClick={handleLeave}
-                    className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition"
-                  >
-                    Leave RunCrew
-                  </button>
-                </div>
-              )}
             </div>
           </section>
         </div>
