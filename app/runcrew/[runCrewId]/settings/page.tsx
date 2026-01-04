@@ -424,20 +424,21 @@ export default function RunCrewSettingsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 w-full">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-4">
+              {/* Always render graphic - emoji OR logo, never missing */}
               {crew.runCrewBaseInfo?.logo ? (
                 <img
                   src={crew.runCrewBaseInfo.logo}
                   alt={crew.runCrewBaseInfo?.name || 'RunCrew'}
                   className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl object-cover border-2 border-gray-200 flex-shrink-0"
                 />
-              ) : crew.runCrewBaseInfo?.icon ? (
+              ) : (
                 <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-2xl sm:text-3xl border-2 border-gray-200 flex-shrink-0">
-                  {crew.runCrewBaseInfo.icon}
+                  {crew.runCrewBaseInfo?.icon || '🏃'}
                 </div>
-              ) : null}
+              )}
               <div>
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">RunCrew Settings</h1>
-                <p className="text-sm sm:text-base text-gray-600 mt-1">{crew.runCrewBaseInfo?.name}</p>
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">{crew.runCrewBaseInfo?.name || 'RunCrew'}</h1>
+                <p className="text-sm sm:text-base text-gray-600 mt-1">Settings</p>
               </div>
             </div>
             <div className="flex gap-2 sm:gap-4 flex-shrink-0">
