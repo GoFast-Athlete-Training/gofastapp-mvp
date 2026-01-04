@@ -452,7 +452,7 @@ export default function RunCrewSettingsPage() {
         </div>
       </header>
 
-      <main className="w-full min-w-0">
+      <main className="w-full min-w-0 overflow-x-hidden">
         <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-6">
           {/* General Settings */}
           <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 w-full min-w-0">
@@ -501,49 +501,51 @@ export default function RunCrewSettingsPage() {
                   <div>
                     <p className="text-sm font-medium text-gray-700 mb-2">Upload a graphic</p>
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            
-                            try {
-                              setSavingLogo(true);
-                              // Upload to blob storage
-                              const formData = new FormData();
-                              formData.append('file', file);
+                      <div className="max-w-md">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
                               
-                              const uploadResponse = await api.post('/upload', formData, {
-                                headers: {
-                                  'Content-Type': 'multipart/form-data',
-                                },
-                              });
-                              
-                              if (uploadResponse.data.success && uploadResponse.data.url) {
-                                // Upload logo - this replaces icon (icon goes away)
-                                setCrewLogo(uploadResponse.data.url);
-                                setCrewIcon(''); // Clear icon when logo is uploaded
-                                await handleSaveLogo();
-                              } else {
-                                showToast('Failed to upload logo');
+                              try {
+                                setSavingLogo(true);
+                                // Upload to blob storage
+                                const formData = new FormData();
+                                formData.append('file', file);
+                                
+                                const uploadResponse = await api.post('/upload', formData, {
+                                  headers: {
+                                    'Content-Type': 'multipart/form-data',
+                                  },
+                                });
+                                
+                                if (uploadResponse.data.success && uploadResponse.data.url) {
+                                  // Upload logo - this replaces icon (icon goes away)
+                                  setCrewLogo(uploadResponse.data.url);
+                                  setCrewIcon(''); // Clear icon when logo is uploaded
+                                  await handleSaveLogo();
+                                } else {
+                                  showToast('Failed to upload logo');
+                                  setSavingLogo(false);
+                                }
+                              } catch (err: any) {
+                                console.error('Error uploading logo:', err);
+                                showToast(err.response?.data?.error || 'Failed to upload logo');
                                 setSavingLogo(false);
                               }
-                            } catch (err: any) {
-                              console.error('Error uploading logo:', err);
-                              showToast(err.response?.data?.error || 'Failed to upload logo');
-                              setSavingLogo(false);
-                            }
-                            
-                            e.target.value = '';
-                          }}
-                          disabled={savingLogo}
-                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        />
-                        {savingLogo && (
-                          <span className="text-xs text-orange-600 whitespace-nowrap">Saving...</span>
-                        )}
+                              
+                              e.target.value = '';
+                            }}
+                            disabled={savingLogo}
+                            className="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          />
+                          {savingLogo && (
+                            <span className="text-xs text-orange-600 whitespace-nowrap">Saving...</span>
+                          )}
+                        </div>
                       </div>
                       <p className="text-xs text-gray-500">Option 1: Upload your own image</p>
                     </div>
@@ -552,29 +554,31 @@ export default function RunCrewSettingsPage() {
                   <div className="border-t border-gray-100 pt-4">
                     <p className="text-sm font-medium text-gray-700 mb-2">Or pick an emoji</p>
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={crewIcon}
-                          onChange={(e) => setCrewIcon(e.target.value)}
-                          placeholder="🏃"
-                          maxLength={2}
-                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-2xl"
-                        />
-                        {crewIcon.trim() !== originalIcon && (
-                          <button
-                            onClick={async () => {
-                              // Set emoji - this replaces logo (logo goes away)
-                              setCrewLogo(''); // Clear logo when emoji is set
-                              await handleSaveIcon();
-                            }}
-                            disabled={savingIcon}
-                            className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                          >
-                            <Save className="w-3 h-3" />
-                            {savingIcon ? 'Saving...' : 'Save'}
-                          </button>
-                        )}
+                      <div className="max-w-md">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={crewIcon}
+                            onChange={(e) => setCrewIcon(e.target.value)}
+                            placeholder="🏃"
+                            maxLength={2}
+                            className="w-20 text-center px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-2xl"
+                          />
+                          {crewIcon.trim() !== originalIcon && (
+                            <button
+                              onClick={async () => {
+                                // Set emoji - this replaces logo (logo goes away)
+                                setCrewLogo(''); // Clear logo when emoji is set
+                                await handleSaveIcon();
+                              }}
+                              disabled={savingIcon}
+                              className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            >
+                              <Save className="w-3 h-3" />
+                              {savingIcon ? 'Saving...' : 'Save'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <p className="text-xs text-gray-500">Option 2: Pick an emoji (1-2 characters)</p>
                     </div>
