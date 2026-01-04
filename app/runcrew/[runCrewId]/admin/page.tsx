@@ -836,18 +836,19 @@ export default function RunCrewAdminPage() {
                 <GooglePlacesAutocomplete
                   value={runForm.meetUpAddress}
                   onChange={(e) => {
-                    // Allow manual typing - update state immediately
+                    // Always allow manual typing - this works whether autocomplete is enabled or not
                     setRunForm({ ...runForm, meetUpAddress: e.target.value });
                   }}
                   onPlaceSelected={(placeData) => {
-                    // When place is selected from autocomplete, use the formatted address
+                    // When place is selected from autocomplete dropdown, use the formatted address
+                    // This is optional - manual typing still works
                     setRunForm({ ...runForm, meetUpAddress: placeData.address });
                   }}
-                  placeholder="Start typing address..."
+                  placeholder="Type address or select from suggestions..."
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                   disabled={loadingRuns}
                 />
-                <p className="text-xs text-gray-500">Select an address from the dropdown suggestions</p>
+                <p className="text-xs text-gray-500">You can type manually or select from Google Places suggestions</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

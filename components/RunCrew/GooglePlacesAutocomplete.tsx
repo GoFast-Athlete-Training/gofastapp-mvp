@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const loaderCache: Record<string, Promise<any>> = {};
 
@@ -58,11 +58,13 @@ export default function GooglePlacesAutocomplete({
 }: GooglePlacesAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<any>(null);
+  const [autocompleteEnabled, setAutocompleteEnabled] = useState(false);
 
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
-      console.warn('Google Maps API key missing. Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY');
+      // No API key - just a regular input, no autocomplete
+      console.warn('Google Maps API key missing. Address input will work without autocomplete.');
       return;
     }
 
@@ -72,46 +74,61 @@ export default function GooglePlacesAutocomplete({
       .then((maps) => {
         if (!isMounted || !inputRef.current || autocompleteRef.current) return;
 
-        autocompleteRef.current = new maps.places.Autocomplete(inputRef.current, {
-          types: ['geocode', 'establishment'],
-          fields: ['formatted_address', 'geometry', 'name', 'place_id'],
-        });
+        try {
+          autocompleteRef.current = new maps.places.Autocomplete(inputRef.current, {
+            types: ['geocode', 'establishment'],
+            fields: ['formatted_address', 'geometry', 'name', 'place_id'],
+          });
 
-        autocompleteRef.current.addListener('place_changed', () => {
-          const place = autocompleteRef.current.getPlace();
+          autocompleteRef.current.addListener('place_changed', () => {
+            const place = autocompleteRef.current.getPlace();
 
-          // Only process if place has geometry (valid selection)
-          if (place && place.geometry && place.formatted_address) {
-            const placeData = {
-              address: place.formatted_address,
-              name: place.name || '',
-              placeId: place.place_id || '',
-              lat: place.geometry.location.lat(),
-              lng: place.geometry.location.lng(),
-            };
+            // Only process if place has geometry (valid selection)
+            if (place && place.geometry && place.formatted_address) {
+              const placeData = {
+                address: place.formatted_address,
+                name: place.name || '',
+                placeId: place.place_id || '',
+                lat: place.geometry.location.lat(),
+                lng: place.geometry.location.lng(),
+              };
 
-            // Update the input value directly to avoid conflicts
-            if (inputRef.current) {
-              inputRef.current.value = place.formatted_address;
+              // Trigger onChange to update React state
+              if (inputRef.current) {
+                const syntheticEvent = {
+                  target: { value: place.formatted_address },
+                } as React.ChangeEvent<HTMLInputElement>;
+                onChange(syntheticEvent);
+              }
+
+              if (onPlaceSelected) {
+                onPlaceSelected(placeData);
+              }
             }
+          });
 
-            if (onPlaceSelected) {
-              onPlaceSelected(placeData);
-            }
-          }
-        });
+          setAutocompleteEnabled(true);
+        } catch (error) {
+          console.error('Failed to initialize Google Places Autocomplete:', error);
+          // Fallback: input still works, just without autocomplete
+        }
       })
       .catch((error) => {
         console.error('Failed to load Google Maps autocomplete:', error);
+        // Fallback: input still works, just without autocomplete
       });
 
     return () => {
       isMounted = false;
       if (autocompleteRef.current) {
-        (window as any).google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
+        try {
+          (window as any).google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
+        } catch (e) {
+          // Ignore cleanup errors
+        }
       }
     };
-  }, [onPlaceSelected]);
+  }, [onChange, onPlaceSelected]);
 
   return (
     <input
