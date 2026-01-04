@@ -14,7 +14,6 @@
     "db:push": "prisma db push --schema=./prisma/schema.prisma",
     "db:studio": "prisma studio --schema=./prisma/schema.prisma",
     "db:upsert-company": "tsx scripts/upsert-company.ts",
-    "db:upsert-training-schema": "tsx scripts/upsert-training-schema.ts",
     "db:init-company": "tsx scripts/init-company.ts",
     "db:setup-company": "tsx scripts/setup-company.ts",
     "db:backfill-athletes": "tsx scripts/backfill-athlete-company.ts",

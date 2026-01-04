@@ -280,14 +280,19 @@ model race_registry {
 //
 // ─── PROMPT ENGINE ────────────────────────────────────────────────────────────
 //
-// NOTE: All Prompt Engine models moved to GoFastCompany as Plantuner* models
-// - RuleSet, RuleSetTopic, RuleSetItem → Removed (not needed in product app)
-// - MustHaves → PlantunerMustHaves (in GoFastCompany)
-// - ReturnJsonFormat → Removed (not needed in product app)
-// - PromptInstruction → Removed (not needed in product app)
-// - TrainingSchema → Removed (deprecated)
-// - AIRole → PlantunerAIRole (in GoFastCompany)
-// - TrainingGenPrompt → PlantunerTrainingGenPrompt (in GoFastCompany)
+// ⚠️ DEPRECATED - ALL MODELS MOVED TO GOFASTCOMPANY ⚠️
+//
+// All Prompt Engine models have been moved to GoFastCompany as Plantuner* models:
+// - RuleSet, RuleSetTopic, RuleSetItem → PlantunerRuleSet, PlantunerRuleSetTopic, PlantunerRuleSetItem
+// - MustHaves → PlantunerMustHaves
+// - ReturnJsonFormat → PlantunerReturnJsonFormat
+// - PromptInstruction → PlantunerPromptInstruction
+// - TrainingSchema → Removed (deprecated - functionality replaced by PlantunerMustHaves)
+// - AIRole → PlantunerAIRole
+// - TrainingGenPrompt → PlantunerTrainingGenPrompt
+//
+// All training plan generation configuration is now managed in GoFastCompany.
+// This section is kept for historical reference only.
 //
 
 //
