@@ -53,6 +53,9 @@ export default function RunCrewSettingsPage() {
   const [savingIcon, setSavingIcon] = useState(false);
   const [savingLogo, setSavingLogo] = useState(false);
   
+  // RunCrew Graphic UX mode
+  const [graphicMode, setGraphicMode] = useState<'view' | 'edit'>('view');
+  
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
@@ -118,8 +121,13 @@ export default function RunCrewSettingsPage() {
         setCrew(crewData);
         const name = crewData.runCrewBaseInfo?.name || '';
         const description = crewData.runCrewBaseInfo?.description || '';
-        const icon = crewData.runCrewBaseInfo?.icon || '';
-        const logo = crewData.runCrewBaseInfo?.logo || '';
+        let icon = crewData.runCrewBaseInfo?.icon || '';
+        let logo = crewData.runCrewBaseInfo?.logo || '';
+        
+        // Auto-hydrate default emoji if neither exists (legacy/bad data)
+        if (!icon && !logo) {
+          icon = '🏃';
+        }
         
         setCrewName(name);
         setCrewDescription(description);
@@ -462,45 +470,88 @@ export default function RunCrewSettingsPage() {
             </div>
 
             <div className="space-y-6">
-              {/* RunCrew Graphic - Fork: Upload or Emoji */}
+              {/* RunCrew Graphic - Identity Editor */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
                   RunCrew Graphic
                 </label>
                 
-                {/* Current Graphic Display */}
-                <div className="mb-4">
-                  {crewLogo ? (
-                    <div className="flex items-center gap-3">
+                {graphicMode === 'view' ? (
+                  /* DEFAULT MODE: Identity Confirmation */
+                  <div className="flex items-center gap-4">
+                    {/* Always render graphic - emoji OR logo, never missing */}
+                    {crewLogo ? (
                       <img
                         src={crewLogo}
-                        alt="RunCrew Graphic"
-                        className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200"
+                        alt={crew.runCrewBaseInfo?.name || 'RunCrew'}
+                        className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200 flex-shrink-0"
                       />
-                      <p className="text-sm text-gray-600">Current: Uploaded logo</p>
-                    </div>
-                  ) : crewIcon ? (
-                    <div className="flex items-center gap-3">
-                      <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-3xl border-2 border-gray-200">
-                        {crewIcon}
+                    ) : (
+                      <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-3xl border-2 border-gray-200 flex-shrink-0">
+                        {crewIcon || '🏃'}
                       </div>
-                      <p className="text-sm text-gray-600">Current: Emoji icon</p>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">{crew.runCrewBaseInfo?.name || 'RunCrew'}</p>
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <div className="w-16 h-16 rounded-xl bg-gray-200 border-2 border-gray-300 flex items-center justify-center text-gray-400">
-                        No graphic
+                    <button
+                      onClick={() => setGraphicMode('edit')}
+                      className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition whitespace-nowrap"
+                    >
+                      Change
+                    </button>
+                  </div>
+                ) : (
+                  /* CHANGE MODE: Forked Choice */
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-sm text-gray-600">Choose how your RunCrew appears</p>
+                      <button
+                        onClick={() => {
+                          setGraphicMode('view');
+                          // Reset to original values on cancel
+                          setCrewIcon(originalIcon);
+                          setCrewLogo(originalLogo);
+                        }}
+                        className="text-sm text-gray-600 hover:text-gray-900"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    
+                    {/* Card 1: Select Emoji */}
+                    <div className="border border-gray-200 rounded-lg p-4">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-3">Select Emoji</h3>
+                      <div className="max-w-md">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={crewIcon}
+                            onChange={(e) => setCrewIcon(e.target.value)}
+                            placeholder="🏃"
+                            maxLength={2}
+                            className="w-20 text-center px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-2xl"
+                          />
+                          <button
+                            onClick={async () => {
+                              // Set emoji - this replaces logo (logo goes away)
+                              setCrewLogo('');
+                              await handleSaveIcon();
+                              setGraphicMode('view');
+                            }}
+                            disabled={savingIcon || !crewIcon.trim()}
+                            className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                          >
+                            <Save className="w-3 h-3" />
+                            {savingIcon ? 'Saving...' : 'Save'}
+                          </button>
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-500">No graphic set</p>
                     </div>
-                  )}
-                </div>
 
-                {/* Fork: Two Options */}
-                <div className="space-y-4 border-t border-gray-200 pt-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 mb-2">Upload a graphic</p>
-                    <div className="space-y-2">
+                    {/* Card 2: Add Logo */}
+                    <div className="border border-gray-200 rounded-lg p-4">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-3">Add Logo</h3>
                       <div className="max-w-md">
                         <div className="flex items-center gap-2">
                           <input
@@ -525,8 +576,9 @@ export default function RunCrewSettingsPage() {
                                 if (uploadResponse.data.success && uploadResponse.data.url) {
                                   // Upload logo - this replaces icon (icon goes away)
                                   setCrewLogo(uploadResponse.data.url);
-                                  setCrewIcon(''); // Clear icon when logo is uploaded
+                                  setCrewIcon('');
                                   await handleSaveLogo();
+                                  setGraphicMode('view');
                                 } else {
                                   showToast('Failed to upload logo');
                                   setSavingLogo(false);
@@ -547,43 +599,9 @@ export default function RunCrewSettingsPage() {
                           )}
                         </div>
                       </div>
-                      <p className="text-xs text-gray-500">Option 1: Upload your own image</p>
                     </div>
                   </div>
-
-                  <div className="border-t border-gray-100 pt-4">
-                    <p className="text-sm font-medium text-gray-700 mb-2">Or pick an emoji</p>
-                    <div className="space-y-2">
-                      <div className="max-w-md">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={crewIcon}
-                            onChange={(e) => setCrewIcon(e.target.value)}
-                            placeholder="🏃"
-                            maxLength={2}
-                            className="w-20 text-center px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-2xl"
-                          />
-                          {crewIcon.trim() !== originalIcon && (
-                            <button
-                              onClick={async () => {
-                                // Set emoji - this replaces logo (logo goes away)
-                                setCrewLogo(''); // Clear logo when emoji is set
-                                await handleSaveIcon();
-                              }}
-                              disabled={savingIcon}
-                              className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                            >
-                              <Save className="w-3 h-3" />
-                              {savingIcon ? 'Saving...' : 'Save'}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-500">Option 2: Pick an emoji (1-2 characters)</p>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Crew Name */}
