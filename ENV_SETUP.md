@@ -81,10 +81,13 @@ GARMIN_USER_REFRESH_TOKEN_SECRET=""
 ## Google Maps API (Required for Address Autocomplete)
 
 ```bash
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyBj7tM40doX13BZJ6PqaiRkBinDD4K1MH4
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
 ```
 
-**Note**: This is already configured in Vercel production. Add to `.env.local` for local development.
+**Note**: 
+- This is already configured in Vercel production environment variables.
+- For local development, add to `.env.local` (which is gitignored).
+- Get your API key from Google Cloud Console → APIs & Services → Credentials.
 
 ## App URL
 
