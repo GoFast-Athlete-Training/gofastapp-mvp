@@ -372,6 +372,18 @@ model RunCrew {
 
 ## Implementation Checklist
 
+### Run Detail Page (Priority: High - Navigation Currently Broken)
+- [x] Create stub page: `/app/runcrew/[runCrewId]/runs/[runId]/page.tsx`
+- [ ] Implement full run details display
+- [ ] Add RSVP functionality (going/maybe/not going)
+- [ ] Add edit run functionality (admin/manager)
+- [ ] Add delete run functionality (admin/manager)
+- [ ] Add API endpoint for RSVP: `POST /api/runcrew/[id]/runs/[runId]/rsvp`
+- [ ] Add API endpoint for edit: `PUT /api/runcrew/[id]/runs/[runId]`
+- [ ] Add API endpoint for delete: `DELETE /api/runcrew/[id]/runs/[runId]`
+- [ ] Test navigation from RunCard
+- [ ] Test all run detail features
+
 ### Add Member as Manager
 - [ ] Create API endpoint: `PUT /api/runcrew/[id]/members/[membershipId]/role`
 - [ ] Add UI: Promote to manager button in settings
