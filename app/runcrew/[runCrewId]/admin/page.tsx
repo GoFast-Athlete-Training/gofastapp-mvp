@@ -811,17 +811,14 @@ export default function RunCrewAdminPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Start Time *</label>
-                  <select
+                  <input
+                    type="text"
                     value={runForm.time}
                     onChange={(e) => setRunForm({ ...runForm, time: e.target.value })}
+                    placeholder="6:15 AM"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                     required
-                  >
-                    <option value="">Select time...</option>
-                    {timeOptions.map((time) => (
-                      <option key={time} value={time}>{time}</option>
-                    ))}
-                  </select>
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Meet-Up Point *</label>
