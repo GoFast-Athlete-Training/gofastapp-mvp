@@ -102,11 +102,21 @@ function JoinCrewPageContent() {
           localStorage.removeItem(PENDING_CREW_ID_KEY);
         }
         
-        // Redirect to crew page
-        router.push(`/runcrew/${response.data.runCrew.id}`);
+        // Redirect to crew page (even if already a member, just redirect)
+        router.push(`/runcrew/${response.data.runCrew?.id || crewId}`);
       }
     } catch (err: any) {
       console.error('Error joining crew:', err);
+      
+      // If user is already a member, just redirect to crew page
+      if (err.response?.status === 409 || err.response?.data?.error?.includes('already a member')) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(PENDING_CREW_ID_KEY);
+        }
+        router.push(`/runcrew/${crewId}`);
+        return;
+      }
+      
       setError(
         err.response?.data?.error ||
         err.response?.data?.message ||

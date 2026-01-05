@@ -1,6 +1,24 @@
 import { prisma } from './prisma';
 import { normalizeCrewResponse } from './normalize-prisma';
 
+/**
+ * Generate a shareable invite link for a RunCrew
+ * Server-side helper function for generating join links
+ * 
+ * @param runCrewId - The RunCrew ID
+ * @returns The join link path: /join/crew/{runCrewId}
+ * 
+ * @example
+ * const link = getRunCrewJoinLink('clx123abc');
+ * // Returns: '/join/crew/clx123abc'
+ */
+export function getRunCrewJoinLink(runCrewId: string): string {
+  if (!runCrewId) {
+    throw new Error('runCrewId is required');
+  }
+  return `/join/crew/${runCrewId}`;
+}
+
 export async function createCrew(data: {
   name: string;
   description?: string;
