@@ -597,10 +597,11 @@ export async function joinCrewById(runCrewId: string, athleteId: string) {
 
 /**
  * Create a new run for a RunCrew
+ * Uses athleteId from authenticated user (from localStorage)
  */
 export async function createRun(data: {
   runCrewId: string;
-  createdById: string;
+  athleteId: string; // From authenticated user (localStorage)
   title: string;
   date: Date;
   startTime?: string | null;
@@ -614,15 +615,16 @@ export async function createRun(data: {
   const run = await prisma.run_crew_runs.create({
     data: {
       runCrewId: data.runCrewId,
+      createdById: data.athleteId, // Map athleteId to createdById (schema field)
       title: data.title,
       date: data.date,
-      startTime: data.startTime,
-      meetUpPoint: data.meetUpPoint,
-      meetUpAddress: data.meetUpAddress,
-      totalMiles: data.totalMiles,
-      pace: data.pace,
-      stravaMapUrl: data.stravaMapUrl,
-      description: data.description,
+      startTime: data.startTime ?? '',
+      meetUpPoint: data.meetUpPoint ?? '',
+      meetUpAddress: data.meetUpAddress ?? null,
+      totalMiles: data.totalMiles ?? null,
+      pace: data.pace ?? null,
+      stravaMapUrl: data.stravaMapUrl ?? null,
+      description: data.description ?? null,
     },
   });
 
@@ -697,7 +699,7 @@ export async function postAnnouncement(data: {
   const announcement = await prisma.run_crew_announcements.create({
     data: {
       runCrewId: data.runCrewId,
-      athleteId: data.authorId,
+      authorId: data.authorId, // Schema uses authorId, not athleteId
       title: data.title,
       content: data.content,
     },

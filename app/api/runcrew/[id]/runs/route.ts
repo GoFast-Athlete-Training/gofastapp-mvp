@@ -74,7 +74,7 @@ export async function POST(
     try {
       run = await createRun({
         runCrewId: id,
-        createdById: athlete.id,
+        athleteId: athlete.id, // Use athleteId (from authenticated user)
         title,
         date: new Date(date),
         startTime,
