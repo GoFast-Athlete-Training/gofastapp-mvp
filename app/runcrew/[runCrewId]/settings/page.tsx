@@ -840,7 +840,7 @@ export default function RunCrewSettingsPage() {
                 >
                   <option value="">Choose a member...</option>
                   {availableMembers.map((membership: any) => {
-                    const athlete = membership.athlete || {};
+                    const athlete = membership.Athlete || {};
                     return (
                       <option key={membership.id} value={membership.athleteId}>
                         {athlete.firstName} {athlete.lastName}
