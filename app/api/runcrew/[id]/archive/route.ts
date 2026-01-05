@@ -62,17 +62,16 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden - Admin only' }, { status: 403 });
     }
 
-    // Check if already archived
-    if (crew.runCrewBaseInfo?.isArchived) {
+    // Check if already archived (archivedAt is not null)
+    if (crew.runCrewBaseInfo?.archivedAt) {
       return NextResponse.json({ error: 'Crew is already archived' }, { status: 400 });
     }
 
-    // Archive the crew
+    // Archive the crew (set archivedAt timestamp)
     const { prisma } = await import('@/lib/prisma');
     const updated = await prisma.run_crews.update({
       where: { id },
       data: {
-        isArchived: true,
         archivedAt: new Date(),
       },
     });

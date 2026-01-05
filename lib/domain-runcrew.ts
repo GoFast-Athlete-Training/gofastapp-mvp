@@ -137,7 +137,6 @@ export async function hydrateCrew(runCrewId: string) {
       joinCode: true,
       logo: true,
       icon: true,
-      isArchived: true,
       archivedAt: true,
       // Explicitly exclude messageTopics to avoid column not found error
       run_crew_memberships: {
@@ -240,7 +239,6 @@ export async function hydrateCrew(runCrewId: string) {
       joinCode: crew.joinCode,
       logo: crew.logo,
       icon: crew.icon,
-      isArchived: crew.isArchived,
       archivedAt: crew.archivedAt,
       messageTopics,
     },

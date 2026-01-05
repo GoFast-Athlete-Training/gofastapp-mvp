@@ -328,7 +328,6 @@ model run_crews {
   joinCode                String                    @unique
   logo                    String?
   icon                    String?
-  isArchived              Boolean                   @default(false)
   archivedAt              DateTime?
   createdAt               DateTime                  @default(now())
   updatedAt               DateTime                  @updatedAt
