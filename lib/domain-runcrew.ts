@@ -203,6 +203,7 @@ export async function hydrateCrew(runCrewId: string) {
               id: true,
               firstName: true,
               lastName: true,
+              photoURL: true,
             },
           },
           run_crew_run_rsvps: {

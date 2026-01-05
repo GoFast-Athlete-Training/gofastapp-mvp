@@ -284,12 +284,11 @@ export default function RunCrewSettingsPage() {
 
     try {
       setIsDeleting(true);
-      // TODO: Implement delete endpoint
-      // const response = await api.delete(`/runcrew/${runCrewId}`);
-      // if (response.data.success) {
-      //   router.push('/welcome');
-      // }
-      showToast('Delete crew feature coming soon');
+      const response = await api.delete(`/runcrew/${runCrewId}/delete`);
+      if (response.data.success) {
+        showToast('RunCrew deleted successfully');
+        router.push('/welcome');
+      }
       setShowDeleteConfirm(false);
     } catch (err: any) {
       console.error('Error deleting crew:', err);
@@ -717,7 +716,7 @@ export default function RunCrewSettingsPage() {
                       const newOwner = memberships.find((m: any) => m.id === newOwnerMembershipId);
                       if (!newOwner) return;
                       
-                      const athlete = newOwner.athlete || {};
+                      const athlete = newOwner.Athlete || {};
                       if (confirm(`Transfer ownership to ${athlete.firstName} ${athlete.lastName}? You will become a regular member.`)) {
                         try {
                           const response = await api.post(`/runcrew/${runCrewId}/transfer-ownership`, {
@@ -740,7 +739,7 @@ export default function RunCrewSettingsPage() {
                     {memberships
                       .filter((m: any) => m.athleteId !== membership?.athleteId)
                       .map((m: any) => {
-                        const athlete = m.athlete || {};
+                        const athlete = m.Athlete || {};
                         return (
                           <option key={m.id} value={m.id}>
                             {athlete.firstName} {athlete.lastName} {m.role === 'manager' ? '(Manager)' : ''}

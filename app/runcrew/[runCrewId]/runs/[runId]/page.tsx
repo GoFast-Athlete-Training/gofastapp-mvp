@@ -268,6 +268,39 @@ export default function RunDetailPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <div className="space-y-4">
+            {/* Creator Info */}
+            {run.athlete && (
+              <div className="pb-4 border-b border-gray-200">
+                <h2 className="text-sm font-medium text-gray-500 mb-2">Created by</h2>
+                <div className="flex items-center gap-3">
+                  {run.athlete.photoURL ? (
+                    <img
+                      src={run.athlete.photoURL}
+                      alt={run.athlete.firstName || 'Creator'}
+                      className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-semibold text-sm border border-gray-200">
+                      {(run.athlete.firstName?.[0] || 'C').toUpperCase()}
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-base font-semibold text-gray-900">
+                      {run.athlete.firstName || 'Admin'} {run.athlete.lastName || ''}
+                    </p>
+                    {run.createdAt && (
+                      <p className="text-xs text-gray-500">
+                        {new Date(run.createdAt).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
             <div>
               <h2 className="text-sm font-medium text-gray-500">Date & Time</h2>
               <p className="text-lg text-gray-900">

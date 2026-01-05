@@ -451,11 +451,25 @@ export default function RunCrewMemberPage() {
                   crew.announcementsBox.announcements.map((announcement: any) => (
                     <div key={announcement.id} className="border border-orange-200 rounded-lg px-3 py-2 bg-white shadow-sm">
                       <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                        <span>
-                          {announcement.athlete?.firstName
-                            ? `${announcement.athlete.firstName}${announcement.athlete.lastName ? ` ${announcement.athlete.lastName}` : ''}`
-                            : 'Admin'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {/* Author Profile Picture */}
+                          {announcement.athlete?.photoURL ? (
+                            <img
+                              src={announcement.athlete.photoURL}
+                              alt={announcement.athlete.firstName || 'Author'}
+                              className="w-6 h-6 rounded-full object-cover border border-gray-200"
+                            />
+                          ) : (
+                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-semibold border border-gray-200">
+                              {(announcement.athlete?.firstName?.[0] || 'A').toUpperCase()}
+                            </div>
+                          )}
+                          <span>
+                            {announcement.athlete?.firstName
+                              ? `${announcement.athlete.firstName}${announcement.athlete.lastName ? ` ${announcement.athlete.lastName}` : ''}`
+                              : 'Admin'}
+                          </span>
+                        </div>
                         <span>
                           {announcement.createdAt
                             ? new Date(announcement.createdAt).toLocaleString('en-US', {
@@ -516,6 +530,25 @@ export default function RunCrewMemberPage() {
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
                             <h3 className="text-sm font-semibold text-gray-900 mb-1">{run.title || 'Untitled Run'}</h3>
+                            {/* Creator Info */}
+                            {run.athlete && (
+                              <div className="flex items-center gap-2 mb-2">
+                                {run.athlete.photoURL ? (
+                                  <img
+                                    src={run.athlete.photoURL}
+                                    alt={run.athlete.firstName || 'Creator'}
+                                    className="w-5 h-5 rounded-full object-cover border border-gray-200"
+                                  />
+                                ) : (
+                                  <div className="w-5 h-5 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-semibold border border-gray-200">
+                                    {(run.athlete.firstName?.[0] || 'C').toUpperCase()}
+                                  </div>
+                                )}
+                                <span className="text-xs text-gray-500">
+                                  Created by {run.athlete.firstName || 'Admin'}
+                                </span>
+                              </div>
+                            )}
                             <div className="text-xs text-gray-600 space-y-1">
                               <p className="flex items-center gap-1">
                                 <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
