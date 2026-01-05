@@ -343,10 +343,10 @@ export default function RunCrewSettingsPage() {
              'You don\'t have access to this RunCrew.'}
           </p>
           <Link
-            href="/athlete-home"
+            href="/runcrew"
             className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
           >
-            Back to Home
+            Back to RunCrews
           </Link>
         </div>
       </div>
@@ -360,10 +360,10 @@ export default function RunCrewSettingsPage() {
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Error</h2>
           <p className="text-gray-600 mb-4">Failed to load RunCrew settings.</p>
           <Link
-            href="/athlete-home"
+            href="/runcrew"
             className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
           >
-            Back to Home
+            Back to RunCrews
           </Link>
         </div>
       </div>
@@ -766,7 +766,7 @@ export default function RunCrewSettingsPage() {
                           const response = await api.post(`/runcrew/${runCrewId}/archive`);
                           if (response.data.success) {
                             showToast('RunCrew archived successfully');
-                            router.push('/athlete-home');
+                            router.push('/runcrew');
                           }
                         } catch (err: any) {
                           console.error('Error archiving crew:', err);
@@ -952,13 +952,13 @@ export default function RunCrewSettingsPage() {
             </div>
             <div className="space-y-3">
               <button
-                onClick={() => router.push('/athlete-home')}
+                onClick={() => router.push('/runcrew')}
                 className="w-full px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition"
               >
                 Create Another RunCrew
               </button>
               <button
-                onClick={() => router.push('/athlete-home')}
+                onClick={() => router.push('/runcrew')}
                 className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
               >
                 Join a RunCrew
