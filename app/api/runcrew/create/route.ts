@@ -59,6 +59,9 @@ export async function POST(request: Request) {
       typicalRunMiles,
       longRunMilesMin,
       longRunMilesMax,
+      trainingFor,
+      trainingForDistance,
+      specificRaceIds,
     } = body;
 
     if (!name || !joinCode) {
@@ -92,6 +95,9 @@ export async function POST(request: Request) {
         typicalRunMiles: typicalRunMiles ? parseFloat(typicalRunMiles) : undefined,
         longRunMilesMin: longRunMilesMin ? parseFloat(longRunMilesMin) : undefined,
         longRunMilesMax: longRunMilesMax ? parseFloat(longRunMilesMax) : undefined,
+        trainingFor: trainingFor || undefined,
+        trainingForDistance: Array.isArray(trainingForDistance) && trainingForDistance.length > 0 ? trainingForDistance : undefined,
+        specificRaceIds: Array.isArray(specificRaceIds) && specificRaceIds.length > 0 ? specificRaceIds : undefined,
       });
     } catch (err) {
       console.error('Prisma error:', err);

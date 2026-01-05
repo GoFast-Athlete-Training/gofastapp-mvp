@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     }
 
     // 4. Fetch RunCrew memberships with role information
-    const memberships = await prisma.runCrewMembership.findMany({
+    const memberships = await prisma.run_crew_memberships.findMany({
       where: { athleteId },
       include: {
         runCrew: {

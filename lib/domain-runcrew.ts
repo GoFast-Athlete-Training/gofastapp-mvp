@@ -22,6 +22,9 @@ export async function createCrew(data: {
   typicalRunMiles?: number;
   longRunMilesMin?: number;
   longRunMilesMax?: number;
+  trainingFor?: string;
+  trainingForDistance?: string[];
+  specificRaceIds?: string[];
 }) {
   // Create the crew
   const crew = await prisma.runCrew.create({
@@ -46,8 +49,20 @@ export async function createCrew(data: {
       typicalRunMiles: data.typicalRunMiles,
       longRunMilesMin: data.longRunMilesMin,
       longRunMilesMax: data.longRunMilesMax,
+      trainingFor: data.trainingFor || null,
+      trainingForDistance: data.trainingForDistance as any || [],
     },
   });
+
+  // Create specific race relationships if provided
+  if (data.specificRaceIds && data.specificRaceIds.length > 0) {
+    await prisma.runCrewSpecificRace.createMany({
+      data: data.specificRaceIds.map((raceId) => ({
+        runCrewId: crew.id,
+        raceRegistryId: raceId,
+      })),
+    });
+  }
 
   // Create membership with admin role
   await prisma.runCrewMembership.create({

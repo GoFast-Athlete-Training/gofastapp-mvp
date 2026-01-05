@@ -46,7 +46,7 @@ model Athlete {
   weeklyMileage           Int?
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime
-  go_fast_companies       go_fast_companies        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  goFastCompany           GoFastCompany            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   athlete_activities      athlete_activities[]
   run_crew_announcements  run_crew_announcements[]
   run_crew_event_rsvps    run_crew_event_rsvps[]
@@ -98,7 +98,7 @@ model athlete_activities {
   Athlete          Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 }
 
-model go_fast_companies {
+model GoFastCompany {
   id        String    @id
   name      String?
   slug      String?   @unique
@@ -108,7 +108,9 @@ model go_fast_companies {
   zip       String?
   domain    String?
   createdAt DateTime  @default(now())
-  updatedAt DateTime
+  updatedAt DateTime  @updatedAt
+
+  @@map("go_fast_companies")
   Athlete   Athlete[]
 }
 
@@ -145,17 +147,18 @@ model prompt_instructions {
 }
 
 model race_registry {
-  id             String           @id
-  name           String
-  raceType       String
-  miles          Float
-  date           DateTime
-  city           String?
-  state          String?
-  country        String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime
-  training_plans training_plans[]
+  id                      String                    @id
+  name                    String
+  raceType                String
+  miles                   Float
+  date                    DateTime
+  city                    String?
+  state                   String?
+  country                 String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime
+  training_plans          training_plans[]
+  run_crew_specific_races run_crew_specific_races[]
 }
 
 model return_json_formats {
@@ -318,40 +321,55 @@ model run_crew_runs {
 }
 
 model run_crews {
-  id                     String                   @id
-  name                   String
-  description            String?
-  joinCode               String                   @unique
-  logo                   String?
-  icon                   String?
-  isArchived             Boolean                  @default(false)
-  archivedAt             DateTime?
-  createdAt              DateTime                 @default(now())
-  updatedAt              DateTime
-  messageTopics          Json?
-  city                   String?
-  paceMin                Int?
-  paceMax                Int?
-  ageMin                 Int?
-  ageMax                 Int?
-  primaryMeetUpPoint     String?
-  primaryMeetUpAddress   String?
-  primaryMeetUpPlaceId   String?
-  primaryMeetUpLat       Float?
-  primaryMeetUpLng       Float?
-  gender                 Gender?
-  state                  State?
-  typicalRunMiles        Float?
-  longRunMilesMin        Float?
-  longRunMilesMax        Float?
-  timePreference         TimePreference[]         @default([])
-  join_codes             join_codes[]
-  run_crew_announcements run_crew_announcements[]
-  run_crew_events        run_crew_events[]
-  run_crew_managers      run_crew_managers[]
-  run_crew_memberships   run_crew_memberships[]
-  run_crew_messages      run_crew_messages[]
-  run_crew_runs          run_crew_runs[]
+  id                      String                    @id
+  name                    String
+  description             String?
+  joinCode                String                    @unique
+  logo                    String?
+  icon                    String?
+  isArchived              Boolean                   @default(false)
+  archivedAt              DateTime?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime
+  messageTopics           Json?
+  city                    String?
+  paceMin                 Int?
+  paceMax                 Int?
+  ageMin                  Int?
+  ageMax                  Int?
+  primaryMeetUpPoint      String?
+  primaryMeetUpAddress    String?
+  primaryMeetUpPlaceId    String?
+  primaryMeetUpLat        Float?
+  primaryMeetUpLng        Float?
+  gender                  Gender?
+  state                   State?
+  typicalRunMiles         Float?
+  longRunMilesMin         Float?
+  longRunMilesMax         Float?
+  timePreference          TimePreference[]          @default([])
+  purpose                 Purpose[]                 @default([])
+  trainingFor             String? // race_registry.id (nullable)
+  trainingForDistance     TrainingForDistance[]     @default([])
+  join_codes              join_codes[]
+  run_crew_specific_races run_crew_specific_races[]
+  run_crew_announcements  run_crew_announcements[]
+  run_crew_events         run_crew_events[]
+  run_crew_managers       run_crew_managers[]
+  run_crew_memberships    run_crew_memberships[]
+  run_crew_messages       run_crew_messages[]
+  run_crew_runs           run_crew_runs[]
+}
+
+model run_crew_specific_races {
+  id             String        @id @default(cuid())
+  runCrewId      String
+  raceRegistryId String
+  createdAt      DateTime      @default(now())
+  run_crews      run_crews     @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  race_registry  race_registry @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
+
+  @@unique([runCrewId, raceRegistryId])
 }
 
 model training_days_executed {
@@ -542,8 +560,22 @@ enum State {
   WY
 }
 
+enum Purpose {
+  Training
+  Fun
+  Social
+}
+
 enum TimePreference {
   Morning
   Afternoon
   Evening
+}
+
+enum TrainingForDistance {
+  FiveK
+  TenK
+  HalfMarathon
+  Marathon
+  Ultra
 }
