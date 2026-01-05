@@ -700,12 +700,10 @@ export default function RunCrewSettingsPage() {
           <div className="space-y-6">
             <h1 className="text-2xl font-bold text-gray-900">Page Lifecycle</h1>
             
-            <div className="bg-white rounded-lg border-2 border-red-200 p-6">
-              <h2 className="text-lg font-bold text-red-900 mb-6">Danger Zone</h2>
-
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
               <div className="space-y-6">
                 {/* Transfer Ownership */}
-                <div className="border-b border-red-200 pb-4">
+                <div className="border-b border-gray-200 pb-4">
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">Transfer Ownership</h3>
                   <p className="text-sm text-gray-600 mb-4">
                     Transfer ownership of this RunCrew to another member. You will become a regular member.
@@ -736,7 +734,7 @@ export default function RunCrewSettingsPage() {
                       }
                       e.target.value = '';
                     }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 mb-2"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 mb-2"
                   >
                     <option value="">Select a member...</option>
                     {memberships
@@ -753,7 +751,7 @@ export default function RunCrewSettingsPage() {
                 </div>
 
                 {/* Archive RunCrew */}
-                <div className="border-b border-red-200 pb-4">
+                <div className="border-b border-gray-200 pb-4">
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">Archive RunCrew</h3>
                   <p className="text-sm text-gray-600 mb-4">
                     Archive this RunCrew. Members can still view history, but no new activity can be created.
