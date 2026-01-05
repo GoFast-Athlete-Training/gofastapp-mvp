@@ -9,6 +9,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import TopNav from '@/components/shared/TopNav';
 
 interface RunCrewCard {
   id: string;
@@ -155,6 +156,7 @@ export default function WelcomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600">
+      <TopNav />
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">

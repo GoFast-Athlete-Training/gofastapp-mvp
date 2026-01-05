@@ -534,32 +534,10 @@ export default function RunCrewAdminPage() {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">{crew.runCrewBaseInfo?.name} - Admin</h1>
-                {crew.runCrewBaseInfo?.description && (
-                  <p className="text-gray-600 mt-2">{crew.runCrewBaseInfo.description}</p>
-                )}
-              </div>
-              {/* Current User Profile Picture */}
-              {currentUser && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
-                  {currentUser.photoURL ? (
-                    <img
-                      src={currentUser.photoURL}
-                      alt={`${currentUser.firstName || 'Admin'}`}
-                      className="w-8 h-8 rounded-full object-cover border border-gray-200"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-semibold text-xs border border-gray-200">
-                      {(currentUser.firstName?.[0] || 'A').toUpperCase()}
-                    </div>
-                  )}
-                  <div className="text-xs">
-                    <p className="font-semibold text-gray-900">{currentUser.firstName || 'Admin'}</p>
-                    <p className="text-gray-500">Editing</p>
-                  </div>
-                </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{crew.runCrewBaseInfo?.name} - Admin</h1>
+              {crew.runCrewBaseInfo?.description && (
+                <p className="text-gray-600 mt-2">{crew.runCrewBaseInfo.description}</p>
               )}
             </div>
             <div className="flex gap-4">

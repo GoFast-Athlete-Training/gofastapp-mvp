@@ -63,6 +63,8 @@ export default function RunCrewSettingsPage() {
   
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
+  const [deletedCrewName, setDeletedCrewName] = useState('');
   
   // Add Admin/Manager modal state
   const [showAddManagerModal, setShowAddManagerModal] = useState(false);
@@ -284,15 +286,17 @@ export default function RunCrewSettingsPage() {
 
     try {
       setIsDeleting(true);
+      const crewName = crew.runCrewBaseInfo?.name || 'RunCrew';
       const response = await api.delete(`/runcrew/${runCrewId}/delete`);
       if (response.data.success) {
-        showToast('RunCrew deleted successfully');
-        router.push('/welcome');
+        setDeletedCrewName(crewName);
+        setShowDeleteConfirm(false);
+        setShowDeleteSuccess(true);
       }
-      setShowDeleteConfirm(false);
     } catch (err: any) {
       console.error('Error deleting crew:', err);
       showToast(err.response?.data?.error || 'Failed to delete crew');
+      setShowDeleteConfirm(false);
     } finally {
       setIsDeleting(false);
     }
@@ -922,6 +926,42 @@ export default function RunCrewSettingsPage() {
               >
                 <Trash2 className="w-4 h-4" />
                 {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Success Modal */}
+      {showDeleteSuccess && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 text-center">
+            <div className="mb-4">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">RunCrew Deleted</h3>
+              <p className="text-gray-600 mb-4">
+                You've deleted <strong>{deletedCrewName}</strong>.
+              </p>
+              <p className="text-gray-700 font-medium mb-6">
+                Thanks for starting {deletedCrewName} and leading other runners.
+              </p>
+            </div>
+            <div className="space-y-3">
+              <button
+                onClick={() => router.push('/welcome')}
+                className="w-full px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition"
+              >
+                Create Another RunCrew
+              </button>
+              <button
+                onClick={() => router.push('/welcome')}
+                className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
+              >
+                Join a RunCrew
               </button>
             </div>
           </div>
