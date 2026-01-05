@@ -491,8 +491,7 @@ model RunCrewAnnouncement {
   title   String
   content String
 
-  isArchived Boolean   @default(false)
-  archivedAt DateTime?
+  archivedAt DateTime? // If null, announcement is active. If set, announcement is archived.
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
