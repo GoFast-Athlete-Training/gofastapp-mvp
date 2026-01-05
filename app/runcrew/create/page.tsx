@@ -99,6 +99,7 @@ export default function CreateCrewPage() {
     primaryMeetUpPlaceId: '',
     primaryMeetUpLat: '',
     primaryMeetUpLng: '',
+    purpose: [] as string[],
   });
 
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -229,6 +230,7 @@ export default function CreateCrewPage() {
         primaryMeetUpPlaceId: formData.primaryMeetUpPlaceId || undefined,
         primaryMeetUpLat: formData.primaryMeetUpLat ? parseFloat(formData.primaryMeetUpLat) : undefined,
         primaryMeetUpLng: formData.primaryMeetUpLng ? parseFloat(formData.primaryMeetUpLng) : undefined,
+        purpose: formData.purpose.length > 0 ? formData.purpose : undefined,
       });
       
       if (response.data.success) {
@@ -699,6 +701,37 @@ export default function CreateCrewPage() {
               </div>
             </div>
             <p className="text-xs text-gray-500 mt-2">Age range for your crew (optional)</p>
+          </div>
+
+          {/* Purpose of Group */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Purpose of Group <span className="text-gray-400 text-xs">(Optional - Select all that apply)</span>
+            </label>
+            <div className="flex gap-3 flex-wrap">
+              {(['Training', 'Fun', 'Social'] as const).map((purposeOption) => (
+                <button
+                  key={purposeOption}
+                  type="button"
+                  onClick={() => {
+                    const newPurpose = formData.purpose.includes(purposeOption)
+                      ? formData.purpose.filter((p) => p !== purposeOption)
+                      : [...formData.purpose, purposeOption];
+                    setFormData({ ...formData, purpose: newPurpose });
+                    setError(null);
+                  }}
+                  className={`px-6 py-3 rounded-lg border-2 font-medium transition ${
+                    formData.purpose.includes(purposeOption)
+                      ? 'bg-sky-600 text-white border-sky-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-sky-500'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  disabled={loading}
+                >
+                  {purposeOption}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-2">Select what your crew is all about</p>
           </div>
 
           {/* Primary Meetup Point */}

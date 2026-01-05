@@ -37,9 +37,11 @@ export default function RunCrewAdminPage() {
 
   // Announcements state
   const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [activeAnnouncement, setActiveAnnouncement] = useState<any | null>(null);
   const [announcementTitle, setAnnouncementTitle] = useState('');
   const [announcementContent, setAnnouncementContent] = useState('');
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
 
   // Runs state
   const [runs, setRuns] = useState<any[]>([]);
@@ -96,7 +98,10 @@ export default function RunCrewAdminPage() {
 
       const crewData = response.data.runCrew;
       setCrew(crewData);
-      setAnnouncements(crewData.announcementsBox?.announcements || []);
+      const announcementsList = crewData.announcementsBox?.announcements || [];
+      setAnnouncements(announcementsList);
+      // Only one active announcement per crew
+      setActiveAnnouncement(announcementsList.length > 0 ? announcementsList[0] : null);
       setRuns(crewData.runsBox?.runs || []);
       // Topics are fixed defaults for MVP1 (no add/remove functionality)
 
@@ -172,20 +177,71 @@ export default function RunCrewAdminPage() {
 
     try {
       setLoadingAnnouncements(true);
-      const response = await api.post(`/runcrew/${runCrewId}/announcements`, {
-        title: announcementTitle.trim(),
-        content: announcementContent.trim(),
-      });
+      
+      if (editingAnnouncementId) {
+        // Update existing announcement
+        const response = await api.put(`/runcrew/${runCrewId}/announcements/${editingAnnouncementId}`, {
+          title: announcementTitle.trim(),
+          content: announcementContent.trim(),
+        });
 
-      if (response.data.success) {
-        setAnnouncementTitle('');
-        setAnnouncementContent('');
-        await loadCrewData(); // Reload to get updated announcements
-        showToast('Announcement posted successfully');
+        if (response.data.success) {
+          setAnnouncementTitle('');
+          setAnnouncementContent('');
+          setEditingAnnouncementId(null);
+          await loadCrewData();
+          showToast('Announcement updated successfully');
+        }
+      } else {
+        // Create new announcement (will archive old one)
+        const response = await api.post(`/runcrew/${runCrewId}/announcements`, {
+          title: announcementTitle.trim(),
+          content: announcementContent.trim(),
+        });
+
+        if (response.data.success) {
+          setAnnouncementTitle('');
+          setAnnouncementContent('');
+          await loadCrewData();
+          showToast('Announcement posted successfully');
+        }
       }
     } catch (err: any) {
-      console.error('Error posting announcement:', err);
-      showToast(err.response?.data?.error || 'Failed to post announcement');
+      console.error('Error saving announcement:', err);
+      showToast(err.response?.data?.error || `Failed to ${editingAnnouncementId ? 'update' : 'post'} announcement`);
+    } finally {
+      setLoadingAnnouncements(false);
+    }
+  };
+
+  const handleEditAnnouncement = (announcement: any) => {
+    setEditingAnnouncementId(announcement.id);
+    setAnnouncementTitle(announcement.title || '');
+    setAnnouncementContent(announcement.content || '');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingAnnouncementId(null);
+    setAnnouncementTitle('');
+    setAnnouncementContent('');
+  };
+
+  const handleDeleteAnnouncement = async (announcementId: string) => {
+    if (!confirm('Are you sure you want to delete this announcement? It will be archived and can be retrieved later.')) {
+      return;
+    }
+
+    try {
+      setLoadingAnnouncements(true);
+      const response = await api.delete(`/runcrew/${runCrewId}/announcements/${announcementId}`);
+      
+      if (response.data.success) {
+        await loadCrewData();
+        showToast('Announcement deleted successfully');
+      }
+    } catch (err: any) {
+      console.error('Error deleting announcement:', err);
+      showToast(err.response?.data?.error || 'Failed to delete announcement');
     } finally {
       setLoadingAnnouncements(false);
     }
@@ -577,32 +633,39 @@ export default function RunCrewAdminPage() {
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 min-h-[80px]"
                   />
                 </div>
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  {editingAnnouncementId && (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="border border-gray-300 text-gray-700 px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-gray-50 transition"
+                    >
+                      Cancel
+                    </button>
+                  )}
                   <button
                     type="submit"
                     disabled={loadingAnnouncements || !announcementTitle.trim() || !announcementContent.trim()}
                     className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-1.5 rounded-lg text-sm font-semibold transition"
                   >
-                    {loadingAnnouncements ? 'Posting...' : 'Post'}
+                    {loadingAnnouncements ? (editingAnnouncementId ? 'Updating...' : 'Posting...') : (editingAnnouncementId ? 'Update' : 'Post')}
                   </button>
                 </div>
               </form>
 
-              <div className="space-y-3">
-                {announcements.length === 0 && (
-                  <p className="text-xs text-gray-500">No announcements yet. Be the first to post one.</p>
-                )}
-                {announcements.map((announcement: any) => (
-                  <div key={announcement.id} className="border border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
-                    <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+              {/* Active Announcement Display */}
+              {activeAnnouncement ? (
+                <div className="border border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                    <span>
+                      {activeAnnouncement.author?.firstName
+                        ? `${activeAnnouncement.author.firstName}${activeAnnouncement.author.lastName ? ` ${activeAnnouncement.author.lastName}` : ''}`
+                        : 'Admin'}
+                    </span>
+                    <div className="flex items-center gap-2">
                       <span>
-                        {announcement.author?.firstName
-                          ? `${announcement.author.firstName}${announcement.author.lastName ? ` ${announcement.author.lastName}` : ''}`
-                          : 'Admin'}
-                      </span>
-                      <span>
-                        {announcement.createdAt
-                          ? new Date(announcement.createdAt).toLocaleString('en-US', {
+                        {activeAnnouncement.createdAt
+                          ? new Date(activeAnnouncement.createdAt).toLocaleString('en-US', {
                               month: 'short',
                               day: 'numeric',
                               hour: 'numeric',
@@ -610,14 +673,30 @@ export default function RunCrewAdminPage() {
                             })
                           : 'Just now'}
                       </span>
+                      <button
+                        onClick={() => handleEditAnnouncement(activeAnnouncement)}
+                        className="text-xs text-gray-500 hover:text-gray-700"
+                        disabled={loadingAnnouncements}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteAnnouncement(activeAnnouncement.id)}
+                        className="text-xs text-red-500 hover:text-red-700"
+                        disabled={loadingAnnouncements}
+                      >
+                        Delete
+                      </button>
                     </div>
-                    {announcement.title && (
-                      <h4 className="text-sm font-semibold text-gray-900 mb-1">{announcement.title}</h4>
-                    )}
-                    <p className="text-xs text-gray-800 whitespace-pre-line">{announcement.content || announcement.text}</p>
                   </div>
-                ))}
-              </div>
+                  {activeAnnouncement.title && (
+                    <h4 className="text-sm font-semibold text-gray-900 mb-1">{activeAnnouncement.title}</h4>
+                  )}
+                  <p className="text-xs text-gray-800 whitespace-pre-line">{activeAnnouncement.content || activeAnnouncement.text}</p>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500">No active announcement. Post one above to share updates with your crew.</p>
+              )}
             </section>
 
             {/* Runs Section */}

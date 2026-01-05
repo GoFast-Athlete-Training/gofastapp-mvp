@@ -54,6 +54,7 @@ export async function POST(request: Request) {
       primaryMeetUpPlaceId,
       primaryMeetUpLat,
       primaryMeetUpLng,
+      purpose,
     } = body;
 
     if (!name || !joinCode) {
@@ -82,6 +83,7 @@ export async function POST(request: Request) {
         primaryMeetUpPlaceId,
         primaryMeetUpLat: primaryMeetUpLat ? parseFloat(primaryMeetUpLat) : undefined,
         primaryMeetUpLng: primaryMeetUpLng ? parseFloat(primaryMeetUpLng) : undefined,
+        purpose: Array.isArray(purpose) && purpose.length > 0 ? purpose : undefined,
       });
     } catch (err) {
       console.error('Prisma error:', err);

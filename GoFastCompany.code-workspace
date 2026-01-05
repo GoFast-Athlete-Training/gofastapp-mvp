@@ -7,10 +7,7 @@
 			"path": "."
 		},
 		{
-			"path": "../../Ignite/IgniteBd-Next-combine"
-		},
-		{
-			"path": "../GoFast-Events"
+			"path": "../GoFastLanding"
 		}
 	],
 	"settings": {}

@@ -17,6 +17,7 @@ export async function createCrew(data: {
   primaryMeetUpPlaceId?: string;
   primaryMeetUpLat?: number;
   primaryMeetUpLng?: number;
+  purpose?: string[];
 }) {
   // Create the crew
   const crew = await prisma.runCrew.create({
@@ -36,6 +37,7 @@ export async function createCrew(data: {
       primaryMeetUpPlaceId: data.primaryMeetUpPlaceId,
       primaryMeetUpLat: data.primaryMeetUpLat,
       primaryMeetUpLng: data.primaryMeetUpLng,
+      purpose: data.purpose as any || [],
     },
   });
 
@@ -163,6 +165,9 @@ export async function hydrateCrew(runCrewId: string) {
         take: 50,
       },
       announcements: {
+        where: {
+          isArchived: false, // Only show active announcements
+        },
         include: {
           author: {
             select: {
@@ -176,7 +181,7 @@ export async function hydrateCrew(runCrewId: string) {
         orderBy: {
           createdAt: 'desc',
         },
-        take: 10,
+        take: 1, // Only one active announcement per crew
       },
       runs: {
         include: {
@@ -372,8 +377,24 @@ export async function postAnnouncement(data: {
   title: string;
   content: string;
 }) {
+  // Archive all existing active announcements for this crew
+  await prisma.runCrewAnnouncement.updateMany({
+    where: {
+      runCrewId: data.runCrewId,
+      isArchived: false,
+    },
+    data: {
+      isArchived: true,
+      archivedAt: new Date(),
+    },
+  });
+
+  // Create new active announcement
   return prisma.runCrewAnnouncement.create({
-    data,
+    data: {
+      ...data,
+      isArchived: false,
+    },
     include: {
       author: {
         select: {
