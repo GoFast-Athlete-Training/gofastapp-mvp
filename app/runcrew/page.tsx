@@ -137,7 +137,11 @@ export default function RunCrewDiscoveryPage() {
                   type="text"
                   value={filterCity}
                   onChange={(e) => setFilterCity(e.target.value)}
-                  onBlur={fetchRunCrews}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleApplyFilters();
+                    }
+                  }}
                   placeholder="e.g. Arlington"
                   className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
                 />
@@ -150,12 +154,25 @@ export default function RunCrewDiscoveryPage() {
                   type="text"
                   value={filterState}
                   onChange={(e) => setFilterState(e.target.value)}
-                  onBlur={fetchRunCrews}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleApplyFilters();
+                    }
+                  }}
                   placeholder="e.g. VA"
                   className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
                 />
               </div>
             </div>
+            {(filterCity || filterState) && (
+              <button
+                onClick={handleApplyFilters}
+                disabled={applyingFilters}
+                className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {applyingFilters ? 'Applying...' : 'Apply Filters'}
+              </button>
+            )}
           </div>
         </div>
 
