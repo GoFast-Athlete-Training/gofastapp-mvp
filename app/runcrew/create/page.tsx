@@ -141,7 +141,7 @@ export default function CreateCrewPage() {
       
       if (uploadResponse.ok && uploadData.url) {
         setLogo(uploadData.url);
-        // Clear icon if logo is set
+        // Clear icon if logo is set (mutually exclusive)
         setIcon('');
       } else {
         throw new Error(uploadData.error || 'Failed to upload logo');
