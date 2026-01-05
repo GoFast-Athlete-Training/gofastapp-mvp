@@ -113,11 +113,25 @@ export async function getDiscoverableRunCrews(options?: {
 }) {
   const limit = options?.limit || 50;
 
+  // Build where clause with optional filters
+  const where: any = {
+    archivedAt: null, // Only show active crews
+  };
+
+  if (options?.city) {
+    where.city = {
+      contains: options.city,
+      mode: 'insensitive',
+    };
+  }
+
+  if (options?.state) {
+    where.state = options.state;
+  }
+
   // Get non-archived crews with member counts
   const crews = await prisma.run_crews.findMany({
-    where: {
-      archivedAt: null, // Only show active crews
-    },
+    where,
     select: {
       id: true,
       name: true,
