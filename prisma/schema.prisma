@@ -305,6 +305,66 @@ enum RunCrewRole {
   manager
 }
 
+enum Gender {
+  male
+  female
+  both
+}
+
+enum State {
+  AL
+  AK
+  AZ
+  AR
+  CA
+  CO
+  CT
+  DE
+  DC
+  FL
+  GA
+  HI
+  ID
+  IL
+  IN
+  IA
+  KS
+  KY
+  LA
+  ME
+  MD
+  MA
+  MI
+  MN
+  MS
+  MO
+  MT
+  NE
+  NV
+  NH
+  NJ
+  NM
+  NY
+  NC
+  ND
+  OH
+  OK
+  OR
+  PA
+  RI
+  SC
+  SD
+  TN
+  TX
+  UT
+  VT
+  VA
+  WA
+  WV
+  WI
+  WY
+}
+
 model RunCrew {
   id          String  @id @default(cuid())
   name        String
@@ -312,6 +372,26 @@ model RunCrew {
   joinCode    String  @unique
   logo        String?
   icon        String?
+
+  // Location metadata
+  city  String?
+  state State?
+
+  // Primary meetup location (for radius-based search)
+  primaryMeetUpPoint   String?
+  primaryMeetUpAddress String?
+  primaryMeetUpPlaceId String?
+  primaryMeetUpLat     Float?
+  primaryMeetUpLng     Float?
+
+  // Pace metadata (in seconds per mile)
+  paceMin Int?
+  paceMax Int?
+
+  // Demographics metadata
+  gender Gender?
+  ageMin Int?
+  ageMax Int?
 
   isArchived Boolean   @default(false)
   archivedAt DateTime?

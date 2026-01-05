@@ -38,7 +38,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
 
-    const { name, description, joinCode } = body;
+    const { 
+      name, 
+      description, 
+      joinCode,
+      city,
+      state,
+      paceMin,
+      paceMax,
+      gender,
+      ageMin,
+      ageMax,
+      primaryMeetUpPoint,
+      primaryMeetUpAddress,
+      primaryMeetUpPlaceId,
+      primaryMeetUpLat,
+      primaryMeetUpLng,
+    } = body;
 
     if (!name || !joinCode) {
       return NextResponse.json(
@@ -54,6 +70,18 @@ export async function POST(request: Request) {
         description,
         joinCode,
         athleteId: athlete.id,
+        city,
+        state,
+        paceMin: paceMin ? parseInt(paceMin) : undefined,
+        paceMax: paceMax ? parseInt(paceMax) : undefined,
+        gender: gender || undefined,
+        ageMin: ageMin ? parseInt(ageMin) : undefined,
+        ageMax: ageMax ? parseInt(ageMax) : undefined,
+        primaryMeetUpPoint,
+        primaryMeetUpAddress,
+        primaryMeetUpPlaceId,
+        primaryMeetUpLat: primaryMeetUpLat ? parseFloat(primaryMeetUpLat) : undefined,
+        primaryMeetUpLng: primaryMeetUpLng ? parseFloat(primaryMeetUpLng) : undefined,
       });
     } catch (err) {
       console.error('Prisma error:', err);

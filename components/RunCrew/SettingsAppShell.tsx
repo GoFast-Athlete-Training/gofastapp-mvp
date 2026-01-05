@@ -31,7 +31,7 @@ export default function SettingsAppShell({
 
   return (
     <>
-      {/* Header */}
+      {/* Header - sticky below TopNav */}
       <header className="bg-white border-b border-gray-200 sticky top-14 z-30">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
@@ -60,41 +60,39 @@ export default function SettingsAppShell({
         </div>
       </header>
 
-      <div className="flex">
-        {/* Sidebar */}
-        <aside className="w-64 bg-white border-r border-gray-200 min-h-[calc(100vh-7rem)]">
-          <nav className="p-4">
-            <ul className="space-y-1">
-              {sections.map((section) => {
-                const Icon = section.icon;
-                const isActive = activeSection === section.id;
-                return (
-                  <li key={section.id}>
-                    <button
-                      onClick={() => onSectionChange(section.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition ${
-                        isActive
-                          ? 'bg-orange-50 text-orange-600'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <Icon className="w-5 h-5 flex-shrink-0" />
-                      <span className="truncate">{section.label}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
-        </aside>
+      {/* Fixed Sidebar - positioned below header */}
+      <aside className="w-64 bg-white border-r border-gray-200 fixed left-0 top-[calc(3.5rem+4rem)] h-[calc(100vh-3.5rem-4rem)] overflow-y-auto z-20">
+        <nav className="p-4">
+          <ul className="space-y-1">
+            {sections.map((section) => {
+              const Icon = section.icon;
+              const isActive = activeSection === section.id;
+              return (
+                <li key={section.id}>
+                  <button
+                    onClick={() => onSectionChange(section.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition ${
+                      isActive
+                        ? 'bg-orange-50 text-orange-600'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5 flex-shrink-0" />
+                    <span className="truncate">{section.label}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      </aside>
 
-        {/* Main Content */}
-        <main className="flex-1 min-w-0">
-          <div className="p-8">
-            {children}
-          </div>
-        </main>
-      </div>
+      {/* Main Content - with margin for fixed sidebar */}
+      <main className="ml-64 min-w-0">
+        <div className="p-8">
+          {children}
+        </div>
+      </main>
     </>
   );
 }

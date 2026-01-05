@@ -10,9 +10,6 @@
 			"path": "../../Ignite/IgniteBd-Next-combine"
 		},
 		{
-			"path": "../gofastfrontend-mvp1"
-		},
-		{
 			"path": "../GoFast-Events"
 		}
 	],

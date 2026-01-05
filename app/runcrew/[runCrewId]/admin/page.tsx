@@ -853,7 +853,6 @@ export default function RunCrewAdminPage() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                   disabled={loadingRuns}
                 />
-                <p className="text-xs text-gray-500">You can type manually or select from Google Places suggestions</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -884,7 +883,7 @@ export default function RunCrewAdminPage() {
                     </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Strava Route URL (Optional)</label>
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Strava Route URL</label>
                 <input
                   type="url"
                   value={runForm.stravaMapUrl}
@@ -892,7 +891,6 @@ export default function RunCrewAdminPage() {
                   placeholder="https://www.strava.com/routes/..."
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                 />
-                <p className="text-xs text-gray-500">Paste the Strava route URL to link to the route map</p>
               </div>
 
               <div className="space-y-2">

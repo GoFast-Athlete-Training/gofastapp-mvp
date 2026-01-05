@@ -8,6 +8,62 @@ import Image from 'next/image';
 import { X, ImageIcon } from 'lucide-react';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import GooglePlacesAutocomplete from '@/components/RunCrew/GooglePlacesAutocomplete';
+
+// US States + DC for dropdown
+const US_STATES = [
+  { value: 'AL', label: 'Alabama' },
+  { value: 'AK', label: 'Alaska' },
+  { value: 'AZ', label: 'Arizona' },
+  { value: 'AR', label: 'Arkansas' },
+  { value: 'CA', label: 'California' },
+  { value: 'CO', label: 'Colorado' },
+  { value: 'CT', label: 'Connecticut' },
+  { value: 'DE', label: 'Delaware' },
+  { value: 'DC', label: 'District of Columbia' },
+  { value: 'FL', label: 'Florida' },
+  { value: 'GA', label: 'Georgia' },
+  { value: 'HI', label: 'Hawaii' },
+  { value: 'ID', label: 'Idaho' },
+  { value: 'IL', label: 'Illinois' },
+  { value: 'IN', label: 'Indiana' },
+  { value: 'IA', label: 'Iowa' },
+  { value: 'KS', label: 'Kansas' },
+  { value: 'KY', label: 'Kentucky' },
+  { value: 'LA', label: 'Louisiana' },
+  { value: 'ME', label: 'Maine' },
+  { value: 'MD', label: 'Maryland' },
+  { value: 'MA', label: 'Massachusetts' },
+  { value: 'MI', label: 'Michigan' },
+  { value: 'MN', label: 'Minnesota' },
+  { value: 'MS', label: 'Mississippi' },
+  { value: 'MO', label: 'Missouri' },
+  { value: 'MT', label: 'Montana' },
+  { value: 'NE', label: 'Nebraska' },
+  { value: 'NV', label: 'Nevada' },
+  { value: 'NH', label: 'New Hampshire' },
+  { value: 'NJ', label: 'New Jersey' },
+  { value: 'NM', label: 'New Mexico' },
+  { value: 'NY', label: 'New York' },
+  { value: 'NC', label: 'North Carolina' },
+  { value: 'ND', label: 'North Dakota' },
+  { value: 'OH', label: 'Ohio' },
+  { value: 'OK', label: 'Oklahoma' },
+  { value: 'OR', label: 'Oregon' },
+  { value: 'PA', label: 'Pennsylvania' },
+  { value: 'RI', label: 'Rhode Island' },
+  { value: 'SC', label: 'South Carolina' },
+  { value: 'SD', label: 'South Dakota' },
+  { value: 'TN', label: 'Tennessee' },
+  { value: 'TX', label: 'Texas' },
+  { value: 'UT', label: 'Utah' },
+  { value: 'VT', label: 'Vermont' },
+  { value: 'VA', label: 'Virginia' },
+  { value: 'WA', label: 'Washington' },
+  { value: 'WV', label: 'West Virginia' },
+  { value: 'WI', label: 'Wisconsin' },
+  { value: 'WY', label: 'Wyoming' },
+];
 
 // Common running emojis for quick selection
 const RUNNING_EMOJIS = [
@@ -31,6 +87,18 @@ export default function CreateCrewPage() {
     name: '',
     description: '',
     joinCode: '',
+    city: '',
+    state: '',
+    paceMin: '',
+    paceMax: '',
+    gender: '',
+    ageMin: '',
+    ageMax: '',
+    primaryMeetUpPoint: '',
+    primaryMeetUpAddress: '',
+    primaryMeetUpPlaceId: '',
+    primaryMeetUpLat: '',
+    primaryMeetUpLng: '',
   });
 
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -130,12 +198,37 @@ export default function CreateCrewPage() {
 
     setLoading(true);
 
+    // Convert pace from MM:SS format to seconds per mile
+    const convertPaceToSeconds = (paceStr: string): number | undefined => {
+      if (!paceStr.trim()) return undefined;
+      const parts = paceStr.trim().split(':');
+      if (parts.length === 2) {
+        const minutes = parseInt(parts[0]) || 0;
+        const seconds = parseInt(parts[1]) || 0;
+        return minutes * 60 + seconds;
+      }
+      return undefined;
+    };
+
     try {
       const response = await api.post('/runcrew/create', {
-        ...formData,
+        name: formData.name,
+        description: formData.description,
         joinCode: normalizedCode,
         logo: logo || null,
         icon: icon || null,
+        city: formData.city || undefined,
+        state: formData.state || undefined,
+        paceMin: formData.paceMin ? convertPaceToSeconds(formData.paceMin) : undefined,
+        paceMax: formData.paceMax ? convertPaceToSeconds(formData.paceMax) : undefined,
+        gender: formData.gender || undefined,
+        ageMin: formData.ageMin ? parseInt(formData.ageMin) : undefined,
+        ageMax: formData.ageMax ? parseInt(formData.ageMax) : undefined,
+        primaryMeetUpPoint: formData.primaryMeetUpPoint || undefined,
+        primaryMeetUpAddress: formData.primaryMeetUpAddress || undefined,
+        primaryMeetUpPlaceId: formData.primaryMeetUpPlaceId || undefined,
+        primaryMeetUpLat: formData.primaryMeetUpLat ? parseFloat(formData.primaryMeetUpLat) : undefined,
+        primaryMeetUpLng: formData.primaryMeetUpLng ? parseFloat(formData.primaryMeetUpLng) : undefined,
       });
       
       if (response.data.success) {
@@ -428,6 +521,213 @@ export default function CreateCrewPage() {
               disabled={loading}
             />
             <p className="text-xs text-gray-500 mt-1">Help your crew understand what you're all about</p>
+          </div>
+
+          {/* Location Fields */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                City <span className="text-gray-400 text-xs">(Optional)</span>
+              </label>
+              <input
+                type="text"
+                value={formData.city}
+                onChange={(e) => {
+                  setFormData({ ...formData, city: e.target.value });
+                  setError(null);
+                }}
+                className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
+                placeholder="Arlington"
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                State <span className="text-gray-400 text-xs">(Optional)</span>
+              </label>
+              <select
+                value={formData.state}
+                onChange={(e) => {
+                  setFormData({ ...formData, state: e.target.value });
+                  setError(null);
+                }}
+                className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
+                disabled={loading}
+              >
+                <option value="">Select a state</option>
+                {US_STATES.map((state) => (
+                  <option key={state.value} value={state.value}>
+                    {state.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Pace Range Fields */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Pace Range <span className="text-gray-400 text-xs">(Optional - min/mile)</span>
+            </label>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Min Pace</label>
+                <input
+                  type="text"
+                  value={formData.paceMin}
+                  onChange={(e) => {
+                    setFormData({ ...formData, paceMin: e.target.value });
+                    setError(null);
+                  }}
+                  className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition font-mono"
+                  placeholder="8:00"
+                  disabled={loading}
+                />
+                <p className="text-xs text-gray-500 mt-1">Format: MM:SS</p>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Max Pace</label>
+                <input
+                  type="text"
+                  value={formData.paceMax}
+                  onChange={(e) => {
+                    setFormData({ ...formData, paceMax: e.target.value });
+                    setError(null);
+                  }}
+                  className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition font-mono"
+                  placeholder="10:00"
+                  disabled={loading}
+                />
+                <p className="text-xs text-gray-500 mt-1">Format: MM:SS</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">Target pace range for your crew (e.g., 8:00-10:00 min/mile)</p>
+          </div>
+
+          {/* Gender Field */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Gender <span className="text-gray-400 text-xs">(Optional)</span>
+            </label>
+            <div className="flex gap-6">
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="gender"
+                  value="male"
+                  checked={formData.gender === 'male'}
+                  onChange={(e) => {
+                    setFormData({ ...formData, gender: e.target.value });
+                    setError(null);
+                  }}
+                  className="w-4 h-4 text-sky-600 border-gray-300 focus:ring-sky-500"
+                  disabled={loading}
+                />
+                <span className="text-sm text-gray-700">Male</span>
+              </label>
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="gender"
+                  value="female"
+                  checked={formData.gender === 'female'}
+                  onChange={(e) => {
+                    setFormData({ ...formData, gender: e.target.value });
+                    setError(null);
+                  }}
+                  className="w-4 h-4 text-sky-600 border-gray-300 focus:ring-sky-500"
+                  disabled={loading}
+                />
+                <span className="text-sm text-gray-700">Female</span>
+              </label>
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="gender"
+                  value="both"
+                  checked={formData.gender === 'both'}
+                  onChange={(e) => {
+                    setFormData({ ...formData, gender: e.target.value });
+                    setError(null);
+                  }}
+                  className="w-4 h-4 text-sky-600 border-gray-300 focus:ring-sky-500"
+                  disabled={loading}
+                />
+                <span className="text-sm text-gray-700">Both</span>
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Select the gender(s) welcome in your crew</p>
+          </div>
+
+          {/* Age Range Fields */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Age Range <span className="text-gray-400 text-xs">(Optional)</span>
+            </label>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Min Age</label>
+                <input
+                  type="number"
+                  value={formData.ageMin}
+                  onChange={(e) => {
+                    setFormData({ ...formData, ageMin: e.target.value });
+                    setError(null);
+                  }}
+                  className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
+                  placeholder="18"
+                  min="0"
+                  max="120"
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Max Age</label>
+                <input
+                  type="number"
+                  value={formData.ageMax}
+                  onChange={(e) => {
+                    setFormData({ ...formData, ageMax: e.target.value });
+                    setError(null);
+                  }}
+                  className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
+                  placeholder="65"
+                  min="0"
+                  max="120"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">Age range for your crew (optional)</p>
+          </div>
+
+          {/* Primary Meetup Point */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Primary Meetup Point <span className="text-gray-400 text-xs">(Optional)</span>
+            </label>
+            <p className="text-xs text-gray-500 mb-2">Where does your crew typically meet? This helps with radius-based search.</p>
+            <GooglePlacesAutocomplete
+              value={formData.primaryMeetUpAddress}
+              onChange={(e) => {
+                setFormData({ ...formData, primaryMeetUpAddress: e.target.value });
+                setError(null);
+              }}
+              onPlaceSelected={(placeData) => {
+                setFormData({
+                  ...formData,
+                  primaryMeetUpPoint: placeData.name,
+                  primaryMeetUpAddress: placeData.address,
+                  primaryMeetUpPlaceId: placeData.placeId,
+                  primaryMeetUpLat: placeData.lat.toString(),
+                  primaryMeetUpLng: placeData.lng.toString(),
+                });
+              }}
+              placeholder="Search for a location (e.g., park, running trail, coffee shop)..."
+              className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
+              disabled={loading}
+            />
+            <p className="text-xs text-gray-500 mt-1">Type to search or enter address manually</p>
           </div>
 
           <div>

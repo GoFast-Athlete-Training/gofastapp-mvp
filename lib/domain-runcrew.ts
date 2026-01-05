@@ -5,6 +5,18 @@ export async function createCrew(data: {
   description?: string;
   joinCode: string;
   athleteId: string;
+  city?: string;
+  state?: string;
+  paceMin?: number;
+  paceMax?: number;
+  gender?: string;
+  ageMin?: number;
+  ageMax?: number;
+  primaryMeetUpPoint?: string;
+  primaryMeetUpAddress?: string;
+  primaryMeetUpPlaceId?: string;
+  primaryMeetUpLat?: number;
+  primaryMeetUpLng?: number;
 }) {
   // Create the crew
   const crew = await prisma.runCrew.create({
@@ -12,6 +24,18 @@ export async function createCrew(data: {
       name: data.name,
       description: data.description,
       joinCode: data.joinCode,
+      city: data.city,
+      state: data.state as any, // Prisma will validate enum
+      paceMin: data.paceMin,
+      paceMax: data.paceMax,
+      gender: data.gender as any, // Prisma will validate enum
+      ageMin: data.ageMin,
+      ageMax: data.ageMax,
+      primaryMeetUpPoint: data.primaryMeetUpPoint,
+      primaryMeetUpAddress: data.primaryMeetUpAddress,
+      primaryMeetUpPlaceId: data.primaryMeetUpPlaceId,
+      primaryMeetUpLat: data.primaryMeetUpLat,
+      primaryMeetUpLng: data.primaryMeetUpLng,
     },
   });
 
