@@ -186,10 +186,10 @@ export async function DELETE(
     }
 
     // Archive the announcement (don't delete, so it can be retrieved)
+    // Set archivedAt timestamp - if null, announcement is active; if set, it's archived
     const archived = await prisma.runCrewAnnouncement.update({
       where: { id: announcementId },
       data: {
-        isArchived: true,
         archivedAt: new Date(),
       },
     });

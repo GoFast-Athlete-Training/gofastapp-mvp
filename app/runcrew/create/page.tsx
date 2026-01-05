@@ -742,6 +742,101 @@ export default function CreateCrewPage() {
             <p className="text-xs text-gray-500 mt-2">Select what your crew is all about</p>
           </div>
 
+          {/* Time Preference */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Typical Run Times <span className="text-gray-400 text-xs">(Optional - Select all that apply)</span>
+            </label>
+            <div className="flex gap-3 flex-wrap">
+              {(['Morning', 'Afternoon', 'Evening'] as const).map((timeOption) => (
+                <button
+                  key={timeOption}
+                  type="button"
+                  onClick={() => {
+                    const newTimePreference = formData.timePreference.includes(timeOption)
+                      ? formData.timePreference.filter((t) => t !== timeOption)
+                      : [...formData.timePreference, timeOption];
+                    setFormData({ ...formData, timePreference: newTimePreference });
+                    setError(null);
+                  }}
+                  className={`px-6 py-3 rounded-lg border-2 font-medium transition ${
+                    formData.timePreference.includes(timeOption)
+                      ? 'bg-sky-600 text-white border-sky-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-sky-500'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  disabled={loading}
+                >
+                  {timeOption}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-2">When does your crew typically run?</p>
+          </div>
+
+          {/* Run Distance Fields */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Typical Run Distance <span className="text-gray-400 text-xs">(Optional)</span>
+            </label>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Average Typical Run (miles)</label>
+                <input
+                  type="number"
+                  value={formData.typicalRunMiles}
+                  onChange={(e) => {
+                    setFormData({ ...formData, typicalRunMiles: e.target.value });
+                    setError(null);
+                  }}
+                  className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
+                  placeholder="6.0"
+                  step="0.1"
+                  min="0"
+                  disabled={loading}
+                />
+                <p className="text-xs text-gray-500 mt-1">Average distance for a typical run</p>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Long Run Range (miles)</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Min</label>
+                    <input
+                      type="number"
+                      value={formData.longRunMilesMin}
+                      onChange={(e) => {
+                        setFormData({ ...formData, longRunMilesMin: e.target.value });
+                        setError(null);
+                      }}
+                      className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
+                      placeholder="13"
+                      step="0.1"
+                      min="0"
+                      disabled={loading}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Max</label>
+                    <input
+                      type="number"
+                      value={formData.longRunMilesMax}
+                      onChange={(e) => {
+                        setFormData({ ...formData, longRunMilesMax: e.target.value });
+                        setError(null);
+                      }}
+                      className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
+                      placeholder="18"
+                      step="0.1"
+                      min="0"
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Long run distance range (e.g., 13-18 miles for serious training vs 6 for a bagel stop)</p>
+              </div>
+            </div>
+          </div>
+
           {/* Primary Meetup Point */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">

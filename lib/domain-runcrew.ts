@@ -174,7 +174,7 @@ export async function hydrateCrew(runCrewId: string) {
       },
       announcements: {
         where: {
-          isArchived: false, // Only show active announcements
+          archivedAt: null, // Only show active announcements (archivedAt is null)
         },
         include: {
           author: {
@@ -385,24 +385,20 @@ export async function postAnnouncement(data: {
   title: string;
   content: string;
 }) {
-  // Archive all existing active announcements for this crew
+  // Archive all existing active announcements for this crew (where archivedAt is null)
   await prisma.runCrewAnnouncement.updateMany({
     where: {
       runCrewId: data.runCrewId,
-      isArchived: false,
+      archivedAt: null, // Only archive active announcements
     },
     data: {
-      isArchived: true,
       archivedAt: new Date(),
     },
   });
 
-  // Create new active announcement
+  // Create new active announcement (archivedAt is null by default)
   return prisma.runCrewAnnouncement.create({
-    data: {
-      ...data,
-      isArchived: false,
-    },
+    data,
     include: {
       author: {
         select: {

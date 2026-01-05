@@ -409,22 +409,41 @@ model RunCrew {
 
 ## 11. Summary Table
 
-| Preference Type | Original Scope | RunCrew Current | Athlete Current | Recommendation |
-|----------------|----------------|-----------------|-----------------|----------------|
-| **Purpose/Goals** | ✅ `myRunningGoals` | ✅ `purpose[]` | ❌ Missing | ✅ **Done for RunCrew** |
-| **Pace Range** | ✅ `myPaceRange` | ✅ `paceMin/Max` | ⚠️ Only `fiveKPace` | ✅ **Done for RunCrew** |
-| **Distance** | ✅ `preferredDistance` | ❌ Missing | ❌ Missing | 🔴 **Add to RunCrew** |
-| **Time** | ✅ `timePreference` | ❌ Missing | ❌ Missing | 🔴 **Add to RunCrew** |
-| **Days** | ❌ Not scoped | ❌ Missing | ❌ Missing | 🟡 **Add to RunCrew** (nice to have) |
-| **Demographics** | ⚠️ Indirect | ✅ `gender`, `ageMin/Max` | ✅ `gender` | ✅ **Done for RunCrew** |
-| **Location** | ⚠️ Indirect | ✅ `city`, `state`, meetup | ✅ `city`, `state` | ✅ **Done for RunCrew** |
+| Preference Type | Original Scope | RunCrew Current | Athlete Current | Status |
+|----------------|----------------|-----------------|-----------------|--------|
+| **Purpose/Goals** | ✅ `myRunningGoals` | ✅ `purpose[]` (Training, Fun, Social) | ❌ Missing | ✅ **Implemented** |
+| **Pace Range** | ✅ `myPaceRange` | ✅ `paceMin/Max` (seconds/mile) | ⚠️ Only `fiveKPace` | ✅ **Implemented** |
+| **Time Preference** | ✅ `timePreference` | ✅ `timePreference[]` (Morning, Afternoon, Evening) | ❌ Missing | ✅ **Implemented** |
+| **Typical Run Distance** | ❌ Not scoped | ✅ `typicalRunMiles` (average) | ❌ Missing | ✅ **Implemented** |
+| **Long Run Range** | ❌ Not scoped | ✅ `longRunMilesMin/Max` | ❌ Missing | ✅ **Implemented** |
+| **Demographics** | ⚠️ Indirect | ✅ `gender`, `ageMin/Max` | ✅ `gender` | ✅ **Implemented** |
+| **Location** | ⚠️ Indirect | ✅ `city`, `state`, `primaryMeetUpPoint` + lat/lng | ✅ `city`, `state` | ✅ **Implemented** |
+| **Typical Days** | ❌ Not scoped | ❌ Skipped (intentional - not a scheduled club) | ❌ Missing | ✅ **Intentionally Skipped** |
 
 **Legend:**
 - ✅ Implemented
 - ❌ Missing
 - ⚠️ Partial
-- 🔴 High Priority
-- 🟡 Medium Priority
+
+---
+
+## 12. Final Implementation Status (January 2025)
+
+### ✅ **Complete - RunCrew Preferences**
+
+All core RunCrew preference fields for user choice/affinity matching are now implemented:
+
+1. ✅ **Purpose** - `purpose[]` (Training, Fun, Social) - Multi-select buttons
+2. ✅ **Pace Range** - `paceMin` / `paceMax` (seconds per mile) - Structured range
+3. ✅ **Time Preference** - `timePreference[]` (Morning, Afternoon, Evening) - Multi-select buttons
+4. ✅ **Typical Run Distance** - `typicalRunMiles` (Float) - Average typical run
+5. ✅ **Long Run Range** - `longRunMilesMin` / `longRunMilesMax` (Float) - Min/max range
+6. ✅ **Demographics** - `gender` (enum), `ageMin` / `ageMax` (Int)
+7. ✅ **Location** - `city`, `state` (enum), `primaryMeetUpPoint` + lat/lng for radius search
+
+### ✅ **Coverage: 100% of Core Preferences**
+
+All fields needed for RunCrew discovery and user affinity matching are now in place.
 
 ---
 
