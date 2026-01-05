@@ -632,7 +632,7 @@ export default function RunCrewSettingsPage() {
                   <p className="text-gray-500 text-center py-4">No admins or managers yet</p>
                 ) : (
                   adminsAndManagers.map((membershipItem: any) => {
-                    const athlete = membershipItem.athlete || {};
+                    const athlete = membershipItem.Athlete || {};
                     return (
                       <div key={membershipItem.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
                         {athlete.photoURL ? (
