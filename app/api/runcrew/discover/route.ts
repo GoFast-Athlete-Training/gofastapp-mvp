@@ -13,6 +13,15 @@ import { getDiscoverableRunCrews } from '@/lib/domain-runcrew';
  * - limit: number (default 50)
  * - city: string (optional filter)
  * - state: string (optional filter)
+ * - purpose: string[] (optional - Training, Fun, Social)
+ * - timePreference: string[] (optional - Morning, Afternoon, Evening)
+ * - paceMin: number (optional - seconds per mile)
+ * - paceMax: number (optional - seconds per mile)
+ * - gender: string (optional - male, female, both)
+ * - ageMin: number (optional)
+ * - ageMax: number (optional)
+ * - typicalRunMilesMin: number (optional)
+ * - typicalRunMilesMax: number (optional)
  * 
  * Returns:
  * {
@@ -49,11 +58,45 @@ export async function GET(request: Request) {
       : undefined;
     const city = searchParams.get('city') || undefined;
     const state = searchParams.get('state') || undefined;
+    
+    // Parse array params
+    const purpose = searchParams.getAll('purpose');
+    const timePreference = searchParams.getAll('timePreference');
+    
+    // Parse number params
+    const paceMin = searchParams.get('paceMin') 
+      ? parseInt(searchParams.get('paceMin')!, 10)
+      : undefined;
+    const paceMax = searchParams.get('paceMax') 
+      ? parseInt(searchParams.get('paceMax')!, 10)
+      : undefined;
+    const gender = searchParams.get('gender') || undefined;
+    const ageMin = searchParams.get('ageMin') 
+      ? parseInt(searchParams.get('ageMin')!, 10)
+      : undefined;
+    const ageMax = searchParams.get('ageMax') 
+      ? parseInt(searchParams.get('ageMax')!, 10)
+      : undefined;
+    const typicalRunMilesMin = searchParams.get('typicalRunMilesMin') 
+      ? parseFloat(searchParams.get('typicalRunMilesMin')!)
+      : undefined;
+    const typicalRunMilesMax = searchParams.get('typicalRunMilesMax') 
+      ? parseFloat(searchParams.get('typicalRunMilesMax')!)
+      : undefined;
 
     const crews = await getDiscoverableRunCrews({
       limit,
       city,
       state,
+      purpose: purpose.length > 0 ? purpose : undefined,
+      timePreference: timePreference.length > 0 ? timePreference : undefined,
+      paceMin,
+      paceMax,
+      gender,
+      ageMin,
+      ageMax,
+      typicalRunMilesMin,
+      typicalRunMilesMax,
     });
 
     return NextResponse.json({

@@ -110,6 +110,15 @@ export async function getDiscoverableRunCrews(options?: {
   limit?: number;
   city?: string;
   state?: string;
+  purpose?: string[];
+  timePreference?: string[];
+  paceMin?: number;
+  paceMax?: number;
+  gender?: string;
+  ageMin?: number;
+  ageMax?: number;
+  typicalRunMilesMin?: number;
+  typicalRunMilesMax?: number;
 }) {
   const limit = options?.limit || 50;
 
@@ -127,6 +136,58 @@ export async function getDiscoverableRunCrews(options?: {
 
   if (options?.state) {
     where.state = options.state;
+  }
+
+  if (options?.purpose && options.purpose.length > 0) {
+    where.purpose = {
+      hasSome: options.purpose,
+    };
+  }
+
+  if (options?.timePreference && options.timePreference.length > 0) {
+    where.timePreference = {
+      hasSome: options.timePreference,
+    };
+  }
+
+  if (options?.paceMin !== undefined) {
+    where.paceMax = {
+      gte: options.paceMin, // Crew's max pace should be >= user's min pace
+    };
+  }
+
+  if (options?.paceMax !== undefined) {
+    where.paceMin = {
+      lte: options.paceMax, // Crew's min pace should be <= user's max pace
+    };
+  }
+
+  if (options?.gender) {
+    where.gender = {
+      in: [options.gender, 'both'], // Include crews that accept this gender or both
+    };
+  }
+
+  if (options?.ageMin !== undefined) {
+    where.ageMax = {
+      gte: options.ageMin, // Crew's max age should be >= user's min age
+    };
+  }
+
+  if (options?.ageMax !== undefined) {
+    where.ageMin = {
+      lte: options.ageMax, // Crew's min age should be <= user's max age
+    };
+  }
+
+  if (options?.typicalRunMilesMin !== undefined || options?.typicalRunMilesMax !== undefined) {
+    where.typicalRunMiles = {};
+    if (options?.typicalRunMilesMin !== undefined) {
+      where.typicalRunMiles.gte = options.typicalRunMilesMin;
+    }
+    if (options?.typicalRunMilesMax !== undefined) {
+      where.typicalRunMiles.lte = options.typicalRunMilesMax;
+    }
   }
 
   // Get non-archived crews with member counts
@@ -211,7 +272,7 @@ export async function getCrewById(runCrewId: string) {
     include: {
       run_crew_memberships: {
         include: {
-          athletes: {
+          Athlete: {
             select: {
               id: true,
               firstName: true,
@@ -227,7 +288,7 @@ export async function getCrewById(runCrewId: string) {
         take: 50,
         orderBy: { createdAt: 'desc' },
         include: {
-          athletes: {
+          Athlete: {
             select: {
               id: true,
               firstName: true,
@@ -241,7 +302,7 @@ export async function getCrewById(runCrewId: string) {
         take: 10,
         orderBy: { createdAt: 'desc' },
         include: {
-          athletes: {
+          Athlete: {
             select: {
               id: true,
               firstName: true,
@@ -254,7 +315,7 @@ export async function getCrewById(runCrewId: string) {
       run_crew_runs: {
         orderBy: { date: 'asc' },
         include: {
-          athletes: {
+          Athlete: {
             select: {
               id: true,
               firstName: true,
@@ -272,6 +333,193 @@ export async function getCrewById(runCrewId: string) {
   }
 
   return normalizeCrewResponse(crew);
+}
+
+/**
+ * Hydrate crew with full box structure - returns comprehensive crew data
+ * This is the main function used by API routes to fetch crew data
+ */
+export async function hydrateCrew(runCrewId: string) {
+  const crew = await prisma.run_crews.findUnique({
+    where: { id: runCrewId },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      joinCode: true,
+      logo: true,
+      icon: true,
+      archivedAt: true,
+      messageTopics: true,
+      run_crew_announcements: {
+        where: {
+          archivedAt: null, // Only fetch active announcements
+        },
+        include: {
+          Athlete: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              photoURL: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 1, // Only fetch the latest active announcement
+      },
+      run_crew_runs: {
+        select: {
+          id: true,
+          title: true,
+          date: true,
+          startTime: true,
+          meetUpPoint: true,
+          meetUpAddress: true,
+          totalMiles: true,
+          pace: true,
+          stravaMapUrl: true,
+          description: true,
+          run_crew_run_rsvps: {
+            select: {
+              id: true,
+              status: true,
+              Athlete: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  photoURL: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          date: 'asc',
+        },
+      },
+      run_crew_memberships: {
+        include: {
+          Athlete: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              photoURL: true,
+            },
+          },
+        },
+      },
+      run_crew_messages: {
+        take: 50,
+        orderBy: {
+          createdAt: 'desc',
+        },
+        include: {
+          Athlete: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              photoURL: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!crew) {
+    return null;
+  }
+
+  // Parse messageTopics (stored as JSON)
+  let messageTopics: string[] = ['#general', '#runs', '#training tips', '#myvictories', '#social'];
+  if (crew.messageTopics) {
+    try {
+      if (typeof crew.messageTopics === 'string') {
+        messageTopics = JSON.parse(crew.messageTopics);
+      } else if (Array.isArray(crew.messageTopics)) {
+        // Type assertion for Prisma Json type
+        messageTopics = crew.messageTopics as string[];
+      }
+    } catch (err) {
+      console.warn('Failed to parse messageTopics, using defaults');
+    }
+  }
+
+  // Build box structure
+  return {
+    runCrewBaseInfo: {
+      runCrewId: crew.id,
+      name: crew.name,
+      description: crew.description,
+      joinCode: crew.joinCode,
+      logo: crew.logo,
+      icon: crew.icon,
+      messageTopics,
+      archivedAt: crew.archivedAt,
+    },
+    membershipsBox: {
+      memberships: crew.run_crew_memberships.map((m: any) => ({
+        id: m.id,
+        athleteId: m.athleteId,
+        runCrewId: m.runCrewId,
+        role: m.role,
+        joinedAt: m.joinedAt,
+        createdAt: m.createdAt,
+        updatedAt: m.updatedAt,
+        Athlete: m.Athlete,
+      })),
+    },
+    messagesBox: {
+      messages: crew.run_crew_messages.map((m: any) => ({
+        id: m.id,
+        runCrewId: m.runCrewId,
+        athleteId: m.athleteId,
+        content: m.content,
+        topic: m.topic,
+        createdAt: m.createdAt,
+        updatedAt: m.updatedAt,
+        Athlete: m.Athlete,
+      })),
+    },
+    announcementsBox: {
+      announcements: crew.run_crew_announcements.map((a: any) => ({
+        id: a.id,
+        runCrewId: a.runCrewId,
+        athleteId: a.athleteId,
+        title: a.title,
+        content: a.content,
+        archivedAt: a.archivedAt,
+        createdAt: a.createdAt,
+        updatedAt: a.updatedAt,
+        Athlete: a.Athlete,
+      })),
+    },
+    runsBox: {
+      runs: crew.run_crew_runs.map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        date: r.date,
+        startTime: r.startTime,
+        meetUpPoint: r.meetUpPoint,
+        meetUpAddress: r.meetUpAddress,
+        totalMiles: r.totalMiles,
+        pace: r.pace,
+        stravaMapUrl: r.stravaMapUrl,
+        description: r.description,
+        run_crew_run_rsvps: r.run_crew_run_rsvps.map((rsvp: any) => ({
+          id: rsvp.id,
+          status: rsvp.status,
+          Athlete: rsvp.Athlete,
+        })),
+      })),
+    },
+  };
 }
 
 /**
@@ -345,4 +593,171 @@ export async function joinCrewById(runCrewId: string, athleteId: string) {
   });
 
   return crew;
+}
+
+/**
+ * Create a new run for a RunCrew
+ */
+export async function createRun(data: {
+  runCrewId: string;
+  createdById: string;
+  title: string;
+  date: Date;
+  startTime?: string | null;
+  meetUpPoint?: string | null;
+  meetUpAddress?: string | null;
+  totalMiles?: number | null;
+  pace?: string | null;
+  stravaMapUrl?: string | null;
+  description?: string | null;
+}) {
+  const run = await prisma.run_crew_runs.create({
+    data: {
+      runCrewId: data.runCrewId,
+      title: data.title,
+      date: data.date,
+      startTime: data.startTime,
+      meetUpPoint: data.meetUpPoint,
+      meetUpAddress: data.meetUpAddress,
+      totalMiles: data.totalMiles,
+      pace: data.pace,
+      stravaMapUrl: data.stravaMapUrl,
+      description: data.description,
+    },
+  });
+
+  return run;
+}
+
+/**
+ * Post a message to a RunCrew
+ */
+export async function postMessage(data: {
+  runCrewId: string;
+  athleteId: string;
+  content: string;
+  topic?: string;
+}) {
+  // Archive existing active announcements when a new one is posted
+  if (data.topic === '#announcement') {
+    await prisma.run_crew_announcements.updateMany({
+      where: {
+        runCrewId: data.runCrewId,
+        archivedAt: null,
+      },
+      data: {
+        archivedAt: new Date(),
+      },
+    });
+  }
+
+  const message = await prisma.run_crew_messages.create({
+    data: {
+      runCrewId: data.runCrewId,
+      athleteId: data.athleteId,
+      content: data.content,
+      topic: data.topic || '#general',
+    },
+    include: {
+      Athlete: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          photoURL: true,
+        },
+      },
+    },
+  });
+
+  return message;
+}
+
+/**
+ * Post an announcement to a RunCrew
+ * Archives existing active announcements when a new one is posted
+ */
+export async function postAnnouncement(data: {
+  runCrewId: string;
+  authorId: string;
+  title: string;
+  content: string;
+}) {
+  // Archive existing active announcements
+  await prisma.run_crew_announcements.updateMany({
+    where: {
+      runCrewId: data.runCrewId,
+      archivedAt: null,
+    },
+    data: {
+      archivedAt: new Date(),
+    },
+  });
+
+  const announcement = await prisma.run_crew_announcements.create({
+    data: {
+      runCrewId: data.runCrewId,
+      athleteId: data.authorId,
+      title: data.title,
+      content: data.content,
+    },
+    include: {
+      Athlete: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          photoURL: true,
+        },
+      },
+    },
+  });
+
+  return announcement;
+}
+
+/**
+ * RSVP to a run
+ */
+export async function rsvpToRun(data: {
+  runId: string;
+  athleteId: string;
+  status: 'going' | 'maybe' | 'not-going';
+}) {
+  const rsvp = await prisma.run_crew_run_rsvps.upsert({
+    where: {
+      runId_athleteId: {
+        runId: data.runId,
+        athleteId: data.athleteId,
+      },
+    },
+    update: {
+      status: data.status,
+    },
+    create: {
+      runId: data.runId,
+      athleteId: data.athleteId,
+      status: data.status,
+    },
+    include: {
+      Athlete: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          photoURL: true,
+        },
+      },
+    },
+  });
+
+  return rsvp;
+}
+
+/**
+ * Create an event (placeholder - events may be deprecated)
+ */
+export async function createEvent(data: any) {
+  // Events are deprecated for MVP1, but keeping function signature for API compatibility
+  throw new Error('Events are deprecated for MVP1');
 }
