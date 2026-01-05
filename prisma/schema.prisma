@@ -371,6 +371,12 @@ enum Purpose {
   Social
 }
 
+enum TimePreference {
+  Morning
+  Afternoon
+  Evening
+}
+
 model RunCrew {
   id          String  @id @default(cuid())
   name        String
@@ -393,6 +399,14 @@ model RunCrew {
   // Pace metadata (in seconds per mile)
   paceMin Int?
   paceMax Int?
+
+  // Run distance metadata
+  typicalRunMiles Float? // Average typical run distance
+  longRunMilesMin Float? // Long run minimum (e.g., 13)
+  longRunMilesMax Float? // Long run maximum (e.g., 18)
+
+  // Time preference (when crew typically runs)
+  timePreference TimePreference[] @default([])
 
   // Demographics metadata
   gender Gender?

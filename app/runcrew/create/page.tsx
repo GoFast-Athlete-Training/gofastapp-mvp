@@ -100,6 +100,10 @@ export default function CreateCrewPage() {
     primaryMeetUpLat: '',
     primaryMeetUpLng: '',
     purpose: [] as string[],
+    timePreference: [] as string[],
+    typicalRunMiles: '',
+    longRunMilesMin: '',
+    longRunMilesMax: '',
   });
 
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -231,6 +235,10 @@ export default function CreateCrewPage() {
         primaryMeetUpLat: formData.primaryMeetUpLat ? parseFloat(formData.primaryMeetUpLat) : undefined,
         primaryMeetUpLng: formData.primaryMeetUpLng ? parseFloat(formData.primaryMeetUpLng) : undefined,
         purpose: formData.purpose.length > 0 ? formData.purpose : undefined,
+        timePreference: formData.timePreference.length > 0 ? formData.timePreference : undefined,
+        typicalRunMiles: formData.typicalRunMiles ? parseFloat(formData.typicalRunMiles) : undefined,
+        longRunMilesMin: formData.longRunMilesMin ? parseFloat(formData.longRunMilesMin) : undefined,
+        longRunMilesMax: formData.longRunMilesMax ? parseFloat(formData.longRunMilesMax) : undefined,
       });
       
       if (response.data.success) {

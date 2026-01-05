@@ -18,6 +18,10 @@ export async function createCrew(data: {
   primaryMeetUpLat?: number;
   primaryMeetUpLng?: number;
   purpose?: string[];
+  timePreference?: string[];
+  typicalRunMiles?: number;
+  longRunMilesMin?: number;
+  longRunMilesMax?: number;
 }) {
   // Create the crew
   const crew = await prisma.runCrew.create({
@@ -38,6 +42,10 @@ export async function createCrew(data: {
       primaryMeetUpLat: data.primaryMeetUpLat,
       primaryMeetUpLng: data.primaryMeetUpLng,
       purpose: data.purpose as any || [],
+      timePreference: data.timePreference as any || [],
+      typicalRunMiles: data.typicalRunMiles,
+      longRunMilesMin: data.longRunMilesMin,
+      longRunMilesMax: data.longRunMilesMax,
     },
   });
 

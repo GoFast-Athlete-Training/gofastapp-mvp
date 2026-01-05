@@ -55,6 +55,10 @@ export async function POST(request: Request) {
       primaryMeetUpLat,
       primaryMeetUpLng,
       purpose,
+      timePreference,
+      typicalRunMiles,
+      longRunMilesMin,
+      longRunMilesMax,
     } = body;
 
     if (!name || !joinCode) {
@@ -84,6 +88,10 @@ export async function POST(request: Request) {
         primaryMeetUpLat: primaryMeetUpLat ? parseFloat(primaryMeetUpLat) : undefined,
         primaryMeetUpLng: primaryMeetUpLng ? parseFloat(primaryMeetUpLng) : undefined,
         purpose: Array.isArray(purpose) && purpose.length > 0 ? purpose : undefined,
+        timePreference: Array.isArray(timePreference) && timePreference.length > 0 ? timePreference : undefined,
+        typicalRunMiles: typicalRunMiles ? parseFloat(typicalRunMiles) : undefined,
+        longRunMilesMin: longRunMilesMin ? parseFloat(longRunMilesMin) : undefined,
+        longRunMilesMax: longRunMilesMax ? parseFloat(longRunMilesMax) : undefined,
       });
     } catch (err) {
       console.error('Prisma error:', err);

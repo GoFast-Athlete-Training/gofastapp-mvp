@@ -655,44 +655,49 @@ export default function RunCrewAdminPage() {
 
               {/* Active Announcement Display */}
               {activeAnnouncement ? (
-                <div className="border border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
-                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                    <span>
-                      {activeAnnouncement.author?.firstName
-                        ? `${activeAnnouncement.author.firstName}${activeAnnouncement.author.lastName ? ` ${activeAnnouncement.author.lastName}` : ''}`
-                        : 'Admin'}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span>
-                        {activeAnnouncement.createdAt
-                          ? new Date(activeAnnouncement.createdAt).toLocaleString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              hour: 'numeric',
-                              minute: '2-digit'
-                            })
-                          : 'Just now'}
-                      </span>
+                <div className="border border-gray-200 rounded-lg px-4 py-3 bg-gray-50">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+                        <span>
+                          {activeAnnouncement.author?.firstName
+                            ? `${activeAnnouncement.author.firstName}${activeAnnouncement.author.lastName ? ` ${activeAnnouncement.author.lastName}` : ''}`
+                            : 'Admin'}
+                        </span>
+                        <span>•</span>
+                        <span>
+                          {activeAnnouncement.createdAt
+                            ? new Date(activeAnnouncement.createdAt).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit'
+                              })
+                            : 'Just now'}
+                        </span>
+                      </div>
+                      {activeAnnouncement.title && (
+                        <h4 className="text-sm font-semibold text-gray-900 mb-1">{activeAnnouncement.title}</h4>
+                      )}
+                      <p className="text-xs text-gray-800 whitespace-pre-line">{activeAnnouncement.content || activeAnnouncement.text}</p>
+                    </div>
+                    <div className="flex gap-2 ml-4 flex-shrink-0">
                       <button
                         onClick={() => handleEditAnnouncement(activeAnnouncement)}
-                        className="text-xs text-gray-500 hover:text-gray-700"
+                        className="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-xs font-semibold transition"
                         disabled={loadingAnnouncements}
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => handleDeleteAnnouncement(activeAnnouncement.id)}
-                        className="text-xs text-red-500 hover:text-red-700"
+                        className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-semibold transition"
                         disabled={loadingAnnouncements}
                       >
                         Delete
                       </button>
                     </div>
                   </div>
-                  {activeAnnouncement.title && (
-                    <h4 className="text-sm font-semibold text-gray-900 mb-1">{activeAnnouncement.title}</h4>
-                  )}
-                  <p className="text-xs text-gray-800 whitespace-pre-line">{activeAnnouncement.content || activeAnnouncement.text}</p>
                 </div>
               ) : (
                 <p className="text-xs text-gray-500">No active announcement. Post one above to share updates with your crew.</p>
