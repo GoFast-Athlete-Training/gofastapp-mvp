@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { normalizeAthleteMemberships } from './normalize-prisma';
 
 export async function getAthleteById(athleteId: string) {
   return prisma.athlete.findUnique({
@@ -197,7 +198,7 @@ export async function hydrateAthlete(athleteId: string) {
     // RunCrew Memberships (hydrated) - empty if tables don't exist
     runCrews: crews,
     runCrewCount: crews.length,
-    runCrewMemberships: (hasRunCrewTables ? athlete.run_crew_memberships : []) || [],
+    runCrewMemberships: (hasRunCrewTables ? normalizeAthleteMemberships(athlete.run_crew_memberships || []) : []) || [],
     
     // Primary crew context (for localStorage)
     MyCrew: MyCrew,

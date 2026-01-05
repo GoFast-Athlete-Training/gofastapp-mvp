@@ -125,8 +125,14 @@ export default function ProfilePage() {
           </p>
           
           <button 
-            onClick={() => router.push('/athlete-edit-profile')}
-            className="bg-orange-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-colors shadow-md hover:shadow-lg"
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('Edit Profile button clicked');
+              router.push('/athlete-edit-profile');
+            }}
+            className="bg-orange-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-colors shadow-md hover:shadow-lg cursor-pointer"
           >
             Edit Profile
           </button>
@@ -278,8 +284,14 @@ export default function ProfilePage() {
                 Add information about yourself to help other athletes find and connect with you.
               </p>
               <button
-                onClick={() => router.push('/athlete-edit-profile')}
-                className="bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-colors shadow-md hover:shadow-lg"
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('Add Profile Information button clicked');
+                  router.push('/athlete-edit-profile');
+                }}
+                className="bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-colors shadow-md hover:shadow-lg cursor-pointer"
               >
                 Add Profile Information
               </button>

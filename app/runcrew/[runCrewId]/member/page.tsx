@@ -452,8 +452,8 @@ export default function RunCrewMemberPage() {
                     <div key={announcement.id} className="border border-orange-200 rounded-lg px-3 py-2 bg-white shadow-sm">
                       <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
                         <span>
-                          {announcement.Athlete?.firstName
-                            ? `${announcement.Athlete.firstName}${announcement.Athlete.lastName ? ` ${announcement.Athlete.lastName}` : ''}`
+                          {announcement.athlete?.firstName
+                            ? `${announcement.athlete.firstName}${announcement.athlete.lastName ? ` ${announcement.athlete.lastName}` : ''}`
                             : 'Admin'}
                         </span>
                         <span>

@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { normalizeCrewResponse } from './normalize-prisma';
 
 export async function createCrew(data: {
   name: string;
@@ -230,7 +231,7 @@ export async function hydrateCrew(runCrewId: string) {
   }
 
   // Map Prisma result to box-grouped response
-  return {
+  const response = {
     runCrewBaseInfo: {
       runCrewId: crew.id,
       name: crew.name,
@@ -258,6 +259,9 @@ export async function hydrateCrew(runCrewId: string) {
       joinCodes: crew.join_codes,
     },
   };
+
+  // Normalize Prisma snake_case relations to camelCase for frontend
+  return normalizeCrewResponse(response);
 }
 
 export async function getCrewById(runCrewId: string) {
