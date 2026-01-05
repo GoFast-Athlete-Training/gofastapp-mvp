@@ -9,6 +9,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
+import TopNav from '@/components/shared/TopNav';
 
 /**
  * Run Detail Page - CLIENT-SIDE
@@ -246,6 +247,7 @@ export default function RunDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <TopNav />
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

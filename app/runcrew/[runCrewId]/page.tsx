@@ -9,6 +9,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
+import TopNav from '@/components/shared/TopNav';
 
 /**
  * RunCrew Home Page - CLIENT-SIDE
@@ -210,6 +211,7 @@ export default function RunCrewHomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50">
+      <TopNav />
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between">

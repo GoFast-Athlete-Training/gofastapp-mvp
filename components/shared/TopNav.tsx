@@ -57,10 +57,11 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
 
           {/* Right: Profile & Actions */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Profile Picture Button */}
+            {/* Profile Picture Button - Links to Edit Profile */}
             <Link
-              href="/profile"
+              href="/athlete-edit-profile"
               className="flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-gray-600 hover:text-gray-900 rounded-lg font-medium hover:bg-gray-100 transition"
+              title="Edit Profile"
             >
               {athleteProfile?.photoURL ? (
                 <img

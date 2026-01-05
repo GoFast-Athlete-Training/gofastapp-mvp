@@ -10,6 +10,7 @@ import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
 import MessageFeed from '@/components/RunCrew/MessageFeed';
+import TopNav from '@/components/shared/TopNav';
 import GooglePlacesAutocomplete from '@/components/RunCrew/GooglePlacesAutocomplete';
 
 /**
@@ -523,6 +524,7 @@ export default function RunCrewAdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <TopNav />
       {toast && (
         <div className="fixed top-6 right-6 bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg z-50">
           {toast}

@@ -10,6 +10,7 @@ import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
 import MessageFeed from '@/components/RunCrew/MessageFeed';
+import TopNav from '@/components/shared/TopNav';
 import { Copy, Check, Link as LinkIcon } from 'lucide-react';
 
 /**
@@ -272,6 +273,7 @@ export default function RunCrewMemberPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
+      <TopNav />
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
