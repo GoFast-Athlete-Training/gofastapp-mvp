@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     const memberships = await prisma.run_crew_memberships.findMany({
       where: { athleteId },
       include: {
-        runCrew: {
+        run_crews: {
           select: {
             id: true,
             name: true,
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
       return {
         membershipId: membership.id,
         runCrewId: membership.runCrewId,
-        runCrewName: membership.runCrew.name,
+        runCrewName: membership.run_crews.name,
         role,
       };
     });

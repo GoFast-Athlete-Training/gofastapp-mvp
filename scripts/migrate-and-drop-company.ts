@@ -22,7 +22,7 @@ async function migrateAndDropCompany() {
     const companies = await prisma.goFastCompany.findMany({
       orderBy: { createdAt: 'asc' },
       include: {
-        athletes: {
+        Athlete: {
           select: {
             id: true,
             email: true,
@@ -48,12 +48,12 @@ async function migrateAndDropCompany() {
     console.log(`     - Created: ${firstCompany.createdAt.toISOString()}`);
     console.log(`     - Name: ${firstCompany.name || '(no name)'}`);
     console.log(`     - Slug: ${firstCompany.slug || '(no slug)'}`);
-    console.log(`     - Athletes: ${firstCompany.athletes.length}`);
+    console.log(`     - Athletes: ${firstCompany.Athlete.length}`);
 
     if (otherCompanies.length > 0) {
       console.log(`\n   Other Companies (DROP): ${otherCompanies.length}`);
       otherCompanies.forEach((company, index) => {
-        console.log(`     ${index + 1}. ${company.id} - Created: ${company.createdAt.toISOString()} - Athletes: ${company.athletes.length}`);
+        console.log(`     ${index + 1}. ${company.id} - Created: ${company.createdAt.toISOString()} - Athletes: ${company.Athlete.length}`);
       });
     } else {
       console.log(`\n   ✅ No other companies to drop`);
@@ -71,10 +71,10 @@ async function migrateAndDropCompany() {
     // Step 3: Migrate athletes from other companies to first company
     let totalMigrated = 0;
     for (const company of otherCompanies) {
-      if (company.athletes.length > 0) {
-        console.log(`\n👥 Migrating ${company.athletes.length} athlete(s) from company ${company.id} to first company...`);
+      if (company.Athlete.length > 0) {
+        console.log(`\n👥 Migrating ${company.Athlete.length} athlete(s) from company ${company.id} to first company...`);
         
-        for (const athlete of company.athletes) {
+        for (const athlete of company.Athlete) {
           try {
             await prisma.athlete.update({
               where: { id: athlete.id },
@@ -160,7 +160,7 @@ async function migrateAndDropCompany() {
     const finalCompanies = await prisma.goFastCompany.findMany({
       orderBy: { createdAt: 'asc' },
       include: {
-        athletes: {
+        Athlete: {
           select: {
             id: true,
           },
@@ -170,7 +170,7 @@ async function migrateAndDropCompany() {
 
     console.log(`   Total companies: ${finalCompanies.length}`);
     console.log(`   First company ID: ${finalCompanies[0].id}`);
-    console.log(`   First company athletes: ${finalCompanies[0].athletes.length}`);
+    console.log(`   First company athletes: ${finalCompanies[0].Athlete.length}`);
     
     if (finalCompanies.length === 1) {
       console.log(`\n✅ SUCCESS: Only one company remains - clean database!`);

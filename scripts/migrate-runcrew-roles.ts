@@ -138,18 +138,18 @@ async function migrateRunCrewRoles() {
         ],
       },
       include: {
-        runCrewMemberships: true,
+        run_crew_memberships: true,
       },
     });
 
     if (adam) {
       console.log(`✅ Found athlete: ${adam.firstName} ${adam.lastName} (${adam.email})`);
       console.log(`   ID: ${adam.id}`);
-      console.log(`   Memberships: ${adam.runCrewMemberships.length}`);
+      console.log(`   Memberships: ${adam.run_crew_memberships.length}`);
 
       // Update all of Adam's memberships to ensure they have correct roles
       // Note: Roles are now stored in membership.role, not in separate RunCrewManager table
-      for (const membership of adam.runCrewMemberships) {
+      for (const membership of adam.run_crew_memberships) {
         const role = membership.role || 'member';
         if (!membership.role) {
           // Ensure role is set if missing

@@ -9,7 +9,7 @@ datasource db {
 }
 
 model Athlete {
-  id                      String                   @id
+  id                      String                   @id @default(cuid())
   firebaseId              String                   @unique
   email                   String?
   companyId               String
@@ -45,7 +45,7 @@ model Athlete {
   fiveKPace               String?
   weeklyMileage           Int?
   createdAt               DateTime                 @default(now())
-  updatedAt               DateTime
+  updatedAt               DateTime                 @updatedAt
   goFastCompany           GoFastCompany            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   athlete_activities      athlete_activities[]
   run_crew_announcements  run_crew_announcements[]
@@ -99,7 +99,7 @@ model athlete_activities {
 }
 
 model GoFastCompany {
-  id        String    @id
+  id        String    @id @default(cuid())
   name      String?
   slug      String?   @unique
   address   String?
@@ -109,9 +109,9 @@ model GoFastCompany {
   domain    String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  Athlete   Athlete[]
 
   @@map("go_fast_companies")
-  Athlete   Athlete[]
 }
 
 model join_codes {
@@ -156,7 +156,7 @@ model race_registry {
   state                   String?
   country                 String?
   createdAt               DateTime                  @default(now())
-  updatedAt               DateTime
+  updatedAt               DateTime                  @updatedAt
   training_plans          training_plans[]
   run_crew_specific_races run_crew_specific_races[]
 }
@@ -200,13 +200,13 @@ model rule_sets {
 }
 
 model run_crew_announcements {
-  id         String    @id
+  id         String    @id @default(cuid())
   runCrewId  String
   authorId   String
   title      String
   content    String
   createdAt  DateTime  @default(now())
-  updatedAt  DateTime
+  updatedAt  DateTime  @updatedAt
   archivedAt DateTime? @db.Timestamp(6)
   Athlete    Athlete   @relation(fields: [authorId], references: [id], onDelete: Cascade)
   run_crews  run_crews @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
@@ -225,7 +225,7 @@ model run_crew_event_rsvps {
 }
 
 model run_crew_events {
-  id                   String                 @id
+  id                   String                 @id @default(cuid())
   runCrewId            String
   organizerId          String
   title                String
@@ -236,7 +236,7 @@ model run_crew_events {
   description          String?
   eventType            String?
   createdAt            DateTime               @default(now())
-  updatedAt            DateTime
+  updatedAt            DateTime               @updatedAt
   run_crew_event_rsvps run_crew_event_rsvps[]
   Athlete              Athlete                @relation(fields: [organizerId], references: [id], onDelete: Cascade)
   run_crews            run_crews              @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
@@ -255,12 +255,12 @@ model run_crew_managers {
 }
 
 model run_crew_memberships {
-  id        String      @id
+  id        String      @id @default(cuid())
   runCrewId String
   athleteId String
   joinedAt  DateTime    @default(now())
   createdAt DateTime    @default(now())
-  updatedAt DateTime
+  updatedAt DateTime    @updatedAt
   role      RunCrewRole @default(member)
   Athlete   Athlete     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   run_crews run_crews   @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
@@ -270,18 +270,19 @@ model run_crew_memberships {
 }
 
 model run_crew_messages {
-  id        String    @id
+  id        String    @id @default(cuid())
   runCrewId String
   athleteId String
   content   String
   createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   topic     String    @default("general")
   Athlete   Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   run_crews run_crews @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
 }
 
 model run_crew_run_rsvps {
-  id            String        @id
+  id            String        @id @default(cuid())
   runId         String
   athleteId     String
   status        String
@@ -293,7 +294,7 @@ model run_crew_run_rsvps {
 }
 
 model run_crew_runs {
-  id                 String               @id
+  id                 String               @id @default(cuid())
   runCrewId          String
   createdById        String
   title              String
@@ -314,14 +315,14 @@ model run_crew_runs {
   stravaMapUrl       String?
   description        String?
   createdAt          DateTime             @default(now())
-  updatedAt          DateTime
+  updatedAt          DateTime             @updatedAt
   run_crew_run_rsvps run_crew_run_rsvps[]
   Athlete            Athlete              @relation(fields: [createdById], references: [id], onDelete: Cascade)
   run_crews          run_crews            @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
 }
 
 model run_crews {
-  id                      String                    @id
+  id                      String                    @id @default(cuid())
   name                    String
   description             String?
   joinCode                String                    @unique
@@ -330,7 +331,7 @@ model run_crews {
   isArchived              Boolean                   @default(false)
   archivedAt              DateTime?
   createdAt               DateTime                  @default(now())
-  updatedAt               DateTime
+  updatedAt               DateTime                  @updatedAt
   messageTopics           Json?
   city                    String?
   paceMin                 Int?
@@ -349,7 +350,7 @@ model run_crews {
   longRunMilesMax         Float?
   timePreference          TimePreference[]          @default([])
   purpose                 Purpose[]                 @default([])
-  trainingFor             String? // race_registry.id (nullable)
+  trainingForRace         String? // race_registry.id (nullable)
   trainingForDistance     TrainingForDistance[]     @default([])
   join_codes              join_codes[]
   run_crew_specific_races run_crew_specific_races[]

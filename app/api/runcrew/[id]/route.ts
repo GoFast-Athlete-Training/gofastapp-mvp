@@ -190,7 +190,7 @@ export async function PUT(
 
     // Perform update if there's data to update
     if (Object.keys(updateData).length > 0) {
-      await prisma.runCrew.update({
+      await prisma.run_crews.update({
         where: { id },
         data: updateData,
       });

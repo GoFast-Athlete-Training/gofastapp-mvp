@@ -69,7 +69,7 @@ export async function PUT(
 
     // Get the message
     const { prisma } = await import('@/lib/prisma');
-    const message = await prisma.runCrewMessage.findUnique({
+    const message = await prisma.run_crew_messages.findUnique({
       where: { id: messageId },
     });
 
@@ -96,11 +96,11 @@ export async function PUT(
     }
 
     // Update the message
-    const updated = await prisma.runCrewMessage.update({
+    const updated = await prisma.run_crew_messages.update({
       where: { id: messageId },
       data: { content: content.trim() },
       include: {
-        athlete: {
+        Athlete: {
           select: {
             id: true,
             firstName: true,
@@ -177,7 +177,7 @@ export async function DELETE(
 
     // Get the message
     const { prisma } = await import('@/lib/prisma');
-    const message = await prisma.runCrewMessage.findUnique({
+    const message = await prisma.run_crew_messages.findUnique({
       where: { id: messageId },
     });
 
@@ -199,7 +199,7 @@ export async function DELETE(
     }
 
     // Delete the message
-    await prisma.runCrewMessage.delete({
+    await prisma.run_crew_messages.delete({
       where: { id: messageId },
     });
 

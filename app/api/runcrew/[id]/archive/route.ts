@@ -69,7 +69,7 @@ export async function POST(
 
     // Archive the crew
     const { prisma } = await import('@/lib/prisma');
-    const updated = await prisma.runCrew.update({
+    const updated = await prisma.run_crews.update({
       where: { id },
       data: {
         isArchived: true,

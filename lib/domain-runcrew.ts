@@ -22,12 +22,11 @@ export async function createCrew(data: {
   typicalRunMiles?: number;
   longRunMilesMin?: number;
   longRunMilesMax?: number;
-  trainingFor?: string;
+  trainingForRace?: string;
   trainingForDistance?: string[];
-  specificRaceIds?: string[];
 }) {
   // Create the crew
-  const crew = await prisma.runCrew.create({
+  const crew = await prisma.run_crews.create({
     data: {
       name: data.name,
       description: data.description,
@@ -49,23 +48,13 @@ export async function createCrew(data: {
       typicalRunMiles: data.typicalRunMiles,
       longRunMilesMin: data.longRunMilesMin,
       longRunMilesMax: data.longRunMilesMax,
-      trainingFor: data.trainingFor || null,
+      trainingForRace: data.trainingForRace || null,
       trainingForDistance: data.trainingForDistance as any || [],
     },
   });
 
-  // Create specific race relationships if provided
-  if (data.specificRaceIds && data.specificRaceIds.length > 0) {
-    await prisma.runCrewSpecificRace.createMany({
-      data: data.specificRaceIds.map((raceId) => ({
-        runCrewId: crew.id,
-        raceRegistryId: raceId,
-      })),
-    });
-  }
-
   // Create membership with admin role
-  await prisma.runCrewMembership.create({
+  await prisma.run_crew_memberships.create({
     data: {
       runCrewId: crew.id,
       athleteId: data.athleteId,
@@ -78,7 +67,7 @@ export async function createCrew(data: {
 
 export async function joinCrew(joinCode: string, athleteId: string) {
   // Find crew by join code
-  const crew = await prisma.runCrew.findUnique({
+  const crew = await prisma.run_crews.findUnique({
     where: { joinCode },
   });
 
@@ -87,7 +76,7 @@ export async function joinCrew(joinCode: string, athleteId: string) {
   }
 
   // Check if already a member
-  const existingMembership = await prisma.runCrewMembership.findUnique({
+  const existingMembership = await prisma.run_crew_memberships.findUnique({
     where: {
       runCrewId_athleteId: {
         runCrewId: crew.id,
@@ -101,7 +90,7 @@ export async function joinCrew(joinCode: string, athleteId: string) {
   }
 
   // Create membership with member role
-  await prisma.runCrewMembership.create({
+  await prisma.run_crew_memberships.create({
     data: {
       runCrewId: crew.id,
       athleteId,
@@ -138,7 +127,7 @@ export async function hydrateCrew(runCrewId: string) {
   }
 
   // Use select to explicitly choose fields, excluding messageTopics to avoid Prisma error
-  const crew = await prisma.runCrew.findUnique({
+  const crew = await prisma.run_crews.findUnique({
     where: { id: runCrewId },
     select: {
       id: true,
@@ -150,9 +139,9 @@ export async function hydrateCrew(runCrewId: string) {
       isArchived: true,
       archivedAt: true,
       // Explicitly exclude messageTopics to avoid column not found error
-      memberships: {
+      run_crew_memberships: {
         include: {
-          athlete: {
+          Athlete: {
             select: {
               id: true,
               firstName: true,
@@ -163,7 +152,7 @@ export async function hydrateCrew(runCrewId: string) {
           },
         },
       },
-      messages: {
+      run_crew_messages: {
         select: {
           id: true,
           runCrewId: true,
@@ -173,7 +162,7 @@ export async function hydrateCrew(runCrewId: string) {
           createdAt: true,
           // updatedAt excluded until migration runs - will add back after migration
           // updatedAt: true, // Track when message was edited
-          athlete: {
+          Athlete: {
             select: {
               id: true,
               firstName: true,
@@ -187,12 +176,12 @@ export async function hydrateCrew(runCrewId: string) {
         },
         take: 50,
       },
-      announcements: {
+      run_crew_announcements: {
         where: {
           archivedAt: null, // Only show active announcements (archivedAt is null)
         },
         include: {
-          author: {
+          Athlete: {
             select: {
               id: true,
               firstName: true,
@@ -206,18 +195,18 @@ export async function hydrateCrew(runCrewId: string) {
         },
         take: 1, // Only one active announcement per crew
       },
-      runs: {
+      run_crew_runs: {
         include: {
-          createdBy: {
+          Athlete: {
             select: {
               id: true,
               firstName: true,
               lastName: true,
             },
           },
-          rsvps: {
+          run_crew_run_rsvps: {
             include: {
-              athlete: {
+              Athlete: {
                 select: {
                   id: true,
                   firstName: true,
@@ -232,7 +221,7 @@ export async function hydrateCrew(runCrewId: string) {
           date: 'asc',
         },
       },
-      joinCodes: true,
+      join_codes: true,
     },
   });
 
@@ -254,25 +243,25 @@ export async function hydrateCrew(runCrewId: string) {
       messageTopics,
     },
     membershipsBox: {
-      memberships: crew.memberships,
+      memberships: crew.run_crew_memberships,
     },
     messagesBox: {
-      messages: crew.messages,
+      messages: crew.run_crew_messages,
     },
     announcementsBox: {
-      announcements: crew.announcements,
+      announcements: crew.run_crew_announcements,
     },
     runsBox: {
-      runs: crew.runs,
+      runs: crew.run_crew_runs,
     },
     joinCodesBox: {
-      joinCodes: crew.joinCodes,
+      joinCodes: crew.join_codes,
     },
   };
 }
 
 export async function getCrewById(runCrewId: string) {
-  return prisma.runCrew.findUnique({
+  return prisma.run_crews.findUnique({
     where: { id: runCrewId },
   });
 }
@@ -282,7 +271,7 @@ export async function getCrewById(runCrewId: string) {
  * No memberships, messages, or sensitive data
  */
 export async function getCrewPublicMetadata(runCrewId: string) {
-  const crew = await prisma.runCrew.findUnique({
+  const crew = await prisma.run_crews.findUnique({
     where: { id: runCrewId },
     select: {
       id: true,
@@ -316,7 +305,7 @@ export async function getCrewPublicMetadata(runCrewId: string) {
  */
 export async function joinCrewById(runCrewId: string, athleteId: string) {
   // Find crew by id
-  const crew = await prisma.runCrew.findUnique({
+  const crew = await prisma.run_crews.findUnique({
     where: { id: runCrewId },
   });
 
@@ -325,7 +314,7 @@ export async function joinCrewById(runCrewId: string, athleteId: string) {
   }
 
   // Check if already a member
-  const existingMembership = await prisma.runCrewMembership.findUnique({
+  const existingMembership = await prisma.run_crew_memberships.findUnique({
     where: {
       runCrewId_athleteId: {
         runCrewId: crew.id,
@@ -339,7 +328,7 @@ export async function joinCrewById(runCrewId: string, athleteId: string) {
   }
 
   // Create membership with member role
-  await prisma.runCrewMembership.create({
+  await prisma.run_crew_memberships.create({
     data: {
       runCrewId: crew.id,
       athleteId,
@@ -363,7 +352,7 @@ export async function createRun(data: {
   stravaMapUrl?: string;
   description?: string;
 }) {
-  return prisma.runCrewRun.create({
+  return prisma.run_crew_runs.create({
     data,
   });
 }
@@ -374,7 +363,7 @@ export async function postMessage(data: {
   content: string;
   topic?: string;
 }) {
-  return prisma.runCrewMessage.create({
+  return prisma.run_crew_messages.create({
     data: {
       runCrewId: data.runCrewId,
       athleteId: data.athleteId,
@@ -382,7 +371,7 @@ export async function postMessage(data: {
       topic: data.topic || 'general',
     },
     include: {
-      athlete: {
+      Athlete: {
         select: {
           id: true,
           firstName: true,
@@ -401,7 +390,7 @@ export async function postAnnouncement(data: {
   content: string;
 }) {
   // Archive all existing active announcements for this crew (where archivedAt is null)
-  await prisma.runCrewAnnouncement.updateMany({
+  await prisma.run_crew_announcements.updateMany({
     where: {
       runCrewId: data.runCrewId,
       archivedAt: null, // Only archive active announcements
@@ -412,10 +401,10 @@ export async function postAnnouncement(data: {
   });
 
   // Create new active announcement (archivedAt is null by default)
-  return prisma.runCrewAnnouncement.create({
+  return prisma.run_crew_announcements.create({
     data,
     include: {
-      author: {
+      Athlete: {
         select: {
           id: true,
           firstName: true,
@@ -438,10 +427,10 @@ export async function createEvent(data: {
   description?: string;
   eventType?: string;
 }) {
-  return prisma.runCrewEvent.create({
+  return prisma.run_crew_events.create({
     data,
     include: {
-      organizer: {
+      Athlete: {
         select: {
           id: true,
           firstName: true,
@@ -449,9 +438,9 @@ export async function createEvent(data: {
           photoURL: true,
         },
       },
-      rsvps: {
+      run_crew_event_rsvps: {
         include: {
-          athlete: {
+          Athlete: {
             select: {
               id: true,
               firstName: true,
@@ -470,7 +459,7 @@ export async function rsvpToRun(data: {
   athleteId: string;
   status: 'going' | 'maybe' | 'not-going';
 }) {
-  return prisma.runCrewRunRSVP.upsert({
+  return prisma.run_crew_run_rsvps.upsert({
     where: {
       runId_athleteId: {
         runId: data.runId,
@@ -482,7 +471,7 @@ export async function rsvpToRun(data: {
       status: data.status,
     },
     include: {
-      athlete: {
+      Athlete: {
         select: {
           id: true,
           firstName: true,

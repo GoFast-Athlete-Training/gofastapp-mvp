@@ -34,16 +34,16 @@ export async function hydrateAthlete(athleteId: string) {
     athlete = await prisma.athlete.findUnique({
       where: { id: athleteId },
       include: {
-        company: {
+        goFastCompany: {
           select: {
             id: true,
             name: true,
             slug: true,
           },
         },
-        runCrewMemberships: {
+        run_crew_memberships: {
           include: {
-            runCrew: {
+            run_crews: {
               select: {
                 // Explicitly select fields, excluding messageTopics to avoid column not found error
                 id: true,
@@ -53,9 +53,9 @@ export async function hydrateAthlete(athleteId: string) {
                 logo: true,
                 icon: true,
                 // messageTopics excluded - column may not exist in database
-                memberships: {
+                run_crew_memberships: {
                   include: {
-                    athlete: {
+                    Athlete: {
                       select: {
                         id: true,
                         firstName: true,
@@ -77,10 +77,10 @@ export async function hydrateAthlete(athleteId: string) {
     // Check if RunCrew data was loaded successfully
     if (athlete) {
       console.log('✅ HYDRATE ATHLETE: Athlete loaded successfully');
-      console.log(`   RunCrew Memberships: ${athlete.runCrewMemberships?.length || 0}`);
+      console.log(`   RunCrew Memberships: ${athlete.run_crew_memberships?.length || 0}`);
       
-      // If athlete loaded but runCrewMemberships is undefined, tables might not exist
-      if (athlete.runCrewMemberships === undefined) {
+      // If athlete loaded but run_crew_memberships is undefined, tables might not exist
+      if (athlete.run_crew_memberships === undefined) {
         console.warn('⚠️ HYDRATE ATHLETE: runCrewMemberships is undefined - RunCrew tables may not exist');
         hasRunCrewTables = false;
       }
@@ -109,7 +109,7 @@ export async function hydrateAthlete(athleteId: string) {
         athlete = await prisma.athlete.findUnique({
           where: { id: athleteId },
           include: {
-            company: {
+            goFastCompany: {
               select: {
                 id: true,
                 name: true,
@@ -140,14 +140,14 @@ export async function hydrateAthlete(athleteId: string) {
   const weeklyTotals = { distance: 0, duration: 0, activities: 0 };
 
   // Normalize crews with roles (handle case where tables don't exist)
-  const crews = hasRunCrewTables && athlete.runCrewMemberships && Array.isArray(athlete.runCrewMemberships)
-    ? athlete.runCrewMemberships.map((membership: any) => {
-        if (!membership || !membership.runCrew) {
+  const crews = hasRunCrewTables && athlete.run_crew_memberships && Array.isArray(athlete.run_crew_memberships)
+    ? athlete.run_crew_memberships.map((membership: any) => {
+        if (!membership || !membership.run_crews) {
           console.warn('⚠️ HYDRATE ATHLETE: Invalid membership structure:', membership);
           return null;
         }
         return {
-          ...membership.runCrew,
+          ...membership.run_crews,
           role: membership.role || 'member',
           joinedAt: membership.joinedAt,
         };
@@ -197,7 +197,7 @@ export async function hydrateAthlete(athleteId: string) {
     // RunCrew Memberships (hydrated) - empty if tables don't exist
     runCrews: crews,
     runCrewCount: crews.length,
-    runCrewMemberships: (hasRunCrewTables ? athlete.runCrewMemberships : []) || [],
+    runCrewMemberships: (hasRunCrewTables ? athlete.run_crew_memberships : []) || [],
     
     // Primary crew context (for localStorage)
     MyCrew: MyCrew,

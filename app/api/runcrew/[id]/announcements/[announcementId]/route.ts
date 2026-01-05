@@ -69,7 +69,7 @@ export async function PUT(
 
     // Get the announcement
     const { prisma } = await import('@/lib/prisma');
-    const announcement = await prisma.runCrewAnnouncement.findUnique({
+    const announcement = await prisma.run_crew_announcements.findUnique({
       where: { id: announcementId },
     });
 
@@ -88,14 +88,14 @@ export async function PUT(
     }
 
     // Update the announcement
-    const updated = await prisma.runCrewAnnouncement.update({
+    const updated = await prisma.run_crew_announcements.update({
       where: { id: announcementId },
       data: {
         title: title.trim(),
         content: content.trim(),
       },
       include: {
-        author: {
+        Athlete: {
           select: {
             id: true,
             firstName: true,
@@ -172,7 +172,7 @@ export async function DELETE(
 
     // Get the announcement
     const { prisma } = await import('@/lib/prisma');
-    const announcement = await prisma.runCrewAnnouncement.findUnique({
+    const announcement = await prisma.run_crew_announcements.findUnique({
       where: { id: announcementId },
     });
 
@@ -187,7 +187,7 @@ export async function DELETE(
 
     // Archive the announcement (don't delete, so it can be retrieved)
     // Set archivedAt timestamp - if null, announcement is active; if set, it's archived
-    const archived = await prisma.runCrewAnnouncement.update({
+    const archived = await prisma.run_crew_announcements.update({
       where: { id: announcementId },
       data: {
         archivedAt: new Date(),

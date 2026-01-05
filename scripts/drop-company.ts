@@ -21,7 +21,7 @@ async function dropCompany() {
     const companies = await prisma.goFastCompany.findMany({
       orderBy: { createdAt: 'asc' },
       include: {
-        athletes: {
+        Athlete: {
           select: {
             id: true,
             email: true,
@@ -49,10 +49,10 @@ async function dropCompany() {
     console.log('📋 Company Analysis:');
     console.log(`   First Company (KEEP): ${firstCompany.id}`);
     console.log(`     - Created: ${firstCompany.createdAt.toISOString()}`);
-    console.log(`     - Athletes: ${firstCompany.athletes.length}`);
+    console.log(`     - Athletes: ${firstCompany.Athlete.length}`);
     console.log(`   Second Company (DROP): ${secondCompany.id}`);
     console.log(`     - Created: ${secondCompany.createdAt.toISOString()}`);
-    console.log(`     - Athletes: ${secondCompany.athletes.length}`);
+    console.log(`     - Athletes: ${secondCompany.Athlete.length}`);
     console.log('');
 
     // Verify config matches first company
@@ -64,11 +64,11 @@ async function dropCompany() {
     }
 
     // Verify second company has no athletes
-    if (secondCompany.athletes.length > 0) {
-      console.log(`\n❌ ERROR: Second company has ${secondCompany.athletes.length} athlete(s)!`);
+    if (secondCompany.Athlete.length > 0) {
+      console.log(`\n❌ ERROR: Second company has ${secondCompany.Athlete.length} athlete(s)!`);
       console.log(`   Cannot delete company with athletes. Please migrate athletes first.`);
       console.log(`   Athletes in second company:`);
-      secondCompany.athletes.forEach((athlete) => {
+      secondCompany.Athlete.forEach((athlete) => {
         console.log(`     - ${athlete.id} (${athlete.email || 'no email'}) - ${athlete.firstName || ''} ${athlete.lastName || ''}`);
       });
       return;

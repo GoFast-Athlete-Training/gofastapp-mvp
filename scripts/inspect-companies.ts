@@ -17,7 +17,7 @@ async function inspectCompanies() {
     const companies = await prisma.goFastCompany.findMany({
       orderBy: { createdAt: 'asc' },
       include: {
-        athletes: {
+        Athlete: {
           select: {
             id: true,
             firebaseId: true,
@@ -41,7 +41,7 @@ async function inspectCompanies() {
 
     companies.forEach((company, index) => {
       const isFirst = index === 0;
-      const athleteCount = company.athletes.length;
+      const athleteCount = company.Athlete.length;
       
       console.log(`${isFirst ? '👉' : '  '} Company ${index + 1} (${isFirst ? 'FIRST - KEEP THIS ONE' : 'DROP THIS ONE'}):`);
       console.log(`   ID: ${company.id}`);
@@ -53,7 +53,7 @@ async function inspectCompanies() {
       
       if (athleteCount > 0) {
         console.log(`   Athlete IDs (first 5):`);
-        company.athletes.slice(0, 5).forEach((athlete) => {
+        company.Athlete.slice(0, 5).forEach((athlete) => {
           console.log(`     - ${athlete.id} (${athlete.email || athlete.firebaseId}) - ${athlete.firstName || ''} ${athlete.lastName || ''}`);
         });
         if (athleteCount > 5) {
@@ -74,15 +74,15 @@ async function inspectCompanies() {
       console.log('\n📋 SUMMARY:');
       console.log(`   First Company (KEEP): ${firstCompany.id} - ${firstCompany.name || firstCompany.slug || 'unnamed'}`);
       console.log(`     - Created: ${firstCompany.createdAt.toISOString()}`);
-      console.log(`     - Athletes: ${firstCompany.athletes.length}`);
+      console.log(`     - Athletes: ${firstCompany.Athlete.length}`);
       
       if (secondCompany) {
         console.log(`   Second Company (DROP): ${secondCompany.id} - ${secondCompany.name || secondCompany.slug || 'unnamed'}`);
         console.log(`     - Created: ${secondCompany.createdAt.toISOString()}`);
-        console.log(`     - Athletes: ${secondCompany.athletes.length}`);
+        console.log(`     - Athletes: ${secondCompany.Athlete.length}`);
         
-        if (secondCompany.athletes.length > 0) {
-          console.log(`\n⚠️  WARNING: Second company has ${secondCompany.athletes.length} athlete(s) that need to be migrated!`);
+        if (secondCompany.Athlete.length > 0) {
+          console.log(`\n⚠️  WARNING: Second company has ${secondCompany.Athlete.length} athlete(s) that need to be migrated!`);
         }
       }
 

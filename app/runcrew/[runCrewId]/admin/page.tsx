@@ -660,9 +660,9 @@ export default function RunCrewAdminPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
                         <span>
-                          {activeAnnouncement.author?.firstName
-                            ? `${activeAnnouncement.author.firstName}${activeAnnouncement.author.lastName ? ` ${activeAnnouncement.author.lastName}` : ''}`
-                            : 'Admin'}
+                      {activeAnnouncement.Athlete?.firstName
+                        ? `${activeAnnouncement.Athlete.firstName}${activeAnnouncement.Athlete.lastName ? ` ${activeAnnouncement.Athlete.lastName}` : ''}`
+                        : 'Admin'}
                         </span>
                         <span>•</span>
                         <span>

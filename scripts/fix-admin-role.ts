@@ -18,9 +18,9 @@ async function fixAdminRole(identifier: string) {
         ],
       },
       include: {
-        runCrewMemberships: {
+        run_crew_memberships: {
           include: {
-            runCrew: {
+            run_crews: {
               select: {
                 id: true,
                 name: true,
@@ -40,16 +40,16 @@ async function fixAdminRole(identifier: string) {
     console.log(`   Firebase ID: ${athlete.firebaseId}`);
     console.log(`   Athlete ID: ${athlete.id}\n`);
 
-    if (athlete.runCrewMemberships.length === 0) {
+    if (athlete.run_crew_memberships.length === 0) {
       console.log('⚠️  No RunCrew memberships found\n');
       await prisma.$disconnect();
       return;
     }
 
-    console.log(`📋 Found ${athlete.runCrewMemberships.length} membership(s):\n`);
+    console.log(`📋 Found ${athlete.run_crew_memberships.length} membership(s):\n`);
     
-    for (const membership of athlete.runCrewMemberships) {
-      const runCrew = membership.runCrew;
+    for (const membership of athlete.run_crew_memberships) {
+      const runCrew = membership.run_crews;
       console.log(`   RunCrew: ${runCrew.name} (${runCrew.id})`);
       console.log(`   Membership ID: ${membership.id}`);
       console.log(`   Current Role: ${membership.role || 'NULL'}`);
@@ -59,7 +59,7 @@ async function fixAdminRole(identifier: string) {
         console.log(`   ⚠️  Role is not 'admin'`);
         console.log(`   🔧 Setting role to 'admin'...`);
         
-        await prisma.runCrewMembership.update({
+        await prisma.run_crew_memberships.update({
           where: { id: membership.id },
           data: { role: 'admin' },
         });

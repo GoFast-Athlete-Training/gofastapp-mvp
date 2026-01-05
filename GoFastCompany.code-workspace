@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../GoFastLanding"
+		},
+		{
+			"path": "../../Ignite/IgniteBd-Next-combine"
 		}
 	],
 	"settings": {}

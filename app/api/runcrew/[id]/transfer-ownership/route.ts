@@ -88,11 +88,11 @@ export async function POST(
     // Update roles: new owner becomes admin, old admin becomes member
     const { prisma } = await import('@/lib/prisma');
     await prisma.$transaction([
-      prisma.runCrewMembership.update({
+      prisma.run_crew_memberships.update({
         where: { id: newOwnerMembershipId },
         data: { role: 'admin' },
       }),
-      prisma.runCrewMembership.update({
+      prisma.run_crew_memberships.update({
         where: { id: membership.id },
         data: { role: 'member' },
       }),

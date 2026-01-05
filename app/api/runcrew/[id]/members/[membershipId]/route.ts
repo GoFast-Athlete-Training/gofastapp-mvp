@@ -87,11 +87,11 @@ export async function PUT(
 
     // Update the membership role
     const { prisma } = await import('@/lib/prisma');
-    const updated = await prisma.runCrewMembership.update({
+    const updated = await prisma.run_crew_memberships.update({
       where: { id: membershipId },
       data: { role },
       include: {
-        athlete: {
+        Athlete: {
           select: {
             id: true,
             firstName: true,

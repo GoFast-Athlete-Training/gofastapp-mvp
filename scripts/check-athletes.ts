@@ -25,7 +25,7 @@ async function checkAthletes() {
         firebaseId: true,
         gofastHandle: true,
         companyId: true,
-        company: {
+        goFastCompany: {
           select: {
             id: true,
             name: true,
@@ -46,7 +46,7 @@ async function checkAthletes() {
       console.log(`   ID: ${athlete.id}`);
       console.log(`   Firebase ID: ${athlete.firebaseId}`);
       console.log(`   Handle: ${athlete.gofastHandle || 'none'}`);
-      console.log(`   Company: ${athlete.company?.name || 'Unknown'} (${athlete.companyId || 'MISSING'})`);
+      console.log(`   Company: ${athlete.goFastCompany?.name || 'Unknown'} (${athlete.companyId || 'MISSING'})`);
       if (!athlete.companyId) {
         console.log(`   ⚠️  WARNING: This athlete has no companyId! Run backfill script.`);
       }
@@ -61,7 +61,7 @@ async function checkAthletes() {
 
     // Check for RunCrew memberships
     try {
-      const membershipsCount = await prisma.runCrewMembership.count();
+      const membershipsCount = await prisma.run_crew_memberships.count();
       console.log(`👥 Total RunCrew memberships: ${membershipsCount}`);
     } catch (err: any) {
       if (err.message?.includes('does not exist')) {
