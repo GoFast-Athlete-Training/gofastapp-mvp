@@ -331,7 +331,6 @@ export default function CreateCrewPage() {
           <div className="bg-sky-50 border border-sky-200 rounded-lg p-4 text-left">
             <p className="text-sm text-sky-800 font-medium mb-1">💡 Make it fun and memorable!</p>
             <p className="text-xs text-sky-700">
-              Choose a name that your crew will remember. This is how you'll recognize each other and build your running community.
             </p>
           </div>
         </div>
