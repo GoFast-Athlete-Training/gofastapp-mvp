@@ -289,6 +289,10 @@ export async function getDiscoverableRunCrews(options?: {
     crushingItPace: crew.crushingItPace,
     paceRange: crew.paceAverage 
       ? `${crew.paceAverage} min/mile avg`
+      : crew.easyMilesPace && crew.crushingItPace
+      ? `Easy: ${crew.easyMilesPace} | Tempo: ${crew.crushingItPace}`
+      : crew.paceAverage || crew.easyMilesPace || crew.crushingItPace
+      ? `${crew.paceAverage || crew.easyMilesPace || crew.crushingItPace} min/mile`
       : null,
     gender: crew.gender,
     ageRange: crew.ageMin && crew.ageMax

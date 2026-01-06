@@ -39,8 +39,6 @@ export default function RunCrewDiscoveryPage() {
   const [filterState, setFilterState] = useState('');
   const [filterPurpose, setFilterPurpose] = useState<string[]>([]);
   const [filterTimePreference, setFilterTimePreference] = useState<string[]>([]);
-  const [filterPaceMin, setFilterPaceMin] = useState('');
-  const [filterPaceMax, setFilterPaceMax] = useState('');
   const [filterGender, setFilterGender] = useState('');
   const [filterAgeMin, setFilterAgeMin] = useState('');
   const [filterAgeMax, setFilterAgeMax] = useState('');
@@ -278,35 +276,6 @@ export default function RunCrewDiscoveryPage() {
                 </div>
               </div>
 
-              {/* Pace Range Filter */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Pace Range (min/mile)</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Min Pace</label>
-                    <input
-                      type="text"
-                      value={filterPaceMin}
-                      onChange={(e) => setFilterPaceMin(e.target.value)}
-                      placeholder="8:00"
-                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition font-mono"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Format: MM:SS</p>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Max Pace</label>
-                    <input
-                      type="text"
-                      value={filterPaceMax}
-                      onChange={(e) => setFilterPaceMax(e.target.value)}
-                      placeholder="10:00"
-                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition font-mono"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Format: MM:SS</p>
-                  </div>
-                </div>
-              </div>
-
               {/* Gender Filter */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-900 mb-3">Gender</h3>
@@ -411,8 +380,6 @@ export default function RunCrewDiscoveryPage() {
                     setFilterState('');
                     setFilterPurpose([]);
                     setFilterTimePreference([]);
-                    setFilterPaceMin('');
-                    setFilterPaceMax('');
                     setFilterGender('');
                     setFilterAgeMin('');
                     setFilterAgeMax('');
