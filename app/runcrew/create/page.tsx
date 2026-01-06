@@ -88,7 +88,6 @@ export default function CreateCrewPage() {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    joinCode: '',
     city: '',
     state: '',
     paceAverage: '',
@@ -189,25 +188,6 @@ export default function CreateCrewPage() {
       setError('Crew name is required');
       return;
     }
-    
-    if (!formData.joinCode.trim()) {
-      setError('Join code is required');
-      return;
-    }
-
-    const normalizedCode = formData.joinCode.toUpperCase().trim();
-    if (normalizedCode.length < 3) {
-      setError('Join code must be at least 3 characters');
-      return;
-    }
-    if (normalizedCode.length > 20) {
-      setError('Join code must be 20 characters or less');
-      return;
-    }
-    if (!/^[A-Z0-9-_]+$/.test(normalizedCode)) {
-      setError('Join code can only contain letters, numbers, hyphens, and underscores');
-      return;
-    }
 
     setLoading(true);
 
@@ -215,7 +195,6 @@ export default function CreateCrewPage() {
       const response = await api.post('/runcrew/create', {
         name: formData.name,
         description: formData.description,
-        joinCode: normalizedCode,
         logo: logo || null,
         icon: icon || null,
         city: formData.city || undefined,
@@ -245,7 +224,7 @@ export default function CreateCrewPage() {
         const crewData = {
           id: createdCrew.id,
           name: createdCrew.name,
-          joinCode: createdCrew.joinCode || normalizedCode,
+          joinCode: createdCrew.joinCode,
           description: createdCrew.description,
           logo: createdCrew.logo || logo,
           icon: createdCrew.icon || icon,
@@ -352,7 +331,7 @@ export default function CreateCrewPage() {
           <div className="bg-sky-50 border border-sky-200 rounded-lg p-4 text-left">
             <p className="text-sm text-sky-800 font-medium mb-1">💡 Make it fun and memorable!</p>
             <p className="text-xs text-sky-700">
-              Choose a name and join code that your crew will remember. This is how you'll recognize each other and build your running community.
+              Choose a name that your crew will remember. This is how you'll recognize each other and build your running community.
             </p>
           </div>
         </div>
@@ -849,38 +828,9 @@ export default function CreateCrewPage() {
             <p className="text-xs text-gray-500 mt-1">Type to search or enter address manually</p>
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Join Code <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.joinCode}
-              onChange={(e) => {
-                setFormData({ ...formData, joinCode: e.target.value.toUpperCase() });
-                setError(null);
-              }}
-              className="w-full p-4 border-2 border-gray-300 rounded-lg font-mono uppercase focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
-              placeholder="FAST123"
-              maxLength={20}
-              disabled={loading}
-              required
-            />
-            <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-xs font-semibold text-blue-900 mb-1">🔑 What is a Join Code?</p>
-              <p className="text-xs text-blue-800">
-                This is how your friends will join your crew. Share this code with them, and they can enter it to join. 
-                Make it something easy to remember — like your crew name initials or a fun word!
-              </p>
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              3-20 characters, letters and numbers only (no spaces)
-            </p>
-          </div>
-
           <button
             type="submit"
-            disabled={loading || !formData.name.trim() || !formData.joinCode.trim()}
+            disabled={loading || !formData.name.trim()}
             className="w-full bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white font-bold py-4 rounded-lg transition shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg"
           >
             {loading ? (

@@ -19,10 +19,28 @@ export function getRunCrewJoinLink(runCrewId: string): string {
   return `/join/crew/${runCrewId}`;
 }
 
+/**
+ * Generate a unique join code for backward compatibility
+ * Uses crew name initials + random string
+ */
+function generateJoinCode(name: string): string {
+  // Get first 3 letters of name, uppercase, remove spaces
+  const initials = name
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .substring(0, 3)
+    .toUpperCase()
+    .padEnd(3, 'X');
+  
+  // Add random 4-digit number
+  const random = Math.floor(1000 + Math.random() * 9000);
+  
+  return `${initials}${random}`;
+}
+
 export async function createCrew(data: {
   name: string;
   description?: string;
-  joinCode: string;
+  joinCode?: string; // Optional - auto-generated if not provided
   athleteId: string;
   city?: string;
   state?: string;
@@ -45,12 +63,33 @@ export async function createCrew(data: {
   trainingForRace?: string;
   trainingForDistance?: string[];
 }) {
+  // Auto-generate joinCode if not provided (for backward compatibility)
+  let joinCode = data.joinCode;
+  if (!joinCode) {
+    // Generate unique code - keep trying until we get a unique one
+    let attempts = 0;
+    while (!joinCode && attempts < 10) {
+      const candidate = generateJoinCode(data.name);
+      const existing = await prisma.run_crews.findUnique({
+        where: { joinCode: candidate },
+      });
+      if (!existing) {
+        joinCode = candidate;
+      }
+      attempts++;
+    }
+    // Fallback to random if we can't generate from name
+    if (!joinCode) {
+      joinCode = `CREW${Math.floor(10000 + Math.random() * 90000)}`;
+    }
+  }
+
   // Create the crew
   const crew = await prisma.run_crews.create({
     data: {
       name: data.name,
       description: data.description,
-      joinCode: data.joinCode,
+      joinCode,
       city: data.city,
       state: data.state as any, // Prisma will validate enum
       paceAverage: data.paceAverage,

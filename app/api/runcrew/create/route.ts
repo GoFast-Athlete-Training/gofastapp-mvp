@@ -41,7 +41,6 @@ export async function POST(request: Request) {
     const { 
       name, 
       description, 
-      joinCode,
       city,
       state,
       paceAverage,
@@ -64,9 +63,9 @@ export async function POST(request: Request) {
       trainingForDistance,
     } = body;
 
-    if (!name || !joinCode) {
+    if (!name) {
       return NextResponse.json(
-        { error: 'Name and joinCode are required' },
+        { error: 'Name is required' },
         { status: 400 }
       );
     }
@@ -76,7 +75,6 @@ export async function POST(request: Request) {
       crew = await createCrew({
         name,
         description,
-        joinCode,
         athleteId: athlete.id,
         city,
         state,
