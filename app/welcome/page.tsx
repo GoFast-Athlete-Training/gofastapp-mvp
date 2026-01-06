@@ -242,16 +242,10 @@ export default function WelcomePage() {
           </div>
         )}
 
-        {/* Create/Join Options (only show if user has crews) */}
+        {/* Create Options (only show if user has crews) */}
         {runCrewCards.length > 0 && (
           <div className="mt-12 text-center">
             <div className="inline-flex gap-4">
-              <Link
-                href="/runcrew/join"
-                className="bg-white hover:bg-gray-50 text-gray-900 px-6 py-3 rounded-lg font-semibold transition shadow-md"
-              >
-                + Join Another RunCrew
-              </Link>
               <Link
                 href="/runcrew/create"
                 className="bg-white hover:bg-gray-50 text-gray-900 px-6 py-3 rounded-lg font-semibold transition shadow-md"

@@ -34,7 +34,6 @@ export default function RunCrewMemberPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [copiedCode, setCopiedCode] = useState(false);
 
   useEffect(() => {
     if (!runCrewId) {
@@ -206,8 +205,8 @@ export default function RunCrewMemberPage() {
   const isManager = membership?.role === 'manager';
   const canPostAnnouncements = isAdmin || isManager;
   const memberships = crew.membershipsBox?.memberships || [];
-  const joinCode = crew.runCrewBaseInfo?.joinCode || '';
-  const inviteUrl = joinCode ? `${typeof window !== 'undefined' ? window.location.origin : ''}/runcrew/join?code=${joinCode}` : '';
+  // Use direct join link instead of join code URL
+  const inviteUrl = runCrewId ? `${typeof window !== 'undefined' ? window.location.origin : ''}/join/crew/${runCrewId}` : '';
 
   const handleCopyLink = async () => {
     if (!inviteUrl) return;
@@ -231,43 +230,6 @@ export default function RunCrewMemberPage() {
       setTimeout(() => setCopiedLink(false), 2000);
     } catch (err) {
       console.error('Failed to copy link:', err);
-      // Fallback: select the input text
-      const input = document.querySelector('input[value*="runcrew/join"]') as HTMLInputElement;
-      if (input) {
-        input.select();
-        input.setSelectionRange(0, 99999);
-      }
-    }
-  };
-
-  const handleCopyCode = async () => {
-    if (!joinCode) return;
-    try {
-      // Try modern clipboard API first
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(joinCode);
-      } else {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = joinCode;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-      }
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy code:', err);
-      // Fallback: select the input text
-      const input = document.querySelector(`input[value="${joinCode}"]`) as HTMLInputElement;
-      if (input) {
-        input.select();
-        input.setSelectionRange(0, 99999);
-      }
     }
   };
 
@@ -364,77 +326,40 @@ export default function RunCrewMemberPage() {
             </section>
 
             {/* Invite Section */}
-            {joinCode && (
-              <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 sticky top-6 mt-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Invite Teammates</h2>
-                
-                <div className="space-y-4">
-                  {/* Invite URL */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
-                      Invite URL
-                    </label>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <input
-                        type="text"
-                        value={inviteUrl}
-                        readOnly
-                        className="flex-1 min-w-0 px-3 py-2 text-xs border border-gray-300 rounded-lg bg-gray-50 font-mono truncate"
-                      />
-                      <button
-                        onClick={handleCopyLink}
-                        className="px-3 sm:px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-xs sm:text-sm font-semibold transition flex items-center gap-1 sm:gap-2 flex-shrink-0"
-                      >
-                        {copiedLink ? (
-                          <>
-                            <Check className="w-4 h-4" />
-                            Copied!
-                          </>
-                        ) : (
-                          <>
-                            <LinkIcon className="w-4 h-4" />
-                            Copy
-                          </>
-                        )}
-                      </button>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">Share this URL to invite members</p>
-                  </div>
-
-                  {/* Join Code */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
-                      Join Code
-                    </label>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <input
-                        type="text"
-                        value={joinCode}
-                        readOnly
-                        className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 font-mono font-bold text-center truncate"
-                      />
-                      <button
-                        onClick={handleCopyCode}
-                        className="px-3 sm:px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-xs sm:text-sm font-semibold transition flex items-center gap-1 sm:gap-2 flex-shrink-0"
-                      >
-                        {copiedCode ? (
-                          <>
-                            <Check className="w-4 h-4" />
-                            Copied!
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-4 h-4" />
-                            Copy
-                          </>
-                        )}
-                      </button>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">Or share just the code</p>
-                  </div>
+            <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 sticky top-6 mt-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Invite Teammates</h2>
+              
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
+                  Invite Link
+                </label>
+                <div className="flex items-center gap-2 min-w-0">
+                  <input
+                    type="text"
+                    value={inviteUrl}
+                    readOnly
+                    className="flex-1 min-w-0 px-3 py-2 text-xs border border-gray-300 rounded-lg bg-gray-50 font-mono truncate"
+                  />
+                  <button
+                    onClick={handleCopyLink}
+                    className="px-3 sm:px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-xs sm:text-sm font-semibold transition flex items-center gap-1 sm:gap-2 flex-shrink-0"
+                  >
+                    {copiedLink ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <LinkIcon className="w-4 h-4" />
+                        Copy
+                      </>
+                    )}
+                  </button>
                 </div>
-              </section>
-            )}
+                <p className="text-xs text-gray-500 mt-1">Share this link to invite members</p>
+              </div>
+            </section>
           </aside>
 
           {/* MAIN CONTENT: Announcements First (Important!), then Messages */}

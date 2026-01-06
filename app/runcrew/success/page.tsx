@@ -11,7 +11,6 @@ function RunCrewSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [copiedLink, setCopiedLink] = useState(false);
-  const [copiedCode, setCopiedCode] = useState(false);
   
   // Get crew data from URL params or localStorage
   const crewId = searchParams?.get('crewId');
@@ -29,16 +28,19 @@ function RunCrewSuccessContent() {
     }
   }, []);
 
-  const crewCode = crewData?.joinCode || crewData?.crewCode || 'CODE123';
   const crewName = crewData?.name || 'Your Crew';
 
-  // Generate custom invite URL
+  // Generate run crew URL from params
   const BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
-  const inviteUrl = `${BASE_URL}/runcrew/join?code=${crewCode}`;
+  const runCrewUrl = crewId 
+    ? `${BASE_URL}/runcrew/${crewId}`
+    : crewData?.id 
+    ? `${BASE_URL}/runcrew/${crewData.id}`
+    : `${BASE_URL}/runcrew`;
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(inviteUrl);
+      await navigator.clipboard.writeText(runCrewUrl);
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
     } catch (err) {
@@ -46,15 +48,6 @@ function RunCrewSuccessContent() {
     }
   };
 
-  const handleCopyCode = async () => {
-    try {
-      await navigator.clipboard.writeText(crewCode);
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2000);
-    } catch (err) {
-      alert('Failed to copy code');
-    }
-  };
 
   const handleGoToCentral = () => {
     if (crewId) {
@@ -67,7 +60,7 @@ function RunCrewSuccessContent() {
   };
 
   const createShareMessage = () => {
-    return `You've been invited to join ${crewName} on GoFast!\n\nJoin here: ${inviteUrl}`;
+    return `Check out ${crewName} on GoFast!\n\nView here: ${runCrewUrl}`;
   };
 
   const handleCopyMessage = async () => {
@@ -112,15 +105,15 @@ function RunCrewSuccessContent() {
             </p>
           </div>
 
-          {/* Invite Link Section - PRIMARY */}
+          {/* Run Crew Link Section - PRIMARY */}
           <div className="bg-gradient-to-br from-sky-50 to-sky-100 rounded-xl p-6 mb-6 border-2 border-sky-200">
             <div className="flex items-center justify-center mb-4">
               <LinkIcon className="w-6 h-6 text-sky-600 mr-2" />
-              <h2 className="text-xl font-bold text-gray-900">Your Invite Link</h2>
+              <h2 className="text-xl font-bold text-gray-900">Your Run Crew Link</h2>
             </div>
             <div className="bg-white rounded-lg p-4 mb-4 border-2 border-sky-300">
               <p className="text-sm font-mono text-sky-700 break-all text-center">
-                {inviteUrl}
+                {runCrewUrl}
               </p>
             </div>
             <button
@@ -135,12 +128,12 @@ function RunCrewSuccessContent() {
               ) : (
                 <>
                   <Copy className="w-5 h-5" />
-                  <span>Copy Invite Link</span>
+                  <span>Copy Run Crew Link</span>
                 </>
               )}
             </button>
             <p className="text-xs text-gray-600 text-center mt-3">
-              Share this link — friends can join with one click!
+              Share this link — friends can view and join your crew!
             </p>
           </div>
 
@@ -159,32 +152,6 @@ function RunCrewSuccessContent() {
               <Copy className="w-4 h-4" />
               <span>Copy Message</span>
             </button>
-          </div>
-
-          {/* Join Code (Fallback) */}
-          <div className="bg-gray-50 rounded-xl p-4 mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Join Code (if needed)</p>
-                <p className="text-lg font-mono font-bold text-gray-900">{crewCode}</p>
-              </div>
-              <button
-                onClick={handleCopyCode}
-                className="px-4 py-2 bg-white border-2 border-gray-300 text-gray-700 rounded-lg hover:border-gray-400 transition-colors flex items-center space-x-2"
-              >
-                {copiedCode ? (
-                  <>
-                    <Check className="w-4 h-4" />
-                    <span className="text-sm">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4" />
-                    <span className="text-sm">Copy</span>
-                  </>
-                )}
-              </button>
-            </div>
           </div>
 
           {/* Action Buttons */}

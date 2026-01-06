@@ -71,12 +71,6 @@ export default function SignupPage() {
               localStorage.setItem('athleteId', athlete.athleteId);
               localStorage.setItem('email', athlete.data?.email || user.email || '');
 
-              // Check for pending crew join first
-              const joinedCrew = await handlePendingCrewJoin(router);
-              if (joinedCrew) {
-                return; // Already redirected
-              }
-
               // Route based on profile completion
               if (athlete.data?.gofastHandle) {
                 router.replace('/welcome');
@@ -152,12 +146,6 @@ export default function SignupPage() {
       localStorage.setItem('firebaseId', result.user.uid);
       localStorage.setItem('athleteId', athlete.athleteId);
       localStorage.setItem('email', athlete.data?.email || result.user.email || '');
-
-      // Check for pending crew join first
-      const joinedCrew = await handlePendingCrewJoin(router);
-      if (joinedCrew) {
-        return; // Already redirected
-      }
 
       // Route based on profile completion (check gofastHandle - key indicator)
       if (athlete.data?.gofastHandle) {
@@ -253,12 +241,6 @@ export default function SignupPage() {
       localStorage.setItem('firebaseId', user.uid);
       localStorage.setItem('athleteId', athlete.athleteId);
       localStorage.setItem('email', athlete.data?.email || user.email || '');
-
-      // Check for pending crew join first
-      const joinedCrew = await handlePendingCrewJoin(router);
-      if (joinedCrew) {
-        return; // Already redirected
-      }
 
       // Route based on profile completion (check gofastHandle - key indicator)
       if (athlete.data?.gofastHandle) {

@@ -438,7 +438,7 @@ export default function RunCrewDiscoveryPage() {
                   {filteredCrews.map((crew) => (
                     <Link
                       key={crew.id}
-                      href={`/join/crew/${crew.id}`}
+                      href={`/runcrew/${crew.id}`}
                       className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all hover:-translate-y-1"
                     >
                       {/* Crew Header */}
