@@ -17,8 +17,7 @@ interface DiscoverableRunCrew {
   icon: string | null;
   city: string | null;
   state: string | null;
-  paceAverage: string | null;
-  paceRange: string | null; // Deprecated - use paceAverage
+  paceRange: string | null;
   gender: string | null;
   ageRange: string | null;
   primaryMeetUpPoint: string | null;
@@ -76,7 +75,7 @@ export default function RunCrewDiscoveryPage() {
       // Time preference filters
       filterTimePreference.forEach(t => params.append('timePreference', t));
       
-      // TODO: Pace filtering removed - new pace model (paceAverage, easyMilesPace, crushingItPace)
+      // TODO: Pace filtering removed - new pace model (easyMilesPace, crushingItPace)
       // doesn't support min/max filtering. Re-implement if needed.
       
       // Gender filter
