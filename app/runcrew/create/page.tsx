@@ -361,7 +361,6 @@ export default function CreateCrewPage() {
               disabled={loading}
               required
             />
-            <p className="text-xs text-gray-500 mt-1">Pick something your crew will remember and get excited about</p>
           </div>
 
           {/* RunCrew Graphic - iPhone style */}
@@ -478,7 +477,6 @@ export default function CreateCrewPage() {
               placeholder="What makes your crew special? What are your goals?"
               disabled={loading}
             />
-            <p className="text-xs text-gray-500 mt-1">Help your crew understand what you're all about</p>
           </div>
 
           {/* Location Fields */}
@@ -525,7 +523,7 @@ export default function CreateCrewPage() {
           {/* Pace Fields */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Pace <span className="text-gray-400 text-xs">(min/mile)</span>
+              Pace
             </label>
             <div className="space-y-4">
               <div>
@@ -541,10 +539,9 @@ export default function CreateCrewPage() {
                   placeholder="8:00"
                   disabled={loading}
                 />
-                <p className="text-xs text-gray-500 mt-1">Format: MM:SS</p>
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Easy Miles (jogging pace)</label>
+                <label className="block text-xs text-gray-600 mb-1">Easy Miles</label>
                 <input
                   type="text"
                   value={formData.easyMilesPace}
@@ -556,10 +553,9 @@ export default function CreateCrewPage() {
                   placeholder="9:30"
                   disabled={loading}
                 />
-                <p className="text-xs text-gray-500 mt-1">Format: MM:SS</p>
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Crushing It (tempo pace when in training mode)</label>
+                <label className="block text-xs text-gray-600 mb-1">Crushing It</label>
                 <input
                   type="text"
                   value={formData.crushingItPace}
@@ -571,7 +567,6 @@ export default function CreateCrewPage() {
                   placeholder="7:00"
                   disabled={loading}
                 />
-                <p className="text-xs text-gray-500 mt-1">Format: MM:SS</p>
               </div>
             </div>
           </div>
@@ -628,7 +623,6 @@ export default function CreateCrewPage() {
                 <span className="text-sm text-gray-700">Both</span>
               </label>
             </div>
-            <p className="text-xs text-gray-500 mt-1">Let people know who your crew is open to: men, women, or everyone</p>
           </div>
 
           {/* Age Range Fields */}
@@ -670,7 +664,6 @@ export default function CreateCrewPage() {
                 />
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">Age range for your crew</p>
           </div>
 
           {/* Purpose of Group */}
@@ -701,7 +694,6 @@ export default function CreateCrewPage() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-500 mt-2">Select what your crew is all about</p>
           </div>
 
           {/* Time Preference */}
@@ -732,7 +724,6 @@ export default function CreateCrewPage() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-500 mt-2">When does your crew typically run?</p>
           </div>
 
           {/* Run Distance Fields */}
@@ -756,7 +747,6 @@ export default function CreateCrewPage() {
                   min="0"
                   disabled={loading}
                 />
-                <p className="text-xs text-gray-500 mt-1">Average distance for a typical run</p>
               </div>
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Long Run Range (miles)</label>
@@ -794,7 +784,6 @@ export default function CreateCrewPage() {
                     />
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">Long run distance range (e.g., 13-18 miles for serious training vs 6 for a bagel stop)</p>
               </div>
             </div>
           </div>
@@ -804,7 +793,6 @@ export default function CreateCrewPage() {
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Primary Meetup Point
             </label>
-            <p className="text-xs text-gray-500 mb-2">Where does your crew typically meet? This helps with radius-based search.</p>
             <GooglePlacesAutocomplete
               value={formData.primaryMeetUpAddress}
               onChange={(e) => {
@@ -825,7 +813,6 @@ export default function CreateCrewPage() {
               className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
               disabled={loading}
             />
-            <p className="text-xs text-gray-500 mt-1">Type to search or enter address manually</p>
           </div>
 
           <button
