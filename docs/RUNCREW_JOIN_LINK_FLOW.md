@@ -299,3 +299,4 @@ const handleCopyInviteLink = async () => {
 - No server-side sessions required
 - MVP1 implementation - no expiration or advanced features
 
+

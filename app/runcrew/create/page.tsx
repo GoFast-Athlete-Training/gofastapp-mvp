@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { X, ImageIcon } from 'lucide-react';
+import { X, ImageIcon, Plus, Camera } from 'lucide-react';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import GooglePlacesAutocomplete from '@/components/RunCrew/GooglePlacesAutocomplete';
@@ -69,8 +69,10 @@ const US_STATES = [
 const RUNNING_EMOJIS = [
   '🏃', '🏃‍♀️', '🏃‍♂️', '🏔️', '⛰️', '🌄', '🌅', '🌆',
   '🔥', '⚡', '💪', '🏆', '🎯', '🚀', '⭐', '🌟',
-  '🌲', '🌳', '🌿', '🌊', '☀️', '🌙', '⭐', '💫',
-  '👟', '🎽', '🏅', '🥇', '🥈', '🥉', '🎖️', '🏵️'
+  '🌲', '🌳', '🌿', '🌊', '☀️', '🌙', '💫', '🌈',
+  '👟', '🎽', '🏅', '🥇', '🥈', '🥉', '🎖️', '🏵️',
+  '🌴', '🏖️', '⚽', '🌶️', '🍩', '🥾', '🌭', '🚀',
+  '🍣', '🏆', '😍', '🐬', '⛵', '🦄', '🏄', '🏃‍♀️'
 ];
 
 export default function CreateCrewPage() {
@@ -166,7 +168,12 @@ export default function CreateCrewPage() {
   const handleEmojiSelect = (emoji: string) => {
     setIcon(emoji);
     setShowEmojiPicker(false);
-    // Clear logo if icon is selected
+    // Clear logo if icon is selected (mutually exclusive)
+    setLogo('');
+    setLogoPreview(null);
+    if (logoFileInputRef.current) {
+      logoFileInputRef.current.value = '';
+    }
     if (logo) {
       handleRemoveLogo();
     }
@@ -388,143 +395,103 @@ export default function CreateCrewPage() {
             <p className="text-xs text-gray-500 mt-1">Pick something your crew will remember and get excited about</p>
           </div>
 
-          {/* RunCrew Graphic */}
+          {/* RunCrew Graphic - iPhone style */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-3">
               RunCrew Graphic <span className="text-gray-400 text-xs">(Optional)</span>
             </label>
             
-            {/* Split screen layout - side by side on larger screens, stacked on mobile */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Select Emoji Card */}
-              <div className="border border-gray-200 rounded-lg p-4 hover:border-orange-300 transition cursor-pointer" onClick={() => !showEmojiPicker && setShowEmojiPicker(true)}>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Select Emoji</h3>
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-4xl border-2 border-gray-200">
-                    {icon || '🏃'}
-                  </div>
-                  <input
-                    type="text"
-                    value={icon}
-                    onChange={(e) => {
-                      setIcon(e.target.value);
-                      // Clear logo when emoji is set
-                      if (e.target.value) {
-                        setLogo('');
-                        setLogoPreview(null);
-                      }
-                    }}
-                    placeholder="🏃"
-                    maxLength={2}
-                    className="w-24 text-center px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-2xl"
-                    onClick={(e) => e.stopPropagation()}
-                    disabled={loading}
-                  />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowEmojiPicker(!showEmojiPicker);
-                    }}
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold transition text-sm"
-                    disabled={loading}
-                  >
-                    {showEmojiPicker ? 'Hide' : 'Browse'}
-                  </button>
-                </div>
-                
-                {showEmojiPicker && (
-                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-2">Quick pick:</p>
-                    <div className="grid grid-cols-6 gap-2">
-                      {RUNNING_EMOJIS.map((emoji, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEmojiSelect(emoji);
-                            setShowEmojiPicker(false);
-                          }}
-                          className="w-10 h-10 text-2xl hover:bg-white hover:scale-110 rounded-lg transition"
-                          disabled={loading}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Or type any emoji above
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Add Logo Card */}
-              <div className="border border-gray-200 rounded-lg p-4 hover:border-orange-300 transition">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Add Logo</h3>
-                <div className="flex flex-col items-center gap-3">
-                  {logoPreview ? (
-                    <div className="relative">
+            {/* Current selection preview */}
+            {(icon || logoPreview || logo) && (
+              <div className="mb-4 flex justify-center">
+                <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-gray-200">
+                  {logoPreview || logo ? (
+                    <>
                       <img
-                        src={logoPreview}
-                        alt="Logo preview"
-                        className="w-20 h-20 rounded-xl object-cover border-2 border-gray-200"
+                        src={logoPreview || logo}
+                        alt="Crew graphic"
+                        className="w-full h-full object-cover"
                       />
                       <button
                         type="button"
                         onClick={handleRemoveLogo}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition"
+                        className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition"
                         disabled={uploadingLogo || loading}
-                        title="Remove logo"
                       >
                         <X className="w-4 h-4" />
                       </button>
-                    </div>
-                  ) : logo ? (
-                    <div className="relative">
-                      <img
-                        src={logo}
-                        alt="Logo"
-                        className="w-20 h-20 rounded-xl object-cover border-2 border-gray-200"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleRemoveLogo}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition"
-                        disabled={uploadingLogo || loading}
-                        title="Remove logo"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
+                    </>
                   ) : (
-                    <div className="w-20 h-20 rounded-xl bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center">
-                      <ImageIcon className="w-8 h-8 text-gray-400" />
+                    <div className="w-full h-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-5xl">
+                      {icon}
                     </div>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => logoFileInputRef.current?.click()}
-                    disabled={uploadingLogo || loading || !!icon}
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                  >
-                    {uploadingLogo ? 'Uploading...' : 'Upload Photo'}
-                  </button>
-                  <input
-                    ref={logoFileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoUpload}
-                    className="hidden"
-                    disabled={uploadingLogo || loading || !!icon}
-                  />
-                  <p className="text-xs text-gray-500 text-center">
-                    JPG, PNG - max 5MB
-                  </p>
                 </div>
               </div>
+            )}
+
+            {/* Action buttons row - iPhone style */}
+            <div className="flex items-center justify-center gap-3 mb-4">
+              {/* Photo upload button */}
+              <button
+                type="button"
+                onClick={() => logoFileInputRef.current?.click()}
+                disabled={uploadingLogo || loading || !!icon}
+                className="w-14 h-14 rounded-full bg-blue-100 hover:bg-blue-200 flex items-center justify-center transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {uploadingLogo ? (
+                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Camera className="w-6 h-6 text-blue-600" />
+                )}
+              </button>
+              <input
+                ref={logoFileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleLogoUpload}
+                className="hidden"
+                disabled={uploadingLogo || loading || !!icon}
+              />
+
+              {/* Emoji picker toggle */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEmojiPicker(!showEmojiPicker);
+                  if (logo || logoPreview) {
+                    setLogo('');
+                    setLogoPreview(null);
+                  }
+                }}
+                disabled={loading}
+                className="w-14 h-14 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition"
+              >
+                <span className="text-2xl">😊</span>
+              </button>
             </div>
+
+            {/* Emoji grid - iPhone style */}
+            {showEmojiPicker && (
+              <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="grid grid-cols-8 gap-2">
+                  {RUNNING_EMOJIS.map((emoji, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        handleEmojiSelect(emoji);
+                        setShowEmojiPicker(false);
+                      }}
+                      className="w-12 h-12 text-3xl hover:bg-white hover:scale-110 rounded-lg transition flex items-center justify-center"
+                      disabled={loading}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div>

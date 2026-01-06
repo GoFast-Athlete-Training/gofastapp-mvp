@@ -61,3 +61,4 @@ npx prisma migrate deploy --schema=packages/shared-db/prisma/schema.prisma
 
 **Note:** There's a failed migration in the database (`20241214220000_add_planning_days_to_weeks`). You may need to resolve that first or mark it as applied if it's already been manually fixed.
 
+
