@@ -351,7 +351,6 @@ export default function CreateCrewPage() {
                 setError(null);
               }}
               className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
-              placeholder="e.g. Morning Warriors, Trail Runners, Weekend Warriors"
               disabled={loading}
               required
             />
@@ -468,7 +467,6 @@ export default function CreateCrewPage() {
               }}
               rows={3}
               className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition resize-none"
-              placeholder="What makes your crew special? What are your goals?"
               disabled={loading}
             />
           </div>
@@ -487,7 +485,6 @@ export default function CreateCrewPage() {
                   setError(null);
                 }}
                 className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
-                placeholder="Arlington"
                 disabled={loading}
               />
             </div>
@@ -530,7 +527,6 @@ export default function CreateCrewPage() {
                     setError(null);
                   }}
                   className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition font-mono"
-                  placeholder="8:00"
                   disabled={loading}
                 />
               </div>
@@ -544,7 +540,6 @@ export default function CreateCrewPage() {
                     setError(null);
                   }}
                   className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition font-mono"
-                  placeholder="9:30"
                   disabled={loading}
                 />
               </div>
@@ -558,7 +553,6 @@ export default function CreateCrewPage() {
                     setError(null);
                   }}
                   className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition font-mono"
-                  placeholder="7:00"
                   disabled={loading}
                 />
               </div>
@@ -635,7 +629,6 @@ export default function CreateCrewPage() {
                     setError(null);
                   }}
                   className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
-                  placeholder="18"
                   min="0"
                   max="120"
                   disabled={loading}
@@ -651,7 +644,6 @@ export default function CreateCrewPage() {
                     setError(null);
                   }}
                   className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
-                  placeholder="65"
                   min="0"
                   max="120"
                   disabled={loading}
@@ -736,7 +728,6 @@ export default function CreateCrewPage() {
                     setError(null);
                   }}
                   className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
-                  placeholder="6.0"
                   step="0.1"
                   min="0"
                   disabled={loading}
@@ -755,7 +746,6 @@ export default function CreateCrewPage() {
                         setError(null);
                       }}
                       className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
-                      placeholder="13"
                       step="0.1"
                       min="0"
                       disabled={loading}
@@ -771,7 +761,6 @@ export default function CreateCrewPage() {
                         setError(null);
                       }}
                       className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
-                      placeholder="18"
                       step="0.1"
                       min="0"
                       disabled={loading}
@@ -803,7 +792,6 @@ export default function CreateCrewPage() {
                   primaryMeetUpLng: placeData.lng.toString(),
                 });
               }}
-              placeholder="Search for a location (e.g., park, running trail, coffee shop)..."
               className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
               disabled={loading}
             />

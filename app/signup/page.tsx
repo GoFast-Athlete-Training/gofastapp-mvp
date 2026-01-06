@@ -10,49 +10,6 @@ import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 
-const PENDING_CREW_ID_KEY = 'pendingCrewId';
-
-/**
- * Helper function to handle auto-join after signup/login
- * Checks for pendingCrewId in localStorage and joins the crew if present
- */
-async function handlePendingCrewJoin(router: any): Promise<boolean> {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  const pendingCrewId = localStorage.getItem(PENDING_CREW_ID_KEY);
-  
-  if (!pendingCrewId) {
-    return false;
-  }
-
-  try {
-    console.log('🔗 SIGNUP: Found pendingCrewId, attempting auto-join...', pendingCrewId);
-    
-    // Join the crew
-    const joinRes = await api.post('/runcrew/join', { crewId: pendingCrewId });
-    
-    if (joinRes.data?.success && joinRes.data?.runCrew) {
-      console.log('✅ SIGNUP: Successfully joined crew:', joinRes.data.runCrew.name);
-      
-      // Clear pending crew ID
-      localStorage.removeItem(PENDING_CREW_ID_KEY);
-      
-      // Redirect to crew page
-      router.replace(`/runcrew/${joinRes.data.runCrew.id}`);
-      return true;
-    }
-  } catch (err: any) {
-    console.error('❌ SIGNUP: Failed to auto-join crew:', err);
-    // Don't block the flow - just log the error and continue
-    // The user can manually join later if needed
-    localStorage.removeItem(PENDING_CREW_ID_KEY);
-  }
-
-  return false;
-}
-
 export default function SignupPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
