@@ -328,11 +328,6 @@ export default function CreateCrewPage() {
           <p className="text-gray-600 mb-3">
             This is your crew — your friends, your accountability partners, your running family.
           </p>
-          <div className="bg-sky-50 border border-sky-200 rounded-lg p-4 text-left">
-            <p className="text-sm text-sky-800 font-medium mb-1">💡 Make it fun and memorable!</p>
-            <p className="text-xs text-sky-700">
-            </p>
-          </div>
         </div>
 
         {/* Error Message */}
