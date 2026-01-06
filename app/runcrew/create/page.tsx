@@ -649,7 +649,7 @@ export default function CreateCrewPage() {
                 <span className="text-sm text-gray-700">Both</span>
               </label>
             </div>
-            <p className="text-xs text-gray-500 mt-1">Let people know if you are one gender or another or co-ed</p>
+            <p className="text-xs text-gray-500 mt-1">Let people know who your crew is open to: men, women, or everyone</p>
           </div>
 
           {/* Age Range Fields */}
