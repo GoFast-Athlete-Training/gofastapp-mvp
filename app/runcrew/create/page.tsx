@@ -90,7 +90,6 @@ export default function CreateCrewPage() {
     description: '',
     city: '',
     state: '',
-    paceAverage: '',
     easyMilesPace: '',
     crushingItPace: '',
     gender: '',
@@ -199,7 +198,6 @@ export default function CreateCrewPage() {
         icon: icon || null,
         city: formData.city || undefined,
         state: formData.state || undefined,
-        paceAverage: formData.paceAverage || undefined,
         easyMilesPace: formData.easyMilesPace || undefined,
         crushingItPace: formData.crushingItPace || undefined,
         gender: formData.gender || undefined,
@@ -517,19 +515,6 @@ export default function CreateCrewPage() {
               Pace
             </label>
             <div className="space-y-4">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Pace Average</label>
-                <input
-                  type="text"
-                  value={formData.paceAverage}
-                  onChange={(e) => {
-                    setFormData({ ...formData, paceAverage: e.target.value });
-                    setError(null);
-                  }}
-                  className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition font-mono"
-                  disabled={loading}
-                />
-              </div>
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Easy Miles</label>
                 <input

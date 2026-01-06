@@ -44,7 +44,6 @@ export async function createCrew(data: {
   athleteId: string;
   city?: string;
   state?: string;
-  paceAverage?: string;
   easyMilesPace?: string;
   crushingItPace?: string;
   gender?: string;
@@ -92,7 +91,6 @@ export async function createCrew(data: {
       joinCode,
       city: data.city,
       state: data.state as any, // Prisma will validate enum
-      paceAverage: data.paceAverage,
       easyMilesPace: data.easyMilesPace,
       crushingItPace: data.crushingItPace,
       gender: data.gender as any, // Prisma will validate enum
@@ -209,7 +207,7 @@ export async function getDiscoverableRunCrews(options?: {
     };
   }
 
-  // TODO: Pace filtering removed - new pace model (paceAverage, easyMilesPace, crushingItPace)
+  // TODO: Pace filtering removed - new pace model (easyMilesPace, crushingItPace)
   // doesn't map cleanly to min/max filtering. Re-implement filtering logic if needed.
 
   if (options?.gender) {
@@ -251,7 +249,6 @@ export async function getDiscoverableRunCrews(options?: {
       icon: true,
       city: true,
       state: true,
-      paceAverage: true,
       easyMilesPace: true,
       crushingItPace: true,
       gender: true,
@@ -284,15 +281,12 @@ export async function getDiscoverableRunCrews(options?: {
     icon: crew.icon,
     city: crew.city,
     state: crew.state,
-    paceAverage: crew.paceAverage,
     easyMilesPace: crew.easyMilesPace,
     crushingItPace: crew.crushingItPace,
-    paceRange: crew.paceAverage 
-      ? `${crew.paceAverage} min/mile avg`
-      : crew.easyMilesPace && crew.crushingItPace
+    paceRange: crew.easyMilesPace && crew.crushingItPace
       ? `Easy: ${crew.easyMilesPace} | Tempo: ${crew.crushingItPace}`
-      : crew.paceAverage || crew.easyMilesPace || crew.crushingItPace
-      ? `${crew.paceAverage || crew.easyMilesPace || crew.crushingItPace} min/mile`
+      : crew.easyMilesPace || crew.crushingItPace
+      ? `${crew.easyMilesPace || crew.crushingItPace} min/mile`
       : null,
     gender: crew.gender,
     ageRange: crew.ageMin && crew.ageMax

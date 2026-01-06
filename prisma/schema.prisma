@@ -333,7 +333,6 @@ model run_crews {
   updatedAt               DateTime                  @updatedAt
   messageTopics           Json?
   city                    String?
-  paceAverage             String?
   easyMilesPace           String?
   crushingItPace          String?
   ageMin                  Int?
