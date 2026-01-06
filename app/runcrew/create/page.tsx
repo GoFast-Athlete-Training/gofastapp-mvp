@@ -398,7 +398,7 @@ export default function CreateCrewPage() {
           {/* RunCrew Graphic - iPhone style */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-3">
-              RunCrew Graphic <span className="text-gray-400 text-xs">(Optional)</span>
+              RunCrew Graphic
             </label>
             
             {/* Current selection preview */}
@@ -496,7 +496,7 @@ export default function CreateCrewPage() {
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Description <span className="text-gray-400 text-xs">(Optional)</span>
+              Description
             </label>
             <textarea
               value={formData.description}
@@ -506,7 +506,7 @@ export default function CreateCrewPage() {
               }}
               rows={3}
               className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition resize-none"
-              placeholder="What makes your crew special? What are your goals? (optional)"
+              placeholder="What makes your crew special? What are your goals?"
               disabled={loading}
             />
             <p className="text-xs text-gray-500 mt-1">Help your crew understand what you're all about</p>
@@ -516,7 +516,7 @@ export default function CreateCrewPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                City <span className="text-gray-400 text-xs">(Optional)</span>
+                City
               </label>
               <input
                 type="text"
@@ -532,7 +532,7 @@ export default function CreateCrewPage() {
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                State <span className="text-gray-400 text-xs">(Optional)</span>
+                State
               </label>
               <select
                 value={formData.state}
@@ -556,7 +556,7 @@ export default function CreateCrewPage() {
           {/* Pace Range Fields */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Pace Range <span className="text-gray-400 text-xs">(Optional - min/mile)</span>
+              Pace Range <span className="text-gray-400 text-xs">(min/mile)</span>
             </label>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -596,7 +596,7 @@ export default function CreateCrewPage() {
           {/* Gender Field */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Gender <span className="text-gray-400 text-xs">(Optional)</span>
+              Gender
             </label>
             <div className="flex gap-6">
               <label className="flex items-center space-x-2 cursor-pointer">
@@ -651,7 +651,7 @@ export default function CreateCrewPage() {
           {/* Age Range Fields */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Age Range <span className="text-gray-400 text-xs">(Optional)</span>
+              Age Range
             </label>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -687,13 +687,13 @@ export default function CreateCrewPage() {
                 />
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">Age range for your crew (optional)</p>
+            <p className="text-xs text-gray-500 mt-2">Age range for your crew</p>
           </div>
 
           {/* Purpose of Group */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Purpose of Group <span className="text-gray-400 text-xs">(Optional - Select all that apply)</span>
+              Purpose of Group
             </label>
             <div className="flex gap-3 flex-wrap">
               {(['Training', 'Fun', 'Social'] as const).map((purposeOption) => (
@@ -724,7 +724,7 @@ export default function CreateCrewPage() {
           {/* Time Preference */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Typical Run Times <span className="text-gray-400 text-xs">(Optional - Select all that apply)</span>
+              Typical Run Times
             </label>
             <div className="flex gap-3 flex-wrap">
               {(['Morning', 'Afternoon', 'Evening'] as const).map((timeOption) => (
@@ -755,7 +755,7 @@ export default function CreateCrewPage() {
           {/* Run Distance Fields */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Typical Run Distance <span className="text-gray-400 text-xs">(Optional)</span>
+              Typical Run Distance
             </label>
             <div className="space-y-4">
               <div>
@@ -819,7 +819,7 @@ export default function CreateCrewPage() {
           {/* Primary Meetup Point */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Primary Meetup Point <span className="text-gray-400 text-xs">(Optional)</span>
+              Primary Meetup Point
             </label>
             <p className="text-xs text-gray-500 mb-2">Where does your crew typically meet? This helps with radius-based search.</p>
             <GooglePlacesAutocomplete
