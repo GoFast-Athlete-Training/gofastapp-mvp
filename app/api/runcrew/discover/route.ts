@@ -15,8 +15,8 @@ import { getDiscoverableRunCrews } from '@/lib/domain-runcrew';
  * - state: string (optional filter)
  * - purpose: string[] (optional - Training, Fun, Social)
  * - timePreference: string[] (optional - Morning, Afternoon, Evening)
- * - paceMin: number (optional - seconds per mile)
- * - paceMax: number (optional - seconds per mile)
+ * - paceMin: number (optional - DEPRECATED - pace filtering removed with new pace model)
+ * - paceMax: number (optional - DEPRECATED - pace filtering removed with new pace model)
  * - gender: string (optional - male, female, both)
  * - ageMin: number (optional)
  * - ageMax: number (optional)
@@ -64,12 +64,7 @@ export async function GET(request: Request) {
     const timePreference = searchParams.getAll('timePreference');
     
     // Parse number params
-    const paceMin = searchParams.get('paceMin') 
-      ? parseInt(searchParams.get('paceMin')!, 10)
-      : undefined;
-    const paceMax = searchParams.get('paceMax') 
-      ? parseInt(searchParams.get('paceMax')!, 10)
-      : undefined;
+    // TODO: Pace filtering removed - new pace model doesn't support min/max filtering
     const gender = searchParams.get('gender') || undefined;
     const ageMin = searchParams.get('ageMin') 
       ? parseInt(searchParams.get('ageMin')!, 10)
@@ -90,8 +85,6 @@ export async function GET(request: Request) {
       state,
       purpose: purpose.length > 0 ? purpose : undefined,
       timePreference: timePreference.length > 0 ? timePreference : undefined,
-      paceMin,
-      paceMax,
       gender,
       ageMin,
       ageMax,

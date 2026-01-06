@@ -209,17 +209,8 @@ export async function getDiscoverableRunCrews(options?: {
     };
   }
 
-  if (options?.paceMin !== undefined) {
-    where.paceMax = {
-      gte: options.paceMin, // Crew's max pace should be >= user's min pace
-    };
-  }
-
-  if (options?.paceMax !== undefined) {
-    where.paceMin = {
-      lte: options.paceMax, // Crew's min pace should be <= user's max pace
-    };
-  }
+  // TODO: Pace filtering removed - new pace model (paceAverage, easyMilesPace, crushingItPace)
+  // doesn't map cleanly to min/max filtering. Re-implement filtering logic if needed.
 
   if (options?.gender) {
     where.gender = {
@@ -260,8 +251,9 @@ export async function getDiscoverableRunCrews(options?: {
       icon: true,
       city: true,
       state: true,
-      paceMin: true,
-      paceMax: true,
+      paceAverage: true,
+      easyMilesPace: true,
+      crushingItPace: true,
       gender: true,
       ageMin: true,
       ageMax: true,
@@ -283,14 +275,6 @@ export async function getDiscoverableRunCrews(options?: {
     take: limit,
   });
 
-  // Format pace from seconds to MM:SS format
-  const formatPace = (seconds?: number | null): string | null => {
-    if (!seconds) return null;
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
-  };
-
   // Format response with public-safe data
   return crews.map((crew) => ({
     id: crew.id,
@@ -300,12 +284,11 @@ export async function getDiscoverableRunCrews(options?: {
     icon: crew.icon,
     city: crew.city,
     state: crew.state,
-    paceRange: crew.paceMin && crew.paceMax
-      ? `${formatPace(crew.paceMin)} - ${formatPace(crew.paceMax)} min/mile`
-      : crew.paceMin
-      ? `${formatPace(crew.paceMin)}+ min/mile`
-      : crew.paceMax
-      ? `Up to ${formatPace(crew.paceMax)} min/mile`
+    paceAverage: crew.paceAverage,
+    easyMilesPace: crew.easyMilesPace,
+    crushingItPace: crew.crushingItPace,
+    paceRange: crew.paceAverage 
+      ? `${crew.paceAverage} min/mile avg`
       : null,
     gender: crew.gender,
     ageRange: crew.ageMin && crew.ageMax
