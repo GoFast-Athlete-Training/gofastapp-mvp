@@ -26,8 +26,9 @@ export async function createCrew(data: {
   athleteId: string;
   city?: string;
   state?: string;
-  paceMin?: number;
-  paceMax?: number;
+  paceAverage?: string;
+  easyMilesPace?: string;
+  crushingItPace?: string;
   gender?: string;
   ageMin?: number;
   ageMax?: number;
@@ -52,8 +53,9 @@ export async function createCrew(data: {
       joinCode: data.joinCode,
       city: data.city,
       state: data.state as any, // Prisma will validate enum
-      paceMin: data.paceMin,
-      paceMax: data.paceMax,
+      paceAverage: data.paceAverage,
+      easyMilesPace: data.easyMilesPace,
+      crushingItPace: data.crushingItPace,
       gender: data.gender as any, // Prisma will validate enum
       ageMin: data.ageMin,
       ageMax: data.ageMax,

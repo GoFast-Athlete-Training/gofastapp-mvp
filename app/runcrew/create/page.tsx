@@ -91,8 +91,9 @@ export default function CreateCrewPage() {
     joinCode: '',
     city: '',
     state: '',
-    paceMin: '',
-    paceMax: '',
+    paceAverage: '',
+    easyMilesPace: '',
+    crushingItPace: '',
     gender: '',
     ageMin: '',
     ageMax: '',
@@ -210,18 +211,6 @@ export default function CreateCrewPage() {
 
     setLoading(true);
 
-    // Convert pace from MM:SS format to seconds per mile
-    const convertPaceToSeconds = (paceStr: string): number | undefined => {
-      if (!paceStr.trim()) return undefined;
-      const parts = paceStr.trim().split(':');
-      if (parts.length === 2) {
-        const minutes = parseInt(parts[0]) || 0;
-        const seconds = parseInt(parts[1]) || 0;
-        return minutes * 60 + seconds;
-      }
-      return undefined;
-    };
-
     try {
       const response = await api.post('/runcrew/create', {
         name: formData.name,
@@ -231,8 +220,9 @@ export default function CreateCrewPage() {
         icon: icon || null,
         city: formData.city || undefined,
         state: formData.state || undefined,
-        paceMin: formData.paceMin ? convertPaceToSeconds(formData.paceMin) : undefined,
-        paceMax: formData.paceMax ? convertPaceToSeconds(formData.paceMax) : undefined,
+        paceAverage: formData.paceAverage || undefined,
+        easyMilesPace: formData.easyMilesPace || undefined,
+        crushingItPace: formData.crushingItPace || undefined,
         gender: formData.gender || undefined,
         ageMin: formData.ageMin ? parseInt(formData.ageMin) : undefined,
         ageMax: formData.ageMax ? parseInt(formData.ageMax) : undefined,
@@ -553,19 +543,19 @@ export default function CreateCrewPage() {
             </div>
           </div>
 
-          {/* Pace Range Fields */}
+          {/* Pace Fields */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Pace Range <span className="text-gray-400 text-xs">(min/mile)</span>
+              Pace <span className="text-gray-400 text-xs">(min/mile)</span>
             </label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Min Pace</label>
+                <label className="block text-xs text-gray-600 mb-1">Pace Average</label>
                 <input
                   type="text"
-                  value={formData.paceMin}
+                  value={formData.paceAverage}
                   onChange={(e) => {
-                    setFormData({ ...formData, paceMin: e.target.value });
+                    setFormData({ ...formData, paceAverage: e.target.value });
                     setError(null);
                   }}
                   className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition font-mono"
@@ -575,22 +565,36 @@ export default function CreateCrewPage() {
                 <p className="text-xs text-gray-500 mt-1">Format: MM:SS</p>
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Max Pace</label>
+                <label className="block text-xs text-gray-600 mb-1">Easy Miles (jogging pace)</label>
                 <input
                   type="text"
-                  value={formData.paceMax}
+                  value={formData.easyMilesPace}
                   onChange={(e) => {
-                    setFormData({ ...formData, paceMax: e.target.value });
+                    setFormData({ ...formData, easyMilesPace: e.target.value });
                     setError(null);
                   }}
                   className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition font-mono"
-                  placeholder="10:00"
+                  placeholder="9:30"
+                  disabled={loading}
+                />
+                <p className="text-xs text-gray-500 mt-1">Format: MM:SS</p>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Crushing It (tempo pace when in training mode)</label>
+                <input
+                  type="text"
+                  value={formData.crushingItPace}
+                  onChange={(e) => {
+                    setFormData({ ...formData, crushingItPace: e.target.value });
+                    setError(null);
+                  }}
+                  className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition font-mono"
+                  placeholder="7:00"
                   disabled={loading}
                 />
                 <p className="text-xs text-gray-500 mt-1">Format: MM:SS</p>
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">Target pace range for your crew (e.g., 8:00-10:00 min/mile)</p>
           </div>
 
           {/* Gender Field */}
@@ -645,7 +649,7 @@ export default function CreateCrewPage() {
                 <span className="text-sm text-gray-700">Both</span>
               </label>
             </div>
-            <p className="text-xs text-gray-500 mt-1">Select the gender(s) welcome in your crew</p>
+            <p className="text-xs text-gray-500 mt-1">Let people know if you are one gender or another or co-ed</p>
           </div>
 
           {/* Age Range Fields */}
