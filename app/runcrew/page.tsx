@@ -48,29 +48,52 @@ export default function RunCrewDiscoveryPage() {
   const [filterCity, setFilterCity] = useState('');
   const [filterState, setFilterState] = useState('');
   const [filterPurpose, setFilterPurpose] = useState<string[]>([]);
+  const [filterRaceTrainingGroups, setFilterRaceTrainingGroups] = useState<boolean>(false);
   const [filterTrainingForRace, setFilterTrainingForRace] = useState<string | null>(null); // race ID or null
   const [raceSearchQuery, setRaceSearchQuery] = useState('');
   const [raceSearchResults, setRaceSearchResults] = useState<any[]>([]);
   const [raceSearching, setRaceSearching] = useState(false);
   const [selectedFilterRace, setSelectedFilterRace] = useState<any | null>(null);
   const [raceDebounceTimer, setRaceDebounceTimer] = useState<NodeJS.Timeout | null>(null);
-  const [applyingFilters, setApplyingFilters] = useState(false);
   const [searchDebounceTimer, setSearchDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [availableLocations, setAvailableLocations] = useState<{ 
+    states: string[]; 
+    citiesByState: { [state: string]: string[] } 
+  }>({ 
+    states: [], 
+    citiesByState: {} 
+  });
+  const [loadingLocations, setLoadingLocations] = useState(true);
 
   useEffect(() => {
+    fetchAvailableLocations();
+    // Initial load - show all crews (no active filter)
     fetchRunCrews();
   }, []);
 
-  // Debounced general search - calls API when user types
+  const fetchAvailableLocations = async () => {
+    try {
+      setLoadingLocations(true);
+      const response = await api.get('/runcrew/locations');
+      if (response.data.success) {
+        setAvailableLocations({
+          states: response.data.states || [],
+          citiesByState: response.data.citiesByState || {},
+        });
+      }
+    } catch (error: any) {
+      console.error('Error fetching locations:', error);
+    } finally {
+      setLoadingLocations(false);
+    }
+  };
+
+  // Debounced general search - only when search box is active AND user has clicked Find
   useEffect(() => {
+    if (activeFilterBox !== 'search' || !searchQuery.trim()) return;
+    
     if (searchDebounceTimer) {
       clearTimeout(searchDebounceTimer);
-    }
-
-    if (!searchQuery.trim()) {
-      // If search is empty, fetch all (with filters if any)
-      fetchRunCrews();
-      return;
     }
 
     const timer = setTimeout(() => {
@@ -81,7 +104,7 @@ export default function RunCrewDiscoveryPage() {
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [searchQuery]);
+  }, [searchQuery, activeFilterBox]);
 
   // Format race date helper
   function formatRaceDate(dateString: string | Date): string {
@@ -148,7 +171,7 @@ export default function RunCrewDiscoveryPage() {
     setFilterTrainingForRace(race.id);
     setRaceSearchQuery(race.name);
     setRaceSearchResults([]);
-    handleApplyFilters();
+    fetchRunCrews();
   };
 
 
@@ -164,28 +187,30 @@ export default function RunCrewDiscoveryPage() {
     return undefined;
   };
 
+  const [activeFilterBox, setActiveFilterBox] = useState<string | null>(null); // 'search' | 'location' | 'purpose' | 'raceTraining'
+
   const fetchRunCrews = async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
       
-      // General search query
-      if (searchQuery.trim()) {
+      // Only apply the active filter box - they're independent discovery methods
+      if (activeFilterBox === 'search' && searchQuery.trim()) {
         params.append('search', searchQuery.trim());
+      } else if (activeFilterBox === 'location') {
+        if (filterCity) params.append('city', filterCity);
+        if (filterState) params.append('state', filterState);
+      } else if (activeFilterBox === 'purpose' && filterPurpose.length > 0) {
+        filterPurpose.forEach(p => params.append('purpose', p));
+      } else if (activeFilterBox === 'raceTraining') {
+        if (filterRaceTrainingGroups) {
+          params.append('raceTrainingGroups', 'true');
+        } else if (filterTrainingForRace) {
+          params.append('trainingForRace', filterTrainingForRace);
+        }
       }
       
-      // Location filters
-      if (filterCity) params.append('city', filterCity);
-      if (filterState) params.append('state', filterState);
-      
-      // Purpose filters
-      filterPurpose.forEach(p => params.append('purpose', p));
-      
-      // Training for Race filter (race ID string)
-      if (filterTrainingForRace) {
-        params.append('trainingForRace', filterTrainingForRace); // Specific race ID
-      }
-      
+      // If no active filter, show all (or limit to recent)
       const response = await api.get(`/runcrew/discover?${params.toString()}`);
       
       if (response.data.success) {
@@ -195,23 +220,35 @@ export default function RunCrewDiscoveryPage() {
       console.error('Error fetching runcrews:', error);
     } finally {
       setLoading(false);
-      setApplyingFilters(false);
     }
   };
 
-  const handleApplyFilters = () => {
-    setApplyingFilters(true);
-    fetchRunCrews();
-  };
-
   const handleClearFilters = () => {
+    setActiveFilterBox(null);
     setFilterCity('');
     setFilterState('');
     setFilterPurpose([]);
+    setFilterRaceTrainingGroups(false);
     setFilterTrainingForRace(null);
     setSelectedFilterRace(null);
     setRaceSearchQuery('');
     setSearchQuery('');
+    fetchRunCrews();
+  };
+
+  const handleActivateFilterBox = (boxType: string) => {
+    // Reset all filters when switching boxes
+    if (activeFilterBox && activeFilterBox !== boxType) {
+      setFilterCity('');
+      setFilterState('');
+      setFilterPurpose([]);
+      setFilterRaceTrainingGroups(false);
+      setFilterTrainingForRace(null);
+      setSelectedFilterRace(null);
+      setRaceSearchQuery('');
+      setSearchQuery('');
+    }
+    setActiveFilterBox(boxType);
     fetchRunCrews();
   };
 
@@ -254,110 +291,164 @@ export default function RunCrewDiscoveryPage() {
             </Link>
           </div>
 
-          {/* Search Section - Split Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            {/* General Search */}
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <label className="block text-sm font-semibold text-gray-900 mb-3">
-                Search
+          {/* Independent Filter Boxes - Choose Your Discovery Method */}
+          <div className="space-y-3 mb-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Choose your discovery method</h2>
+            
+            {/* Filter Box 1: Search by Name */}
+            <div 
+              className={`bg-white rounded-xl shadow-md p-4 border-2 transition ${
+                activeFilterBox === 'search' ? 'border-orange-500 bg-orange-50' : 'border-gray-200'
+              }`}
+            >
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                1. Search by Name
               </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder='e.g., "gofast bandits"'
-                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
-                />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder='e.g., "gofast bandits"'
+                    className="w-full pl-10 pr-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition text-sm"
+                  />
+                </div>
+                <button
+                  onClick={() => handleActivateFilterBox('search')}
+                  disabled={!searchQuery.trim()}
+                  className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  Find
+                </button>
               </div>
-              <p className="text-xs text-gray-500 mt-2">Search by crew name, location, or description</p>
+              {activeFilterBox === 'search' && searchQuery && (
+                <p className="text-xs text-orange-600 mt-2">✓ Searching for: "{searchQuery}"</p>
+              )}
             </div>
 
-            {/* Look Up By Filters */}
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <label className="block text-sm font-semibold text-gray-900 mb-3">
-                Look Up By...
+            {/* Filter Box 2: Location */}
+            <div 
+              className={`bg-white rounded-xl shadow-md p-4 border-2 transition ${
+                activeFilterBox === 'location' ? 'border-orange-500 bg-orange-50' : 'border-gray-200'
+              }`}
+            >
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                2. Browse by Location
               </label>
-              
-              {/* City Filter */}
-              <div className="mb-4">
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  City
-                </label>
-                <input
-                  type="text"
-                  value={filterCity}
-                  onChange={(e) => setFilterCity(e.target.value)}
-                  placeholder="e.g. Arlington"
-                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
-                />
-              </div>
-
-              {/* State Filter */}
-              <div className="mb-4">
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  State
-                </label>
-                <input
-                  type="text"
-                  value={filterState}
-                  onChange={(e) => setFilterState(e.target.value)}
-                  placeholder="e.g. VA"
-                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
-                />
-              </div>
-
-              {/* Purpose Filter */}
-              <div className="mb-4">
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  Purpose
-                </label>
-                <div className="flex gap-2 flex-wrap">
-                  {(['Training', 'Social', 'General Fitness'] as const).map((purpose) => (
-                    <button
-                      key={purpose}
-                      type="button"
-                      onClick={() => {
-                        const newPurpose = filterPurpose.includes(purpose)
-                          ? filterPurpose.filter((p) => p !== purpose)
-                          : [...filterPurpose, purpose];
-                        setFilterPurpose(newPurpose);
-                        // Clear race filter if Training is deselected
-                        if (purpose === 'Training' && filterPurpose.includes('Training')) {
-                          setFilterTrainingForRace(null);
-                          setSelectedFilterRace(null);
-                          setRaceSearchQuery('');
-                        }
-                      }}
-                      className={`px-3 py-1.5 rounded-lg border-2 font-medium text-sm transition ${
-                        filterPurpose.includes(purpose)
-                          ? 'bg-orange-500 text-white border-orange-500'
-                          : 'bg-white text-gray-700 border-gray-300 hover:border-orange-500'
-                      }`}
-                    >
-                      {purpose}
-                    </button>
-                  ))}
+              <div className="space-y-2">
+                {/* Step 1: Select State */}
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">State</label>
+                  <select
+                    value={filterState}
+                    onChange={(e) => {
+                      const newState = e.target.value;
+                      setFilterState(newState);
+                      setFilterCity(''); // Clear city when state changes
+                    }}
+                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition text-sm bg-white"
+                  >
+                    <option value="">Select a state</option>
+                    {availableLocations.states.map((state) => (
+                      <option key={state} value={state}>
+                        {state}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+                
+                {/* Step 2: Select City (only shown if state is selected) */}
+                {filterState && (
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">City (optional)</label>
+                    <select
+                      value={filterCity}
+                      onChange={(e) => setFilterCity(e.target.value)}
+                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition text-sm bg-white"
+                    >
+                      <option value="">All cities in {filterState}</option>
+                      {(availableLocations.citiesByState[filterState] || []).map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <button
+                  onClick={() => handleActivateFilterBox('location')}
+                  disabled={!filterState}
+                  className="w-full mt-2 px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Find
+                </button>
               </div>
+              {activeFilterBox === 'location' && filterState && (
+                <p className="text-xs text-orange-600 mt-2">
+                  ✓ Showing crews in {filterCity ? `${filterCity}, ` : ''}{filterState}
+                </p>
+              )}
+            </div>
 
-              {/* Training for Race - Only if Purpose includes Training */}
+            {/* Filter Box 3: Purpose */}
+            <div 
+              className={`bg-white rounded-xl shadow-md p-4 border-2 transition ${
+                activeFilterBox === 'purpose' ? 'border-orange-500 bg-orange-50' : 'border-gray-200'
+              }`}
+            >
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                3. Browse by Purpose
+              </label>
+              <div className="flex gap-2 flex-wrap mb-2">
+                {(['Training', 'Social', 'General Fitness'] as const).map((purpose) => (
+                  <button
+                    key={purpose}
+                    type="button"
+                    onClick={() => {
+                      const newPurpose = filterPurpose.includes(purpose)
+                        ? filterPurpose.filter((p) => p !== purpose)
+                        : [...filterPurpose, purpose];
+                      setFilterPurpose(newPurpose);
+                      // Clear race filter if Training is deselected
+                      if (purpose === 'Training' && filterPurpose.includes('Training')) {
+                        setFilterTrainingForRace(null);
+                        setSelectedFilterRace(null);
+                        setRaceSearchQuery('');
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-lg border-2 font-medium text-sm transition ${
+                      filterPurpose.includes(purpose)
+                        ? 'bg-orange-500 text-white border-orange-500'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-orange-500'
+                    }`}
+                  >
+                    {purpose}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => handleActivateFilterBox('purpose')}
+                disabled={filterPurpose.length === 0}
+                className="w-full px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Find
+              </button>
+              {/* Show specific race picker when Training is selected */}
               {filterPurpose.includes('Training') && (
-                <div className="mb-4">
-                  <label className="block text-xs font-medium text-gray-700 mb-2">
-                    Training for a race
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <label className="block text-xs font-semibold text-gray-700 mb-2">
+                    Training for a specific race:
                   </label>
-                  <p className="text-xs text-gray-500 mb-2">Search for a specific race</p>
-                  
-                  {selectedFilterRace ? (
-                    <div className="bg-white border-2 border-orange-500 rounded-lg p-3 mb-2">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-semibold text-gray-900 text-sm">{selectedFilterRace.name}</div>
-                          <div className="text-xs text-gray-600">
-                            {selectedFilterRace.raceType?.toUpperCase()} ({selectedFilterRace.miles} miles) • {formatRaceDate(selectedFilterRace.date)}
-                            {selectedFilterRace.city && ` • ${selectedFilterRace.city}, ${selectedFilterRace.state || selectedFilterRace.country}`}
+                  <div className="relative">
+                    {selectedFilterRace ? (
+                      <div className="bg-orange-50 border-2 border-orange-500 rounded-lg p-2 flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-gray-900 text-xs truncate">{selectedFilterRace.name}</div>
+                          <div className="text-xs text-gray-600 truncate">
+                            {formatRaceDate(selectedFilterRace.date)}
+                            {selectedFilterRace.miles && ` • ${selectedFilterRace.miles} mi`}
                           </div>
                         </div>
                         <button
@@ -366,79 +457,84 @@ export default function RunCrewDiscoveryPage() {
                             setSelectedFilterRace(null);
                             setFilterTrainingForRace(null);
                             setRaceSearchQuery('');
-                            handleApplyFilters();
+                            fetchRunCrews();
                           }}
-                          className="text-red-500 hover:text-red-700 ml-2"
+                          className="text-red-500 hover:text-red-700 ml-2 flex-shrink-0"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3 h-3" />
                         </button>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={raceSearchQuery}
-                        onChange={(e) => setRaceSearchQuery(e.target.value)}
-                        placeholder="Search for a race (e.g., Boston Marathon)"
-                        className="w-full px-4 py-2 rounded-lg border-2 border-gray-300 focus:border-orange-500 focus:outline-none text-sm"
-                      />
-                      {raceSearching && (
-                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500"></div>
-                        </div>
-                      )}
-
-                      {/* Search Results Dropdown */}
-                      {raceSearchQuery.trim() && raceSearchResults.length > 0 && (
-                        <div className="absolute z-10 w-full mt-1 border-2 border-gray-200 rounded-lg bg-white max-h-48 overflow-y-auto shadow-lg">
-                          {raceSearchResults.map((race) => (
-                            <button
-                              key={race.id}
-                              type="button"
-                              onClick={() => handleSelectFilterRace(race)}
-                              className="w-full text-left p-3 hover:bg-orange-50 border-b border-gray-100 last:border-b-0"
-                            >
-                              <div className="font-semibold text-gray-900 text-sm">{race.name}</div>
-                              <div className="text-xs text-gray-600">
-                                {race.raceType?.toUpperCase()} ({race.miles} miles) • {formatRaceDate(race.date)}
-                                {race.city && ` • ${race.city}, ${race.state || race.country}`}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* No Results */}
-                      {raceSearchQuery.trim() && !raceSearching && raceSearchResults.length === 0 && raceSearchQuery.length >= 2 && (
-                        <div className="mt-2 bg-blue-50 border-2 border-blue-200 rounded-lg p-3">
-                          <p className="text-xs text-blue-900">No races found. Try a different search term.</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    ) : (
+                      <>
+                        <input
+                          type="text"
+                          value={raceSearchQuery}
+                          onChange={(e) => setRaceSearchQuery(e.target.value)}
+                          placeholder="Search for a race..."
+                          className="w-full px-3 py-1.5 rounded-lg border-2 border-gray-300 focus:border-orange-500 focus:outline-none text-sm"
+                        />
+                        {raceSearching && (
+                          <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-orange-500"></div>
+                          </div>
+                        )}
+                        {raceSearchQuery.trim() && raceSearchResults.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 border-2 border-gray-200 rounded-lg bg-white max-h-40 overflow-y-auto shadow-lg">
+                            {raceSearchResults.map((race) => (
+                              <button
+                                key={race.id}
+                                type="button"
+                                onClick={() => handleSelectFilterRace(race)}
+                                className="w-full text-left p-2 hover:bg-orange-50 border-b border-gray-100 last:border-b-0"
+                              >
+                                <div className="font-semibold text-gray-900 text-xs">{race.name}</div>
+                                <div className="text-xs text-gray-600">
+                                  {formatRaceDate(race.date)}
+                                  {race.miles && ` • ${race.miles} mi`}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
-
-              {/* Apply Filters Button */}
-              <div className="flex gap-2 mt-4">
-                <button
-                  onClick={handleApplyFilters}
-                  disabled={applyingFilters}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {applyingFilters ? 'Applying...' : 'Apply Filters'}
-                </button>
-                {(filterCity || filterState || filterPurpose.length > 0 || filterTrainingForRace) && (
-                  <button
-                    onClick={handleClearFilters}
-                    className="px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
             </div>
+
+            {/* Filter Box 4: Race Training Groups */}
+            <div 
+              className={`bg-white rounded-xl shadow-md p-4 border-2 transition ${
+                activeFilterBox === 'raceTraining' ? 'border-orange-500 bg-orange-50' : 'border-gray-200'
+              }`}
+            >
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                4. Race Training Groups
+              </label>
+              <button
+                onClick={() => {
+                  setFilterRaceTrainingGroups(true);
+                  handleActivateFilterBox('raceTraining');
+                }}
+                className="w-full px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition"
+              >
+                Show all crews training for a race
+              </button>
+              {activeFilterBox === 'raceTraining' && (
+                <p className="text-xs text-orange-600 mt-2">✓ Showing only race training groups</p>
+              )}
+            </div>
+
+            {/* Clear Button */}
+            {activeFilterBox && (
+              <button
+                onClick={handleClearFilters}
+                className="w-full px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-50 transition"
+              >
+                Clear & Show All
+              </button>
+            )}
           </div>
 
         </div>

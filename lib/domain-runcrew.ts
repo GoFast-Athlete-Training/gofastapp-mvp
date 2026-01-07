@@ -166,11 +166,12 @@ export async function joinCrew(joinCode: string, athleteId: string) {
  */
 export async function getDiscoverableRunCrews(options?: {
   limit?: number;
-  search?: string; // General search by name, description, city, state
+  search?: string; // Search by name only
   city?: string;
   state?: string;
   purpose?: string[];
   trainingForRace?: string; // race ID to filter by specific race
+  raceTrainingGroups?: boolean; // true = only crews training for a race (trainingForRace IS NOT NULL)
 }) {
   const limit = options?.limit || 50;
 
@@ -179,14 +180,12 @@ export async function getDiscoverableRunCrews(options?: {
     archivedAt: null, // Only show active crews
   };
 
-  // General search - searches name, description, city, state
+  // Search - name only
   if (options?.search) {
-    where.OR = [
-      { name: { contains: options.search, mode: 'insensitive' } },
-      { description: { contains: options.search, mode: 'insensitive' } },
-      { city: { contains: options.search, mode: 'insensitive' } },
-      { state: { contains: options.search, mode: 'insensitive' } },
-    ];
+    where.name = {
+      contains: options.search,
+      mode: 'insensitive',
+    };
   }
 
   if (options?.city) {
@@ -209,6 +208,11 @@ export async function getDiscoverableRunCrews(options?: {
   // Training for Race filter (race ID)
   if (options?.trainingForRace) {
     where.trainingForRace = options.trainingForRace;
+  }
+
+  // Race Training Groups filter (has any race)
+  if (options?.raceTrainingGroups === true) {
+    where.trainingForRace = { not: null };
   }
 
   // Get non-archived crews with member counts and race data

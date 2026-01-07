@@ -11,11 +11,12 @@ import { getDiscoverableRunCrews } from '@/lib/domain-runcrew';
  * 
  * Query params (MVP):
  * - limit: number (default 50)
- * - search: string (optional - general search by name, description, city, state)
+ * - search: string (optional - search by crew name only)
  * - city: string (optional filter)
  * - state: string (optional filter)
  * - purpose: string[] (optional - Training, Social, General Fitness)
  * - trainingForRace: string (optional - race ID to filter by specific race)
+ * - raceTrainingGroups: boolean (optional - true = only crews training for a race)
  * 
  * Returns:
  * {
@@ -59,6 +60,10 @@ export async function GET(request: Request) {
     
     // Training for Race filter (race ID)
     const trainingForRace = searchParams.get('trainingForRace') || undefined;
+    
+    // Race Training Groups filter (boolean)
+    const raceTrainingGroupsParam = searchParams.get('raceTrainingGroups');
+    const raceTrainingGroups = raceTrainingGroupsParam === 'true' ? true : undefined;
 
     const crews = await getDiscoverableRunCrews({
       limit,
@@ -67,6 +72,7 @@ export async function GET(request: Request) {
       state,
       purpose: purpose.length > 0 ? purpose : undefined,
       trainingForRace,
+      raceTrainingGroups,
     });
 
     return NextResponse.json({
