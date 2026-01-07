@@ -147,7 +147,7 @@ model prompt_instructions {
 }
 
 model race_registry {
-  id                      String                    @id
+  id                      String                    @id @default(cuid())
   name                    String
   raceType                String
   miles                   Float

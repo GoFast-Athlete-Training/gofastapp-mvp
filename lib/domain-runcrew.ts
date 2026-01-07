@@ -166,17 +166,11 @@ export async function joinCrew(joinCode: string, athleteId: string) {
  */
 export async function getDiscoverableRunCrews(options?: {
   limit?: number;
+  search?: string; // General search by name, description, city, state
   city?: string;
   state?: string;
   purpose?: string[];
-  timePreference?: string[];
-  paceMin?: number;
-  paceMax?: number;
-  gender?: string;
-  ageMin?: number;
-  ageMax?: number;
-  typicalRunMilesMin?: number;
-  typicalRunMilesMax?: number;
+  trainingForRace?: string; // race ID to filter by specific race
 }) {
   const limit = options?.limit || 50;
 
@@ -184,6 +178,16 @@ export async function getDiscoverableRunCrews(options?: {
   const where: any = {
     archivedAt: null, // Only show active crews
   };
+
+  // General search - searches name, description, city, state
+  if (options?.search) {
+    where.OR = [
+      { name: { contains: options.search, mode: 'insensitive' } },
+      { description: { contains: options.search, mode: 'insensitive' } },
+      { city: { contains: options.search, mode: 'insensitive' } },
+      { state: { contains: options.search, mode: 'insensitive' } },
+    ];
+  }
 
   if (options?.city) {
     where.city = {
@@ -202,44 +206,12 @@ export async function getDiscoverableRunCrews(options?: {
     };
   }
 
-  if (options?.timePreference && options.timePreference.length > 0) {
-    where.timePreference = {
-      hasSome: options.timePreference,
-    };
+  // Training for Race filter (race ID)
+  if (options?.trainingForRace) {
+    where.trainingForRace = options.trainingForRace;
   }
 
-  // TODO: Pace filtering removed - new pace model (easyMilesPace, crushingItPace)
-  // doesn't map cleanly to min/max filtering. Re-implement filtering logic if needed.
-
-  if (options?.gender) {
-    where.gender = {
-      in: [options.gender, 'both'], // Include crews that accept this gender or both
-    };
-  }
-
-  if (options?.ageMin !== undefined) {
-    where.ageMax = {
-      gte: options.ageMin, // Crew's max age should be >= user's min age
-    };
-  }
-
-  if (options?.ageMax !== undefined) {
-    where.ageMin = {
-      lte: options.ageMax, // Crew's min age should be <= user's max age
-    };
-  }
-
-  if (options?.typicalRunMilesMin !== undefined || options?.typicalRunMilesMax !== undefined) {
-    where.typicalRunMiles = {};
-    if (options?.typicalRunMilesMin !== undefined) {
-      where.typicalRunMiles.gte = options.typicalRunMilesMin;
-    }
-    if (options?.typicalRunMilesMax !== undefined) {
-      where.typicalRunMiles.lte = options.typicalRunMilesMax;
-    }
-  }
-
-  // Get non-archived crews with member counts
+  // Get non-archived crews with member counts and race data
   const crews = await prisma.run_crews.findMany({
     where,
     select: {
@@ -260,6 +232,19 @@ export async function getDiscoverableRunCrews(options?: {
       purpose: true,
       timePreference: true,
       typicalRunMiles: true,
+      trainingForRace: true,
+      race_registry: {
+        select: {
+          id: true,
+          name: true,
+          raceType: true,
+          miles: true,
+          date: true,
+          city: true,
+          state: true,
+          country: true,
+        },
+      },
       createdAt: true,
       _count: {
         select: {
@@ -307,6 +292,17 @@ export async function getDiscoverableRunCrews(options?: {
       purpose: crew.purpose,
       timePreference: crew.timePreference,
       typicalRunMiles: crew.typicalRunMiles,
+      trainingForRace: crew.trainingForRace,
+      race: crew.race_registry ? {
+        id: crew.race_registry.id,
+        name: crew.race_registry.name,
+        raceType: crew.race_registry.raceType,
+        miles: crew.race_registry.miles,
+        date: crew.race_registry.date,
+        city: crew.race_registry.city,
+        state: crew.race_registry.state,
+        country: crew.race_registry.country,
+      } : null,
       memberCount: crew._count.run_crew_memberships,
       createdAt: crew.createdAt,
     };

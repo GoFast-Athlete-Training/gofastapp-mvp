@@ -25,6 +25,17 @@ interface DiscoverableRunCrew {
   purpose: string[] | null;
   timePreference: string[] | null;
   typicalRunMiles: number | null;
+  trainingForRace: string | null;
+  race: {
+    id: string;
+    name: string;
+    raceType: string | null;
+    miles: number | null;
+    date: Date | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+  } | null;
   memberCount: number;
   createdAt: Date;
 }
@@ -37,24 +48,40 @@ export default function RunCrewDiscoveryPage() {
   const [filterCity, setFilterCity] = useState('');
   const [filterState, setFilterState] = useState('');
   const [filterPurpose, setFilterPurpose] = useState<string[]>([]);
-  const [filterTimePreference, setFilterTimePreference] = useState<string[]>([]);
-  const [filterGender, setFilterGender] = useState('');
-  const [filterAgeMin, setFilterAgeMin] = useState('');
-  const [filterAgeMax, setFilterAgeMax] = useState('');
-  const [filterTypicalRunMilesMin, setFilterTypicalRunMilesMin] = useState('');
-  const [filterTypicalRunMilesMax, setFilterTypicalRunMilesMax] = useState('');
-  const [filterTrainingForRace, setFilterTrainingForRace] = useState('');
-  const [filterTrainingForDistance, setFilterTrainingForDistance] = useState<string[]>([]);
+  const [filterTrainingForRace, setFilterTrainingForRace] = useState<string | null>(null); // race ID or null
   const [raceSearchQuery, setRaceSearchQuery] = useState('');
   const [raceSearchResults, setRaceSearchResults] = useState<any[]>([]);
   const [raceSearching, setRaceSearching] = useState(false);
   const [selectedFilterRace, setSelectedFilterRace] = useState<any | null>(null);
+  const [raceDebounceTimer, setRaceDebounceTimer] = useState<NodeJS.Timeout | null>(null);
   const [applyingFilters, setApplyingFilters] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
+  const [searchDebounceTimer, setSearchDebounceTimer] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     fetchRunCrews();
   }, []);
+
+  // Debounced general search - calls API when user types
+  useEffect(() => {
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer);
+    }
+
+    if (!searchQuery.trim()) {
+      // If search is empty, fetch all (with filters if any)
+      fetchRunCrews();
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      fetchRunCrews();
+    }, 500); // 500ms debounce for search
+
+    setSearchDebounceTimer(timer);
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [searchQuery]);
 
   // Format race date helper
   function formatRaceDate(dateString: string | Date): string {
@@ -95,6 +122,10 @@ export default function RunCrewDiscoveryPage() {
 
   // Debounce race search
   useEffect(() => {
+    if (raceDebounceTimer) {
+      clearTimeout(raceDebounceTimer);
+    }
+
     if (!raceSearchQuery.trim()) {
       setRaceSearchResults([]);
       setRaceSearching(false);
@@ -105,7 +136,10 @@ export default function RunCrewDiscoveryPage() {
       handleRaceSearch(raceSearchQuery);
     }, 300);
 
-    return () => clearTimeout(timer);
+    setRaceDebounceTimer(timer);
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [raceSearchQuery, handleRaceSearch]);
 
   // Handle race selection for filter
@@ -114,7 +148,9 @@ export default function RunCrewDiscoveryPage() {
     setFilterTrainingForRace(race.id);
     setRaceSearchQuery(race.name);
     setRaceSearchResults([]);
+    handleApplyFilters();
   };
+
 
   // Convert pace from MM:SS to seconds
   const convertPaceToSeconds = (paceStr: string): number | undefined => {
@@ -132,32 +168,23 @@ export default function RunCrewDiscoveryPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams();
+      
+      // General search query
+      if (searchQuery.trim()) {
+        params.append('search', searchQuery.trim());
+      }
+      
+      // Location filters
       if (filterCity) params.append('city', filterCity);
       if (filterState) params.append('state', filterState);
       
       // Purpose filters
       filterPurpose.forEach(p => params.append('purpose', p));
       
-      // Time preference filters
-      filterTimePreference.forEach(t => params.append('timePreference', t));
-      
-      // TODO: Pace filtering removed - new pace model (easyMilesPace, crushingItPace)
-      // doesn't support min/max filtering. Re-implement if needed.
-      
-      // Gender filter
-      if (filterGender) params.append('gender', filterGender);
-      
-      // Age filters
-      if (filterAgeMin) params.append('ageMin', filterAgeMin);
-      if (filterAgeMax) params.append('ageMax', filterAgeMax);
-      
-      // Typical run miles filters
-      if (filterTypicalRunMilesMin) params.append('typicalRunMilesMin', filterTypicalRunMilesMin);
-      if (filterTypicalRunMilesMax) params.append('typicalRunMilesMax', filterTypicalRunMilesMax);
-      
-      // Training filters
-      if (filterTrainingForRace) params.append('trainingForRace', filterTrainingForRace);
-      filterTrainingForDistance.forEach(d => params.append('trainingForDistance', d));
+      // Training for Race filter (race ID string)
+      if (filterTrainingForRace) {
+        params.append('trainingForRace', filterTrainingForRace); // Specific race ID
+      }
       
       const response = await api.get(`/runcrew/discover?${params.toString()}`);
       
@@ -177,17 +204,19 @@ export default function RunCrewDiscoveryPage() {
     fetchRunCrews();
   };
 
-  // Filter crews based on search query
-  const filteredCrews = runCrews.filter((crew) => {
-    const query = searchQuery.toLowerCase();
-    return (
-      crew.name.toLowerCase().includes(query) ||
-      crew.description?.toLowerCase().includes(query) ||
-      crew.city?.toLowerCase().includes(query) ||
-      crew.state?.toLowerCase().includes(query) ||
-      crew.primaryMeetUpPoint?.toLowerCase().includes(query)
-    );
-  });
+  const handleClearFilters = () => {
+    setFilterCity('');
+    setFilterState('');
+    setFilterPurpose([]);
+    setFilterTrainingForRace(null);
+    setSelectedFilterRace(null);
+    setRaceSearchQuery('');
+    setSearchQuery('');
+    fetchRunCrews();
+  };
+
+  // Use runCrews directly - filtering is done by API
+  const filteredCrews = runCrews;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -225,77 +254,67 @@ export default function RunCrewDiscoveryPage() {
             </Link>
           </div>
 
-          {/* Search */}
-          <div className="bg-white rounded-xl shadow-md p-4 sm:p-6 mb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, location, or description..."
-                className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
-              />
+          {/* Search Section - Split Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* General Search */}
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <label className="block text-sm font-semibold text-gray-900 mb-3">
+                Search
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder='e.g., "gofast bandits"'
+                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-2">Search by crew name, location, or description</p>
             </div>
-          </div>
 
-          {/* Filters Toggle */}
-          <div className="mb-4">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 text-gray-700 hover:text-gray-900 font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition"
-            >
-              <span>Filters</span>
-              <svg
-                className={`w-5 h-5 transition-transform ${showFilters ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          </div>
+            {/* Look Up By Filters */}
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <label className="block text-sm font-semibold text-gray-900 mb-3">
+                Look Up By...
+              </label>
+              
+              {/* City Filter */}
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  City
+                </label>
+                <input
+                  type="text"
+                  value={filterCity}
+                  onChange={(e) => setFilterCity(e.target.value)}
+                  placeholder="e.g. Arlington"
+                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+                />
+              </div>
 
-          {/* Filters Panel */}
-          {showFilters && (
-            <div className="bg-white rounded-xl shadow-md p-4 sm:p-6 space-y-6 mb-8">
-              {/* Location Filters */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Location</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      City
-                    </label>
-                    <input
-                      type="text"
-                      value={filterCity}
-                      onChange={(e) => setFilterCity(e.target.value)}
-                      placeholder="e.g. Arlington"
-                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      State
-                    </label>
-                    <input
-                      type="text"
-                      value={filterState}
-                      onChange={(e) => setFilterState(e.target.value)}
-                      placeholder="e.g. VA"
-                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
-                    />
-                  </div>
-                </div>
+              {/* State Filter */}
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  State
+                </label>
+                <input
+                  type="text"
+                  value={filterState}
+                  onChange={(e) => setFilterState(e.target.value)}
+                  placeholder="e.g. VA"
+                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+                />
               </div>
 
               {/* Purpose Filter */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Purpose</h3>
-                <div className="flex gap-3 flex-wrap">
-                  {(['Training', 'Fun', 'Social'] as const).map((purpose) => (
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Purpose
+                </label>
+                <div className="flex gap-2 flex-wrap">
+                  {(['Training', 'Social', 'General Fitness'] as const).map((purpose) => (
                     <button
                       key={purpose}
                       type="button"
@@ -306,13 +325,12 @@ export default function RunCrewDiscoveryPage() {
                         setFilterPurpose(newPurpose);
                         // Clear race filter if Training is deselected
                         if (purpose === 'Training' && filterPurpose.includes('Training')) {
-                          setFilterTrainingForRace('');
-                          setFilterTrainingForDistance([]);
+                          setFilterTrainingForRace(null);
                           setSelectedFilterRace(null);
                           setRaceSearchQuery('');
                         }
                       }}
-                      className={`px-4 py-2 rounded-lg border-2 font-medium transition ${
+                      className={`px-3 py-1.5 rounded-lg border-2 font-medium text-sm transition ${
                         filterPurpose.includes(purpose)
                           ? 'bg-orange-500 text-white border-orange-500'
                           : 'bg-white text-gray-700 border-gray-300 hover:border-orange-500'
@@ -324,260 +342,105 @@ export default function RunCrewDiscoveryPage() {
                 </div>
               </div>
 
-              {/* Training For Race Filter - Shown when Training purpose is selected */}
+              {/* Training for Race - Only if Purpose includes Training */}
               {filterPurpose.includes('Training') && (
-                <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-4 space-y-4">
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-2">
-                      Training For Race 🏃‍♂️
-                    </h3>
-                    <p className="text-xs text-gray-600 mb-3">
-                      Filter crews training for a specific race
-                    </p>
-
-                    {selectedFilterRace ? (
-                      <div className="bg-white border-2 border-orange-500 rounded-lg p-3 mb-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-semibold text-gray-900 text-sm">{selectedFilterRace.name}</div>
-                            <div className="text-xs text-gray-600">
-                              {selectedFilterRace.raceType?.toUpperCase()} ({selectedFilterRace.miles} miles) • {formatRaceDate(selectedFilterRace.date)}
-                              {selectedFilterRace.city && ` • ${selectedFilterRace.city}, ${selectedFilterRace.state || selectedFilterRace.country}`}
-                            </div>
+                <div className="mb-4">
+                  <label className="block text-xs font-medium text-gray-700 mb-2">
+                    Training for a race
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">Search for a specific race</p>
+                  
+                  {selectedFilterRace ? (
+                    <div className="bg-white border-2 border-orange-500 rounded-lg p-3 mb-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-semibold text-gray-900 text-sm">{selectedFilterRace.name}</div>
+                          <div className="text-xs text-gray-600">
+                            {selectedFilterRace.raceType?.toUpperCase()} ({selectedFilterRace.miles} miles) • {formatRaceDate(selectedFilterRace.date)}
+                            {selectedFilterRace.city && ` • ${selectedFilterRace.city}, ${selectedFilterRace.state || selectedFilterRace.country}`}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedFilterRace(null);
-                              setFilterTrainingForRace('');
-                              setRaceSearchQuery('');
-                            }}
-                            className="text-red-500 hover:text-red-700 ml-2"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={raceSearchQuery}
-                          onChange={(e) => setRaceSearchQuery(e.target.value)}
-                          placeholder="Search for a race (e.g., Boston Marathon)"
-                          className="w-full px-4 py-2 rounded-lg border-2 border-gray-300 focus:border-orange-500 focus:outline-none text-sm"
-                        />
-                        {raceSearching && (
-                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500"></div>
-                          </div>
-                        )}
-
-                        {/* Search Results Dropdown */}
-                        {raceSearchQuery.trim() && raceSearchResults.length > 0 && (
-                          <div className="absolute z-10 w-full mt-1 border-2 border-gray-200 rounded-lg bg-white max-h-48 overflow-y-auto shadow-lg">
-                            {raceSearchResults.map((race) => (
-                              <button
-                                key={race.id}
-                                type="button"
-                                onClick={() => handleSelectFilterRace(race)}
-                                className="w-full text-left p-3 hover:bg-orange-50 border-b border-gray-100 last:border-b-0"
-                              >
-                                <div className="font-semibold text-gray-900 text-sm">{race.name}</div>
-                                <div className="text-xs text-gray-600">
-                                  {race.raceType?.toUpperCase()} ({race.miles} miles) • {formatRaceDate(race.date)}
-                                  {race.city && ` • ${race.city}, ${race.state || race.country}`}
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* No Results */}
-                        {raceSearchQuery.trim() && !raceSearching && raceSearchResults.length === 0 && raceSearchQuery.length >= 2 && (
-                          <div className="mt-2 bg-blue-50 border-2 border-blue-200 rounded-lg p-3">
-                            <p className="text-xs text-blue-900">No races found. Try a different search term.</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Training Distance Filter */}
-                    <div className="mt-3">
-                      <label className="block text-xs font-semibold text-gray-700 mb-2">
-                        Training Distances
-                      </label>
-                      <div className="flex gap-2 flex-wrap">
-                        {(['FiveK', 'TenK', 'HalfMarathon', 'Marathon', 'Ultra'] as const).map((distance) => (
-                          <button
-                            key={distance}
-                            type="button"
-                            onClick={() => {
-                              const newDistances = filterTrainingForDistance.includes(distance)
-                                ? filterTrainingForDistance.filter((d) => d !== distance)
-                                : [...filterTrainingForDistance, distance];
-                              setFilterTrainingForDistance(newDistances);
-                            }}
-                            className={`px-3 py-1.5 rounded-lg border-2 font-medium text-xs transition ${
-                              filterTrainingForDistance.includes(distance)
-                                ? 'bg-orange-500 text-white border-orange-500'
-                                : 'bg-white text-gray-700 border-gray-300 hover:border-orange-500'
-                            }`}
-                          >
-                            {distance.replace(/([A-Z])/g, ' $1').trim()}
-                          </button>
-                        ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedFilterRace(null);
+                            setFilterTrainingForRace(null);
+                            setRaceSearchQuery('');
+                            handleApplyFilters();
+                          }}
+                          className="text-red-500 hover:text-red-700 ml-2"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={raceSearchQuery}
+                        onChange={(e) => setRaceSearchQuery(e.target.value)}
+                        placeholder="Search for a race (e.g., Boston Marathon)"
+                        className="w-full px-4 py-2 rounded-lg border-2 border-gray-300 focus:border-orange-500 focus:outline-none text-sm"
+                      />
+                      {raceSearching && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500"></div>
+                        </div>
+                      )}
+
+                      {/* Search Results Dropdown */}
+                      {raceSearchQuery.trim() && raceSearchResults.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 border-2 border-gray-200 rounded-lg bg-white max-h-48 overflow-y-auto shadow-lg">
+                          {raceSearchResults.map((race) => (
+                            <button
+                              key={race.id}
+                              type="button"
+                              onClick={() => handleSelectFilterRace(race)}
+                              className="w-full text-left p-3 hover:bg-orange-50 border-b border-gray-100 last:border-b-0"
+                            >
+                              <div className="font-semibold text-gray-900 text-sm">{race.name}</div>
+                              <div className="text-xs text-gray-600">
+                                {race.raceType?.toUpperCase()} ({race.miles} miles) • {formatRaceDate(race.date)}
+                                {race.city && ` • ${race.city}, ${race.state || race.country}`}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* No Results */}
+                      {raceSearchQuery.trim() && !raceSearching && raceSearchResults.length === 0 && raceSearchQuery.length >= 2 && (
+                        <div className="mt-2 bg-blue-50 border-2 border-blue-200 rounded-lg p-3">
+                          <p className="text-xs text-blue-900">No races found. Try a different search term.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Time Preference Filter */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Run Times</h3>
-                <div className="flex gap-3 flex-wrap">
-                  {(['Morning', 'Afternoon', 'Evening'] as const).map((time) => (
-                    <button
-                      key={time}
-                      type="button"
-                      onClick={() => {
-                        setFilterTimePreference(
-                          filterTimePreference.includes(time)
-                            ? filterTimePreference.filter((t) => t !== time)
-                            : [...filterTimePreference, time]
-                        );
-                      }}
-                      className={`px-4 py-2 rounded-lg border-2 font-medium transition ${
-                        filterTimePreference.includes(time)
-                          ? 'bg-orange-500 text-white border-orange-500'
-                          : 'bg-white text-gray-700 border-gray-300 hover:border-orange-500'
-                      }`}
-                    >
-                      {time}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Gender Filter */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Gender</h3>
-                <div className="flex gap-6">
-                  {(['male', 'female', 'both'] as const).map((gender) => (
-                    <label key={gender} className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="gender"
-                        value={gender}
-                        checked={filterGender === gender}
-                        onChange={(e) => setFilterGender(e.target.value)}
-                        className="w-4 h-4 text-orange-600 border-gray-300 focus:ring-orange-500"
-                      />
-                      <span className="text-sm text-gray-700 capitalize">{gender}</span>
-                    </label>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setFilterGender('')}
-                    className="text-xs text-gray-500 hover:text-gray-700 underline"
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-
-              {/* Age Range Filter */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Age Range</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Min Age</label>
-                    <input
-                      type="number"
-                      value={filterAgeMin}
-                      onChange={(e) => setFilterAgeMin(e.target.value)}
-                      placeholder="18"
-                      min="0"
-                      max="120"
-                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Max Age</label>
-                    <input
-                      type="number"
-                      value={filterAgeMax}
-                      onChange={(e) => setFilterAgeMax(e.target.value)}
-                      placeholder="65"
-                      min="0"
-                      max="120"
-                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Typical Run Miles Filter */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Typical Run Distance (miles)</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Min Miles</label>
-                    <input
-                      type="number"
-                      value={filterTypicalRunMilesMin}
-                      onChange={(e) => setFilterTypicalRunMilesMin(e.target.value)}
-                      placeholder="3.0"
-                      step="0.1"
-                      min="0"
-                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Max Miles</label>
-                    <input
-                      type="number"
-                      value={filterTypicalRunMilesMax}
-                      onChange={(e) => setFilterTypicalRunMilesMax(e.target.value)}
-                      placeholder="10.0"
-                      step="0.1"
-                      min="0"
-                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
-                    />
-                  </div>
-                </div>
-              </div>
-
               {/* Apply Filters Button */}
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <div className="flex gap-2 mt-4">
                 <button
                   onClick={handleApplyFilters}
                   disabled={applyingFilters}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {applyingFilters ? 'Applying Filters...' : 'Apply Filters'}
+                  {applyingFilters ? 'Applying...' : 'Apply Filters'}
                 </button>
-                <button
-                  onClick={() => {
-                    setFilterCity('');
-                    setFilterState('');
-                    setFilterPurpose([]);
-                    setFilterTimePreference([]);
-                    setFilterGender('');
-                    setFilterAgeMin('');
-                    setFilterAgeMax('');
-                    setFilterTypicalRunMilesMin('');
-                    setFilterTypicalRunMilesMax('');
-                    fetchRunCrews();
-                  }}
-                  className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
-                >
-                  Clear All
-                </button>
+                {(filterCity || filterState || filterPurpose.length > 0 || filterTrainingForRace) && (
+                  <button
+                    onClick={handleClearFilters}
+                    className="px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
+                  >
+                    Clear
+                  </button>
+                )}
               </div>
             </div>
-          )}
+          </div>
+
         </div>
 
         {/* Loading State */}
@@ -699,6 +562,20 @@ export default function RunCrewDiscoveryPage() {
                                 {purpose}
                               </span>
                             ))}
+                          </div>
+                        )}
+
+                        {/* Training for Race */}
+                        {crew.purpose?.includes('Training') && crew.race && (
+                          <div className="pt-2 border-t border-gray-200">
+                            <div className="text-xs text-gray-500 mb-1">Training for:</div>
+                            <div className="text-sm font-semibold text-gray-900">{crew.race.name}</div>
+                            {crew.race.date && (
+                              <div className="text-xs text-gray-600">
+                                {new Date(crew.race.date).toLocaleDateString()}
+                                {crew.race.miles && ` • ${crew.race.miles} miles`}
+                              </div>
+                            )}
                           </div>
                         )}
 

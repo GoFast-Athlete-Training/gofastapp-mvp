@@ -58,7 +58,6 @@ export async function POST(request: NextRequest) {
       // Create new race in registry
       race = await prisma.race_registry.create({
         data: {
-          id: undefined, // Let Prisma generate ID
           name: name.trim(),
           raceType: finalRaceType,
           miles: miles,

@@ -101,13 +101,12 @@ export default function CreateCrewPage() {
     primaryMeetUpPlaceId: '',
     primaryMeetUpLat: '',
     primaryMeetUpLng: '',
-    purpose: [] as string[],
+    purpose: '' as string, // REQUIRED: 'Training' or 'Social'
     timePreference: [] as string[],
     typicalRunMiles: '',
     longRunMilesMin: '',
     longRunMilesMax: '',
     trainingForRace: '',
-    trainingForDistance: [] as string[],
   });
 
   // Race picker state (shown when Training purpose is selected)
@@ -118,6 +117,7 @@ export default function CreateCrewPage() {
   const [creatingRace, setCreatingRace] = useState(false);
   const [selectedRace, setSelectedRace] = useState<any | null>(null);
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [isTrainingForRace, setIsTrainingForRace] = useState(false); // Toggle: Training for a race?
 
   // Create race form state
   const [newRaceName, setNewRaceName] = useState('');
@@ -304,7 +304,7 @@ export default function CreateCrewPage() {
   };
 
   // Check if Training purpose is selected
-  const isTrainingPurposeSelected = formData.purpose.includes('Training');
+  const isTrainingPurposeSelected = formData.purpose === 'Training';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -313,6 +313,28 @@ export default function CreateCrewPage() {
     // Validation
     if (!formData.name.trim()) {
       setError('Crew name is required');
+      return;
+    }
+
+    if (!formData.purpose) {
+      setError('Purpose is required');
+      return;
+    }
+
+    if (formData.purpose !== 'Training' && formData.purpose !== 'Social' && formData.purpose !== 'General Fitness') {
+      setError('Purpose must be Training, Social, or General Fitness');
+      return;
+    }
+
+    // Validation: No race data if purpose is not Training
+    if (formData.purpose !== 'Training' && formData.trainingForRace) {
+      setError('Race data is only allowed when purpose is Training');
+      return;
+    }
+
+    // Validation: No race data if toggle is NO
+    if (formData.purpose === 'Training' && !isTrainingForRace && formData.trainingForRace) {
+      setError('Race data is only allowed when "Training for a race" is selected');
       return;
     }
 
@@ -351,13 +373,14 @@ export default function CreateCrewPage() {
         primaryMeetUpPlaceId: formData.primaryMeetUpPlaceId || undefined,
         primaryMeetUpLat: formData.primaryMeetUpLat ? parseFloat(formData.primaryMeetUpLat) : undefined,
         primaryMeetUpLng: formData.primaryMeetUpLng ? parseFloat(formData.primaryMeetUpLng) : undefined,
-        purpose: formData.purpose.length > 0 ? formData.purpose : undefined,
+        purpose: [formData.purpose], // Convert to array format
         timePreference: formData.timePreference.length > 0 ? formData.timePreference : undefined,
         typicalRunMiles: formData.typicalRunMiles ? parseFloat(formData.typicalRunMiles) : undefined,
         longRunMilesMin: formData.longRunMilesMin ? parseFloat(formData.longRunMilesMin) : undefined,
         longRunMilesMax: formData.longRunMilesMax ? parseFloat(formData.longRunMilesMax) : undefined,
-        trainingForRace: formData.trainingForRace || undefined,
-        trainingForDistance: formData.trainingForDistance.length > 0 ? formData.trainingForDistance : undefined,
+        // Only include trainingForRace if purpose is Training AND toggle is YES
+        trainingForRace: (formData.purpose === 'Training' && isTrainingForRace && formData.trainingForRace) ? formData.trainingForRace : undefined,
+        trainingForDistance: undefined, // Not in MVP
       });
       
       if (response.data.success) {
@@ -763,33 +786,29 @@ export default function CreateCrewPage() {
             </div>
           </div>
 
-          {/* Purpose of Group */}
+          {/* Purpose of Group - REQUIRED */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Purpose of Group
+              Purpose of Group <span className="text-red-500">*</span>
             </label>
             <div className="flex gap-3 flex-wrap">
-              {(['Training', 'Fun', 'Social'] as const).map((purposeOption) => (
+              {(['Training', 'Social', 'General Fitness'] as const).map((purposeOption) => (
                 <button
                   key={purposeOption}
                   type="button"
                   onClick={() => {
-                    const newPurpose = formData.purpose.includes(purposeOption)
-                      ? formData.purpose.filter((p) => p !== purposeOption)
-                      : [...formData.purpose, purposeOption];
-                    setFormData({ ...formData, purpose: newPurpose });
-                    // Clear race selection if Training is deselected
-                    if (purposeOption === 'Training' && formData.purpose.includes('Training')) {
-                      setFormData({ ...formData, purpose: newPurpose, trainingForRace: '', trainingForDistance: [] });
+                    setFormData({ ...formData, purpose: purposeOption });
+                    // Clear race data if switching away from Training
+                    if (purposeOption !== 'Training') {
+                      setFormData({ ...formData, purpose: purposeOption, trainingForRace: '' });
                       setSelectedRace(null);
                       setRaceSearchQuery('');
-                    } else {
-                      setFormData({ ...formData, purpose: newPurpose });
+                      setIsTrainingForRace(false);
                     }
                     setError(null);
                   }}
                   className={`px-6 py-3 rounded-lg border-2 font-medium transition ${
-                    formData.purpose.includes(purposeOption)
+                    formData.purpose === purposeOption
                       ? 'bg-sky-600 text-white border-sky-600'
                       : 'bg-white text-gray-700 border-gray-300 hover:border-sky-500'
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -801,18 +820,62 @@ export default function CreateCrewPage() {
             </div>
           </div>
 
-          {/* Training For Race - Shown when Training purpose is selected */}
+          {/* Training for Race Toggle - ONLY if purpose = Training */}
           {isTrainingPurposeSelected && (
-            <div className="bg-sky-50 border-2 border-sky-200 rounded-lg p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Training For Race 🏃‍♂️
+            <div className="bg-sky-50 border-2 border-sky-200 rounded-lg p-6">
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Training for a race?
                 </label>
-                <p className="text-xs text-gray-600 mb-3">
-                  Select the race your crew is training for (or create a new one)
-                </p>
+                <div className="flex gap-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsTrainingForRace(true);
+                      setError(null);
+                    }}
+                    className={`px-6 py-3 rounded-lg border-2 font-medium transition ${
+                      isTrainingForRace
+                        ? 'bg-sky-600 text-white border-sky-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-sky-500'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    disabled={loading}
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsTrainingForRace(false);
+                      setFormData({ ...formData, trainingForRace: '' });
+                      setSelectedRace(null);
+                      setRaceSearchQuery('');
+                      setError(null);
+                    }}
+                    className={`px-6 py-3 rounded-lg border-2 font-medium transition ${
+                      !isTrainingForRace
+                        ? 'bg-sky-600 text-white border-sky-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-sky-500'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    disabled={loading}
+                  >
+                    No
+                  </button>
+                </div>
+              </div>
 
-                {selectedRace ? (
+              {/* Race Picker - ONLY if purpose = Training AND toggle = YES */}
+              {isTrainingForRace && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Select Race (Optional)
+                    </label>
+                    <p className="text-xs text-gray-600 mb-3">
+                      Search for a race or create a new one
+                    </p>
+
+                    {selectedRace ? (
                   <div className="bg-white border-2 border-sky-500 rounded-lg p-4 mb-3">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1019,39 +1082,10 @@ export default function CreateCrewPage() {
                       </button>
                     )}
                   </>
-                )}
-
-                {/* Training Distance Selection */}
-                {selectedRace && (
-                  <div className="mt-4">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Training Distances
-                    </label>
-                    <div className="flex gap-2 flex-wrap">
-                      {(['FiveK', 'TenK', 'HalfMarathon', 'Marathon', 'Ultra'] as const).map((distance) => (
-                        <button
-                          key={distance}
-                          type="button"
-                          onClick={() => {
-                            const newDistances = formData.trainingForDistance.includes(distance)
-                              ? formData.trainingForDistance.filter((d) => d !== distance)
-                              : [...formData.trainingForDistance, distance];
-                            setFormData({ ...formData, trainingForDistance: newDistances });
-                          }}
-                          className={`px-4 py-2 rounded-lg border-2 font-medium text-sm transition ${
-                            formData.trainingForDistance.includes(distance)
-                              ? 'bg-sky-600 text-white border-sky-600'
-                              : 'bg-white text-gray-700 border-gray-300 hover:border-sky-500'
-                          } disabled:opacity-50 disabled:cursor-not-allowed`}
-                          disabled={loading}
-                        >
-                          {distance.replace(/([A-Z])/g, ' $1').trim()}
-                        </button>
-                      ))}
-                    </div>
+                  )}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1172,7 +1206,7 @@ export default function CreateCrewPage() {
 
           <button
             type="submit"
-            disabled={loading || !formData.name.trim()}
+            disabled={loading || !formData.name.trim() || !formData.purpose}
             className="w-full bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white font-bold py-4 rounded-lg transition shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg"
           >
             {loading ? (

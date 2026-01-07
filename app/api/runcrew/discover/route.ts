@@ -9,19 +9,13 @@ import { getDiscoverableRunCrews } from '@/lib/domain-runcrew';
  * Public endpoint to discover runcrews.
  * No authentication required - returns public information for discovery.
  * 
- * Query params:
+ * Query params (MVP):
  * - limit: number (default 50)
+ * - search: string (optional - general search by name, description, city, state)
  * - city: string (optional filter)
  * - state: string (optional filter)
- * - purpose: string[] (optional - Training, Fun, Social)
- * - timePreference: string[] (optional - Morning, Afternoon, Evening)
- * - paceMin: number (optional - DEPRECATED - pace filtering removed with new pace model)
- * - paceMax: number (optional - DEPRECATED - pace filtering removed with new pace model)
- * - gender: string (optional - male, female, both)
- * - ageMin: number (optional)
- * - ageMax: number (optional)
- * - typicalRunMilesMin: number (optional)
- * - typicalRunMilesMax: number (optional)
+ * - purpose: string[] (optional - Training, Social, General Fitness)
+ * - trainingForRace: string (optional - race ID to filter by specific race)
  * 
  * Returns:
  * {
@@ -56,40 +50,23 @@ export async function GET(request: Request) {
     const limit = searchParams.get('limit') 
       ? parseInt(searchParams.get('limit')!, 10)
       : undefined;
+    const search = searchParams.get('search') || undefined;
     const city = searchParams.get('city') || undefined;
     const state = searchParams.get('state') || undefined;
     
     // Parse array params
     const purpose = searchParams.getAll('purpose');
-    const timePreference = searchParams.getAll('timePreference');
     
-    // Parse number params
-    // TODO: Pace filtering removed - new pace model doesn't support min/max filtering
-    const gender = searchParams.get('gender') || undefined;
-    const ageMin = searchParams.get('ageMin') 
-      ? parseInt(searchParams.get('ageMin')!, 10)
-      : undefined;
-    const ageMax = searchParams.get('ageMax') 
-      ? parseInt(searchParams.get('ageMax')!, 10)
-      : undefined;
-    const typicalRunMilesMin = searchParams.get('typicalRunMilesMin') 
-      ? parseFloat(searchParams.get('typicalRunMilesMin')!)
-      : undefined;
-    const typicalRunMilesMax = searchParams.get('typicalRunMilesMax') 
-      ? parseFloat(searchParams.get('typicalRunMilesMax')!)
-      : undefined;
+    // Training for Race filter (race ID)
+    const trainingForRace = searchParams.get('trainingForRace') || undefined;
 
     const crews = await getDiscoverableRunCrews({
       limit,
+      search,
       city,
       state,
       purpose: purpose.length > 0 ? purpose : undefined,
-      timePreference: timePreference.length > 0 ? timePreference : undefined,
-      gender,
-      ageMin,
-      ageMax,
-      typicalRunMilesMin,
-      typicalRunMilesMax,
+      trainingForRace,
     });
 
     return NextResponse.json({
