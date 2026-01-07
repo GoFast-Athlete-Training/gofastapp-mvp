@@ -64,6 +64,7 @@ export default function RunCrewDiscoveryPage() {
     citiesByState: {} 
   });
   const [loadingLocations, setLoadingLocations] = useState(true);
+  const [activeFilterBox, setActiveFilterBox] = useState<string | null>(null); // 'search' | 'location' | 'purpose' | 'raceTraining'
 
   useEffect(() => {
     fetchAvailableLocations();
@@ -186,8 +187,6 @@ export default function RunCrewDiscoveryPage() {
     }
     return undefined;
   };
-
-  const [activeFilterBox, setActiveFilterBox] = useState<string | null>(null); // 'search' | 'location' | 'purpose' | 'raceTraining'
 
   const fetchRunCrews = async () => {
     try {

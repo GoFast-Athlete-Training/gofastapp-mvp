@@ -23,12 +23,13 @@ export async function GET() {
       distinct: ['city', 'state'],
     });
 
-    // Extract unique states
+    // Extract unique states (convert enum to string)
     const states = Array.from(
       new Set(
         crews
           .map((crew) => crew.state)
-          .filter((state): state is string => state !== null && state.trim() !== '')
+          .filter((state): state is NonNullable<typeof state> => state !== null)
+          .map((state) => String(state))
           .sort()
       )
     );
@@ -37,11 +38,12 @@ export async function GET() {
     const citiesByState: { [state: string]: string[] } = {};
     crews.forEach((crew) => {
       if (crew.city && crew.state) {
-        if (!citiesByState[crew.state]) {
-          citiesByState[crew.state] = [];
+        const stateKey = String(crew.state);
+        if (!citiesByState[stateKey]) {
+          citiesByState[stateKey] = [];
         }
-        if (!citiesByState[crew.state].includes(crew.city)) {
-          citiesByState[crew.state].push(crew.city);
+        if (!citiesByState[stateKey].includes(crew.city)) {
+          citiesByState[stateKey].push(crew.city);
         }
       }
     });
