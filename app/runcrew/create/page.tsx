@@ -8,7 +8,6 @@ import { X, ImageIcon, Plus, Camera } from 'lucide-react';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import GooglePlacesAutocomplete from '@/components/RunCrew/GooglePlacesAutocomplete';
-import { formatPaceInput, validatePaceFormat, paceToSeconds } from '@/utils/formatPace';
 import TopNav from '@/components/shared/TopNav';
 
 // US States + DC for dropdown
@@ -91,8 +90,10 @@ export default function CreateCrewPage() {
     description: '',
     city: '',
     state: '',
-    easyMilesPace: '',
-    crushingItPace: '',
+    easyMilesPaceMinutes: '',
+    easyMilesPaceSeconds: '',
+    crushingItPaceMinutes: '',
+    crushingItPaceSeconds: '',
     gender: '',
     ageMin: '',
     ageMax: '',
@@ -108,6 +109,12 @@ export default function CreateCrewPage() {
     longRunMilesMax: '',
     trainingForRace: '',
   });
+
+  // Refs for pace inputs to enable auto-advancing
+  const easyMinutesRef = useRef<HTMLInputElement>(null);
+  const easySecondsRef = useRef<HTMLInputElement>(null);
+  const crushingMinutesRef = useRef<HTMLInputElement>(null);
+  const crushingSecondsRef = useRef<HTMLInputElement>(null);
 
   // Race picker state (shown when Training purpose is selected)
   const [raceSearchQuery, setRaceSearchQuery] = useState('');
@@ -338,18 +345,14 @@ export default function CreateCrewPage() {
       return;
     }
 
-    // Validate pace formats before submitting
-    if (formData.easyMilesPace && !validatePaceFormat(formData.easyMilesPace)) {
-      setError('Easy Miles pace must be in MM:SS format (e.g., 8:00)');
-      setLoading(false);
-      return;
-    }
+    // Combine pace minutes and seconds into MM:SS format
+    const easyMilesPace = formData.easyMilesPaceMinutes && formData.easyMilesPaceSeconds
+      ? `${formData.easyMilesPaceMinutes.padStart(2, '0')}:${formData.easyMilesPaceSeconds.padStart(2, '0')}`
+      : undefined;
 
-    if (formData.crushingItPace && !validatePaceFormat(formData.crushingItPace)) {
-      setError('Crushing It pace must be in MM:SS format (e.g., 7:00)');
-      setLoading(false);
-      return;
-    }
+    const crushingItPace = formData.crushingItPaceMinutes && formData.crushingItPaceSeconds
+      ? `${formData.crushingItPaceMinutes.padStart(2, '0')}:${formData.crushingItPaceSeconds.padStart(2, '0')}`
+      : undefined;
 
     setLoading(true);
 
@@ -363,11 +366,11 @@ export default function CreateCrewPage() {
         icon: icon || null,
         city: formData.city || undefined,
         state: formData.state || undefined,
-        easyMilesPace: formData.easyMilesPace || undefined,
-        crushingItPace: formData.crushingItPace || undefined,
+        easyMilesPace: easyMilesPace,
+        crushingItPace: crushingItPace,
         gender: formData.gender || undefined,
-        ageMin: formData.ageMin ? parseInt(formData.ageMin) : undefined,
-        ageMax: formData.ageMax ? parseInt(formData.ageMax) : undefined,
+        ageMin: formData.ageMin && formData.ageMin !== '' ? parseInt(formData.ageMin, 10) : undefined,
+        ageMax: formData.ageMax && formData.ageMax !== '' ? parseInt(formData.ageMax, 10) : undefined,
         primaryMeetUpPoint: formData.primaryMeetUpPoint || undefined,
         primaryMeetUpAddress: formData.primaryMeetUpAddress || undefined,
         primaryMeetUpPlaceId: formData.primaryMeetUpPlaceId || undefined,
@@ -657,38 +660,130 @@ export default function CreateCrewPage() {
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Pace
             </label>
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Easy Miles</label>
-                <input
-                  type="text"
-                  value={formData.easyMilesPace}
-                  onChange={(e) => {
-                    const formatted = formatPaceInput(e.target.value);
-                    setFormData({ ...formData, easyMilesPace: formatted });
-                    setError(null);
-                  }}
-                  placeholder="8:00"
-                  className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition font-mono"
-                  disabled={loading}
-                />
-                <p className="text-xs text-gray-500 mt-1">Format: MM:SS (e.g., 8:00, 9:30)</p>
+                <label className="block text-xs text-gray-600 mb-2">Easy Miles</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-500 mb-1">Minutes</label>
+                    <input
+                      ref={easyMinutesRef}
+                      type="number"
+                      min="0"
+                      max="59"
+                      value={formData.easyMilesPaceMinutes}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        if (val === '' || (parseInt(val) >= 0 && parseInt(val) <= 59)) {
+                          setFormData({ ...formData, easyMilesPaceMinutes: val });
+                          setError(null);
+                          // Auto-advance to seconds when 2 digits entered
+                          if (val.length === 2 && easySecondsRef.current) {
+                            easySecondsRef.current.focus();
+                          }
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if ((e.key === 'Tab' || e.key === 'Enter') && !e.shiftKey && easySecondsRef.current) {
+                          e.preventDefault();
+                          easySecondsRef.current.focus();
+                        }
+                      }}
+                      placeholder="8"
+                      className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition text-center"
+                      disabled={loading}
+                    />
+                  </div>
+                  <div className="pt-6 text-xl font-bold text-gray-400">:</div>
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-500 mb-1">Seconds</label>
+                    <input
+                      ref={easySecondsRef}
+                      type="number"
+                      min="0"
+                      max="59"
+                      value={formData.easyMilesPaceSeconds}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        if (val === '' || (parseInt(val) >= 0 && parseInt(val) <= 59)) {
+                          setFormData({ ...formData, easyMilesPaceSeconds: val });
+                          setError(null);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Tab' && e.shiftKey && easyMinutesRef.current) {
+                          e.preventDefault();
+                          easyMinutesRef.current.focus();
+                        }
+                      }}
+                      placeholder="00"
+                      className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition text-center"
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Crushing It</label>
-                <input
-                  type="text"
-                  value={formData.crushingItPace}
-                  onChange={(e) => {
-                    const formatted = formatPaceInput(e.target.value);
-                    setFormData({ ...formData, crushingItPace: formatted });
-                    setError(null);
-                  }}
-                  placeholder="7:00"
-                  className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition font-mono"
-                  disabled={loading}
-                />
-                <p className="text-xs text-gray-500 mt-1">Format: MM:SS (e.g., 7:00, 6:30)</p>
+                <label className="block text-xs text-gray-600 mb-2">Crushing It</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-500 mb-1">Minutes</label>
+                    <input
+                      ref={crushingMinutesRef}
+                      type="number"
+                      min="0"
+                      max="59"
+                      value={formData.crushingItPaceMinutes}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        if (val === '' || (parseInt(val) >= 0 && parseInt(val) <= 59)) {
+                          setFormData({ ...formData, crushingItPaceMinutes: val });
+                          setError(null);
+                          // Auto-advance to seconds when 2 digits entered
+                          if (val.length === 2 && crushingSecondsRef.current) {
+                            crushingSecondsRef.current.focus();
+                          }
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if ((e.key === 'Tab' || e.key === 'Enter') && !e.shiftKey && crushingSecondsRef.current) {
+                          e.preventDefault();
+                          crushingSecondsRef.current.focus();
+                        }
+                      }}
+                      placeholder="7"
+                      className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition text-center"
+                      disabled={loading}
+                    />
+                  </div>
+                  <div className="pt-6 text-xl font-bold text-gray-400">:</div>
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-500 mb-1">Seconds</label>
+                    <input
+                      ref={crushingSecondsRef}
+                      type="number"
+                      min="0"
+                      max="59"
+                      value={formData.crushingItPaceSeconds}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        if (val === '' || (parseInt(val) >= 0 && parseInt(val) <= 59)) {
+                          setFormData({ ...formData, crushingItPaceSeconds: val });
+                          setError(null);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Tab' && e.shiftKey && crushingMinutesRef.current) {
+                          e.preventDefault();
+                          crushingMinutesRef.current.focus();
+                        }
+                      }}
+                      placeholder="00"
+                      className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition text-center"
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -757,14 +852,16 @@ export default function CreateCrewPage() {
                 <label className="block text-xs text-gray-600 mb-1">Min Age</label>
                 <input
                   type="number"
-                  value={formData.ageMin}
+                  value={formData.ageMin === '' ? '' : formData.ageMin}
                   onChange={(e) => {
-                    setFormData({ ...formData, ageMin: e.target.value });
+                    const value = e.target.value;
+                    setFormData({ ...formData, ageMin: value === '' ? '' : value });
                     setError(null);
                   }}
                   className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
                   min="0"
                   max="120"
+                  placeholder="18"
                   disabled={loading}
                 />
               </div>
@@ -772,14 +869,16 @@ export default function CreateCrewPage() {
                 <label className="block text-xs text-gray-600 mb-1">Max Age</label>
                 <input
                   type="number"
-                  value={formData.ageMax}
+                  value={formData.ageMax === '' ? '' : formData.ageMax}
                   onChange={(e) => {
-                    setFormData({ ...formData, ageMax: e.target.value });
+                    const value = e.target.value;
+                    setFormData({ ...formData, ageMax: value === '' ? '' : value });
                     setError(null);
                   }}
                   className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
                   min="0"
                   max="120"
+                  placeholder="65"
                   disabled={loading}
                 />
               </div>
