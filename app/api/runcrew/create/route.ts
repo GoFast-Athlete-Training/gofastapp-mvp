@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
 import { createCrew } from '@/lib/domain-runcrew';
+import { validatePaceFormat, paceToSeconds } from '@/utils/formatPace';
 
 export async function POST(request: Request) {
   try {
@@ -69,6 +70,36 @@ export async function POST(request: Request) {
       );
     }
 
+    // Validate and convert pace fields from MM:SS to seconds
+    let easyMilesPaceSeconds: number | undefined;
+    let crushingItPaceSeconds: number | undefined;
+
+    if (easyMilesPace) {
+      if (!validatePaceFormat(easyMilesPace)) {
+        return NextResponse.json(
+          { error: 'Easy Miles pace must be in MM:SS format (e.g., 8:00)' },
+          { status: 400 }
+        );
+      }
+      const seconds = paceToSeconds(easyMilesPace);
+      if (seconds !== null) {
+        easyMilesPaceSeconds = seconds;
+      }
+    }
+
+    if (crushingItPace) {
+      if (!validatePaceFormat(crushingItPace)) {
+        return NextResponse.json(
+          { error: 'Crushing It pace must be in MM:SS format (e.g., 7:00)' },
+          { status: 400 }
+        );
+      }
+      const seconds = paceToSeconds(crushingItPace);
+      if (seconds !== null) {
+        crushingItPaceSeconds = seconds;
+      }
+    }
+
     let crew;
     try {
       crew = await createCrew({
@@ -77,8 +108,8 @@ export async function POST(request: Request) {
         athleteId: athlete.id,
         city,
         state,
-        easyMilesPace: easyMilesPace || undefined,
-        crushingItPace: crushingItPace || undefined,
+        easyMilesPace: easyMilesPaceSeconds,
+        crushingItPace: crushingItPaceSeconds,
         gender: gender || undefined,
         ageMin: ageMin ? parseInt(ageMin) : undefined,
         ageMax: ageMax ? parseInt(ageMax) : undefined,

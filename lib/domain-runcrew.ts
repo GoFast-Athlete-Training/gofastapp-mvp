@@ -1,5 +1,6 @@
 import { prisma } from './prisma';
 import { normalizeCrewResponse } from './normalize-prisma';
+import { secondsToPace } from '@/utils/formatPace';
 
 /**
  * Generate a shareable invite link for a RunCrew
@@ -44,8 +45,8 @@ export async function createCrew(data: {
   athleteId: string;
   city?: string;
   state?: string;
-  easyMilesPace?: string;
-  crushingItPace?: string;
+  easyMilesPace?: number;  // Seconds per mile (e.g., 480 for "8:00")
+  crushingItPace?: number;  // Seconds per mile (e.g., 420 for "7:00")
   gender?: string;
   ageMin?: number;
   ageMax?: number;
@@ -273,21 +274,26 @@ export async function getDiscoverableRunCrews(options?: {
   });
 
   // Format response with public-safe data
-  return crews.map((crew) => ({
-    id: crew.id,
-    name: crew.name,
-    description: crew.description,
-    logo: crew.logo,
-    icon: crew.icon,
-    city: crew.city,
-    state: crew.state,
-    easyMilesPace: crew.easyMilesPace,
-    crushingItPace: crew.crushingItPace,
-    paceRange: crew.easyMilesPace && crew.crushingItPace
-      ? `Easy: ${crew.easyMilesPace} | Tempo: ${crew.crushingItPace}`
-      : crew.easyMilesPace || crew.crushingItPace
-      ? `${crew.easyMilesPace || crew.crushingItPace} min/mile`
-      : null,
+  // Convert pace from seconds to MM:SS format for display
+  return crews.map((crew) => {
+    const easyPaceFormatted = secondsToPace(crew.easyMilesPace);
+    const crushingPaceFormatted = secondsToPace(crew.crushingItPace);
+    
+    return {
+      id: crew.id,
+      name: crew.name,
+      description: crew.description,
+      logo: crew.logo,
+      icon: crew.icon,
+      city: crew.city,
+      state: crew.state,
+      easyMilesPace: easyPaceFormatted,  // Convert to MM:SS for display
+      crushingItPace: crushingPaceFormatted,  // Convert to MM:SS for display
+      paceRange: easyPaceFormatted && crushingPaceFormatted
+        ? `Easy: ${easyPaceFormatted} | Tempo: ${crushingPaceFormatted}`
+        : easyPaceFormatted || crushingPaceFormatted
+        ? `${easyPaceFormatted || crushingPaceFormatted} min/mile`
+        : null,
     gender: crew.gender,
     ageRange: crew.ageMin && crew.ageMax
       ? `${crew.ageMin}-${crew.ageMax}`

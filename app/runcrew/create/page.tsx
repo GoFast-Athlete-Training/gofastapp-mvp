@@ -4,11 +4,12 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { X, ImageIcon, Plus, Camera } from 'lucide-react';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import GooglePlacesAutocomplete from '@/components/RunCrew/GooglePlacesAutocomplete';
+import { formatPaceInput, validatePaceFormat, paceToSeconds } from '@/utils/formatPace';
+import TopNav from '@/components/shared/TopNav';
 
 // US States + DC for dropdown
 const US_STATES = [
@@ -188,9 +189,24 @@ export default function CreateCrewPage() {
       return;
     }
 
+    // Validate pace formats before submitting
+    if (formData.easyMilesPace && !validatePaceFormat(formData.easyMilesPace)) {
+      setError('Easy Miles pace must be in MM:SS format (e.g., 8:00)');
+      setLoading(false);
+      return;
+    }
+
+    if (formData.crushingItPace && !validatePaceFormat(formData.crushingItPace)) {
+      setError('Crushing It pace must be in MM:SS format (e.g., 7:00)');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
 
     try {
+      // Convert pace from MM:SS to seconds before sending
+      // The API will validate and convert, but we can do it here too for consistency
       const response = await api.post('/runcrew/create', {
         name: formData.name,
         description: formData.description,
@@ -287,32 +303,7 @@ export default function CreateCrewPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 to-sky-100">
-      {/* Header */}
-      <div className="bg-white shadow-sm">
-        <div className="max-w-2xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <button 
-              onClick={() => router.push('/runcrew')} 
-              className="text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <div className="flex items-center space-x-2">
-              <Image 
-                src="/logo.jpg" 
-                alt="GoFast" 
-                width={24}
-                height={24}
-                className="w-6 h-6 rounded-full"
-              />
-              <span className="font-bold text-gray-900">GoFast</span>
-            </div>
-            <div></div>
-          </div>
-        </div>
-      </div>
+      <TopNav showBack={true} backUrl="/runcrew" backLabel="Back to Discovery" />
 
       <div className="max-w-2xl mx-auto px-6 py-12">
         {/* Header */}
@@ -521,12 +512,15 @@ export default function CreateCrewPage() {
                   type="text"
                   value={formData.easyMilesPace}
                   onChange={(e) => {
-                    setFormData({ ...formData, easyMilesPace: e.target.value });
+                    const formatted = formatPaceInput(e.target.value);
+                    setFormData({ ...formData, easyMilesPace: formatted });
                     setError(null);
                   }}
+                  placeholder="8:00"
                   className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition font-mono"
                   disabled={loading}
                 />
+                <p className="text-xs text-gray-500 mt-1">Format: MM:SS (e.g., 8:00, 9:30)</p>
               </div>
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Crushing It</label>
@@ -534,12 +528,15 @@ export default function CreateCrewPage() {
                   type="text"
                   value={formData.crushingItPace}
                   onChange={(e) => {
-                    setFormData({ ...formData, crushingItPace: e.target.value });
+                    const formatted = formatPaceInput(e.target.value);
+                    setFormData({ ...formData, crushingItPace: formatted });
                     setError(null);
                   }}
+                  placeholder="7:00"
                   className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition font-mono"
                   disabled={loading}
                 />
+                <p className="text-xs text-gray-500 mt-1">Format: MM:SS (e.g., 7:00, 6:30)</p>
               </div>
             </div>
           </div>
@@ -798,15 +795,6 @@ export default function CreateCrewPage() {
             ) : (
               'Create RunCrew'
             )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => router.push('/runcrew')}
-            className="w-full text-gray-600 hover:text-gray-800 text-sm font-medium py-2 transition-colors"
-            disabled={loading}
-          >
-            ← Back to RunCrew
           </button>
         </form>
       </div>
