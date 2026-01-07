@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, ImageIcon, Plus, Camera } from 'lucide-react';
 import api from '@/lib/api';
@@ -106,7 +106,25 @@ export default function CreateCrewPage() {
     typicalRunMiles: '',
     longRunMilesMin: '',
     longRunMilesMax: '',
+    trainingForRace: '',
+    trainingForDistance: [] as string[],
   });
+
+  // Race picker state (shown when Training purpose is selected)
+  const [raceSearchQuery, setRaceSearchQuery] = useState('');
+  const [raceSearchResults, setRaceSearchResults] = useState<any[]>([]);
+  const [raceSearching, setRaceSearching] = useState(false);
+  const [showCreateRaceForm, setShowCreateRaceForm] = useState(false);
+  const [creatingRace, setCreatingRace] = useState(false);
+  const [selectedRace, setSelectedRace] = useState<any | null>(null);
+  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+
+  // Create race form state
+  const [newRaceName, setNewRaceName] = useState('');
+  const [newRaceDistance, setNewRaceDistance] = useState('marathon');
+  const [newRaceDate, setNewRaceDate] = useState('');
+  const [newRaceCity, setNewRaceCity] = useState('');
+  const [newRaceState, setNewRaceState] = useState('');
 
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -179,6 +197,115 @@ export default function CreateCrewPage() {
     }
   };
 
+  // Format race date helper
+  function formatRaceDate(dateString: string | Date): string {
+    try {
+      const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+      if (isNaN(date.getTime())) return 'Invalid date';
+      const year = date.getUTCFullYear();
+      const month = date.getUTCMonth() + 1;
+      const day = date.getUTCDate();
+      return `${month}/${day}/${year}`;
+    } catch {
+      return 'Invalid date';
+    }
+  }
+
+  // Race search handler
+  const handleRaceSearch = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setRaceSearchResults([]);
+      return;
+    }
+
+    setRaceSearching(true);
+    try {
+      const response = await api.post('/race/search', { query: query.trim() });
+      if (response.data.success) {
+        setRaceSearchResults(response.data.race_registry || []);
+      } else {
+        setRaceSearchResults([]);
+      }
+    } catch (err: any) {
+      console.error('Race search error:', err);
+      setRaceSearchResults([]);
+    } finally {
+      setRaceSearching(false);
+    }
+  }, []);
+
+  // Debounce race search
+  useEffect(() => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+
+    if (!raceSearchQuery.trim()) {
+      setRaceSearchResults([]);
+      setRaceSearching(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      handleRaceSearch(raceSearchQuery);
+    }, 300);
+
+    setDebounceTimer(timer);
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [raceSearchQuery, handleRaceSearch]);
+
+  // Handle race selection
+  const handleSelectRace = (race: any) => {
+    setSelectedRace(race);
+    setFormData({ ...formData, trainingForRace: race.id });
+    setRaceSearchQuery(race.name);
+    setRaceSearchResults([]);
+    setShowCreateRaceForm(false);
+  };
+
+  // Handle create race
+  const handleCreateRace = async () => {
+    if (!newRaceName || !newRaceDate) {
+      setError('Race name and date are required');
+      return;
+    }
+
+    setCreatingRace(true);
+    setError(null);
+
+    try {
+      const response = await api.post('/race/create', {
+        name: newRaceName,
+        raceType: newRaceDistance,
+        date: newRaceDate,
+        city: newRaceCity || null,
+        state: newRaceState || null,
+        country: 'USA',
+      });
+
+      if (response.data.success && response.data.race) {
+        handleSelectRace(response.data.race);
+        // Reset create form
+        setNewRaceName('');
+        setNewRaceDate('');
+        setNewRaceCity('');
+        setNewRaceState('');
+        setShowCreateRaceForm(false);
+      } else {
+        setError(response.data.error || 'Failed to create race');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to create race');
+    } finally {
+      setCreatingRace(false);
+    }
+  };
+
+  // Check if Training purpose is selected
+  const isTrainingPurposeSelected = formData.purpose.includes('Training');
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -229,6 +356,8 @@ export default function CreateCrewPage() {
         typicalRunMiles: formData.typicalRunMiles ? parseFloat(formData.typicalRunMiles) : undefined,
         longRunMilesMin: formData.longRunMilesMin ? parseFloat(formData.longRunMilesMin) : undefined,
         longRunMilesMax: formData.longRunMilesMax ? parseFloat(formData.longRunMilesMax) : undefined,
+        trainingForRace: formData.trainingForRace || undefined,
+        trainingForDistance: formData.trainingForDistance.length > 0 ? formData.trainingForDistance : undefined,
       });
       
       if (response.data.success) {
@@ -649,6 +778,14 @@ export default function CreateCrewPage() {
                       ? formData.purpose.filter((p) => p !== purposeOption)
                       : [...formData.purpose, purposeOption];
                     setFormData({ ...formData, purpose: newPurpose });
+                    // Clear race selection if Training is deselected
+                    if (purposeOption === 'Training' && formData.purpose.includes('Training')) {
+                      setFormData({ ...formData, purpose: newPurpose, trainingForRace: '', trainingForDistance: [] });
+                      setSelectedRace(null);
+                      setRaceSearchQuery('');
+                    } else {
+                      setFormData({ ...formData, purpose: newPurpose });
+                    }
                     setError(null);
                   }}
                   className={`px-6 py-3 rounded-lg border-2 font-medium transition ${
@@ -663,6 +800,260 @@ export default function CreateCrewPage() {
               ))}
             </div>
           </div>
+
+          {/* Training For Race - Shown when Training purpose is selected */}
+          {isTrainingPurposeSelected && (
+            <div className="bg-sky-50 border-2 border-sky-200 rounded-lg p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Training For Race 🏃‍♂️
+                </label>
+                <p className="text-xs text-gray-600 mb-3">
+                  Select the race your crew is training for (or create a new one)
+                </p>
+
+                {selectedRace ? (
+                  <div className="bg-white border-2 border-sky-500 rounded-lg p-4 mb-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-semibold text-gray-900">{selectedRace.name}</div>
+                        <div className="text-sm text-gray-600">
+                          {selectedRace.raceType?.toUpperCase()} ({selectedRace.miles} miles) • {formatRaceDate(selectedRace.date)}
+                          {selectedRace.city && ` • ${selectedRace.city}, ${selectedRace.state || selectedRace.country}`}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedRace(null);
+                          setFormData({ ...formData, trainingForRace: '' });
+                          setRaceSearchQuery('');
+                        }}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Race Search */}
+                    <div className="relative mb-2">
+                      <input
+                        type="text"
+                        value={raceSearchQuery}
+                        onChange={(e) => setRaceSearchQuery(e.target.value)}
+                        placeholder="Type to search for a race (e.g., Boston Marathon)"
+                        className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-sky-500 focus:outline-none"
+                        disabled={loading}
+                      />
+                      {raceSearching && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-sky-500"></div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Search Results Dropdown */}
+                    {raceSearchQuery.trim() && raceSearchResults.length > 0 && (
+                      <div className="border-2 border-gray-200 rounded-lg bg-white max-h-64 overflow-y-auto mb-3">
+                        {raceSearchResults.map((race) => (
+                          <button
+                            key={race.id}
+                            type="button"
+                            onClick={() => handleSelectRace(race)}
+                            className="w-full text-left p-4 hover:bg-sky-50 border-b border-gray-100 last:border-b-0"
+                          >
+                            <div className="font-semibold text-gray-900">{race.name}</div>
+                            <div className="text-sm text-gray-600">
+                              {race.raceType?.toUpperCase()} ({race.miles} miles) • {formatRaceDate(race.date)}
+                              {race.city && ` • ${race.city}, ${race.state || race.country}`}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* No Results / Create New */}
+                    {raceSearchQuery.trim() && !raceSearching && raceSearchResults.length === 0 && raceSearchQuery.length >= 2 && (
+                      <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-3">
+                        <p className="text-sm text-blue-900 mb-2">No races found</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewRaceName(raceSearchQuery.trim());
+                            setShowCreateRaceForm(true);
+                          }}
+                          className="w-full bg-sky-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-sky-600 transition"
+                        >
+                          Create "{raceSearchQuery.trim()}"
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Divider */}
+                    {!showCreateRaceForm && (
+                      <div className="flex items-center gap-4 my-4">
+                        <div className="flex-1 h-px bg-gray-300"></div>
+                        <span className="text-gray-500 font-semibold text-sm">OR</span>
+                        <div className="flex-1 h-px bg-gray-300"></div>
+                      </div>
+                    )}
+
+                    {/* Create Race Form */}
+                    {showCreateRaceForm ? (
+                      <div className="space-y-4 bg-white rounded-lg p-4 border-2 border-gray-200">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">
+                            Race Name *
+                          </label>
+                          <input
+                            type="text"
+                            value={newRaceName}
+                            onChange={(e) => setNewRaceName(e.target.value)}
+                            placeholder="e.g., Boston Marathon 2025"
+                            className="w-full px-3 py-2 rounded-lg border-2 border-gray-300 focus:border-sky-500 focus:outline-none"
+                            disabled={loading || creatingRace}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">
+                              Distance *
+                            </label>
+                            <select
+                              value={newRaceDistance}
+                              onChange={(e) => setNewRaceDistance(e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg border-2 border-gray-300 focus:border-sky-500 focus:outline-none"
+                              disabled={loading || creatingRace}
+                            >
+                              <option value="5k">5K</option>
+                              <option value="10k">10K</option>
+                              <option value="half">Half Marathon</option>
+                              <option value="marathon">Marathon</option>
+                              <option value="ultra">Ultra</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">
+                              Race Date *
+                            </label>
+                            <input
+                              type="date"
+                              value={newRaceDate}
+                              onChange={(e) => setNewRaceDate(e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg border-2 border-gray-300 focus:border-sky-500 focus:outline-none"
+                              disabled={loading || creatingRace}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">
+                              City
+                            </label>
+                            <input
+                              type="text"
+                              value={newRaceCity}
+                              onChange={(e) => setNewRaceCity(e.target.value)}
+                              placeholder="City"
+                              className="w-full px-3 py-2 rounded-lg border-2 border-gray-300 focus:border-sky-500 focus:outline-none"
+                              disabled={loading || creatingRace}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">
+                              State
+                            </label>
+                            <select
+                              value={newRaceState}
+                              onChange={(e) => setNewRaceState(e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg border-2 border-gray-300 focus:border-sky-500 focus:outline-none"
+                              disabled={loading || creatingRace}
+                            >
+                              <option value="">Select State</option>
+                              {US_STATES.map((state) => (
+                                <option key={state.value} value={state.value}>
+                                  {state.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCreateRaceForm(false);
+                              setNewRaceName('');
+                              setNewRaceDate('');
+                              setNewRaceCity('');
+                              setNewRaceState('');
+                            }}
+                            className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg font-semibold hover:bg-gray-200 transition"
+                            disabled={loading || creatingRace}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCreateRace}
+                            disabled={creatingRace || !newRaceName || !newRaceDate}
+                            className="flex-1 bg-sky-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-sky-600 transition disabled:opacity-50"
+                          >
+                            {creatingRace ? 'Creating...' : 'Create Race'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateRaceForm(true)}
+                        className="w-full bg-white border-2 border-sky-500 text-sky-600 py-3 px-6 rounded-lg font-semibold hover:bg-sky-50 transition"
+                        disabled={loading}
+                      >
+                        + Create New Race
+                      </button>
+                    )}
+                  </>
+                )}
+
+                {/* Training Distance Selection */}
+                {selectedRace && (
+                  <div className="mt-4">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Training Distances
+                    </label>
+                    <div className="flex gap-2 flex-wrap">
+                      {(['FiveK', 'TenK', 'HalfMarathon', 'Marathon', 'Ultra'] as const).map((distance) => (
+                        <button
+                          key={distance}
+                          type="button"
+                          onClick={() => {
+                            const newDistances = formData.trainingForDistance.includes(distance)
+                              ? formData.trainingForDistance.filter((d) => d !== distance)
+                              : [...formData.trainingForDistance, distance];
+                            setFormData({ ...formData, trainingForDistance: newDistances });
+                          }}
+                          className={`px-4 py-2 rounded-lg border-2 font-medium text-sm transition ${
+                            formData.trainingForDistance.includes(distance)
+                              ? 'bg-sky-600 text-white border-sky-600'
+                              : 'bg-white text-gray-700 border-gray-300 hover:border-sky-500'
+                          } disabled:opacity-50 disabled:cursor-not-allowed`}
+                          disabled={loading}
+                        >
+                          {distance.replace(/([A-Z])/g, ' $1').trim()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Time Preference */}
           <div>

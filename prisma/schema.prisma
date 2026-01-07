@@ -159,6 +159,7 @@ model race_registry {
   updatedAt               DateTime                  @updatedAt
   training_plans          training_plans[]
   run_crew_specific_races run_crew_specific_races[]
+  run_crews_training_for  run_crews[]               @relation("TrainingForRace")
 }
 
 model return_json_formats {
@@ -333,8 +334,8 @@ model run_crews {
   updatedAt               DateTime                  @updatedAt
   messageTopics           Json?
   city                    String?
-  easyMilesPace           Int?    // Seconds per mile (e.g., 480 for "8:00")
-  crushingItPace          Int?    // Seconds per mile (e.g., 420 for "7:00")
+  easyMilesPace           Int? // Seconds per mile (e.g., 480 for "8:00")
+  crushingItPace          Int? // Seconds per mile (e.g., 420 for "7:00")
   ageMin                  Int?
   ageMax                  Int?
   primaryMeetUpPoint      String?
@@ -359,6 +360,7 @@ model run_crews {
   run_crew_memberships    run_crew_memberships[]
   run_crew_messages       run_crew_messages[]
   run_crew_runs           run_crew_runs[]
+  race_registry           race_registry?            @relation("TrainingForRace", fields: [trainingForRace], references: [id], onDelete: SetNull)
 }
 
 model run_crew_specific_races {

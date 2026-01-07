@@ -2,12 +2,12 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import TopNav from '@/components/shared/TopNav';
-import { Search, MapPin, Users, Clock, Target } from 'lucide-react';
+import { Search, MapPin, Users, Clock, Target, X } from 'lucide-react';
 
 interface DiscoverableRunCrew {
   id: string;
@@ -43,12 +43,78 @@ export default function RunCrewDiscoveryPage() {
   const [filterAgeMax, setFilterAgeMax] = useState('');
   const [filterTypicalRunMilesMin, setFilterTypicalRunMilesMin] = useState('');
   const [filterTypicalRunMilesMax, setFilterTypicalRunMilesMax] = useState('');
+  const [filterTrainingForRace, setFilterTrainingForRace] = useState('');
+  const [filterTrainingForDistance, setFilterTrainingForDistance] = useState<string[]>([]);
+  const [raceSearchQuery, setRaceSearchQuery] = useState('');
+  const [raceSearchResults, setRaceSearchResults] = useState<any[]>([]);
+  const [raceSearching, setRaceSearching] = useState(false);
+  const [selectedFilterRace, setSelectedFilterRace] = useState<any | null>(null);
   const [applyingFilters, setApplyingFilters] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     fetchRunCrews();
   }, []);
+
+  // Format race date helper
+  function formatRaceDate(dateString: string | Date): string {
+    try {
+      const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+      if (isNaN(date.getTime())) return 'Invalid date';
+      const year = date.getUTCFullYear();
+      const month = date.getUTCMonth() + 1;
+      const day = date.getUTCDate();
+      return `${month}/${day}/${year}`;
+    } catch {
+      return 'Invalid date';
+    }
+  }
+
+  // Race search handler
+  const handleRaceSearch = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setRaceSearchResults([]);
+      return;
+    }
+
+    setRaceSearching(true);
+    try {
+      const response = await api.post('/race/search', { query: query.trim() });
+      if (response.data.success) {
+        setRaceSearchResults(response.data.race_registry || []);
+      } else {
+        setRaceSearchResults([]);
+      }
+    } catch (err: any) {
+      console.error('Race search error:', err);
+      setRaceSearchResults([]);
+    } finally {
+      setRaceSearching(false);
+    }
+  }, []);
+
+  // Debounce race search
+  useEffect(() => {
+    if (!raceSearchQuery.trim()) {
+      setRaceSearchResults([]);
+      setRaceSearching(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      handleRaceSearch(raceSearchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [raceSearchQuery, handleRaceSearch]);
+
+  // Handle race selection for filter
+  const handleSelectFilterRace = (race: any) => {
+    setSelectedFilterRace(race);
+    setFilterTrainingForRace(race.id);
+    setRaceSearchQuery(race.name);
+    setRaceSearchResults([]);
+  };
 
   // Convert pace from MM:SS to seconds
   const convertPaceToSeconds = (paceStr: string): number | undefined => {
@@ -88,6 +154,10 @@ export default function RunCrewDiscoveryPage() {
       // Typical run miles filters
       if (filterTypicalRunMilesMin) params.append('typicalRunMilesMin', filterTypicalRunMilesMin);
       if (filterTypicalRunMilesMax) params.append('typicalRunMilesMax', filterTypicalRunMilesMax);
+      
+      // Training filters
+      if (filterTrainingForRace) params.append('trainingForRace', filterTrainingForRace);
+      filterTrainingForDistance.forEach(d => params.append('trainingForDistance', d));
       
       const response = await api.get(`/runcrew/discover?${params.toString()}`);
       
@@ -230,11 +300,17 @@ export default function RunCrewDiscoveryPage() {
                       key={purpose}
                       type="button"
                       onClick={() => {
-                        setFilterPurpose(
-                          filterPurpose.includes(purpose)
-                            ? filterPurpose.filter((p) => p !== purpose)
-                            : [...filterPurpose, purpose]
-                        );
+                        const newPurpose = filterPurpose.includes(purpose)
+                          ? filterPurpose.filter((p) => p !== purpose)
+                          : [...filterPurpose, purpose];
+                        setFilterPurpose(newPurpose);
+                        // Clear race filter if Training is deselected
+                        if (purpose === 'Training' && filterPurpose.includes('Training')) {
+                          setFilterTrainingForRace('');
+                          setFilterTrainingForDistance([]);
+                          setSelectedFilterRace(null);
+                          setRaceSearchQuery('');
+                        }
                       }}
                       className={`px-4 py-2 rounded-lg border-2 font-medium transition ${
                         filterPurpose.includes(purpose)
@@ -247,6 +323,115 @@ export default function RunCrewDiscoveryPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Training For Race Filter - Shown when Training purpose is selected */}
+              {filterPurpose.includes('Training') && (
+                <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-4 space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                      Training For Race 🏃‍♂️
+                    </h3>
+                    <p className="text-xs text-gray-600 mb-3">
+                      Filter crews training for a specific race
+                    </p>
+
+                    {selectedFilterRace ? (
+                      <div className="bg-white border-2 border-orange-500 rounded-lg p-3 mb-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-semibold text-gray-900 text-sm">{selectedFilterRace.name}</div>
+                            <div className="text-xs text-gray-600">
+                              {selectedFilterRace.raceType?.toUpperCase()} ({selectedFilterRace.miles} miles) • {formatRaceDate(selectedFilterRace.date)}
+                              {selectedFilterRace.city && ` • ${selectedFilterRace.city}, ${selectedFilterRace.state || selectedFilterRace.country}`}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedFilterRace(null);
+                              setFilterTrainingForRace('');
+                              setRaceSearchQuery('');
+                            }}
+                            className="text-red-500 hover:text-red-700 ml-2"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={raceSearchQuery}
+                          onChange={(e) => setRaceSearchQuery(e.target.value)}
+                          placeholder="Search for a race (e.g., Boston Marathon)"
+                          className="w-full px-4 py-2 rounded-lg border-2 border-gray-300 focus:border-orange-500 focus:outline-none text-sm"
+                        />
+                        {raceSearching && (
+                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500"></div>
+                          </div>
+                        )}
+
+                        {/* Search Results Dropdown */}
+                        {raceSearchQuery.trim() && raceSearchResults.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 border-2 border-gray-200 rounded-lg bg-white max-h-48 overflow-y-auto shadow-lg">
+                            {raceSearchResults.map((race) => (
+                              <button
+                                key={race.id}
+                                type="button"
+                                onClick={() => handleSelectFilterRace(race)}
+                                className="w-full text-left p-3 hover:bg-orange-50 border-b border-gray-100 last:border-b-0"
+                              >
+                                <div className="font-semibold text-gray-900 text-sm">{race.name}</div>
+                                <div className="text-xs text-gray-600">
+                                  {race.raceType?.toUpperCase()} ({race.miles} miles) • {formatRaceDate(race.date)}
+                                  {race.city && ` • ${race.city}, ${race.state || race.country}`}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* No Results */}
+                        {raceSearchQuery.trim() && !raceSearching && raceSearchResults.length === 0 && raceSearchQuery.length >= 2 && (
+                          <div className="mt-2 bg-blue-50 border-2 border-blue-200 rounded-lg p-3">
+                            <p className="text-xs text-blue-900">No races found. Try a different search term.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Training Distance Filter */}
+                    <div className="mt-3">
+                      <label className="block text-xs font-semibold text-gray-700 mb-2">
+                        Training Distances
+                      </label>
+                      <div className="flex gap-2 flex-wrap">
+                        {(['FiveK', 'TenK', 'HalfMarathon', 'Marathon', 'Ultra'] as const).map((distance) => (
+                          <button
+                            key={distance}
+                            type="button"
+                            onClick={() => {
+                              const newDistances = filterTrainingForDistance.includes(distance)
+                                ? filterTrainingForDistance.filter((d) => d !== distance)
+                                : [...filterTrainingForDistance, distance];
+                              setFilterTrainingForDistance(newDistances);
+                            }}
+                            className={`px-3 py-1.5 rounded-lg border-2 font-medium text-xs transition ${
+                              filterTrainingForDistance.includes(distance)
+                                ? 'bg-orange-500 text-white border-orange-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:border-orange-500'
+                            }`}
+                          >
+                            {distance.replace(/([A-Z])/g, ' $1').trim()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Time Preference Filter */}
               <div>

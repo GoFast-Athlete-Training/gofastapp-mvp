@@ -7,16 +7,10 @@
 			"path": "."
 		},
 		{
-			"path": "../../Ignite/eventscrm-backend"
-		},
-		{
-			"path": "../../Ignite/ignitestrategescrm-frontend"
-		},
-		{
-			"path": "../gofast-user-dashboard"
-		},
-		{
 			"path": "../gofastbackendv2-fall2025"
+		},
+		{
+			"path": "../trainingmvp"
 		}
 	],
 	"settings": {}
