@@ -294,22 +294,23 @@ export async function getDiscoverableRunCrews(options?: {
         : easyPaceFormatted || crushingPaceFormatted
         ? `${easyPaceFormatted || crushingPaceFormatted} min/mile`
         : null,
-    gender: crew.gender,
-    ageRange: crew.ageMin && crew.ageMax
-      ? `${crew.ageMin}-${crew.ageMax}`
-      : crew.ageMin
-      ? `${crew.ageMin}+`
-      : crew.ageMax
-      ? `Up to ${crew.ageMax}`
-      : null,
-    primaryMeetUpPoint: crew.primaryMeetUpPoint,
-    primaryMeetUpAddress: crew.primaryMeetUpAddress,
-    purpose: crew.purpose,
-    timePreference: crew.timePreference,
-    typicalRunMiles: crew.typicalRunMiles,
-    memberCount: crew._count.run_crew_memberships,
-    createdAt: crew.createdAt,
-  }));
+      gender: crew.gender,
+      ageRange: crew.ageMin && crew.ageMax
+        ? `${crew.ageMin}-${crew.ageMax}`
+        : crew.ageMin
+        ? `${crew.ageMin}+`
+        : crew.ageMax
+        ? `Up to ${crew.ageMax}`
+        : null,
+      primaryMeetUpPoint: crew.primaryMeetUpPoint,
+      primaryMeetUpAddress: crew.primaryMeetUpAddress,
+      purpose: crew.purpose,
+      timePreference: crew.timePreference,
+      typicalRunMiles: crew.typicalRunMiles,
+      memberCount: crew._count.run_crew_memberships,
+      createdAt: crew.createdAt,
+    };
+  });
 }
 
 export async function getCrewById(runCrewId: string) {
