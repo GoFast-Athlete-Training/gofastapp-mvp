@@ -1,0 +1,195 @@
+'use client';
+
+export const dynamic = 'force-dynamic';
+
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import api from '@/lib/api';
+
+/**
+ * Join-Crew Explainer Page
+ * 
+ * Route: /join/runcrew/[handle]/signup
+ * 
+ * Purpose: Explain why signup is required before joining
+ * - Acknowledge user intent to join
+ * - Explain community protection
+ * - Set expectations
+ * - Route to signup with join-crew mode
+ */
+export default function JoinCrewSignupExplainerPage() {
+  const params = useParams();
+  const router = useRouter();
+  const handle = params.handle as string;
+
+  const [crew, setCrew] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!handle) {
+      setError('Missing handle');
+      setLoading(false);
+      return;
+    }
+
+    async function fetchCrew() {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/runcrew/public/handle/${handle}`);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error('not_found');
+          }
+          throw new Error('Failed to fetch crew');
+        }
+
+        const data = await response.json();
+        if (!data.success || !data.runCrew) {
+          throw new Error('Crew not found');
+        }
+
+        setCrew(data.runCrew);
+        setLoading(false);
+      } catch (err: any) {
+        console.error('❌ EXPLAINER: Error fetching crew:', err);
+        if (err.message === 'not_found') {
+          setError('not_found');
+        } else {
+          setError('error');
+        }
+        setLoading(false);
+      }
+    }
+
+    fetchCrew();
+  }, [handle]);
+
+  const handleSignUp = () => {
+    // Store join intent
+    localStorage.setItem('runCrewJoinIntent', crew.id);
+    localStorage.setItem('runCrewJoinIntentHandle', handle);
+    
+    // Route to signup with join-crew mode
+    router.push(`/signup?mode=join-crew&handle=${handle}`);
+  };
+
+  const handleNotNow = () => {
+    // Clear any existing intent and go back to front door
+    localStorage.removeItem('runCrewJoinIntent');
+    localStorage.removeItem('runCrewJoinIntentHandle');
+    router.push(`/join/runcrew/${handle}`);
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error states
+  if (error === 'not_found') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md w-full bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">RunCrew Not Found</h2>
+          <p className="text-gray-600 mb-4">The RunCrew you're looking for doesn't exist.</p>
+          <Link
+            href="/runcrew"
+            className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+          >
+            Back to RunCrews
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !crew) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md w-full bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Error</h2>
+          <p className="text-gray-600 mb-4">Failed to load RunCrew data.</p>
+          <Link
+            href="/runcrew"
+            className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+          >
+            Back to RunCrews
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full">
+        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
+          <div className="text-center mb-6">
+            {/* Crew Icon/Logo */}
+            <div className="flex justify-center mb-4">
+              {crew.logo ? (
+                <img
+                  src={crew.logo}
+                  alt={crew.name || 'RunCrew'}
+                  className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200"
+                />
+              ) : crew.icon ? (
+                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-3xl border-2 border-gray-200">
+                  {crew.icon}
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-3xl border-2 border-gray-200">
+                  🏃
+                </div>
+              )}
+            </div>
+            
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              You're about to join {crew.name}
+            </h1>
+          </div>
+
+          <div className="mb-6 text-left space-y-4 text-gray-700">
+            <p className="text-base leading-relaxed">
+              To protect our community and keep things safe, we ask everyone to create an account before joining a crew.
+            </p>
+            
+            <p className="text-sm font-medium text-gray-900">This helps us:</p>
+            <ul className="text-sm space-y-2 ml-4 list-disc">
+              <li>prevent spam</li>
+              <li>keep runs organized</li>
+              <li>make sure members are real people</li>
+            </ul>
+          </div>
+
+          <div className="space-y-3">
+            <button
+              onClick={handleSignUp}
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold text-lg transition shadow-lg hover:shadow-xl"
+            >
+              Sign me up
+            </button>
+            
+            <button
+              onClick={handleNotNow}
+              className="w-full bg-gray-200 hover:bg-gray-300 text-gray-900 px-6 py-3 rounded-xl font-semibold text-lg transition"
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+

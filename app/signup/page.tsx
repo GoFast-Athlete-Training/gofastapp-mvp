@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -11,6 +11,8 @@ import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 
 const RUNCREW_JOIN_INTENT_HANDLE_KEY = 'runCrewJoinIntentHandle';
+
+type SignupMode = 'default' | 'join-crew';
 
 /**
  * Check if user has a pending RunCrew join intent
@@ -32,6 +34,12 @@ function redirectToFrontDoorIfIntent(router: any): boolean {
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // Detect signup mode from URL params
+  const mode: SignupMode = (searchParams?.get('mode') === 'join-crew') ? 'join-crew' : 'default';
+  const runCrewHandle = searchParams?.get('handle') || null;
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -45,6 +53,23 @@ export default function SignupPage() {
     password: '',
     confirmPassword: '',
   });
+  
+  // Fetch crew name for join-crew mode
+  const [crewName, setCrewName] = useState<string | null>(null);
+  
+  useEffect(() => {
+    if (mode === 'join-crew' && runCrewHandle) {
+      // Fetch crew name for display
+      fetch(`/api/runcrew/public/handle/${runCrewHandle}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.runCrew) {
+            setCrewName(data.runCrew.name);
+          }
+        })
+        .catch(err => console.error('Error fetching crew name:', err));
+    }
+  }, [mode, runCrewHandle]);
 
   // Check if user is already authenticated on page load
   useEffect(() => {
@@ -79,7 +104,12 @@ export default function SignupPage() {
               // Check for pending crew join intent - redirect to front door (NO auto-join)
               if (redirectToFrontDoorIfIntent(router)) return;
               
-              router.push('/welcome');
+              // Join-crew mode: redirect to front door, default: redirect to welcome
+              if (mode === 'join-crew' && runCrewHandle) {
+                router.push(`/join/runcrew/${runCrewHandle}`);
+              } else {
+                router.push('/welcome');
+              }
               return;
             }
           } catch (hydrateErr: any) {
@@ -98,8 +128,10 @@ export default function SignupPage() {
               // Check for pending crew join intent - redirect to front door (NO auto-join)
               if (redirectToFrontDoorIfIntent(router)) return;
 
-              // Route based on profile completion
-              if (athlete.data?.gofastHandle) {
+              // Join-crew mode: redirect to front door, default: route based on profile
+              if (mode === 'join-crew' && runCrewHandle) {
+                router.replace(`/join/runcrew/${runCrewHandle}`);
+              } else if (athlete.data?.gofastHandle) {
                 router.replace('/welcome');
               } else {
                 router.replace('/athlete-create-profile');
@@ -161,7 +193,12 @@ export default function SignupPage() {
           // Check for pending crew join intent - redirect to front door (NO auto-join)
           if (redirectToFrontDoorIfIntent(router)) return;
           
-          router.push('/welcome');
+          // Join-crew mode: redirect to front door, default: redirect to welcome
+          if (mode === 'join-crew' && runCrewHandle) {
+            router.push(`/join/runcrew/${runCrewHandle}`);
+          } else {
+            router.push('/welcome');
+          }
           return;
         } else {
           throw createErr; // Re-throw if not a 500 error
@@ -263,7 +300,12 @@ export default function SignupPage() {
           // Check for pending crew join intent - redirect to front door (NO auto-join)
           if (redirectToFrontDoorIfIntent(router)) return;
           
-          router.push('/athlete-create-profile');
+          // Join-crew mode: redirect to front door, default: redirect to profile creation
+          if (mode === 'join-crew' && runCrewHandle) {
+            router.push(`/join/runcrew/${runCrewHandle}`);
+          } else {
+            router.push('/athlete-create-profile');
+          }
           return;
         } else {
           throw createErr; // Re-throw if not a 500 error
@@ -385,8 +427,10 @@ export default function SignupPage() {
       // Check for pending crew join intent - redirect to front door (NO auto-join)
       if (redirectToFrontDoorIfIntent(router)) return;
 
-      // Route based on profile completion (check gofastHandle - key indicator)
-      if (athlete.data?.gofastHandle) {
+      // Join-crew mode: redirect to front door, default: route based on profile
+      if (mode === 'join-crew' && runCrewHandle) {
+        router.replace(`/join/runcrew/${runCrewHandle}`);
+      } else if (athlete.data?.gofastHandle) {
         console.log('✅ SIGNIN: Existing athlete with profile → Welcome');
         router.replace('/welcome');
       } else {
@@ -437,10 +481,18 @@ export default function SignupPage() {
             priority
           />
           <h1 className="text-4xl font-bold text-white mb-2">
-            {authMode === 'signup' ? 'Welcome to GoFast!' : 'Welcome Back!'}
+            {mode === 'join-crew' && crewName
+              ? `Join ${crewName}`
+              : authMode === 'signup'
+              ? 'Welcome to GoFast!'
+              : 'Welcome Back!'}
           </h1>
           <p className="text-xl text-white/80 mb-8">
-            {authMode === 'signup' ? 'Join the community!' : 'Sign in to continue'}
+            {mode === 'join-crew'
+              ? 'Create your account to join this crew'
+              : authMode === 'signup'
+              ? 'Join the community!'
+              : 'Sign in to continue'}
           </p>
         </div>
 
@@ -608,5 +660,20 @@ export default function SignupPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-xl text-sky-100">Loading...</p>
+        </div>
+      </div>
+    }>
+      <SignupPageContent />
+    </Suspense>
   );
 }

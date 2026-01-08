@@ -141,15 +141,13 @@ export default function RunCrewFrontDoorPage() {
   const handleJoinClick = () => {
     if (!crew) return;
 
-    // Store join intent (both ID and handle for redirect)
-    localStorage.setItem(RUNCREW_JOIN_INTENT_KEY, crew.id);
-    localStorage.setItem(RUNCREW_JOIN_INTENT_HANDLE_KEY, handle);
-
     if (!isAuthenticated) {
-      // Redirect to signup (signup will redirect back here)
-      router.push('/signup');
+      // Route to explainer page (NOT direct signup)
+      router.push(`/join/runcrew/${handle}/signup`);
     } else {
-      // Show confirmation UI
+      // Store join intent and show confirmation UI
+      localStorage.setItem(RUNCREW_JOIN_INTENT_KEY, crew.id);
+      localStorage.setItem(RUNCREW_JOIN_INTENT_HANDLE_KEY, handle);
       setShowJoinConfirmation(true);
     }
   };
@@ -398,7 +396,7 @@ export default function RunCrewFrontDoorPage() {
               onClick={handleJoinClick}
               className="w-full bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold text-lg transition shadow-lg hover:shadow-xl"
             >
-              {isAuthenticated ? 'Join Crew' : 'Sign up to join'}
+              {isAuthenticated ? 'Join Crew' : 'Join this Crew'}
             </button>
           </div>
         </div>
