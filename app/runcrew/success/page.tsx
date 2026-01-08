@@ -154,20 +154,13 @@ function RunCrewSuccessContent() {
             </button>
           </div>
 
-          {/* Action Buttons */}
-          <div className="space-y-3">
+          {/* Action Button */}
+          <div>
             <button
               onClick={handleGoToCentral}
               className="w-full bg-orange-500 text-white py-4 rounded-xl font-bold text-lg hover:bg-orange-600 transition-colors shadow-lg"
             >
-              Go to Run Crew Central
-            </button>
-            
-            <button
-              onClick={() => router.push('/athlete-home')}
-              className="w-full bg-white border-2 border-orange-200 text-gray-900 py-3 rounded-xl font-medium hover:border-orange-400 transition-colors"
-            >
-              Go Back to Athlete Central
+              Head to Your Run Crew
             </button>
           </div>
 
