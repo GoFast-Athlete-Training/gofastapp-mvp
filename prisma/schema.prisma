@@ -51,7 +51,6 @@ model Athlete {
   run_crew_announcements  run_crew_announcements[]
   run_crew_event_rsvps    run_crew_event_rsvps[]
   run_crew_events         run_crew_events[]
-  run_crew_managers       run_crew_managers[]
   run_crew_memberships    run_crew_memberships[]
   run_crew_messages       run_crew_messages[]
   run_crew_run_rsvps      run_crew_run_rsvps[]
@@ -243,17 +242,6 @@ model run_crew_events {
   run_crews            run_crews              @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
 }
 
-model run_crew_managers {
-  id        String    @id
-  runCrewId String
-  athleteId String
-  role      String
-  createdAt DateTime  @default(now())
-  Athlete   Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  run_crews run_crews @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-
-  @@unique([runCrewId, athleteId])
-}
 
 model run_crew_memberships {
   id        String      @id @default(cuid())
@@ -357,7 +345,6 @@ model run_crews {
   run_crew_specific_races run_crew_specific_races[]
   run_crew_announcements  run_crew_announcements[]
   run_crew_events         run_crew_events[]
-  run_crew_managers       run_crew_managers[]
   run_crew_memberships    run_crew_memberships[]
   run_crew_messages       run_crew_messages[]
   run_crew_runs           run_crew_runs[]
