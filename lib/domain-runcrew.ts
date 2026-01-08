@@ -71,31 +71,8 @@ export async function getCrewPublicMetadataByHandle(handle: string) {
     return null;
   }
 
-  // Get leader separately to avoid complex relation query
-  let leader = null;
-  try {
-    const adminManager = await prisma.run_crew_managers.findFirst({
-      where: {
-        runCrewId: crew.id,
-        role: 'admin',
-      },
-      select: {
-        Athlete: {
-          select: {
-            firstName: true,
-            lastName: true,
-            bio: true,
-          },
-        },
-      },
-    });
-    leader = adminManager?.Athlete || null;
-  } catch (err) {
-    // Leader is optional, continue without it
-    console.warn('Could not fetch leader info:', err);
-  }
-
   // Return only public fields
+  // NOTE: Leader info removed for now - will be added via proper hydration pattern
   return {
     id: crew.id,
     handle: crew.handle,
@@ -109,10 +86,7 @@ export async function getCrewPublicMetadataByHandle(handle: string) {
     easyMilesPace: crew.easyMilesPace,
     crushingItPace: crew.crushingItPace,
     purpose: crew.purpose,
-    leader: leader ? {
-      name: `${leader.firstName || ''} ${leader.lastName || ''}`.trim() || 'RunCrew Leader',
-      bio: leader.bio || null,
-    } : null,
+    // leader: removed - see RUNCREW_LEADER_HYDRATION_ANALYSIS.md
   };
 }
 
