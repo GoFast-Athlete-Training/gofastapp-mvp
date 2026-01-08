@@ -9,6 +9,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
+import { secondsToPace } from '@/utils/formatPace';
 
 const RUNCREW_JOIN_INTENT_KEY = 'runCrewJoinIntent';
 const RUNCREW_JOIN_INTENT_HANDLE_KEY = 'runCrewJoinIntentHandle';
@@ -44,6 +45,7 @@ export default function RunCrewFrontDoorPage() {
   const [athleteId, setAthleteId] = useState<string | null>(null);
   const [showJoinConfirmation, setShowJoinConfirmation] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
     if (!handle) {
@@ -265,42 +267,112 @@ export default function RunCrewFrontDoorPage() {
     );
   }
 
+  // Format pace from seconds to MM:SS
+  const easyPace = crew.easyMilesPace ? secondsToPace(crew.easyMilesPace) : null;
+  const crushingPace = crew.crushingItPace ? secondsToPace(crew.crushingItPace) : null;
+  
+  // Format purpose array
+  const purposeDisplay = Array.isArray(crew.purpose) && crew.purpose.length > 0
+    ? crew.purpose.join(', ')
+    : null;
+
   // Card UI (public view)
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50 flex items-center justify-center">
-      <div className="max-w-md w-full px-6">
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full">
         {/* Crew Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
+        <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-200">
           <div className="text-center">
             {/* Crew Logo/Icon */}
-            <div className="flex justify-center mb-6">
+            <div className="flex justify-center mb-4">
               {crew.logo ? (
                 <img
                   src={crew.logo}
                   alt={crew.name || 'RunCrew'}
-                  className="w-24 h-24 rounded-xl object-cover border-2 border-gray-200"
+                  className="w-20 h-20 rounded-xl object-cover border-2 border-gray-200"
                 />
               ) : crew.icon ? (
-                <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-5xl border-2 border-gray-200">
+                <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-4xl border-2 border-gray-200">
                   {crew.icon}
                 </div>
               ) : (
-                <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-5xl border-2 border-gray-200">
+                <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-4xl border-2 border-gray-200">
                   🏃
                 </div>
               )}
             </div>
             
             {/* Crew Name */}
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            <h1 className="text-2xl font-bold text-gray-900 mb-3">
               {crew.name}
             </h1>
             
-            {/* Crew Description */}
-            {crew.description && (
-              <p className="text-gray-600 mb-6">
-                {crew.description}
-              </p>
+            {/* Compact Info */}
+            <div className="space-y-2 mb-4 text-sm text-gray-600">
+              {/* City */}
+              {crew.city && (
+                <div className="flex items-center justify-center gap-1">
+                  <span>📍</span>
+                  <span>{crew.city}{crew.state ? `, ${crew.state}` : ''}</span>
+                </div>
+              )}
+              
+              {/* Purpose */}
+              {purposeDisplay && (
+                <div className="flex items-center justify-center gap-1">
+                  <span>🎯</span>
+                  <span>{purposeDisplay}</span>
+                </div>
+              )}
+              
+              {/* Paces */}
+              {(easyPace || crushingPace) && (
+                <div className="flex items-center justify-center gap-2 text-xs">
+                  {easyPace && (
+                    <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                      Easy: {easyPace}/mi
+                    </span>
+                  )}
+                  {crushingPace && (
+                    <span className="bg-orange-50 text-orange-700 px-2 py-1 rounded">
+                      Tempo: {crushingPace}/mi
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* Expand Details Button */}
+            {(crew.description || crew.leader) && (
+              <button
+                onClick={() => setShowDetails(!showDetails)}
+                className="text-sm text-orange-600 hover:text-orange-700 mb-4 underline"
+              >
+                {showDetails ? 'Hide details' : 'Click for more details'}
+              </button>
+            )}
+            
+            {/* Expanded Details */}
+            {showDetails && (
+              <div className="mb-4 text-left space-y-3 text-sm text-gray-600 border-t pt-4">
+                {/* Description */}
+                {crew.description && (
+                  <div>
+                    <p className="font-medium text-gray-900 mb-1">About</p>
+                    <p>{crew.description}</p>
+                  </div>
+                )}
+                
+                {/* Leader */}
+                {crew.leader && (
+                  <div>
+                    <p className="font-medium text-gray-900 mb-1">Led by {crew.leader.name}</p>
+                    {crew.leader.bio && (
+                      <p className="text-xs">{crew.leader.bio}</p>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
             
             {/* Join Button */}

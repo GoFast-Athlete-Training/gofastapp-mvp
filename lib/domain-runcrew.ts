@@ -58,13 +58,34 @@ export async function getCrewPublicMetadataByHandle(handle: string) {
       logo: true,
       icon: true,
       joinCode: true,
-      // Exclude: memberships, messages, announcements, runs, managers, etc.
+      city: true,
+      state: true,
+      easyMilesPace: true, // Seconds per mile
+      crushingItPace: true, // Seconds per mile
+      purpose: true, // Array of Purpose enum
+      run_crew_managers: {
+        where: { role: 'admin' },
+        take: 1,
+        select: {
+          Athlete: {
+            select: {
+              firstName: true,
+              lastName: true,
+              bio: true,
+            },
+          },
+        },
+      },
+      // Exclude: memberships, messages, announcements, runs, etc.
     },
   });
 
   if (!crew) {
     return null;
   }
+
+  // Get leader (first admin)
+  const leader = crew.run_crew_managers?.[0]?.Athlete;
 
   // Return only public fields
   return {
@@ -75,6 +96,15 @@ export async function getCrewPublicMetadataByHandle(handle: string) {
     logo: crew.logo,
     icon: crew.icon,
     joinCode: crew.joinCode,
+    city: crew.city,
+    state: crew.state,
+    easyMilesPace: crew.easyMilesPace,
+    crushingItPace: crew.crushingItPace,
+    purpose: crew.purpose,
+    leader: leader ? {
+      name: `${leader.firstName || ''} ${leader.lastName || ''}`.trim() || 'RunCrew Leader',
+      bio: leader.bio,
+    } : null,
   };
 }
 
