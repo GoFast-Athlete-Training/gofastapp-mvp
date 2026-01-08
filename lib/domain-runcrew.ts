@@ -64,8 +64,8 @@ export async function getCrewPublicMetadataByHandle(handle: string) {
         easyMilesPace: true, // Seconds per mile
         crushingItPace: true, // Seconds per mile
         purpose: true, // Array of Purpose enum
-        // Include leader via relation (single query)
-        run_crew_managers: {
+        // Include leader via memberships (run_crew_managers is deprecated)
+        run_crew_memberships: {
           where: { role: 'admin' },
           take: 1, // Only need first admin
           select: {
@@ -86,10 +86,10 @@ export async function getCrewPublicMetadataByHandle(handle: string) {
       return null;
     }
 
-    // Extract leader from relation (single query result)
-    // Safely handle: no managers, no admin, or relation failure
-    const leaderManager = crew.run_crew_managers?.[0];
-    const leader = leaderManager?.Athlete || null;
+    // Extract leader from memberships (run_crew_managers is deprecated)
+    // Safely handle: no memberships, no admin, or relation failure
+    const adminMembership = crew.run_crew_memberships?.[0];
+    const leader = adminMembership?.Athlete || null;
 
     // Return only public fields
     return {

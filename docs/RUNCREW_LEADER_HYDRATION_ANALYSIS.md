@@ -46,10 +46,11 @@ The problem isn't the database query itself - it's the **API architecture patter
    - But it's a server-side API endpoint (should be single response)
 
 3. **Foreign Key Resolution**:
-   - Leader is stored in `run_crew_managers` table (junction table)
+   - Leader is stored in `run_crew_memberships` table with `role: 'admin'`
    - Foreign key: `runCrewId` → `run_crews.id`
    - Foreign key: `athleteId` → `athletes.id`
-   - We need to resolve: `runCrewId` → find admin manager → get athlete details
+   - We need to resolve: `runCrewId` → find admin membership → get athlete details
+   - **NOTE**: `run_crew_managers` table is deprecated - use `run_crew_memberships.role` instead
 
 ---
 
@@ -75,7 +76,7 @@ export async function getCrewPublicMetadataByHandle(handle: string) {
       crushingItPace: true,
       purpose: true,
       // Include leader via relation
-      run_crew_managers: {
+      run_crew_memberships: {
         where: { role: 'admin' },
         take: 1,
         select: {
@@ -96,7 +97,7 @@ export async function getCrewPublicMetadataByHandle(handle: string) {
   }
 
   // Extract leader from relation (single query result)
-  const leader = crew.run_crew_managers?.[0]?.Athlete;
+  const leader = crew.run_crew_memberships?.[0]?.Athlete;
 
   return {
     id: crew.id,
@@ -150,7 +151,7 @@ If leader info becomes a performance bottleneck, we could:
 **Status**: ✅ **LIVE** - Not deferred, fully implemented and working
 
 **Implementation Details**:
-- Single query includes `run_crew_managers` relation with `where: { role: 'admin' }`
+- Single query includes `run_crew_memberships` relation with `where: { role: 'admin' }` (run_crew_managers is deprecated)
 - Takes first admin (`take: 1`)
 - Safely extracts leader from relation result
 - Fallback error handling: if relation query fails, retries without leader info
@@ -164,7 +165,7 @@ If leader info becomes a performance bottleneck, we could:
 
 **Testing**:
 - [x] Verified Prisma relation name: `Athlete` (capital A)
-- [x] Verified relation path: `run_crews.run_crew_managers[].Athlete`
+- [x] Verified relation path: `run_crews.run_crew_memberships[].Athlete` (using memberships, not deprecated managers table)
 - [x] Implemented single query with nested relation
 - [x] Added error handling with fallback
 - [x] Front door page updated to display leader info
@@ -186,13 +187,13 @@ model run_crews {
   run_crew_managers       run_crew_managers[]
 }
 
-model run_crew_managers {
-  id        String    @id
+model run_crew_memberships {
+  id        String      @id @default(cuid())
   runCrewId String
   athleteId String
-  role      String
-  Athlete   Athlete   @relation(fields: [athleteId], references: [id])
-  run_crews run_crews @relation(fields: [runCrewId], references: [id])
+  role      RunCrewRole @default(member) // 'admin', 'manager', or 'member'
+  Athlete   Athlete     @relation(fields: [athleteId], references: [id])
+  run_crews run_crews   @relation(fields: [runCrewId], references: [id])
 }
 
 model Athlete {
@@ -205,8 +206,9 @@ model Athlete {
 ```
 
 **Key Relations**:
-- `run_crews.run_crew_managers` → array of managers
-- `run_crew_managers.Athlete` → athlete details (capital A - Prisma relation name)
+- `run_crews.run_crew_memberships` → array of memberships (includes admins via role field)
+- `run_crew_memberships.Athlete` → athlete details (capital A - Prisma relation name)
+- **NOTE**: `run_crew_managers` table is deprecated - roles are now in `run_crew_memberships.role`
 
 ---
 
