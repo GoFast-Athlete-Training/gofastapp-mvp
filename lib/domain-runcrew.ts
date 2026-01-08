@@ -5,19 +5,38 @@ import { secondsToPace } from '@/utils/formatPace';
 /**
  * Generate a shareable invite link for a RunCrew
  * Server-side helper function for generating join links
+ * Adds 'join-' prefix to preserve unique ID logic without slugs
  * 
  * @param runCrewId - The RunCrew ID
- * @returns The join link path: /join/crew/{runCrewId}
+ * @returns The join link path: /join/runcrew/join-{runCrewId}
  * 
  * @example
- * const link = getRunCrewJoinLink('clx123abc');
- * // Returns: '/join/crew/clx123abc'
+ * const link = getRunCrewJoinLink('cmk4nxh0c0001lb04dmyed0qy');
+ * // Returns: '/join/runcrew/join-cmk4nxh0c0001lb04dmyed0qy'
  */
 export function getRunCrewJoinLink(runCrewId: string): string {
   if (!runCrewId) {
     throw new Error('runCrewId is required');
   }
-  return `/join/crew/${runCrewId}`;
+  return `/join/runcrew/join-${runCrewId}`;
+}
+
+/**
+ * Decode public join URL to get actual runCrewId
+ * Removes 'join-' prefix from encoded ID
+ * 
+ * @param encodedId - The encoded ID from URL (e.g., 'join-cmk4nxh0c0001lb04dmyed0qy')
+ * @returns The actual runCrewId or null if invalid
+ * 
+ * @example
+ * const runCrewId = decodePublicJoinUrl('join-cmk4nxh0c0001lb04dmyed0qy');
+ * // Returns: 'cmk4nxh0c0001lb04dmyed0qy'
+ */
+export function decodePublicJoinUrl(encodedId: string): string | null {
+  if (!encodedId || !encodedId.startsWith('join-')) {
+    return null;
+  }
+  return encodedId.replace('join-', '');
 }
 
 /**
