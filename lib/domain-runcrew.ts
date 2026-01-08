@@ -74,6 +74,7 @@ export async function getCrewPublicMetadataByHandle(handle: string) {
                 firstName: true,
                 lastName: true,
                 bio: true,
+                photoURL: true,
               },
             },
           },
@@ -108,6 +109,7 @@ export async function getCrewPublicMetadataByHandle(handle: string) {
       leader: leader ? {
         name: `${leader.firstName || ''} ${leader.lastName || ''}`.trim() || 'RunCrew Leader',
         bio: leader.bio || null,
+        photoURL: leader.photoURL || null,
       } : null,
     };
   } catch (error) {

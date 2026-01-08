@@ -363,13 +363,31 @@ export default function RunCrewFrontDoorPage() {
                   </div>
                 )}
                 
-                {/* Leader */}
+                {/* Leader Profile Card */}
                 {crew.leader && (
-                  <div>
-                    <p className="font-medium text-gray-900 mb-1">Led by {crew.leader.name}</p>
-                    {crew.leader.bio && (
-                      <p className="text-xs text-gray-600">{crew.leader.bio}</p>
-                    )}
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div className="flex items-start gap-3">
+                      {/* Leader Photo */}
+                      {crew.leader.photoURL ? (
+                        <img
+                          src={crew.leader.photoURL}
+                          alt={crew.leader.name}
+                          className="w-12 h-12 rounded-full object-cover border-2 border-gray-300"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-lg font-semibold border-2 border-gray-300">
+                          {crew.leader.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      
+                      {/* Leader Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 mb-1">Led by {crew.leader.name}</p>
+                        {crew.leader.bio && (
+                          <p className="text-sm text-gray-600 leading-relaxed">{crew.leader.bio}</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
