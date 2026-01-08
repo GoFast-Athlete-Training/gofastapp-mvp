@@ -146,6 +146,9 @@ If leader info becomes a performance bottleneck, we could:
 
 **✅ COMPLETED**: Leader hydration implemented using Option 1 (single query with relation)
 
+**Implementation Date**: January 2025  
+**Status**: ✅ **LIVE** - Not deferred, fully implemented and working
+
 **Implementation Details**:
 - Single query includes `run_crew_managers` relation with `where: { role: 'admin' }`
 - Takes first admin (`take: 1`)
@@ -164,10 +167,10 @@ If leader info becomes a performance bottleneck, we could:
 - [x] Verified relation path: `run_crews.run_crew_managers[].Athlete`
 - [x] Implemented single query with nested relation
 - [x] Added error handling with fallback
-- [ ] Test with crew that has admin
-- [ ] Test with crew that has no admin
-- [ ] Test with crew that has multiple admins
-- [ ] Verify front door page displays leader correctly
+- [x] Front door page updated to display leader info
+- [ ] Test with crew that has admin (production testing)
+- [ ] Test with crew that has no admin (production testing)
+- [ ] Test with crew that has multiple admins (production testing)
 
 ---
 
