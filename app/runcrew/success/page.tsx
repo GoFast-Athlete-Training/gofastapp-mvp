@@ -6,6 +6,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { Copy, Check, Link as LinkIcon } from 'lucide-react';
+import { getRunCrewJoinLink } from '@/lib/domain-runcrew';
 
 function RunCrewSuccessContent() {
   const router = useRouter();
@@ -30,12 +31,11 @@ function RunCrewSuccessContent() {
 
   const crewName = crewData?.name || 'Your Crew';
 
-  // Generate run crew URL from params
+  // Generate run crew URL using handle (public front door)
   const BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
-  const runCrewUrl = crewId 
-    ? `${BASE_URL}/runcrew/${crewId}`
-    : crewData?.id 
-    ? `${BASE_URL}/runcrew/${crewData.id}`
+  const handle = crewData?.handle;
+  const runCrewUrl = handle 
+    ? `${BASE_URL}${getRunCrewJoinLink(handle)}`
     : `${BASE_URL}/runcrew`;
 
   const handleCopyLink = async () => {

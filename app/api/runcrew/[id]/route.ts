@@ -41,7 +41,7 @@ export async function GET(
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
 
-    // Just hydrate - welcome page is the gate, let it through
+    // Hydrate crew data
     let crew;
     try {
       crew = await hydrateCrew(id);
@@ -55,6 +55,17 @@ export async function GET(
     if (!crew) {
       console.error('❌ RUNCREW GET: Crew not found for id:', id);
       return NextResponse.json({ error: 'Crew not found' }, { status: 404 });
+    }
+
+    // SERVER-SIDE MEMBERSHIP ENFORCEMENT (REQUIRED)
+    // Verify user is a member of the crew before returning data
+    const isMember = crew.membershipsBox?.memberships?.some(
+      (membership: any) => membership.athleteId === athlete.id
+    );
+    
+    if (!isMember) {
+      console.error('❌ RUNCREW GET: User is not a member of crew:', id, 'athleteId:', athlete.id);
+      return NextResponse.json({ error: 'Forbidden - Membership required' }, { status: 403 });
     }
 
     try {

@@ -12,17 +12,22 @@ import api from '@/lib/api';
 import TopNav from '@/components/shared/TopNav';
 
 /**
- * RunCrew Home Page - CLIENT-SIDE
+ * RunCrew Container Page - MEMBER-ONLY
  * 
  * Route: /runcrew/:runCrewId
  * 
- * Purpose: Main landing page for a RunCrew
- * - Used for onboarding flow after joining
- * - General home page (not welcome page which is for hydration)
- * - Shows crew overview and navigation options
- * - PUBLIC: Can be viewed without authentication (shows public preview)
+ * Purpose: Internal container page for RunCrew members
+ * - MEMBER-ONLY: Server enforces membership (403 if not member)
+ * - Assumes: If page renders, user is already a member
+ * - Shows: Full container UI with stats, announcements, runs
+ * 
+ * Security:
+ * - Server-side membership enforcement in GET /api/runcrew/[id]
+ * - No public view logic
+ * - No join logic
+ * - No client-side access control
  */
-export default function RunCrewHomePage() {
+export default function RunCrewContainerPage() {
   const params = useParams();
   const router = useRouter();
   const runCrewId = params.runCrewId as string;
@@ -32,7 +37,6 @@ export default function RunCrewHomePage() {
   const [membership, setMembership] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isPublicView, setIsPublicView] = useState(false);
 
   useEffect(() => {
     if (!runCrewId) {
@@ -53,121 +57,32 @@ export default function RunCrewHomePage() {
         return;
       }
 
-      // Mark as fetched immediately to prevent re-runs
-      hasFetchedRef.current = true;
-
-      // If no Firebase user, fetch public metadata instead
+      // No Firebase user - redirect to signup
       if (!firebaseUser) {
-        console.log('🔍 RUNCREW HOME: No Firebase user - fetching public metadata...');
-        try {
-          setLoading(true);
-          setError(null);
-          setIsPublicView(true);
-
-          // Fetch public crew metadata (no auth required)
-          const response = await fetch(`/api/runcrew/public/${runCrewId}`);
-          
-          if (!response.ok) {
-            if (response.status === 404) {
-              throw new Error('not_found');
-            }
-            throw new Error('Failed to fetch crew');
-          }
-
-          const data = await response.json();
-          if (!data.success || !data.runCrew) {
-            throw new Error('Crew not found');
-          }
-
-          // Transform public metadata to match expected format
-          const crewData = {
-            runCrewBaseInfo: {
-              id: data.runCrew.id,
-              name: data.runCrew.name,
-              description: data.runCrew.description,
-              logo: data.runCrew.logo,
-              icon: data.runCrew.icon,
-            },
-            joinCode: data.runCrew.joinCode,
-            // Public view doesn't include these
-            membershipsBox: { memberships: [] },
-            announcementsBox: { announcements: [] },
-            runsBox: { runs: [] },
-          };
-
-          setCrew(crewData);
-          console.log(`✅ RUNCREW HOME: Public crew loaded: ${crewData.runCrewBaseInfo?.name}`);
-          setLoading(false);
-        } catch (err: any) {
-          console.error('❌ RUNCREW HOME: Error fetching public crew:', err);
-          if (err.message === 'not_found') {
-            setError('not_found');
-          } else {
-            setError('error');
-          }
-          setLoading(false);
-        }
+        hasFetchedRef.current = true;
+        console.warn('⚠️ RUNCREW CONTAINER: No Firebase user - redirecting to signup');
+        router.push('/signup');
         return;
       }
 
-      // Authenticated user flow
+      // Mark as fetched immediately to prevent re-runs
+      hasFetchedRef.current = true;
+
+      // Get athleteId from localStorage
       const athleteId = LocalStorageAPI.getAthleteId();
       if (!athleteId) {
-        console.warn('⚠️ RUNCREW HOME: No athleteId in localStorage - fetching public metadata instead');
-        setIsPublicView(true);
-        try {
-          setLoading(true);
-          setError(null);
-
-          const response = await fetch(`/api/runcrew/public/${runCrewId}`);
-          if (!response.ok) {
-            if (response.status === 404) {
-              throw new Error('not_found');
-            }
-            throw new Error('Failed to fetch crew');
-          }
-
-          const data = await response.json();
-          if (!data.success || !data.runCrew) {
-            throw new Error('Crew not found');
-          }
-
-          const crewData = {
-            runCrewBaseInfo: {
-              id: data.runCrew.id,
-              name: data.runCrew.name,
-              description: data.runCrew.description,
-              logo: data.runCrew.logo,
-              icon: data.runCrew.icon,
-            },
-            joinCode: data.runCrew.joinCode,
-            membershipsBox: { memberships: [] },
-            announcementsBox: { announcements: [] },
-            runsBox: { runs: [] },
-          };
-
-          setCrew(crewData);
-          setLoading(false);
-        } catch (err: any) {
-          console.error('❌ RUNCREW HOME: Error fetching public crew:', err);
-          if (err.message === 'not_found') {
-            setError('not_found');
-          } else {
-            setError('error');
-          }
-          setLoading(false);
-        }
+        console.warn('⚠️ RUNCREW CONTAINER: No athleteId in localStorage - redirecting to signup');
+        router.push('/signup');
         return;
       }
 
       try {
         setLoading(true);
         setError(null);
-        setIsPublicView(false);
 
-        console.log(`🔍 RUNCREW HOME: Fetching crew ${runCrewId}...`);
+        console.log(`🔍 RUNCREW CONTAINER: Fetching crew ${runCrewId}...`);
 
-        // Fetch crew data via API (API uses Firebase token from interceptor)
+        // Fetch crew data via API (server enforces membership - returns 403 if not member)
         const response = await api.get(`/runcrew/${runCrewId}`);
         
         if (!response.data.success || !response.data.runCrew) {
@@ -183,44 +98,19 @@ export default function RunCrewHomePage() {
         );
         setMembership(currentMembership);
 
-        console.log(`✅ RUNCREW HOME: Crew loaded successfully: ${crewData.runCrewBaseInfo?.name}`);
+        console.log(`✅ RUNCREW CONTAINER: Crew loaded successfully: ${crewData.runCrewBaseInfo?.name}`);
         setLoading(false);
       } catch (err: any) {
-        console.error('❌ RUNCREW HOME: Error fetching crew:', err);
+        console.error('❌ RUNCREW CONTAINER: Error fetching crew:', err);
         if (err.response?.status === 401) {
-          // Fallback to public view if auth fails
-          setIsPublicView(true);
-          try {
-            const publicResponse = await fetch(`/api/runcrew/public/${runCrewId}`);
-            if (publicResponse.ok) {
-              const publicData = await publicResponse.json();
-              if (publicData.success && publicData.runCrew) {
-                const crewData = {
-                  runCrewBaseInfo: {
-                    id: publicData.runCrew.id,
-                    name: publicData.runCrew.name,
-                    description: publicData.runCrew.description,
-                    logo: publicData.runCrew.logo,
-                    icon: publicData.runCrew.icon,
-                  },
-                  joinCode: publicData.runCrew.joinCode,
-                  membershipsBox: { memberships: [] },
-                  announcementsBox: { announcements: [] },
-                  runsBox: { runs: [] },
-                };
-                setCrew(crewData);
-                setLoading(false);
-                return;
-              }
-            }
-          } catch (publicErr) {
-            console.error('❌ RUNCREW HOME: Error fetching public crew as fallback:', publicErr);
-          }
+          // 401 is handled by API interceptor (redirects to signup)
           setError('unauthorized');
+        } else if (err.response?.status === 403) {
+          // 403 = Not a member - redirect to front door if we have handle
+          // For now, show error (in future, could redirect to front door)
+          setError('forbidden');
         } else if (err.response?.status === 404) {
           setError('not_found');
-        } else if (err.response?.status === 403) {
-          setError('forbidden');
         } else {
           setError('error');
         }
@@ -264,12 +154,12 @@ export default function RunCrewHomePage() {
     );
   }
 
-  if (error === 'not_found') {
+  if (error === 'forbidden') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">RunCrew Not Found</h2>
-          <p className="text-gray-600 mb-4">The RunCrew you're looking for doesn't exist.</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Membership Required</h2>
+          <p className="text-gray-600 mb-4">You must be a member of this RunCrew to view it.</p>
           <Link
             href="/runcrew"
             className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
@@ -281,12 +171,12 @@ export default function RunCrewHomePage() {
     );
   }
 
-  if (error === 'forbidden') {
+  if (error === 'not_found') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
-          <p className="text-gray-600 mb-4">You don't have access to this RunCrew.</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">RunCrew Not Found</h2>
+          <p className="text-gray-600 mb-4">The RunCrew you're looking for doesn't exist.</p>
           <Link
             href="/runcrew"
             className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
@@ -315,6 +205,7 @@ export default function RunCrewHomePage() {
     );
   }
 
+  // If we reach here, user is a member (server enforced)
   // Check if user is admin or manager
   const isAdmin = membership?.role === 'admin';
   const isManager = membership?.role === 'manager';
@@ -327,63 +218,7 @@ export default function RunCrewHomePage() {
     return new Date(runDate) >= new Date();
   }).slice(0, 3);
 
-  // Handle Join button click for public view
-  const handleJoin = () => {
-    // Store crewId for signup flow
-    if (runCrewId) {
-      localStorage.setItem('pendingCrewId', runCrewId);
-    }
-    router.push('/signup');
-  };
-
-  // Public view UI (not authenticated) - Simple: Name, Card, Join Button
-  if (isPublicView) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50 flex items-center justify-center">
-        <TopNav />
-        <div className="max-w-md w-full px-6">
-          {/* Crew Card */}
-          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
-            <div className="text-center">
-              {/* Crew Logo/Icon */}
-              <div className="flex justify-center mb-6">
-                {crew.runCrewBaseInfo?.logo ? (
-                  <img
-                    src={crew.runCrewBaseInfo.logo}
-                    alt={crew.runCrewBaseInfo?.name || 'RunCrew'}
-                    className="w-24 h-24 rounded-xl object-cover border-2 border-gray-200"
-                  />
-                ) : crew.runCrewBaseInfo?.icon ? (
-                  <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-5xl border-2 border-gray-200">
-                    {crew.runCrewBaseInfo.icon}
-                  </div>
-                ) : (
-                  <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-5xl border-2 border-gray-200">
-                    🏃
-                  </div>
-                )}
-              </div>
-              
-              {/* Crew Name */}
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">
-                {crew.runCrewBaseInfo?.name}
-              </h1>
-              
-              {/* Join Button */}
-              <button
-                onClick={handleJoin}
-                className="w-full bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold text-lg transition shadow-lg hover:shadow-xl"
-              >
-                Join
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Authenticated view UI
+  // Container UI (member-only)
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50">
       <TopNav />
@@ -540,4 +375,3 @@ export default function RunCrewHomePage() {
     </div>
   );
 }
-

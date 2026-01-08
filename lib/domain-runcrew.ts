@@ -3,40 +3,79 @@ import { normalizeCrewResponse } from './normalize-prisma';
 import { secondsToPace } from '@/utils/formatPace';
 
 /**
- * Generate a shareable invite link for a RunCrew
+ * Generate a shareable invite link for a RunCrew using handle
  * Server-side helper function for generating join links
- * Adds 'join-' prefix to preserve unique ID logic without slugs
  * 
- * @param runCrewId - The RunCrew ID
- * @returns The join link path: /join/runcrew/join-{runCrewId}
+ * @param handle - The RunCrew handle (public-facing identifier)
+ * @returns The join link path: /join/runcrew/{handle}
  * 
  * @example
- * const link = getRunCrewJoinLink('cmk4nxh0c0001lb04dmyed0qy');
- * // Returns: '/join/runcrew/join-cmk4nxh0c0001lb04dmyed0qy'
+ * const link = getRunCrewJoinLink('boston-runners');
+ * // Returns: '/join/runcrew/boston-runners'
  */
-export function getRunCrewJoinLink(runCrewId: string): string {
-  if (!runCrewId) {
-    throw new Error('runCrewId is required');
+export function getRunCrewJoinLink(handle: string): string {
+  if (!handle) {
+    throw new Error('handle is required');
   }
-  return `/join/runcrew/join-${runCrewId}`;
+  return `/join/runcrew/${handle}`;
 }
 
 /**
- * Decode public join URL to get actual runCrewId
- * Removes 'join-' prefix from encoded ID
+ * Resolve RunCrew by handle (public-facing identifier)
+ * Returns the runCrewId for internal use
  * 
- * @param encodedId - The encoded ID from URL (e.g., 'join-cmk4nxh0c0001lb04dmyed0qy')
- * @returns The actual runCrewId or null if invalid
- * 
- * @example
- * const runCrewId = decodePublicJoinUrl('join-cmk4nxh0c0001lb04dmyed0qy');
- * // Returns: 'cmk4nxh0c0001lb04dmyed0qy'
+ * @param handle - The RunCrew handle (lowercase, unique)
+ * @returns The runCrewId or null if not found
  */
-export function decodePublicJoinUrl(encodedId: string): string | null {
-  if (!encodedId || !encodedId.startsWith('join-')) {
+export async function resolveRunCrewByHandle(handle: string): Promise<string | null> {
+  if (!handle) {
     return null;
   }
-  return encodedId.replace('join-', '');
+  
+  const crew = await prisma.run_crews.findUnique({
+    where: { handle: handle.toLowerCase() },
+    select: { id: true },
+  });
+  
+  return crew?.id || null;
+}
+
+/**
+ * Get public metadata by handle
+ * Fetches minimal crew metadata using handle instead of ID
+ * 
+ * @param handle - The RunCrew handle
+ * @returns Public metadata or null if not found
+ */
+export async function getCrewPublicMetadataByHandle(handle: string) {
+  const crew = await prisma.run_crews.findUnique({
+    where: { handle: handle.toLowerCase() },
+    select: {
+      id: true,
+      handle: true,
+      name: true,
+      description: true,
+      logo: true,
+      icon: true,
+      joinCode: true,
+      // Exclude: memberships, messages, announcements, runs, managers, etc.
+    },
+  });
+
+  if (!crew) {
+    return null;
+  }
+
+  // Return only public fields
+  return {
+    id: crew.id,
+    handle: crew.handle,
+    name: crew.name,
+    description: crew.description,
+    logo: crew.logo,
+    icon: crew.icon,
+    joinCode: crew.joinCode,
+  };
 }
 
 /**
@@ -57,8 +96,31 @@ function generateJoinCode(name: string): string {
   return `${initials}${random}`;
 }
 
+/**
+ * Generate a handle from crew name
+ * Converts to lowercase, removes special chars, handles collisions
+ */
+function generateHandle(name: string): string {
+  // Convert to lowercase, remove special chars, replace spaces with hyphens
+  let base = name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special chars
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Collapse multiple hyphens
+    .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+  
+  // Ensure minimum length
+  if (base.length < 3) {
+    base = base + '-crew';
+  }
+  
+  return base;
+}
+
 export async function createCrew(data: {
   name: string;
+  handle?: string; // Optional - auto-generated from name if not provided
   description?: string;
   joinCode?: string; // Optional - auto-generated if not provided
   athleteId: string;
@@ -82,6 +144,40 @@ export async function createCrew(data: {
   trainingForRace?: string;
   trainingForDistance?: string[];
 }) {
+  // Generate handle if not provided
+  let handle = data.handle?.toLowerCase().trim();
+  if (!handle) {
+    // Generate unique handle - keep trying until we get a unique one
+    let attempts = 0;
+    const baseHandle = generateHandle(data.name);
+    handle = baseHandle;
+    
+    while (attempts < 20) {
+      const existing = await prisma.run_crews.findUnique({
+        where: { handle },
+      });
+      if (!existing) {
+        break; // Found unique handle
+      }
+      // Append number to make unique
+      handle = `${baseHandle}-${attempts + 1}`;
+      attempts++;
+    }
+    
+    // Final fallback
+    if (attempts >= 20) {
+      handle = `${baseHandle}-${Date.now()}`;
+    }
+  } else {
+    // Validate handle is unique
+    const existing = await prisma.run_crews.findUnique({
+      where: { handle },
+    });
+    if (existing) {
+      throw new Error(`Handle "${handle}" is already taken`);
+    }
+  }
+
   // Auto-generate joinCode if not provided (for backward compatibility)
   let joinCode = data.joinCode;
   if (!joinCode) {
@@ -107,6 +203,7 @@ export async function createCrew(data: {
   const crew = await prisma.run_crews.create({
     data: {
       name: data.name,
+      handle,
       description: data.description,
       joinCode,
       city: data.city,
@@ -597,6 +694,7 @@ export async function getCrewPublicMetadata(runCrewId: string) {
     where: { id: runCrewId },
     select: {
       id: true,
+      handle: true,
       name: true,
       description: true,
       logo: true,
@@ -613,6 +711,7 @@ export async function getCrewPublicMetadata(runCrewId: string) {
   // Return only public fields
   return {
     id: crew.id,
+    handle: crew.handle,
     name: crew.name,
     description: crew.description,
     logo: crew.logo,

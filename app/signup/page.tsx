@@ -10,29 +10,24 @@ import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 
-const PENDING_CREW_ID_KEY = 'pendingCrewId';
+const RUNCREW_JOIN_INTENT_HANDLE_KEY = 'runCrewJoinIntentHandle';
 
 /**
- * Handle pending crew join after signup/login
- * Checks localStorage for pendingCrewId and joins the crew if found
+ * Check if user has a pending RunCrew join intent
+ * If so, redirect back to front door page (NO auto-join)
+ * 
+ * This follows the authoritative UX flow:
+ * - User clicks Join → stored intent → signup → return to front door
+ * - Front door will show explicit confirmation UI
+ * - Only then will membership be created
  */
-async function handlePendingCrewJoin(router: any): Promise<boolean> {
-  const pendingCrewId = localStorage.getItem(PENDING_CREW_ID_KEY);
-  if (!pendingCrewId) return false;
+function redirectToFrontDoorIfIntent(router: any): boolean {
+  const handle = localStorage.getItem(RUNCREW_JOIN_INTENT_HANDLE_KEY);
+  if (!handle) return false;
   
-  try {
-    const joinRes = await api.post('/runcrew/join', { crewId: pendingCrewId });
-    if (joinRes.data?.success && joinRes.data?.runCrew) {
-      localStorage.removeItem(PENDING_CREW_ID_KEY);
-      router.replace(`/runcrew/${joinRes.data.runCrew.id}`);
-      return true;
-    }
-  } catch (err: any) {
-    console.error('❌ SIGNUP: Error joining pending crew:', err);
-    // Remove pendingCrewId even on error to prevent infinite loop
-    localStorage.removeItem(PENDING_CREW_ID_KEY);
-  }
-  return false;
+  // Redirect back to front door (NO membership mutation here)
+  router.replace(`/join/runcrew/${handle}`);
+  return true;
 }
 
 export default function SignupPage() {
@@ -81,9 +76,8 @@ export default function SignupPage() {
                 });
               }
               
-              // Check for pending crew join
-              const joined = await handlePendingCrewJoin(router);
-              if (joined) return; // Already redirected to crew page
+              // Check for pending crew join intent - redirect to front door (NO auto-join)
+              if (redirectToFrontDoorIfIntent(router)) return;
               
               router.push('/welcome');
               return;
@@ -101,9 +95,8 @@ export default function SignupPage() {
               localStorage.setItem('athleteId', athlete.athleteId);
               localStorage.setItem('email', athlete.data?.email || user.email || '');
 
-              // Check for pending crew join
-              const joined = await handlePendingCrewJoin(router);
-              if (joined) return; // Already redirected to crew page
+              // Check for pending crew join intent - redirect to front door (NO auto-join)
+              if (redirectToFrontDoorIfIntent(router)) return;
 
               // Route based on profile completion
               if (athlete.data?.gofastHandle) {
@@ -165,9 +158,8 @@ export default function SignupPage() {
           // Athlete might exist - redirect to athlete-home
           console.log('✅ SIGNUP: Athlete might exist, redirecting to athlete-home');
           
-          // Check for pending crew join
-          const joined = await handlePendingCrewJoin(router);
-          if (joined) return; // Already redirected to crew page
+          // Check for pending crew join intent - redirect to front door (NO auto-join)
+          if (redirectToFrontDoorIfIntent(router)) return;
           
           router.push('/welcome');
           return;
@@ -186,9 +178,8 @@ export default function SignupPage() {
       localStorage.setItem('athleteId', athlete.athleteId);
       localStorage.setItem('email', athlete.data?.email || result.user.email || '');
 
-      // Check for pending crew join
-      const joined = await handlePendingCrewJoin(router);
-      if (joined) return; // Already redirected to crew page
+      // Check for pending crew join intent - redirect to front door (NO auto-join)
+      if (redirectToFrontDoorIfIntent(router)) return;
 
       // Route based on profile completion (check gofastHandle - key indicator)
       if (athlete.data?.gofastHandle) {
@@ -269,9 +260,8 @@ export default function SignupPage() {
           // Athlete might exist - redirect to profile creation
           console.log('✅ SIGNUP: Athlete might exist, redirecting to create profile');
           
-          // Check for pending crew join
-          const joined = await handlePendingCrewJoin(router);
-          if (joined) return; // Already redirected to crew page
+          // Check for pending crew join intent - redirect to front door (NO auto-join)
+          if (redirectToFrontDoorIfIntent(router)) return;
           
           router.push('/athlete-create-profile');
           return;
@@ -290,9 +280,8 @@ export default function SignupPage() {
       localStorage.setItem('athleteId', athlete.athleteId);
       localStorage.setItem('email', athlete.data?.email || user.email || '');
 
-      // Check for pending crew join
-      const joined = await handlePendingCrewJoin(router);
-      if (joined) return; // Already redirected to crew page
+      // Check for pending crew join intent - redirect to front door (NO auto-join)
+      if (redirectToFrontDoorIfIntent(router)) return;
 
       // Route based on profile completion (check gofastHandle - key indicator)
       if (athlete.data?.gofastHandle) {
@@ -393,9 +382,8 @@ export default function SignupPage() {
       localStorage.setItem('athleteId', athlete.athleteId);
       localStorage.setItem('email', athlete.data?.email || user.email || '');
 
-      // Check for pending crew join
-      const joined = await handlePendingCrewJoin(router);
-      if (joined) return; // Already redirected to crew page
+      // Check for pending crew join intent - redirect to front door (NO auto-join)
+      if (redirectToFrontDoorIfIntent(router)) return;
 
       // Route based on profile completion (check gofastHandle - key indicator)
       if (athlete.data?.gofastHandle) {

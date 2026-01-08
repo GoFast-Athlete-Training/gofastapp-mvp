@@ -324,6 +324,7 @@ model run_crew_runs {
 
 model run_crews {
   id                      String                    @id @default(cuid())
+  handle                  String                    @unique // Public-facing identifier (lowercase, user-chosen)
   name                    String
   description             String?
   joinCode                String                    @unique
