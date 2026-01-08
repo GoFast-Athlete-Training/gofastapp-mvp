@@ -48,69 +48,72 @@ export async function resolveRunCrewByHandle(handle: string): Promise<string | n
  * @returns Public metadata or null if not found
  */
 export async function getCrewPublicMetadataByHandle(handle: string) {
+  const crew = await prisma.run_crews.findUnique({
+    where: { handle: handle.toLowerCase() },
+    select: {
+      id: true,
+      handle: true,
+      name: true,
+      description: true,
+      logo: true,
+      icon: true,
+      joinCode: true,
+      city: true,
+      state: true,
+      easyMilesPace: true, // Seconds per mile
+      crushingItPace: true, // Seconds per mile
+      purpose: true, // Array of Purpose enum
+      // Exclude: memberships, messages, announcements, runs, managers, etc.
+    },
+  });
+
+  if (!crew) {
+    return null;
+  }
+
+  // Get leader separately to avoid complex relation query
+  let leader = null;
   try {
-    const crew = await prisma.run_crews.findUnique({
-      where: { handle: handle.toLowerCase() },
+    const adminManager = await prisma.run_crew_managers.findFirst({
+      where: {
+        runCrewId: crew.id,
+        role: 'admin',
+      },
       select: {
-        id: true,
-        handle: true,
-        name: true,
-        description: true,
-        logo: true,
-        icon: true,
-        joinCode: true,
-        city: true,
-        state: true,
-        easyMilesPace: true, // Seconds per mile
-        crushingItPace: true, // Seconds per mile
-        purpose: true, // Array of Purpose enum
-        run_crew_managers: {
-          where: { role: 'admin' },
-          take: 1,
+        Athlete: {
           select: {
-            Athlete: {
-              select: {
-                firstName: true,
-                lastName: true,
-                bio: true,
-              },
-            },
+            firstName: true,
+            lastName: true,
+            bio: true,
           },
         },
-        // Exclude: memberships, messages, announcements, runs, etc.
       },
     });
-
-    if (!crew) {
-      return null;
-    }
-
-    // Get leader (first admin) - safely handle missing relation
-    const leader = crew.run_crew_managers?.[0]?.Athlete || null;
-
-    // Return only public fields
-    return {
-      id: crew.id,
-      handle: crew.handle,
-      name: crew.name,
-      description: crew.description,
-      logo: crew.logo,
-      icon: crew.icon,
-      joinCode: crew.joinCode,
-      city: crew.city,
-      state: crew.state,
-      easyMilesPace: crew.easyMilesPace,
-      crushingItPace: crew.crushingItPace,
-      purpose: crew.purpose,
-      leader: leader ? {
-        name: `${leader.firstName || ''} ${leader.lastName || ''}`.trim() || 'RunCrew Leader',
-        bio: leader.bio || null,
-      } : null,
-    };
-  } catch (error) {
-    console.error('Error in getCrewPublicMetadataByHandle:', error);
-    throw error;
+    leader = adminManager?.Athlete || null;
+  } catch (err) {
+    // Leader is optional, continue without it
+    console.warn('Could not fetch leader info:', err);
   }
+
+  // Return only public fields
+  return {
+    id: crew.id,
+    handle: crew.handle,
+    name: crew.name,
+    description: crew.description,
+    logo: crew.logo,
+    icon: crew.icon,
+    joinCode: crew.joinCode,
+    city: crew.city,
+    state: crew.state,
+    easyMilesPace: crew.easyMilesPace,
+    crushingItPace: crew.crushingItPace,
+    purpose: crew.purpose,
+    leader: leader ? {
+      name: `${leader.firstName || ''} ${leader.lastName || ''}`.trim() || 'RunCrew Leader',
+      bio: leader.bio || null,
+    } : null,
+  };
 }
 
 /**
