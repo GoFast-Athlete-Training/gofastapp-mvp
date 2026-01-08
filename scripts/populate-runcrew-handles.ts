@@ -28,7 +28,9 @@ async function populateHandles() {
   
   const crews = await prisma.run_crews.findMany({
     where: {
-      handle: null,
+      handle: {
+        equals: null,
+      },
     },
   });
 
