@@ -116,8 +116,8 @@ export default function JoinCrewSignupExplainerPage() {
         localStorage.setItem('athleteId', athleteRes.data.athleteId);
         localStorage.setItem('email', athleteRes.data.data?.email || result.user.email || '');
         
-        // Redirect to front door (will show confirmation)
-        router.push(`/join/runcrew/${handle}`);
+        // Redirect to confirmation page
+        router.push(`/join/runcrew/${handle}/confirm`);
       }
     } catch (err: any) {
       console.error('❌ EXPLAINER: Google signup error:', err);
@@ -170,8 +170,8 @@ export default function JoinCrewSignupExplainerPage() {
         localStorage.setItem('athleteId', athleteRes.data.athleteId);
         localStorage.setItem('email', athleteRes.data.data?.email || user.email || '');
         
-        // Redirect to front door (will show confirmation)
-        router.push(`/join/runcrew/${handle}`);
+        // Redirect to confirmation page
+        router.push(`/join/runcrew/${handle}/confirm`);
       }
     } catch (err: any) {
       console.error('❌ EXPLAINER: Email signup error:', err);
