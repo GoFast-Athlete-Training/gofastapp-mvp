@@ -58,12 +58,7 @@ export default function RunCrewFrontDoorPage() {
       return;
     }
 
-    // Check for existing join intent (user returned from signup)
-    const existingIntent = localStorage.getItem(RUNCREW_JOIN_INTENT_KEY);
-    const existingHandle = localStorage.getItem(RUNCREW_JOIN_INTENT_HANDLE_KEY);
-    if (existingIntent && existingHandle === handle) {
-      setShowJoinConfirmation(true);
-    }
+    // No longer checking for join intent here - that's handled by confirmation page
 
     // Wait for Firebase auth to be ready
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
