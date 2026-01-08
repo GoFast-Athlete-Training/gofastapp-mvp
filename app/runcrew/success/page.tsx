@@ -74,10 +74,10 @@ function RunCrewSuccessContent() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white overflow-x-hidden">
       {/* Header */}
       <div className="bg-white shadow-sm">
-        <div className="max-w-md mx-auto px-6 py-4">
+        <div className="max-w-md mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-center">
             <Image 
               src="/logo.jpg" 
@@ -92,7 +92,7 @@ function RunCrewSuccessContent() {
       </div>
 
       {/* Content */}
-      <div className="max-w-md mx-auto px-6 py-8">
+      <div className="max-w-md mx-auto px-4 sm:px-6 py-8 w-full box-border">
         <div className="text-center">
           {/* Success Animation */}
           <div className="mb-8">
@@ -106,13 +106,13 @@ function RunCrewSuccessContent() {
           </div>
 
           {/* Run Crew Link Section - PRIMARY */}
-          <div className="bg-gradient-to-br from-sky-50 to-sky-100 rounded-xl p-6 mb-6 border-2 border-sky-200">
-            <div className="flex items-center justify-center mb-4">
+          <div className="bg-gradient-to-br from-sky-50 to-sky-100 rounded-xl p-4 sm:p-6 mb-6 border-2 border-sky-200 w-full box-border">
+            <div className="flex items-center justify-center mb-4 flex-wrap">
               <LinkIcon className="w-6 h-6 text-sky-600 mr-2" />
               <h2 className="text-xl font-bold text-gray-900">Your Run Crew Link</h2>
             </div>
-            <div className="bg-white rounded-lg p-4 mb-4 border-2 border-sky-300">
-              <p className="text-sm font-mono text-sky-700 break-all text-center">
+            <div className="bg-white rounded-lg p-3 sm:p-4 mb-4 border-2 border-sky-300 w-full overflow-hidden">
+              <p className="text-xs sm:text-sm font-mono text-sky-700 break-all text-center">
                 {runCrewUrl}
               </p>
             </div>
@@ -138,10 +138,10 @@ function RunCrewSuccessContent() {
           </div>
 
           {/* Share Message Section */}
-          <div className="bg-orange-50 rounded-xl p-6 mb-6">
+          <div className="bg-orange-50 rounded-xl p-4 sm:p-6 mb-6 w-full box-border">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Or Share This Message</h2>
-            <div className="bg-white rounded-lg p-4 mb-4 border-2 border-orange-200">
-              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+            <div className="bg-white rounded-lg p-3 sm:p-4 mb-4 border-2 border-orange-200 w-full overflow-hidden">
+              <p className="text-xs sm:text-sm text-gray-700 leading-relaxed whitespace-pre-line break-words">
                 {createShareMessage()}
               </p>
             </div>

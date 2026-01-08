@@ -20,6 +20,7 @@ import TopNav from '@/components/shared/TopNav';
  * - Used for onboarding flow after joining
  * - General home page (not welcome page which is for hydration)
  * - Shows crew overview and navigation options
+ * - PUBLIC: Can be viewed without authentication (shows public preview)
  */
 export default function RunCrewHomePage() {
   const params = useParams();
@@ -31,6 +32,7 @@ export default function RunCrewHomePage() {
   const [membership, setMembership] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isPublicView, setIsPublicView] = useState(false);
 
   useEffect(() => {
     if (!runCrewId) {
@@ -51,28 +53,117 @@ export default function RunCrewHomePage() {
         return;
       }
 
-      // No Firebase user - redirect to signup
-      if (!firebaseUser) {
-        hasFetchedRef.current = true;
-        console.warn('⚠️ RUNCREW HOME: No Firebase user - redirecting to signup');
-        router.push('/signup');
-        return;
-      }
-
       // Mark as fetched immediately to prevent re-runs
       hasFetchedRef.current = true;
 
-      // Get athleteId from localStorage (for reference, but API uses Firebase token)
+      // If no Firebase user, fetch public metadata instead
+      if (!firebaseUser) {
+        console.log('🔍 RUNCREW HOME: No Firebase user - fetching public metadata...');
+        try {
+          setLoading(true);
+          setError(null);
+          setIsPublicView(true);
+
+          // Fetch public crew metadata (no auth required)
+          const response = await fetch(`/api/runcrew/public/${runCrewId}`);
+          
+          if (!response.ok) {
+            if (response.status === 404) {
+              throw new Error('not_found');
+            }
+            throw new Error('Failed to fetch crew');
+          }
+
+          const data = await response.json();
+          if (!data.success || !data.runCrew) {
+            throw new Error('Crew not found');
+          }
+
+          // Transform public metadata to match expected format
+          const crewData = {
+            runCrewBaseInfo: {
+              id: data.runCrew.id,
+              name: data.runCrew.name,
+              description: data.runCrew.description,
+              logo: data.runCrew.logo,
+              icon: data.runCrew.icon,
+            },
+            joinCode: data.runCrew.joinCode,
+            // Public view doesn't include these
+            membershipsBox: { memberships: [] },
+            announcementsBox: { announcements: [] },
+            runsBox: { runs: [] },
+          };
+
+          setCrew(crewData);
+          console.log(`✅ RUNCREW HOME: Public crew loaded: ${crewData.runCrewBaseInfo?.name}`);
+          setLoading(false);
+        } catch (err: any) {
+          console.error('❌ RUNCREW HOME: Error fetching public crew:', err);
+          if (err.message === 'not_found') {
+            setError('not_found');
+          } else {
+            setError('error');
+          }
+          setLoading(false);
+        }
+        return;
+      }
+
+      // Authenticated user flow
       const athleteId = LocalStorageAPI.getAthleteId();
       if (!athleteId) {
-        console.warn('⚠️ RUNCREW HOME: No athleteId in localStorage - redirecting to signup');
-        router.push('/signup');
+        console.warn('⚠️ RUNCREW HOME: No athleteId in localStorage - fetching public metadata instead');
+        setIsPublicView(true);
+        try {
+          setLoading(true);
+          setError(null);
+
+          const response = await fetch(`/api/runcrew/public/${runCrewId}`);
+          if (!response.ok) {
+            if (response.status === 404) {
+              throw new Error('not_found');
+            }
+            throw new Error('Failed to fetch crew');
+          }
+
+          const data = await response.json();
+          if (!data.success || !data.runCrew) {
+            throw new Error('Crew not found');
+          }
+
+          const crewData = {
+            runCrewBaseInfo: {
+              id: data.runCrew.id,
+              name: data.runCrew.name,
+              description: data.runCrew.description,
+              logo: data.runCrew.logo,
+              icon: data.runCrew.icon,
+            },
+            joinCode: data.runCrew.joinCode,
+            membershipsBox: { memberships: [] },
+            announcementsBox: { announcements: [] },
+            runsBox: { runs: [] },
+          };
+
+          setCrew(crewData);
+          setLoading(false);
+        } catch (err: any) {
+          console.error('❌ RUNCREW HOME: Error fetching public crew:', err);
+          if (err.message === 'not_found') {
+            setError('not_found');
+          } else {
+            setError('error');
+          }
+          setLoading(false);
+        }
         return;
       }
 
       try {
         setLoading(true);
         setError(null);
+        setIsPublicView(false);
 
         console.log(`🔍 RUNCREW HOME: Fetching crew ${runCrewId}...`);
 
@@ -97,7 +188,34 @@ export default function RunCrewHomePage() {
       } catch (err: any) {
         console.error('❌ RUNCREW HOME: Error fetching crew:', err);
         if (err.response?.status === 401) {
-          // 401 is handled by API interceptor (redirects to signup)
+          // Fallback to public view if auth fails
+          setIsPublicView(true);
+          try {
+            const publicResponse = await fetch(`/api/runcrew/public/${runCrewId}`);
+            if (publicResponse.ok) {
+              const publicData = await publicResponse.json();
+              if (publicData.success && publicData.runCrew) {
+                const crewData = {
+                  runCrewBaseInfo: {
+                    id: publicData.runCrew.id,
+                    name: publicData.runCrew.name,
+                    description: publicData.runCrew.description,
+                    logo: publicData.runCrew.logo,
+                    icon: publicData.runCrew.icon,
+                  },
+                  joinCode: publicData.runCrew.joinCode,
+                  membershipsBox: { memberships: [] },
+                  announcementsBox: { announcements: [] },
+                  runsBox: { runs: [] },
+                };
+                setCrew(crewData);
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (publicErr) {
+            console.error('❌ RUNCREW HOME: Error fetching public crew as fallback:', publicErr);
+          }
           setError('unauthorized');
         } else if (err.response?.status === 404) {
           setError('not_found');
@@ -209,6 +327,63 @@ export default function RunCrewHomePage() {
     return new Date(runDate) >= new Date();
   }).slice(0, 3);
 
+  // Handle Join button click for public view
+  const handleJoin = () => {
+    // Store crewId for signup flow
+    if (runCrewId) {
+      localStorage.setItem('pendingCrewId', runCrewId);
+    }
+    router.push('/signup');
+  };
+
+  // Public view UI (not authenticated) - Simple: Name, Card, Join Button
+  if (isPublicView) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50 flex items-center justify-center">
+        <TopNav />
+        <div className="max-w-md w-full px-6">
+          {/* Crew Card */}
+          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
+            <div className="text-center">
+              {/* Crew Logo/Icon */}
+              <div className="flex justify-center mb-6">
+                {crew.runCrewBaseInfo?.logo ? (
+                  <img
+                    src={crew.runCrewBaseInfo.logo}
+                    alt={crew.runCrewBaseInfo?.name || 'RunCrew'}
+                    className="w-24 h-24 rounded-xl object-cover border-2 border-gray-200"
+                  />
+                ) : crew.runCrewBaseInfo?.icon ? (
+                  <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-5xl border-2 border-gray-200">
+                    {crew.runCrewBaseInfo.icon}
+                  </div>
+                ) : (
+                  <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-5xl border-2 border-gray-200">
+                    🏃
+                  </div>
+                )}
+              </div>
+              
+              {/* Crew Name */}
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">
+                {crew.runCrewBaseInfo?.name}
+              </h1>
+              
+              {/* Join Button */}
+              <button
+                onClick={handleJoin}
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold text-lg transition shadow-lg hover:shadow-xl"
+              >
+                Join
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Authenticated view UI
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50">
       <TopNav />
