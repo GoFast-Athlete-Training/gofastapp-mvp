@@ -48,46 +48,115 @@ export async function resolveRunCrewByHandle(handle: string): Promise<string | n
  * @returns Public metadata or null if not found
  */
 export async function getCrewPublicMetadataByHandle(handle: string) {
-  const crew = await prisma.run_crews.findUnique({
-    where: { handle: handle.toLowerCase() },
-    select: {
-      id: true,
-      handle: true,
-      name: true,
-      description: true,
-      logo: true,
-      icon: true,
-      joinCode: true,
-      city: true,
-      state: true,
-      easyMilesPace: true, // Seconds per mile
-      crushingItPace: true, // Seconds per mile
-      purpose: true, // Array of Purpose enum
-      // Exclude: memberships, messages, announcements, runs, managers, etc.
-    },
-  });
+  try {
+    const crew = await prisma.run_crews.findUnique({
+      where: { handle: handle.toLowerCase() },
+      select: {
+        id: true,
+        handle: true,
+        name: true,
+        description: true,
+        logo: true,
+        icon: true,
+        joinCode: true,
+        city: true,
+        state: true,
+        easyMilesPace: true, // Seconds per mile
+        crushingItPace: true, // Seconds per mile
+        purpose: true, // Array of Purpose enum
+        // Include leader via relation (single query)
+        run_crew_managers: {
+          where: { role: 'admin' },
+          take: 1, // Only need first admin
+          select: {
+            Athlete: {
+              select: {
+                firstName: true,
+                lastName: true,
+                bio: true,
+              },
+            },
+          },
+        },
+        // Exclude: memberships, messages, announcements, runs, etc.
+      },
+    });
 
-  if (!crew) {
-    return null;
+    if (!crew) {
+      return null;
+    }
+
+    // Extract leader from relation (single query result)
+    // Safely handle: no managers, no admin, or relation failure
+    const leaderManager = crew.run_crew_managers?.[0];
+    const leader = leaderManager?.Athlete || null;
+
+    // Return only public fields
+    return {
+      id: crew.id,
+      handle: crew.handle,
+      name: crew.name,
+      description: crew.description,
+      logo: crew.logo,
+      icon: crew.icon,
+      joinCode: crew.joinCode,
+      city: crew.city,
+      state: crew.state,
+      easyMilesPace: crew.easyMilesPace,
+      crushingItPace: crew.crushingItPace,
+      purpose: crew.purpose,
+      leader: leader ? {
+        name: `${leader.firstName || ''} ${leader.lastName || ''}`.trim() || 'RunCrew Leader',
+        bio: leader.bio || null,
+      } : null,
+    };
+  } catch (error) {
+    console.error('Error in getCrewPublicMetadataByHandle:', error);
+    // If relation query fails, try without leader info
+    try {
+      const crew = await prisma.run_crews.findUnique({
+        where: { handle: handle.toLowerCase() },
+        select: {
+          id: true,
+          handle: true,
+          name: true,
+          description: true,
+          logo: true,
+          icon: true,
+          joinCode: true,
+          city: true,
+          state: true,
+          easyMilesPace: true,
+          crushingItPace: true,
+          purpose: true,
+        },
+      });
+
+      if (!crew) {
+        return null;
+      }
+
+      // Return without leader if relation query failed
+      return {
+        id: crew.id,
+        handle: crew.handle,
+        name: crew.name,
+        description: crew.description,
+        logo: crew.logo,
+        icon: crew.icon,
+        joinCode: crew.joinCode,
+        city: crew.city,
+        state: crew.state,
+        easyMilesPace: crew.easyMilesPace,
+        crushingItPace: crew.crushingItPace,
+        purpose: crew.purpose,
+        leader: null, // Leader unavailable due to query error
+      };
+    } catch (fallbackError) {
+      console.error('Fallback query also failed:', fallbackError);
+      throw error; // Re-throw original error
+    }
   }
-
-  // Return only public fields
-  // NOTE: Leader info removed for now - will be added via proper hydration pattern
-  return {
-    id: crew.id,
-    handle: crew.handle,
-    name: crew.name,
-    description: crew.description,
-    logo: crew.logo,
-    icon: crew.icon,
-    joinCode: crew.joinCode,
-    city: crew.city,
-    state: crew.state,
-    easyMilesPace: crew.easyMilesPace,
-    crushingItPace: crew.crushingItPace,
-    purpose: crew.purpose,
-    // leader: removed - see RUNCREW_LEADER_HYDRATION_ANALYSIS.md
-  };
 }
 
 /**

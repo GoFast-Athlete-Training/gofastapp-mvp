@@ -368,7 +368,7 @@ export default function RunCrewFrontDoorPage() {
                   <div>
                     <p className="font-medium text-gray-900 mb-1">Led by {crew.leader.name}</p>
                     {crew.leader.bio && (
-                      <p className="text-xs">{crew.leader.bio}</p>
+                      <p className="text-xs text-gray-600">{crew.leader.bio}</p>
                     )}
                   </div>
                 )}

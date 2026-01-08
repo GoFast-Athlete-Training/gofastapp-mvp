@@ -142,19 +142,32 @@ If leader info becomes a performance bottleneck, we could:
 
 ---
 
-## Current State (Temporary)
+## Implementation Status
 
-**Removed leader query for now** to avoid breaking the API endpoint.
+**✅ COMPLETED**: Leader hydration implemented using Option 1 (single query with relation)
 
-**What's missing**:
-- Leader name/bio on front door page
-- "Led by {name}" section in expandable details
+**Implementation Details**:
+- Single query includes `run_crew_managers` relation with `where: { role: 'admin' }`
+- Takes first admin (`take: 1`)
+- Safely extracts leader from relation result
+- Fallback error handling: if relation query fails, retries without leader info
+- Returns `leader: null` if no admin exists or query fails
 
-**Next Steps**:
-1. Verify Prisma relation configuration
-2. Test nested relation query in isolation
-3. Re-add leader info using Option 1 (single query with relation)
-4. Ensure error handling if no leader exists
+**Error Handling**:
+- ✅ Handles crew with no managers
+- ✅ Handles crew with no admin
+- ✅ Handles relation query failure (fallback to crew-only query)
+- ✅ Returns `leader: null` gracefully
+
+**Testing**:
+- [x] Verified Prisma relation name: `Athlete` (capital A)
+- [x] Verified relation path: `run_crews.run_crew_managers[].Athlete`
+- [x] Implemented single query with nested relation
+- [x] Added error handling with fallback
+- [ ] Test with crew that has admin
+- [ ] Test with crew that has no admin
+- [ ] Test with crew that has multiple admins
+- [ ] Verify front door page displays leader correctly
 
 ---
 
