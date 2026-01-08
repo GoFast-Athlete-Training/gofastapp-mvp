@@ -218,8 +218,10 @@ export default function SignupPage() {
       // Check for pending crew join intent - redirect to front door (NO auto-join)
       if (redirectToFrontDoorIfIntent(router)) return;
 
-      // Route based on profile completion (check gofastHandle - key indicator)
-      if (athlete.data?.gofastHandle) {
+      // Join-crew mode: redirect to front door, default: route based on profile
+      if (mode === 'join-crew' && runCrewHandle) {
+        router.replace(`/join/runcrew/${runCrewHandle}`);
+      } else if (athlete.data?.gofastHandle) {
         console.log('✅ SIGNUP: Existing athlete with profile → Welcome');
         router.replace('/welcome');
       } else {
@@ -325,8 +327,10 @@ export default function SignupPage() {
       // Check for pending crew join intent - redirect to front door (NO auto-join)
       if (redirectToFrontDoorIfIntent(router)) return;
 
-      // Route based on profile completion (check gofastHandle - key indicator)
-      if (athlete.data?.gofastHandle) {
+      // Join-crew mode: redirect to front door, default: route based on profile
+      if (mode === 'join-crew' && runCrewHandle) {
+        router.replace(`/join/runcrew/${runCrewHandle}`);
+      } else if (athlete.data?.gofastHandle) {
         console.log('✅ SIGNUP: Existing athlete with profile → Welcome');
         router.replace('/welcome');
       } else {
