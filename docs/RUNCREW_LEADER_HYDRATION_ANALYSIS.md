@@ -232,7 +232,8 @@ When re-implementing leader hydration:
 ## Summary
 
 **Problem**: Double hydration pattern (two queries) breaks API architecture  
-**Solution**: Single query with nested relation to include leader in main response  
-**Status**: Leader query removed temporarily, needs proper implementation  
-**Priority**: Medium - Leader info is nice-to-have, not critical for MVP
+**Solution**: ✅ **IMPLEMENTED** - Single query with nested relation to include leader in main response  
+**Status**: ✅ **COMPLETE** - Leader hydration working via Option 1 (single query pattern)  
+**Implementation Date**: January 2025  
+**Result**: Leader info now included in single API response, no secondary calls needed
 
