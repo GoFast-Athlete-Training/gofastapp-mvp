@@ -7,10 +7,10 @@
 			"path": "."
 		},
 		{
-			"path": "../gofastbackendv2-fall2025"
+			"path": "../gofast-fitnesssupportpro"
 		},
 		{
-			"path": "../trainingmvp"
+			"path": "../gofast-user-dashboard"
 		}
 	],
 	"settings": {}

@@ -225,3 +225,4 @@ This makes shared links work immediately (they'll go to crew page).
 4. ⏳ **Test:** Test both authenticated and unauthenticated flows
 5. ⏳ **Update:** Update member page to use join links again (if using Option 1 or 2)
 
+

@@ -150,3 +150,4 @@ All profile pictures follow the same pattern:
 5. Add profile picture to announcement creation form
 
 
+
