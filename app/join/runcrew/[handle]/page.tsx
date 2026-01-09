@@ -97,6 +97,15 @@ export default function RunCrewFrontDoorPage() {
 
         // If authenticated, check membership
         if (firebaseUser && athleteId) {
+          // Check for join intent - if exists, redirect to confirm page
+          const joinIntent = localStorage.getItem(RUNCREW_JOIN_INTENT_KEY);
+          const joinIntentHandle = localStorage.getItem(RUNCREW_JOIN_INTENT_HANDLE_KEY);
+          if (joinIntent && joinIntentHandle === handle) {
+            // User has join intent - redirect to dedicated confirm page
+            router.replace(`/join/runcrew/${handle}/confirm`);
+            return;
+          }
+
           try {
             // Check if user is a member by calling container API
             // This will return 403 if not a member, which is expected
