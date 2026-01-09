@@ -79,25 +79,7 @@ export default function JoinCrewSignupExplainerPage() {
     fetchCrew();
   }, [handle]);
 
-  // Check if already authenticated - if so, check for join intent and go to confirm
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user && crew) {
-        // Already signed in - check if we have join intent, then go to confirm
-        const joinIntent = localStorage.getItem('runCrewJoinIntent');
-        const joinIntentHandle = localStorage.getItem('runCrewJoinIntentHandle');
-        
-        if (joinIntent && joinIntentHandle === handle) {
-          // Has join intent - go to confirmation page
-          router.push(`/join/runcrew/${handle}/confirm`);
-        } else {
-          // No join intent - might already be a member, go to front door to check
-          router.push(`/join/runcrew/${handle}`);
-        }
-      }
-    });
-    return () => unsubscribe();
-  }, [crew, handle, router]);
+  // No redirects - just handle signup when user clicks button
 
   const handleGoogleSignUp = async () => {
     if (!crew) return;
