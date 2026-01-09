@@ -48,27 +48,60 @@ export async function GET(request: Request) {
     });
 
     // Format RunCrews for GoFastCompany
-    const formattedRunCrews = runCrews.map((crew) => ({
-      id: crew.id,
-      name: crew.name,
-      description: crew.description,
-      logo: crew.logo,
-      icon: crew.icon,
-      city: crew.city,
-      state: crew.state,
-      paceRange: crew.paceRange,
-      gender: crew.gender,
-      ageRange: crew.ageRange,
-      primaryMeetUpPoint: crew.primaryMeetUpPoint,
-      primaryMeetUpAddress: crew.primaryMeetUpAddress,
-      purpose: crew.purpose,
-      timePreference: crew.timePreference,
-      typicalRunMiles: crew.typicalRunMiles,
-      joinCode: crew.joinCode,
-      memberCount: crew._count.run_crew_memberships,
-      createdAt: crew.createdAt,
-      updatedAt: crew.updatedAt,
-    }));
+    const formattedRunCrews = runCrews.map((crew) => {
+      // Format pace range from easyMilesPace and crushingItPace
+      let paceRange = null;
+      if (crew.easyMilesPace && crew.crushingItPace) {
+        const easyMin = Math.floor(crew.easyMilesPace / 60);
+        const easySec = crew.easyMilesPace % 60;
+        const crushMin = Math.floor(crew.crushingItPace / 60);
+        const crushSec = crew.crushingItPace % 60;
+        paceRange = `${crushMin}:${crushSec.toString().padStart(2, '0')}-${easyMin}:${easySec.toString().padStart(2, '0')}/mile`;
+      } else if (crew.easyMilesPace) {
+        const easyMin = Math.floor(crew.easyMilesPace / 60);
+        const easySec = crew.easyMilesPace % 60;
+        paceRange = `~${easyMin}:${easySec.toString().padStart(2, '0')}/mile`;
+      }
+
+      // Format age range
+      let ageRange = null;
+      if (crew.ageMin && crew.ageMax) {
+        ageRange = `${crew.ageMin}-${crew.ageMax}`;
+      } else if (crew.ageMin) {
+        ageRange = `${crew.ageMin}+`;
+      } else if (crew.ageMax) {
+        ageRange = `up to ${crew.ageMax}`;
+      }
+
+      return {
+        id: crew.id,
+        name: crew.name,
+        description: crew.description,
+        logo: crew.logo,
+        icon: crew.icon,
+        city: crew.city,
+        state: crew.state,
+        paceRange,
+        gender: crew.gender,
+        ageRange,
+        ageMin: crew.ageMin,
+        ageMax: crew.ageMax,
+        easyMilesPace: crew.easyMilesPace,
+        crushingItPace: crew.crushingItPace,
+        primaryMeetUpPoint: crew.primaryMeetUpPoint,
+        primaryMeetUpAddress: crew.primaryMeetUpAddress,
+        purpose: crew.purpose,
+        timePreference: crew.timePreference,
+        typicalRunMiles: crew.typicalRunMiles,
+        longRunMilesMin: crew.longRunMilesMin,
+        longRunMilesMax: crew.longRunMilesMax,
+        joinCode: crew.joinCode,
+        handle: crew.handle,
+        memberCount: crew._count.run_crew_memberships,
+        createdAt: crew.createdAt,
+        updatedAt: crew.updatedAt,
+      };
+    });
 
     return NextResponse.json({
       success: true,
