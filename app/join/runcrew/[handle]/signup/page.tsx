@@ -79,12 +79,21 @@ export default function JoinCrewSignupExplainerPage() {
     fetchCrew();
   }, [handle]);
 
-  // Check if already authenticated
+  // Check if already authenticated - if so, check for join intent and go to confirm
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user && crew) {
-        // Already signed in - redirect to front door
-        router.push(`/join/runcrew/${handle}`);
+        // Already signed in - check if we have join intent, then go to confirm
+        const joinIntent = localStorage.getItem('runCrewJoinIntent');
+        const joinIntentHandle = localStorage.getItem('runCrewJoinIntentHandle');
+        
+        if (joinIntent && joinIntentHandle === handle) {
+          // Has join intent - go to confirmation page
+          router.push(`/join/runcrew/${handle}/confirm`);
+        } else {
+          // No join intent - might already be a member, go to front door to check
+          router.push(`/join/runcrew/${handle}`);
+        }
       }
     });
     return () => unsubscribe();
@@ -104,20 +113,48 @@ export default function JoinCrewSignupExplainerPage() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       
-      // Get Firebase token
-      const firebaseToken = await result.user.getIdToken();
+      // Get Firebase token (force refresh)
+      const firebaseToken = await result.user.getIdToken(true);
       localStorage.setItem('firebaseToken', firebaseToken);
 
       // Create/get athlete
-      const athleteRes = await api.post('/athlete/create', {});
+      let athleteRes;
+      try {
+        athleteRes = await api.post('/athlete/create', {});
+      } catch (createErr: any) {
+        // If create fails with 500, athlete might already exist - try hydrate
+        if (createErr?.response?.status === 500) {
+          try {
+            const hydrateRes = await api.post('/athlete/hydrate', {});
+            if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
+              athleteRes = {
+                data: {
+                  success: true,
+                  athleteId: hydrateRes.data.athlete.athleteId || hydrateRes.data.athlete.id,
+                  data: hydrateRes.data.athlete
+                }
+              };
+            } else {
+              throw createErr;
+            }
+          } catch (hydrateErr) {
+            throw createErr;
+          }
+        } else {
+          throw createErr;
+        }
+      }
       
-      if (athleteRes.data?.success) {
+      if (athleteRes?.data?.success || athleteRes?.data) {
+        const athleteId = athleteRes.data.athleteId || athleteRes.data?.athlete?.athleteId || athleteRes.data?.athlete?.id;
         localStorage.setItem('firebaseId', result.user.uid);
-        localStorage.setItem('athleteId', athleteRes.data.athleteId);
-        localStorage.setItem('email', athleteRes.data.data?.email || result.user.email || '');
+        localStorage.setItem('athleteId', athleteId);
+        localStorage.setItem('email', athleteRes.data?.data?.email || athleteRes.data?.athlete?.email || result.user.email || '');
         
-        // Redirect to confirmation page
+        // Redirect to confirmation page IMMEDIATELY
         router.push(`/join/runcrew/${handle}/confirm`);
+      } else {
+        throw new Error('Failed to create/get athlete');
       }
     } catch (err: any) {
       console.error('❌ EXPLAINER: Google signup error:', err);
@@ -158,20 +195,48 @@ export default function JoinCrewSignupExplainerPage() {
         await updateProfile(user, { displayName });
       }
 
-      // Get Firebase token
-      const firebaseToken = await user.getIdToken();
+      // Get Firebase token (force refresh)
+      const firebaseToken = await user.getIdToken(true);
       localStorage.setItem('firebaseToken', firebaseToken);
 
       // Create/get athlete
-      const athleteRes = await api.post('/athlete/create', {});
+      let athleteRes;
+      try {
+        athleteRes = await api.post('/athlete/create', {});
+      } catch (createErr: any) {
+        // If create fails with 500, athlete might already exist - try hydrate
+        if (createErr?.response?.status === 500) {
+          try {
+            const hydrateRes = await api.post('/athlete/hydrate', {});
+            if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
+              athleteRes = {
+                data: {
+                  success: true,
+                  athleteId: hydrateRes.data.athlete.athleteId || hydrateRes.data.athlete.id,
+                  data: hydrateRes.data.athlete
+                }
+              };
+            } else {
+              throw createErr;
+            }
+          } catch (hydrateErr) {
+            throw createErr;
+          }
+        } else {
+          throw createErr;
+        }
+      }
       
-      if (athleteRes.data?.success) {
+      if (athleteRes?.data?.success || athleteRes?.data) {
+        const athleteId = athleteRes.data.athleteId || athleteRes.data?.athlete?.athleteId || athleteRes.data?.athlete?.id;
         localStorage.setItem('firebaseId', user.uid);
-        localStorage.setItem('athleteId', athleteRes.data.athleteId);
-        localStorage.setItem('email', athleteRes.data.data?.email || user.email || '');
+        localStorage.setItem('athleteId', athleteId);
+        localStorage.setItem('email', athleteRes.data?.data?.email || athleteRes.data?.athlete?.email || user.email || '');
         
-        // Redirect to confirmation page
+        // Redirect to confirmation page IMMEDIATELY
         router.push(`/join/runcrew/${handle}/confirm`);
+      } else {
+        throw new Error('Failed to create/get athlete');
       }
     } catch (err: any) {
       console.error('❌ EXPLAINER: Email signup error:', err);
