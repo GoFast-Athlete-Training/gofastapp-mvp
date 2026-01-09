@@ -13,7 +13,8 @@ import { joinCrewById } from '@/lib/domain-runcrew';
  * 
  * Request body:
  * {
- *   "crewId": "clx123abc"
+ *   "crewId": "clx123abc",
+ *   "athleteId": "optional - from localStorage"
  * }
  * 
  * Returns:
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    const { crewId } = body;
+    const { crewId, athleteId: bodyAthleteId } = body;
 
     if (!crewId) {
       return NextResponse.json({ error: 'Missing crewId' }, { status: 400 });
@@ -63,10 +64,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
 
+    // Use athleteId from body (localStorage) if provided, otherwise use athlete from Firebase lookup
+    // Verify that bodyAthleteId matches authenticated athlete for security
+    const finalAthleteId = bodyAthleteId && bodyAthleteId === athlete.id 
+      ? bodyAthleteId 
+      : athlete.id;
+
     // Join crew by crewId
     let crew;
     try {
-      crew = await joinCrewById(crewId, athlete.id);
+      crew = await joinCrewById(crewId, finalAthleteId);
     } catch (err: any) {
       console.error('❌ RUNCREW JOIN: Error joining crew:', err);
       if (err.message === 'Crew not found') {

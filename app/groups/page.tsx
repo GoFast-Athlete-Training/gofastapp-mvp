@@ -5,12 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import api from '@/lib/api';
-import { LocalStorageAPI } from '@/lib/localstorage';
-import TopNav from '@/components/shared/TopNav';
-import { Search, MapPin, Users, Clock, Target, X, Check } from 'lucide-react';
+import { Search, MapPin, Users, Clock, Target, X } from 'lucide-react';
 
 interface DiscoverableRunCrew {
   id: string;
@@ -49,7 +44,22 @@ interface DiscoverableRunCrew {
   createdAt: Date;
 }
 
-export default function RunCrewDiscoveryPage() {
+/**
+ * Public Groups Discovery Page
+ * 
+ * Route: /groups
+ * 
+ * Purpose: Public discovery page from landing page link
+ * - No authentication required to view
+ * - Uses fetch() for public API calls (no auth)
+ * - Simple join flow: 9 out of 10 users → redirect to signup
+ * - Edge case: If authenticated → use localStorage athleteId
+ * 
+ * Key difference from /runcrew:
+ * - This is for NEW users coming from website
+ * - /runcrew is for AUTHENTICATED users already in app
+ */
+export default function PublicGroupsPage() {
   const router = useRouter();
   const [runCrews, setRunCrews] = useState<DiscoverableRunCrew[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +68,7 @@ export default function RunCrewDiscoveryPage() {
   const [filterState, setFilterState] = useState('');
   const [filterPurpose, setFilterPurpose] = useState<string[]>([]);
   const [filterRaceTrainingGroups, setFilterRaceTrainingGroups] = useState<boolean>(false);
-  const [filterTrainingForRace, setFilterTrainingForRace] = useState<string | null>(null); // race ID or null
+  const [filterTrainingForRace, setFilterTrainingForRace] = useState<string | null>(null);
   const [raceSearchQuery, setRaceSearchQuery] = useState('');
   const [raceSearchResults, setRaceSearchResults] = useState<any[]>([]);
   const [raceSearching, setRaceSearching] = useState(false);
@@ -73,32 +83,25 @@ export default function RunCrewDiscoveryPage() {
     citiesByState: {} 
   });
   const [loadingLocations, setLoadingLocations] = useState(true);
-  const [activeFilterBox, setActiveFilterBox] = useState<string | null>(null); // 'search' | 'location' | 'purpose' | 'raceTraining'
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [activeFilterBox, setActiveFilterBox] = useState<string | null>(null);
   const [expandedCrews, setExpandedCrews] = useState<Set<string>>(new Set());
-  const [joiningCrews, setJoiningCrews] = useState<Set<string>>(new Set());
-  const [joinedCrews, setJoinedCrews] = useState<Set<string>>(new Set());
 
+  // Simple initialization - no auth checking
   useEffect(() => {
     fetchAvailableLocations();
-    // Initial load - show all crews (no active filter)
     fetchRunCrews();
-
-    // Check auth state
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setIsAuthenticated(!!user);
-    });
-    return () => unsubscribe();
   }, []);
 
+  // Public API call - no auth required
   const fetchAvailableLocations = async () => {
     try {
       setLoadingLocations(true);
-      const response = await api.get('/runcrew/locations');
-      if (response.data.success) {
+      const response = await fetch('/api/runcrew/locations');
+      const data = await response.json();
+      if (data.success) {
         setAvailableLocations({
-          states: response.data.states || [],
-          citiesByState: response.data.citiesByState || {},
+          states: data.states || [],
+          citiesByState: data.citiesByState || {},
         });
       }
     } catch (error: any) {
@@ -108,7 +111,7 @@ export default function RunCrewDiscoveryPage() {
     }
   };
 
-  // Debounced general search - only when search box is active AND user has clicked Find
+  // Debounced search
   useEffect(() => {
     if (activeFilterBox !== 'search' || !searchQuery.trim()) return;
     
@@ -118,7 +121,7 @@ export default function RunCrewDiscoveryPage() {
 
     const timer = setTimeout(() => {
       fetchRunCrews();
-    }, 500); // 500ms debounce for search
+    }, 500);
 
     setSearchDebounceTimer(timer);
     return () => {
@@ -149,9 +152,15 @@ export default function RunCrewDiscoveryPage() {
 
     setRaceSearching(true);
     try {
-      const response = await api.post('/race/search', { query: query.trim() });
-      if (response.data.success) {
-        setRaceSearchResults(response.data.race_registry || []);
+      // Public API call - check if this endpoint is public
+      const response = await fetch('/api/race/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: query.trim() }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setRaceSearchResults(data.race_registry || []);
       } else {
         setRaceSearchResults([]);
       }
@@ -194,25 +203,12 @@ export default function RunCrewDiscoveryPage() {
     fetchRunCrews();
   };
 
-
-  // Convert pace from MM:SS to seconds
-  const convertPaceToSeconds = (paceStr: string): number | undefined => {
-    if (!paceStr.trim()) return undefined;
-    const parts = paceStr.trim().split(':');
-    if (parts.length === 2) {
-      const minutes = parseInt(parts[0]) || 0;
-      const seconds = parseInt(parts[1]) || 0;
-      return minutes * 60 + seconds;
-    }
-    return undefined;
-  };
-
+  // Public API call - no auth required
   const fetchRunCrews = async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
       
-      // Only apply the active filter box - they're independent discovery methods
       if (activeFilterBox === 'search' && searchQuery.trim()) {
         params.append('search', searchQuery.trim());
       } else if (activeFilterBox === 'location') {
@@ -228,11 +224,11 @@ export default function RunCrewDiscoveryPage() {
         }
       }
       
-      // If no active filter, show all (or limit to recent)
-      const response = await api.get(`/runcrew/discover?${params.toString()}`);
+      const response = await fetch(`/api/runcrew/discover?${params.toString()}`);
+      const data = await response.json();
       
-      if (response.data.success) {
-        setRunCrews(response.data.runCrews || []);
+      if (data.success) {
+        setRunCrews(data.runCrews || []);
       }
     } catch (error: any) {
       console.error('Error fetching runcrews:', error);
@@ -255,7 +251,6 @@ export default function RunCrewDiscoveryPage() {
   };
 
   const handleActivateFilterBox = (boxType: string) => {
-    // Reset all filters when switching boxes
     if (activeFilterBox && activeFilterBox !== boxType) {
       setFilterCity('');
       setFilterState('');
@@ -270,12 +265,28 @@ export default function RunCrewDiscoveryPage() {
     fetchRunCrews();
   };
 
-  // Use runCrews directly - filtering is done by API
+  // Join handler - uses same UX as invite flow
+  // Always redirects to explainer page which handles:
+  // - Explainer → Signup (Google/Email) → Confirm → Join API → Crew
+  const handleJoin = (crew: DiscoverableRunCrew) => {
+    // Always redirect to explainer page (same as invite flow)
+    // The explainer page has signup built in and routes to confirm
+    router.push(`/join/runcrew/${crew.handle}/signup`);
+  };
+
   const filteredCrews = runCrews;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopNav />
+      {/* Minimal header - no TopNav */}
+      <header className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <Link href="/" className="flex items-center gap-3">
+            <img src="/logo.jpg" alt="GoFast" className="w-8 h-8 rounded-full" />
+            <span className="text-xl font-bold text-gray-900">GoFast</span>
+          </Link>
+        </div>
+      </header>
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {/* Header Section */}
@@ -309,11 +320,10 @@ export default function RunCrewDiscoveryPage() {
             </Link>
           </div>
 
-          {/* Independent Filter Boxes - Choose Your Discovery Method */}
+          {/* Filter Cards - Side by Side */}
           <div className="mb-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Find RunCrews by:</h2>
             
-            {/* Filter Cards - Side by Side */}
             <div className="flex flex-col lg:flex-row items-stretch gap-4 mb-4">
               {/* Filter Card 1: Search by Name */}
               <div 
@@ -363,7 +373,6 @@ export default function RunCrewDiscoveryPage() {
                   Browse by Location
                 </label>
               <div className="space-y-2">
-                {/* Step 1: Select State */}
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">State</label>
                   <select
@@ -371,7 +380,7 @@ export default function RunCrewDiscoveryPage() {
                     onChange={(e) => {
                       const newState = e.target.value;
                       setFilterState(newState);
-                      setFilterCity(''); // Clear city when state changes
+                      setFilterCity('');
                     }}
                     className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition text-sm bg-white"
                   >
@@ -384,7 +393,6 @@ export default function RunCrewDiscoveryPage() {
                   </select>
                 </div>
                 
-                {/* Step 2: Select City (only shown if state is selected) */}
                 {filterState && (
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">City (optional)</label>
@@ -441,7 +449,6 @@ export default function RunCrewDiscoveryPage() {
                         ? filterPurpose.filter((p) => p !== purpose)
                         : [...filterPurpose, purpose];
                       setFilterPurpose(newPurpose);
-                      // Clear race filter if Training is deselected
                       if (purpose === 'Training' && filterPurpose.includes('Training')) {
                         setFilterTrainingForRace(null);
                         setSelectedFilterRace(null);
@@ -465,7 +472,6 @@ export default function RunCrewDiscoveryPage() {
               >
                 Find
               </button>
-              {/* Show specific race picker when Training is selected */}
               {filterPurpose.includes('Training') && (
                 <div className="mt-3 pt-3 border-t border-gray-200">
                   <label className="block text-xs font-semibold text-gray-700 mb-2">
@@ -574,7 +580,6 @@ export default function RunCrewDiscoveryPage() {
               </div>
             )}
           </div>
-
         </div>
 
         {/* Loading State */}
@@ -618,8 +623,6 @@ export default function RunCrewDiscoveryPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredCrews.map((crew) => {
                     const isExpanded = expandedCrews.has(crew.id);
-                    const isJoining = joiningCrews.has(crew.id);
-                    const isJoined = joinedCrews.has(crew.id);
 
                     const handleToggleDetails = () => {
                       const newExpanded = new Set(expandedCrews);
@@ -629,45 +632,6 @@ export default function RunCrewDiscoveryPage() {
                         newExpanded.add(crew.id);
                       }
                       setExpandedCrews(newExpanded);
-                    };
-
-                    const handleJoin = async () => {
-                      if (!isAuthenticated) {
-                        router.push(`/join/runcrew/${crew.handle}/signup`);
-                        return;
-                      }
-
-                      // Get athleteId from localStorage (hydrated in welcome page)
-                      const athleteId = LocalStorageAPI.getAthleteId();
-                      if (!athleteId) {
-                        // Should be hydrated, but if not, redirect to welcome to re-hydrate
-                        console.warn('⚠️ Discovery: athleteId not found in localStorage, redirecting to welcome');
-                        router.push('/welcome');
-                        return;
-                      }
-
-                      setJoiningCrews(prev => new Set(prev).add(crew.id));
-                      try {
-                        // Pass athleteId from localStorage in request body (key difference from invite flow)
-                        const response = await api.post('/runcrew/join', { 
-                          crewId: crew.id,
-                          athleteId: athleteId 
-                        });
-                        if (response.data?.success) {
-                          setJoinedCrews(prev => new Set(prev).add(crew.id));
-                        } else {
-                          throw new Error('Join failed');
-                        }
-                      } catch (err: any) {
-                        console.error('Error joining crew:', err);
-                        alert('Failed to join crew. Please try again.');
-                      } finally {
-                        setJoiningCrews(prev => {
-                          const newSet = new Set(prev);
-                          newSet.delete(crew.id);
-                          return newSet;
-                        });
-                      }
                     };
 
                     return (
@@ -814,40 +778,15 @@ export default function RunCrewDiscoveryPage() {
                             </>
                           )}
 
-                          {/* Success Message */}
-                          {isJoined && (
-                            <div className="pt-3 border-t border-gray-200">
-                              <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
-                                <div className="flex items-start gap-2 mb-2">
-                                  <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                                  <div className="flex-1">
-                                    <p className="font-semibold text-green-900 mb-1">
-                                      Congrats! Welcome to {crew.name}
-                                    </p>
-                                    <Link
-                                      href={`/runcrew/${crew.id}/member`}
-                                      className="inline-block mt-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold text-sm transition"
-                                    >
-                                      Go check out the crew
-                                    </Link>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Join Button */}
-                          {!isJoined && (
-                            <div className="pt-3 border-t border-gray-200">
-                              <button
-                                onClick={handleJoin}
-                                disabled={isJoining}
-                                className="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-semibold text-center transition disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {isJoining ? 'Joining...' : isAuthenticated ? 'Join this Crew' : 'Join this Crew'}
-                              </button>
-                            </div>
-                          )}
+                          {/* Join Button - Always redirects to invite flow */}
+                          <div className="pt-3 border-t border-gray-200">
+                            <button
+                              onClick={() => handleJoin(crew)}
+                              className="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-semibold text-center transition"
+                            >
+                              Join this Crew
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -879,3 +818,4 @@ export default function RunCrewDiscoveryPage() {
     </div>
   );
 }
+

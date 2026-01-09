@@ -419,6 +419,7 @@ export async function getDiscoverableRunCrews(options?: {
     where,
     select: {
       id: true,
+      handle: true,
       name: true,
       description: true,
       logo: true,
@@ -448,6 +449,21 @@ export async function getDiscoverableRunCrews(options?: {
           country: true,
         },
       },
+      // Include leader via memberships (run_crew_managers is deprecated)
+      run_crew_memberships: {
+        where: { role: 'admin' },
+        take: 1, // Only need first admin
+        select: {
+          Athlete: {
+            select: {
+              firstName: true,
+              lastName: true,
+              bio: true,
+              photoURL: true,
+            },
+          },
+        },
+      },
       createdAt: true,
       _count: {
         select: {
@@ -467,8 +483,18 @@ export async function getDiscoverableRunCrews(options?: {
     const easyPaceFormatted = secondsToPace(crew.easyMilesPace);
     const crushingPaceFormatted = secondsToPace(crew.crushingItPace);
     
+    // Extract leader from memberships (run_crew_managers is deprecated)
+    const adminMembership = crew.run_crew_memberships?.[0];
+    const leaderAthlete = adminMembership?.Athlete || null;
+    const leader = leaderAthlete ? {
+      name: `${leaderAthlete.firstName || ''} ${leaderAthlete.lastName || ''}`.trim() || 'RunCrew Leader',
+      bio: leaderAthlete.bio || null,
+      photoURL: leaderAthlete.photoURL || null,
+    } : null;
+    
     return {
       id: crew.id,
+      handle: crew.handle,
       name: crew.name,
       description: crew.description,
       logo: crew.logo,
@@ -506,6 +532,7 @@ export async function getDiscoverableRunCrews(options?: {
         state: crew.race_registry.state,
         country: crew.race_registry.country,
       } : null,
+      leader: leader,
       memberCount: crew._count.run_crew_memberships,
       createdAt: crew.createdAt,
     };
