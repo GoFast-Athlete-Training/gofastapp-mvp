@@ -636,7 +636,7 @@ export default function RunCrewSettingsPage() {
                   <p className="text-gray-500 text-center py-4">No admins or managers yet</p>
                 ) : (
                   adminsAndManagers.map((membershipItem: any) => {
-                    const athlete = membershipItem.Athlete || {};
+                    const athlete = membershipItem.athlete || {};
                     return (
                       <div key={membershipItem.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
                         {athlete.photoURL ? (
@@ -720,7 +720,7 @@ export default function RunCrewSettingsPage() {
                       const newOwner = memberships.find((m: any) => m.id === newOwnerMembershipId);
                       if (!newOwner) return;
                       
-                      const athlete = newOwner.Athlete || {};
+                      const athlete = newOwner.athlete || {};
                       if (confirm(`Transfer ownership to ${athlete.firstName} ${athlete.lastName}? You will become a regular member.`)) {
                         try {
                           const response = await api.post(`/runcrew/${runCrewId}/transfer-ownership`, {
@@ -743,7 +743,7 @@ export default function RunCrewSettingsPage() {
                     {memberships
                       .filter((m: any) => m.athleteId !== membership?.athleteId)
                       .map((m: any) => {
-                        const athlete = m.Athlete || {};
+                        const athlete = m.athlete || {};
                         return (
                           <option key={m.id} value={m.id}>
                             {athlete.firstName} {athlete.lastName} {m.role === 'manager' ? '(Manager)' : ''}
@@ -844,7 +844,7 @@ export default function RunCrewSettingsPage() {
                 >
                   <option value="">Choose a member...</option>
                   {availableMembers.map((membership: any) => {
-                    const athlete = membership.Athlete || {};
+                    const athlete = membership.athlete || {};
                     return (
                       <option key={membership.id} value={membership.athleteId}>
                         {athlete.firstName} {athlete.lastName}

@@ -17,13 +17,7 @@ interface Message {
   content: string;
   createdAt: string;
   updatedAt?: string;
-  athlete?: {
-    id: string;
-    firstName: string;
-    gofastHandle?: string;
-    photoURL?: string;
-  };
-  Athlete?: {
+  athlete: {
     id: string;
     firstName: string;
     gofastHandle?: string;
@@ -150,8 +144,7 @@ export default function MessageFeed({ crewId, topics = ['#general', '#runs', '#t
   };
 
   const canEditMessage = (message: Message) => {
-    const athlete = message.Athlete || message.athlete;
-    return isAdmin || (currentUserId && athlete?.id === currentUserId);
+    return isAdmin || (currentUserId && message.athlete?.id === currentUserId);
   };
 
   return (

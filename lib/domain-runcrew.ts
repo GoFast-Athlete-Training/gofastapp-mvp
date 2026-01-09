@@ -718,7 +718,7 @@ export async function hydrateCrew(runCrewId: string) {
         joinedAt: m.joinedAt,
         createdAt: m.createdAt,
         updatedAt: m.updatedAt,
-        Athlete: m.Athlete,
+        athlete: m.Athlete, // Normalize to lowercase
       })),
     },
     messagesBox: {
@@ -730,7 +730,7 @@ export async function hydrateCrew(runCrewId: string) {
         topic: m.topic,
         createdAt: m.createdAt,
         updatedAt: m.updatedAt,
-        Athlete: m.Athlete,
+        athlete: m.Athlete, // Normalize to lowercase
       })),
     },
     announcementsBox: {
@@ -743,7 +743,7 @@ export async function hydrateCrew(runCrewId: string) {
         archivedAt: a.archivedAt,
         createdAt: a.createdAt,
         updatedAt: a.updatedAt,
-        Athlete: a.Athlete,
+        athlete: a.Athlete, // Normalize to lowercase
       })),
     },
     runsBox: {
@@ -761,7 +761,7 @@ export async function hydrateCrew(runCrewId: string) {
         run_crew_run_rsvps: r.run_crew_run_rsvps.map((rsvp: any) => ({
           id: rsvp.id,
           status: rsvp.status,
-          Athlete: rsvp.Athlete,
+          athlete: rsvp.Athlete, // Normalize to lowercase
         })),
       })),
     },
