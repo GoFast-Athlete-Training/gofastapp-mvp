@@ -87,6 +87,7 @@ export default function CreateCrewPage() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
+    handle: '',
     description: '',
     city: '',
     state: '',
@@ -323,6 +324,28 @@ export default function CreateCrewPage() {
       return;
     }
 
+    // Validate handle format if provided
+    if (formData.handle.trim()) {
+      const handleRegex = /^[a-z0-9-]+$/;
+      const normalizedHandle = formData.handle.toLowerCase().trim();
+      if (!handleRegex.test(normalizedHandle)) {
+        setError('Handle can only contain lowercase letters, numbers, and hyphens');
+        return;
+      }
+      if (normalizedHandle.length < 3) {
+        setError('Handle must be at least 3 characters long');
+        return;
+      }
+      if (normalizedHandle.length > 50) {
+        setError('Handle must be 50 characters or less');
+        return;
+      }
+      if (normalizedHandle.startsWith('-') || normalizedHandle.endsWith('-')) {
+        setError('Handle cannot start or end with a hyphen');
+        return;
+      }
+    }
+
     if (!formData.purpose) {
       setError('Purpose is required');
       return;
@@ -361,6 +384,7 @@ export default function CreateCrewPage() {
       // The API will validate and convert, but we can do it here too for consistency
       const response = await api.post('/runcrew/create', {
         name: formData.name,
+        handle: formData.handle.trim() || undefined,
         description: formData.description,
         logo: logo || null,
         icon: icon || null,
@@ -498,6 +522,33 @@ export default function CreateCrewPage() {
               disabled={loading}
               required
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Public URL Handle <span className="text-gray-500 text-xs">(Optional)</span>
+            </label>
+            <input
+              type="text"
+              value={formData.handle}
+              onChange={(e) => {
+                // Auto-convert to lowercase and remove invalid characters
+                const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                setFormData({ ...formData, handle: value });
+                setError(null);
+              }}
+              placeholder="e.g., boston-runners"
+              className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
+              disabled={loading}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Used for your public URL: /join/runcrew/[handle]. If left empty, one will be auto-generated from your crew name.
+            </p>
+            {formData.handle && (
+              <p className="mt-1 text-xs text-sky-600">
+                Your URL will be: <span className="font-mono">/join/runcrew/{formData.handle.toLowerCase().trim()}</span>
+              </p>
+            )}
           </div>
 
           {/* RunCrew Graphic - iPhone style */}

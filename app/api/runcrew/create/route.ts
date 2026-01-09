@@ -41,6 +41,7 @@ export async function POST(request: Request) {
 
     const { 
       name, 
+      handle,
       description, 
       city,
       state,
@@ -68,6 +69,40 @@ export async function POST(request: Request) {
         { error: 'Name is required' },
         { status: 400 }
       );
+    }
+
+    // Validate handle format if provided
+    if (handle) {
+      const normalizedHandle = handle.toLowerCase().trim();
+      const handleRegex = /^[a-z0-9-]+$/;
+      
+      if (!handleRegex.test(normalizedHandle)) {
+        return NextResponse.json(
+          { error: 'Handle can only contain lowercase letters, numbers, and hyphens' },
+          { status: 400 }
+        );
+      }
+      
+      if (normalizedHandle.length < 3) {
+        return NextResponse.json(
+          { error: 'Handle must be at least 3 characters long' },
+          { status: 400 }
+        );
+      }
+      
+      if (normalizedHandle.length > 50) {
+        return NextResponse.json(
+          { error: 'Handle must be 50 characters or less' },
+          { status: 400 }
+        );
+      }
+      
+      if (normalizedHandle.startsWith('-') || normalizedHandle.endsWith('-')) {
+        return NextResponse.json(
+          { error: 'Handle cannot start or end with a hyphen' },
+          { status: 400 }
+        );
+      }
     }
 
     // Validate and convert pace fields from MM:SS to seconds
@@ -104,6 +139,7 @@ export async function POST(request: Request) {
     try {
       crew = await createCrew({
         name,
+        handle: handle ? handle.toLowerCase().trim() : undefined,
         description,
         athleteId: athlete.id,
         city,
