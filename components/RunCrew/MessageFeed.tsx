@@ -144,7 +144,8 @@ export default function MessageFeed({ crewId, topics = ['#general', '#runs', '#t
   };
 
   const canEditMessage = (message: Message) => {
-    return isAdmin || (currentUserId && message.athlete.id === currentUserId);
+    const athlete = message.Athlete || message.athlete;
+    return isAdmin || (currentUserId && athlete?.id === currentUserId);
   };
 
   return (

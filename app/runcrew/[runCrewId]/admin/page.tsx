@@ -587,23 +587,27 @@ export default function RunCrewAdminPage() {
               ) : (
                 <div className="space-y-2 max-h-[300px] overflow-y-auto">
                   {memberships.map((membership: any) => {
-                    const athlete = membership.athlete || {};
+                    // API returns Athlete (capital A), not athlete
+                    const athlete = membership.Athlete || membership.athlete || {};
+                    const displayName = athlete.firstName && athlete.lastName
+                      ? `${athlete.firstName} ${athlete.lastName}`
+                      : athlete.firstName || athlete.gofastHandle || 'Athlete';
                     return (
                       <div key={membership.id} className="flex items-center gap-2 p-2 border border-gray-200 rounded hover:bg-gray-50 transition">
                         {athlete.photoURL ? (
                           <img
                             src={athlete.photoURL}
-                            alt={`${athlete.firstName} ${athlete.lastName}`}
+                            alt={displayName}
                             className="w-8 h-8 rounded-full object-cover border border-gray-200"
                           />
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white font-semibold text-xs">
-                            {(athlete.firstName?.[0] || 'A').toUpperCase()}
+                            {(athlete.firstName?.[0] || athlete.gofastHandle?.[0] || 'A').toUpperCase()}
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold text-gray-900 truncate">
-                            {athlete.firstName || 'Athlete'} {athlete.lastName || ''}
+                            {displayName}
                             {membership.role === 'admin' && <span className="text-orange-600 text-xs font-bold ml-1">Admin</span>}
                           </p>
                         </div>
@@ -667,22 +671,26 @@ export default function RunCrewAdminPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
                         {/* Author Profile Picture */}
-                        {activeAnnouncement.athlete?.photoURL ? (
-                          <img
-                            src={activeAnnouncement.athlete.photoURL}
-                            alt={activeAnnouncement.athlete.firstName || 'Author'}
-                            className="w-6 h-6 rounded-full object-cover border border-gray-200"
-                          />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-semibold border border-gray-200">
-                            {(activeAnnouncement.athlete?.firstName?.[0] || 'A').toUpperCase()}
-                          </div>
+                        {(activeAnnouncement.Athlete || activeAnnouncement.athlete) && (
+                          <>
+                            {(activeAnnouncement.Athlete || activeAnnouncement.athlete)?.photoURL ? (
+                              <img
+                                src={(activeAnnouncement.Athlete || activeAnnouncement.athlete).photoURL}
+                                alt={(activeAnnouncement.Athlete || activeAnnouncement.athlete).firstName || 'Author'}
+                                className="w-6 h-6 rounded-full object-cover border border-gray-200"
+                              />
+                            ) : (
+                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-semibold border border-gray-200">
+                                {((activeAnnouncement.Athlete || activeAnnouncement.athlete)?.firstName?.[0] || 'A').toUpperCase()}
+                              </div>
+                            )}
+                            <span>
+                              {(activeAnnouncement.Athlete || activeAnnouncement.athlete)?.firstName
+                                ? `${(activeAnnouncement.Athlete || activeAnnouncement.athlete).firstName}${(activeAnnouncement.Athlete || activeAnnouncement.athlete).lastName ? ` ${(activeAnnouncement.Athlete || activeAnnouncement.athlete).lastName}` : ''}`
+                                : 'Admin'}
+                            </span>
+                          </>
                         )}
-                        <span>
-                      {activeAnnouncement.athlete?.firstName
-                        ? `${activeAnnouncement.athlete.firstName}${activeAnnouncement.athlete.lastName ? ` ${activeAnnouncement.athlete.lastName}` : ''}`
-                        : 'Admin'}
-                        </span>
                         <span>•</span>
                         <span>
                           {activeAnnouncement.createdAt
