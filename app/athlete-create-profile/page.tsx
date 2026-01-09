@@ -302,7 +302,16 @@ export default function AthleteCreateProfilePage() {
 
       // Navigate to runcrew explainer page after profile setup
       console.log('🏃 Navigating to runcrew explainer page...');
-      router.push('/runcrew');
+      // Check for join intent - if exists, redirect to confirm page
+      const joinIntent = localStorage.getItem('runCrewJoinIntent');
+      const joinIntentHandle = localStorage.getItem('runCrewJoinIntentHandle');
+      if (joinIntent && joinIntentHandle) {
+        // User was joining a crew - redirect to confirmation page
+        router.push(`/join/runcrew/${joinIntentHandle}/confirm`);
+      } else {
+        // Normal flow - go to runcrew list
+        router.push('/runcrew');
+      }
       
     } catch (err: any) {
       console.error('❌ Profile creation failed:', err);

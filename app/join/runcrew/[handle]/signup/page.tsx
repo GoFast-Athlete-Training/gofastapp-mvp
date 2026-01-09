@@ -131,12 +131,23 @@ export default function JoinCrewSignupExplainerPage() {
       
       if (athleteRes?.data?.success || athleteRes?.data) {
         const athleteId = athleteRes.data.athleteId || athleteRes.data?.athlete?.athleteId || athleteRes.data?.athlete?.id;
+        const athleteData = athleteRes.data?.data || athleteRes.data?.athlete;
         localStorage.setItem('firebaseId', result.user.uid);
         localStorage.setItem('athleteId', athleteId);
-        localStorage.setItem('email', athleteRes.data?.data?.email || athleteRes.data?.athlete?.email || result.user.email || '');
+        localStorage.setItem('email', athleteData?.email || result.user.email || '');
         
-        // Redirect to confirmation page IMMEDIATELY
-        router.push(`/join/runcrew/${handle}/confirm`);
+        // Store join intent for profile creation page
+        localStorage.setItem(RUNCREW_JOIN_INTENT_KEY, crew.id);
+        localStorage.setItem(RUNCREW_JOIN_INTENT_HANDLE_KEY, handle);
+        
+        // Check if profile is complete (has gofastHandle)
+        if (athleteData?.gofastHandle) {
+          // Profile complete - go to confirmation
+          router.push(`/join/runcrew/${handle}/confirm`);
+        } else {
+          // No profile - go to profile creation (will redirect to confirm after)
+          router.push('/athlete-create-profile');
+        }
       } else {
         throw new Error('Failed to create/get athlete');
       }
@@ -215,12 +226,23 @@ export default function JoinCrewSignupExplainerPage() {
       
       if (athleteRes?.data?.success || athleteRes?.data) {
         const athleteId = athleteRes.data.athleteId || athleteRes.data?.athlete?.athleteId || athleteRes.data?.athlete?.id;
+        const athleteData = athleteRes.data?.data || athleteRes.data?.athlete;
         localStorage.setItem('firebaseId', user.uid);
         localStorage.setItem('athleteId', athleteId);
-        localStorage.setItem('email', athleteRes.data?.data?.email || athleteRes.data?.athlete?.email || user.email || '');
+        localStorage.setItem('email', athleteData?.email || user.email || '');
         
-        // Redirect to confirmation page IMMEDIATELY
-        router.push(`/join/runcrew/${handle}/confirm`);
+        // Store join intent for profile creation page
+        localStorage.setItem(RUNCREW_JOIN_INTENT_KEY, crew.id);
+        localStorage.setItem(RUNCREW_JOIN_INTENT_HANDLE_KEY, handle);
+        
+        // Check if profile is complete (has gofastHandle)
+        if (athleteData?.gofastHandle) {
+          // Profile complete - go to confirmation
+          router.push(`/join/runcrew/${handle}/confirm`);
+        } else {
+          // No profile - go to profile creation (will redirect to confirm after)
+          router.push('/athlete-create-profile');
+        }
       } else {
         throw new Error('Failed to create/get athlete');
       }
