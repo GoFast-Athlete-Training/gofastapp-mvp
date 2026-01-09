@@ -127,8 +127,8 @@ export default function JoinConfirmationPage() {
         localStorage.removeItem(RUNCREW_JOIN_INTENT_KEY);
         localStorage.removeItem(RUNCREW_JOIN_INTENT_HANDLE_KEY);
         
-        // Redirect to container (user is now a member)
-        router.replace(`/runcrew/${response.data.runCrew.id}`);
+        // Redirect directly to member page (user is now a member)
+        router.replace(`/runcrew/${response.data.runCrew.id}/member`);
       } else {
         throw new Error('Join failed');
       }
