@@ -92,7 +92,7 @@ export default function JoinConfirmationPage() {
           api.get(`/runcrew/${crew.id}`)
             .then(() => {
               // Already a member - redirect to container
-              router.replace(`/runcrew/${crew.id}`);
+              router.replace(`/runcrew/${crew.id}/member`);
             })
             .catch(() => {
               // Not a member - show confirmation
@@ -127,8 +127,8 @@ export default function JoinConfirmationPage() {
         localStorage.removeItem(RUNCREW_JOIN_INTENT_KEY);
         localStorage.removeItem(RUNCREW_JOIN_INTENT_HANDLE_KEY);
         
-        // Redirect directly to member page (user is now a member)
-        router.replace(`/runcrew/${response.data.runCrew.id}/member`);
+        // Redirect to success page (user is now a member)
+        router.replace(`/runcrew/${response.data.runCrew.id}/join-success`);
       } else {
         throw new Error('Join failed');
       }

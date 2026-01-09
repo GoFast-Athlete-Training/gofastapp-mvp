@@ -111,9 +111,9 @@ export default function RunCrewFrontDoorPage() {
             // This will return 403 if not a member, which is expected
             const memberCheck = await api.get(`/runcrew/${data.runCrew.id}`);
             if (memberCheck.data?.success) {
-              // User is a member - redirect to container
+              // User is a member - redirect to member page
               setIsMember(true);
-              router.replace(`/runcrew/${data.runCrew.id}`);
+              router.replace(`/runcrew/${data.runCrew.id}/member`);
               return;
             }
           } catch (err: any) {
@@ -168,8 +168,8 @@ export default function RunCrewFrontDoorPage() {
         // Clear join intent
         localStorage.removeItem(RUNCREW_JOIN_INTENT_KEY);
         localStorage.removeItem(RUNCREW_JOIN_INTENT_HANDLE_KEY);
-        // Redirect directly to member page (user is now a member)
-        router.replace(`/runcrew/${response.data.runCrew.id}/member`);
+        // Redirect to success page (user is now a member)
+        router.replace(`/runcrew/${response.data.runCrew.id}/join-success`);
       } else {
         throw new Error('Join failed');
       }
