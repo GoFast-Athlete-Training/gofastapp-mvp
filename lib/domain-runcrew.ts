@@ -590,6 +590,7 @@ export async function hydrateCrew(runCrewId: string) {
     where: { id: runCrewId },
     select: {
       id: true,
+      handle: true,
       name: true,
       description: true,
       joinCode: true,
@@ -701,6 +702,7 @@ export async function hydrateCrew(runCrewId: string) {
   return {
     runCrewBaseInfo: {
       runCrewId: crew.id,
+      handle: crew.handle,
       name: crew.name,
       description: crew.description,
       joinCode: crew.joinCode,
