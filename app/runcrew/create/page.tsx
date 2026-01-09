@@ -330,12 +330,12 @@ export default function CreateCrewPage() {
       return;
     }
 
-    // Validate handle format
+    // Validate handle format (letters and numbers only, like Instagram)
     if (formData.handle.trim()) {
-      const handleRegex = /^[a-z0-9-]+$/;
+      const handleRegex = /^[a-z0-9]+$/;
       const normalizedHandle = formData.handle.toLowerCase().trim();
       if (!handleRegex.test(normalizedHandle)) {
-        setError('Handle can only contain lowercase letters, numbers, and hyphens');
+        setError('Handle can only contain lowercase letters and numbers');
         return;
       }
       if (normalizedHandle.length < 3) {
@@ -344,10 +344,6 @@ export default function CreateCrewPage() {
       }
       if (normalizedHandle.length > 50) {
         setError('Handle must be 50 characters or less');
-        return;
-      }
-      if (normalizedHandle.startsWith('-') || normalizedHandle.endsWith('-')) {
-        setError('Handle cannot start or end with a hyphen');
         return;
       }
     }
@@ -531,26 +527,25 @@ export default function CreateCrewPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
               Handle Name <span className="text-red-500">*</span>
             </label>
+            <p className="text-xs text-gray-500 mb-2">
+              Single word for how people can find you
+            </p>
             <input
               type="text"
               value={formData.handle}
               onChange={(e) => {
-                // Auto-convert to lowercase and remove invalid characters
-                const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                // Auto-convert to lowercase and remove invalid characters (letters and numbers only, like Instagram)
+                const value = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '');
                 setFormData({ ...formData, handle: value });
                 setError(null);
               }}
-              placeholder="e.g., boston-runners"
               className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
               disabled={loading}
               required
             />
-            <p className="mt-1 text-xs text-gray-500">
-              A unique identifier for your crew. Use lowercase letters, numbers, and hyphens.
-            </p>
           </div>
 
           {/* RunCrew Graphic - iPhone style */}

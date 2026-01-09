@@ -71,14 +71,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate handle format if provided
+    // Validate handle format (letters and numbers only, like Instagram)
     if (handle) {
       const normalizedHandle = handle.toLowerCase().trim();
-      const handleRegex = /^[a-z0-9-]+$/;
+      const handleRegex = /^[a-z0-9]+$/;
       
       if (!handleRegex.test(normalizedHandle)) {
         return NextResponse.json(
-          { error: 'Handle can only contain lowercase letters, numbers, and hyphens' },
+          { error: 'Handle can only contain lowercase letters and numbers' },
           { status: 400 }
         );
       }
@@ -93,13 +93,6 @@ export async function POST(request: Request) {
       if (normalizedHandle.length > 50) {
         return NextResponse.json(
           { error: 'Handle must be 50 characters or less' },
-          { status: 400 }
-        );
-      }
-      
-      if (normalizedHandle.startsWith('-') || normalizedHandle.endsWith('-')) {
-        return NextResponse.json(
-          { error: 'Handle cannot start or end with a hyphen' },
           { status: 400 }
         );
       }

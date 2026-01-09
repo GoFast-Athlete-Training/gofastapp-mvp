@@ -181,21 +181,18 @@ function generateJoinCode(name: string): string {
 
 /**
  * Generate a handle from crew name
- * Converts to lowercase, removes special chars, handles collisions
+ * Converts to lowercase, removes special chars (letters and numbers only, like Instagram)
  */
 function generateHandle(name: string): string {
-  // Convert to lowercase, remove special chars, replace spaces with hyphens
+  // Convert to lowercase, keep only letters and numbers
   let base = name
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9\s-]/g, '') // Remove special chars
-    .replace(/\s+/g, '-') // Replace spaces with hyphens
-    .replace(/-+/g, '-') // Collapse multiple hyphens
-    .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+    .replace(/[^a-z0-9]/g, ''); // Remove everything except letters and numbers
   
   // Ensure minimum length
   if (base.length < 3) {
-    base = base + '-crew';
+    base = base + 'crew';
   }
   
   return base;
@@ -242,14 +239,14 @@ export async function createCrew(data: {
       if (!existing) {
         break; // Found unique handle
       }
-      // Append number to make unique
-      handle = `${baseHandle}-${attempts + 1}`;
+      // Append number to make unique (no hyphens, like Instagram)
+      handle = `${baseHandle}${attempts + 1}`;
       attempts++;
     }
     
     // Final fallback
     if (attempts >= 20) {
-      handle = `${baseHandle}-${Date.now()}`;
+      handle = `${baseHandle}${Date.now()}`;
     }
   } else {
     // Validate handle is unique
