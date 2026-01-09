@@ -14,14 +14,27 @@ api.interceptors.request.use(async (config) => {
     try {
       // Force refresh to get the latest token
       const token = await user.getIdToken(true);
-      config.headers['Authorization'] = `Bearer ${token}`;
+      if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        console.error('❌ API: Got empty token from Firebase');
+      }
     } catch (error) {
       console.error('❌ API: Failed to get token:', error);
-      // Don't block the request, but log the error
+      // Try to get token without force refresh
+      try {
+        const token = await user.getIdToken(false);
+        if (token) {
+          config.headers['Authorization'] = `Bearer ${token}`;
+        }
+      } catch (fallbackError) {
+        console.error('❌ API: Fallback token get also failed:', fallbackError);
+      }
     }
   } else {
     // No user - this will cause 401, but let the response interceptor handle it
     console.warn('⚠️ API: No Firebase user found - request may fail with 401');
+    console.warn('⚠️ API: Current path:', typeof window !== 'undefined' ? window.location.pathname : 'server');
   }
   return config;
 });

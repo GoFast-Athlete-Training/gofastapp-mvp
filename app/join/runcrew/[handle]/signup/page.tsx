@@ -95,9 +95,17 @@ export default function JoinCrewSignupExplainerPage() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       
+      // Wait for auth state to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Get Firebase token (force refresh)
       const firebaseToken = await result.user.getIdToken(true);
       localStorage.setItem('firebaseToken', firebaseToken);
+      
+      // Ensure auth.currentUser is set (for API interceptor)
+      if (!auth.currentUser) {
+        throw new Error('Auth state not ready');
+      }
 
       // Create/get athlete
       let athleteRes;
@@ -177,9 +185,17 @@ export default function JoinCrewSignupExplainerPage() {
         await updateProfile(user, { displayName });
       }
 
+      // Wait for auth state to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // Get Firebase token (force refresh)
       const firebaseToken = await user.getIdToken(true);
       localStorage.setItem('firebaseToken', firebaseToken);
+      
+      // Ensure auth.currentUser is set (for API interceptor)
+      if (!auth.currentUser) {
+        throw new Error('Auth state not ready');
+      }
 
       // Create/get athlete
       let athleteRes;
