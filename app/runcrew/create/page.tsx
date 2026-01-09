@@ -324,7 +324,13 @@ export default function CreateCrewPage() {
       return;
     }
 
-    // Validate handle format if provided
+    // Handle is required
+    if (!formData.handle.trim()) {
+      setError('Handle name is required');
+      return;
+    }
+
+    // Validate handle format
     if (formData.handle.trim()) {
       const handleRegex = /^[a-z0-9-]+$/;
       const normalizedHandle = formData.handle.toLowerCase().trim();
@@ -526,7 +532,7 @@ export default function CreateCrewPage() {
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Public URL Handle <span className="text-gray-500 text-xs">(Optional)</span>
+              Handle Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -540,15 +546,11 @@ export default function CreateCrewPage() {
               placeholder="e.g., boston-runners"
               className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
               disabled={loading}
+              required
             />
             <p className="mt-1 text-xs text-gray-500">
-              Used for your public URL: /join/runcrew/[handle]. If left empty, one will be auto-generated from your crew name.
+              A unique identifier for your crew. Use lowercase letters, numbers, and hyphens.
             </p>
-            {formData.handle && (
-              <p className="mt-1 text-xs text-sky-600">
-                Your URL will be: <span className="font-mono">/join/runcrew/{formData.handle.toLowerCase().trim()}</span>
-              </p>
-            )}
           </div>
 
           {/* RunCrew Graphic - iPhone style */}
