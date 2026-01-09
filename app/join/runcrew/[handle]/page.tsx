@@ -206,10 +206,10 @@ export default function RunCrewFrontDoorPage() {
           <h2 className="text-xl font-semibold text-gray-900 mb-2">RunCrew Not Found</h2>
           <p className="text-gray-600 mb-4">The RunCrew you're looking for doesn't exist.</p>
           <Link
-            href="/runcrew"
+            href="/my-runcrews"
             className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
           >
-            Back to RunCrews
+            My RunCrews
           </Link>
         </div>
       </div>
@@ -223,10 +223,10 @@ export default function RunCrewFrontDoorPage() {
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Error</h2>
           <p className="text-gray-600 mb-4">Failed to load RunCrew data.</p>
           <Link
-            href="/runcrew"
+            href="/my-runcrews"
             className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
           >
-            Back to RunCrews
+            My RunCrews
           </Link>
         </div>
       </div>

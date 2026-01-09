@@ -291,6 +291,19 @@ export default function RunCrewSettingsPage() {
       if (response.data.success) {
         setDeletedCrewName(crewName);
         setShowDeleteConfirm(false);
+        // Refresh localStorage to get updated crew list
+        try {
+          const hydrateRes = await api.post('/athlete/hydrate');
+          if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
+            LocalStorageAPI.setFullHydrationModel({
+              athlete: hydrateRes.data.athlete,
+              weeklyActivities: hydrateRes.data.athlete.weeklyActivities || [],
+              weeklyTotals: hydrateRes.data.athlete.weeklyTotals || null,
+            });
+          }
+        } catch (hydrateErr) {
+          console.error('Error refreshing data:', hydrateErr);
+        }
         setShowDeleteSuccess(true);
       }
     } catch (err: any) {
@@ -343,10 +356,10 @@ export default function RunCrewSettingsPage() {
              'You don\'t have access to this RunCrew.'}
           </p>
           <Link
-            href="/runcrew"
+            href="/my-runcrews"
             className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
           >
-            Back to RunCrews
+            My RunCrews
           </Link>
         </div>
       </div>
@@ -360,10 +373,10 @@ export default function RunCrewSettingsPage() {
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Error</h2>
           <p className="text-gray-600 mb-4">Failed to load RunCrew settings.</p>
           <Link
-            href="/runcrew"
+            href="/my-runcrews"
             className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
           >
-            Back to RunCrews
+            My RunCrews
           </Link>
         </div>
       </div>
@@ -766,7 +779,29 @@ export default function RunCrewSettingsPage() {
                           const response = await api.post(`/runcrew/${runCrewId}/archive`);
                           if (response.data.success) {
                             showToast('RunCrew archived successfully');
-                            router.push('/runcrew');
+                            // Refresh localStorage to get updated crew list
+                            try {
+                              const hydrateRes = await api.post('/athlete/hydrate');
+                              if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
+                                LocalStorageAPI.setFullHydrationModel({
+                                  athlete: hydrateRes.data.athlete,
+                                  weeklyActivities: hydrateRes.data.athlete.weeklyActivities || [],
+                                  weeklyTotals: hydrateRes.data.athlete.weeklyTotals || null,
+                                });
+                                // Check if user still has crews (including archived)
+                                const memberships = hydrateRes.data.athlete.runCrewMemberships || [];
+                                if (memberships.length > 0) {
+                                  router.push('/my-runcrews');
+                                } else {
+                                  router.push('/runcrew');
+                                }
+                              } else {
+                                router.push('/my-runcrews');
+                              }
+                            } catch (hydrateErr) {
+                              console.error('Error refreshing data:', hydrateErr);
+                              router.push('/my-runcrews');
+                            }
                           }
                         } catch (err: any) {
                           console.error('Error archiving crew:', err);
@@ -951,18 +986,40 @@ export default function RunCrewSettingsPage() {
               </p>
             </div>
             <div className="space-y-3">
-              <button
-                onClick={() => router.push('/runcrew')}
-                className="w-full px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition"
-              >
-                Create Another RunCrew
-              </button>
-              <button
-                onClick={() => router.push('/runcrew')}
-                className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
-              >
-                Join a RunCrew
-              </button>
+              {/* Check if user has other crews remaining */}
+              {(() => {
+                const model = LocalStorageAPI.getFullHydrationModel();
+                const memberships = model?.athlete?.runCrewMemberships || [];
+                const hasOtherCrews = memberships.length > 0;
+                
+                if (hasOtherCrews) {
+                  return (
+                    <button
+                      onClick={() => router.push('/my-runcrews')}
+                      className="w-full px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition"
+                    >
+                      My RunCrews
+                    </button>
+                  );
+                } else {
+                  return (
+                    <>
+                      <button
+                        onClick={() => router.push('/runcrew')}
+                        className="w-full px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition"
+                      >
+                        Create Another RunCrew
+                      </button>
+                      <button
+                        onClick={() => router.push('/runcrew')}
+                        className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
+                      >
+                        Join a RunCrew
+                      </button>
+                    </>
+                  );
+                }
+              })()}
             </div>
           </div>
         </div>

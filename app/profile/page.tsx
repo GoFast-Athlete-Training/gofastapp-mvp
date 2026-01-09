@@ -92,7 +92,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <TopNav showBack backUrl="/runcrew" backLabel="Back to RunCrews" />
+      <TopNav showBack backUrl="/my-runcrews" backLabel="My RunCrews" />
 
       <div className="max-w-4xl mx-auto px-6 py-8">
         {/* Profile Header */}

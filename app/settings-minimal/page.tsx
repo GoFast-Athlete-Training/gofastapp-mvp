@@ -32,10 +32,10 @@ export default function MinimalSettingsPage() {
             <p className="text-gray-600">Manage your account</p>
           </div>
           <button
-            onClick={() => router.push('/athlete')}
+            onClick={() => router.push('/my-runcrews')}
             className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
           >
-            ← Back to Home
+            ← My RunCrews
           </button>
         </div>
 

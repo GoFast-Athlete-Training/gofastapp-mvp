@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
-import { Settings } from 'lucide-react';
+// MVP1: Settings deprecated
+// import { Settings } from 'lucide-react';
 
 interface TopNavProps {
   showBack?: boolean;
@@ -41,7 +42,7 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
         <div className="flex items-center justify-between">
           {/* Left: Logo */}
           <div className="flex items-center gap-3">
-            <Link href="/welcome" className="flex items-center gap-3">
+            <Link href="/my-runcrews" className="flex items-center gap-3">
               <img src="/logo.jpg" alt="GoFast" className="w-8 h-8 rounded-full" />
               <span className="text-xl font-bold text-gray-900 hidden sm:inline">GoFast</span>
             </Link>
@@ -79,7 +80,8 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
               </span>
             </Link>
 
-            {/* Settings Button */}
+            {/* MVP1: Settings deprecated - Profile management via profile icon */}
+            {/* Settings Button - COMMENTED OUT FOR MVP1
             <Link
               href="/settings"
               className="flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-gray-600 hover:text-gray-900 rounded-lg font-medium hover:bg-gray-100 transition"
@@ -87,6 +89,7 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
               <Settings className="h-5 w-5" />
               <span className="hidden sm:inline text-sm">Settings</span>
             </Link>
+            */}
 
             {/* Sign Out Button */}
             <button
