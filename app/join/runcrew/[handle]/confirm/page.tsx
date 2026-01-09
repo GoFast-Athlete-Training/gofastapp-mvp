@@ -91,7 +91,7 @@ export default function JoinConfirmationPage() {
           // Check if already a member
           api.get(`/runcrew/${crew.id}`)
             .then(() => {
-              // Already a member - redirect to container
+              // Already a member - redirect to member page
               router.replace(`/runcrew/${crew.id}/member`);
             })
             .catch(() => {
