@@ -3,8 +3,42 @@
 export const dynamic = 'force-dynamic';
 
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+// MVP1: Settings page deprecated - redirecting to profile edit
+// Profile management is now done via the profile icon in navigation
+// All Garmin connection code preserved below for MVP2
+
+export default function SettingsPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // MVP1: Settings page is redundant - redirect to profile edit
+    // Users can manage their profile by clicking the profile icon
+    router.replace('/athlete-edit-profile');
+  }, [router]);
+
+  return null;
+}
+
+/* 
+ * ============================================================================
+ * MVP1: SETTINGS PAGE DEPRECATED
+ * ============================================================================
+ * 
+ * The settings page has been deprecated for MVP1 because:
+ * - Profile management is now accessible via the profile icon in navigation
+ * - Settings page was redundant (just showed profile info and linked to edit)
+ * 
+ * All Garmin connection code is preserved below for MVP2 re-enablement.
+ * 
+ * ============================================================================
+ * ORIGINAL SETTINGS PAGE CODE (PRESERVED FOR MVP2)
+ * ============================================================================
+ */
+
+/*
 import { LocalStorageAPI } from '@/lib/localstorage';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import api from '@/lib/api';
 import TopNav from '@/components/shared/TopNav';
@@ -49,6 +83,17 @@ export default function SettingsPage() {
       console.error('Error refreshing athlete data:', error);
     }
   };
+
+  // ============================================================================
+  // GARMIN CONNECTION CODE - PRESERVED FOR MVP2
+  // ============================================================================
+  // All Garmin connection functionality is preserved below.
+  // To re-enable for MVP2:
+  // 1. Uncomment the code below
+  // 2. Restore the connections state
+  // 3. Add Garmin connection UI to the settings page
+  // 4. Uncomment Settings button in TopNav and AthleteHeader
+  // ============================================================================
 
   // PHASE 1: Garmin functions DEPRECATED - Commented out but code preserved
   /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -230,6 +275,14 @@ export default function SettingsPage() {
   };
   /* eslint-enable @typescript-eslint/no-unused-vars */
 
+  // ============================================================================
+  // ORIGINAL SETTINGS PAGE UI (PRESERVED FOR MVP2)
+  // ============================================================================
+  // To restore the settings page UI, uncomment the return statement below
+  // and restore the connections state at the top of the component
+  // ============================================================================
+
+  /*
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNav />
@@ -286,6 +339,39 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Garmin Connection Section - FOR MVP2 */}
+        {/* Uncomment this section when re-enabling Garmin for MVP2
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Device Connections</h2>
+          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">Garmin Connect</h3>
+                <p className="text-sm text-gray-500">
+                  {connections.garmin ? 'Connected' : 'Connect your Garmin device to sync activities'}
+                </p>
+              </div>
+              {connections.garmin ? (
+                <button
+                  onClick={disconnectGarmin}
+                  className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition"
+                >
+                  Disconnect
+                </button>
+              ) : (
+                <button
+                  onClick={connectGarmin}
+                  disabled={loading}
+                  className="px-4 py-2 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition disabled:opacity-50"
+                >
+                  {loading ? 'Connecting...' : 'Connect Garmin'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+        */}
+
         {/* Info Section */}
         <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
           <p className="text-sm text-blue-800">
@@ -295,4 +381,5 @@ export default function SettingsPage() {
       </div>
     </div>
   );
+  */
 }

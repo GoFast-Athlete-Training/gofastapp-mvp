@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
-import { Settings } from 'lucide-react';
+// MVP1: Settings deprecated
+// import { Settings } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 export default function AthleteHeader() {
@@ -52,6 +53,8 @@ export default function AthleteHeader() {
               </span>
             )}
           </button>
+          {/* MVP1: Settings deprecated - Profile management via profile icon */}
+          {/* Settings Button - COMMENTED OUT FOR MVP1
           <button
             onClick={(e) => {
               e.preventDefault();
@@ -66,6 +69,7 @@ export default function AthleteHeader() {
             <Settings className="h-5 w-5" />
             <span>Settings</span>
           </button>
+          */}
           <button
             onClick={handleSignOut}
             className="px-4 py-2 text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100 transition"
