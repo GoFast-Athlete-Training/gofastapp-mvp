@@ -40,7 +40,6 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
-        athleteId: false, // Not a field in schema
         firebaseId: true,
         email: true,
         firstName: true,
