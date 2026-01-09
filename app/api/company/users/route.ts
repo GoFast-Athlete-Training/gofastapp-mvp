@@ -4,6 +4,19 @@ import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 
+// CORS headers for GoFastCompany HQ
+const corsHeaders = {
+  'Access-Control-Allow-Origin': 'https://gofasthq.gofastcrushgoals.com',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Max-Age': '86400',
+};
+
+// Handle OPTIONS preflight request
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 /**
  * GET /api/company/users
  * 
@@ -18,10 +31,13 @@ export async function GET(request: Request) {
     // Verify Firebase token
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Unauthorized' 
-      }, { status: 401 });
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Unauthorized' 
+        },
+        { status: 401, headers: corsHeaders }
+      );
     }
 
     let decodedToken;
@@ -29,10 +45,13 @@ export async function GET(request: Request) {
       decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
     } catch (err: any) {
       console.error('❌ COMPANY USERS: Token verification failed:', err?.message);
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Invalid token' 
-      }, { status: 401 });
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Invalid token' 
+        },
+        { status: 401, headers: corsHeaders }
+      );
     }
 
     // Fetch all athletes with relevant fields
@@ -100,18 +119,24 @@ export async function GET(request: Request) {
       },
     }));
 
-    return NextResponse.json({
-      success: true,
-      athletes: formattedAthletes,
-      count: formattedAthletes.length,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        athletes: formattedAthletes,
+        count: formattedAthletes.length,
+      },
+      { headers: corsHeaders }
+    );
   } catch (err: any) {
     console.error('❌ COMPANY USERS: Error:', err);
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Server error',
-      details: err?.message 
-    }, { status: 500 });
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Server error',
+        details: err?.message 
+      },
+      { status: 500, headers: corsHeaders }
+    );
   }
 }
 
