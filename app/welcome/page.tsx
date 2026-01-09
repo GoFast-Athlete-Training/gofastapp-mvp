@@ -48,7 +48,10 @@ export default function WelcomePage() {
       if (typeof window !== 'undefined') {
         const existingModel = LocalStorageAPI.getFullHydrationModel();
         if (existingModel?.athlete) {
-          console.log('✅ Welcome: Already hydrated, redirecting to /my-runcrews');
+          // Only log if we're actually on the welcome page (not being redirected from elsewhere)
+          if (window.location.pathname === '/welcome') {
+            console.log('✅ Welcome: Already hydrated, redirecting to /my-runcrews');
+          }
           hasProcessedRef.current = true;
           router.replace('/my-runcrews');
           return;

@@ -47,12 +47,18 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
               <span className="text-xl font-bold text-gray-900 hidden sm:inline">GoFast</span>
             </Link>
             {showBack && backUrl && (
-              <Link
-                href={backUrl}
-                className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition ml-4"
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log(`🔵 TopNav: Navigating to ${backUrl}`);
+                  router.push(backUrl);
+                }}
+                className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition ml-4 cursor-pointer"
+                type="button"
               >
                 ← {backLabel}
-              </Link>
+              </button>
             )}
           </div>
 
