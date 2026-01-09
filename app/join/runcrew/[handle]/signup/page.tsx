@@ -10,6 +10,9 @@ import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 
+const RUNCREW_JOIN_INTENT_KEY = 'runCrewJoinIntent';
+const RUNCREW_JOIN_INTENT_HANDLE_KEY = 'runCrewJoinIntentHandle';
+
 /**
  * Join-Crew Explainer Page
  * 
