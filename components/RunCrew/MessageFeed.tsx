@@ -17,7 +17,13 @@ interface Message {
   content: string;
   createdAt: string;
   updatedAt?: string;
-  athlete: {
+  athlete?: {
+    id: string;
+    firstName: string;
+    gofastHandle?: string;
+    photoURL?: string;
+  };
+  Athlete?: {
     id: string;
     firstName: string;
     gofastHandle?: string;
