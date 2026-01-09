@@ -95,34 +95,16 @@ export default function JoinCrewSignupExplainerPage() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       
-      // Get Firebase token immediately from the signed-in user
-      const firebaseToken = await result.user.getIdToken(true);
+      // Get Firebase ID token for backend verification
+      const firebaseToken = await result.user.getIdToken();
+      
+      // Store Firebase token for API calls (Axios interceptor will use it)
       localStorage.setItem('firebaseToken', firebaseToken);
-      
-      // Wait for auth.currentUser to be set (for API interceptor)
-      // Poll until auth.currentUser is available (max 1 second)
-      let attempts = 0;
-      while (!auth.currentUser && attempts < 10) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        attempts++;
-      }
-      
-      if (!auth.currentUser) {
-        console.error('❌ Auth state not ready after signup');
-        throw new Error('Auth state not ready - please try again');
-      }
 
-      console.log('✅ Auth state ready, making athlete/create call');
-      
-      // Create/get athlete
+      // Create/get athlete - empty body, token auto-injected
       let athleteRes;
       try {
-        // Manually attach token to ensure it's sent
-        athleteRes = await api.post('/athlete/create', {}, {
-          headers: {
-            'Authorization': `Bearer ${firebaseToken}`
-          }
-        });
+        athleteRes = await api.post('/athlete/create', {});
       } catch (createErr: any) {
         // If create fails with 500, athlete might already exist - try hydrate
         if (createErr?.response?.status === 500) {
@@ -197,34 +179,16 @@ export default function JoinCrewSignupExplainerPage() {
         await updateProfile(user, { displayName });
       }
 
-      // Get Firebase token immediately from the signed-in user
-      const firebaseToken = await user.getIdToken(true);
+      // Get Firebase ID token for backend verification
+      const firebaseToken = await user.getIdToken();
+      
+      // Store Firebase token for API calls
       localStorage.setItem('firebaseToken', firebaseToken);
-      
-      // Wait for auth.currentUser to be set (for API interceptor)
-      // Poll until auth.currentUser is available (max 1 second)
-      let attempts = 0;
-      while (!auth.currentUser && attempts < 10) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        attempts++;
-      }
-      
-      if (!auth.currentUser) {
-        console.error('❌ Auth state not ready after signup');
-        throw new Error('Auth state not ready - please try again');
-      }
 
-      console.log('✅ Auth state ready, making athlete/create call');
-      
-      // Create/get athlete
+      // Create/get athlete - empty body, token auto-injected
       let athleteRes;
       try {
-        // Manually attach token to ensure it's sent
-        athleteRes = await api.post('/athlete/create', {}, {
-          headers: {
-            'Authorization': `Bearer ${firebaseToken}`
-          }
-        });
+        athleteRes = await api.post('/athlete/create', {});
       } catch (createErr: any) {
         // If create fails with 500, athlete might already exist - try hydrate
         if (createErr?.response?.status === 500) {
