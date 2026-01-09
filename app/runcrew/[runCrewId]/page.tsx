@@ -206,166 +206,20 @@ export default function RunCrewContainerPage() {
   }
 
   // If we reach here, user is a member (server enforced)
-  // Check if user is admin or manager
-  const isAdmin = membership?.role === 'admin';
-  const isManager = membership?.role === 'manager';
-  const memberships = crew.membershipsBox?.memberships || [];
-  const announcements = crew.announcementsBox?.announcements || [];
-  const runs = crew.runsBox?.runs || [];
-  const upcomingRuns = runs.filter((run: any) => {
-    const runDate = run.date || run.scheduledAt;
-    if (!runDate) return false;
-    return new Date(runDate) >= new Date();
-  }).slice(0, 3);
+  // Redirect to member page (the actual member view)
+  useEffect(() => {
+    if (!loading && crew) {
+      router.replace(`/runcrew/${runCrewId}/member`);
+    }
+  }, [loading, crew, runCrewId, router]);
 
-  // Container UI (member-only)
+  // Show loading while redirecting
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50">
-      <TopNav />
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {crew.runCrewBaseInfo?.logo ? (
-                <img
-                  src={crew.runCrewBaseInfo.logo}
-                  alt={crew.runCrewBaseInfo?.name || 'RunCrew'}
-                  className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200"
-                />
-              ) : crew.runCrewBaseInfo?.icon ? (
-                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-3xl border-2 border-gray-200">
-                  {crew.runCrewBaseInfo.icon}
-                </div>
-              ) : (
-                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-3xl border-2 border-gray-200">
-                  🏃
-                </div>
-              )}
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">{crew.runCrewBaseInfo?.name}</h1>
-                {crew.runCrewBaseInfo?.description && (
-                  <p className="text-gray-600 mt-2">{crew.runCrewBaseInfo.description}</p>
-                )}
-              </div>
-            </div>
-            <div className="flex gap-4">
-              <Link
-                href="/runcrew"
-                className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100"
-              >
-                ← Back to Home
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-6 py-10">
-        {/* Welcome Section */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-8 border border-gray-200">
-          <div className="text-center mb-8">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Welcome to {crew.runCrewBaseInfo?.name}!
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              {crew.runCrewBaseInfo?.description || 'Get ready to run with your crew and achieve your goals together.'}
-            </p>
-          </div>
-
-          {/* Admin Button Only */}
-          {(isAdmin || isManager) && (
-            <div className="flex justify-center">
-              <Link
-                href={`/runcrew/${runCrewId}/admin`}
-                className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition shadow-lg hover:shadow-xl text-center"
-              >
-                View as Admin
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-            <div className="text-3xl font-bold text-gray-900 mb-2">{memberships.length}</div>
-            <div className="text-sm text-gray-600">Members</div>
-          </div>
-          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-            <div className="text-3xl font-bold text-gray-900 mb-2">{announcements.length}</div>
-            <div className="text-sm text-gray-600">Announcements</div>
-          </div>
-          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-            <div className="text-3xl font-bold text-gray-900 mb-2">{upcomingRuns.length}</div>
-            <div className="text-sm text-gray-600">Upcoming Runs</div>
-          </div>
-        </div>
-
-        {/* Quick Preview Sections */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Announcements */}
-          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Recent Announcements</h3>
-            {announcements.length > 0 ? (
-              <div className="space-y-3">
-                {announcements.slice(0, 3).map((announcement: any) => (
-                  <div key={announcement.id} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                    {announcement.title && (
-                      <h4 className="text-sm font-semibold text-gray-900 mb-1">{announcement.title}</h4>
-                    )}
-                    <p className="text-xs text-gray-600 line-clamp-2">{announcement.content || announcement.text}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500">No announcements yet.</p>
-            )}
-            <Link
-              href={`/runcrew/${runCrewId}/member`}
-              className="mt-4 inline-block text-blue-600 hover:text-blue-800 text-sm font-semibold"
-            >
-              View all →
-            </Link>
-          </div>
-
-          {/* Upcoming Runs */}
-          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Upcoming Runs</h3>
-            {upcomingRuns.length > 0 ? (
-              <div className="space-y-3">
-                {upcomingRuns.map((run: any) => {
-                  const runDate = run.date || run.scheduledAt;
-                  const formattedDate = runDate
-                    ? new Date(runDate).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit'
-                      })
-                    : 'Date TBD';
-                  return (
-                    <div key={run.id} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                      <h4 className="text-sm font-semibold text-gray-900 mb-1">{run.title || 'Untitled Run'}</h4>
-                      <p className="text-xs text-gray-600">{formattedDate}</p>
-                      {run.meetUpPoint && (
-                        <p className="text-xs text-gray-500 mt-1">📍 {run.meetUpPoint}</p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500">No upcoming runs scheduled.</p>
-            )}
-            <Link
-              href={`/runcrew/${runCrewId}/member`}
-              className="mt-4 inline-block text-blue-600 hover:text-blue-800 text-sm font-semibold"
-            >
-              View all →
-            </Link>
-          </div>
-        </div>
-      </main>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+        <p className="text-gray-600">Loading...</p>
+      </div>
     </div>
   );
 }
