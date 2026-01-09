@@ -297,23 +297,27 @@ export default function RunCrewMemberPage() {
               ) : (
                 <div className="space-y-2 max-h-[300px] overflow-y-auto">
                   {memberships.map((membershipItem: any) => {
-                    const athlete = membershipItem.athlete || {};
+                    // API returns Athlete (capital A), not athlete
+                    const athlete = membershipItem.Athlete || membershipItem.athlete || {};
+                    const displayName = athlete.firstName && athlete.lastName
+                      ? `${athlete.firstName} ${athlete.lastName}`
+                      : athlete.firstName || athlete.gofastHandle || 'Athlete';
                     return (
                       <div key={membershipItem.id} className="flex items-center gap-2 p-2 border border-gray-200 rounded hover:bg-gray-50 transition">
                         {athlete.photoURL ? (
                           <img
                             src={athlete.photoURL}
-                            alt={`${athlete.firstName} ${athlete.lastName}`}
+                            alt={displayName}
                             className="w-8 h-8 rounded-full object-cover border border-gray-200"
                           />
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white font-semibold text-xs">
-                            {(athlete.firstName?.[0] || 'A').toUpperCase()}
+                            {(athlete.firstName?.[0] || athlete.gofastHandle?.[0] || 'A').toUpperCase()}
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold text-gray-900 truncate">
-                            {athlete.firstName || 'Athlete'} {athlete.lastName || ''}
+                            {displayName}
                             {membershipItem.role === 'admin' && <span className="text-orange-600 text-xs font-bold ml-1">Admin</span>}
                             {membershipItem.role === 'manager' && <span className="text-blue-600 text-xs font-bold ml-1">Manager</span>}
                           </p>
