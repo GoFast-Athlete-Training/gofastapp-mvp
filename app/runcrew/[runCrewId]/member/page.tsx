@@ -12,6 +12,7 @@ import api from '@/lib/api';
 import MessageFeed from '@/components/RunCrew/MessageFeed';
 import TopNav from '@/components/shared/TopNav';
 import { Copy, Check, Link as LinkIcon } from 'lucide-react';
+import { getRunCrewJoinLink } from '@/lib/domain-runcrew';
 
 /**
  * Member Page - CLIENT-SIDE
@@ -205,8 +206,11 @@ export default function RunCrewMemberPage() {
   const isManager = membership?.role === 'manager';
   const canPostAnnouncements = isAdmin || isManager;
   const memberships = crew.membershipsBox?.memberships || [];
-  // Use direct join link instead of join code URL
-  const inviteUrl = runCrewId ? `${typeof window !== 'undefined' ? window.location.origin : ''}/join/crew/${runCrewId}` : '';
+  // Use handle-based join link (public front door)
+  const handle = crew.runCrewBaseInfo?.handle || crew.handle;
+  const inviteUrl = handle 
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}${getRunCrewJoinLink(handle)}`
+    : '';
 
   const handleCopyLink = async () => {
     if (!inviteUrl) return;
