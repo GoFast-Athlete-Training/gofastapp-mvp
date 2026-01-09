@@ -272,23 +272,17 @@ export default function RunCrewContainerPage() {
             </p>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-2xl mx-auto">
-            <Link
-              href={`/runcrew/${runCrewId}/member`}
-              className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition shadow-lg hover:shadow-xl text-center"
-            >
-              View as Member
-            </Link>
-            {(isAdmin || isManager) && (
+          {/* Admin Button Only */}
+          {(isAdmin || isManager) && (
+            <div className="flex justify-center">
               <Link
                 href={`/runcrew/${runCrewId}/admin`}
-                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition shadow-lg hover:shadow-xl text-center"
+                className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition shadow-lg hover:shadow-xl text-center"
               >
                 View as Admin
               </Link>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Stats Grid */}
