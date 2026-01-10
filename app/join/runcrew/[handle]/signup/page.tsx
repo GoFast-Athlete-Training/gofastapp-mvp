@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, updateProfile, onAuthStateChanged } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, updateProfile, onAuthStateChanged, reload } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
@@ -98,8 +98,8 @@ export default function JoinCrewSignupExplainerPage() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       
-      // Get Firebase ID token for backend verification
-      const firebaseToken = await result.user.getIdToken();
+      // Get Firebase ID token for backend verification - force refresh to ensure latest profile data
+      const firebaseToken = await result.user.getIdToken(true);
       
       // Store Firebase token for API calls (Axios interceptor will use it)
       localStorage.setItem('firebaseToken', firebaseToken);
@@ -190,11 +190,19 @@ export default function JoinCrewSignupExplainerPage() {
       // Update profile with display name
       const displayName = `${emailData.firstName} ${emailData.lastName}`.trim();
       if (displayName) {
-        await updateProfile(user, { displayName });
+        try {
+          await updateProfile(user, { displayName });
+          // Reload user object to get updated profile data from Firebase
+          await reload(user);
+          console.log('✅ SIGNUP: Profile updated and user reloaded. DisplayName:', user.displayName);
+        } catch (profileError) {
+          console.warn('⚠️ SIGNUP: Failed to update profile:', profileError);
+          // Continue anyway - the API can still use firstName/lastName from the request if needed
+        }
       }
 
-      // Get Firebase ID token for backend verification
-      const firebaseToken = await user.getIdToken();
+      // Get Firebase ID token for backend verification - force refresh to get updated displayName
+      const firebaseToken = await user.getIdToken(true);
       
       // Store Firebase token for API calls
       localStorage.setItem('firebaseToken', firebaseToken);

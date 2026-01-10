@@ -53,7 +53,9 @@ export async function POST(request: Request) {
 
     const firebaseId = decodedToken.uid;
     const email = decodedToken.email || undefined;
-    const displayName = decodedToken.name || undefined;
+    // Firebase Admin SDK uses 'name' field for displayName in decoded token
+    // Check both 'name' and 'displayName' fields (though 'displayName' is less common)
+    const displayName = decodedToken.name || decodedToken.displayName || undefined;
     const picture = decodedToken.picture || undefined;
     
     console.log('👤 ATHLETE CREATE: Firebase token name:', displayName || 'missing');
@@ -63,14 +65,71 @@ export async function POST(request: Request) {
     }
     
     // Log all available token fields for debugging
-    console.log('🔍 ATHLETE CREATE: Available token fields:', Object.keys(decodedToken).filter(k => ['name', 'email', 'picture', 'displayName'].includes(k)));
+    const relevantFields = Object.keys(decodedToken).filter(k => ['name', 'email', 'picture', 'displayName'].includes(k));
+    console.log('🔍 ATHLETE CREATE: Available token fields:', relevantFields);
+    if (decodedToken.name && decodedToken.displayName && decodedToken.name !== decodedToken.displayName) {
+      console.warn('⚠️ ATHLETE CREATE: name field differs from displayName field. name:', decodedToken.name, 'displayName:', decodedToken.displayName);
+    }
 
-    // Parse displayName into firstName/lastName if available
-    const firstName = displayName?.split(' ')[0] || null;
-    const lastName = displayName?.split(' ').slice(1).join(' ') || null;
+    // Normalize displayName into firstName/lastName with duplicate detection
+    // Rules:
+    // 1. Split on whitespace (handles single space, multiple spaces, tabs, etc.)
+    // 2. First token = firstName
+    // 3. All remaining tokens = lastName (handles middle names)
+    // 4. If only one token exists, it's firstName (no lastName)
+    // 5. Empty/null displayName = both null
+    // 6. SAFETY: Detect and fix duplicated names (e.g., "Adam Adam" -> firstName="Adam", lastName=null)
+    let firstName: string | null = null;
+    let lastName: string | null = null;
     
-    console.log('👤 ATHLETE CREATE: Parsed firstName:', firstName);
-    console.log('👤 ATHLETE CREATE: Parsed lastName:', lastName);
+    if (displayName) {
+      const trimmed = displayName.trim();
+      if (trimmed) {
+        // Split on any whitespace and filter out empty strings
+        const parts = trimmed.split(/\s+/).filter(part => part.length > 0);
+        
+        if (parts.length > 0) {
+          firstName = parts[0] || null;
+          
+          // Only set lastName if there are additional parts after firstName
+          if (parts.length > 1) {
+            const remainingParts = parts.slice(1);
+            lastName = remainingParts.join(' ').trim() || null;
+            
+            // SAFETY GUARD: Detect duplicated names (e.g., "Adam Adam" or "Adam Adam Cole")
+            // If firstName equals the first part of lastName, it's likely a duplicate
+            // Fix by treating the first occurrence as firstName and subsequent as lastName
+            if (firstName && lastName) {
+              const lastNameParts = lastName.split(/\s+/);
+              // If firstName matches first part of lastName exactly, it's a duplicate
+              if (lastNameParts.length > 0 && firstName.toLowerCase() === lastNameParts[0].toLowerCase()) {
+                console.warn('⚠️ ATHLETE CREATE: Detected duplicated firstName in displayName:', displayName);
+                // Remove the duplicate first word from lastName
+                lastName = lastNameParts.slice(1).join(' ').trim() || null;
+                console.log('👤 ATHLETE CREATE: Fixed duplicate - firstName:', firstName, 'lastName:', lastName);
+              }
+            }
+          }
+          // If only one part, firstName is set, lastName remains null
+        }
+      }
+    }
+    
+    console.log('👤 ATHLETE CREATE: Normalized from displayName:', displayName);
+    console.log('👤 ATHLETE CREATE: → firstName:', firstName);
+    console.log('👤 ATHLETE CREATE: → lastName:', lastName);
+    
+    // Additional validation warnings
+    if (displayName) {
+      if (firstName && lastName && firstName.toLowerCase() === lastName.toLowerCase()) {
+        console.warn('⚠️ ATHLETE CREATE: firstName === lastName after normalization:', firstName, 'from displayName:', displayName);
+        // If they're still equal after normalization, clear lastName (likely a duplicate)
+        lastName = null;
+      }
+      if (firstName && !lastName && displayName.includes(' ')) {
+        console.warn('⚠️ ATHLETE CREATE: displayName contains space but lastName is null after normalization:', displayName);
+      }
+    }
 
     // Step 1: Resolve Canonical Company (Pin to First Company)
     // Always use the first company (oldest by createdAt) as the single source of truth
@@ -96,6 +155,12 @@ export async function POST(request: Request) {
 
     console.log('🔍 ATHLETE CREATE: Looking up athlete with firebaseId:', firebaseId);
 
+    // Check if athlete already exists to preserve user-edited profile data
+    const existingAthlete = await prisma.athlete.findUnique({
+      where: { firebaseId },
+      select: { id: true, firstName: true, lastName: true, photoURL: true }
+    });
+
     // Use upsert pattern to atomically handle create/update and prevent race conditions
     // This ensures only one athlete record exists per firebaseId
     const updateData: any = {};
@@ -109,20 +174,50 @@ export async function POST(request: Request) {
       updateData.email = email || undefined;
       createData.email = email || undefined;
     }
-    // Sync name fields if displayName was present in the token
-    // Note: firstName/lastName will be null if displayName was undefined/null
-    if (displayName !== undefined) {
-      updateData.firstName = firstName || null;
+    
+    // IDEMPOTENT name handling: Only use displayName if athlete name is empty
+    // Rules:
+    // 1. Never append or concatenate names
+    // 2. Never merge existing + incoming values
+    // 3. Treat displayName as authoritative ONLY if athlete name is empty
+    // 4. If athlete already has a name, preserve it (do not overwrite or merge)
+    if (displayName !== undefined && (firstName !== null || lastName !== null)) {
+      // For new athletes (create), always set names from displayName
       createData.firstName = firstName || null;
-      updateData.lastName = lastName || null;
       createData.lastName = lastName || null;
-      console.log('👤 ATHLETE CREATE: Syncing name fields - firstName:', firstName, 'lastName:', lastName);
+      
+      // For existing athletes (update), only set if name is empty
+      // This ensures idempotency - repeated calls won't overwrite user-edited names
+      const hasExistingName = existingAthlete?.firstName || existingAthlete?.lastName;
+      
+      if (!hasExistingName) {
+        // Athlete has no name - safe to set from displayName
+        if (firstName !== null) {
+          updateData.firstName = firstName;
+          console.log('👤 ATHLETE CREATE: Setting firstName from token (athlete has no name):', firstName);
+        }
+        if (lastName !== null) {
+          updateData.lastName = lastName;
+          console.log('👤 ATHLETE CREATE: Setting lastName from token (athlete has no name):', lastName);
+        }
+      } else {
+        // Athlete already has a name - preserve it (idempotent behavior)
+        console.log('👤 ATHLETE CREATE: Preserving existing name fields (idempotent) - firstName:', existingAthlete?.firstName, 'lastName:', existingAthlete?.lastName);
+        console.log('👤 ATHLETE CREATE: Ignoring displayName to prevent overwrite:', displayName);
+      }
     } else {
-      console.log('👤 ATHLETE CREATE: No displayName in token, skipping name sync');
+      if (displayName === undefined) {
+        console.log('👤 ATHLETE CREATE: No displayName in token, skipping name sync');
+      } else {
+        console.log('👤 ATHLETE CREATE: displayName exists but normalized to null - skipping name sync');
+      }
     }
+    // Sync photoURL only if athlete doesn't already have one set
     if (picture !== undefined) {
-      updateData.photoURL = picture || undefined;
       createData.photoURL = picture || undefined;
+      if (!existingAthlete?.photoURL) {
+        updateData.photoURL = picture || undefined;
+      }
     }
     // companyId is always derived from GoFastCompany (ultra container)
     updateData.companyId = company.id;
