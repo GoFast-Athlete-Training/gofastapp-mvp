@@ -86,7 +86,7 @@ export async function POST(request: Request) {
       const trimmed = displayName.trim();
       if (trimmed) {
         // Split on any whitespace and filter out empty strings
-        const parts = trimmed.split(/\s+/).filter(part => part.length > 0);
+        const parts = trimmed.split(/\s+/).filter((part: string) => part.length > 0);
         
         if (parts.length > 0) {
           firstName = parts[0] || null;
@@ -181,17 +181,25 @@ export async function POST(request: Request) {
     // 2. Never merge existing + incoming values
     // 3. Treat displayName as authoritative ONLY if athlete name is empty
     // 4. If athlete already has a name, preserve it (do not overwrite or merge)
+    // 5. CRITICAL: If athlete has BOTH firstName AND lastName, NEVER overwrite (even if one is missing)
     if (displayName !== undefined && (firstName !== null || lastName !== null)) {
       // For new athletes (create), always set names from displayName
       createData.firstName = firstName || null;
       createData.lastName = lastName || null;
       
-      // For existing athletes (update), only set if name is empty
-      // This ensures idempotency - repeated calls won't overwrite user-edited names
-      const hasExistingName = existingAthlete?.firstName || existingAthlete?.lastName;
+      // For existing athletes (update), check if they have names
+      // CRITICAL SAFEGUARD: If athlete has BOTH firstName AND lastName, NEVER overwrite
+      const hasBothNames = existingAthlete?.firstName && existingAthlete?.lastName;
+      const hasAnyName = existingAthlete?.firstName || existingAthlete?.lastName;
       
-      if (!hasExistingName) {
-        // Athlete has no name - safe to set from displayName
+      if (hasBothNames) {
+        // Athlete has complete name - NEVER overwrite (strongest protection)
+        console.log('🔒 ATHLETE CREATE: Athlete has both firstName and lastName - PRESERVING (idempotent)');
+        console.log('🔒 ATHLETE CREATE: Existing - firstName:', existingAthlete.firstName, 'lastName:', existingAthlete.lastName);
+        console.log('🔒 ATHLETE CREATE: Ignoring displayName to prevent overwrite:', displayName);
+        // Don't set updateData.firstName or updateData.lastName at all
+      } else if (!hasAnyName) {
+        // Athlete has no name at all - safe to set from displayName
         if (firstName !== null) {
           updateData.firstName = firstName;
           console.log('👤 ATHLETE CREATE: Setting firstName from token (athlete has no name):', firstName);
@@ -201,9 +209,19 @@ export async function POST(request: Request) {
           console.log('👤 ATHLETE CREATE: Setting lastName from token (athlete has no name):', lastName);
         }
       } else {
-        // Athlete already has a name - preserve it (idempotent behavior)
-        console.log('👤 ATHLETE CREATE: Preserving existing name fields (idempotent) - firstName:', existingAthlete?.firstName, 'lastName:', existingAthlete?.lastName);
-        console.log('👤 ATHLETE CREATE: Ignoring displayName to prevent overwrite:', displayName);
+        // Athlete has partial name (only firstName OR only lastName)
+        // Only fill in the missing part, never overwrite existing
+        if (!existingAthlete?.firstName && firstName !== null) {
+          updateData.firstName = firstName;
+          console.log('👤 ATHLETE CREATE: Setting firstName from token (athlete missing firstName):', firstName);
+        }
+        if (!existingAthlete?.lastName && lastName !== null) {
+          updateData.lastName = lastName;
+          console.log('👤 ATHLETE CREATE: Setting lastName from token (athlete missing lastName):', lastName);
+        }
+        if (existingAthlete?.firstName || existingAthlete?.lastName) {
+          console.log('👤 ATHLETE CREATE: Preserving existing partial name (idempotent)');
+        }
       }
     } else {
       if (displayName === undefined) {

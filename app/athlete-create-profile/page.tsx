@@ -47,37 +47,17 @@ export default function AthleteCreateProfilePage() {
         const firstNameFromFirebase = displayName.split(' ')[0] || '';
         const lastNameFromFirebase = displayName.split(' ').slice(1).join(' ') || '';
 
-        // Sync Firebase data by calling /athlete/create to get synced data from database
-        let syncedPhotoURL = firebaseUser.photoURL || existingAthlete?.photoURL;
-        let syncedFirstName = firstNameFromFirebase;
-        let syncedLastName = lastNameFromFirebase;
-        try {
-          console.log('🔄 PROFILE CREATE: Syncing athlete data from Firebase token...');
-          console.log('🔄 PROFILE CREATE: Firebase user displayName:', firebaseUser.displayName);
-          console.log('🔄 PROFILE CREATE: Firebase user photoURL:', firebaseUser.photoURL);
-          const res = await api.post('/athlete/create', {});
-          const athleteData = res.data;
-          console.log('🔄 PROFILE CREATE: Athlete data response:', athleteData);
-          
-          // Use synced data from database response (synced from Firebase token)
-          if (athleteData?.data) {
-            if (athleteData.data.photoURL) {
-              syncedPhotoURL = athleteData.data.photoURL;
-              console.log('📸 PROFILE CREATE: Using synced photoURL from database:', syncedPhotoURL);
-            }
-            if (athleteData.data.firstName) {
-              syncedFirstName = athleteData.data.firstName;
-              console.log('👤 PROFILE CREATE: Using synced firstName from database:', syncedFirstName);
-            }
-            if (athleteData.data.lastName) {
-              syncedLastName = athleteData.data.lastName;
-              console.log('👤 PROFILE CREATE: Using synced lastName from database:', syncedLastName);
-            }
-          }
-        } catch (err) {
-          console.error('❌ PROFILE CREATE: Failed to sync athlete data on mount:', err);
-          // Continue with Firebase/LocalStorage values if sync fails
-        }
+        // Use existing athlete data from localStorage first (most reliable)
+        // Only use Firebase displayName as fallback if no existing data
+        // DON'T call /athlete/create here - it could overwrite correct names with stale Firebase displayName
+        let syncedPhotoURL = existingAthlete?.photoURL || firebaseUser.photoURL;
+        let syncedFirstName = existingAthlete?.firstName || firstNameFromFirebase;
+        let syncedLastName = existingAthlete?.lastName || lastNameFromFirebase;
+        
+        console.log('🔄 PROFILE CREATE: Loading form data...');
+        console.log('🔄 PROFILE CREATE: Using existing athlete data from localStorage (preserves user-edited names)');
+        console.log('🔄 PROFILE CREATE: Firebase user displayName (fallback only):', firebaseUser.displayName);
+        console.log('🔄 PROFILE CREATE: Firebase user photoURL:', firebaseUser.photoURL);
 
         setFormData(prev => ({
           ...prev,
@@ -255,18 +235,28 @@ export default function AthleteCreateProfilePage() {
         return;
       }
       
-      // Step 1: Find or create athlete (EXACTLY like MVP1)
-      console.log('🌐 Step 1: Finding/creating athlete via /api/athlete/create');
-      console.log('🔐 Axios automatically adds Firebase token (no body needed)');
+      // Step 1: Get athlete ID from localStorage (already created during signup)
+      // Don't call /athlete/create here - it could overwrite names with stale Firebase displayName
+      const storedAthleteId = LocalStorageAPI.getAthleteId();
+      const storedAthlete = LocalStorageAPI.getAthlete();
       
-      const res = await api.post('/athlete/create', {});
-      const athleteData = res.data;
-      console.log('✅ Step 1 - Athlete created/found:', athleteData);
+      let athleteId = storedAthleteId;
       
-      // Get athlete ID from response (could be athleteId or data.id)
-      const athleteId = athleteData.athleteId || athleteData.data?.id;
+      // Only call /athlete/create if we don't have an athleteId
       if (!athleteId) {
-        throw new Error('No athlete ID returned from server');
+        console.log('🌐 Step 1: Finding/creating athlete via /api/athlete/create (no athleteId in localStorage)');
+        console.log('🔐 Axios automatically adds Firebase token (no body needed)');
+        
+        const res = await api.post('/athlete/create', {});
+        const athleteData = res.data;
+        console.log('✅ Step 1 - Athlete created/found:', athleteData);
+        
+        athleteId = athleteData.athleteId || athleteData.data?.id;
+        if (!athleteId) {
+          throw new Error('No athlete ID returned from server');
+        }
+      } else {
+        console.log('✅ Step 1 - Using existing athleteId from localStorage:', athleteId);
       }
       
       // Step 2: Update athlete with full profile (EXACTLY like MVP1)
