@@ -1,6 +1,7 @@
 # Google Play Store Submission Roadmap
 
-**Date**: January 2025  
+**Date**: January 2026  
+**Last Updated**: January 9, 2026  
 **Project**: GoFast MVP (Next.js Web App)  
 **Goal**: Get GoFast app published on Google Play Store
 
@@ -8,18 +9,23 @@
 
 ## Current Status Assessment
 
-### ✅ What We Have
+### ✅ What We Have (Verified January 2026)
 
 1. **Web Application**
-   - ✅ Next.js 15.4.8 app deployed on Vercel
+   - ✅ Next.js app deployed on Vercel
    - ✅ Full MVP1 feature set complete
    - ✅ Build errors resolved (TypeScript compilation passes)
    - ✅ Responsive design (mobile-friendly)
 
 2. **PWA Setup**
-   - ✅ `manifest.json` configured
-   - ✅ Service worker (`sw.js`) present
-   - ✅ Icons (192x192, 512x512) in place
+   - ✅ `manifest.json` configured (`/public/manifest.json`)
+     - Name: "GoFast Training"
+     - Short name: "GoFast"
+     - Display: standalone
+   - ✅ Service worker (`sw.js`) present (basic install/activate)
+   - ✅ Icons in place:
+     - `/public/icons/icon-192.png` (192x192)
+     - `/public/icons/icon-512.png` (512x512)
    - ✅ Standalone display mode configured
 
 3. **Functionality**
@@ -29,18 +35,23 @@
    - ✅ Settings
    - ✅ All MVP1 features implemented
 
-### ❌ What We're Missing
+### ❌ What We're Missing (Action Required)
 
-1. **Native Android App**
-   - ❌ No Android project structure
-   - ❌ No APK/AAB build
-   - ❌ No Android wrapper
+1. **TWA/Android Project** (Critical)
+   - ❌ No Android project structure created
+   - ❌ No APK/AAB build generated
+   - ❌ No TWA wrapper configured
 
-2. **Play Store Requirements**
-   - ❌ App icon (Play Store specific)
-   - ❌ Screenshots (phone, tablet, TV)
-   - ❌ Privacy policy URL
-   - ❌ Store listing content
+2. **Digital Asset Links** (Critical for TWA)
+   - ❌ No `/.well-known/assetlinks.json` file
+   - ❌ No signing key fingerprint configured
+
+3. **Play Store Requirements**
+   - ❌ App icon (512x512 PNG, no transparency) - *have 512x512 but need to verify no transparency*
+   - ❌ Screenshots (2-8 phone screenshots, 1080x1920 recommended)
+   - ❌ Feature graphic (1024x500 PNG)
+   - ❌ Privacy policy URL (required)
+   - ❌ Store listing content (descriptions)
    - ❌ Content rating questionnaire
    - ❌ Google Play Developer account ($25 one-time)
 
@@ -328,26 +339,34 @@ dependencies {
 
 ## Next Steps (Immediate Actions)
 
-### This Week
+### Priority 1: TWA Setup (This Week)
 
-1. **Decide on approach** ✅ (TWA recommended)
-2. **Install Android Studio** (if not already installed)
-3. **Create TWA project** (follow Phase 1 steps)
-4. **Test TWA locally** (verify it loads your Vercel URL)
+1. **Install Bubblewrap CLI** (easiest TWA generator)
+   ```bash
+   npm install -g @nicholasbraun/nicholasbraun.github.io/wiki/Bubblewrap
+   # OR use npx @nicholasbraun/nicholasbraun.github.io/wiki/Bubblewrap init --manifest https://your-app.vercel.app/manifest.json
+   ```
+   **Alternative**: Use [PWABuilder](https://www.pwabuilder.com/) - web-based tool that generates TWA packages automatically
+2. **Generate TWA project** with your Vercel URL
+3. **Generate signing key** and get SHA256 fingerprint
+4. **Create `/.well-known/assetlinks.json`** with fingerprint
+5. **Test TWA locally** on Android emulator or device
 
-### Next Week
+### Priority 2: Play Store Assets (Next Week)
 
-1. **Create/store assets** (icons, screenshots)
-2. **Set up Play Console account** ($25)
-3. **Write privacy policy** (or use template)
-4. **Build and test APK/AAB**
+1. **Verify icon** - Check 512x512 has no transparency
+2. **Capture screenshots** (2-8 phone, 1080x1920)
+3. **Create feature graphic** (1024x500 PNG)
+4. **Write privacy policy** and host it
+5. **Set up Play Console account** ($25)
 
-### Week 3+
+### Priority 3: Submission (Week 3+)
 
-1. **Upload to Play Console**
-2. **Start internal testing**
-3. **Gather feedback**
-4. **Submit for production review**
+1. **Build signed AAB** for release
+2. **Upload to Play Console**
+3. **Complete store listing** and content rating
+4. **Start internal testing**
+5. **Submit for production review**
 
 ---
 
@@ -470,6 +489,6 @@ dependencies {
 
 ---
 
-**Last Updated**: January 2025  
-**Status**: Ready to begin Phase 1
+**Last Updated**: January 9, 2026  
+**Status**: Ready to begin Phase 1 - TWA project creation pending
 

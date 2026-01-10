@@ -104,37 +104,77 @@ export default function JoinCrewSignupExplainerPage() {
       // Store Firebase token for API calls (Axios interceptor will use it)
       localStorage.setItem('firebaseToken', firebaseToken);
 
-      // Create/get athlete - empty body, token auto-injected
+      // Try hydrate first (user might already exist), then create if not found
       let athleteRes;
       try {
-        athleteRes = await api.post('/athlete/create', {});
-      } catch (createErr: any) {
-        // If create fails with 500, athlete might already exist - try hydrate
-        if (createErr?.response?.status === 500) {
+        const hydrateRes = await api.post('/athlete/hydrate', {});
+        if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
+          athleteRes = {
+            data: {
+              success: true,
+              athleteId: hydrateRes.data.athlete.athleteId || hydrateRes.data.athlete.id,
+              data: hydrateRes.data.athlete
+            }
+          };
+        } else {
+          throw new Error('Hydrate returned invalid response');
+        }
+      } catch (hydrateErr: any) {
+        // 404 = athlete not found (deleted user but still has Firebase ID) - try create route
+        if (hydrateErr?.response?.status === 404) {
+          console.log('⚠️ EXPLAINER: Hydrate failed with 404 (athlete not found), trying create route...');
           try {
-            const hydrateRes = await api.post('/athlete/hydrate', {});
-            if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
+            const createRes = await api.post('/athlete/create', {});
+            if (createRes.data?.success) {
               athleteRes = {
-                data: {
-                  success: true,
-                  athleteId: hydrateRes.data.athlete.athleteId || hydrateRes.data.athlete.id,
-                  data: hydrateRes.data.athlete
-                }
+                data: createRes.data
               };
             } else {
-              throw createErr;
+              throw new Error('Create route did not return valid athlete data');
             }
-          } catch (hydrateErr) {
+          } catch (createErr: any) {
+            console.error('❌ EXPLAINER: Create route also failed:', createErr?.response?.status || createErr?.message);
             throw createErr;
           }
+        } else if (hydrateErr?.response?.status === 401) {
+          // 401 = unauthorized, re-throw
+          throw hydrateErr;
         } else {
-          throw createErr;
+          // Other hydrate errors, try create as fallback
+          console.log('⚠️ EXPLAINER: Hydrate failed with non-404 error, trying create route...');
+          try {
+            const createRes = await api.post('/athlete/create', {});
+            if (createRes.data?.success) {
+              athleteRes = {
+                data: createRes.data
+              };
+            } else {
+              throw hydrateErr;
+            }
+          } catch (createErr: any) {
+            console.error('❌ EXPLAINER: Both hydrate and create failed');
+            throw hydrateErr;
+          }
         }
       }
       
       if (athleteRes?.data?.success || athleteRes?.data) {
         const athleteId = athleteRes.data.athleteId || athleteRes.data?.athlete?.athleteId || athleteRes.data?.athlete?.id;
         const athleteData = athleteRes.data?.data || athleteRes.data?.athlete;
+        
+        if (!athleteId) {
+          throw new Error('Failed to get athlete ID from server response');
+        }
+        
+        // CRITICAL: Clear ALL stale athlete data from localStorage FIRST before storing new data
+        // This ensures profile creation page starts fresh and doesn't pre-fill with old/deleted profile data
+        localStorage.removeItem('athlete');
+        localStorage.removeItem('athleteProfile');
+        localStorage.removeItem('fullHydrationModel');
+        localStorage.removeItem('weeklyActivities');
+        localStorage.removeItem('weeklyTotals');
+        
+        // Now store basic auth data
         localStorage.setItem('firebaseId', result.user.uid);
         localStorage.setItem('athleteId', athleteId);
         localStorage.setItem('email', athleteData?.email || result.user.email || '');
@@ -145,10 +185,13 @@ export default function JoinCrewSignupExplainerPage() {
         
         // Check if profile is complete (has gofastHandle)
         if (athleteData?.gofastHandle) {
-          // Profile complete - go to confirmation
+          // Profile complete - store full athlete data and go to confirmation
+          LocalStorageAPI.setAthlete(athleteData);
           router.push(`/join/runcrew/${handle}/confirm`);
         } else {
           // No profile - go to profile creation (will redirect to confirm after)
+          // DON'T store athlete data - localStorage is already cleared above
+          // Profile creation page will only use Firebase data (email, displayName) as fallback
           router.push('/athlete-create-profile');
         }
       } else {
@@ -207,37 +250,77 @@ export default function JoinCrewSignupExplainerPage() {
       // Store Firebase token for API calls
       localStorage.setItem('firebaseToken', firebaseToken);
 
-      // Create/get athlete - empty body, token auto-injected
+      // Try hydrate first (user might already exist), then create if not found
       let athleteRes;
       try {
-        athleteRes = await api.post('/athlete/create', {});
-      } catch (createErr: any) {
-        // If create fails with 500, athlete might already exist - try hydrate
-        if (createErr?.response?.status === 500) {
+        const hydrateRes = await api.post('/athlete/hydrate', {});
+        if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
+          athleteRes = {
+            data: {
+              success: true,
+              athleteId: hydrateRes.data.athlete.athleteId || hydrateRes.data.athlete.id,
+              data: hydrateRes.data.athlete
+            }
+          };
+        } else {
+          throw new Error('Hydrate returned invalid response');
+        }
+      } catch (hydrateErr: any) {
+        // 404 = athlete not found (deleted user but still has Firebase ID) - try create route
+        if (hydrateErr?.response?.status === 404) {
+          console.log('⚠️ EXPLAINER: Hydrate failed with 404 (athlete not found), trying create route...');
           try {
-            const hydrateRes = await api.post('/athlete/hydrate', {});
-            if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
+            const createRes = await api.post('/athlete/create', {});
+            if (createRes.data?.success) {
               athleteRes = {
-                data: {
-                  success: true,
-                  athleteId: hydrateRes.data.athlete.athleteId || hydrateRes.data.athlete.id,
-                  data: hydrateRes.data.athlete
-                }
+                data: createRes.data
               };
             } else {
-              throw createErr;
+              throw new Error('Create route did not return valid athlete data');
             }
-          } catch (hydrateErr) {
+          } catch (createErr: any) {
+            console.error('❌ EXPLAINER: Create route also failed:', createErr?.response?.status || createErr?.message);
             throw createErr;
           }
+        } else if (hydrateErr?.response?.status === 401) {
+          // 401 = unauthorized, re-throw
+          throw hydrateErr;
         } else {
-          throw createErr;
+          // Other hydrate errors, try create as fallback
+          console.log('⚠️ EXPLAINER: Hydrate failed with non-404 error, trying create route...');
+          try {
+            const createRes = await api.post('/athlete/create', {});
+            if (createRes.data?.success) {
+              athleteRes = {
+                data: createRes.data
+              };
+            } else {
+              throw hydrateErr;
+            }
+          } catch (createErr: any) {
+            console.error('❌ EXPLAINER: Both hydrate and create failed');
+            throw hydrateErr;
+          }
         }
       }
       
       if (athleteRes?.data?.success || athleteRes?.data) {
         const athleteId = athleteRes.data.athleteId || athleteRes.data?.athlete?.athleteId || athleteRes.data?.athlete?.id;
         const athleteData = athleteRes.data?.data || athleteRes.data?.athlete;
+        
+        if (!athleteId) {
+          throw new Error('Failed to get athlete ID from server response');
+        }
+        
+        // CRITICAL: Clear ALL stale athlete data from localStorage FIRST before storing new data
+        // This ensures profile creation page starts fresh and doesn't pre-fill with old/deleted profile data
+        localStorage.removeItem('athlete');
+        localStorage.removeItem('athleteProfile');
+        localStorage.removeItem('fullHydrationModel');
+        localStorage.removeItem('weeklyActivities');
+        localStorage.removeItem('weeklyTotals');
+        
+        // Now store basic auth data
         localStorage.setItem('firebaseId', user.uid);
         localStorage.setItem('athleteId', athleteId);
         localStorage.setItem('email', athleteData?.email || user.email || '');
@@ -248,10 +331,13 @@ export default function JoinCrewSignupExplainerPage() {
         
         // Check if profile is complete (has gofastHandle)
         if (athleteData?.gofastHandle) {
-          // Profile complete - go to confirmation
+          // Profile complete - store full athlete data and go to confirmation
+          LocalStorageAPI.setAthlete(athleteData);
           router.push(`/join/runcrew/${handle}/confirm`);
         } else {
           // No profile - go to profile creation (will redirect to confirm after)
+          // DON'T store athlete data - localStorage is already cleared above
+          // Profile creation page will only use Firebase data (email, displayName) as fallback
           router.push('/athlete-create-profile');
         }
       } else {

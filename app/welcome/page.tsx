@@ -92,9 +92,40 @@ export default function WelcomePage() {
       } catch (error: any) {
         console.error('❌ Welcome: Hydrate failed:', error?.response?.status || error?.message);
         
-        // 404 = athlete not found, redirect to create profile
+        // 404 = athlete not found (deleted user but still has Firebase ID) - try create route
         if (error?.response?.status === 404) {
-          router.replace('/athlete-create-profile');
+          console.log('⚠️ Welcome: Athlete not found (404), trying create route...');
+          try {
+            const createRes = await api.post('/athlete/create', {});
+            if (createRes.data?.success && createRes.data?.athleteId) {
+              console.log('✅ Welcome: Athlete created successfully, redirecting to profile creation');
+              
+              // CRITICAL: Clear ALL stale athlete data from localStorage FIRST before storing new data
+              // This ensures profile creation page starts fresh and doesn't pre-fill with old/deleted profile data
+              localStorage.removeItem('athlete');
+              localStorage.removeItem('athleteProfile');
+              localStorage.removeItem('fullHydrationModel');
+              localStorage.removeItem('weeklyActivities');
+              localStorage.removeItem('weeklyTotals');
+              
+              // Store basic auth data only
+              localStorage.setItem('firebaseId', firebaseUser.uid);
+              localStorage.setItem('athleteId', createRes.data.athleteId);
+              localStorage.setItem('email', createRes.data.data?.email || firebaseUser.email || '');
+              
+              // Redirect to profile creation since this is a new/recreated athlete
+              // DON'T store athlete data - let user fill out the form fresh
+              router.replace('/athlete-create-profile');
+              return;
+            } else {
+              throw new Error('Create route did not return valid athlete data');
+            }
+          } catch (createErr: any) {
+            console.error('❌ Welcome: Create route also failed:', createErr?.response?.status || createErr?.message);
+            // If create also fails, redirect to signup to start fresh
+            router.replace('/signup');
+            return;
+          }
         } else if (error?.response?.status === 401) {
           // 401 = unauthorized, redirect to signup
           router.replace('/signup');

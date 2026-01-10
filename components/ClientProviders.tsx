@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import DataSyncBanner from './DataSyncBanner';
 
 export default function ClientProviders({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -12,11 +11,6 @@ export default function ClientProviders({ children }: { children: React.ReactNod
     }
   }, []);
 
-  return (
-    <>
-      <DataSyncBanner />
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }
 

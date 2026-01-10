@@ -242,7 +242,6 @@ model run_crew_events {
   run_crews            run_crews              @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
 }
 
-
 model run_crew_memberships {
   id        String      @id @default(cuid())
   runCrewId String

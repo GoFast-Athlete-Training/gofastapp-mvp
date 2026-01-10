@@ -34,53 +34,43 @@ export default function AthleteCreateProfilePage() {
   const [handleError, setHandleError] = useState('');
   const handleCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Prefill from Firebase and LocalStorage (EXACTLY like MVP1)
-  // Rules: LocalStorage takes precedence, then Firebase, then defaults
+  // Prefill from Firebase only - localStorage is cleared during signup to ensure fresh start
+  // Rules: Firebase displayName/photoURL only, then defaults (NO localStorage data)
   useEffect(() => {
     const loadAthleteData = async () => {
       const firebaseUser = auth.currentUser;
-      const existingAthlete = LocalStorageAPI.getAthlete();
+      
+      // Get athleteId from localStorage (set during signup)
+      const storedAthleteId = LocalStorageAPI.getAthleteId();
+      
+      // CRITICAL: Don't use localStorage athlete data on profile creation page
+      // It may be stale from a previous session. Only use Firebase data as fallback.
+      // If we have a storedAthleteId but no localStorage athlete data, that means
+      // we just signed up and should start fresh (which is correct)
 
       if (firebaseUser) {
         // Parse Firebase displayName as fallback
         const displayName = firebaseUser.displayName || '';
         const firstNameFromFirebase = displayName.split(' ')[0] || '';
         const lastNameFromFirebase = displayName.split(' ').slice(1).join(' ') || '';
-
-        // Use existing athlete data from localStorage first (most reliable)
-        // Only use Firebase displayName as fallback if no existing data
-        // DON'T call /athlete/create here - it could overwrite correct names with stale Firebase displayName
-        let syncedPhotoURL = existingAthlete?.photoURL || firebaseUser.photoURL;
-        let syncedFirstName = existingAthlete?.firstName || firstNameFromFirebase;
-        let syncedLastName = existingAthlete?.lastName || lastNameFromFirebase;
         
         console.log('🔄 PROFILE CREATE: Loading form data...');
-        console.log('🔄 PROFILE CREATE: Using existing athlete data from localStorage (preserves user-edited names)');
-        console.log('🔄 PROFILE CREATE: Firebase user displayName (fallback only):', firebaseUser.displayName);
+        console.log('🔄 PROFILE CREATE: Starting fresh - only using Firebase data as fallback');
+        console.log('🔄 PROFILE CREATE: Stored athleteId:', storedAthleteId);
+        console.log('🔄 PROFILE CREATE: Firebase user displayName:', firebaseUser.displayName);
         console.log('🔄 PROFILE CREATE: Firebase user photoURL:', firebaseUser.photoURL);
 
         setFormData(prev => ({
           ...prev,
           // Email: Always from Firebase (read-only)
           email: firebaseUser.email || '',
-          // Name: LocalStorage first, then synced from database, then Firebase fallback, then keep existing
-          firstName: existingAthlete?.firstName || syncedFirstName || prev.firstName,
-          lastName: existingAthlete?.lastName || syncedLastName || prev.lastName,
-          // Phone: LocalStorage first, then keep existing
-          phoneNumber: existingAthlete?.phoneNumber || prev.phoneNumber,
-          // Photo: Database synced photoURL first, then Firebase, then LocalStorage, then keep existing
-          profilePhotoPreview: syncedPhotoURL || prev.profilePhotoPreview,
-          // Profile fields: LocalStorage first, then keep existing
-          gofastHandle: existingAthlete?.gofastHandle || prev.gofastHandle,
-          birthday: existingAthlete?.birthday 
-            ? new Date(existingAthlete.birthday).toISOString().split('T')[0] 
-            : prev.birthday,
-          gender: existingAthlete?.gender || prev.gender,
-          city: existingAthlete?.city || prev.city,
-          state: existingAthlete?.state || prev.state,
-          primarySport: existingAthlete?.primarySport || prev.primarySport,
-          bio: existingAthlete?.bio || prev.bio,
-          instagram: existingAthlete?.instagram || prev.instagram,
+          // Name: Only from Firebase displayName (no localStorage data)
+          firstName: firstNameFromFirebase || prev.firstName,
+          lastName: lastNameFromFirebase || prev.lastName,
+          // Photo: Only from Firebase (no localStorage data)
+          profilePhotoPreview: firebaseUser.photoURL || prev.profilePhotoPreview,
+          // All other fields start empty (user will fill them out)
+          // Don't pre-fill from localStorage to avoid stale data confusion
         }));
       }
     };
