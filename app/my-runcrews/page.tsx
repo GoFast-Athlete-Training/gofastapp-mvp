@@ -102,8 +102,11 @@ export default function MyRunCrewsPage() {
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Hey {athlete?.firstName || 'runner'} — which RunCrew do you want to check on?
+            Welcome back{athlete?.firstName ? `, ${athlete.firstName}` : ''}
           </h1>
+          <p className="text-xl md:text-2xl text-white/90 mt-2">
+            See what your run crew is up to or join/start a new one
+          </p>
         </div>
 
         {runCrewCards.length === 0 ? (
