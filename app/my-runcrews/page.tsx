@@ -102,7 +102,7 @@ export default function MyRunCrewsPage() {
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Hey runner — which RunCrew do you want to check on?
+            Hey {athlete?.firstName || 'runner'} — which RunCrew do you want to check on?
           </h1>
         </div>
 
