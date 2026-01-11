@@ -1005,7 +1005,7 @@ export default function RunCrewSettingsPage() {
                   return (
                     <>
                       <button
-                        onClick={() => router.push('/runcrew')}
+                        onClick={() => router.push('/runcrew/create')}
                         className="w-full px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition"
                       >
                         Create Another RunCrew

@@ -186,8 +186,14 @@ export default function MyRunCrewsPage() {
           </div>
         )}
 
-        {/* Create Options */}
-        <div className="mt-12 text-center">
+        {/* Action Options */}
+        <div className="mt-12 text-center space-x-4">
+          <Link
+            href="/runcrew"
+            className="inline-block bg-white hover:bg-gray-50 text-gray-900 px-6 py-3 rounded-lg font-semibold transition shadow-md"
+          >
+            Explore RunCrews
+          </Link>
           <Link
             href="/runcrew/create"
             className="inline-block bg-white hover:bg-gray-50 text-gray-900 px-6 py-3 rounded-lg font-semibold transition shadow-md"

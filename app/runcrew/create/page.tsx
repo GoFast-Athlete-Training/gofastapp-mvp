@@ -484,7 +484,7 @@ export default function CreateCrewPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 to-sky-100">
-      <TopNav showBack={true} backUrl="/runcrew" backLabel="Back to Discovery" />
+      <TopNav showBack={true} backUrl="/my-runcrews" backLabel="Back to My RunCrews" />
 
       <div className="max-w-2xl mx-auto px-6 py-12">
         {/* Header */}
