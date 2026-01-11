@@ -999,31 +999,39 @@ export default function RunCrewAdminPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Meet-Up Point *</label>
-                  <input
-                    type="text"
+                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Starting Point *</label>
+                  <GooglePlacesAutocomplete
                     value={runForm.meetUpPoint}
-                    onChange={(e) => setRunForm({ ...runForm, meetUpPoint: e.target.value })}
+                    onChange={(e) => {
+                      setRunForm({ ...runForm, meetUpPoint: e.target.value });
+                    }}
+                    onPlaceSelected={(placeData) => {
+                      // When place is selected, set both the name (starting point) and address automatically
+                      setRunForm({ 
+                        ...runForm, 
+                        meetUpPoint: placeData.name || placeData.address,
+                        meetUpAddress: placeData.address 
+                      });
+                    }}
+                    placeholder="Search for a location or type manually..."
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-                    required
+                    disabled={loadingRuns}
                   />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Select from suggestions or type the location name manually
+                  </p>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Meetup Address</label>
-                <GooglePlacesAutocomplete
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  Address <span className="text-gray-400 font-normal">(auto-filled if using suggestions, or enter manually)</span>
+                </label>
+                <input
+                  type="text"
                   value={runForm.meetUpAddress}
-                  onChange={(e) => {
-                    // Always allow manual typing - this works whether autocomplete is enabled or not
-                    setRunForm({ ...runForm, meetUpAddress: e.target.value });
-                  }}
-                  onPlaceSelected={(placeData) => {
-                    // When place is selected from autocomplete dropdown, use the formatted address
-                    // This is optional - manual typing still works
-                    setRunForm({ ...runForm, meetUpAddress: placeData.address });
-                  }}
-                  placeholder="Type address or select from suggestions..."
+                  onChange={(e) => setRunForm({ ...runForm, meetUpAddress: e.target.value })}
+                  placeholder="Address will auto-fill if you select from suggestions, or type manually..."
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                   disabled={loadingRuns}
                 />
