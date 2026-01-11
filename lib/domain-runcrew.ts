@@ -646,7 +646,9 @@ export async function hydrateCrew(runCrewId: string) {
           id: true,
           title: true,
           date: true,
-          startTime: true,
+          startTimeHour: true,
+          startTimeMinute: true,
+          startTimePeriod: true,
           meetUpPoint: true,
           meetUpAddress: true,
           totalMiles: true,
@@ -777,7 +779,9 @@ export async function hydrateCrew(runCrewId: string) {
         id: r.id,
         title: r.title,
         date: r.date,
-        startTime: r.startTime,
+        startTimeHour: r.startTimeHour,
+        startTimeMinute: r.startTimeMinute,
+        startTimePeriod: r.startTimePeriod,
         meetUpPoint: r.meetUpPoint,
         meetUpAddress: r.meetUpAddress,
         totalMiles: r.totalMiles,
@@ -878,7 +882,9 @@ export async function createRun(data: {
   athleteId: string; // From authenticated user (localStorage)
   title: string;
   date: Date;
-  startTime?: string | null;
+  startTimeHour?: number | null;
+  startTimeMinute?: number | null;
+  startTimePeriod?: string | null;
   meetUpPoint?: string | null;
   meetUpAddress?: string | null;
   totalMiles?: number | null;
@@ -892,7 +898,9 @@ export async function createRun(data: {
       createdById: data.athleteId, // Map athleteId to createdById (schema field)
       title: data.title,
       date: data.date,
-      startTime: data.startTime ?? '',
+      startTimeHour: data.startTimeHour ?? null,
+      startTimeMinute: data.startTimeMinute ?? null,
+      startTimePeriod: data.startTimePeriod ?? null,
       meetUpPoint: data.meetUpPoint ?? '',
       meetUpAddress: data.meetUpAddress ?? null,
       totalMiles: data.totalMiles ?? null,

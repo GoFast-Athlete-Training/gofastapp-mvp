@@ -1,13 +1,17 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { formatRunTime } from '@/utils/formatTime';
 
 interface RunCardProps {
   run: {
     id: string;
     title: string;
     date: string;
-    startTime: string;
+    startTimeHour?: number | null;
+    startTimeMinute?: number | null;
+    startTimePeriod?: string | null;
+    startTime?: string | null;
     meetUpPoint: string;
     totalMiles?: number;
     pace?: string;
@@ -20,6 +24,7 @@ export default function RunCard({ run, crewId }: RunCardProps) {
   const router = useRouter();
 
   const goingCount = run.rsvps?.filter((r) => r.status === 'going').length || 0;
+  const timeStr = formatRunTime(run);
 
   return (
     <div
@@ -34,7 +39,7 @@ export default function RunCard({ run, crewId }: RunCardProps) {
       </div>
       <div className="space-y-1 text-sm text-gray-600">
         <div>
-          {new Date(run.date).toLocaleDateString()} at {run.startTime}
+          {new Date(run.date).toLocaleDateString()} {timeStr && `at ${timeStr}`}
         </div>
         <div>{run.meetUpPoint}</div>
         {run.totalMiles && <div>{run.totalMiles} miles</div>}

@@ -52,7 +52,9 @@ export default function RunCrewAdminPage() {
   const [runForm, setRunForm] = useState({
     title: '',
     date: '',
-    time: '',
+    startTimeHour: '',
+    startTimeMinute: '',
+    startTimePeriod: 'AM',
     meetUpPoint: '',
     meetUpAddress: '',
     totalMiles: '',
@@ -255,41 +257,24 @@ export default function RunCrewAdminPage() {
 
   const handleRunSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!runCrewId || !runForm.title.trim() || !runForm.date || !runForm.time || !runForm.meetUpPoint.trim()) {
+    if (!runCrewId || !runForm.title.trim() || !runForm.date || !runForm.startTimeHour || !runForm.startTimeMinute || !runForm.meetUpPoint.trim()) {
       showToast('Please fill in all required fields');
       return;
     }
 
-    // Convert time from "6:30 AM" format to "06:30:00" (24-hour ISO format)
-    const convertTimeTo24Hour = (timeStr: string) => {
-      if (!timeStr) return '00:00:00';
-      
-      // If already in 24-hour format, return as-is
-      if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(timeStr) && !timeStr.includes('AM') && !timeStr.includes('PM')) {
-        return timeStr.includes(':') && timeStr.split(':').length === 2 ? `${timeStr}:00` : timeStr;
-      }
-      
-      // Parse "6:30 AM" or "6:30 PM" format
-      const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-      if (!match) {
-        console.warn('Invalid time format:', timeStr);
-        return '00:00:00';
-      }
-      
-      let hours = parseInt(match[1], 10);
-      const minutes = match[2];
-      const period = match[3].toUpperCase();
-      
-      if (period === 'PM' && hours !== 12) {
-        hours += 12;
-      } else if (period === 'AM' && hours === 12) {
-        hours = 0;
-      }
-      
-      return `${hours.toString().padStart(2, '0')}:${minutes}:00`;
-    };
-
-    const time24Hour = convertTimeTo24Hour(runForm.time);
+    // Convert time fields to 24-hour format for date
+    const hour = parseInt(runForm.startTimeHour, 10);
+    const minute = parseInt(runForm.startTimeMinute, 10);
+    const period = runForm.startTimePeriod.toUpperCase();
+    
+    let hours24 = hour;
+    if (period === 'PM' && hour !== 12) {
+      hours24 = hour + 12;
+    } else if (period === 'AM' && hour === 12) {
+      hours24 = 0;
+    }
+    
+    const time24Hour = `${hours24.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
     const isoDate = `${runForm.date}T${time24Hour}`;
 
     try {
@@ -300,7 +285,9 @@ export default function RunCrewAdminPage() {
         const response = await api.put(`/runcrew/${runCrewId}/runs/${editingRunId}`, {
           title: runForm.title.trim(),
           date: isoDate,
-          startTime: runForm.time,
+          startTimeHour: parseInt(runForm.startTimeHour, 10),
+          startTimeMinute: parseInt(runForm.startTimeMinute, 10),
+          startTimePeriod: runForm.startTimePeriod,
           meetUpPoint: runForm.meetUpPoint.trim(),
           meetUpAddress: runForm.meetUpAddress.trim() || null,
           totalMiles: runForm.totalMiles ? parseFloat(runForm.totalMiles) : null,
@@ -313,7 +300,9 @@ export default function RunCrewAdminPage() {
           setRunForm({
             title: '',
             date: '',
-            time: '',
+            startTimeHour: '',
+            startTimeMinute: '',
+            startTimePeriod: 'AM',
             meetUpPoint: '',
             meetUpAddress: '',
             totalMiles: '',
@@ -331,7 +320,9 @@ export default function RunCrewAdminPage() {
         const response = await api.post(`/runcrew/${runCrewId}/runs`, {
           title: runForm.title.trim(),
           date: isoDate,
-          startTime: runForm.time,
+          startTimeHour: parseInt(runForm.startTimeHour, 10),
+          startTimeMinute: parseInt(runForm.startTimeMinute, 10),
+          startTimePeriod: runForm.startTimePeriod,
           meetUpPoint: runForm.meetUpPoint.trim(),
           meetUpAddress: runForm.meetUpAddress.trim() || null,
           totalMiles: runForm.totalMiles ? parseFloat(runForm.totalMiles) : null,
@@ -344,7 +335,9 @@ export default function RunCrewAdminPage() {
           setRunForm({
             title: '',
             date: '',
-            time: '',
+            startTimeHour: '',
+            startTimeMinute: '',
+            startTimePeriod: 'AM',
             meetUpPoint: '',
             meetUpAddress: '',
             totalMiles: '',
@@ -393,10 +386,33 @@ export default function RunCrewAdminPage() {
 
   const handleEditRun = (run: any) => {
     setEditingRunId(run.id);
+    
+    // Parse time fields - if we have the new format, use it; otherwise parse from old startTime string
+    let startTimeHour = '';
+    let startTimeMinute = '';
+    let startTimePeriod = 'AM';
+    
+    if (run.startTimeHour !== undefined && run.startTimeHour !== null) {
+      // New format - use the fields directly
+      startTimeHour = run.startTimeHour.toString();
+      startTimeMinute = run.startTimeMinute !== undefined && run.startTimeMinute !== null ? run.startTimeMinute.toString() : '';
+      startTimePeriod = run.startTimePeriod || 'AM';
+    } else if (run.startTime) {
+      // Old format - parse string like "6:30 AM"
+      const match = run.startTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (match) {
+        startTimeHour = match[1];
+        startTimeMinute = match[2];
+        startTimePeriod = match[3].toUpperCase();
+      }
+    }
+    
     setRunForm({
       title: run.title || '',
       date: formatDateForInput(run.date || run.scheduledAt),
-      time: run.startTime || '',
+      startTimeHour,
+      startTimeMinute,
+      startTimePeriod,
       meetUpPoint: run.meetUpPoint || '',
       meetUpAddress: run.meetUpAddress || '',
       totalMiles: run.totalMiles ? run.totalMiles.toString() : '',
@@ -889,7 +905,9 @@ export default function RunCrewAdminPage() {
                   setRunForm({
                     title: '',
                     date: '',
-                    time: '',
+                    startTimeHour: '',
+                    startTimeMinute: '',
+                    startTimePeriod: 'AM',
                     meetUpPoint: '',
                     meetUpAddress: '',
                     totalMiles: '',
@@ -914,7 +932,6 @@ export default function RunCrewAdminPage() {
                     type="text"
                     value={runForm.title}
                     onChange={(e) => setRunForm({ ...runForm, title: e.target.value })}
-                    placeholder="Saturday Sunrise Run"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                     required
                   />
@@ -934,14 +951,52 @@ export default function RunCrewAdminPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Start Time *</label>
-                  <input
-                    type="text"
-                    value={runForm.time}
-                    onChange={(e) => setRunForm({ ...runForm, time: e.target.value })}
-                    placeholder="6:15 AM"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-                    required
-                  />
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <input
+                        type="number"
+                        min="1"
+                        max="12"
+                        value={runForm.startTimeHour}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, '');
+                          if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 12)) {
+                            setRunForm({ ...runForm, startTimeHour: val });
+                          }
+                        }}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                        required
+                      />
+                    </div>
+                    <div className="text-lg font-bold text-gray-400">:</div>
+                    <div className="flex-1">
+                      <input
+                        type="number"
+                        min="0"
+                        max="59"
+                        value={runForm.startTimeMinute}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, '');
+                          if (val === '' || (parseInt(val) >= 0 && parseInt(val) <= 59)) {
+                            setRunForm({ ...runForm, startTimeMinute: val });
+                          }
+                        }}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                        required
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <select
+                        value={runForm.startTimePeriod}
+                        onChange={(e) => setRunForm({ ...runForm, startTimePeriod: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                        required
+                      >
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Meet-Up Point *</label>
@@ -949,7 +1004,6 @@ export default function RunCrewAdminPage() {
                     type="text"
                     value={runForm.meetUpPoint}
                     onChange={(e) => setRunForm({ ...runForm, meetUpPoint: e.target.value })}
-                    placeholder="Central Park – Bethesda Terrace"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                     required
                   />
@@ -983,7 +1037,6 @@ export default function RunCrewAdminPage() {
                     step="0.1"
                     value={runForm.totalMiles}
                     onChange={(e) => setRunForm({ ...runForm, totalMiles: e.target.value })}
-                    placeholder="5.0"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                   />
                 </div>
@@ -1008,7 +1061,6 @@ export default function RunCrewAdminPage() {
                   type="url"
                   value={runForm.stravaMapUrl}
                   onChange={(e) => setRunForm({ ...runForm, stravaMapUrl: e.target.value })}
-                  placeholder="https://www.strava.com/routes/..."
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                 />
               </div>
@@ -1018,7 +1070,6 @@ export default function RunCrewAdminPage() {
                 <textarea
                   value={runForm.description}
                   onChange={(e) => setRunForm({ ...runForm, description: e.target.value })}
-                  placeholder="Tell your crew what to expect..."
                   rows={3}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                 />

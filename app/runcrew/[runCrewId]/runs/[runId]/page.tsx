@@ -313,7 +313,11 @@ export default function RunDetailPage() {
                   day: 'numeric',
                 })}
               </p>
-              <p className="text-lg text-gray-900">{run.startTime}</p>
+              <p className="text-lg text-gray-900">
+                {run.startTimeHour !== null && run.startTimeHour !== undefined && run.startTimeMinute !== null && run.startTimeMinute !== undefined
+                  ? `${run.startTimeHour}:${run.startTimeMinute.toString().padStart(2, '0')} ${run.startTimePeriod || ''}`
+                  : run.startTime || ''}
+              </p>
             </div>
 
             {run.meetUpPoint && (

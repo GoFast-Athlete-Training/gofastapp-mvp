@@ -83,8 +83,14 @@ export async function PUT(
     if (body.date !== undefined) {
       updateData.date = new Date(body.date);
     }
-    if (body.startTime !== undefined) {
-      updateData.startTime = body.startTime.trim();
+    if (body.startTimeHour !== undefined) {
+      updateData.startTimeHour = body.startTimeHour ? parseInt(body.startTimeHour, 10) : null;
+    }
+    if (body.startTimeMinute !== undefined) {
+      updateData.startTimeMinute = body.startTimeMinute ? parseInt(body.startTimeMinute, 10) : null;
+    }
+    if (body.startTimePeriod !== undefined) {
+      updateData.startTimePeriod = body.startTimePeriod?.trim() || null;
     }
     if (body.meetUpPoint !== undefined) {
       updateData.meetUpPoint = body.meetUpPoint.trim();

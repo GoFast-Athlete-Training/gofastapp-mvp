@@ -213,7 +213,7 @@ model run_crew_announcements {
 }
 
 model run_crew_event_rsvps {
-  id              String          @id
+  id              String          @id @default(cuid())
   eventId         String
   athleteId       String
   status          String
@@ -288,7 +288,9 @@ model run_crew_runs {
   title              String
   runType            String               @default("single")
   date               DateTime
-  startTime          String
+  startTimeHour      Int?
+  startTimeMinute    Int?
+  startTimePeriod    String?
   timezone           String?
   meetUpPoint        String
   meetUpAddress      String?

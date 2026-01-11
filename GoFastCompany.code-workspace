@@ -11,6 +11,9 @@
 		},
 		{
 			"path": "../gofast-user-dashboard"
+		},
+		{
+			"path": "../GoFastLanding"
 		}
 	],
 	"settings": {}

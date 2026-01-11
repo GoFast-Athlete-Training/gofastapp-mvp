@@ -68,7 +68,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const { title, date, startTime, meetUpPoint, meetUpAddress, totalMiles, pace, stravaMapUrl, description } = body;
+    const { title, date, startTimeHour, startTimeMinute, startTimePeriod, meetUpPoint, meetUpAddress, totalMiles, pace, stravaMapUrl, description } = body;
 
     let run;
     try {
@@ -77,7 +77,9 @@ export async function POST(
         athleteId: athlete.id, // Use athleteId (from authenticated user)
         title,
         date: new Date(date),
-        startTime,
+        startTimeHour,
+        startTimeMinute,
+        startTimePeriod,
         meetUpPoint,
         meetUpAddress,
         totalMiles,

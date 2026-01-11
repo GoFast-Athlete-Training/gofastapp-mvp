@@ -108,9 +108,14 @@ export default function CrewHero({ crew, nextRun, nextRunAttendees, isCrewAdmin,
                         day: 'numeric',
                       })
                     : 'Date TBD'}
-                  {nextRun.time || nextRun.startTime
-                    ? ` · ${nextRun.time || nextRun.startTime}`
-                    : ''}
+                  {(() => {
+                    if (nextRun.time) return ` · ${nextRun.time}`;
+                    if (nextRun.startTimeHour !== null && nextRun.startTimeHour !== undefined && nextRun.startTimeMinute !== null && nextRun.startTimeMinute !== undefined) {
+                      return ` · ${nextRun.startTimeHour}:${nextRun.startTimeMinute.toString().padStart(2, '0')} ${nextRun.startTimePeriod || ''}`;
+                    }
+                    if (nextRun.startTime) return ` · ${nextRun.startTime}`;
+                    return '';
+                  })()}
                 </span>
               </div>
               {nextRun.meetUpPoint && (
