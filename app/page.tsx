@@ -30,7 +30,7 @@ export default function RootPage() {
         if (isAuthenticated) {
           router.replace('/welcome');
         } else {
-          router.replace('/signup');
+          router.replace('/explainer');
         }
       }, 1500); // Logo shows for 1.5 seconds, then route
 

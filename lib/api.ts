@@ -50,13 +50,14 @@ api.interceptors.response.use(
       if (typeof window !== 'undefined') {
         // Clear any stale auth data
         const currentPath = window.location.pathname;
-        // Don't redirect if already on signup/signin pages OR join-crew signup/confirm pages
+        // Don't redirect if already on signup/signin/explainer pages OR join-crew signup/confirm pages
         if (!currentPath.includes('/signup') && 
             !currentPath.includes('/signin') &&
+            !currentPath.includes('/explainer') &&
             !currentPath.includes('/join/runcrew/') &&
             !currentPath.includes('/confirm')) {
-          console.log('🚫 Redirecting to signup due to 401');
-          window.location.href = '/signup';
+          console.log('🚫 Redirecting to explainer due to 401');
+          window.location.href = '/explainer';
         }
       }
     }

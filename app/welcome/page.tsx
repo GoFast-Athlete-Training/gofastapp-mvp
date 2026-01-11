@@ -37,10 +37,10 @@ export default function WelcomePage() {
         return;
       }
 
-      // No Firebase user - redirect to signup
+      // No Firebase user - redirect to explainer
       if (!firebaseUser) {
         hasProcessedRef.current = true;
-        router.replace('/signup');
+        router.replace('/explainer');
         return;
       }
 
