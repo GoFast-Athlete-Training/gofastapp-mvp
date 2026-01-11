@@ -50,15 +50,18 @@ export default function RootPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center">
-      <div className="animate-fade-in">
+      <div className="animate-fade-in text-center">
         <Image 
           src="/logo.jpg" 
           alt="GoFast Logo" 
           width={192}
           height={192}
-          className="w-48 h-48 rounded-full shadow-2xl mx-auto"
+          className="w-48 h-48 rounded-full shadow-2xl mx-auto mb-6"
           priority
         />
+        <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+          Run with others. PR.
+        </h1>
       </div>
     </div>
   );

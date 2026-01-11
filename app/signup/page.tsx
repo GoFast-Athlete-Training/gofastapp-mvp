@@ -557,119 +557,56 @@ function SignupPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50">
-      <div className="max-w-4xl mx-auto px-4 py-12 md:py-20">
+    <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600">
+      <div className="max-w-4xl mx-auto px-4 py-8 md:py-12">
         {/* Explainer Section - only show in default mode for signup */}
         {mode === 'default' && authMode === 'signup' && (
-          <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12 mb-8 border border-gray-200">
-            <div className="text-center mb-8">
-              <Image
-                src="/logo.jpg"
-                alt="GoFast Logo"
-                width={120}
-                height={120}
-                className="w-32 h-32 rounded-full shadow-xl mx-auto mb-6"
-                priority
-              />
-              <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl shadow-xl p-6 md:p-8 mb-6 border border-white/20">
+            <div className="text-center mb-6">
+              <h1 className="text-3xl md:text-4xl font-bold text-white mb-3">
                 Welcome to GoFast
               </h1>
-              <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-8">
-                The platform that connects runners, builds communities, and helps you achieve your goals
+              <p className="text-lg text-white/90 max-w-2xl mx-auto">
+                Connect with runners, join crews, and achieve your goals together
               </p>
             </div>
 
-            <div className="space-y-8">
-              {/* What is GoFast */}
-              <section>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">What is GoFast?</h2>
-                <p className="text-lg text-gray-700 leading-relaxed">
-                  GoFast is a running community platform designed to bring runners together. 
-                  Whether you're training for a race, looking for running buddies, or just want 
-                  to connect with like-minded athletes, GoFast helps you find your crew and 
-                  stay motivated.
-                </p>
-              </section>
-
-              {/* Features */}
-              <section>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">What can you do on GoFast?</h2>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center text-2xl">
-                      👥
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Join RunCrews</h3>
-                      <p className="text-gray-700">
-                        Discover and join running groups in your area. Find crews that match your pace, 
-                        goals, and schedule.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-sky-100 flex items-center justify-center text-2xl">
-                      🏃
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Organize Runs</h3>
-                      <p className="text-gray-700">
-                        Plan group runs, track RSVPs, and coordinate meetups with your crew. 
-                        Never run alone again.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center text-2xl">
-                      📊
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Track Activities</h3>
-                      <p className="text-gray-700">
-                        Connect your devices and track your runs. See your progress and 
-                        stay accountable with your crew.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-sky-100 flex items-center justify-center text-2xl">
-                      🎯
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Train Together</h3>
-                      <p className="text-gray-700">
-                        Train for races with your crew. Share goals, celebrate milestones, 
-                        and push each other to new heights.
-                      </p>
-                    </div>
-                  </div>
+            <div className="grid md:grid-cols-2 gap-4 mb-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-xl">
+                  👥
                 </div>
-              </section>
+                <div>
+                  <h3 className="text-base font-semibold text-white mb-1">Join RunCrews</h3>
+                  <p className="text-sm text-white/80">
+                    Find running groups that match your pace and goals
+                  </p>
+                </div>
+              </div>
 
-              {/* Community */}
-              <section>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">Built for Runners, by Runners</h2>
-                <p className="text-lg text-gray-700 leading-relaxed">
-                  GoFast is more than just an app—it's a community. Connect with runners who share 
-                  your passion, support each other's goals, and build lasting friendships on the road 
-                  and trails.
-                </p>
-              </section>
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-xl">
+                  🏃
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-white mb-1">Organize Runs</h3>
+                  <p className="text-sm text-white/80">
+                    Plan group runs and coordinate with your crew
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
         {/* Signup Form */}
         <div className="max-w-md mx-auto">
-          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-white/20">
             <div className="text-center mb-8">
               {mode === 'default' && authMode === 'signup' ? (
                 <>
-                  <h2 className="text-3xl font-bold text-gray-900 mb-2">Ready to get started?</h2>
-                  <p className="text-lg text-gray-600">
+                  <h2 className="text-3xl font-bold text-white mb-2">Ready to get started?</h2>
+                  <p className="text-lg text-white/90">
                     Create your free account and join the community
                   </p>
                 </>
@@ -683,14 +620,14 @@ function SignupPageContent() {
                     className="w-32 h-32 rounded-full shadow-xl mx-auto mb-6 object-cover"
                     priority
                   />
-                  <h1 className="text-4xl font-bold text-gray-900 mb-2">
+                  <h1 className="text-4xl font-bold text-white mb-2">
                     {mode === 'join-crew' && crewName
                       ? `Join ${crewName}`
                       : authMode === 'signup'
                       ? 'Welcome to GoFast!'
                       : 'Welcome Back!'}
                   </h1>
-                  <p className="text-xl text-gray-600 mb-8">
+                  <p className="text-xl text-white/90 mb-8">
                     {mode === 'join-crew'
                       ? 'Create your account to join this crew'
                       : authMode === 'signup'
@@ -702,13 +639,13 @@ function SignupPageContent() {
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm mb-4">
+              <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-100 text-sm mb-4">
                 {error}
               </div>
             )}
 
             {errorMessage && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm mb-4">
+              <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-100 text-sm mb-4">
                 {errorMessage}
               </div>
             )}
@@ -719,7 +656,7 @@ function SignupPageContent() {
                 <button
                   onClick={handleGoogle}
                   disabled={loading}
-                  className="w-full flex items-center justify-center gap-3 py-3 px-6 border-2 border-gray-300 rounded-lg shadow-lg text-base font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  className="w-full flex items-center justify-center gap-3 py-3 px-6 border-2 border-white/30 rounded-lg shadow-lg text-base font-medium text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
               {loading ? (
                 <>
@@ -741,28 +678,28 @@ function SignupPageContent() {
 
                 {/* Divider */}
                 <div className="flex items-center gap-4">
-                  <div className="flex-1 border-t border-gray-300"></div>
-                  <span className="text-gray-500 text-sm">or</span>
-                  <div className="flex-1 border-t border-gray-300"></div>
+                  <div className="flex-1 border-t border-white/30"></div>
+                  <span className="text-white/60 text-sm">or</span>
+                  <div className="flex-1 border-t border-white/30"></div>
                 </div>
 
                 {/* Email Sign Up Option */}
                 <button
                   onClick={() => setShowEmailForm(true)}
                   disabled={loading}
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white py-4 px-6 rounded-xl font-semibold transition shadow-lg hover:shadow-xl disabled:opacity-50"
+                  className="w-full bg-white/10 border-2 border-white/30 text-white py-4 px-6 rounded-xl font-semibold hover:bg-white/20 transition shadow-lg disabled:opacity-50"
                 >
                   Sign {authMode === 'signup' ? 'up' : 'in'} with Email
                 </button>
 
                 {/* Toggle between signup and signin */}
-                <p className="text-gray-600 text-sm text-center">
+                <p className="text-white/80 text-sm text-center">
                   {authMode === 'signup' ? (
                     <>
                       Already have an account?{' '}
                       <button
                         onClick={() => setAuthMode('signin')}
-                        className="text-orange-500 font-semibold hover:underline"
+                        className="text-blue-300 font-semibold hover:underline"
                       >
                         Sign In
                       </button>
@@ -772,7 +709,7 @@ function SignupPageContent() {
                       Don't have an account?{' '}
                       <button
                         onClick={() => setAuthMode('signup')}
-                        className="text-orange-500 font-semibold hover:underline"
+                        className="text-blue-300 font-semibold hover:underline"
                       >
                         Sign Up
                       </button>
@@ -791,7 +728,7 @@ function SignupPageContent() {
                         placeholder="First Name"
                         value={emailData.firstName}
                         onChange={(e) => setEmailData({ ...emailData, firstName: e.target.value })}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
                         required
                         disabled={loading}
                       />
@@ -800,7 +737,7 @@ function SignupPageContent() {
                         placeholder="Last Name"
                         value={emailData.lastName}
                         onChange={(e) => setEmailData({ ...emailData, lastName: e.target.value })}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
                         required
                         disabled={loading}
                       />
@@ -811,7 +748,7 @@ function SignupPageContent() {
                     placeholder="Email Address"
                     value={emailData.email}
                     onChange={(e) => setEmailData({ ...emailData, email: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
                     required
                     disabled={loading}
                   />
@@ -820,7 +757,7 @@ function SignupPageContent() {
                     placeholder={authMode === 'signup' ? 'Password (min 6 characters)' : 'Password'}
                     value={emailData.password}
                     onChange={(e) => setEmailData({ ...emailData, password: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
                     required
                     minLength={authMode === 'signup' ? 6 : undefined}
                     disabled={loading}
@@ -831,7 +768,7 @@ function SignupPageContent() {
                       placeholder="Confirm Password"
                       value={emailData.confirmPassword}
                       onChange={(e) => setEmailData({ ...emailData, confirmPassword: e.target.value })}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
                       required
                       disabled={loading}
                     />
@@ -841,14 +778,14 @@ function SignupPageContent() {
                       type="button"
                       onClick={() => setShowEmailForm(false)}
                       disabled={loading}
-                      className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 py-3 px-6 rounded-xl font-semibold transition disabled:opacity-50"
+                      className="flex-1 bg-white/10 border border-white/30 text-white py-3 px-6 rounded-xl font-semibold hover:bg-white/20 transition disabled:opacity-50"
                     >
                       Back
                     </button>
                     <button
                       type="submit"
                       disabled={loading}
-                      className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3 px-6 rounded-xl font-semibold transition shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 bg-gradient-to-r from-sky-500 to-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:from-sky-600 hover:to-blue-700 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {loading ? (
                         <span className="flex items-center justify-center gap-2">
