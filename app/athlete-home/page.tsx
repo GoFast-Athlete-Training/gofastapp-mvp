@@ -22,7 +22,7 @@ export default function AthleteHomePage() {
 
   useEffect(() => {
     // Redirect to /runcrew (general RunCrew landing page)
-    router.replace('/runcrew');
+    router.replace('/runcrew-discovery');
   }, [router]);
 
   // Show loading state during redirect

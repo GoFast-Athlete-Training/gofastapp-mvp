@@ -274,3 +274,4 @@ The implementation properly follows the param-based procedure pattern:
 
 The foreign key relationship is correct: each RSVP links one `athleteId` to one `runId`, expressing the athlete's intent to attend that specific run.
 
+

@@ -58,12 +58,17 @@ export async function GET(request: Request) {
     // Parse array params
     const purpose = searchParams.getAll('purpose');
     
-    // Training for Race filter (race ID)
+    // Training for Race filter (race ID) - deprecated, use raceType instead
     const trainingForRace = searchParams.get('trainingForRace') || undefined;
     
-    // Race Training Groups filter (boolean)
+    // Race Training Groups filter (boolean) - deprecated, use raceType instead
     const raceTrainingGroupsParam = searchParams.get('raceTrainingGroups');
     const raceTrainingGroups = raceTrainingGroupsParam === 'true' ? true : undefined;
+
+    // Race filtering (by race name/ID)
+    const raceId = searchParams.get('raceId') || undefined;
+    const raceCity = searchParams.get('raceCity') || undefined;
+    const raceState = searchParams.get('raceState') || undefined;
 
     const crews = await getDiscoverableRunCrews({
       limit,
@@ -71,8 +76,10 @@ export async function GET(request: Request) {
       city,
       state,
       purpose: purpose.length > 0 ? purpose : undefined,
-      trainingForRace,
+      trainingForRace: raceId || trainingForRace, // Use raceId if provided, fallback to trainingForRace
       raceTrainingGroups,
+      raceCity,
+      raceState,
     });
 
     return NextResponse.json({

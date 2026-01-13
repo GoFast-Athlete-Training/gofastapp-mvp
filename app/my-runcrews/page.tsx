@@ -69,7 +69,7 @@ export default function MyRunCrewsPage() {
           
           // If no crews exist, redirect to discovery
           if (cards.length === 0) {
-            router.replace('/runcrew');
+            router.replace('/runcrew-discovery');
             return;
           }
         } else {
@@ -102,11 +102,8 @@ export default function MyRunCrewsPage() {
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Welcome back{athlete?.firstName ? `, ${athlete.firstName}` : ''}
+            Hey {athlete?.firstName || 'runner'} — which RunCrew do you want to check on?
           </h1>
-          <p className="text-xl md:text-2xl text-white/90 mt-2">
-            See what your run crew is up to or join/start a new one
-          </p>
         </div>
 
         {runCrewCards.length === 0 ? (
@@ -117,7 +114,7 @@ export default function MyRunCrewsPage() {
               It looks like you don't have any crews yet. Head over to our RunCrew directory to explore and find your crew.
             </p>
             <Link
-              href="/runcrew"
+              href="/runcrew-discovery"
               className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition shadow-lg hover:shadow-xl"
             >
               Explore RunCrews
@@ -192,7 +189,7 @@ export default function MyRunCrewsPage() {
         {/* Action Options */}
         <div className="mt-12 text-center space-x-4">
           <Link
-            href="/runcrew"
+            href="/runcrew-discovery"
             className="inline-block bg-white hover:bg-gray-50 text-gray-900 px-6 py-3 rounded-lg font-semibold transition shadow-md"
           >
             Explore RunCrews

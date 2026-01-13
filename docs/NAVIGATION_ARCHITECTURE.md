@@ -4,35 +4,46 @@
 **Status:** ✅ Implemented  
 **Purpose:** Define clear navigation patterns for RunCrew selection and discovery
 
+**Related:** See [Welcome vs My-RunCrews Pattern](./WELCOME_VS_MYRUNCREWS_PATTERN.md) for detailed explanation of the dual-purpose pattern.
+
 ---
 
 ## Core Navigation Principles
 
-### 1. **Hydration Flow** (`/welcome`)
-- **Purpose:** Initial authentication and data hydration ONLY
+### 1. **Front Door Handler** (`/welcome`)
+- **Purpose:** Front door entry point that handles hydration + shows selector UI
+- **Role:** Front door handler (not home handler)
+- **Message:** "Welcome back" (greeting during hydration)
 - **Behavior:**
   - Waits for Firebase auth
-  - Calls `/api/athlete/hydrate` once
+  - Shows "Welcome back" message
+  - Calls `/api/athlete/hydrate` once (API call)
   - Stores athlete data in localStorage
-  - **Immediately redirects to `/my-runcrews`**
+  - **Shows the same RunCrew selector UI as `/my-runcrews`** (does NOT redirect)
+  - User interacts directly on welcome page (no redirect = no "yank")
 - **When to use:** Only from signup/root page after authentication
-- **Never use as:** A landing page, navigation target, or "home" page
+- **Never use as:** A navigation target or "home" page (for back buttons, etc.)
+- **See:** [Welcome vs My-RunCrews Pattern](./WELCOME_VS_MYRUNCREWS_PATTERN.md)
 
-### 2. **RunCrew Selector** (`/my-runcrews`)
-- **Purpose:** Personal sandbox for selecting which RunCrew to view/manage
-- **Message:** "Hey runner — which RunCrew do you want to check on?"
+### 2. **Home Handler** (`/my-runcrews`)
+- **Purpose:** Home base where users return to select/manage their RunCrews
+- **Role:** Home handler (navigation target)
+- **Message:** "Hey [FirstName] — which RunCrew do you want to check on?" (action-oriented)
 - **Behavior:**
-  - Reads from localStorage (no API calls)
+  - Reads from localStorage (no API calls - already hydrated)
+  - Shows the same RunCrew selector UI as `/welcome` (consistent experience)
   - Displays all RunCrews user is a member of
   - Provides "View as Member" and "View as Admin" buttons
-  - Shows "Explore RunCrews" link if no crews exist
+  - Shows "Explore RunCrews" and "Create RunCrew" buttons
 - **When to redirect here:**
   - ✅ Coming back from profile page
   - ✅ Coming back from admin functions (settings, admin page)
   - ✅ Navigation from member pages
   - ✅ User is "lost" and needs a safe landing zone
   - ✅ After completing actions (archive, delete, etc.) **IF** user still has other crews
+  - ✅ TopNav logo click
 - **Fallback:** If no crews exist, redirects to `/runcrew` (discovery)
+- **See:** [Welcome vs My-RunCrews Pattern](./WELCOME_VS_MYRUNCREWS_PATTERN.md)
 
 ### 3. **RunCrew Discovery** (`/runcrew`)
 - **Purpose:** Discover and join new RunCrews
@@ -125,8 +136,8 @@ User Action
 
 | Page | Hydration | Data Source | Primary Purpose | Redirects To |
 |------|-----------|-------------|-----------------|--------------|
-| `/welcome` | ✅ Yes (once) | API call | Initial hydration | `/my-runcrews` |
-| `/my-runcrews` | ❌ No | localStorage | RunCrew selector | `/runcrew` if no crews |
+| `/welcome` | ✅ Yes (once) | API call | Front door handler (hydrate + show selector) | N/A (shows UI directly) |
+| `/my-runcrews` | ❌ No | localStorage | Home handler (selector) | `/runcrew` if no crews |
 | `/runcrew` | ❌ No | API call | Discovery/exploration | N/A |
 | `/profile` | ❌ No | localStorage | View/edit profile | Back to `/my-runcrews` |
 | `/runcrew/[id]/admin` | ❌ No | API call | Admin functions | Back to `/my-runcrews` |

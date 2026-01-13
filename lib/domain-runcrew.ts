@@ -368,6 +368,8 @@ export async function getDiscoverableRunCrews(options?: {
   purpose?: string[];
   trainingForRace?: string; // race ID to filter by specific race
   raceTrainingGroups?: boolean; // true = only crews training for a race (trainingForRace IS NOT NULL)
+  raceCity?: string; // Filter by race city (for race filtering)
+  raceState?: string; // Filter by race state (for race filtering)
 }) {
   const limit = options?.limit || 50;
 
@@ -409,6 +411,40 @@ export async function getDiscoverableRunCrews(options?: {
   // Race Training Groups filter (has any race)
   if (options?.raceTrainingGroups === true) {
     where.trainingForRace = { not: null };
+  }
+
+  // Race filtering - filter by race ID (from race name selection) and/or race location
+  if (options?.trainingForRace || options?.raceState || options?.raceCity) {
+    where.trainingForRace = { not: null }; // Must have a race
+    
+    // If specific race ID is provided, filter by it
+    if (options.trainingForRace) {
+      where.trainingForRace = options.trainingForRace;
+    }
+    
+    // If race location filters are provided, filter by race location
+    if (options?.raceState || options?.raceCity) {
+      const raceLocationFilter: any = {};
+      if (options.raceState) {
+        raceLocationFilter.state = options.raceState;
+      }
+      if (options.raceCity) {
+        raceLocationFilter.city = {
+          contains: options.raceCity,
+          mode: 'insensitive',
+        };
+      }
+      
+      // Combine with race ID filter if present
+      if (options.trainingForRace) {
+        where.race_registry = {
+          id: options.trainingForRace,
+          ...raceLocationFilter,
+        };
+      } else {
+        where.race_registry = raceLocationFilter;
+      }
+    }
   }
 
   // Get non-archived crews with member counts and race data

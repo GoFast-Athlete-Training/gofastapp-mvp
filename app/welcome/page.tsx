@@ -173,6 +173,7 @@ export default function WelcomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center">
       <div className="text-center">
+        <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Welcome back</h1>
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
         <p className="text-white text-lg">Loading your RunCrews...</p>
       </div>

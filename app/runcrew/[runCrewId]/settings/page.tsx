@@ -793,7 +793,7 @@ export default function RunCrewSettingsPage() {
                                 if (memberships.length > 0) {
                                   router.push('/my-runcrews');
                                 } else {
-                                  router.push('/runcrew');
+                                  router.push('/runcrew-discovery');
                                 }
                               } else {
                                 router.push('/my-runcrews');
@@ -1011,7 +1011,7 @@ export default function RunCrewSettingsPage() {
                         Create Another RunCrew
                       </button>
                       <button
-                        onClick={() => router.push('/runcrew')}
+                        onClick={() => router.push('/runcrew-discovery')}
                         className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
                       >
                         Join a RunCrew

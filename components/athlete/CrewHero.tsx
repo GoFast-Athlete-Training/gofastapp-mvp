@@ -40,7 +40,7 @@ export default function CrewHero({ crew, nextRun, nextRunAttendees, isCrewAdmin,
     
     if (!runCrewId) {
       console.log('🔵 No runCrewId, navigating to /runcrew');
-      router.push('/runcrew');
+      router.push('/runcrew-discovery');
       return;
     }
 

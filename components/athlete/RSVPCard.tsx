@@ -16,7 +16,7 @@ export default function RSVPCard({ nextRun, crew, runCrewId, isCrewAdmin }: RSVP
 
   const handleGoToCrew = () => {
     if (!runCrewId) {
-      router.push('/runcrew');
+      router.push('/runcrew-discovery');
       return;
     }
     const targetRoute = isCrewAdmin ? `/runcrew/${runCrewId}/admin` : `/runcrew/${runCrewId}`;

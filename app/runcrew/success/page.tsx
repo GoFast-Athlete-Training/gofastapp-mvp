@@ -55,7 +55,7 @@ function RunCrewSuccessContent() {
     } else if (crewData?.id) {
       router.push(`/runcrew/${crewData.id}/admin`);
     } else {
-      router.push('/runcrew');
+      router.push('/runcrew-discovery');
     }
   };
 

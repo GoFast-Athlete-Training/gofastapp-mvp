@@ -5,6 +5,8 @@ export const dynamic = 'force-dynamic';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, ImageIcon, Plus, Camera } from 'lucide-react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import GooglePlacesAutocomplete from '@/components/RunCrew/GooglePlacesAutocomplete';
@@ -80,6 +82,8 @@ export default function CreateCrewPage() {
   const logoFileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null); // null = checking, true = authenticated, false = not authenticated
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logo, setLogo] = useState<string>('');
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -126,6 +130,31 @@ export default function CreateCrewPage() {
   const [selectedRace, setSelectedRace] = useState<any | null>(null);
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
   const [isTrainingForRace, setIsTrainingForRace] = useState(false); // Toggle: Training for a race?
+
+  // Check authentication state on mount
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // User is authenticated
+        setIsAuthenticated(true);
+        setCheckingAuth(false);
+        
+        // Store token for API calls
+        try {
+          const firebaseToken = await firebaseUser.getIdToken();
+          localStorage.setItem('firebaseToken', firebaseToken);
+        } catch (err) {
+          console.error('Error getting Firebase token:', err);
+        }
+      } else {
+        // User is not authenticated
+        setIsAuthenticated(false);
+        setCheckingAuth(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Create race form state
   const [newRaceName, setNewRaceName] = useState('');
@@ -482,6 +511,37 @@ export default function CreateCrewPage() {
     }
   };
 
+  // Show loading state while checking auth
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-50 to-sky-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Public view for unauthenticated users - redirect to signup explainer
+  useEffect(() => {
+    if (!checkingAuth && !isAuthenticated) {
+      router.replace('/public/create-crew/signup');
+    }
+  }, [checkingAuth, isAuthenticated, router]);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-50 to-sky-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Redirecting...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Authenticated view - show full create form
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 to-sky-100">
       <TopNav showBack={true} backUrl="/my-runcrews" backLabel="Back to My RunCrews" />

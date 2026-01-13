@@ -7,13 +7,13 @@
 			"path": "."
 		},
 		{
-			"path": "../gofast-fitnesssupportpro"
-		},
-		{
-			"path": "../gofast-user-dashboard"
-		},
-		{
 			"path": "../GoFastLanding"
+		},
+		{
+			"path": "../../Ignite/IgniteBd-Next-combine"
+		},
+		{
+			"path": "../gofast-bostmarathon-landing"
 		}
 	],
 	"settings": {}

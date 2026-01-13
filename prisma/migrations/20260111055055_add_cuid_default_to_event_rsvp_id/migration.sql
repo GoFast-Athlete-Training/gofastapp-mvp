@@ -1,0 +1,4 @@
+-- Migration: Add @default(cuid()) to run_crew_event_rsvps.id
+-- Note: Prisma generates cuid() client-side in application code.
+-- This migration is for documentation purposes only.
+-- No database-level changes are required for @default(cuid()) in Prisma.
