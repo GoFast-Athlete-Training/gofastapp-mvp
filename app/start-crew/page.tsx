@@ -211,60 +211,57 @@ export default function StartCrewExplainerPage() {
             <h3 className="text-2xl md:text-3xl font-bold text-gray-900">Manage Your Crew</h3>
           </div>
           <p className="text-lg text-gray-600 mb-6 max-w-3xl">
-            Your crew dashboard puts everything in one place. See all members, upcoming runs, events, and conversations at a glance.
+            Think Slack/Teams — but purpose-built for run clubs. One “container” where your crew chats, plans, RSVPs, and stays excited.
           </p>
           
-          {/* Interface Preview */}
+          {/* Capabilities Sell */}
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 md:p-8">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Members Sidebar Preview */}
-              <div className="lg:col-span-3">
-                <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-semibold text-gray-900">Members</h4>
-                    <span className="text-sm text-gray-500 bg-gray-200 px-2 py-1 rounded-full">8</span>
-                  </div>
-                  <div className="space-y-2">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="flex items-center gap-2 p-2 bg-white rounded border border-gray-200">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-sky-600"></div>
-                        <div className="flex-1 h-4 bg-gray-200 rounded"></div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+                <p className="text-sm font-semibold text-gray-900 mb-2">Your crew container includes</p>
+                <ul className="text-sm text-gray-700 space-y-1">
+                  <li>• Members + roles (leaders/admins)</li>
+                  <li>• Runs (schedule + RSVP)</li>
+                  <li>• Events (social meetups, etc.)</li>
+                  <li>• Announcements (important updates)</li>
+                  <li>• Chat channels (topics like #general)</li>
+                </ul>
               </div>
-              
-              {/* Main Content Preview */}
-              <div className="lg:col-span-9 space-y-4">
-                <div className="bg-orange-50 rounded-lg border-2 border-orange-200 p-4">
-                  <h4 className="font-semibold text-gray-900 mb-2">Announcements</h4>
-                  <div className="space-y-2">
-                    <div className="bg-white rounded p-3 border border-orange-200">
-                      <div className="h-3 bg-gray-200 rounded w-1/3 mb-2"></div>
-                      <div className="h-2 bg-gray-200 rounded w-full"></div>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                  <h4 className="font-semibold text-gray-900 mb-2">Upcoming Runs</h4>
-                  <div className="space-y-2">
-                    <div className="border border-gray-200 rounded p-3">
-                      <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
-                      <div className="h-2 bg-gray-200 rounded w-3/4"></div>
-                    </div>
-                  </div>
-                </div>
+
+              <div className="rounded-xl border border-gray-200 p-5">
+                <p className="text-sm font-semibold text-gray-900 mb-2">How leaders use it</p>
+                <ul className="text-sm text-gray-700 space-y-1">
+                  <li>• Post “Saturday long run” with meetup spot + pace</li>
+                  <li>• Create a social event (coffee / happy hour)</li>
+                  <li>• Pin a weekly announcement (“new route this week”)</li>
+                  <li>• Share invite link to grow the crew</li>
+                </ul>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 p-5">
+                <p className="text-sm font-semibold text-gray-900 mb-2">What members get</p>
+                <ul className="text-sm text-gray-700 space-y-1">
+                  <li>• One place to see what’s next</li>
+                  <li>• RSVP so nobody shows up alone</li>
+                  <li>• Chat + hype + accountability</li>
+                  <li>• Fewer “where are we meeting?” texts</li>
+                </ul>
               </div>
             </div>
-            
-            <div className="mt-6 text-center">
+
+            <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={() => setShowFullExample(!showFullExample)}
-                className="text-orange-600 hover:text-orange-700 font-semibold underline"
+                className="inline-flex justify-center items-center px-6 py-3 bg-white border border-gray-300 text-gray-900 font-semibold rounded-xl hover:bg-gray-50 transition"
               >
-                {showFullExample ? 'Hide' : 'See'} Full Example →
+                {showFullExample ? 'Hide' : 'See'} a full example →
               </button>
+              <Link
+                href="/runcrew/create"
+                className="inline-flex justify-center items-center px-6 py-3 bg-orange-500 text-white font-semibold rounded-xl shadow hover:bg-orange-600 transition"
+              >
+                Create your crew →
+              </Link>
             </div>
           </div>
         </section>
