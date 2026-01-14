@@ -239,13 +239,18 @@ export default function StartCrewExplainerPage() {
               </div>
 
               <div className="rounded-xl border border-gray-200 p-5">
-                <p className="text-sm font-semibold text-gray-900 mb-2">What members get</p>
+                <p className="text-sm font-semibold text-gray-900 mb-2">Members engage (the magic)</p>
                 <ul className="text-sm text-gray-700 space-y-1">
-                  <li>• One place to see what’s next</li>
                   <li>• RSVP so nobody shows up alone</li>
-                  <li>• Chat + hype + accountability</li>
-                  <li>• Fewer “where are we meeting?” texts</li>
+                  <li>• Banter + hype in chat channels</li>
+                  <li>• Announcements keep everyone aligned</li>
+                  <li>• Social events turn runners into friends</li>
                 </ul>
+                <div className="mt-3 text-sm">
+                  <a href="#members-engage" className="text-orange-600 hover:text-orange-700 font-semibold underline">
+                    See member experience ↓
+                  </a>
+                </div>
               </div>
             </div>
 
@@ -340,6 +345,105 @@ export default function StartCrewExplainerPage() {
               >
                 Create your crew →
               </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* Step 3: Members Engage */}
+        <section id="members-engage" className="mb-16 scroll-mt-24">
+          <div className="flex items-center mb-6">
+            <span className="text-4xl font-bold text-orange-500 mr-4">3</span>
+            <h3 className="text-2xl md:text-3xl font-bold text-gray-900">Members Engage</h3>
+          </div>
+          <p className="text-lg text-gray-600 mb-8 max-w-3xl">
+            This is what keeps the crew consistent: clear plans, quick RSVPs, and the chatter that makes people show up.
+          </p>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* RSVP Loop */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <h4 className="text-xl font-bold text-gray-900">RSVP loop</h4>
+                  <p className="text-sm text-gray-600">Members tap one button, leaders see the turnout.</p>
+                </div>
+                <div className="text-2xl">✅</div>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-semibold text-gray-900">Saturday Morning Long Run</p>
+                  <span className="text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-1 rounded-full">
+                    6 going
+                  </span>
+                </div>
+                <div className="text-xs text-gray-600 space-y-1">
+                  <div>📅 Sat, Jan 18 • 7:00 AM</div>
+                  <div>📍 Golden Gate Park - Stow Lake</div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <span className="text-xs font-semibold bg-green-50 text-green-700 border border-green-200 px-2 py-1 rounded-full">Going</span>
+                  <span className="text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200 px-2 py-1 rounded-full">Maybe</span>
+                  <span className="text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200 px-2 py-1 rounded-full">Can’t</span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  {[
+                    { name: 'Marcus', status: 'Going' },
+                    { name: 'Emma', status: 'Going' },
+                    { name: 'David', status: 'Going' },
+                    { name: 'Maya', status: 'Maybe' },
+                  ].map((r) => (
+                    <div key={`${r.name}-${r.status}`} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white text-xs font-semibold">
+                          {r.name[0]}
+                        </div>
+                        <span className="text-sm font-semibold text-gray-900">{r.name}</span>
+                      </div>
+                      <span className="text-xs font-semibold text-gray-600">{r.status}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Message banter */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <h4 className="text-xl font-bold text-gray-900">Message banter</h4>
+                  <p className="text-sm text-gray-600">The hype + accountability that turns “maybe” into “going.”</p>
+                </div>
+                <div className="text-2xl">💬</div>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+                {[
+                  { who: 'David', time: '3h ago', text: 'Who’s in for Saturday? Trying to hit 8:30 pace.' },
+                  { who: 'Jessica', time: '2h ago', text: 'I’m going — first run with y’all. Excited!' },
+                  { who: 'Sarah', time: '1h ago', text: 'Route’s updated in the run details. Bring a layer — chilly early.' },
+                ].map((m) => (
+                  <div key={`${m.who}-${m.time}`} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-semibold">
+                          {m.who[0]}
+                        </div>
+                        <span className="text-sm font-semibold text-gray-900">{m.who}</span>
+                      </div>
+                      <span className="text-xs text-gray-500">{m.time}</span>
+                    </div>
+                    <p className="text-sm text-gray-800">{m.text}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 p-4">
+                <p className="text-sm font-semibold text-gray-900 mb-1">Leaders can also post announcements</p>
+                <p className="text-sm text-gray-700">So important updates don’t get buried in chat.</p>
+              </div>
             </div>
           </div>
         </section>
