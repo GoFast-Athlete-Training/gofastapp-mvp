@@ -1,20 +1,17 @@
+/* eslint-disable react/no-unescaped-entities */
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
 
 /**
- * Start a Crew Explainer Page
- * 
+ * Start a Crew - Example Page (React app)
+ *
  * Route: /start-crew
- * 
- * Purpose: Show how to start and manage a run crew
- * - How It Works section with UI previews
- * - Feature deep dives (Runs, Messages, Announcements, Social Events)
- * - See an Example section with full fake data preview
+ *
+ * Purpose: Pure demo of what the crew "container" looks like.
+ * The marketing explainer lives in the HTML landing site (`GoFastLanding/start-crew.html`).
  */
-export default function StartCrewExplainerPage() {
-  const [showFullExample, setShowFullExample] = useState(false);
+export default function StartCrewExamplePage() {
 
   // Fake crew data for the "See an Example" section
   const fakeCrew = {
@@ -103,242 +100,19 @@ export default function StartCrewExplainerPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white py-16 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            Start Your Run Crew
-          </h1>
-          <p className="text-xl md:text-2xl mb-8 text-orange-50">
-            Manage your members in one place. Set runs. Set events. Get them excited.
-          </p>
-          <Link
-            href="/runcrew/create"
-            className="inline-block px-8 py-4 bg-white text-orange-600 font-bold rounded-xl shadow-lg hover:bg-orange-50 transition transform hover:scale-105"
-          >
-            Create Your Crew →
-          </Link>
-        </div>
-      </div>
-
-      {/* How It Works Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            How It Works
-          </h2>
-          <p className="text-lg text-gray-600">
-            Everything you need to build and manage your run crew
-          </p>
-        </div>
-
-        {/* Step 1: Create Your Crew */}
-        <section className="mb-16">
-          <div className="flex items-center mb-6">
-            <span className="text-4xl font-bold text-orange-500 mr-4">1</span>
-            <h3 className="text-2xl md:text-3xl font-bold text-gray-900">Create Your Crew</h3>
-          </div>
-          <p className="text-lg text-gray-600 mb-6 max-w-3xl">
-            Set up your crew in minutes. Add key details like name, location, pace preferences, and what you're all about.
-          </p>
-          
-          {/* What you'll input */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 md:p-8">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-sky-50 border border-sky-200 flex items-center justify-center text-2xl flex-shrink-0">
-                📝
-              </div>
-              <div className="min-w-0">
-                <p className="text-base font-semibold text-gray-900">What you’ll set up</p>
-                <p className="text-sm text-gray-600 mt-1">
-                  Quick setup — just a few fields to define your crew’s vibe, pace, and meetup.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-xl border border-gray-200 p-4 bg-gray-50">
-                <p className="text-sm font-semibold text-gray-900 mb-2">Core details</p>
-                <ul className="text-sm text-gray-700 space-y-1">
-                  <li>• Crew name</li>
-                  <li>• Handle (your shareable link)</li>
-                  <li>• City + state</li>
-                  <li>• Description</li>
-                </ul>
-              </div>
-
-              <div className="rounded-xl border border-gray-200 p-4 bg-gray-50">
-                <p className="text-sm font-semibold text-gray-900 mb-2">Pace + focus</p>
-                <ul className="text-sm text-gray-700 space-y-1">
-                  <li>• Easy pace + tempo pace</li>
-                  <li>• Purpose (training / social)</li>
-                  <li>• Typical run distance</li>
-                  <li>• When you usually run</li>
-                </ul>
-              </div>
-
-              <div className="md:col-span-2 rounded-xl border border-gray-200 p-4 bg-gray-50">
-                <p className="text-sm font-semibold text-gray-900 mb-2">Meetup (optional but recommended)</p>
-                <ul className="text-sm text-gray-700 space-y-1">
-                  <li>• Primary meetup spot (park / track / coffee shop)</li>
-                  <li>• Address / map location</li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-col sm:flex-row gap-3">
-              <Link
-                href="/runcrew/create"
-                className="inline-flex justify-center items-center px-5 py-3 bg-orange-500 text-white font-semibold rounded-xl shadow hover:bg-orange-600 transition"
-              >
-                Start setup →
-              </Link>
-              <button
-                type="button"
-                onClick={() => setShowFullExample(true)}
-                className="inline-flex justify-center items-center px-5 py-3 bg-white border border-gray-300 text-gray-900 font-semibold rounded-xl hover:bg-gray-50 transition"
-              >
-                See a full example →
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* Step 2: Manage Your Crew */}
-        <section className="mb-16">
-          <div className="flex items-center mb-6">
-            <span className="text-4xl font-bold text-orange-500 mr-4">2</span>
-            <h3 className="text-2xl md:text-3xl font-bold text-gray-900">Manage Your Crew</h3>
-          </div>
-          <p className="text-lg text-gray-600 mb-6 max-w-3xl">
-            Think Slack/Teams — but purpose-built for run clubs. One “container” where your crew chats, plans, RSVPs, and stays excited.
-          </p>
-          
-          {/* Capabilities Sell */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 md:p-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
-                <p className="text-sm font-semibold text-gray-900 mb-2">Your crew container includes</p>
-                <ul className="text-sm text-gray-700 space-y-1">
-                  <li>• Members + roles (leaders/admins)</li>
-                  <li>• Runs (schedule + RSVP)</li>
-                  <li>• Events (social meetups, etc.)</li>
-                  <li>• Announcements (important updates)</li>
-                  <li>• Chat channels (topics like #general)</li>
-                </ul>
-              </div>
-
-              <div className="rounded-xl border border-gray-200 p-5">
-                <p className="text-sm font-semibold text-gray-900 mb-2">How leaders use it</p>
-                <ul className="text-sm text-gray-700 space-y-1">
-                  <li>• Post “Saturday long run” with meetup spot + pace</li>
-                  <li>• Create a social event (coffee / happy hour)</li>
-                  <li>• Pin a weekly announcement (“new route this week”)</li>
-                  <li>• Share invite link to grow the crew</li>
-                </ul>
-              </div>
-
-              <div className="rounded-xl border border-gray-200 p-5">
-                <p className="text-sm font-semibold text-gray-900 mb-2">Members engage (the magic)</p>
-                <ul className="text-sm text-gray-700 space-y-1">
-                  <li>• RSVP so nobody shows up alone</li>
-                  <li>• Banter + hype in chat channels</li>
-                  <li>• Announcements keep everyone aligned</li>
-                  <li>• Social events turn runners into friends</li>
-                </ul>
-                <div className="mt-3 text-sm">
-                  <a href="#members-engage" className="text-orange-600 hover:text-orange-700 font-semibold underline">
-                    See member experience ↓
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-10 mb-6 border-t border-gray-200 pt-8">
-              <h4 className="text-xl font-bold text-gray-900 mb-2">What you can do inside the container</h4>
-              <p className="text-gray-600">
-                These are the core tools your crew uses every week — scheduling, coordination, and hype.
+      <div className="bg-gradient-to-br from-sky-50 to-orange-50 border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-2">Example</p>
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+                What a crew “container” looks like
+              </h1>
+              <p className="text-gray-600 mt-2 max-w-2xl">
+                This is a static demo with fake members, runs, events, announcements, and messages.
               </p>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Run Events */}
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                <div className="text-3xl mb-4">🏃</div>
-                <h4 className="text-xl font-bold text-gray-900 mb-2">Schedule Runs</h4>
-                <p className="text-gray-600 mb-4">
-                  Create runs with date, time, location, distance, and pace. Members RSVP so you know who's coming.
-                </p>
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="text-sm font-semibold text-gray-900 mb-1">Saturday Morning Long Run</div>
-                  <div className="text-xs text-gray-600 space-y-1">
-                    <div>📅 Sat, Jan 18, 7:00 AM</div>
-                    <div>📍 Golden Gate Park - Stow Lake</div>
-                    <div>📏 8 miles • 8:30/mi pace</div>
-                    <div className="text-orange-600 font-semibold">6 members going</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Messages */}
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                <div className="text-3xl mb-4">💬</div>
-                <h4 className="text-xl font-bold text-gray-900 mb-2">Crew Messages</h4>
-                <p className="text-gray-600 mb-4">
-                  Keep the conversation going with channels. Share updates, coordinate, and build community.
-                </p>
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-orange-500"></div>
-                      <div className="flex-1">
-                        <div className="text-xs font-semibold text-gray-900">David K.</div>
-                        <div className="text-xs text-gray-600">Can't wait for Saturday!</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Announcements */}
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                <div className="text-3xl mb-4">📢</div>
-                <h4 className="text-xl font-bold text-gray-900 mb-2">Announcements</h4>
-                <p className="text-gray-600 mb-4">
-                  Post official updates that stand out. Perfect for important news, route changes, or crew-wide messages.
-                </p>
-                <div className="bg-orange-50 rounded-lg p-4 border-2 border-orange-200">
-                  <div className="text-sm font-semibold text-gray-900 mb-1">Welcome to the Crew!</div>
-                  <div className="text-xs text-gray-700">Excited to have everyone here. Our first group run is this Saturday at 7am.</div>
-                </div>
-              </div>
-
-              {/* Social Events */}
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                <div className="text-3xl mb-4">🎉</div>
-                <h4 className="text-xl font-bold text-gray-900 mb-2">Events</h4>
-                <p className="text-gray-600 mb-4">
-                  Organize coffee, happy hours, and meetups. Build connections beyond the run.
-                </p>
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="text-sm font-semibold text-gray-900 mb-1">Post-Run Coffee Social</div>
-                  <div className="text-xs text-gray-600 space-y-1">
-                    <div>📅 Sat, Jan 18, 9:00 AM</div>
-                    <div>📍 Blue Bottle Coffee</div>
-                    <div>☕ Join us for coffee after the run!</div>
-                    <div className="text-orange-600 font-semibold">8 members going</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
-              <button
-                onClick={() => setShowFullExample(!showFullExample)}
-                className="inline-flex justify-center items-center px-6 py-3 bg-white border border-gray-300 text-gray-900 font-semibold rounded-xl hover:bg-gray-50 transition"
-              >
-                {showFullExample ? 'Hide' : 'See'} a full example →
-              </button>
+            <div className="flex flex-col sm:flex-row gap-3">
               <Link
                 href="/runcrew/create"
                 className="inline-flex justify-center items-center px-6 py-3 bg-orange-500 text-white font-semibold rounded-xl shadow hover:bg-orange-600 transition"
@@ -347,120 +121,10 @@ export default function StartCrewExplainerPage() {
               </Link>
             </div>
           </div>
-        </section>
-
-        {/* Step 3: Members Engage */}
-        <section id="members-engage" className="mb-16 scroll-mt-24">
-          <div className="flex items-center mb-6">
-            <span className="text-4xl font-bold text-orange-500 mr-4">3</span>
-            <h3 className="text-2xl md:text-3xl font-bold text-gray-900">Members Engage</h3>
-          </div>
-          <p className="text-lg text-gray-600 mb-8 max-w-3xl">
-            This is what keeps the crew consistent: clear plans, quick RSVPs, and the chatter that makes people show up.
-          </p>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* RSVP Loop */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-              <div className="flex items-start justify-between gap-3 mb-4">
-                <div>
-                  <h4 className="text-xl font-bold text-gray-900">RSVP loop</h4>
-                  <p className="text-sm text-gray-600">Members tap one button, leaders see the turnout.</p>
-                </div>
-                <div className="text-2xl">✅</div>
-              </div>
-
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-semibold text-gray-900">Saturday Morning Long Run</p>
-                  <span className="text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-1 rounded-full">
-                    6 going
-                  </span>
-                </div>
-                <div className="text-xs text-gray-600 space-y-1">
-                  <div>📅 Sat, Jan 18 • 7:00 AM</div>
-                  <div>📍 Golden Gate Park - Stow Lake</div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <span className="text-xs font-semibold bg-green-50 text-green-700 border border-green-200 px-2 py-1 rounded-full">Going</span>
-                  <span className="text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200 px-2 py-1 rounded-full">Maybe</span>
-                  <span className="text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200 px-2 py-1 rounded-full">Can’t</span>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  {[
-                    { name: 'Marcus', status: 'Going' },
-                    { name: 'Emma', status: 'Going' },
-                    { name: 'David', status: 'Going' },
-                    { name: 'Maya', status: 'Maybe' },
-                  ].map((r) => (
-                    <div key={`${r.name}-${r.status}`} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white text-xs font-semibold">
-                          {r.name[0]}
-                        </div>
-                        <span className="text-sm font-semibold text-gray-900">{r.name}</span>
-                      </div>
-                      <span className="text-xs font-semibold text-gray-600">{r.status}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Message banter */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-              <div className="flex items-start justify-between gap-3 mb-4">
-                <div>
-                  <h4 className="text-xl font-bold text-gray-900">Message banter</h4>
-                  <p className="text-sm text-gray-600">The hype + accountability that turns “maybe” into “going.”</p>
-                </div>
-                <div className="text-2xl">💬</div>
-              </div>
-
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
-                {[
-                  { who: 'David', time: '3h ago', text: 'Who’s in for Saturday? Trying to hit 8:30 pace.' },
-                  { who: 'Jessica', time: '2h ago', text: 'I’m going — first run with y’all. Excited!' },
-                  { who: 'Sarah', time: '1h ago', text: 'Route’s updated in the run details. Bring a layer — chilly early.' },
-                ].map((m) => (
-                  <div key={`${m.who}-${m.time}`} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-semibold">
-                          {m.who[0]}
-                        </div>
-                        <span className="text-sm font-semibold text-gray-900">{m.who}</span>
-                      </div>
-                      <span className="text-xs text-gray-500">{m.time}</span>
-                    </div>
-                    <p className="text-sm text-gray-800">{m.text}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 p-4">
-                <p className="text-sm font-semibold text-gray-900 mb-1">Leaders can also post announcements</p>
-                <p className="text-sm text-gray-700">So important updates don’t get buried in chat.</p>
-              </div>
-            </div>
-          </div>
-        </section>
+        </div>
       </div>
 
-      {/* See an Example Section */}
-      {showFullExample && (
-        <div className="bg-gray-100 border-t border-gray-200 py-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                See an Example
-              </h2>
-              <p className="text-lg text-gray-600">
-                Here's what a real crew looks like with members, runs, events, and conversations
-              </p>
-            </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
 
             {/* Crew Header */}
             <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 mb-6">
@@ -697,26 +361,6 @@ export default function StartCrewExplainerPage() {
                 </section>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* CTA Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
-        <div className="text-center">
-          <div className="bg-white rounded-2xl shadow-lg border-2 border-orange-200 p-8 max-w-2xl mx-auto">
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">
-              Ready to Start Your Crew?
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Create your run crew in minutes. Invite members, schedule runs, and build your community.
-            </p>
-            <Link
-              href="/runcrew/create"
-              className="inline-block px-8 py-4 bg-orange-500 text-white font-bold rounded-xl shadow-lg hover:bg-orange-600 transition transform hover:scale-105"
-            >
-              Create Your Crew →
-            </Link>
           </div>
         </div>
       </div>
