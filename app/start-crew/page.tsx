@@ -142,60 +142,64 @@ export default function StartCrewExplainerPage() {
             Set up your crew in minutes. Add key details like name, location, pace preferences, and what you're all about.
           </p>
           
-          {/* Example Setup (NOT a real form) */}
+          {/* What you'll input */}
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 md:p-8">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-              <div>
-                <p className="text-sm font-semibold text-gray-900">Example setup (preview)</p>
-                <p className="text-sm text-gray-600">These are sample values to show what you can configure — not fields to fill in here.</p>
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-sky-50 border border-sky-200 flex items-center justify-center text-2xl flex-shrink-0">
+                📝
               </div>
-              <span className="inline-flex w-fit items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700 border border-gray-200">
-                Demo values
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-xl border border-gray-200 p-4">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Crew name</p>
-                  <span className="text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Example</span>
-                </div>
-                <p className="text-base font-semibold text-gray-900">Downtown Runners</p>
-              </div>
-
-              <div className="rounded-xl border border-gray-200 p-4">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Location</p>
-                  <span className="text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Example</span>
-                </div>
-                <p className="text-base font-semibold text-gray-900">San Francisco, CA</p>
-              </div>
-
-              <div className="md:col-span-2 rounded-xl border border-gray-200 p-4">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Description</p>
-                  <span className="text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Example</span>
-                </div>
-                <p className="text-sm text-gray-800 leading-relaxed">
-                  A friendly group of runners who meet every Saturday morning for long runs and coffee
+              <div className="min-w-0">
+                <p className="text-base font-semibold text-gray-900">What you’ll set up</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Quick setup — just a few fields to define your crew’s vibe, pace, and meetup.
                 </p>
               </div>
+            </div>
 
-              <div className="rounded-xl border border-gray-200 p-4">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Easy pace</p>
-                  <span className="text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Example</span>
-                </div>
-                <p className="text-base font-semibold text-gray-900">8:30/mi</p>
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-xl border border-gray-200 p-4 bg-gray-50">
+                <p className="text-sm font-semibold text-gray-900 mb-2">Core details</p>
+                <ul className="text-sm text-gray-700 space-y-1">
+                  <li>• Crew name</li>
+                  <li>• Handle (your shareable link)</li>
+                  <li>• City + state</li>
+                  <li>• Description</li>
+                </ul>
               </div>
 
-              <div className="rounded-xl border border-gray-200 p-4">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Tempo pace</p>
-                  <span className="text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Example</span>
-                </div>
-                <p className="text-base font-semibold text-gray-900">7:30/mi</p>
+              <div className="rounded-xl border border-gray-200 p-4 bg-gray-50">
+                <p className="text-sm font-semibold text-gray-900 mb-2">Pace + focus</p>
+                <ul className="text-sm text-gray-700 space-y-1">
+                  <li>• Easy pace + tempo pace</li>
+                  <li>• Purpose (training / social)</li>
+                  <li>• Typical run distance</li>
+                  <li>• When you usually run</li>
+                </ul>
               </div>
+
+              <div className="md:col-span-2 rounded-xl border border-gray-200 p-4 bg-gray-50">
+                <p className="text-sm font-semibold text-gray-900 mb-2">Meetup (optional but recommended)</p>
+                <ul className="text-sm text-gray-700 space-y-1">
+                  <li>• Primary meetup spot (park / track / coffee shop)</li>
+                  <li>• Address / map location</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col sm:flex-row gap-3">
+              <Link
+                href="/runcrew/create"
+                className="inline-flex justify-center items-center px-5 py-3 bg-orange-500 text-white font-semibold rounded-xl shadow hover:bg-orange-600 transition"
+              >
+                Start setup →
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowFullExample(true)}
+                className="inline-flex justify-center items-center px-5 py-3 bg-white border border-gray-300 text-gray-900 font-semibold rounded-xl hover:bg-gray-50 transition"
+              >
+                See a full example →
+              </button>
             </div>
           </div>
         </section>
