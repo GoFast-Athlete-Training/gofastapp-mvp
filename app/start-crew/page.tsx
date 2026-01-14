@@ -249,6 +249,84 @@ export default function StartCrewExplainerPage() {
               </div>
             </div>
 
+            <div className="mt-10 mb-6 border-t border-gray-200 pt-8">
+              <h4 className="text-xl font-bold text-gray-900 mb-2">What you can do inside the container</h4>
+              <p className="text-gray-600">
+                These are the core tools your crew uses every week — scheduling, coordination, and hype.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Run Events */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <div className="text-3xl mb-4">🏃</div>
+                <h4 className="text-xl font-bold text-gray-900 mb-2">Schedule Runs</h4>
+                <p className="text-gray-600 mb-4">
+                  Create runs with date, time, location, distance, and pace. Members RSVP so you know who's coming.
+                </p>
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="text-sm font-semibold text-gray-900 mb-1">Saturday Morning Long Run</div>
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <div>📅 Sat, Jan 18, 7:00 AM</div>
+                    <div>📍 Golden Gate Park - Stow Lake</div>
+                    <div>📏 8 miles • 8:30/mi pace</div>
+                    <div className="text-orange-600 font-semibold">6 members going</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Messages */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <div className="text-3xl mb-4">💬</div>
+                <h4 className="text-xl font-bold text-gray-900 mb-2">Crew Messages</h4>
+                <p className="text-gray-600 mb-4">
+                  Keep the conversation going with channels. Share updates, coordinate, and build community.
+                </p>
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-orange-500"></div>
+                      <div className="flex-1">
+                        <div className="text-xs font-semibold text-gray-900">David K.</div>
+                        <div className="text-xs text-gray-600">Can't wait for Saturday!</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Announcements */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <div className="text-3xl mb-4">📢</div>
+                <h4 className="text-xl font-bold text-gray-900 mb-2">Announcements</h4>
+                <p className="text-gray-600 mb-4">
+                  Post official updates that stand out. Perfect for important news, route changes, or crew-wide messages.
+                </p>
+                <div className="bg-orange-50 rounded-lg p-4 border-2 border-orange-200">
+                  <div className="text-sm font-semibold text-gray-900 mb-1">Welcome to the Crew!</div>
+                  <div className="text-xs text-gray-700">Excited to have everyone here. Our first group run is this Saturday at 7am.</div>
+                </div>
+              </div>
+
+              {/* Social Events */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <div className="text-3xl mb-4">🎉</div>
+                <h4 className="text-xl font-bold text-gray-900 mb-2">Events</h4>
+                <p className="text-gray-600 mb-4">
+                  Organize coffee, happy hours, and meetups. Build connections beyond the run.
+                </p>
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="text-sm font-semibold text-gray-900 mb-1">Post-Run Coffee Social</div>
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <div>📅 Sat, Jan 18, 9:00 AM</div>
+                    <div>📍 Blue Bottle Coffee</div>
+                    <div>☕ Join us for coffee after the run!</div>
+                    <div className="text-orange-600 font-semibold">8 members going</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={() => setShowFullExample(!showFullExample)}
@@ -262,88 +340,6 @@ export default function StartCrewExplainerPage() {
               >
                 Create your crew →
               </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* Step 3: Key Features */}
-        <section className="mb-16">
-          <div className="flex items-center mb-6">
-            <span className="text-4xl font-bold text-orange-500 mr-4">3</span>
-            <h3 className="text-2xl md:text-3xl font-bold text-gray-900">Key Features</h3>
-          </div>
-          <p className="text-lg text-gray-600 mb-8 max-w-3xl">
-            Powerful tools to keep your crew organized, engaged, and excited to run together.
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Run Events */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-              <div className="text-3xl mb-4">🏃</div>
-              <h4 className="text-xl font-bold text-gray-900 mb-2">Schedule Runs</h4>
-              <p className="text-gray-600 mb-4">
-                Create runs with date, time, location, distance, and pace. Members can RSVP so you know who's coming.
-              </p>
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <div className="text-sm font-semibold text-gray-900 mb-1">Saturday Morning Long Run</div>
-                <div className="text-xs text-gray-600 space-y-1">
-                  <div>📅 Sat, Jan 18, 7:00 AM</div>
-                  <div>📍 Golden Gate Park - Stow Lake</div>
-                  <div>📏 8 miles • 8:30/mi pace</div>
-                  <div className="text-orange-600 font-semibold">6 members going</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Messages */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-              <div className="text-3xl mb-4">💬</div>
-              <h4 className="text-xl font-bold text-gray-900 mb-2">Crew Messages</h4>
-              <p className="text-gray-600 mb-4">
-                Keep the conversation going with topic-based channels. Share updates, coordinate, and build community.
-              </p>
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-orange-500"></div>
-                    <div className="flex-1">
-                      <div className="text-xs font-semibold text-gray-900">David K.</div>
-                      <div className="text-xs text-gray-600">Can't wait for Saturday!</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Announcements */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-              <div className="text-3xl mb-4">📢</div>
-              <h4 className="text-xl font-bold text-gray-900 mb-2">Announcements</h4>
-              <p className="text-gray-600 mb-4">
-                Post official updates that stand out. Perfect for important news, route changes, or crew-wide messages.
-              </p>
-              <div className="bg-orange-50 rounded-lg p-4 border-2 border-orange-200">
-                <div className="text-sm font-semibold text-gray-900 mb-1">Welcome to the Crew!</div>
-                <div className="text-xs text-gray-700">Excited to have everyone here. Our first group run is this Saturday at 7am.</div>
-              </div>
-            </div>
-
-            {/* Social Events */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-              <div className="text-3xl mb-4">🎉</div>
-              <h4 className="text-xl font-bold text-gray-900 mb-2">Social Events</h4>
-              <p className="text-gray-600 mb-4">
-                Organize post-run coffee, happy hours, or other social gatherings. Build connections beyond the run.
-              </p>
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <div className="text-sm font-semibold text-gray-900 mb-1">Post-Run Coffee Social</div>
-                <div className="text-xs text-gray-600 space-y-1">
-                  <div>📅 Sat, Jan 18, 9:00 AM</div>
-                  <div>📍 Blue Bottle Coffee</div>
-                  <div>☕ Join us for coffee after the run!</div>
-                  <div className="text-orange-600 font-semibold">8 members going</div>
-                </div>
-              </div>
             </div>
           </div>
         </section>
