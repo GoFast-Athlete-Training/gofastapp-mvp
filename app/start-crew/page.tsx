@@ -39,21 +39,21 @@ export default function StartCrewExplainerPage() {
         title: 'Welcome to the Crew!',
         content: 'Excited to have everyone here. Our first group run is this Saturday at 7am. See you there!',
         athlete: { firstName: 'Sarah', lastName: 'Chen' },
-        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAtLabel: 'Mon, Jan 12 • 10:15 AM',
       },
       {
         id: '2',
         title: 'New Route This Week',
         content: 'We\'re trying a new 8-mile loop through Golden Gate Park. Should be beautiful!',
         athlete: { firstName: 'Sarah', lastName: 'Chen' },
-        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAtLabel: 'Tue, Jan 13 • 6:42 PM',
       },
     ],
     runs: [
       {
         id: '1',
         title: 'Saturday Morning Long Run',
-        date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+        dateLabel: 'Sat, Jan 18 • 7:00 AM',
         meetUpPoint: 'Golden Gate Park - Stow Lake',
         totalMiles: 8,
         pace: '8:30/mi',
@@ -63,7 +63,7 @@ export default function StartCrewExplainerPage() {
       {
         id: '2',
         title: 'Wednesday Tempo Run',
-        date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+        dateLabel: 'Wed, Jan 22 • 6:15 PM',
         meetUpPoint: 'Embarcadero - Ferry Building',
         totalMiles: 5,
         pace: '7:30/mi',
@@ -75,7 +75,7 @@ export default function StartCrewExplainerPage() {
       {
         id: '1',
         title: 'Post-Run Coffee Social',
-        date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+        dateLabel: 'Sat, Jan 18 • 9:00 AM',
         time: '9:00 AM',
         location: 'Blue Bottle Coffee',
         address: '315 Linden St, San Francisco, CA',
@@ -90,44 +90,15 @@ export default function StartCrewExplainerPage() {
         id: '1',
         content: 'Can\'t wait for Saturday! Who else is in?',
         athlete: { firstName: 'David', lastName: 'Kim' },
-        createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+        createdAtLabel: '3h ago',
       },
       {
         id: '2',
         content: 'I\'ll be there! First time joining - excited to meet everyone 🏃',
         athlete: { firstName: 'Jessica', lastName: 'Williams' },
-        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+        createdAtLabel: '2h ago',
       },
     ],
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit'
-      });
-    } catch {
-      return dateString;
-    }
-  };
-
-  const formatMessageDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-      
-      if (diffHours < 1) return 'Just now';
-      if (diffHours < 24) return `${diffHours}h ago`;
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    } catch {
-      return dateString;
-    }
   };
 
   return (
@@ -171,38 +142,59 @@ export default function StartCrewExplainerPage() {
             Set up your crew in minutes. Add key details like name, location, pace preferences, and what you're all about.
           </p>
           
-          {/* Form Preview */}
+          {/* Example Setup (NOT a real form) */}
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 md:p-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Crew Name *</label>
-                <div className="px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg">
-                  <span className="text-gray-500 italic">Downtown Runners</span>
-                </div>
+                <p className="text-sm font-semibold text-gray-900">Example setup (preview)</p>
+                <p className="text-sm text-gray-600">These are sample values to show what you can configure — not fields to fill in here.</p>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Location</label>
-                <div className="px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg">
-                  <span className="text-gray-500 italic">San Francisco, CA</span>
+              <span className="inline-flex w-fit items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700 border border-gray-200">
+                Demo values
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Crew name</p>
+                  <span className="text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Example</span>
                 </div>
+                <p className="text-base font-semibold text-gray-900">Downtown Runners</p>
               </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
-                <div className="px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg min-h-[80px]">
-                  <span className="text-gray-500 italic">A friendly group of runners who meet every Saturday morning for long runs and coffee</span>
+
+              <div className="rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Location</p>
+                  <span className="text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Example</span>
                 </div>
+                <p className="text-base font-semibold text-gray-900">San Francisco, CA</p>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Easy Pace</label>
-                <div className="px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg">
-                  <span className="text-gray-500 italic">8:30/mi</span>
+
+              <div className="md:col-span-2 rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Description</p>
+                  <span className="text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Example</span>
                 </div>
+                <p className="text-sm text-gray-800 leading-relaxed">
+                  A friendly group of runners who meet every Saturday morning for long runs and coffee
+                </p>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Tempo Pace</label>
-                <div className="px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg">
-                  <span className="text-gray-500 italic">7:30/mi</span>
+
+              <div className="rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Easy pace</p>
+                  <span className="text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Example</span>
                 </div>
+                <p className="text-base font-semibold text-gray-900">8:30/mi</p>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Tempo pace</p>
+                  <span className="text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Example</span>
+                </div>
+                <p className="text-base font-semibold text-gray-900">7:30/mi</p>
               </div>
             </div>
           </div>
@@ -446,7 +438,7 @@ export default function StartCrewExplainerPage() {
                               {announcement.athlete.firstName} {announcement.athlete.lastName}
                             </span>
                           </div>
-                          <span>{formatDate(announcement.createdAt)}</span>
+                          <span>{announcement.createdAtLabel}</span>
                         </div>
                         {announcement.title && (
                           <h4 className="text-sm font-semibold text-gray-900 mb-1">
@@ -491,7 +483,7 @@ export default function StartCrewExplainerPage() {
                                 <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                 </svg>
-                                <span>{formatDate(run.date)}</span>
+                                <span>{run.dateLabel}</span>
                               </p>
                               <p className="flex items-center gap-1">
                                 <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -549,7 +541,7 @@ export default function StartCrewExplainerPage() {
                                 <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                 </svg>
-                                <span>{formatDate(event.date)} at {event.time}</span>
+                                <span>{event.dateLabel}</span>
                               </p>
                               <p className="flex items-center gap-1">
                                 <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -594,7 +586,7 @@ export default function StartCrewExplainerPage() {
                             </span>
                           </div>
                           <span className="text-xs text-gray-500">
-                            {formatMessageDate(message.createdAt)}
+                            {message.createdAtLabel}
                           </span>
                         </div>
                         <p className="text-sm text-gray-800">{message.content}</p>
