@@ -66,3 +66,4 @@ npx prisma migrate deploy --schema=packages/shared-db/prisma/schema.prisma
 
 
 
+

@@ -18,9 +18,12 @@ import {
   User, 
   Calendar,
   Trophy,
-  LogOut
+  LogOut,
+  ExternalLink,
+  MapPin
 } from 'lucide-react';
 import Image from 'next/image';
+import api from '@/lib/api';
 
 export default function AthleteHomePage() {
   const router = useRouter();
@@ -31,6 +34,7 @@ export default function AthleteHomePage() {
   const [weeklyTotals, setWeeklyTotals] = useState<any>(null);
   const [garminConnected, setGarminConnected] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [upcomingRaces, setUpcomingRaces] = useState<any[]>([]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -71,9 +75,25 @@ export default function AthleteHomePage() {
       setGarminConnected(garminStatus === 'true');
     }
 
+    // Load upcoming races
+    loadUpcomingRaces();
+
     setLoading(false);
     return () => unsubscribe();
   }, [router]);
+
+  const loadUpcomingRaces = async () => {
+    try {
+      const response = await api.get('/race-events');
+      if (response.data?.success && response.data?.events) {
+        // Show first 3 upcoming races
+        setUpcomingRaces(response.data.events.slice(0, 3));
+      }
+    } catch (error) {
+      console.log('Could not load upcoming races:', error);
+      setUpcomingRaces([]);
+    }
+  };
 
   // Calculate next run
   const nextRun = useMemo(() => {
@@ -221,13 +241,13 @@ export default function AthleteHomePage() {
             <span>Activities</span>
           </button>
 
-          {/* Sign Up for Races */}
+          {/* Race Events */}
           <button
-            onClick={() => router.push('/events')}
+            onClick={() => router.push('/race-events')}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
           >
             <Trophy className="h-5 w-5" />
-            <span>Sign Up for Races</span>
+            <span>Race Events</span>
           </button>
 
           {/* Profile */}
@@ -363,6 +383,64 @@ export default function AthleteHomePage() {
                 >
                   RSVP →
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Upcoming Races Section */}
+          {upcomingRaces.length > 0 && (
+            <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Trophy className="h-6 w-6 text-orange-500" />
+                  <h3 className="text-lg font-semibold text-gray-900">Upcoming Races</h3>
+                </div>
+                <button
+                  onClick={() => router.push('/race-events')}
+                  className="text-sm text-orange-600 hover:text-orange-700 font-semibold"
+                >
+                  View All →
+                </button>
+              </div>
+              <div className="space-y-3">
+                {upcomingRaces.map((race) => (
+                  <div
+                    key={race.id}
+                    onClick={() => {
+                      if (race.url) {
+                        window.open(race.url, '_blank', 'noopener,noreferrer');
+                      }
+                    }}
+                    className="flex items-start justify-between p-3 rounded-lg border border-gray-200 hover:border-orange-300 hover:bg-orange-50 cursor-pointer transition"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-gray-900 truncate">{race.name}</h4>
+                      <div className="flex items-center gap-3 text-sm text-gray-600 mt-1">
+                        {race.startDate && (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(race.startDate).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </span>
+                        )}
+                        {race.location && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {race.location}
+                          </span>
+                        )}
+                        {race.miles && (
+                          <span className="text-orange-600">{race.miles} miles</span>
+                        )}
+                      </div>
+                    </div>
+                    {race.url && (
+                      <ExternalLink className="h-4 w-4 text-orange-600 ml-2 flex-shrink-0" />
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}

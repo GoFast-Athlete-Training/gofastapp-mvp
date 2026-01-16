@@ -19,12 +19,12 @@ interface Event {
 }
 
 /**
- * Events / Race Signup Page
+ * Race Events Page
  * 
  * Displays upcoming races and events that athletes can sign up for.
  * Integrates with RunSignUp and other race registration platforms.
  */
-export default function EventsPage() {
+export default function RaceEventsPage() {
   const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,14 +38,14 @@ export default function EventsPage() {
 
         // Try to fetch from our API first (if we have RunSignUp integration)
         try {
-          const response = await api.get('/events');
+          const response = await api.get('/race-events');
           if (response.data?.success && response.data?.events) {
             setEvents(response.data.events);
             setLoading(false);
             return;
           }
         } catch (apiError) {
-          console.log('Events API not available, using fallback');
+          console.log('Race events API not available, using fallback');
         }
 
         // Fallback: Show races that crews are training for
@@ -100,7 +100,7 @@ export default function EventsPage() {
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <Trophy className="h-8 w-8 text-orange-500" />
-            <h1 className="text-4xl font-bold text-gray-900">Sign Up for Races</h1>
+            <h1 className="text-4xl font-bold text-gray-900">Race Events</h1>
           </div>
           <p className="text-lg text-gray-600">
             Discover upcoming races and events to register for
@@ -215,4 +215,3 @@ export default function EventsPage() {
     </div>
   );
 }
-

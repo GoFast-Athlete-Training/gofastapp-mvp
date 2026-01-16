@@ -316,15 +316,31 @@ export default function RunCrewSettingsPage() {
   };
 
   const handleLeave = async () => {
-    if (!crew) return; // Only members can leave (admins use delete/transfer)
+    if (!crew) return;
+
+    if (!confirm('Are you sure you want to leave this crew? You can rejoin later using the invite link.')) {
+      return;
+    }
 
     try {
-      // TODO: Implement leave endpoint
-      // const response = await api.post(`/runcrew/${runCrewId}/leave`);
-      // if (response.data.success) {
-      //   router.push('/welcome');
-      // }
-      showToast('Leave crew feature coming soon');
+      const response = await api.post(`/runcrew/${runCrewId}/leave`);
+      if (response.data.success) {
+        showToast('You have left the crew');
+        // Refresh localStorage to get updated crew list
+        try {
+          const hydrateRes = await api.post('/athlete/hydrate');
+          if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
+            LocalStorageAPI.setFullHydrationModel({
+              athlete: hydrateRes.data.athlete,
+              weeklyActivities: hydrateRes.data.athlete.weeklyActivities || [],
+              weeklyTotals: hydrateRes.data.athlete.weeklyTotals || null,
+            });
+          }
+        } catch (hydrateErr) {
+          console.error('Error refreshing data:', hydrateErr);
+        }
+        router.push('/my-runcrews');
+      }
     } catch (err: any) {
       console.error('Error leaving crew:', err);
       showToast(err.response?.data?.error || 'Failed to leave crew');

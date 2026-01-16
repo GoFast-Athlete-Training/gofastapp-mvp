@@ -718,6 +718,8 @@ export async function hydrateCrew(runCrewId: string) {
               firstName: true,
               lastName: true,
               photoURL: true,
+              gofastHandle: true,
+              bio: true,
             },
           },
         },

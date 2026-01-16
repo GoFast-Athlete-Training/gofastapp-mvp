@@ -12,6 +12,7 @@ import api from '@/lib/api';
 import MessageFeed from '@/components/RunCrew/MessageFeed';
 import TopNav from '@/components/shared/TopNav';
 import GooglePlacesAutocomplete from '@/components/RunCrew/GooglePlacesAutocomplete';
+import MemberDetailCard from '@/components/RunCrew/MemberDetailCard';
 
 /**
  * Admin Page - CLIENT-SIDE
@@ -443,6 +444,24 @@ export default function RunCrewAdminPage() {
     }
   };
 
+  const handleRemoveMember = async (membershipId: string, athleteName: string) => {
+    if (!confirm(`Are you sure you want to remove ${athleteName} from this crew?`)) {
+      return;
+    }
+
+    try {
+      const response = await api.delete(`/runcrew/${runCrewId}/members/${membershipId}`);
+      
+      if (response.data.success) {
+        await loadCrewData();
+        showToast(`${athleteName} has been removed from the crew`);
+      }
+    } catch (err: any) {
+      console.error('Error removing member:', err);
+      showToast(err.response?.data?.error || 'Failed to remove member');
+    }
+  };
+
   // Topic add/remove removed for MVP1 - using fixed defaults
 
   // Loading state
@@ -601,34 +620,23 @@ export default function RunCrewAdminPage() {
                   <p>Share your invite code to build the crew.</p>
                 </div>
               ) : (
-                <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                  {memberships.map((membership: any) => {
-                    const athlete = membership.athlete || {};
-                    const displayName = athlete.firstName && athlete.lastName
-                      ? `${athlete.firstName} ${athlete.lastName}`
-                      : athlete.firstName || athlete.gofastHandle || 'Athlete';
-                    return (
-                      <div key={membership.id} className="flex items-center gap-2 p-2 border border-gray-200 rounded hover:bg-gray-50 transition">
-                        {athlete.photoURL ? (
-                          <img
-                            src={athlete.photoURL}
-                            alt={displayName}
-                            className="w-8 h-8 rounded-full object-cover border border-gray-200"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white font-semibold text-xs">
-                            {(athlete.firstName?.[0] || athlete.gofastHandle?.[0] || 'A').toUpperCase()}
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-gray-900 truncate">
-                            {displayName}
-                            {membership.role === 'admin' && <span className="text-orange-600 text-xs font-bold ml-1">Admin</span>}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                  {memberships.map((membershipItem: any) => (
+                    <MemberDetailCard
+                      key={membershipItem.id}
+                      member={{
+                        id: membershipItem.id,
+                        athleteId: membershipItem.athleteId,
+                        role: membershipItem.role,
+                        athlete: membershipItem.athlete || {},
+                        joinedAt: membershipItem.joinedAt,
+                      }}
+                      showRole={true}
+                      onRemove={handleRemoveMember}
+                      canRemove={true}
+                      currentUserId={currentUser?.id}
+                    />
+                  ))}
                 </div>
               )}
             </section>
