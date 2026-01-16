@@ -44,16 +44,16 @@ export default function WelcomePage() {
         return;
       }
 
-      // Check if already hydrated (user navigating directly to /welcome)
+          // Check if already hydrated (user navigating directly to /welcome)
       if (typeof window !== 'undefined') {
         const existingModel = LocalStorageAPI.getFullHydrationModel();
         if (existingModel?.athlete) {
           // Only log if we're actually on the welcome page (not being redirected from elsewhere)
           if (window.location.pathname === '/welcome') {
-            console.log('✅ Welcome: Already hydrated, redirecting to /my-runcrews');
+            console.log('✅ Welcome: Already hydrated, redirecting to /athlete-home');
           }
           hasProcessedRef.current = true;
-          router.replace('/my-runcrews');
+          router.replace('/athlete-home');
           return;
         }
       }
@@ -80,10 +80,10 @@ export default function WelcomePage() {
             localStorage.setItem('garminConnected', String(athlete.garminConnected));
           }
 
-          console.log('✅ Welcome: Athlete hydrated successfully, redirecting to /my-runcrews');
+          console.log('✅ Welcome: Athlete hydrated successfully, redirecting to /athlete-home');
           
-          // Redirect to my-runcrews selector page
-          router.replace('/my-runcrews');
+          // Redirect to athlete home page
+          router.replace('/athlete-home');
         } else {
           console.error('❌ Welcome: Invalid response from hydrate');
           setError('Failed to load athlete data');
