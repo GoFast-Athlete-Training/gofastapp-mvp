@@ -296,8 +296,8 @@ export default function AthleteCreateProfilePage() {
           // User was joining a crew - redirect to confirmation page
           router.push(`/join/runcrew/${joinIntentHandle}/confirm`);
         } else {
-          // Normal flow - go to runcrew list
-          router.push('/runcrew-discovery');
+          // Normal flow - go to athlete home (first-time users)
+          router.push('/athlete-home');
         }
       }
       
