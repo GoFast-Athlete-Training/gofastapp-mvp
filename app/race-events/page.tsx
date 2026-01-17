@@ -9,11 +9,23 @@ import TopNav from '@/components/shared/TopNav';
 import api from '@/lib/api';
 
 interface Event {
-  id: string;
+  race_id: string | null;
   name: string;
-  startDate: string;
-  location: string;
+  start_date: string | null;
+  city: string | null;
+  state: string | null;
   url: string;
+  debug_url_inputs?: {
+    race_id?: any;
+    id?: any;
+    url_string?: any;
+    race_links?: any;
+    race_url?: any;
+  };
+  // Legacy fields for compatibility
+  id?: string;
+  startDate?: string;
+  location?: string;
   raceType?: string;
   miles?: number;
 }
@@ -128,7 +140,7 @@ export default function RaceEventsPage() {
           <div className="space-y-4">
             {events.map((event) => (
               <div
-                key={event.id}
+                key={event.race_id || event.id || event.name}
                 onClick={() => {
                   console.log('🖱️ RACE EVENTS PAGE: Event clicked:', {
                     name: event.name,
@@ -151,16 +163,20 @@ export default function RaceEventsPage() {
                       {event.name}
                     </h3>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-sm text-gray-600 mb-2">
-                      {event.startDate && (
+                      {(event.start_date || event.startDate) && (
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
-                          <span>{formatDate(event.startDate)}</span>
+                          <span>{formatDate(event.start_date || event.startDate || '')}</span>
                         </div>
                       )}
-                      {event.location && (
+                      {(event.city || event.state || event.location) && (
                         <div className="flex items-center gap-1">
                           <MapPin className="h-4 w-4" />
-                          <span>{event.location}</span>
+                          <span>
+                            {event.location || 
+                             [event.city, event.state].filter(Boolean).join(', ') || 
+                             'Location TBD'}
+                          </span>
                         </div>
                       )}
                       {event.raceType && (
