@@ -63,7 +63,7 @@ export async function GET() {
     console.log('  - OK:', response.ok);
     console.log('  - Headers:', Object.fromEntries(response.headers.entries()));
 
-    // Get raw response text first
+    // Get raw response text first (can only read once!)
     const rawResponseText = await response.text();
     console.log('📄 Raw Response (first 500 chars):', rawResponseText.substring(0, 500));
     console.log('📄 Raw Response (full length):', rawResponseText.length, 'characters');
@@ -96,7 +96,7 @@ export async function GET() {
       }, { status: response.status });
     }
 
-    // Parse JSON safely
+    // Parse JSON safely from the already-read text
     let data;
     try {
       data = JSON.parse(rawResponseText);
