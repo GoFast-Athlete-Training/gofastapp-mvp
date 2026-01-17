@@ -39,10 +39,25 @@ export default function RaceEventsPage() {
         // Fetch race events from RunSignUp API (server-side handoff)
         console.log('🔍 RACE EVENTS PAGE: Calling /api/race-events');
         const response = await api.get('/race-events');
-        console.log('📦 RACE EVENTS PAGE: Response status:', response.status);
+        console.log('📦 RACE EVENTS PAGE: Response received');
+        console.log('  - Status:', response.status);
+        console.log('  - Full response.data:', JSON.stringify(response.data, null, 2));
+        console.log('  - response.data.success:', response.data?.success);
+        console.log('  - response.data.events length:', response.data?.events?.length || 0);
+        
         if (response.data?.success && response.data?.events) {
+          console.log('✅ RACE EVENTS PAGE: Setting events, count:', response.data.events.length);
+          response.data.events.forEach((event: any, index: number) => {
+            console.log(`  Event #${index + 1}:`, {
+              race_id: event.race_id,
+              name: event.name,
+              url: event.url,
+              debug_url_inputs: event.debug_url_inputs
+            });
+          });
           setEvents(response.data.events);
         } else {
+          console.log('⚠️ RACE EVENTS PAGE: No events in response, setting empty array');
           setEvents([]);
         }
       } catch (err: any) {
@@ -115,8 +130,17 @@ export default function RaceEventsPage() {
               <div
                 key={event.id}
                 onClick={() => {
+                  console.log('🖱️ RACE EVENTS PAGE: Event clicked:', {
+                    name: event.name,
+                    race_id: event.race_id,
+                    url: event.url,
+                    debug_url_inputs: event.debug_url_inputs
+                  });
                   if (event.url) {
+                    console.log('  ✅ Opening URL:', event.url);
                     window.open(event.url, '_blank', 'noopener,noreferrer');
+                  } else {
+                    console.log('  ❌ No URL available for event');
                   }
                 }}
                 className="rounded-lg border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-orange-300"
