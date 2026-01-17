@@ -25,6 +25,10 @@ export async function GET() {
         success: false, 
         events: [],
         error: 'Missing RunSignUp credentials'
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
       });
     }
 
@@ -58,7 +62,12 @@ export async function GET() {
         success: false, 
         events: [],
         error: `RunSignUp API returned ${response.status}: ${response.statusText}`
-      }, { status: response.status });
+      }, { 
+        status: response.status,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      });
     }
 
     // ============================================================
@@ -73,7 +82,12 @@ export async function GET() {
         success: false, 
         events: [],
         error: 'Failed to parse RunSignUp response as JSON'
-      }, { status: 500 });
+      }, { 
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      });
     }
 
     // Validate structure
@@ -83,6 +97,10 @@ export async function GET() {
         success: false, 
         events: [],
         error: 'RunSignUp response missing races array'
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
       });
     }
 
@@ -113,6 +131,12 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       events: events,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
     });
 
   } catch (error: any) {
@@ -121,6 +145,11 @@ export async function GET() {
       success: false, 
       events: [],
       error: error.message || 'Unknown error'
-    }, { status: 500 });
+    }, { 
+      status: 500,
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      },
+    });
   }
 }
