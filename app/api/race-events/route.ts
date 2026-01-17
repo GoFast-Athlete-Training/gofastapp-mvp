@@ -187,6 +187,16 @@ export async function GET() {
         console.log('    - .race.race_id:', firstRace.race_id);
         console.log('    - .race.name:', firstRace.name);
         console.log('    - .race.url_string:', firstRace.url_string);
+        console.log('    - .race.url_string type:', typeof firstRace.url_string);
+        
+        // Check for other URL-related fields
+        const urlFields = Object.keys(firstRace).filter(k => 
+          k.toLowerCase().includes('url') || k.toLowerCase().includes('link')
+        );
+        console.log('    - URL-related fields:', urlFields);
+        urlFields.forEach(field => {
+          console.log(`      ${field}:`, firstRace[field]);
+        });
       }
     }
 
