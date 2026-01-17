@@ -180,10 +180,19 @@ export default function RaceEventsPage() {
           <div className="space-y-4">
             {events.map((event) => {
               const handleRaceClick = () => {
-                if (!event.url || event.url.length === 0) return;
+                if (!event.url || event.url.length === 0) {
+                  console.warn('⚠️ No URL for race:', event.name);
+                  return;
+                }
+
+                console.log('🔍 Before building affiliate URL:', {
+                  raceName: event.name,
+                  originalUrl: event.url,
+                });
 
                 // Build affiliate URL with tracking
                 const affiliateUrl = buildRunSignUpAffiliateUrl(event.url);
+                
                 if (!affiliateUrl) {
                   console.warn('⚠️ Could not build affiliate URL for:', event.name);
                   return;
@@ -191,11 +200,12 @@ export default function RaceEventsPage() {
 
                 // Log click event internally (athleteId, raceName, raceUrl)
                 const athleteId = LocalStorageAPI.getAthleteId();
-                console.log('🔗 Race click:', {
+                console.log('🔗 Race click - opening URL:', {
                   athleteId: athleteId || 'unknown',
                   raceName: event.name,
-                  raceUrl: event.url,
+                  originalUrl: event.url,
                   affiliateUrl: affiliateUrl,
+                  urlDiffers: event.url !== affiliateUrl,
                   timestamp: new Date().toISOString(),
                 });
 

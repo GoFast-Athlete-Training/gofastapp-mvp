@@ -40,9 +40,19 @@ export function buildRunSignUpAffiliateUrl(raceUrl: string): string {
   }
 
   // Get affiliate token from public env var (safe for client)
+  // NOTE: In Next.js, NEXT_PUBLIC_ vars are embedded at build time
+  // If you change .env.local, you need to restart the dev server
   const affiliateToken = process.env.NEXT_PUBLIC_RUNSIGNUP_AFFILIATE_TOKEN;
+  
+  console.log('🔍 Affiliate URL Builder Debug:', {
+    hasToken: !!affiliateToken,
+    tokenLength: affiliateToken?.length || 0,
+    tokenPreview: affiliateToken ? `${affiliateToken.substring(0, 4)}...` : 'missing',
+    inputUrl: raceUrl,
+  });
+  
   if (!affiliateToken) {
-    console.warn('⚠️ RunSignUp affiliate token not configured');
+    console.warn('⚠️ RunSignUp affiliate token not configured - check NEXT_PUBLIC_RUNSIGNUP_AFFILIATE_TOKEN in .env.local');
     // Still return the URL without affiliate tracking
     return raceUrl;
   }
@@ -59,7 +69,14 @@ export function buildRunSignUpAffiliateUrl(raceUrl: string): string {
     url.searchParams.set('utm_medium', 'race_discovery');
     url.searchParams.set('utm_campaign', 'runsignup_affiliate');
 
-    return url.toString();
+    const finalUrl = url.toString();
+    console.log('✅ Built affiliate URL:', {
+      original: raceUrl,
+      final: finalUrl,
+      hasAffParam: finalUrl.includes('aff='),
+    });
+
+    return finalUrl;
   } catch (error) {
     // Invalid URL format - return empty string
     console.error('❌ Invalid RunSignUp URL format:', raceUrl);
