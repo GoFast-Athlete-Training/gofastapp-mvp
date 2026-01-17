@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { adminAuth } from '@/lib/firebaseAdmin';
+import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0; // Disable all caching
@@ -73,8 +75,34 @@ function buildRunSignUpUrl(race: any): string {
  * Returns normalized list of upcoming events (limit 5 for MVP).
  */
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    // ============================================================
+    // STAGE 0: GET ATHLETE LOCATION (for filtering)
+    // ============================================================
+    let filterState = 'VA'; // Default to Virginia
+    
+    try {
+      // Try to get athlete from auth token
+      const authHeader = request.headers.get('authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        const decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
+        const athlete = await getAthleteByFirebaseId(decodedToken.uid);
+        
+        if (athlete?.state) {
+          filterState = athlete.state.toUpperCase();
+          console.log(`📍 Filtering races by athlete location: ${filterState}`);
+        } else {
+          console.log(`📍 No athlete state found, defaulting to: ${filterState}`);
+        }
+      } else {
+        console.log(`📍 No auth token, defaulting to: ${filterState}`);
+      }
+    } catch (err: any) {
+      // If auth fails, just use default state
+      console.log(`📍 Auth check failed, defaulting to: ${filterState}`, err.message);
+    }
+
     // ============================================================
     // STAGE 1: URL BUILDING (Request Construction)
     // ============================================================
@@ -112,6 +140,9 @@ export async function GET() {
     // Sort by date (upcoming first)
     url.searchParams.append('sort', 'date');
     url.searchParams.append('sort_dir', 'asc'); // Ascending = upcoming first
+    
+    // Filter by state (athlete's location or default to VA)
+    url.searchParams.append('state', filterState);
     
     // Only get upcoming races (start_date defaults to today if not set)
     // This ensures we don't get past events
