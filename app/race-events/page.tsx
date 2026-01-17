@@ -36,35 +36,12 @@ export default function RaceEventsPage() {
         setLoading(true);
         setError(null);
 
-        // Try to fetch from our API first (if we have RunSignUp integration)
-        try {
-          const response = await api.get('/race-events');
-          if (response.data?.success && response.data?.events) {
-            setEvents(response.data.events);
-            setLoading(false);
-            return;
-          }
-        } catch (apiError) {
-          console.log('Race events API not available, using fallback');
-        }
-
-        // Fallback: Show races that crews are training for
-        try {
-          const racesResponse = await api.get('/runcrew/races');
-          if (racesResponse.data?.success && racesResponse.data?.races) {
-            const formattedRaces = racesResponse.data.races.map((race: any) => ({
-              id: race.id,
-              name: race.name,
-              startDate: race.date,
-              location: race.city && race.state ? `${race.city}, ${race.state}` : race.city || race.state || 'Location TBD',
-              url: `https://runsignup.com/Race/${race.id}`,
-              raceType: race.raceType,
-              miles: race.miles,
-            }));
-            setEvents(formattedRaces);
-          }
-        } catch (racesError) {
-          console.error('Error loading races:', racesError);
+        // Fetch race events from RunSignUp API (server-side handoff)
+        const response = await api.get('/race-events');
+        if (response.data?.success && response.data?.events) {
+          setEvents(response.data.events);
+        } else {
+          setEvents([]);
         }
       } catch (err: any) {
         console.error('Error loading events:', err);
@@ -123,16 +100,10 @@ export default function RaceEventsPage() {
         {!loading && !error && events.length === 0 && (
           <div className="rounded-lg bg-white p-8 text-center">
             <Trophy className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No upcoming events found</h3>
-            <p className="text-gray-600 mb-6">
-              Check back soon for new race registrations, or explore RunCrews training for specific races.
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No upcoming races found</h3>
+            <p className="text-gray-600">
+              Check back soon for new race registrations from RunSignUp.
             </p>
-            <button
-              onClick={() => router.push('/runcrew-discovery')}
-              className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition"
-            >
-              Discover RunCrews →
-            </button>
           </div>
         )}
 
@@ -191,26 +162,17 @@ export default function RaceEventsPage() {
         )}
 
         {/* Info Section */}
-        <div className="mt-8 rounded-lg bg-blue-50 border border-blue-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            About Race Registration
-          </h3>
-          <p className="text-gray-700 text-sm mb-4">
-            Click on any race above to open the registration page on RunSignUp. 
-            You'll be able to complete your registration directly on their platform.
-          </p>
-          <p className="text-gray-700 text-sm">
-            Looking for a training group? Check out RunCrews that are training for specific races 
-            on the{' '}
-            <button
-              onClick={() => router.push('/runcrew-discovery')}
-              className="text-orange-600 hover:text-orange-700 font-semibold underline"
-            >
-              RunCrew Discovery
-            </button>
-            {' '}page.
-          </p>
-        </div>
+        {events.length > 0 && (
+          <div className="mt-8 rounded-lg bg-blue-50 border border-blue-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              About Race Registration
+            </h3>
+            <p className="text-gray-700 text-sm">
+              Click on any race above to open the registration page on RunSignUp. 
+              You'll be able to complete your registration directly on their platform.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

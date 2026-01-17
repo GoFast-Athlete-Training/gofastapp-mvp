@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
  * Server-side API route that fetches upcoming events from RunSignUp.
  * Credentials are never exposed to the client.
  * 
- * Returns normalized list of upcoming events (limit ~10).
+ * Returns normalized list of upcoming events (limit 5 for MVP).
  */
 export async function GET() {
   try {
@@ -21,14 +21,18 @@ export async function GET() {
     }
 
     // RunSignUp API endpoint for getting races
-    // Using start_date=today to get upcoming events, results_per_page=10 to get more results
+    // Using start_date=today to get upcoming events, results_per_page=5 for MVP
     const url = new URL('https://runsignup.com/rest/races');
     url.searchParams.append('api_key', apiKey);
     url.searchParams.append('api_secret', apiSecret);
     url.searchParams.append('format', 'json');
     url.searchParams.append('start_date', 'today');
-    url.searchParams.append('results_per_page', '10');
+    url.searchParams.append('results_per_page', '5');
     url.searchParams.append('race_links', 'T'); // Include race URLs
+
+    console.log('🔍 RACE EVENTS API: Calling RunSignUp endpoint...');
+    console.log('📡 URL:', url.toString().replace(apiKey, '***').replace(apiSecret, '***'));
+    console.log('🔑 Has credentials:', !!apiKey && !!apiSecret);
 
     const response = await fetch(url.toString(), {
       method: 'GET',
@@ -37,16 +41,33 @@ export async function GET() {
       },
     });
 
+    console.log('📦 RunSignUp API Response Status:', response.status, response.statusText);
+
     if (!response.ok) {
+      const errorText = await response.text();
       console.error(
         '❌ RunSignUp API error:',
         response.status,
-        response.statusText
+        response.statusText,
+        'Response:', errorText
       );
-      return NextResponse.json({ success: false, events: [] });
+      return NextResponse.json({ 
+        success: false, 
+        events: [],
+        error: `API returned ${response.status}: ${response.statusText}`,
+      });
     }
 
     const data = await response.json();
+    console.log('📊 RunSignUp API Response Data:', {
+      hasRaces: !!data.races,
+      racesCount: data.races?.length || 0,
+      dataKeys: Object.keys(data),
+      sampleRace: data.races?.[0] ? {
+        id: data.races[0].race_id || data.races[0].id,
+        name: data.races[0].name,
+      } : null,
+    });
 
     // Normalize events from RunSignUp response
     // RunSignUp API returns races in data.races array
@@ -61,7 +82,7 @@ export async function GET() {
         const eventDate = new Date(startDate);
         return eventDate >= now;
       })
-      .slice(0, 10)
+      .slice(0, 5)
       .map((race: any) => {
         // Extract location
         const city = race.city || '';
@@ -105,9 +126,16 @@ export async function GET() {
         };
       });
 
+    console.log('✅ RACE EVENTS: Returning', normalizedEvents.length, 'events');
     return NextResponse.json({ success: true, events: normalizedEvents });
   } catch (error: any) {
     console.error('❌ Error fetching events from RunSignUp:', error);
-    return NextResponse.json({ success: false, events: [] });
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error message:', error.message);
+    return NextResponse.json({ 
+      success: false, 
+      events: [],
+      error: error.message || 'Unknown error',
+    });
   }
 }
