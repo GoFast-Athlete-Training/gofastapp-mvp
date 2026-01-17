@@ -211,15 +211,27 @@ export async function POST(request: Request) {
 
     // STEP 3: Select for MVP1
     // Filter out past events (only show upcoming races)
+    // 
+    // HOW "TODAY" IS ESTABLISHED:
+    // - Uses server's local timezone (where API route executes)
+    // - Normalized to midnight (00:00:00) for day-level comparison
+    // - Race dates from RunSignUp are parsed and normalized the same way
+    // - Comparison: raceDate >= today means race happens today or later
+    //
+    // TIMEZONE CONSIDERATIONS:
+    // - Server timezone may differ from user's timezone
+    // - RunSignUp dates are typically in race's local timezone
+    // - For MVP1: server-local comparison is acceptable (shows races from server's "today" forward)
+    // - Future: Could use athlete's timezone from profile for user-specific filtering
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Start of today for comparison
+    today.setHours(0, 0, 0, 0); // Start of today in server's timezone
     
     const isUpcoming = (race: any) => {
       if (!race.startDate) return false; // Exclude races without dates
       try {
         const raceDate = new Date(race.startDate);
-        raceDate.setHours(0, 0, 0, 0);
-        return raceDate >= today;
+        raceDate.setHours(0, 0, 0, 0); // Normalize race date to midnight
+        return raceDate >= today; // Race is today or future
       } catch {
         return false; // Invalid date, exclude it
       }
