@@ -37,7 +37,9 @@ export default function RaceEventsPage() {
         setError(null);
 
         // Fetch race events from RunSignUp API (server-side handoff)
+        console.log('🔍 RACE EVENTS PAGE: Calling /api/race-events');
         const response = await api.get('/race-events');
+        console.log('📦 RACE EVENTS PAGE: Response status:', response.status);
         if (response.data?.success && response.data?.events) {
           setEvents(response.data.events);
         } else {
