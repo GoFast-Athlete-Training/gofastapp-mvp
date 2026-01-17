@@ -84,7 +84,15 @@ export default function AthleteHomePage() {
 
   const loadUpcomingRaces = async () => {
     try {
-      const response = await api.get('/race-events');
+      // Get athleteId from localStorage (like "find my runs" pattern)
+      const athleteId = LocalStorageAPI.getAthleteId();
+      if (!athleteId) {
+        setUpcomingRaces([]);
+        return;
+      }
+
+      // Send athleteId in body so server can get athlete's state
+      const response = await api.post('/race-events', { athleteId });
       if (response.data?.success && response.data?.events) {
         // Show first 3 upcoming races
         setUpcomingRaces(response.data.events.slice(0, 3));
