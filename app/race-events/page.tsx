@@ -5,6 +5,8 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Calendar, MapPin, ExternalLink, Trophy } from 'lucide-react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import TopNav from '@/components/shared/TopNav';
 import api from '@/lib/api';
 
@@ -29,18 +31,24 @@ export default function RaceEventsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadEvents() {
+    if (typeof window === 'undefined') return;
+
+    // Wait for Firebase auth to be ready before making API calls
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // No Firebase user - redirect to signup
+      if (!firebaseUser) {
+        router.push('/signup');
+        return;
+      }
+
+      // Firebase user exists - load events
       try {
         setLoading(true);
         setError(null);
 
         // Fetch race events from RunSignUp API (server-side handoff)
-        // Add cache-busting timestamp to prevent 304 responses
+        // Global axios instance automatically adds Firebase token to headers
         const response = await api.get('/race-events', {
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-          },
           params: {
             _t: Date.now(), // Cache buster
           },
@@ -53,15 +61,18 @@ export default function RaceEventsPage() {
         }
       } catch (err: any) {
         console.error('Error loading events:', err);
-        setError('Could not load events at this time.');
+        // Don't show error if it's a 401 (auth interceptor will handle redirect)
+        if (err.response?.status !== 401) {
+          setError('Could not load events at this time.');
+        }
         setEvents([]);
       } finally {
         setLoading(false);
       }
-    }
+    });
 
-    loadEvents();
-  }, []);
+    return () => unsubscribe();
+  }, [router]);
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'Date TBD';
