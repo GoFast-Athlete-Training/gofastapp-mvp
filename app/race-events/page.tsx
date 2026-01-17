@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Calendar, MapPin, ExternalLink, Trophy } from 'lucide-react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { LocalStorageAPI } from '@/lib/localstorage';
 import TopNav from '@/components/shared/TopNav';
 import api from '@/lib/api';
 
@@ -46,12 +47,19 @@ export default function RaceEventsPage() {
         setLoading(true);
         setError(null);
 
+        // Get athleteId from localStorage (like "find my runs" pattern)
+        const athleteId = LocalStorageAPI.getAthleteId();
+        if (!athleteId) {
+          console.warn('⚠️ No athleteId in localStorage - redirecting to signup');
+          router.push('/signup');
+          return;
+        }
+
         // Fetch race events from RunSignUp API (server-side handoff)
+        // Send athleteId in body so server can get athlete's state
         // Global axios instance automatically adds Firebase token to headers
-        const response = await api.get('/race-events', {
-          params: {
-            _t: Date.now(), // Cache buster
-          },
+        const response = await api.post('/race-events', {
+          athleteId,
         });
         
         if (response.data?.success && response.data?.events) {

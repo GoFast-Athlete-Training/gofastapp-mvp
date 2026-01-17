@@ -67,40 +67,63 @@ function buildRunSignUpUrl(race: any): string {
 }
 
 /**
- * GET /api/race-events
+ * POST /api/race-events
  * 
  * Server-side API route that fetches upcoming events from RunSignUp.
- * Credentials are never exposed to the client.
+ * Accepts athleteId from request body (client sends from localStorage).
+ * Verifies athleteId matches Firebase token for authorization.
+ * Uses athlete's state to filter races.
+ * 
+ * Request body: { athleteId: string }
  * 
  * Returns normalized list of upcoming events (limit 5 for MVP).
  */
 
-export async function GET(request: Request) {
+export async function POST(request: Request) {
   try {
     // ============================================================
     // STAGE 0: GET ATHLETE LOCATION (for filtering)
     // ============================================================
     let filterState = 'VA'; // Default to Virginia
     
+    // 1. Parse request body to get athleteId
+    let body: any = {};
     try {
-      // Try to get athlete from auth token
-      const authHeader = request.headers.get('authorization');
-      if (authHeader?.startsWith('Bearer ')) {
-        const decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-        const athlete = await getAthleteByFirebaseId(decodedToken.uid);
-        
-        if (athlete?.state) {
-          filterState = athlete.state.toUpperCase();
-          console.log(`📍 Filtering races by athlete location: ${filterState}`);
-        } else {
-          console.log(`📍 No athlete state found, defaulting to: ${filterState}`);
-        }
-      } else {
-        console.log(`📍 No auth token, defaulting to: ${filterState}`);
-      }
-    } catch (err: any) {
-      // If auth fails, just use default state
-      console.log(`📍 Auth check failed, defaulting to: ${filterState}`, err.message);
+      body = await request.json();
+    } catch {}
+    
+    const { athleteId } = body;
+    
+    // 2. Verify Firebase token (for authentication)
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let decodedToken;
+    try {
+      decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
+    } catch {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    // 3. Get athlete and verify athleteId matches Firebase token
+    const athlete = await getAthleteByFirebaseId(decodedToken.uid);
+    if (!athlete) {
+      return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
+    }
+
+    // If athleteId provided, verify it matches
+    if (athleteId && athlete.id !== athleteId) {
+      return NextResponse.json({ error: 'Athlete ID mismatch' }, { status: 403 });
+    }
+    
+    // 4. Use athlete's state for filtering
+    if (athlete?.state) {
+      filterState = athlete.state.toUpperCase();
+      console.log(`📍 Filtering races by athlete location: ${filterState} (athleteId: ${athlete.id})`);
+    } else {
+      console.log(`📍 No athlete state found, defaulting to: ${filterState} (athleteId: ${athlete.id})`);
     }
 
     // ============================================================
