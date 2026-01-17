@@ -58,8 +58,15 @@ export default function RaceEventsPage() {
         // Fetch race events from RunSignUp API (server-side handoff)
         // Send athleteId in body so server can get athlete's state
         // Global axios instance automatically adds Firebase token to headers
+        // Add timestamp to prevent caching
         const response = await api.post('/race-events', {
           athleteId,
+          _t: Date.now(), // Cache buster
+        }, {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+          },
         });
         
         console.log('🔍 Race events response:', {
