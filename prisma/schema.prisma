@@ -57,6 +57,7 @@ model Athlete {
   run_crew_runs           run_crew_runs[]
   training_days_executed  training_days_executed[]
   training_plans          training_plans[]
+  workouts                Workout[]
 }
 
 model ai_roles {
@@ -399,26 +400,6 @@ model training_gen_prompts {
   rule_sets           rule_sets?            @relation(fields: [ruleSetId], references: [id])
 }
 
-model training_plan_days {
-  id                   String               @id
-  planId               String
-  phaseId              String
-  weekId               String
-  date                 DateTime
-  dayOfWeek            Int
-  warmup               Json
-  workout              Json
-  cooldown             Json
-  notes                String?
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime
-  training_plan_phases training_plan_phases @relation(fields: [phaseId], references: [id], onDelete: Cascade)
-  training_plans       training_plans       @relation(fields: [planId], references: [id], onDelete: Cascade)
-  training_plan_weeks  training_plan_weeks  @relation(fields: [weekId], references: [id], onDelete: Cascade)
-
-  @@unique([planId, date])
-}
-
 model training_plan_phases {
   id                     String                @id
   planId                 String
@@ -434,7 +415,6 @@ model training_plan_phases {
   phaseEndDate           DateTime
   createdAt              DateTime              @default(now())
   updatedAt              DateTime
-  training_plan_days     training_plan_days[]
   training_plans         training_plans        @relation(fields: [planId], references: [id], onDelete: Cascade)
   training_plan_weeks    training_plan_weeks[]
 
@@ -450,7 +430,6 @@ model training_plan_weeks {
   createdAt            DateTime             @default(now())
   updatedAt            DateTime
   planningDays         Json?
-  training_plan_days   training_plan_days[]
   training_plan_phases training_plan_phases @relation(fields: [phaseId], references: [id], onDelete: Cascade)
   training_plans       training_plans       @relation(fields: [planId], references: [id], onDelete: Cascade)
 
@@ -473,7 +452,6 @@ model training_plans {
   goalPace5K           String?
   createdAt            DateTime               @default(now())
   updatedAt            DateTime
-  training_plan_days   training_plan_days[]
   training_plan_phases training_plan_phases[]
   training_plan_weeks  training_plan_weeks[]
   Athlete              Athlete                @relation(fields: [athleteId], references: [id])
@@ -487,6 +465,31 @@ model training_schemas {
   schemaJson  Json
   createdAt   DateTime @default(now())
   updatedAt   DateTime
+}
+
+// Workout Model - Coach-authored, reusable workout intent
+// This represents intent, not execution data, and does not depend on training_plan_days
+model Workout {
+  id              String        @id @default(cuid())
+  title           String        // Required
+  workoutType     WorkoutType   // Required
+  description     String?       // Coach notes / intent
+  workoutFormat   WorkoutFormat?
+  totalMiles      Float?
+  warmUpMiles     Float?
+  mainSetMiles    Float?
+  coolDownMiles   Float?
+  effortType      EffortType?
+  effortModifier  Float?        // sec/mi OR RPE
+  athleteId       String        // FK for authorship and lookup
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  athlete         Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@index([athleteId])
+  @@index([workoutType])
+  @@map("workouts")
 }
 
 enum Gender {
@@ -573,4 +576,29 @@ enum TrainingForDistance {
   HalfMarathon
   Marathon
   Ultra
+}
+
+enum WorkoutType {
+  Easy
+  Tempo
+  Intervals
+  LongRun
+  Speed
+  Strength
+}
+
+enum WorkoutFormat {
+  Continuous
+  WarmupMainCooldown
+  Progression
+  IntervalsUnstructured
+}
+
+enum EffortType {
+  Easy
+  MarathonEffort
+  HalfMarathonEffort
+  TenKEffort
+  FiveKEffort
+  RPE
 }
