@@ -73,11 +73,30 @@ function extractUrl(race: any): string {
  * @returns Normalized race object (url may be empty)
  */
 export function parseRace(race: any): ParsedRace {
+  // Get start date from race or first event
+  let startDate = race.start_date || race.event_date || race.next_date || null;
+  if (!startDate && race.events && Array.isArray(race.events) && race.events.length > 0) {
+    startDate = race.events[0].start_time || null;
+  }
+
+  // Get location from race address or city/state
+  let location = 'Location TBD';
+  if (race.address) {
+    const parts = [
+      race.address.city,
+      race.address.state
+    ].filter(Boolean);
+    location = parts.join(', ') || location;
+  } else {
+    const parts = [race.city, race.state].filter(Boolean);
+    location = parts.join(', ') || location;
+  }
+
   return {
     id: String(race.race_id || race.id || ''),
     name: race.name || 'Untitled Event',
-    startDate: race.start_date || race.event_date || null,
-    location: [race.city, race.state].filter(Boolean).join(', ') || 'Location TBD',
+    startDate: startDate,
+    location: location,
     url: extractUrl(race), // Strict pass-through - may be empty
   };
 }

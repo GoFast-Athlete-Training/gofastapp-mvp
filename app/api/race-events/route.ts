@@ -197,18 +197,30 @@ export async function POST(request: Request) {
     }
 
     // Filter out non-race events (training programs, ticket events, etc.)
-    // Even with event_type filter, some junk might slip through
+    // RunSignUp returns training programs mixed with actual races
     const realRaces = races.filter((race: any) => {
       const name = (race.name || '').toLowerCase();
-      const eventType = (race.event_type || '').toLowerCase();
       
-      // Exclude training programs, workshops, ticket events
-      const isTraining = name.includes('training') || name.includes('workshop');
-      const isTicketEvent = eventType.includes('ticket') || name.includes('ticket');
-      const hasDistance = race.distance && parseFloat(race.distance) >= 1; // At least 1 mile
+      // Exclude training programs and workshops (these are not races)
+      const isTraining = name.includes('training program') || 
+                        name.includes('training group') ||
+                        name.includes('workshop');
       
-      // Only include if it's a real race with distance
-      return !isTraining && !isTicketEvent && hasDistance;
+      // Exclude ticket events
+      const isTicketEvent = name.includes('ticket');
+      
+      // Check if race has events with distance (distance is at event level, not race level)
+      const hasEventWithDistance = race.events && Array.isArray(race.events) && 
+        race.events.some((event: any) => {
+          const distance = event.distance ? parseFloat(event.distance) : null;
+          return distance && distance >= 1; // At least 1 mile
+        });
+      
+      // Also check race-level distance as fallback
+      const hasRaceDistance = race.distance && parseFloat(race.distance) >= 1;
+      
+      // Include if it's NOT a training program/ticket event AND has distance info
+      return !isTraining && !isTicketEvent && (hasEventWithDistance || hasRaceDistance);
     });
 
     // Parse races using strict pass-through parser (NO URL INVENTION)
