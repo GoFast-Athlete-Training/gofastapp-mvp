@@ -9,25 +9,11 @@ import TopNav from '@/components/shared/TopNav';
 import api from '@/lib/api';
 
 interface Event {
-  race_id: string | null;
+  id: string;
   name: string;
-  start_date: string | null;
-  city: string | null;
-  state: string | null;
+  startDate: string;
+  location: string;
   url: string;
-  debug_url_inputs?: {
-    race_id?: any;
-    id?: any;
-    url_string?: any;
-    race_links?: any;
-    race_url?: any;
-  };
-  // Legacy fields for compatibility
-  id?: string;
-  startDate?: string;
-  location?: string;
-  raceType?: string;
-  miles?: number;
 }
 
 /**
@@ -50,9 +36,6 @@ export default function RaceEventsPage() {
 
         // Fetch race events from RunSignUp API (server-side handoff)
         const response = await api.get('/race-events');
-        
-        // CLIENT-SIDE LOG: What did we receive?
-        console.log('📥 CLIENT RECEIVED:', response.data);
         
         if (response.data?.success && response.data?.events) {
           setEvents(response.data.events);
@@ -127,19 +110,10 @@ export default function RaceEventsPage() {
           <div className="space-y-4">
             {events.map((event) => (
               <div
-                key={event.race_id || event.id || event.name}
+                key={event.id || event.name}
                 onClick={() => {
-                  console.log('🖱️ RACE EVENTS PAGE: Event clicked:', {
-                    name: event.name,
-                    race_id: event.race_id,
-                    url: event.url,
-                    debug_url_inputs: event.debug_url_inputs
-                  });
                   if (event.url) {
-                    console.log('  ✅ Opening URL:', event.url);
                     window.open(event.url, '_blank', 'noopener,noreferrer');
-                  } else {
-                    console.log('  ❌ No URL available for event');
                   }
                 }}
                 className="rounded-lg border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-orange-300"
@@ -150,20 +124,16 @@ export default function RaceEventsPage() {
                       {event.name}
                     </h3>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-sm text-gray-600 mb-2">
-                      {(event.start_date || event.startDate) && (
+                      {event.startDate && (
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
-                          <span>{formatDate(event.start_date || event.startDate || '')}</span>
+                          <span>{formatDate(event.startDate)}</span>
                         </div>
                       )}
-                      {(event.city || event.state || event.location) && (
+                      {event.location && (
                         <div className="flex items-center gap-1">
                           <MapPin className="h-4 w-4" />
-                          <span>
-                            {event.location || 
-                             [event.city, event.state].filter(Boolean).join(', ') || 
-                             'Location TBD'}
-                          </span>
+                          <span>{event.location}</span>
                         </div>
                       )}
                       {event.raceType && (
