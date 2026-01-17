@@ -15,12 +15,16 @@
  * - MVP1 requires predictable, stable behavior
  */
 
+export type RaceCategory = 'race' | 'training_program' | 'other';
+
 export interface ParsedRace {
   id: string;
   name: string;
   startDate: string | null;
+  endDate: string | null;
   location: string;
   url: string; // May be empty - client will handle disabled state
+  category: RaceCategory; // Classification for selection logic
 }
 
 /**
@@ -67,16 +71,90 @@ function extractUrl(race: any): string {
 }
 
 /**
+ * Classify race category based on RunSignUp data
+ * 
+ * Classification rules (simple + explicit):
+ * - training_program if: name contains "training"/"program" OR spans multiple months OR all events have null distance
+ * - race if: single-day/short-duration OR name contains race keywords (5K, 10K, Half, Marathon, Run, etc.)
+ * - otherwise → other
+ */
+function classifyRace(race: any): RaceCategory {
+  const name = (race.name || '').toLowerCase();
+  
+  // Check for training program indicators
+  const hasTrainingKeywords = name.includes('training') || name.includes('program');
+  
+  // Check if spans multiple months (training programs typically do)
+  let spansMultipleMonths = false;
+  if (race.next_date && race.next_end_date) {
+    try {
+      const start = new Date(race.next_date);
+      const end = new Date(race.next_end_date);
+      const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+      spansMultipleMonths = monthsDiff > 1;
+    } catch {
+      // Invalid dates, skip this check
+    }
+  }
+  
+  // Check if all events have null distance (training programs often don't specify distance)
+  const allEventsNullDistance = race.events && Array.isArray(race.events) && race.events.length > 0 &&
+    race.events.every((event: any) => !event.distance || event.distance === null);
+  
+  if (hasTrainingKeywords || spansMultipleMonths || allEventsNullDistance) {
+    return 'training_program';
+  }
+  
+  // Check for race indicators (single-day events with race keywords)
+  const hasRaceKeywords = name.includes('5k') || name.includes('10k') || name.includes('half') ||
+                         name.includes('marathon') || name.includes('run') || name.includes('race');
+  
+  // Check if it's a single-day or short-duration event
+  let isShortDuration = false;
+  if (race.next_date && race.next_end_date) {
+    try {
+      const start = new Date(race.next_date);
+      const end = new Date(race.next_end_date);
+      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      isShortDuration = daysDiff <= 7; // 7 days or less
+    } catch {
+      // Invalid dates, assume it might be a race
+      isShortDuration = true;
+    }
+  } else if (race.next_date) {
+    // Has start date but no end date - likely a single-day race
+    isShortDuration = true;
+  }
+  
+  if (hasRaceKeywords || isShortDuration) {
+    return 'race';
+  }
+  
+  return 'other';
+}
+
+/**
  * Parse a raw RunSignUp race object into normalized format
  * 
+ * STEP 2: Normalize (NO filtering yet)
+ * - Converts raw RunSignUp data to consistent format
+ * - Classifies category (race, training_program, other)
+ * - Does NOT filter anything out
+ * 
  * @param race - Raw race object from RunSignUp API
- * @returns Normalized race object (url may be empty)
+ * @returns Normalized race object with category classification
  */
 export function parseRace(race: any): ParsedRace {
   // Get start date from race or first event
   let startDate = race.start_date || race.event_date || race.next_date || null;
   if (!startDate && race.events && Array.isArray(race.events) && race.events.length > 0) {
     startDate = race.events[0].start_time || null;
+  }
+
+  // Get end date
+  let endDate = race.end_date || race.next_end_date || null;
+  if (!endDate && race.events && Array.isArray(race.events) && race.events.length > 0) {
+    endDate = race.events[0].end_time || null;
   }
 
   // Get location from race address or city/state
@@ -96,8 +174,10 @@ export function parseRace(race: any): ParsedRace {
     id: String(race.race_id || race.id || ''),
     name: race.name || 'Untitled Event',
     startDate: startDate,
+    endDate: endDate,
     location: location,
     url: extractUrl(race), // Strict pass-through - may be empty
+    category: classifyRace(race), // Classification for selection logic
   };
 }
 

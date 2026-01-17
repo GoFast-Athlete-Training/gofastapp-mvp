@@ -14,9 +14,11 @@ import api from '@/lib/api';
 interface Event {
   id: string;
   name: string;
-  startDate: string;
+  startDate: string | null;
+  endDate?: string | null;
   location: string;
   url: string;
+  category?: 'race' | 'training_program' | 'other';
 }
 
 /**

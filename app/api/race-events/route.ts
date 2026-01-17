@@ -86,13 +86,16 @@ export async function POST(request: Request) {
       });
     }
 
-    // Build URL with required params + filters to get REAL races
+    // STEP 1: Over-fetch (Required)
+    // WHY: RunSignUp returns everything (races, training programs, ticket events)
+    // We need to fetch many results, normalize, then select the best ones
+    // Do NOT try to out-smart the API with distance filters or event_type params
     const url = new URL('https://api.runsignup.com/rest/races');
     url.searchParams.append('api_key', apiKey);
     url.searchParams.append('api_secret', apiSecret);
     url.searchParams.append('format', 'json');
     url.searchParams.append('page', '1');
-    url.searchParams.append('results_per_page', '5');
+    url.searchParams.append('results_per_page', '100'); // Over-fetch to have options
     
     // Filter by state (athlete's location or default to VA)
     url.searchParams.append('state', filterState);
@@ -183,75 +186,62 @@ export async function POST(request: Request) {
     console.log(`🔍 RunSignUp returned ${data.races.length} races (before filtering)`);
 
     // ============================================================
-    // STAGE 4: PUSH TO CLIENT (Response Contract)
+    // STAGE 4: NORMALIZE + SELECT (Response Contract)
     // ============================================================
+    // STEP 2: Normalize (NO filtering yet)
     // Extract race objects from wrapper objects (data.races[i].race)
-    const races = (data.races || [])
+    const rawRaces = (data.races || [])
       .map((r: any) => r.race)
       .filter(Boolean);
 
-    // DEBUG: Log first race to see what we're actually getting
+    console.log(`🔍 RunSignUp returned ${rawRaces.length} total items (before normalization)`);
+
+    // Normalize all races (classify but don't filter)
+    // WHY: We need to see what we have before selecting
+    const normalizedRaces = rawRaces.map((race: any) => {
+      return parseRace(race);
+    });
+
+    // Log category breakdown
+    const categoryCounts = normalizedRaces.reduce((acc: any, race: any) => {
+      acc[race.category] = (acc[race.category] || 0) + 1;
+      return acc;
+    }, {});
+    console.log(`📊 Category breakdown:`, categoryCounts);
+
+    // STEP 3: Select for MVP1
+    // Prefer category === 'race', take first 10-20 races
+    // If no races found, fall back to training programs
+    // Never return empty list unless API returned zero items
+    const races = normalizedRaces.filter((r: any) => r.category === 'race');
+    const trainingPrograms = normalizedRaces.filter((r: any) => r.category === 'training_program');
+    
+    let selectedEvents: any[];
     if (races.length > 0) {
-      console.log('🔍 DEBUG: First race object from RunSignUp:', JSON.stringify(races[0], null, 2));
-      console.log('🔍 DEBUG: Available fields:', Object.keys(races[0]));
+      // Prefer actual races
+      selectedEvents = races.slice(0, 20); // Take up to 20 races
+      console.log(`✅ Selected ${selectedEvents.length} races (from ${races.length} available)`);
+    } else if (trainingPrograms.length > 0) {
+      // Fallback to training programs if no races
+      selectedEvents = trainingPrograms.slice(0, 10); // Take up to 10 training programs
+      console.log(`⚠️ No races found, falling back to ${selectedEvents.length} training programs`);
+    } else {
+      // Only "other" category items or empty
+      selectedEvents = normalizedRaces.slice(0, 10);
+      console.log(`⚠️ No races or training programs, showing ${selectedEvents.length} other items`);
     }
 
-    // Filter out non-race events (training programs, ticket events, etc.)
-    // RunSignUp returns training programs mixed with actual races
-    // NOTE: For MVP1, we're filtering out training programs to show only actual races
-    // If RunSignUp only returns training programs for a state, we'll show 0 events
-    const realRaces = races.filter((race: any) => {
-      const name = (race.name || '').toLowerCase();
-      
-      // Exclude training programs and workshops (these are not races)
-      // Training programs are multi-week programs, not single race events
-      const isTraining = name.includes('training program') || 
-                        name.includes('training group') ||
-                        name.includes('workshop');
-      
-      // Exclude ticket events (these are social events, not races)
-      const isTicketEvent = name.includes('ticket');
-      
-      // For MVP1: Only show actual races, not training programs
-      // Training programs don't have a single race date - they're ongoing programs
-      // If user wants training programs, we'd need a separate "Training Programs" section
-      
-      if (isTraining) {
-        console.log(`🚫 Filtered out training program: ${race.name}`);
-        return false;
-      }
-      
-      if (isTicketEvent) {
-        console.log(`🚫 Filtered out ticket event: ${race.name}`);
-        return false;
-      }
-      
-      // Include actual races (not training programs)
-      console.log(`✅ Including race: ${race.name}`);
-      return true;
-    });
-
-    // Parse races using strict pass-through parser (NO URL INVENTION)
-    // All URL logic is in lib/runsignup/raceParser.ts - this route never constructs URLs
-    const events = realRaces.slice(0, 5).map((race: any) => {
-      const parsed = parseRace(race);
-      
-      // DEBUG: Log URL extraction for first race
-      if (realRaces.indexOf(race) === 0) {
-        console.log('🔍 DEBUG: URL extraction (strict pass-through):', {
-          race_url: race.url,
-          url_string: race.url_string,
-          extracted_url: parsed.url,
-          has_url: !!parsed.url,
-        });
-      }
-
-      return parsed;
-    });
+    // Limit to 5 for MVP1 response
+    const events = selectedEvents.slice(0, 5);
     
-    // Log what we filtered out
-    if (races.length > realRaces.length) {
-      console.log(`🔍 Filtered out ${races.length - realRaces.length} non-race events (training programs, ticket events, etc.)`);
+    // DEBUG: Log first event details
+    if (events.length > 0) {
+      console.log('🔍 DEBUG: First event being returned:', {
+        name: events[0].name,
+        category: events[0].category,
+        url: events[0].url,
+        has_url: !!events[0].url,
+      });
     }
 
     console.log(`✅ Returning ${events.length} events to client (filterState: ${filterState})`);
