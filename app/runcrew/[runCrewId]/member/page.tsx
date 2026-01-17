@@ -312,7 +312,7 @@ export default function RunCrewMemberPage() {
                         joinedAt: membershipItem.joinedAt,
                       }}
                       showRole={true}
-                      currentUserId={LocalStorageAPI.getAthleteId()}
+                      currentUserId={LocalStorageAPI.getAthleteId() ?? undefined}
                     />
                   ))}
                 </div>
