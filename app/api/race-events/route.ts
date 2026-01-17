@@ -247,14 +247,21 @@ export async function POST(request: Request) {
     }
 
     console.log(`✅ Returning ${events.length} events to client (filterState: ${filterState})`);
+    console.log(`🔍 Events being returned:`, JSON.stringify(events, null, 2));
 
     if (events.length === 0) {
       console.warn('⚠️ No events after filtering - check RunSignUp API response and filters');
+      console.warn('⚠️ This could mean:');
+      console.warn('   - All races were training programs (filtered out)');
+      console.warn('   - No races match the state filter');
+      console.warn('   - RunSignUp returned no races for this state');
     }
 
+    // Always return success: true with events array (even if empty)
+    // Client will handle empty array by showing "No upcoming races found"
     return NextResponse.json({
       success: true,
-      events: events,
+      events: events, // Always an array, may be empty
     }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

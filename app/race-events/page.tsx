@@ -69,23 +69,41 @@ export default function RaceEventsPage() {
           },
         });
         
-        console.log('🔍 Race events response:', {
+        console.log('🔍 Race events response (full):', {
+          status: response.status,
+          statusText: response.statusText,
+          data: response.data,
           success: response.data?.success,
           eventsCount: response.data?.events?.length || 0,
+          events: response.data?.events,
           error: response.data?.error,
         });
 
-        if (response.data?.success && response.data?.events) {
-          setEvents(response.data.events);
-          if (response.data.events.length === 0) {
-            console.warn('⚠️ No events returned from API');
+        // Always set events array (even if empty) when success is true
+        if (response.data?.success !== undefined) {
+          if (response.data.success) {
+            // Success - set events (may be empty array)
+            const eventsArray = Array.isArray(response.data.events) ? response.data.events : [];
+            console.log(`✅ Setting ${eventsArray.length} events to state`);
+            setEvents(eventsArray);
+            
+            if (eventsArray.length === 0) {
+              console.warn('⚠️ API returned success but 0 events');
+            }
+            
+            // Clear any previous errors
+            setError(null);
+          } else {
+            // API returned success: false
+            console.warn('⚠️ API returned success: false:', response.data);
+            setEvents([]);
+            setError(response.data?.error || 'Failed to load events');
           }
         } else {
-          console.warn('⚠️ API returned unsuccessful or no events:', response.data);
+          // Unexpected response structure
+          console.error('❌ Unexpected response structure:', response.data);
           setEvents([]);
-          if (response.data?.error) {
-            setError(response.data.error);
-          }
+          setError('Unexpected response from server');
         }
       } catch (err: any) {
         console.error('Error loading events:', err);
