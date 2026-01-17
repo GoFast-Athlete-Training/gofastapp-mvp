@@ -22,7 +22,7 @@ export async function GET() {
 
     // RunSignUp API endpoint for getting races
     // Using start_date=today to get upcoming events, results_per_page=5 for MVP
-    const url = new URL('https://runsignup.com/rest/races');
+    const url = new URL('https://api.runsignup.com/rest/races');
     url.searchParams.append('api_key', apiKey);
     url.searchParams.append('api_secret', apiSecret);
     url.searchParams.append('format', 'json');
