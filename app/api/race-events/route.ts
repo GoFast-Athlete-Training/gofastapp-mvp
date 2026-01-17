@@ -114,10 +114,18 @@ export async function POST(request: Request) {
     // ============================================================
     // STAGE 2: PUSH TO SIGNUP SERVER (HTTP Fetch)
     // ============================================================
+    // CRITICAL: Clean-room fetch with NO auth headers
+    // WHY: Firebase Bearer tokens are ONLY for our API, never forwarded to RunSignUp
+    // - No Authorization header
+    // - No cookies
+    // - No session headers
+    // - No shared axios/fetch wrappers that might leak auth
+    // RunSignUp uses api_key/api_secret in URL params only
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        // DO NOT add Authorization, Cookie, or any auth headers
       },
     });
 
