@@ -40,13 +40,16 @@ export async function GET() {
       });
     }
 
-    // Build URL with only required params
+    // Build URL - RunSignUp requires specific params to return race data
     const url = new URL('https://api.runsignup.com/rest/races');
     url.searchParams.append('api_key', apiKey);
     url.searchParams.append('api_secret', apiSecret);
     url.searchParams.append('format', 'json');
     url.searchParams.append('page', '1');
     url.searchParams.append('results_per_page', '5');
+    url.searchParams.append('events', 'T'); // Include events in race objects
+    url.searchParams.append('race_links', 'T'); // Include race URLs
+    url.searchParams.append('race_headings', 'T'); // Include race headings/metadata
 
     const finalUrl = url.toString();
     const maskedUrl = finalUrl.replace(apiKey, '***').replace(apiSecret, '***');
