@@ -198,29 +198,37 @@ export async function POST(request: Request) {
 
     // Filter out non-race events (training programs, ticket events, etc.)
     // RunSignUp returns training programs mixed with actual races
+    // NOTE: For MVP1, we're filtering out training programs to show only actual races
+    // If RunSignUp only returns training programs for a state, we'll show 0 events
     const realRaces = races.filter((race: any) => {
       const name = (race.name || '').toLowerCase();
       
       // Exclude training programs and workshops (these are not races)
+      // Training programs are multi-week programs, not single race events
       const isTraining = name.includes('training program') || 
                         name.includes('training group') ||
                         name.includes('workshop');
       
-      // Exclude ticket events
+      // Exclude ticket events (these are social events, not races)
       const isTicketEvent = name.includes('ticket');
       
-      // Check if race has events with distance (distance is at event level, not race level)
-      const hasEventWithDistance = race.events && Array.isArray(race.events) && 
-        race.events.some((event: any) => {
-          const distance = event.distance ? parseFloat(event.distance) : null;
-          return distance && distance >= 1; // At least 1 mile
-        });
+      // For MVP1: Only show actual races, not training programs
+      // Training programs don't have a single race date - they're ongoing programs
+      // If user wants training programs, we'd need a separate "Training Programs" section
       
-      // Also check race-level distance as fallback
-      const hasRaceDistance = race.distance && parseFloat(race.distance) >= 1;
+      if (isTraining) {
+        console.log(`🚫 Filtered out training program: ${race.name}`);
+        return false;
+      }
       
-      // Include if it's NOT a training program/ticket event AND has distance info
-      return !isTraining && !isTicketEvent && (hasEventWithDistance || hasRaceDistance);
+      if (isTicketEvent) {
+        console.log(`🚫 Filtered out ticket event: ${race.name}`);
+        return false;
+      }
+      
+      // Include actual races (not training programs)
+      console.log(`✅ Including race: ${race.name}`);
+      return true;
     });
 
     // Parse races using strict pass-through parser (NO URL INVENTION)
