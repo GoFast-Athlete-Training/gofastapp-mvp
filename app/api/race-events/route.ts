@@ -26,7 +26,9 @@ export async function GET() {
     url.searchParams.append('api_key', apiKey);
     url.searchParams.append('api_secret', apiSecret);
     url.searchParams.append('format', 'json');
-    url.searchParams.append('start_date', 'today');
+    // Note: start_date might need to be ISO format instead of 'today'
+    // Try without start_date first, or use ISO format like '2025-01-01'
+    // url.searchParams.append('start_date', 'today');
     url.searchParams.append('results_per_page', '5');
     url.searchParams.append('race_links', 'T'); // Include race URLs
 
@@ -44,18 +46,32 @@ export async function GET() {
     console.log('📦 RunSignUp API Response Status:', response.status, response.statusText);
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(
-        '❌ RunSignUp API error:',
-        response.status,
-        response.statusText,
-        'Response:', errorText
-      );
+      let errorText = '';
+      try {
+        errorText = await response.text();
+      } catch (e) {
+        errorText = 'Could not read error response';
+      }
+      
+      console.error('❌ RunSignUp API error:');
+      console.error('  Status:', response.status, response.statusText);
+      console.error('  Response body:', errorText);
+      console.error('  Request URL:', url.toString().replace(apiKey, '***').replace(apiSecret, '***'));
+      
+      // Try to parse error as JSON
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { message: errorText };
+      }
+      
       return NextResponse.json({ 
         success: false, 
         events: [],
-        error: `API returned ${response.status}: ${response.statusText}`,
-      });
+        error: `RunSignUp API error (${response.status}): ${errorText || response.statusText}`,
+        details: errorData,
+      }, { status: response.status });
     }
 
     const data = await response.json();
