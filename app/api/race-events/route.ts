@@ -284,3 +284,24 @@ export async function POST(request: Request) {
     });
   }
 }
+
+/**
+ * GET /api/race-events
+ * 
+ * BLOCKED: This endpoint requires POST with athleteId in body.
+ * GET requests are not supported to prevent caching and ensure athlete context.
+ */
+export async function GET() {
+  console.warn('⚠️ GET /api/race-events called - this endpoint requires POST');
+  return NextResponse.json({ 
+    success: false, 
+    events: [],
+    error: 'This endpoint requires POST method with athleteId in request body'
+  }, { 
+    status: 405, // Method Not Allowed
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'Allow': 'POST',
+    },
+  });
+}
