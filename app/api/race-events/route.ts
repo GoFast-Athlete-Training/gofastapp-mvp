@@ -114,18 +114,51 @@ export async function GET() {
       .map((r: any) => r.race)
       .filter(Boolean);
 
-    // Build events with canonical URL from race_id only
+    // DEBUG: Log first race to see what we're actually getting
+    if (races.length > 0) {
+      console.log('🔍 DEBUG: First race object from RunSignUp:', JSON.stringify(races[0], null, 2));
+      console.log('🔍 DEBUG: Available fields:', Object.keys(races[0]));
+    }
+
+    // Build events with proper URL format: /Race/STATE/CITY/URL_STRING
     const events = races.slice(0, 5).map((race: any) => {
-      // Canonical RunSignUp registration URL - use ONLY race_id
-      const registrationUrl = race.race_id
-        ? `https://runsignup.com/Race/${race.race_id}`
-        : '';
+      // Build URL using proper RunSignUp format: /Race/STATE/CITY/URL_STRING
+      let registrationUrl = '';
+      
+      if (race.url_string) {
+        // url_string might be relative (/Race/VA/Arlington/DCRRCSpringTraining) or absolute
+        if (race.url_string.startsWith('http')) {
+          registrationUrl = race.url_string;
+        } else if (race.url_string.startsWith('/')) {
+          registrationUrl = `https://runsignup.com${race.url_string}`;
+        } else {
+          // Build from state/city/url_string if we have all pieces
+          if (race.state && race.city && race.url_string) {
+            const stateCode = race.state.toUpperCase();
+            const cityName = race.city.replace(/\s+/g, ''); // Remove spaces
+            registrationUrl = `https://runsignup.com/Race/${stateCode}/${cityName}/${race.url_string}`;
+          }
+        }
+      } else if (race.state && race.city && race.name) {
+        // Fallback: try to construct from available fields
+        const stateCode = race.state.toUpperCase();
+        const cityName = race.city.replace(/\s+/g, '');
+        // Use race name as url_string (slugified)
+        const urlSlug = race.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '')
+          .substring(0, 50);
+        registrationUrl = `https://runsignup.com/Race/${stateCode}/${cityName}/${urlSlug}`;
+      } else if (race.race_id) {
+        // Last resort: use race_id (but this might 404)
+        registrationUrl = `https://runsignup.com/Race/${race.race_id}`;
+      }
 
       return {
-        id: race.race_id,
-        name: race.name,
-        startDate: race.start_date,
-        location: [race.city, race.state].filter(Boolean).join(', ') || '',
+        id: String(race.race_id || ''),
+        name: race.name || 'Untitled Event',
+        startDate: race.start_date || null,
+        location: [race.city, race.state].filter(Boolean).join(', ') || 'Location TBD',
         url: registrationUrl,
       };
     });
