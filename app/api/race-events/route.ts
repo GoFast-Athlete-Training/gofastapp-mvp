@@ -123,35 +123,53 @@ export async function GET() {
     // Build events with proper URL format: /Race/STATE/CITY/URL_STRING
     const events = races.slice(0, 5).map((race: any) => {
       // Build URL using proper RunSignUp format: /Race/STATE/CITY/URL_STRING
+      // The url_string field from API should contain the full path or slug
       let registrationUrl = '';
       
+      // Priority 1: Use url_string if available (might be full path or just slug)
       if (race.url_string) {
-        // url_string might be relative (/Race/VA/Arlington/DCRRCSpringTraining) or absolute
         if (race.url_string.startsWith('http')) {
+          // Absolute URL
           registrationUrl = race.url_string;
-        } else if (race.url_string.startsWith('/')) {
+        } else if (race.url_string.startsWith('/Race/')) {
+          // Relative path starting with /Race/
           registrationUrl = `https://runsignup.com${race.url_string}`;
+        } else if (race.state && race.city) {
+          // url_string is just the slug, build full path
+          const stateCode = race.state.toUpperCase();
+          const cityName = race.city.replace(/\s+/g, ''); // Remove spaces for URL
+          registrationUrl = `https://runsignup.com/Race/${stateCode}/${cityName}/${race.url_string}`;
         } else {
-          // Build from state/city/url_string if we have all pieces
-          if (race.state && race.city && race.url_string) {
-            const stateCode = race.state.toUpperCase();
-            const cityName = race.city.replace(/\s+/g, ''); // Remove spaces
-            registrationUrl = `https://runsignup.com/Race/${stateCode}/${cityName}/${race.url_string}`;
-          }
+          // url_string exists but no state/city - try direct path
+          registrationUrl = `https://runsignup.com/Race/${race.url_string}`;
         }
-      } else if (race.state && race.city && race.name) {
-        // Fallback: try to construct from available fields
+      } 
+      // Priority 2: Try to build from state/city/name if url_string missing
+      else if (race.state && race.city && race.name) {
         const stateCode = race.state.toUpperCase();
         const cityName = race.city.replace(/\s+/g, '');
-        // Use race name as url_string (slugified)
+        // Slugify race name as fallback
         const urlSlug = race.name
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '')
           .substring(0, 50);
         registrationUrl = `https://runsignup.com/Race/${stateCode}/${cityName}/${urlSlug}`;
-      } else if (race.race_id) {
-        // Last resort: use race_id (but this might 404)
+      } 
+      // Priority 3: Last resort - use race_id (will likely 404, but better than nothing)
+      else if (race.race_id) {
         registrationUrl = `https://runsignup.com/Race/${race.race_id}`;
+      }
+      
+      // DEBUG: Log URL construction for first race
+      if (races.indexOf(race) === 0) {
+        console.log('🔍 DEBUG: URL construction:', {
+          url_string: race.url_string,
+          state: race.state,
+          city: race.city,
+          name: race.name,
+          race_id: race.race_id,
+          constructed_url: registrationUrl,
+        });
       }
 
       return {
