@@ -174,43 +174,79 @@ export async function GET() {
 
     // Log FIRST race object in DETAIL to see actual structure
     if (data.races.length > 0) {
-      const firstRace = data.races[0];
-      console.log('\n🔬 DETAILED FIRST RACE INSPECTION:');
-      console.log('    - Type:', typeof firstRace);
-      console.log('    - Is array:', Array.isArray(firstRace));
-      console.log('    - Is null:', firstRace === null);
-      console.log('    - Is undefined:', firstRace === undefined);
-      console.log('    - All keys:', Object.keys(firstRace || {}));
-      console.log('    - Full object (JSON):', JSON.stringify(firstRace, null, 2).substring(0, 2000));
+      const firstWrapper = data.races[0];
+      console.log('\n🔬 DETAILED FIRST RACE WRAPPER INSPECTION:');
+      console.log('    - Type:', typeof firstWrapper);
+      console.log('    - All keys:', Object.keys(firstWrapper || {}));
+      console.log('    - Has .race property:', !!firstWrapper?.race);
+      console.log('    - Full wrapper object (JSON):', JSON.stringify(firstWrapper, null, 2).substring(0, 2000));
       
-      // Check specific fields we expect
-      console.log('    - Field checks:');
-      console.log('      race_id:', firstRace?.race_id);
-      console.log('      id:', firstRace?.id);
-      console.log('      name:', firstRace?.name);
-      console.log('      Race ID (capital):', firstRace?.RaceID);
-      console.log('      Name (capital):', firstRace?.Name);
-      console.log('      URL String:', firstRace?.url_string);
+      if (firstWrapper?.race) {
+        const firstRace = firstWrapper.race;
+        console.log('    - .race object keys:', Object.keys(firstRace));
+        console.log('    - .race.race_id:', firstRace.race_id);
+        console.log('    - .race.name:', firstRace.name);
+        console.log('    - .race.url_string:', firstRace.url_string);
+      }
     }
 
     // ============================================================
     // STAGE 4: PUSH TO CLIENT (Response Contract)
     // ============================================================
     console.log('\n📥 STAGE 4: PUSH TO CLIENT');
-    console.log('  - Building response contract...');
+    console.log('  - Extracting race objects from wrappers...');
 
-    // MVP1: Return raw races array (no normalization yet)
+    // Extract race objects from wrapper objects (data.races[i].race)
+    const races = (data.races || [])
+      .map((r: any) => r.race)
+      .filter(Boolean);
+
+    console.log('  - Extracted races count:', races.length);
+    if (races.length > 0) {
+      const firstRace = races[0];
+      console.log('    - First extracted race keys:', Object.keys(firstRace));
+      console.log('    - First extracted race.race_id:', firstRace.race_id);
+      console.log('    - First extracted race.name:', firstRace.name);
+    }
+
+    // Build events with correct race data
+    const events = races.slice(0, 5).map((race: any) => {
+      // Build URL from url_string or race_id
+      const url = race.url_string
+        ? `https://runsignup.com${race.url_string}`
+        : race.race_id
+          ? `https://runsignup.com/Race/${race.race_id}`
+          : '';
+
+      return {
+        race_id: race.race_id,
+        name: race.name || 'Untitled Event',
+        start_date: race.start_date,
+        city: race.city,
+        state: race.state,
+        debug_url_inputs: {
+          race_id: race.race_id,
+          url_string: race.url_string,
+        },
+        url: url,
+      };
+    });
+
     const responsePayload = {
       success: true,
-      events: data.races, // Raw races from RunSignUp
+      events: events,
     };
 
     console.log('  ✅ Response contract built');
     console.log('    - success:', responsePayload.success);
     console.log('    - events.length:', responsePayload.events.length);
-    console.log('    - First event type:', typeof responsePayload.events[0]);
-    console.log('    - First event keys:', responsePayload.events[0] ? Object.keys(responsePayload.events[0]) : 'no events');
-    console.log('    - First event (stringified):', JSON.stringify(responsePayload.events[0] || {}).substring(0, 500));
+    if (events.length > 0) {
+      console.log('    - First event:', {
+        race_id: events[0].race_id,
+        name: events[0].name,
+        url: events[0].url
+      });
+    }
 
     return NextResponse.json(responsePayload);
 
