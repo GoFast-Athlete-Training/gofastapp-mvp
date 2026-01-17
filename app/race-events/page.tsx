@@ -35,7 +35,16 @@ export default function RaceEventsPage() {
         setError(null);
 
         // Fetch race events from RunSignUp API (server-side handoff)
-        const response = await api.get('/race-events');
+        // Add cache-busting timestamp to prevent 304 responses
+        const response = await api.get('/race-events', {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+          },
+          params: {
+            _t: Date.now(), // Cache buster
+          },
+        });
         
         if (response.data?.success && response.data?.events) {
           setEvents(response.data.events);

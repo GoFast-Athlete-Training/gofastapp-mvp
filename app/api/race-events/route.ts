@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0; // Disable all caching
+export const fetchCache = 'force-no-store'; // Disable fetch caching
 
 /**
  * GET /api/race-events
