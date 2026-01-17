@@ -226,12 +226,13 @@ export default function RaceEventsPage() {
                     <div className="ml-4 flex-shrink-0">
                       <ExternalLink className="h-5 w-5 text-orange-600" />
                     </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                         )}
+                       </div>
+                     </div>
+                     );
+                   })}
+                 </div>
+               )}
 
         {/* Info Section */}
         {events.length > 0 && (
