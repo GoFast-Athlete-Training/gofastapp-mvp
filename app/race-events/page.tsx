@@ -85,10 +85,11 @@ export default function RaceEventsPage() {
             // Success - set events (may be empty array)
             const eventsArray = Array.isArray(response.data.events) ? response.data.events : [];
             console.log(`✅ Setting ${eventsArray.length} events to state`);
+            console.log(`🔍 Events array content:`, eventsArray);
             setEvents(eventsArray);
             
             if (eventsArray.length === 0) {
-              console.warn('⚠️ API returned success but 0 events');
+              console.warn('⚠️ API returned success but 0 events - this is expected if all races were filtered out');
             }
             
             // Clear any previous errors
@@ -101,7 +102,7 @@ export default function RaceEventsPage() {
           }
         } else {
           // Unexpected response structure
-          console.error('❌ Unexpected response structure:', response.data);
+          console.error('❌ Unexpected response structure - missing success field:', response.data);
           setEvents([]);
           setError('Unexpected response from server');
         }
