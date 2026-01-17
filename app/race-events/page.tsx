@@ -62,10 +62,23 @@ export default function RaceEventsPage() {
           athleteId,
         });
         
+        console.log('🔍 Race events response:', {
+          success: response.data?.success,
+          eventsCount: response.data?.events?.length || 0,
+          error: response.data?.error,
+        });
+
         if (response.data?.success && response.data?.events) {
           setEvents(response.data.events);
+          if (response.data.events.length === 0) {
+            console.warn('⚠️ No events returned from API');
+          }
         } else {
+          console.warn('⚠️ API returned unsuccessful or no events:', response.data);
           setEvents([]);
+          if (response.data?.error) {
+            setError(response.data.error);
+          }
         }
       } catch (err: any) {
         console.error('Error loading events:', err);

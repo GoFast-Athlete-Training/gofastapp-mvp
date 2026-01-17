@@ -153,27 +153,22 @@ export async function POST(request: Request) {
     url.searchParams.append('page', '1');
     url.searchParams.append('results_per_page', '5');
     
-    // Filter for actual running races only (exclude training programs, ticket events, etc.)
-    url.searchParams.append('event_type', 'running_race'); // Only actual races
-    
-    // Filter by minimum distance to get real races (exclude weird micro-events)
-    url.searchParams.append('min_distance', '1'); // At least 1 mile
-    url.searchParams.append('distance_units', 'miles');
+    // Filter by state (athlete's location or default to VA)
+    url.searchParams.append('state', filterState);
     
     // Sort by date (upcoming first)
     url.searchParams.append('sort', 'date');
     url.searchParams.append('sort_dir', 'asc'); // Ascending = upcoming first
     
-    // Filter by state (athlete's location or default to VA)
-    url.searchParams.append('state', filterState);
-    
-    // Only get upcoming races (start_date defaults to today if not set)
-    // This ensures we don't get past events
-    
     // Include race details
     url.searchParams.append('events', 'T');
     url.searchParams.append('race_links', 'T');
     url.searchParams.append('race_headings', 'T');
+    
+    // Note: Removed event_type and min_distance filters - RunSignUp API might not support them
+    // We'll filter client-side instead
+    
+    console.log(`🔍 Calling RunSignUp API: ${url.toString().replace(apiKey, '***').replace(apiSecret, '***')}`);
 
     // ============================================================
     // STAGE 2: PUSH TO SIGNUP SERVER (HTTP Fetch)
@@ -224,7 +219,7 @@ export async function POST(request: Request) {
 
     // Validate structure
     if (!data.races || !Array.isArray(data.races)) {
-      console.error('❌ RunSignUp response invalid structure');
+      console.error('❌ RunSignUp response invalid structure:', JSON.stringify(data, null, 2));
       return NextResponse.json({ 
         success: false, 
         events: [],
@@ -235,6 +230,8 @@ export async function POST(request: Request) {
         },
       });
     }
+
+    console.log(`🔍 RunSignUp returned ${data.races.length} races (before filtering)`);
 
     // ============================================================
     // STAGE 4: PUSH TO CLIENT (Response Contract)
@@ -296,6 +293,12 @@ export async function POST(request: Request) {
     // Log what we filtered out
     if (races.length > realRaces.length) {
       console.log(`🔍 Filtered out ${races.length - realRaces.length} non-race events (training programs, ticket events, etc.)`);
+    }
+
+    console.log(`✅ Returning ${events.length} events to client (filterState: ${filterState})`);
+
+    if (events.length === 0) {
+      console.warn('⚠️ No events after filtering - check RunSignUp API response and filters');
     }
 
     return NextResponse.json({
