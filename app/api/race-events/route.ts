@@ -169,6 +169,27 @@ export async function GET() {
     console.log('  ✅ Structure validation SUCCESS');
     console.log('    - Races count:', data.races.length);
 
+    // Log FIRST race object in DETAIL to see actual structure
+    if (data.races.length > 0) {
+      const firstRace = data.races[0];
+      console.log('\n🔬 DETAILED FIRST RACE INSPECTION:');
+      console.log('    - Type:', typeof firstRace);
+      console.log('    - Is array:', Array.isArray(firstRace));
+      console.log('    - Is null:', firstRace === null);
+      console.log('    - Is undefined:', firstRace === undefined);
+      console.log('    - All keys:', Object.keys(firstRace || {}));
+      console.log('    - Full object (JSON):', JSON.stringify(firstRace, null, 2).substring(0, 2000));
+      
+      // Check specific fields we expect
+      console.log('    - Field checks:');
+      console.log('      race_id:', firstRace?.race_id);
+      console.log('      id:', firstRace?.id);
+      console.log('      name:', firstRace?.name);
+      console.log('      Race ID (capital):', firstRace?.RaceID);
+      console.log('      Name (capital):', firstRace?.Name);
+      console.log('      URL String:', firstRace?.url_string);
+    }
+
     // ============================================================
     // STAGE 4: PUSH TO CLIENT (Response Contract)
     // ============================================================
@@ -184,7 +205,9 @@ export async function GET() {
     console.log('  ✅ Response contract built');
     console.log('    - success:', responsePayload.success);
     console.log('    - events.length:', responsePayload.events.length);
+    console.log('    - First event type:', typeof responsePayload.events[0]);
     console.log('    - First event keys:', responsePayload.events[0] ? Object.keys(responsePayload.events[0]) : 'no events');
+    console.log('    - First event (stringified):', JSON.stringify(responsePayload.events[0] || {}).substring(0, 500));
 
     return NextResponse.json(responsePayload);
 
