@@ -164,7 +164,11 @@ export default function RaceEventsPage() {
                     window.open(event.url, '_blank', 'noopener,noreferrer');
                   }
                 }}
-                className="rounded-lg border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-orange-300"
+                className={`rounded-lg border-2 border-gray-200 bg-white p-6 shadow-sm transition ${
+                  event.url 
+                    ? 'cursor-pointer hover:shadow-md hover:border-orange-300' 
+                    : 'cursor-default opacity-75'
+                }`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -185,9 +189,13 @@ export default function RaceEventsPage() {
                         </div>
                       )}
                     </div>
-                    {event.url && (
+                    {event.url ? (
                       <p className="text-xs text-gray-500 mt-2">
                         Click to register on RunSignUp
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-400 mt-2 italic">
+                        Registration link not available
                       </p>
                     )}
                   </div>
