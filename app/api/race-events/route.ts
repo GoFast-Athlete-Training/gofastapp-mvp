@@ -210,13 +210,39 @@ export async function GET() {
     }
 
     // Build events with correct race data
-    const events = races.slice(0, 5).map((race: any) => {
-      // Build URL from url_string or race_id
-      const url = race.url_string
-        ? `https://runsignup.com${race.url_string}`
-        : race.race_id
-          ? `https://runsignup.com/Race/${race.race_id}`
-          : '';
+    const events = races.slice(0, 5).map((race: any, index: number) => {
+      console.log(`\n🔗 Building URL for race #${index + 1}:`);
+      console.log('    - race.race_id:', race.race_id);
+      console.log('    - race.url_string:', race.url_string);
+      console.log('    - race.url_string type:', typeof race.url_string);
+      
+      // Build URL - check multiple possible formats
+      let url = '';
+      
+      // Try url_string first (might already be full URL or just path)
+      if (race.url_string) {
+        if (race.url_string.startsWith('http')) {
+          // Already a full URL
+          url = race.url_string;
+          console.log('    ✅ Using url_string as full URL:', url);
+        } else if (race.url_string.startsWith('/')) {
+          // Path - prepend domain
+          url = `https://runsignup.com${race.url_string}`;
+          console.log('    ✅ Using url_string as path:', url);
+        } else {
+          // Relative path without leading slash
+          url = `https://runsignup.com/${race.url_string}`;
+          console.log('    ✅ Using url_string as relative path:', url);
+        }
+      } else if (race.race_id) {
+        // Fallback to race_id - try different URL formats
+        url = `https://runsignup.com/Race/${race.race_id}`;
+        console.log('    ⚠️ Built from race_id (may 404):', url);
+      } else {
+        console.log('    ❌ No URL fields found');
+      }
+
+      console.log('    📍 Final URL:', url);
 
       return {
         race_id: race.race_id,
@@ -227,6 +253,7 @@ export async function GET() {
         debug_url_inputs: {
           race_id: race.race_id,
           url_string: race.url_string,
+          url_string_type: typeof race.url_string,
         },
         url: url,
       };
