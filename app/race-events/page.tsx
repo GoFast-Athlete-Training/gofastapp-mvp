@@ -160,12 +160,14 @@ export default function RaceEventsPage() {
               <div
                 key={event.id || event.name}
                 onClick={() => {
-                  if (event.url) {
+                  // Only clickable if URL exists (strict pass-through from RunSignUp)
+                  // No client-side URL construction allowed
+                  if (event.url && event.url.length > 0) {
                     window.open(event.url, '_blank', 'noopener,noreferrer');
                   }
                 }}
                 className={`rounded-lg border-2 border-gray-200 bg-white p-6 shadow-sm transition ${
-                  event.url 
+                  event.url && event.url.length > 0
                     ? 'cursor-pointer hover:shadow-md hover:border-orange-300' 
                     : 'cursor-default opacity-75'
                 }`}
@@ -189,7 +191,7 @@ export default function RaceEventsPage() {
                         </div>
                       )}
                     </div>
-                    {event.url ? (
+                    {event.url && event.url.length > 0 ? (
                       <p className="text-xs text-gray-500 mt-2">
                         Click to register on RunSignUp
                       </p>
@@ -199,7 +201,7 @@ export default function RaceEventsPage() {
                       </p>
                     )}
                   </div>
-                  {event.url && (
+                  {event.url && event.url.length > 0 && (
                     <div className="ml-4 flex-shrink-0">
                       <ExternalLink className="h-5 w-5 text-orange-600" />
                     </div>

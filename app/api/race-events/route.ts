@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
-import { parseRace } from '@/lib/raceParser';
+import { parseRace } from '@/lib/runsignup/raceParser';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0; // Disable all caching
@@ -204,6 +204,7 @@ export async function POST(request: Request) {
     });
 
     // Parse races using strict pass-through parser (NO URL INVENTION)
+    // All URL logic is in lib/runsignup/raceParser.ts - this route never constructs URLs
     const events = realRaces.slice(0, 5).map((race: any) => {
       const parsed = parseRace(race);
       

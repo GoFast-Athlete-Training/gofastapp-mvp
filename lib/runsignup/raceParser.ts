@@ -1,12 +1,18 @@
 /**
- * Race Parser - Strict Pass-Through for RunSignUp Data
+ * RunSignUp Race Parser - Strict Pass-Through
  * 
  * MVP1 Stability: NO URL INVENTION, NO GUESSING, NO MAGIC
  * 
- * Rules:
+ * CRITICAL RULES:
  * - Only use URLs explicitly provided by RunSignUp
  * - Do NOT construct, guess, or improve URLs
  * - Return empty string if no valid URL exists
+ * 
+ * WHY URL GUESSING IS FORBIDDEN:
+ * - RunSignUp URL patterns are inconsistent and undocumented
+ * - Constructed URLs frequently result in 404s
+ * - Only RunSignUp knows the correct URL format for each race
+ * - MVP1 requires predictable, stable behavior
  */
 
 export interface ParsedRace {
@@ -27,11 +33,12 @@ export interface ParsedRace {
  *    - If relative (starts with /) → prefix with https://runsignup.com
  *    - Otherwise → return empty string
  * 
- * Forbidden:
- * - Building URLs from city/state/name
- * - Using race_id to create URLs
- * - Guessing /TicketEvent vs /Race
+ * FORBIDDEN (will cause 404s):
+ * - Building URLs from city/state/name (e.g., /Race/VA/Arlington/RaceName)
+ * - Using race_id to create URLs (e.g., /Race/12345)
+ * - Guessing /TicketEvent vs /Race format
  * - Slugifying race names
+ * - Any URL construction or inference
  */
 function extractUrl(race: any): string {
   // Priority 1: race.url if absolute
@@ -50,10 +57,12 @@ function extractUrl(race: any): string {
       return `https://runsignup.com${race.url_string}`;
     }
     // Otherwise - invalid format, return empty
+    // DO NOT attempt to construct or guess the URL
     return '';
   }
 
   // No valid URL found
+  // DO NOT fall back to construction - return empty and let client handle it
   return '';
 }
 
