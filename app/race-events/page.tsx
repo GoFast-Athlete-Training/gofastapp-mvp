@@ -136,12 +136,6 @@ export default function RaceEventsPage() {
                           <span>{event.location}</span>
                         </div>
                       )}
-                      {event.raceType && (
-                        <span className="text-orange-600 font-medium">{event.raceType}</span>
-                      )}
-                      {event.miles && (
-                        <span className="text-gray-500">{event.miles} miles</span>
-                      )}
                     </div>
                     {event.url && (
                       <p className="text-xs text-gray-500 mt-2">
