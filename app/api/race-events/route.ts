@@ -210,11 +210,31 @@ export async function POST(request: Request) {
     console.log(`📊 Category breakdown:`, categoryCounts);
 
     // STEP 3: Select for MVP1
+    // Filter out past events (only show upcoming races)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today for comparison
+    
+    const isUpcoming = (race: any) => {
+      if (!race.startDate) return false; // Exclude races without dates
+      try {
+        const raceDate = new Date(race.startDate);
+        raceDate.setHours(0, 0, 0, 0);
+        return raceDate >= today;
+      } catch {
+        return false; // Invalid date, exclude it
+      }
+    };
+    
+    const upcomingRaces = normalizedRaces.filter((r: any) => r.category === 'race' && isUpcoming(r));
+    const upcomingTrainingPrograms = normalizedRaces.filter((r: any) => r.category === 'training_program' && isUpcoming(r));
+    
+    console.log(`📅 Date filtering: ${normalizedRaces.filter((r: any) => r.category === 'race').length} total races → ${upcomingRaces.length} upcoming`);
+    
     // Prefer category === 'race', take first 10-20 races
     // If no races found, fall back to training programs
     // Never return empty list unless API returned zero items
-    const races = normalizedRaces.filter((r: any) => r.category === 'race');
-    const trainingPrograms = normalizedRaces.filter((r: any) => r.category === 'training_program');
+    const races = upcomingRaces;
+    const trainingPrograms = upcomingTrainingPrograms;
     
     let selectedEvents: any[];
     if (races.length > 0) {
@@ -231,8 +251,8 @@ export async function POST(request: Request) {
       console.log(`⚠️ No races or training programs, showing ${selectedEvents.length} other items`);
     }
 
-    // Limit to 5 for MVP1 response
-    const events = selectedEvents.slice(0, 5);
+    // Return all selected events (no limit for accordion view with filtering)
+    const events = selectedEvents;
     
     // DEBUG: Log first event details
     if (events.length > 0) {
