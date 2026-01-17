@@ -49,27 +49,14 @@ export default function RaceEventsPage() {
         setError(null);
 
         // Fetch race events from RunSignUp API (server-side handoff)
-        console.log('🔍 RACE EVENTS PAGE: Calling /api/race-events');
         const response = await api.get('/race-events');
-        console.log('📦 RACE EVENTS PAGE: Response received');
-        console.log('  - Status:', response.status);
-        console.log('  - Full response.data:', JSON.stringify(response.data, null, 2));
-        console.log('  - response.data.success:', response.data?.success);
-        console.log('  - response.data.events length:', response.data?.events?.length || 0);
+        
+        // CLIENT-SIDE LOG: What did we receive?
+        console.log('📥 CLIENT RECEIVED:', response.data);
         
         if (response.data?.success && response.data?.events) {
-          console.log('✅ RACE EVENTS PAGE: Setting events, count:', response.data.events.length);
-          response.data.events.forEach((event: any, index: number) => {
-            console.log(`  Event #${index + 1}:`, {
-              race_id: event.race_id,
-              name: event.name,
-              url: event.url,
-              debug_url_inputs: event.debug_url_inputs
-            });
-          });
           setEvents(response.data.events);
         } else {
-          console.log('⚠️ RACE EVENTS PAGE: No events in response, setting empty array');
           setEvents([]);
         }
       } catch (err: any) {

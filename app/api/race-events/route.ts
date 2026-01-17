@@ -5,51 +5,68 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/race-events
  * 
- * Server-side API route that fetches upcoming events from RunSignUp.
- * Credentials are never exposed to the client.
+ * MVP1 MODULAR DEBUG PIPELINE
  * 
- * Returns normalized list of upcoming events (limit 5 for MVP).
+ * Four explicit stages:
+ * 1. URL BUILDING - Construct RunSignUp request URL
+ * 2. PUSH TO SIGNUP SERVER - Execute fetch, capture raw response
+ * 3. JSON ACCEPTOR - Parse and validate structure
+ * 4. PUSH TO CLIENT - Return response contract
  */
+
 export async function GET() {
   console.log('🚀 RACE EVENTS API: Route hit');
-  
+
   try {
+    // ============================================================
+    // STAGE 1: URL BUILDING (Request Construction)
+    // ============================================================
+    console.log('\n📐 STAGE 1: URL BUILDING');
+    
     const apiKey = process.env.RUNSIGNUP_API_KEY;
     const apiSecret = process.env.RUNSIGNUP_API_SECRET;
 
-    console.log('🔑 RACE EVENTS API: Env vars check');
     console.log('  - RUNSIGNUP_API_KEY exists:', !!apiKey);
     console.log('  - RUNSIGNUP_API_SECRET exists:', !!apiSecret);
     console.log('  - API Key length:', apiKey?.length || 0);
     console.log('  - API Secret length:', apiSecret?.length || 0);
 
     if (!apiKey || !apiSecret) {
-      console.error('❌ RunSignUp credentials missing from environment');
-      return NextResponse.json({ success: false, events: [], error: 'Missing credentials' });
+      console.error('  ❌ Missing credentials');
+      return NextResponse.json({ 
+        success: false, 
+        events: [],
+        error: 'Missing RunSignUp credentials'
+      });
     }
 
-    // RunSignUp API endpoint for getting races
+    // Build URL with only required params
     const url = new URL('https://api.runsignup.com/rest/races');
     url.searchParams.append('api_key', apiKey);
     url.searchParams.append('api_secret', apiSecret);
     url.searchParams.append('format', 'json');
+    url.searchParams.append('page', '1');
     url.searchParams.append('results_per_page', '5');
-    url.searchParams.append('race_links', 'T');
 
     const finalUrl = url.toString();
     const maskedUrl = finalUrl.replace(apiKey, '***').replace(apiSecret, '***');
-    
-    console.log('🔍 RACE EVENTS API: Calling RunSignUp endpoint...');
-    console.log('📡 EXACT URL (masked):', maskedUrl);
-    console.log('📡 URL params:', {
+
+    console.log('  ✅ URL constructed');
+    console.log('  📡 FULL URL (masked):', maskedUrl);
+    console.log('  📋 URL params:', {
       api_key: '***',
       api_secret: '***',
       format: 'json',
-      results_per_page: '5',
-      race_links: 'T'
+      page: '1',
+      results_per_page: '5'
     });
 
-    console.log('📤 RACE EVENTS API: Sending fetch request...');
+    // ============================================================
+    // STAGE 2: PUSH TO SIGNUP SERVER (HTTP Fetch)
+    // ============================================================
+    console.log('\n📤 STAGE 2: PUSH TO SIGNUP SERVER');
+    console.log('  - Executing fetch...');
+
     const response = await fetch(finalUrl, {
       method: 'GET',
       headers: {
@@ -57,54 +74,50 @@ export async function GET() {
       },
     });
 
-    console.log('📦 RunSignUp API Response:');
-    console.log('  - HTTP Status:', response.status);
-    console.log('  - Status Text:', response.statusText);
-    console.log('  - OK:', response.ok);
-    console.log('  - Headers:', Object.fromEntries(response.headers.entries()));
+    console.log('  ✅ Fetch completed');
+    console.log('  📦 HTTP Response:');
+    console.log('    - response.ok:', response.ok);
+    console.log('    - response.status:', response.status);
+    console.log('    - response.statusText:', response.statusText);
 
-    // Get raw response text first (can only read once!)
+    // Capture raw response text (can only read once!)
     const rawResponseText = await response.text();
-    console.log('📄 Raw Response (first 500 chars):', rawResponseText.substring(0, 500));
-    console.log('📄 Raw Response (full length):', rawResponseText.length, 'characters');
+    console.log('  📄 Raw Response Text:');
+    console.log('    - Length:', rawResponseText.length, 'characters');
+    console.log('    - First 500 chars:', rawResponseText.substring(0, 500));
 
     if (!response.ok) {
-      console.error('❌ RunSignUp API error:');
-      console.error('  Status:', response.status, response.statusText);
-      console.error('  Raw response body:', rawResponseText);
-      console.error('  Request URL (masked):', maskedUrl);
-      
-      let errorData;
-      try {
-        errorData = JSON.parse(rawResponseText);
-        console.error('  Parsed error:', errorData);
-      } catch {
-        errorData = { message: rawResponseText };
-        console.error('  Could not parse error as JSON');
-      }
+      console.error('  ❌ HTTP Error - NOT OK');
+      console.error('    - Status:', response.status, response.statusText);
+      console.error('    - Raw response:', rawResponseText);
       
       return NextResponse.json({ 
         success: false, 
         events: [],
-        error: `RunSignUp API error (${response.status}): ${rawResponseText || response.statusText}`,
+        error: `RunSignUp API returned ${response.status}: ${response.statusText}`,
         debug: {
           status: response.status,
           statusText: response.statusText,
-          rawResponse: rawResponseText.substring(0, 500),
-          parsedError: errorData
+          rawResponse: rawResponseText.substring(0, 500)
         }
       }, { status: response.status });
     }
 
-    // Parse JSON safely from the already-read text
+    // ============================================================
+    // STAGE 3: JSON ACCEPTOR (Parse + Validate)
+    // ============================================================
+    console.log('\n🔍 STAGE 3: JSON ACCEPTOR');
+    console.log('  - Attempting JSON parse...');
+
     let data;
     try {
       data = JSON.parse(rawResponseText);
-      console.log('✅ Successfully parsed JSON response');
+      console.log('  ✅ JSON Parse SUCCESS');
     } catch (parseError: any) {
-      console.error('❌ Failed to parse JSON response:');
-      console.error('  Parse error:', parseError.message);
-      console.error('  Raw response:', rawResponseText);
+      console.error('  ❌ JSON Parse FAILED');
+      console.error('    - Error:', parseError.message);
+      console.error('    - Raw response:', rawResponseText);
+      
       return NextResponse.json({ 
         success: false, 
         events: [],
@@ -116,92 +129,78 @@ export async function GET() {
       }, { status: 500 });
     }
 
-    console.log('📊 RunSignUp API Response Structure:');
-    console.log('  - Top-level keys:', Object.keys(data));
-    console.log('  - Has races property:', !!data.races);
-    console.log('  - Races type:', typeof data.races);
-    console.log('  - Races length:', Array.isArray(data.races) ? data.races.length : 'NOT AN ARRAY');
-    
-    if (Array.isArray(data.races) && data.races.length > 0) {
-      const firstRace = data.races[0];
-      console.log('📋 First Race Object Structure:');
-      console.log('  - Keys:', Object.keys(firstRace));
-      console.log('  - race_id:', firstRace.race_id);
-      console.log('  - id:', firstRace.id);
-      console.log('  - name:', firstRace.name);
-      console.log('  - url_string:', firstRace.url_string);
-      console.log('  - race_links:', firstRace.race_links);
-      console.log('  - race_url:', firstRace.race_url);
-      console.log('  - Full first race object:', JSON.stringify(firstRace, null, 2).substring(0, 1000));
+    // Validate structure
+    console.log('  - Validating response structure...');
+    console.log('    - Top-level keys:', Object.keys(data));
+    console.log('    - Has data.races:', !!data.races);
+    console.log('    - data.races type:', typeof data.races);
+    console.log('    - data.races is array:', Array.isArray(data.races));
+
+    if (!data.races) {
+      console.error('  ❌ Structure validation FAILED - no data.races');
+      console.error('    - Available keys:', Object.keys(data));
+      
+      return NextResponse.json({ 
+        success: false, 
+        events: [],
+        error: 'RunSignUp response missing races property',
+        debug: {
+          topLevelKeys: Object.keys(data),
+          dataSample: JSON.stringify(data).substring(0, 500)
+        }
+      });
     }
 
-    // MVP1 DEBUG MODE: Return raw races with URL construction logging
-    const races = data.races || [];
-    console.log('🔄 Processing', races.length, 'races from RunSignUp');
-
-    const events = races.map((race: any, index: number) => {
-      console.log(`\n🔍 Processing race #${index + 1}:`);
-      console.log('  Input fields:', {
-        race_id: race.race_id,
-        id: race.id,
-        url_string: race.url_string,
-        race_links: race.race_links,
-        race_url: race.race_url
-      });
-
-      // URL Construction Logic (explicit logging)
-      let computedUrl = '';
+    if (!Array.isArray(data.races)) {
+      console.error('  ❌ Structure validation FAILED - data.races is not an array');
+      console.error('    - data.races type:', typeof data.races);
       
-      if (race.race_url) {
-        computedUrl = race.race_url;
-        console.log('  ✅ Using race.race_url:', computedUrl);
-      } else if (race.url_string) {
-        computedUrl = `https://runsignup.com${race.url_string}`;
-        console.log('  ✅ Built from url_string:', computedUrl);
-      } else if (race.race_links?.self) {
-        computedUrl = race.race_links.self;
-        console.log('  ✅ Using race_links.self:', computedUrl);
-      } else if (race.race_id || race.id) {
-        const raceId = race.race_id || race.id;
-        computedUrl = `https://runsignup.com/Race/${raceId}`;
-        console.log('  ✅ Built from race_id:', computedUrl);
-      } else {
-        computedUrl = '';
-        console.log('  ❌ No URL fields found - using empty string');
-      }
+      return NextResponse.json({ 
+        success: false, 
+        events: [],
+        error: 'RunSignUp response races property is not an array',
+        debug: {
+          racesType: typeof data.races,
+          racesValue: data.races
+        }
+      });
+    }
 
-      console.log('  📍 Final computed URL:', computedUrl);
+    console.log('  ✅ Structure validation SUCCESS');
+    console.log('    - Races count:', data.races.length);
 
-      // Return raw race + computed URL only
-      return {
-        race_id: race.race_id || race.id || null,
-        name: race.name || 'Untitled Event',
-        start_date: race.start_date || race.event_date || null,
-        city: race.city || null,
-        state: race.state || null,
-        debug_url_inputs: {
-          race_id: race.race_id,
-          id: race.id,
-          url_string: race.url_string,
-          race_links: race.race_links,
-          race_url: race.race_url,
-        },
-        url: computedUrl
-      };
-    });
+    // ============================================================
+    // STAGE 4: PUSH TO CLIENT (Response Contract)
+    // ============================================================
+    console.log('\n📥 STAGE 4: PUSH TO CLIENT');
+    console.log('  - Building response contract...');
 
-    console.log('✅ RACE EVENTS: Returning', events.length, 'events');
-    console.log('📤 Response payload preview:', JSON.stringify(events.slice(0, 2), null, 2));
-    
-    return NextResponse.json({ success: true, events });
+    // MVP1: Return raw races array (no normalization yet)
+    const responsePayload = {
+      success: true,
+      events: data.races, // Raw races from RunSignUp
+    };
+
+    console.log('  ✅ Response contract built');
+    console.log('    - success:', responsePayload.success);
+    console.log('    - events.length:', responsePayload.events.length);
+    console.log('    - First event keys:', responsePayload.events[0] ? Object.keys(responsePayload.events[0]) : 'no events');
+
+    return NextResponse.json(responsePayload);
+
   } catch (error: any) {
-    console.error('❌ Error fetching events from RunSignUp:', error);
-    console.error('❌ Error stack:', error.stack);
-    console.error('❌ Error message:', error.message);
+    console.error('\n❌ UNEXPECTED ERROR in pipeline:');
+    console.error('  - Error message:', error.message);
+    console.error('  - Error stack:', error.stack);
+    
     return NextResponse.json({ 
       success: false, 
       events: [],
       error: error.message || 'Unknown error',
-    });
+      debug: {
+        errorType: error.constructor.name,
+        errorMessage: error.message
+      }
+    }, { status: 500 });
   }
 }
