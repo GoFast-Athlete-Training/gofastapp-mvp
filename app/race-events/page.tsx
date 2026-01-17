@@ -10,6 +10,7 @@ import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import TopNav from '@/components/shared/TopNav';
 import api from '@/lib/api';
+import { buildRunSignUpAffiliateUrl } from '@/lib/runsignup/affiliate';
 
 interface Event {
   id: string;
@@ -177,22 +178,42 @@ export default function RaceEventsPage() {
 
         {!loading && !error && events.length > 0 && (
           <div className="space-y-4">
-            {events.map((event) => (
-              <div
-                key={event.id || event.name}
-                onClick={() => {
-                  // Only clickable if URL exists (strict pass-through from RunSignUp)
-                  // No client-side URL construction allowed
-                  if (event.url && event.url.length > 0) {
-                    window.open(event.url, '_blank', 'noopener,noreferrer');
-                  }
-                }}
-                className={`rounded-lg border-2 border-gray-200 bg-white p-6 shadow-sm transition ${
-                  event.url && event.url.length > 0
-                    ? 'cursor-pointer hover:shadow-md hover:border-orange-300' 
-                    : 'cursor-default opacity-75'
-                }`}
-              >
+            {events.map((event) => {
+              const handleRaceClick = () => {
+                if (!event.url || event.url.length === 0) return;
+
+                // Build affiliate URL with tracking
+                const affiliateUrl = buildRunSignUpAffiliateUrl(event.url);
+                if (!affiliateUrl) {
+                  console.warn('⚠️ Could not build affiliate URL for:', event.name);
+                  return;
+                }
+
+                // Log click event internally (athleteId, raceName, raceUrl)
+                const athleteId = LocalStorageAPI.getAthleteId();
+                console.log('🔗 Race click:', {
+                  athleteId: athleteId || 'unknown',
+                  raceName: event.name,
+                  raceUrl: event.url,
+                  affiliateUrl: affiliateUrl,
+                  timestamp: new Date().toISOString(),
+                });
+
+                // Open affiliate URL in new tab
+                // No secrets are passed, no server calls, no redirects
+                window.open(affiliateUrl, '_blank', 'noopener,noreferrer');
+              };
+
+              return (
+                <div
+                  key={event.id || event.name}
+                  onClick={handleRaceClick}
+                  className={`rounded-lg border-2 border-gray-200 bg-white p-6 shadow-sm transition ${
+                    event.url && event.url.length > 0
+                      ? 'cursor-pointer hover:shadow-md hover:border-orange-300' 
+                      : 'cursor-default opacity-75'
+                  }`}
+                >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">
