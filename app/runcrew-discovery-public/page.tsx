@@ -1,6 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -291,7 +290,7 @@ export default function PublicGroupsPage() {
               </p>
             </div>
             <Link
-              href="/runcrew/create"
+              href="/public/create-crew/signup"
               className="hidden sm:flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition shadow-lg hover:shadow-xl whitespace-nowrap"
             >
               <span>+</span>
@@ -302,7 +301,7 @@ export default function PublicGroupsPage() {
           {/* Mobile Create Button */}
           <div className="sm:hidden mb-4">
             <Link
-              href="/runcrew/create"
+              href="/public/create-crew/signup"
               className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition shadow-lg w-full"
             >
               <span>+</span>
@@ -604,7 +603,7 @@ export default function PublicGroupsPage() {
                 </p>
                 {!activeFilterBox && (
                   <Link
-                    href="/runcrew/create"
+                    href="/public/create-crew/signup"
                     className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-lg font-semibold transition shadow-lg hover:shadow-xl"
                   >
                     Start Your Crew
@@ -803,7 +802,7 @@ export default function PublicGroupsPage() {
               Start your own RunCrew and build your accountability crew from scratch.
             </p>
             <Link
-              href="/runcrew/create"
+              href="/public/create-crew/signup"
               className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-lg font-semibold transition shadow-lg hover:shadow-xl"
             >
               Start Your Crew

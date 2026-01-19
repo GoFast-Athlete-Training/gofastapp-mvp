@@ -1,6 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -401,8 +400,8 @@ export default function RunDetailPage() {
                         ) : (
                           <div className="w-6 h-6 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white text-xs font-semibold border border-gray-200">
                             {(rsvp.athlete?.firstName?.[0] || 'M').toUpperCase()}
-                          </div>
-                        )}
+                </div>
+              )}
                         <span className="text-gray-900">
                           {rsvp.athlete?.firstName} {rsvp.athlete?.lastName}
                         </span>
@@ -433,33 +432,33 @@ export default function RunDetailPage() {
 
           {/* RSVP Section */}
           {!isAdmin ? (
-            <div className="mt-6 pt-6 border-t">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Your RSVP</h3>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleRSVP('going')}
-                  disabled={rsvpLoading}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                    currentRSVP === 'going'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  Going
-                </button>
-                <button
-                  onClick={() => handleRSVP('not-going')}
-                  disabled={rsvpLoading}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                    currentRSVP === 'not-going' || currentRSVP === 'not_going'
-                      ? 'bg-red-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  Not Going
-                </button>
-              </div>
+          <div className="mt-6 pt-6 border-t">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Your RSVP</h3>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleRSVP('going')}
+                disabled={rsvpLoading}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  currentRSVP === 'going'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                Going
+              </button>
+              <button
+                onClick={() => handleRSVP('not-going')}
+                disabled={rsvpLoading}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  currentRSVP === 'not-going' || currentRSVP === 'not_going'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                Not Going
+              </button>
             </div>
+          </div>
           ) : (
             <div className="mt-6 pt-6 border-t">
               <p className="text-sm text-gray-600">

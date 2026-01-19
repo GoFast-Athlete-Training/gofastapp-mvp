@@ -1,6 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -624,17 +623,17 @@ export default function RunCrewAdminPage() {
                 <div className="max-h-[600px] overflow-y-auto">
                   <MemberList
                     members={memberships.map((membershipItem: any) => ({
-                      id: membershipItem.id,
-                      athleteId: membershipItem.athleteId,
-                      role: membershipItem.role,
-                      athlete: membershipItem.athlete || {},
-                      joinedAt: membershipItem.joinedAt,
+                        id: membershipItem.id,
+                        athleteId: membershipItem.athleteId,
+                        role: membershipItem.role,
+                        athlete: membershipItem.athlete || {},
+                        joinedAt: membershipItem.joinedAt,
                     }))}
-                    showRole={true}
-                    onRemove={handleRemoveMember}
-                    canRemove={true}
-                    currentUserId={currentUser?.id}
-                  />
+                      showRole={true}
+                      onRemove={handleRemoveMember}
+                      canRemove={true}
+                      currentUserId={currentUser?.id}
+                    />
                 </div>
               )}
             </section>

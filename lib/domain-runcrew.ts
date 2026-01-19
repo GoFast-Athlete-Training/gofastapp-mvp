@@ -680,8 +680,8 @@ export async function hydrateCrew(runCrewId: string) {
       run_crew_runs: {
         include: {
           Athlete: {
-            select: {
-              id: true,
+        select: {
+          id: true,
               firstName: true,
               lastName: true,
               photoURL: true,

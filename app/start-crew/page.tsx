@@ -106,7 +106,7 @@ export default function StartCrewExamplePage() {
               </p>
             </div>
             <Link
-              href="/runcrew/create"
+              href="/public/create-crew/signup"
               className="inline-flex justify-center items-center px-6 py-3 bg-orange-500 text-white font-semibold rounded-xl shadow hover:bg-orange-600 transition"
             >
               Create your crew →
