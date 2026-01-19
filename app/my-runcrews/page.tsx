@@ -1,9 +1,10 @@
 'use client';
 
-
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import TopNav from '@/components/shared/TopNav';
 
@@ -18,60 +19,116 @@ interface RunCrewCard {
 }
 
 /**
- * My RunCrews (Returner Page)
- *
- * Assumes athlete hydration already occurred in /welcome.
- * This page reads memberships from localStorage and renders navigation.
- * The "Create RunCrew" link is a simple Link to /runcrew/create.
+ * My RunCrews Page - RunCrew Selector
+ * 
+ * Purpose: Personal sandbox for selecting which RunCrew to view
+ * Behavior:
+ * - Reads from localStorage (no hydration - hydration happens in /welcome)
+ * - Displays cards for each RunCrew the user is a member of
+ * - Each card shows logo/icon and has buttons for "View as Member" / "View as Admin"
  */
 export default function MyRunCrewsPage() {
   const router = useRouter();
   const [runCrewCards, setRunCrewCards] = useState<RunCrewCard[]>([]);
+  const [loading, setLoading] = useState(true);
   const [athlete, setAthlete] = useState<any>(null);
-  const [hasChecked, setHasChecked] = useState(false);
 
   useEffect(() => {
-    // Read hydrated model from localStorage (hydration happened in /welcome)
-    if (typeof window === 'undefined') return;
+    // Set a timeout to prevent infinite loading if Firebase doesn't initialize
+    const timeoutId = setTimeout(() => {
+      console.warn('⚠️ MY-RUNCREWS: Auth check timeout, checking localStorage fallback');
+      // Fallback: Check localStorage even if Firebase hasn't initialized
+      if (typeof window !== 'undefined') {
+        const model = LocalStorageAPI.getFullHydrationModel();
+        if (model?.athlete) {
+          // We have athlete data, proceed even without Firebase confirmation
+          setAthlete(model.athlete);
+          const memberships = model.athlete.runCrewMemberships || [];
+          const cards: RunCrewCard[] = memberships.map((membership: any) => {
+            const runCrew = membership.runCrew || {};
+            return {
+              id: runCrew.id || membership.runCrewId,
+              name: runCrew.name || 'Unknown Crew',
+              description: runCrew.description,
+              logo: runCrew.logo,
+              icon: runCrew.icon,
+              role: membership.role || 'member',
+              membershipId: membership.id,
+            };
+          });
+          setRunCrewCards(cards);
+          setLoading(false);
+        } else {
+          // No data - redirect to welcome for hydration
+          router.replace('/welcome');
+        }
+      }
+    }, 3000); // 3 second timeout
 
-    const model = LocalStorageAPI.getFullHydrationModel();
-    
-    // Guard: If no athlete exists → redirect to welcome for hydration
-    if (!model?.athlete) {
-      router.replace('/welcome');
-      return;
-    }
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Clear timeout since auth check completed
+      clearTimeout(timeoutId);
 
-    setAthlete(model.athlete);
-    
-    // Build RunCrew cards from memberships (already resolved in /welcome)
-    const memberships = model.athlete.runCrewMemberships || [];
-    const cards: RunCrewCard[] = memberships.map((membership: any) => {
-      const runCrew = membership.runCrew || {};
-      return {
-        id: runCrew.id || membership.runCrewId,
-        name: runCrew.name || 'Unknown Crew',
-        description: runCrew.description,
-        logo: runCrew.logo,
-        icon: runCrew.icon,
-        role: membership.role || 'member',
-        membershipId: membership.id,
-      };
+      // No Firebase user - redirect to signup
+      if (!firebaseUser) {
+        router.replace('/signup');
+        return;
+      }
+
+      // Read from localStorage (hydration should have happened in /welcome)
+      if (typeof window !== 'undefined') {
+        const model = LocalStorageAPI.getFullHydrationModel();
+        
+        if (model?.athlete) {
+          setAthlete(model.athlete);
+          
+          // Build RunCrew cards from memberships
+          const memberships = model.athlete.runCrewMemberships || [];
+          const cards: RunCrewCard[] = memberships.map((membership: any) => {
+            const runCrew = membership.runCrew || {};
+            return {
+              id: runCrew.id || membership.runCrewId,
+              name: runCrew.name || 'Unknown Crew',
+              description: runCrew.description,
+              logo: runCrew.logo,
+              icon: runCrew.icon,
+              role: membership.role || 'member',
+              membershipId: membership.id,
+            };
+          });
+
+          setRunCrewCards(cards);
+          
+          // If no crews exist, redirect to discovery
+          if (cards.length === 0) {
+            router.replace('/runcrew-discovery');
+            return;
+          }
+        } else {
+          // No data in localStorage - need to hydrate, redirect to welcome
+          router.replace('/welcome');
+          return;
+        }
+      }
+
+      setLoading(false);
     });
 
-    setRunCrewCards(cards);
-    setHasChecked(true);
-
-    // Guard: If athlete exists but has zero runCrewMemberships → redirect to discovery
-    if (cards.length === 0) {
-      router.replace('/runcrew-discovery');
-      return;
-    }
+    return () => {
+      clearTimeout(timeoutId);
+      unsubscribe();
+    };
   }, [router]);
 
-  // Show nothing while checking (prevents flash)
-  if (!hasChecked) {
-    return null;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -183,3 +240,4 @@ export default function MyRunCrewsPage() {
     </div>
   );
 }
+
