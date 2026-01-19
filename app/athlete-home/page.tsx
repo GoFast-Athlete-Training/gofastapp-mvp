@@ -220,14 +220,27 @@ export default function AthleteHomePage() {
 
       // Listen for postMessage from callback
       const messageHandler = (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) return;
+        // Security: only accept messages from same origin
+        if (event.origin !== window.location.origin) {
+          console.warn('⚠️ Ignoring message from different origin:', event.origin);
+          return;
+        }
+        
+        console.log('📨 Received message from callback:', event.data);
+        
         if (event.data.type === 'GARMIN_OAUTH_SUCCESS') {
+          console.log('✅ Garmin OAuth success!');
           clearInterval(checkPopup);
           if (!popup.closed) popup.close();
           setConnectingGarmin(false);
           setGarminConnected(true);
+          // Update localStorage
+          localStorage.setItem('garminConnected', 'true');
+          // Refresh to show updated status
+          window.location.reload();
           window.removeEventListener('message', messageHandler);
         } else if (event.data.type === 'GARMIN_OAUTH_ERROR') {
+          console.error('❌ Garmin OAuth error:', event.data.error);
           clearInterval(checkPopup);
           if (!popup.closed) popup.close();
           setConnectingGarmin(false);

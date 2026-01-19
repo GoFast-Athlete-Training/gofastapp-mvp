@@ -31,8 +31,10 @@ export async function GET(request: Request) {
             <p>${errorMsg}</p>
             <script>
               if (window.opener) {
-                window.opener.postMessage({ success: false, error: '${errorMsg.replace(/'/g, "\\'")}' }, '*');
-                window.close();
+                window.opener.postMessage({ type: 'GARMIN_OAUTH_ERROR', error: '${errorMsg.replace(/'/g, "\\'")}' }, '*');
+                setTimeout(() => {
+                  window.close();
+                }, 1000);
               }
             </script>
           </body>
@@ -158,11 +160,13 @@ export async function GET(request: Request) {
           </div>
           <script>
             if (window.opener) {
-              window.opener.postMessage({ success: true }, '*');
-              window.close();
+              window.opener.postMessage({ type: 'GARMIN_OAUTH_SUCCESS' }, '*');
+              setTimeout(() => {
+                window.close();
+              }, 1000);
             } else {
               setTimeout(() => {
-                window.location.href = '/settings?connected=garmin';
+                window.location.href = '/athlete-home';
               }, 1500);
             }
           </script>
@@ -188,8 +192,10 @@ export async function GET(request: Request) {
           <p>${errorMessage}</p>
           <script>
             if (window.opener) {
-              window.opener.postMessage({ success: false, error: '${errorMessage}' }, '*');
-              window.close();
+              window.opener.postMessage({ type: 'GARMIN_OAUTH_ERROR', error: '${errorMessage}' }, '*');
+              setTimeout(() => {
+                window.close();
+              }, 1000);
             }
           </script>
         </body>
