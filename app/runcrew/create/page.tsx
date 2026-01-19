@@ -84,6 +84,7 @@ export default function CreateCrewPage() {
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null); // null = checking, true = authenticated, false = not authenticated
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const hasCheckedAuthRef = useRef(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logo, setLogo] = useState<string>('');
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -131,27 +132,35 @@ export default function CreateCrewPage() {
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
   const [isTrainingForRace, setIsTrainingForRace] = useState(false); // Toggle: Training for a race?
 
-  // Check authentication state on mount
+  // Check authentication state on mount - simplified approach
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    
-    // Set a timeout to prevent infinite loading
-    timeoutId = setTimeout(() => {
-      console.warn('⚠️ CREATE CREW: Auth check timeout, defaulting to unauthenticated');
-      setIsAuthenticated(false);
-      setCheckingAuth(false);
-    }, 5000); // 5 second timeout
+    // Prevent multiple checks
+    if (hasCheckedAuthRef.current) return;
+    hasCheckedAuthRef.current = true;
 
+    // Quick check: if user has athlete data in localStorage, they're authenticated
+    // This avoids waiting for Firebase auth to initialize
+    const athleteId = LocalStorageAPI.getAthleteId();
+    if (athleteId) {
+      // User has athlete data - they're authenticated, show form immediately
+      setIsAuthenticated(true);
+      setCheckingAuth(false);
+      // Try to get token if Firebase is ready, but don't block on it
+      if (auth.currentUser) {
+        auth.currentUser.getIdToken().then((token) => {
+          localStorage.setItem('firebaseToken', token);
+        }).catch(() => {
+          // Token will be fetched by API interceptor if needed
+        });
+      }
+      return;
+    }
+
+    // No athlete data - wait for Firebase auth state
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      // Clear timeout since auth check completed
-      clearTimeout(timeoutId);
-      
       if (firebaseUser) {
-        // User is authenticated
         setIsAuthenticated(true);
         setCheckingAuth(false);
-        
-        // Store token for API calls
         try {
           const firebaseToken = await firebaseUser.getIdToken();
           localStorage.setItem('firebaseToken', firebaseToken);
@@ -159,16 +168,12 @@ export default function CreateCrewPage() {
           console.error('Error getting Firebase token:', err);
         }
       } else {
-        // User is not authenticated
         setIsAuthenticated(false);
         setCheckingAuth(false);
       }
     });
 
-    return () => {
-      clearTimeout(timeoutId);
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
   // Create race form state
