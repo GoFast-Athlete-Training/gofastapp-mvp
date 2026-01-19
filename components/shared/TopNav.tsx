@@ -6,9 +6,7 @@ import Link from 'next/link';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
-import { Home } from 'lucide-react';
-// MVP1: Settings deprecated
-// import { Settings } from 'lucide-react';
+import { Home, Settings } from 'lucide-react';
 
 interface TopNavProps {
   showBack?: boolean;
@@ -41,19 +39,11 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between">
-          {/* Left: Logo & Home */}
+          {/* Left: Logo */}
           <div className="flex items-center gap-3">
             <Link href="/my-runcrews" className="flex items-center gap-3">
               <img src="/logo.jpg" alt="GoFast" className="w-8 h-8 rounded-full" />
               <span className="text-xl font-bold text-gray-900 hidden sm:inline">GoFast</span>
-            </Link>
-            {/* Home Icon */}
-            <Link
-              href="/athlete-home"
-              className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
-              title="Home"
-            >
-              <Home className="h-5 w-5" />
             </Link>
             {showBack && backUrl && (
               <button
@@ -71,8 +61,26 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
             )}
           </div>
 
-          {/* Right: Profile & Actions */}
+          {/* Right: Home, Settings, Profile & Actions */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Home Icon */}
+            <Link
+              href="/athlete-home"
+              className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
+              title="Home"
+            >
+              <Home className="h-5 w-5" />
+            </Link>
+
+            {/* Settings Icon */}
+            <Link
+              href="/settings"
+              className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
+              title="Settings"
+            >
+              <Settings className="h-5 w-5" />
+            </Link>
+
             {/* Profile Picture Button - Links to Edit Profile */}
             <Link
               href="/athlete-edit-profile"
@@ -94,17 +102,6 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
                 {athleteProfile?.firstName || 'Profile'}
               </span>
             </Link>
-
-            {/* MVP1: Settings deprecated - Profile management via profile icon */}
-            {/* Settings Button - COMMENTED OUT FOR MVP1
-            <Link
-              href="/settings"
-              className="flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-gray-600 hover:text-gray-900 rounded-lg font-medium hover:bg-gray-100 transition"
-            >
-              <Settings className="h-5 w-5" />
-              <span className="hidden sm:inline text-sm">Settings</span>
-            </Link>
-            */}
 
             {/* Sign Out Button */}
             <button
