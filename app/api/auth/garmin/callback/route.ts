@@ -184,13 +184,15 @@ export async function GET(request: Request) {
           </div>
           <script>
             if (window.opener) {
+              // Popup mode - send message to parent and close
               window.opener.postMessage({ type: 'GARMIN_OAUTH_SUCCESS' }, '*');
               setTimeout(() => {
                 window.close();
               }, 1000);
             } else {
+              // No opener (opened in new tab) - redirect to settings page (doesn't require auth check)
               setTimeout(() => {
-                window.location.href = '/athlete-home';
+                window.location.href = '/settings?garmin=connected';
               }, 1500);
             }
           </script>
