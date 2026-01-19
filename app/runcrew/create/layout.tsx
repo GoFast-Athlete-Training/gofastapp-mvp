@@ -9,6 +9,6 @@ export default function RunCrewCreateLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return <>{children}</>;
 }
 
