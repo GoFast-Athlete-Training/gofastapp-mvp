@@ -22,8 +22,8 @@ interface RunCrewCard {
  * My RunCrews (Returner Page)
  *
  * Assumes athlete hydration already occurred in /welcome.
- * This page is a pure selector: it reads memberships and renders navigation.
- * It does not authenticate, hydrate, or repair state.
+ * This page reads memberships from localStorage and renders navigation.
+ * The "Create RunCrew" link is a simple Link to /runcrew/create.
  */
 export default function MyRunCrewsPage() {
   const router = useRouter();
@@ -32,8 +32,7 @@ export default function MyRunCrewsPage() {
   const [hasChecked, setHasChecked] = useState(false);
 
   useEffect(() => {
-    // Read hydrated model once from localStorage
-    // No Firebase checks, no timeouts, no fallbacks
+    // Read hydrated model from localStorage (hydration happened in /welcome)
     if (typeof window === 'undefined') return;
 
     const model = LocalStorageAPI.getFullHydrationModel();
@@ -46,7 +45,7 @@ export default function MyRunCrewsPage() {
 
     setAthlete(model.athlete);
     
-    // Build RunCrew cards from memberships
+    // Build RunCrew cards from memberships (already resolved in /welcome)
     const memberships = model.athlete.runCrewMemberships || [];
     const cards: RunCrewCard[] = memberships.map((membership: any) => {
       const runCrew = membership.runCrew || {};
