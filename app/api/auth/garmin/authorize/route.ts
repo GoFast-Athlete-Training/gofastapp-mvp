@@ -59,9 +59,9 @@ export async function GET(request: Request) {
     let serverUrl = process.env.SERVER_URL || process.env.NEXT_PUBLIC_APP_URL || `https://${process.env.VERCEL_URL}`;
     
     // CRITICAL: In production, ALWAYS use production URL regardless of env vars
-    // This ensures redirect_uri always matches: https://gofast.gofastcrushgoals.com/api/auth/garmin/callback
+    // This ensures redirect_uri always matches: https://pr.gofastcrushgoals.com/api/auth/garmin/callback
     if (process.env.NODE_ENV === 'production') {
-      serverUrl = 'https://gofast.gofastcrushgoals.com';
+      serverUrl = 'https://pr.gofastcrushgoals.com';
       console.log('✅ Production mode: Using production URL:', serverUrl);
     } else if (!serverUrl) {
       console.error('❌ SERVER_URL or NEXT_PUBLIC_APP_URL must be set');
@@ -74,13 +74,13 @@ export async function GET(request: Request) {
     const redirectUri = `${serverUrl}/api/auth/garmin/callback`;
     
     // Validate redirect URI contains production domain
-    if (!redirectUri.includes('gofast.gofastcrushgoals.com')) {
+    if (!redirectUri.includes('pr.gofastcrushgoals.com') && !redirectUri.includes('gofastcrushgoals.com')) {
       console.warn('⚠️ Redirect URI does not contain production domain:', redirectUri);
     }
     
     console.log('🔵 Redirect URI:', redirectUri);
     console.log('🔵 Server URL:', serverUrl);
-    console.log('✅ Redirect URI validated:', redirectUri.includes('gofast.gofastcrushgoals.com') ? 'Production URL' : 'Preview/Dev URL');
+    console.log('✅ Redirect URI validated:', redirectUri.includes('pr.gofastcrushgoals.com') ? 'Production URL' : 'Preview/Dev URL');
 
     // 5. Build Garmin authorization URL with athleteId as state
     const authUrl = buildGarminAuthUrl(codeChallenge, athleteId, redirectUri);

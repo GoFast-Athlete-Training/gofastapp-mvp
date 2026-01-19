@@ -84,11 +84,18 @@ export async function GET(request: Request) {
     console.log(`✅ [CALLBACK] Code verifier found (length: ${codeVerifier.length})`);
 
     // 5. Build redirect URI (must match authorize route - production must use SERVER_URL)
-    const serverUrl = process.env.SERVER_URL || process.env.NEXT_PUBLIC_APP_URL || `https://${process.env.VERCEL_URL}`;
-    if (!serverUrl) {
+    // CRITICAL: Must match the redirect_uri used in authorize route
+    let serverUrl = process.env.SERVER_URL || process.env.NEXT_PUBLIC_APP_URL || `https://${process.env.VERCEL_URL}`;
+    
+    // In production, use pr.gofastcrushgoals.com (must match authorize route)
+    if (process.env.NODE_ENV === 'production') {
+      serverUrl = 'https://pr.gofastcrushgoals.com';
+      console.log('✅ [CALLBACK] Production mode: Using production URL:', serverUrl);
+    } else if (!serverUrl) {
       console.error('❌ [CALLBACK] SERVER_URL or NEXT_PUBLIC_APP_URL must be set');
       return returnErrorHtml('Server URL not configured');
     }
+    
     const redirectUri = `${serverUrl}/api/auth/garmin/callback`;
     console.log(`🔍 [CALLBACK] Redirect URI: ${redirectUri}`);
 
