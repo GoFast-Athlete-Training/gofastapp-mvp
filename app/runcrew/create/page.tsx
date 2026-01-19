@@ -1,5 +1,24 @@
 'use client';
 
+/**
+ * AUTHENTICATED CREATE CREW PAGE
+ * 
+ * Route: /runcrew/create
+ * 
+ * ⚠️ IMPORTANT: This page is for AUTHENTICATED USERS ONLY
+ * 
+ * PUBLIC USERS should go through:
+ *   /public/create-crew/signup → authenticate → /runcrew/create
+ * 
+ * If a public user lands here directly, they are redirected to:
+ *   /public/create-crew/signup
+ * 
+ * DO NOT link to this page from public pages!
+ * Public pages should link to: /public/create-crew/signup
+ * 
+ * See: docs/HYDRATION_ERROR_POSTMORTEM.md for why this matters
+ */
+
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, ImageIcon, Plus, Camera } from 'lucide-react';

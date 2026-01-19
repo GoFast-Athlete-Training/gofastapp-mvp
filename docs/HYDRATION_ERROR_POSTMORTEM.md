@@ -256,6 +256,63 @@ Public User → Public Page → Public Signup → Auth → Authenticated Page
 
 ---
 
+## 🗺️ Correct Route Architecture
+
+### Create Crew Flow (Enforced)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     PUBLIC USERS                                 │
+│                                                                  │
+│  /runcrew-discovery-public  ──→  /public/create-crew/signup     │
+│  /start-crew               ──→  /public/create-crew/signup     │
+│                                         │                        │
+│                                         ▼                        │
+│                                   [AUTHENTICATE]                 │
+│                                         │                        │
+│                            ┌────────────┴────────────┐           │
+│                            ▼                         ▼           │
+│                   Profile Complete?          Profile Missing?    │
+│                            │                         │           │
+│                            ▼                         ▼           │
+│                   /runcrew/create      /athlete-create-profile   │
+│                                                      │           │
+│                                                      ▼           │
+│                                              /runcrew/create     │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                   AUTHENTICATED USERS                            │
+│                                                                  │
+│  /my-runcrews          ──→  /runcrew/create                     │
+│  /runcrew-discovery    ──→  /runcrew/create                     │
+│                                                                  │
+│  (User is already authenticated, goes directly to create form)  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Route Protection Rules
+
+| Route | Access | Links From |
+|-------|--------|------------|
+| `/runcrew/create` | **Authenticated only** | Authenticated pages only |
+| `/public/create-crew/signup` | **Public** | Public pages |
+| `/runcrew-discovery-public` | **Public** | Landing page, external links |
+| `/runcrew-discovery` | **Authenticated only** | Internal app navigation |
+
+### What Happens If Someone Bypasses?
+
+If an unauthenticated user directly navigates to `/runcrew/create`:
+1. Page loads with "Loading..." state
+2. `onAuthStateChanged` fires and detects no user
+3. User is redirected to `/public/create-crew/signup`
+4. User goes through proper signup flow
+5. User returns to `/runcrew/create` authenticated
+
+This is a **fallback**, not the intended flow. Public pages should never link to `/runcrew/create`.
+
+---
+
 ## 🔗 References
 
 - [React Error #310](https://react.dev/errors/310) - Hydration mismatch
