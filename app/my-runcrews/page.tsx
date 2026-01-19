@@ -36,7 +36,41 @@ export default function MyRunCrewsPage() {
   const [athlete, setAthlete] = useState<any>(null);
 
   useEffect(() => {
+    // Set a timeout to prevent infinite loading if Firebase doesn't initialize
+    const timeoutId = setTimeout(() => {
+      console.warn('⚠️ MY-RUNCREWS: Auth check timeout, checking localStorage fallback');
+      // Fallback: Check localStorage even if Firebase hasn't initialized
+      if (typeof window !== 'undefined') {
+        const model = LocalStorageAPI.getFullHydrationModel();
+        if (model?.athlete) {
+          // We have athlete data, proceed even without Firebase confirmation
+          setAthlete(model.athlete);
+          const memberships = model.athlete.runCrewMemberships || [];
+          const cards: RunCrewCard[] = memberships.map((membership: any) => {
+            const runCrew = membership.runCrew || {};
+            return {
+              id: runCrew.id || membership.runCrewId,
+              name: runCrew.name || 'Unknown Crew',
+              description: runCrew.description,
+              logo: runCrew.logo,
+              icon: runCrew.icon,
+              role: membership.role || 'member',
+              membershipId: membership.id,
+            };
+          });
+          setRunCrewCards(cards);
+          setLoading(false);
+        } else {
+          // No data - redirect to welcome for hydration
+          router.replace('/welcome');
+        }
+      }
+    }, 3000); // 3 second timeout
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Clear timeout since auth check completed
+      clearTimeout(timeoutId);
+
       // No Firebase user - redirect to signup
       if (!firebaseUser) {
         router.replace('/signup');
@@ -82,7 +116,10 @@ export default function MyRunCrewsPage() {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(timeoutId);
+      unsubscribe();
+    };
   }, [router]);
 
   if (loading) {
