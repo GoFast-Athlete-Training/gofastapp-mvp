@@ -506,6 +506,7 @@ export default function AthleteHomePage() {
           )}
         </div>
       </main>
+      </div>
     </div>
   );
 }
