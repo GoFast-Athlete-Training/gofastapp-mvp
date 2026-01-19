@@ -692,31 +692,55 @@ export default function RunCrewSettingsPage() {
                             )}
                           </div>
                         </div>
-                        {membershipItem.athleteId !== currentAthleteId && (
-                          <button
-                            onClick={async () => {
-                              if (confirm(`Demote ${athlete.firstName} ${athlete.lastName} to member?`)) {
-                                try {
-                                  const response = await api.put(`/runcrew/${runCrewId}/members/${membershipItem.id}/role`, {
-                                    role: 'member',
-                                  });
-                                  if (response.data.success) {
-                                    showToast(`${membershipItem.role === 'admin' ? 'Admin' : 'Manager'} demoted to member`);
-                                    const crewResponse = await api.get(`/runcrew/${runCrewId}`);
-                                    if (crewResponse.data.success && crewResponse.data.runCrew) {
-                                      setCrew(crewResponse.data.runCrew);
+                        {membershipItem.athleteId !== currentAthleteId && membership?.role === 'admin' && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={async () => {
+                                if (confirm(`Demote ${athlete.firstName} ${athlete.lastName} to member?`)) {
+                                  try {
+                                    const response = await api.put(`/runcrew/${runCrewId}/members/${membershipItem.id}/role`, {
+                                      role: 'member',
+                                    });
+                                    if (response.data.success) {
+                                      showToast(`${membershipItem.role === 'admin' ? 'Admin' : 'Manager'} demoted to member`);
+                                      const crewResponse = await api.get(`/runcrew/${runCrewId}`);
+                                      if (crewResponse.data.success && crewResponse.data.runCrew) {
+                                        setCrew(crewResponse.data.runCrew);
+                                      }
                                     }
+                                  } catch (err: any) {
+                                    console.error('Error demoting:', err);
+                                    showToast(err.response?.data?.error || 'Failed to demote');
                                   }
-                                } catch (err: any) {
-                                  console.error('Error demoting:', err);
-                                  showToast(err.response?.data?.error || 'Failed to demote');
                                 }
-                              }
-                            }}
-                            className="px-3 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white rounded-lg whitespace-nowrap"
-                          >
-                            Demote to Member
-                          </button>
+                              }}
+                              className="px-3 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white rounded-lg whitespace-nowrap"
+                            >
+                              Demote to Member
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (confirm(`Remove ${athlete.firstName} ${athlete.lastName} from this crew?`)) {
+                                  try {
+                                    const response = await api.delete(`/runcrew/${runCrewId}/members/${membershipItem.id}`);
+                                    if (response.data.success) {
+                                      showToast(`${athlete.firstName} ${athlete.lastName} has been removed from the crew`);
+                                      const crewResponse = await api.get(`/runcrew/${runCrewId}`);
+                                      if (crewResponse.data.success && crewResponse.data.runCrew) {
+                                        setCrew(crewResponse.data.runCrew);
+                                      }
+                                    }
+                                  } catch (err: any) {
+                                    console.error('Error removing member:', err);
+                                    showToast(err.response?.data?.error || 'Failed to remove member');
+                                  }
+                                }
+                              }}
+                              className="px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg whitespace-nowrap"
+                            >
+                              Remove
+                            </button>
+                          </div>
                         )}
                       </div>
                     );
@@ -730,7 +754,7 @@ export default function RunCrewSettingsPage() {
       case 'lifecycle':
         return (
           <div className="space-y-6">
-            <h1 className="text-2xl font-bold text-gray-900">Page Lifecycle</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Advanced</h1>
             
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <div className="space-y-6">
@@ -831,20 +855,38 @@ export default function RunCrewSettingsPage() {
                   </button>
                 </div>
 
-                {/* Delete RunCrew */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete RunCrew</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Permanently delete this RunCrew. This action cannot be undone and all data will be lost.
-                  </p>
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Delete RunCrew
-                  </button>
-                </div>
+                {/* Leave Crew (for non-admins) */}
+                {membership && membership.role !== 'admin' && (
+                  <div className="border-b border-gray-200 pb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Leave Crew</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Leave this RunCrew. You can rejoin later using the invite link.
+                    </p>
+                    <button
+                      onClick={handleLeave}
+                      className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-semibold transition"
+                    >
+                      Leave Crew
+                    </button>
+                  </div>
+                )}
+
+                {/* Delete RunCrew (admin only) */}
+                {membership && membership.role === 'admin' && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete RunCrew</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Permanently delete this RunCrew. This action cannot be undone and all data will be lost.
+                    </p>
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete RunCrew
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -1,17 +1,29 @@
 -- Drop deprecated training_plan_days table
 DROP TABLE IF EXISTS "training_plan_days" CASCADE;
 
--- CreateEnum for WorkoutType
-CREATE TYPE "WorkoutType" AS ENUM ('Easy', 'Tempo', 'Intervals', 'LongRun', 'Speed', 'Strength');
+-- CreateEnum for WorkoutType (only if it doesn't exist)
+DO $$ BEGIN
+  CREATE TYPE "WorkoutType" AS ENUM ('Easy', 'Tempo', 'Intervals', 'LongRun', 'Speed', 'Strength');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
 
--- CreateEnum for WorkoutFormat
-CREATE TYPE "WorkoutFormat" AS ENUM ('Continuous', 'WarmupMainCooldown', 'Progression', 'IntervalsUnstructured');
+-- CreateEnum for WorkoutFormat (only if it doesn't exist)
+DO $$ BEGIN
+  CREATE TYPE "WorkoutFormat" AS ENUM ('Continuous', 'WarmupMainCooldown', 'Progression', 'IntervalsUnstructured');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
 
--- CreateEnum for EffortType
-CREATE TYPE "EffortType" AS ENUM ('Easy', 'MarathonEffort', 'HalfMarathonEffort', 'TenKEffort', 'FiveKEffort', 'RPE');
+-- CreateEnum for EffortType (only if it doesn't exist)
+DO $$ BEGIN
+  CREATE TYPE "EffortType" AS ENUM ('Easy', 'MarathonEffort', 'HalfMarathonEffort', 'TenKEffort', 'FiveKEffort', 'RPE');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
 
--- CreateTable: Workout
-CREATE TABLE "workouts" (
+-- CreateTable: Workout (only if it doesn't exist)
+CREATE TABLE IF NOT EXISTS "workouts" (
     "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "workoutType" "WorkoutType" NOT NULL,
@@ -30,11 +42,15 @@ CREATE TABLE "workouts" (
     CONSTRAINT "workouts_pkey" PRIMARY KEY ("id")
 );
 
--- CreateIndex
-CREATE INDEX "workouts_athleteId_idx" ON "workouts"("athleteId");
+-- CreateIndex (only if it doesn't exist)
+CREATE INDEX IF NOT EXISTS "workouts_athleteId_idx" ON "workouts"("athleteId");
 
--- CreateIndex
-CREATE INDEX "workouts_workoutType_idx" ON "workouts"("workoutType");
+-- CreateIndex (only if it doesn't exist)
+CREATE INDEX IF NOT EXISTS "workouts_workoutType_idx" ON "workouts"("workoutType");
 
--- AddForeignKey
-ALTER TABLE "workouts" ADD CONSTRAINT "workouts_athleteId_fkey" FOREIGN KEY ("athleteId") REFERENCES "Athlete"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- AddForeignKey (only if it doesn't exist)
+DO $$ BEGIN
+  ALTER TABLE "workouts" ADD CONSTRAINT "workouts_athleteId_fkey" FOREIGN KEY ("athleteId") REFERENCES "Athlete"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;

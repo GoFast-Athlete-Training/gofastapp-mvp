@@ -22,8 +22,8 @@ export async function POST(
     } catch {}
 
     const { status } = body;
-    if (!status || !['going', 'maybe', 'not-going'].includes(status)) {
-      return NextResponse.json({ error: 'Invalid status. Must be going, maybe, or not-going' }, { status: 400 });
+    if (!status || !['going', 'not-going'].includes(status)) {
+      return NextResponse.json({ error: 'Invalid status. Must be going or not-going' }, { status: 400 });
     }
 
     const authHeader = request.headers.get('authorization');
@@ -84,7 +84,7 @@ export async function POST(
       rsvp = await rsvpToRun({
         runId,
         athleteId: athlete.id,
-        status: status as 'going' | 'maybe' | 'not-going',
+        status: status as 'going' | 'not-going',
       });
     } catch (err) {
       console.error('Prisma error:', err);

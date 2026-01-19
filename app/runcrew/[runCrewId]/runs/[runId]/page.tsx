@@ -219,10 +219,12 @@ export default function RunDetailPage() {
   const rsvps = run.rsvps || [];
   const going = rsvps.filter((r: any) => r.status === 'going');
   const notGoing = rsvps.filter((r: any) => r.status === 'not-going' || r.status === 'not_going');
-  const maybe = rsvps.filter((r: any) => r.status === 'maybe');
+  
+  // Check if current user is admin/manager
+  const isAdmin = membership?.role === 'admin' || membership?.role === 'manager';
 
   // Handle RSVP
-  const handleRSVP = async (status: 'going' | 'maybe' | 'not-going') => {
+  const handleRSVP = async (status: 'going' | 'not-going') => {
     setRsvpLoading(true);
     try {
       const response = await api.post(`/runcrew/${runCrewId}/runs/${runId}/rsvp`, { status });
@@ -390,23 +392,17 @@ export default function RunDetailPage() {
                   <div className="space-y-2">
                     {going.map((rsvp: any) => (
                       <div key={rsvp.id} className="flex items-center gap-2">
-                        <span className="text-gray-900">
-                          {rsvp.athlete?.firstName} {rsvp.athlete?.lastName}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {maybe.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium text-yellow-600 mb-2">
-                    Maybe ({maybe.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {maybe.map((rsvp: any) => (
-                      <div key={rsvp.id} className="flex items-center gap-2">
+                        {rsvp.athlete?.photoURL ? (
+                          <img
+                            src={rsvp.athlete.photoURL}
+                            alt={rsvp.athlete?.firstName || 'Member'}
+                            className="w-6 h-6 rounded-full object-cover border border-gray-200"
+                          />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white text-xs font-semibold border border-gray-200">
+                            {(rsvp.athlete?.firstName?.[0] || 'M').toUpperCase()}
+                          </div>
+                        )}
                         <span className="text-gray-900">
                           {rsvp.athlete?.firstName} {rsvp.athlete?.lastName}
                         </span>
@@ -436,44 +432,41 @@ export default function RunDetailPage() {
           )}
 
           {/* RSVP Section */}
-          <div className="mt-6 pt-6 border-t">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Your RSVP</h3>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleRSVP('going')}
-                disabled={rsvpLoading}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                  currentRSVP === 'going'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                Going
-              </button>
-              <button
-                onClick={() => handleRSVP('maybe')}
-                disabled={rsvpLoading}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                  currentRSVP === 'maybe'
-                    ? 'bg-yellow-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                Maybe
-              </button>
-              <button
-                onClick={() => handleRSVP('not-going')}
-                disabled={rsvpLoading}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                  currentRSVP === 'not-going' || currentRSVP === 'not_going'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                Not Going
-              </button>
+          {!isAdmin ? (
+            <div className="mt-6 pt-6 border-t">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Your RSVP</h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleRSVP('going')}
+                  disabled={rsvpLoading}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    currentRSVP === 'going'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  Going
+                </button>
+                <button
+                  onClick={() => handleRSVP('not-going')}
+                  disabled={rsvpLoading}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    currentRSVP === 'not-going' || currentRSVP === 'not_going'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  Not Going
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="mt-6 pt-6 border-t">
+              <p className="text-sm text-gray-600">
+                As an admin, you're automatically RSVP'd as going. {going.length} {going.length === 1 ? 'person has' : 'people have'} RSVP'd.
+              </p>
+            </div>
+          )}
         </div>
       </main>
     </div>

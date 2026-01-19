@@ -14,6 +14,7 @@ import TopNav from '@/components/shared/TopNav';
 import { Copy, Check, Link as LinkIcon } from 'lucide-react';
 import { getRunCrewJoinLink } from '@/lib/domain-runcrew';
 import MemberDetailCard from '@/components/RunCrew/MemberDetailCard';
+import TrainingPanel from '@/components/RunCrew/TrainingPanel';
 
 /**
  * Member Page - CLIENT-SIDE
@@ -36,6 +37,43 @@ export default function RunCrewMemberPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Mock training week data (front-end only)
+  const trainingWeek = {
+    coach: {
+      name: "Coach Sarah",
+      avatarUrl: "/avatar.png",
+    },
+    coachAdvice: "Focus on consistency this week. If you miss a day, don't chase it. Listen to your body and adjust as needed.",
+    weekOutlook: {
+      focus: "Aerobic consistency",
+      intensity: "Moderate",
+      goal: "Finish the week feeling strong",
+    },
+    trainings: [
+      {
+        role: "Easy Run",
+        title: "Easy Miles",
+        miles: 5,
+        effort: "Easy / Conversational",
+        notes: "Keep it relaxed.",
+      },
+      {
+        role: "Quality Workout",
+        title: "Tempo Run",
+        miles: 6,
+        effort: "10K effort + 10 sec",
+        notes: "Stay controlled.",
+      },
+      {
+        role: "Long Run",
+        title: "Long Run",
+        miles: 10,
+        effort: "Marathon effort",
+        notes: "Finish smooth.",
+      },
+    ],
+  };
 
   useEffect(() => {
     if (!runCrewId) {
@@ -284,10 +322,10 @@ export default function RunCrewMemberPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-        {/* 3-Column Layout: Members (Left) | Main Content (Center) */}
+        {/* 3-Column Layout: Members + Chatter (Left) | Training (Right) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-          {/* LEFT SIDEBAR: Members */}
-          <aside className="lg:col-span-3 space-y-6 min-w-0">
+          {/* LEFT SIDEBAR: Members + Chatter */}
+          <aside className="lg:col-span-4 space-y-6 min-w-0">
             <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 sticky top-6 overflow-hidden">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">Members</h2>
@@ -354,174 +392,8 @@ export default function RunCrewMemberPage() {
                 <p className="text-xs text-gray-500 mt-1">Share this link to invite members</p>
               </div>
             </section>
-          </aside>
 
-          {/* MAIN CONTENT: Announcements First (Important!), then Messages */}
-          <div className="lg:col-span-8 space-y-6 min-w-0">
-            {/* Announcements Section - TOP PRIORITY */}
-            <section className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border-2 border-orange-200 shadow-md p-4 sm:p-5 space-y-4 overflow-hidden">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">{crew.runCrewBaseInfo?.name} Announcements</h2>
-                <p className="text-xs text-gray-600 font-medium">
-                  Official updates from your crew
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                {crew.announcementsBox?.announcements && crew.announcementsBox.announcements.length > 0 ? (
-                  crew.announcementsBox.announcements.map((announcement: any) => (
-                    <div key={announcement.id} className="border border-orange-200 rounded-lg px-3 py-2 bg-white shadow-sm">
-                      <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                        <div className="flex items-center gap-2">
-                          {/* Author Profile Picture */}
-                          {announcement.athlete && (
-                            <>
-                              {announcement.athlete.photoURL ? (
-                                <img
-                                  src={announcement.athlete.photoURL}
-                                  alt={announcement.athlete.firstName || 'Author'}
-                                  className="w-6 h-6 rounded-full object-cover border border-gray-200"
-                                />
-                              ) : (
-                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-semibold border border-gray-200">
-                                  {(announcement.athlete.firstName?.[0] || 'A').toUpperCase()}
-                                </div>
-                              )}
-                              <span>
-                                {announcement.athlete.firstName
-                                  ? `${announcement.athlete.firstName}${announcement.athlete.lastName ? ` ${announcement.athlete.lastName}` : ''}`
-                                  : 'Admin'}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                        <span>
-                          {announcement.createdAt
-                            ? new Date(announcement.createdAt).toLocaleString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                hour: 'numeric',
-                                minute: '2-digit'
-                              })
-                            : 'Just now'}
-                        </span>
-                      </div>
-                      {announcement.title && (
-                        <h4 className="text-sm font-semibold text-gray-900 mb-1">{announcement.title}</h4>
-                      )}
-                      <p className="text-xs text-gray-800 whitespace-pre-line">{announcement.content || announcement.text}</p>
-                    </div>
-                  ))
-                ) : (
-                  <div className="border border-dashed border-orange-300 rounded-lg p-6 text-center bg-white/50">
-                    <p className="text-xs text-gray-600 font-medium">No announcements yet.</p>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* Upcoming Runs Section - View Only */}
-            <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-5 space-y-4 min-w-0">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Upcoming Runs</h2>
-                <p className="text-xs text-gray-500">See what's coming up</p>
-              </div>
-
-              <div className="space-y-3">
-                {crew.runsBox?.runs && crew.runsBox.runs.length > 0 ? (
-                  crew.runsBox.runs.map((run: any) => {
-                    const formatRunDate = (run: any) => {
-                      const date = run.date || run.scheduledAt;
-                      if (!date) return 'Date TBD';
-                      try {
-                        return new Date(date).toLocaleString('en-US', {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric',
-                          hour: 'numeric',
-                          minute: '2-digit'
-                        });
-                      } catch {
-                        return date;
-                      }
-                    };
-
-                    return (
-                      <Link
-                        key={run.id}
-                        href={`/runcrew/${runCrewId}/runs/${run.id}`}
-                        className="block border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-sm font-semibold text-gray-900 mb-1">{run.title || 'Untitled Run'}</h3>
-                            {/* Creator Info */}
-                            {run.athlete && (
-                              <div className="flex items-center gap-2 mb-2">
-                                {run.athlete.photoURL ? (
-                                  <img
-                                    src={run.athlete.photoURL}
-                                    alt={run.athlete.firstName || 'Creator'}
-                                    className="w-5 h-5 rounded-full object-cover border border-gray-200"
-                                  />
-                                ) : (
-                                  <div className="w-5 h-5 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-semibold border border-gray-200">
-                                    {(run.athlete.firstName?.[0] || 'C').toUpperCase()}
-                                  </div>
-                                )}
-                                <span className="text-xs text-gray-500">
-                                  Created by {run.athlete.firstName || 'Admin'}
-                                </span>
-                              </div>
-                            )}
-                            <div className="text-xs text-gray-600 space-y-1">
-                              <p className="flex items-center gap-1">
-                                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                <span className="truncate">{formatRunDate(run)}</span>
-                              </p>
-                              {run.meetUpPoint && (
-                                <p className="flex items-center gap-1">
-                                  <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                  </svg>
-                                  <span className="truncate">{run.meetUpPoint}</span>
-                                </p>
-                              )}
-                              {(run.totalMiles || run.pace) && (
-                                <p className="flex items-center gap-1">
-                                  <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                  </svg>
-                                  <span className="truncate">
-                                    {run.totalMiles ? `${run.totalMiles} miles` : ''}
-                                    {run.totalMiles && run.pace ? ' • ' : ''}
-                                    {run.pace ? `${run.pace} pace` : ''}
-                                  </span>
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="ml-4 flex-shrink-0">
-                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })
-                ) : (
-                  <div className="border border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <p className="text-sm text-gray-500">No runs scheduled yet.</p>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* Messages Section */}
+            {/* Messages Section - Moved to Left Sidebar */}
             <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-5 overflow-hidden min-w-0">
               <div className="mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">RunCrew Chatter</h2>
@@ -534,6 +406,11 @@ export default function RunCrewMemberPage() {
                 isAdmin={isAdmin}
               />
             </section>
+          </aside>
+
+          {/* RIGHT SIDE: Training Panel */}
+          <div className="lg:col-span-8 space-y-6 min-w-0">
+            <TrainingPanel trainingWeek={trainingWeek} />
           </div>
         </div>
       </main>

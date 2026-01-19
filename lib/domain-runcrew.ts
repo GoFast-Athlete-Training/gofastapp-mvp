@@ -691,10 +691,21 @@ export async function hydrateCrew(runCrewId: string) {
           pace: true,
           stravaMapUrl: true,
           description: true,
+          createdAt: true,
+          createdById: true,
+          createdBy: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              photoURL: true,
+            },
+          },
           run_crew_run_rsvps: {
             select: {
               id: true,
               status: true,
+              athleteId: true,
               Athlete: {
                 select: {
                   id: true,
@@ -826,9 +837,17 @@ export async function hydrateCrew(runCrewId: string) {
         pace: r.pace,
         stravaMapUrl: r.stravaMapUrl,
         description: r.description,
-        run_crew_run_rsvps: r.run_crew_run_rsvps.map((rsvp: any) => ({
+        createdAt: r.createdAt,
+        athlete: r.createdBy ? {
+          id: r.createdBy.id,
+          firstName: r.createdBy.firstName,
+          lastName: r.createdBy.lastName,
+          photoURL: r.createdBy.photoURL,
+        } : null,
+        rsvps: r.run_crew_run_rsvps.map((rsvp: any) => ({
           id: rsvp.id,
           status: rsvp.status,
+          athleteId: rsvp.athleteId,
           athlete: rsvp.Athlete, // Normalize to lowercase
         })),
       })),
@@ -948,6 +967,18 @@ export async function createRun(data: {
     },
   });
 
+  // Auto-RSVP the creator (admin/manager) as "going"
+  try {
+    await rsvpToRun({
+      runId: run.id,
+      athleteId: data.athleteId,
+      status: 'going',
+    });
+  } catch (err) {
+    // Log but don't fail run creation if RSVP fails
+    console.error('Failed to auto-RSVP creator to run:', err);
+  }
+
   return run;
 }
 
@@ -1044,7 +1075,7 @@ export async function postAnnouncement(data: {
 export async function rsvpToRun(data: {
   runId: string;
   athleteId: string;
-  status: 'going' | 'maybe' | 'not-going';
+  status: 'going' | 'not-going';
 }) {
   const rsvp = await prisma.run_crew_run_rsvps.upsert({
     where: {

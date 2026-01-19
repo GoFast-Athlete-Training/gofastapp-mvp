@@ -12,7 +12,7 @@ import api from '@/lib/api';
 import MessageFeed from '@/components/RunCrew/MessageFeed';
 import TopNav from '@/components/shared/TopNav';
 import GooglePlacesAutocomplete from '@/components/RunCrew/GooglePlacesAutocomplete';
-import MemberDetailCard from '@/components/RunCrew/MemberDetailCard';
+import MemberList from '@/components/RunCrew/MemberList';
 
 /**
  * Admin Page - CLIENT-SIDE
@@ -620,23 +620,20 @@ export default function RunCrewAdminPage() {
                   <p>Share your invite code to build the crew.</p>
                 </div>
               ) : (
-                <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                  {memberships.map((membershipItem: any) => (
-                    <MemberDetailCard
-                      key={membershipItem.id}
-                      member={{
-                        id: membershipItem.id,
-                        athleteId: membershipItem.athleteId,
-                        role: membershipItem.role,
-                        athlete: membershipItem.athlete || {},
-                        joinedAt: membershipItem.joinedAt,
-                      }}
-                      showRole={true}
-                      onRemove={handleRemoveMember}
-                      canRemove={true}
-                      currentUserId={currentUser?.id}
-                    />
-                  ))}
+                <div className="max-h-[600px] overflow-y-auto">
+                  <MemberList
+                    members={memberships.map((membershipItem: any) => ({
+                      id: membershipItem.id,
+                      athleteId: membershipItem.athleteId,
+                      role: membershipItem.role,
+                      athlete: membershipItem.athlete || {},
+                      joinedAt: membershipItem.joinedAt,
+                    }))}
+                    showRole={true}
+                    onRemove={handleRemoveMember}
+                    canRemove={true}
+                    currentUserId={currentUser?.id}
+                  />
                 </div>
               )}
             </section>
@@ -821,6 +818,14 @@ export default function RunCrewAdminPage() {
                               </svg>
                               <span className="truncate">{formatRunDate(run)}</span>
                             </p>
+                            {run.rsvps && run.rsvps.length > 0 && (
+                              <p className="flex items-center gap-1 text-green-600 font-medium">
+                                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                <span>{run.rsvps.filter((r: any) => r.status === 'going').length} {run.rsvps.filter((r: any) => r.status === 'going').length === 1 ? 'RSVP' : 'RSVPs'}</span>
+                              </p>
+                            )}
                             {run.meetUpPoint && (
                               <p className="flex items-center gap-1">
                                 <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -76,8 +76,8 @@ export default function MemberDetailCard({
             {canRemove && !isCurrentUser && onRemove && (
               <button
                 onClick={() => onRemove(member.id, displayName)}
-                className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition flex-shrink-0"
-                title="Remove member"
+                className="text-sm text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-md border border-red-200 hover:border-red-300 transition flex-shrink-0 font-medium"
+                title="Remove member from crew"
               >
                 Remove
               </button>
