@@ -133,7 +133,19 @@ export default function CreateCrewPage() {
 
   // Check authentication state on mount
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    // Set a timeout to prevent infinite loading
+    timeoutId = setTimeout(() => {
+      console.warn('⚠️ CREATE CREW: Auth check timeout, defaulting to unauthenticated');
+      setIsAuthenticated(false);
+      setCheckingAuth(false);
+    }, 5000); // 5 second timeout
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Clear timeout since auth check completed
+      clearTimeout(timeoutId);
+      
       if (firebaseUser) {
         // User is authenticated
         setIsAuthenticated(true);
@@ -153,7 +165,10 @@ export default function CreateCrewPage() {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(timeoutId);
+      unsubscribe();
+    };
   }, []);
 
   // Create race form state

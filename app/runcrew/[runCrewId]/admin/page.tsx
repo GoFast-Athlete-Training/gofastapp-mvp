@@ -176,7 +176,8 @@ export default function RunCrewAdminPage() {
     return () => {
       unsubscribe();
     };
-  }, [runCrewId, router, loadCrewData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runCrewId, router]);
 
   const handleAnnouncementSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
