@@ -513,19 +513,8 @@ export default function CreateCrewPage() {
     }
   };
 
-  // Show loading state while checking auth
-  if (checkingAuth) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-sky-50 to-sky-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
   // Redirect unauthenticated users to signup (only after auth check completes)
+  // IMPORTANT: This useEffect MUST be before any conditional returns (Rules of Hooks)
   useEffect(() => {
     if (!checkingAuth && isAuthenticated === false) {
       // Only redirect if we're sure they're not authenticated
@@ -534,7 +523,7 @@ export default function CreateCrewPage() {
     }
   }, [checkingAuth, isAuthenticated, router]);
 
-  // Show loading or redirecting state
+  // Show loading state while checking auth
   if (checkingAuth || isAuthenticated === null) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-sky-50 to-sky-100 flex items-center justify-center">
@@ -546,6 +535,7 @@ export default function CreateCrewPage() {
     );
   }
 
+  // Show redirecting state for unauthenticated users
   if (isAuthenticated === false) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-sky-50 to-sky-100 flex items-center justify-center">
