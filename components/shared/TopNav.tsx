@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import { Home } from 'lucide-react';
 // MVP1: Settings deprecated
 // import { Settings } from 'lucide-react';
 
@@ -40,11 +41,19 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between">
-          {/* Left: Logo */}
+          {/* Left: Logo & Home */}
           <div className="flex items-center gap-3">
             <Link href="/my-runcrews" className="flex items-center gap-3">
               <img src="/logo.jpg" alt="GoFast" className="w-8 h-8 rounded-full" />
               <span className="text-xl font-bold text-gray-900 hidden sm:inline">GoFast</span>
+            </Link>
+            {/* Home Icon */}
+            <Link
+              href="/athlete-home"
+              className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
+              title="Home"
+            >
+              <Home className="h-5 w-5" />
             </Link>
             {showBack && backUrl && (
               <button
