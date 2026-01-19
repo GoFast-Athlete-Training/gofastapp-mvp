@@ -132,33 +132,16 @@ export default function CreateCrewPage() {
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
   const [isTrainingForRace, setIsTrainingForRace] = useState(false); // Toggle: Training for a race?
 
-  // Check authentication state on mount - simplified approach
+  // Check authentication state on mount - always use onAuthStateChanged
   useEffect(() => {
     // Prevent multiple checks
     if (hasCheckedAuthRef.current) return;
     hasCheckedAuthRef.current = true;
 
-    // Quick check: if user has athlete data in localStorage, they're authenticated
-    // This avoids waiting for Firebase auth to initialize
-    const athleteId = LocalStorageAPI.getAthleteId();
-    if (athleteId) {
-      // User has athlete data - they're authenticated, show form immediately
-      setIsAuthenticated(true);
-      setCheckingAuth(false);
-      // Try to get token if Firebase is ready, but don't block on it
-      if (auth.currentUser) {
-        auth.currentUser.getIdToken().then((token) => {
-          localStorage.setItem('firebaseToken', token);
-        }).catch(() => {
-          // Token will be fetched by API interceptor if needed
-        });
-      }
-      return;
-    }
-
-    // No athlete data - wait for Firebase auth state
+    // Always use onAuthStateChanged - this is the proper way to check Firebase auth
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        // User is authenticated
         setIsAuthenticated(true);
         setCheckingAuth(false);
         try {
@@ -168,6 +151,7 @@ export default function CreateCrewPage() {
           console.error('Error getting Firebase token:', err);
         }
       } else {
+        // User is not authenticated
         setIsAuthenticated(false);
         setCheckingAuth(false);
       }
@@ -543,14 +527,28 @@ export default function CreateCrewPage() {
     );
   }
 
-  // Public view for unauthenticated users - redirect to signup explainer
+  // Redirect unauthenticated users to signup (only after auth check completes)
   useEffect(() => {
-    if (!checkingAuth && !isAuthenticated) {
+    if (!checkingAuth && isAuthenticated === false) {
+      // Only redirect if we're sure they're not authenticated
+      // This prevents redirecting authenticated users who came from my-runcrews
       router.replace('/public/create-crew/signup');
     }
   }, [checkingAuth, isAuthenticated, router]);
 
-  if (!isAuthenticated) {
+  // Show loading or redirecting state
+  if (checkingAuth || isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-50 to-sky-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated === false) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-sky-50 to-sky-100 flex items-center justify-center">
         <div className="text-center">
