@@ -32,6 +32,7 @@ export default function AthleteHomePage() {
   const [weeklyActivities, setWeeklyActivities] = useState<any[]>([]);
   const [weeklyTotals, setWeeklyTotals] = useState<any>(null);
   const [garminConnected, setGarminConnected] = useState(false);
+  const [connectingGarmin, setConnectingGarmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [upcomingRaces, setUpcomingRaces] = useState<any[]>([]);
 
@@ -163,6 +164,91 @@ export default function AthleteHomePage() {
       router.push(`/runcrew/${runCrewId}/admin`);
     } else {
       router.push(`/runcrew/${runCrewId}`);
+    }
+  };
+
+  // Direct Garmin OAuth flow (like gofastfrontend-mvp1)
+  const handleConnectGarmin = async () => {
+    if (!athlete?.id) {
+      alert('Please sign in to connect Garmin');
+      return;
+    }
+
+    setConnectingGarmin(true);
+    try {
+      // Get Firebase token
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        alert('Please sign in to connect Garmin');
+        setConnectingGarmin(false);
+        return;
+      }
+      const firebaseToken = await currentUser.getIdToken();
+      
+      // Call authorize endpoint to get auth URL (with popup flag)
+      const response = await fetch('/api/auth/garmin/authorize?popup=true', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${firebaseToken}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to get auth URL');
+      }
+
+      const data = await response.json();
+      if (!data.success || !data.authUrl) {
+        throw new Error('Invalid response from server');
+      }
+
+      // Open popup window for OAuth
+      const popup = window.open(
+        data.authUrl,
+        'garmin-oauth',
+        'width=600,height=700,scrollbars=yes,resizable=yes'
+      );
+
+      if (!popup) {
+        alert('Popup blocked. Please allow popups for this site.');
+        setConnectingGarmin(false);
+        return;
+      }
+
+      // Listen for popup to close
+      const checkPopup = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkPopup);
+          setConnectingGarmin(false);
+          // Refresh page to check connection status
+          window.location.reload();
+        }
+      }, 500);
+
+      // Listen for postMessage from callback
+      const messageHandler = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return;
+        if (event.data.type === 'GARMIN_OAUTH_SUCCESS') {
+          clearInterval(checkPopup);
+          if (!popup.closed) popup.close();
+          setConnectingGarmin(false);
+          setGarminConnected(true);
+          window.removeEventListener('message', messageHandler);
+        } else if (event.data.type === 'GARMIN_OAUTH_ERROR') {
+          clearInterval(checkPopup);
+          if (!popup.closed) popup.close();
+          setConnectingGarmin(false);
+          alert('Failed to connect Garmin: ' + (event.data.error || 'Unknown error'));
+          window.removeEventListener('message', messageHandler);
+        }
+      };
+      window.addEventListener('message', messageHandler);
+
+    } catch (error: any) {
+      console.error('Error connecting Garmin:', error);
+      alert('Failed to connect Garmin: ' + (error.message || 'Unknown error'));
+      setConnectingGarmin(false);
     }
   };
 
@@ -346,7 +432,13 @@ export default function AthleteHomePage() {
           {!garminConnected && (
             <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-orange-200 mb-8">
               <div className="flex items-center gap-4">
-                <Activity className="h-12 w-12 text-orange-500" />
+                <Image 
+                  src="/Garmin_Connect_app_1024x1024-02.png" 
+                  alt="Garmin Connect" 
+                  width={48}
+                  height={48}
+                  className="rounded-lg flex-shrink-0"
+                />
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-900 mb-1">
                     Connect Garmin to Track Activities
@@ -356,10 +448,11 @@ export default function AthleteHomePage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => router.push('/settings')}
-                  className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition"
+                  onClick={handleConnectGarmin}
+                  disabled={connectingGarmin}
+                  className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition disabled:opacity-50 whitespace-nowrap"
                 >
-                  Connect →
+                  {connectingGarmin ? 'Connecting...' : 'Connect →'}
                 </button>
               </div>
             </div>

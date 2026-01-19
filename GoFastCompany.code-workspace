@@ -16,7 +16,7 @@
 			"path": "../gofast-contentpublic"
 		},
 		{
-			"path": "../gofast-frontend"
+			"path": "../gofastfrontend-mvp1"
 		}
 	],
 	"settings": {}

@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 
@@ -130,7 +131,16 @@ export default function GarminSettingsPage() {
           ← Back to Settings
         </button>
         
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Garmin Connection</h1>
+        <div className="flex items-center gap-4 mb-8">
+          <Image 
+            src="/Garmin_Connect_app_1024x1024-02.png" 
+            alt="Garmin Connect" 
+            width={48}
+            height={48}
+            className="rounded-lg"
+          />
+          <h1 className="text-3xl font-bold text-gray-900">Garmin Connect</h1>
+        </div>
         
         <div className="bg-white rounded-lg shadow p-6">
           <div className="space-y-4">
