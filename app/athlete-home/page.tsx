@@ -175,8 +175,8 @@ export default function AthleteHomePage() {
       }
       const firebaseToken = await currentUser.getIdToken();
       
-      // Call authorize endpoint to get auth URL (with popup flag)
-      const response = await fetch('/api/auth/garmin/authorize?popup=true', {
+      // Call authorize endpoint to get auth URL (with athleteId and popup flag)
+      const response = await fetch(`/api/auth/garmin/authorize?athleteId=${athlete.id}&popup=true`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${firebaseToken}`
@@ -189,8 +189,8 @@ export default function AthleteHomePage() {
       }
 
       const data = await response.json();
-      if (!data.success || !data.authUrl) {
-        throw new Error('Invalid response from server');
+      if (!data.authUrl) {
+        throw new Error(data.error || 'Invalid response from server');
       }
 
       // Open popup window for OAuth
