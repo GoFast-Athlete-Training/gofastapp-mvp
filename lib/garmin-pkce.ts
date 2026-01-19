@@ -61,6 +61,12 @@ export async function exchangeCodeForTokens(code: string, codeVerifier: string, 
   const tokenUrl = 'https://diauth.garmin.com/di-oauth2-service/oauth/token';
   
   try {
+    console.log(`🔍 [TOKEN_EXCHANGE] Starting token exchange`);
+    console.log(`🔍 [TOKEN_EXCHANGE] Token URL: ${tokenUrl}`);
+    console.log(`🔍 [TOKEN_EXCHANGE] Redirect URI: ${redirectUri}`);
+    console.log(`🔍 [TOKEN_EXCHANGE] Code length: ${code.length}`);
+    console.log(`🔍 [TOKEN_EXCHANGE] Code verifier length: ${codeVerifier.length}`);
+    
     const response = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
@@ -76,14 +82,19 @@ export async function exchangeCodeForTokens(code: string, codeVerifier: string, 
       })
     });
     
+    console.log(`🔍 [TOKEN_EXCHANGE] Response status: ${response.status}`);
+    
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Garmin token exchange failed:', response.status, errorText);
+      console.error('❌ [TOKEN_EXCHANGE] Garmin token exchange failed:', response.status, errorText);
       throw new Error(`Token exchange failed: ${response.status} - ${errorText}`);
     }
     
     const tokenData = await response.json();
-    console.log('✅ Tokens received from Garmin');
+    console.log('✅ [TOKEN_EXCHANGE] Tokens received from Garmin');
+    console.log(`🔍 [TOKEN_EXCHANGE] Token data keys:`, Object.keys(tokenData));
+    console.log(`🔍 [TOKEN_EXCHANGE] Has access_token: ${!!tokenData.access_token}`);
+    console.log(`🔍 [TOKEN_EXCHANGE] Has refresh_token: ${!!tokenData.refresh_token}`);
     
     return {
       success: true,
@@ -91,7 +102,9 @@ export async function exchangeCodeForTokens(code: string, codeVerifier: string, 
     };
     
   } catch (error: any) {
-    console.error('❌ Token exchange error:', error);
+    console.error('❌ [TOKEN_EXCHANGE] Token exchange error:', error);
+    console.error('❌ [TOKEN_EXCHANGE] Error message:', error.message);
+    console.error('❌ [TOKEN_EXCHANGE] Error stack:', error.stack);
     return {
       success: false,
       error: error.message

@@ -65,59 +65,75 @@ export async function GET(request: Request) {
       return returnErrorHtml('Missing authorization code');
     }
 
-    console.log(`🔍 Processing callback for athleteId: ${athleteId}`);
+    console.log(`🔍 [CALLBACK] Processing callback for athleteId: ${athleteId}`);
+    console.log(`🔍 [CALLBACK] Code received: ${code ? code.substring(0, 20) + '...' : 'MISSING'}`);
+    console.log(`🔍 [CALLBACK] State (athleteId): ${athleteId}`);
 
     // 4. Retrieve codeVerifier from cookie storage
     const cookieStore = await cookies();
-    const codeVerifierCookie = await cookieStore.get(`garmin_code_verifier_${athleteId}`);
+    const cookieName = `garmin_code_verifier_${athleteId}`;
+    console.log(`🔍 [CALLBACK] Looking for cookie: ${cookieName}`);
+    const codeVerifierCookie = await cookieStore.get(cookieName);
     const codeVerifier = codeVerifierCookie?.value;
 
     if (!codeVerifier) {
-      console.error(`❌ No code verifier found for athleteId: ${athleteId}`);
+      console.error(`❌ [CALLBACK] No code verifier found for athleteId: ${athleteId}`);
+      console.error(`❌ [CALLBACK] Available cookies:`, await cookieStore.getAll().then(c => c.map(c => c.name)));
       return returnErrorHtml('Session expired. Please try again.');
     }
+    console.log(`✅ [CALLBACK] Code verifier found (length: ${codeVerifier.length})`);
 
     // 5. Build redirect URI (must match authorize route - production must use SERVER_URL)
     const serverUrl = process.env.SERVER_URL || process.env.NEXT_PUBLIC_APP_URL || `https://${process.env.VERCEL_URL}`;
     if (!serverUrl) {
-      console.error('❌ SERVER_URL or NEXT_PUBLIC_APP_URL must be set');
+      console.error('❌ [CALLBACK] SERVER_URL or NEXT_PUBLIC_APP_URL must be set');
       return returnErrorHtml('Server URL not configured');
     }
     const redirectUri = `${serverUrl}/api/auth/garmin/callback`;
+    console.log(`🔍 [CALLBACK] Redirect URI: ${redirectUri}`);
 
     // 6. Exchange code for tokens
-    console.log(`🔍 Exchanging code for tokens for athleteId: ${athleteId}`);
+    console.log(`🔍 [CALLBACK] Exchanging code for tokens for athleteId: ${athleteId}`);
     const tokenResult = await exchangeCodeForTokens(code, codeVerifier, redirectUri);
 
     if (!tokenResult.success) {
-      console.error(`❌ Token exchange failed:`, tokenResult.error);
-      return returnErrorHtml('Token exchange failed. Please try again.');
+      console.error(`❌ [CALLBACK] Token exchange failed:`, tokenResult.error);
+      return returnErrorHtml(`Token exchange failed: ${tokenResult.error}`);
     }
 
     const { tokens } = tokenResult;
-    console.log(`✅ Tokens received for athleteId: ${athleteId}`);
+    console.log(`✅ [CALLBACK] Tokens received for athleteId: ${athleteId}`);
+    console.log(`🔍 [CALLBACK] Token keys:`, Object.keys(tokens));
+    console.log(`🔍 [CALLBACK] Access token present: ${!!tokens.access_token}`);
+    console.log(`🔍 [CALLBACK] Refresh token present: ${!!tokens.refresh_token}`);
 
     // 7. Fetch Garmin user ID and save to database
-    console.log(`🔍 Fetching Garmin user ID for athleteId: ${athleteId}`);
+    console.log(`🔍 [CALLBACK] Fetching Garmin user ID for athleteId: ${athleteId}`);
     const userInfoResult = await fetchAndSaveGarminUserInfo(athleteId, tokens.access_token);
 
     let garminUserId = userInfoResult.garminUserId || 'pending';
     if (userInfoResult.success) {
-      console.log(`✅ Garmin user ID fetched and saved: ${garminUserId}`);
+      console.log(`✅ [CALLBACK] Garmin user ID fetched and saved: ${garminUserId}`);
     } else {
-      console.warn(`⚠️ Could not fetch Garmin user info: ${userInfoResult.error}`);
+      console.warn(`⚠️ [CALLBACK] Could not fetch Garmin user info: ${userInfoResult.error}`);
     }
 
     // 8. Save tokens to database
-    await updateGarminConnection(athleteId, {
-      garmin_user_id: garminUserId,
-      garmin_access_token: tokens.access_token,
-      garmin_refresh_token: tokens.refresh_token,
-      garmin_expires_in: tokens.expires_in || 3600,
-      garmin_scope: tokens.scope
-    });
-
-    console.log(`✅ Garmin tokens saved for athleteId: ${athleteId}`);
+    console.log(`🔍 [CALLBACK] Saving tokens to database for athleteId: ${athleteId}`);
+    try {
+      await updateGarminConnection(athleteId, {
+        garmin_user_id: garminUserId,
+        garmin_access_token: tokens.access_token,
+        garmin_refresh_token: tokens.refresh_token,
+        garmin_expires_in: tokens.expires_in || 3600,
+        garmin_scope: tokens.scope
+      });
+      console.log(`✅ [CALLBACK] Garmin tokens saved successfully for athleteId: ${athleteId}`);
+    } catch (dbError: any) {
+      console.error(`❌ [CALLBACK] Database save failed:`, dbError);
+      console.error(`❌ [CALLBACK] Error details:`, dbError.message, dbError.stack);
+      return returnErrorHtml(`Failed to save tokens: ${dbError.message}`);
+    }
 
     // 9. Clean up cookie
     await cookieStore.delete(`garmin_code_verifier_${athleteId}`);
