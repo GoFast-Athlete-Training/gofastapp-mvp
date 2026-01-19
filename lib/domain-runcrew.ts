@@ -678,22 +678,8 @@ export async function hydrateCrew(runCrewId: string) {
         take: 1, // Only fetch the latest active announcement
       },
       run_crew_runs: {
-        select: {
-          id: true,
-          title: true,
-          date: true,
-          startTimeHour: true,
-          startTimeMinute: true,
-          startTimePeriod: true,
-          meetUpPoint: true,
-          meetUpAddress: true,
-          totalMiles: true,
-          pace: true,
-          stravaMapUrl: true,
-          description: true,
-          createdAt: true,
-          createdById: true,
-          createdBy: {
+        include: {
+          Athlete: {
             select: {
               id: true,
               firstName: true,
@@ -838,18 +824,18 @@ export async function hydrateCrew(runCrewId: string) {
         stravaMapUrl: r.stravaMapUrl,
         description: r.description,
         createdAt: r.createdAt,
-        athlete: r.createdBy ? {
-          id: r.createdBy.id,
-          firstName: r.createdBy.firstName,
-          lastName: r.createdBy.lastName,
-          photoURL: r.createdBy.photoURL,
+        athlete: r.Athlete ? {
+          id: r.Athlete.id,
+          firstName: r.Athlete.firstName,
+          lastName: r.Athlete.lastName,
+          photoURL: r.Athlete.photoURL,
         } : null,
-        rsvps: r.run_crew_run_rsvps.map((rsvp: any) => ({
+        rsvps: r.run_crew_run_rsvps ? r.run_crew_run_rsvps.map((rsvp: any) => ({
           id: rsvp.id,
           status: rsvp.status,
           athleteId: rsvp.athleteId,
           athlete: rsvp.Athlete, // Normalize to lowercase
-        })),
+        })) : [],
       })),
     },
   };
