@@ -14,7 +14,8 @@ import {
   Users, 
   Activity, 
   Settings, 
-  User
+  User,
+  Trophy
 } from 'lucide-react';
 import Image from 'next/image';
 import api from '@/lib/api';
