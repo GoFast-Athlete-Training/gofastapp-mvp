@@ -159,7 +159,9 @@ export default function AthleteHomePage() {
 
   // Direct Garmin OAuth flow (like gofastfrontend-mvp1)
   const handleConnectGarmin = async () => {
-    if (!athlete?.id) {
+    // Get athleteId from localStorage (most reliable)
+    const athleteId = LocalStorageAPI.getAthleteId();
+    if (!athleteId) {
       alert('Please sign in to connect Garmin');
       return;
     }
@@ -176,7 +178,7 @@ export default function AthleteHomePage() {
       const firebaseToken = await currentUser.getIdToken();
       
       // Call authorize endpoint to get auth URL (with athleteId and popup flag)
-      const response = await fetch(`/api/auth/garmin/authorize?athleteId=${athlete.id}&popup=true`, {
+      const response = await fetch(`/api/auth/garmin/authorize?athleteId=${athleteId}&popup=true`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${firebaseToken}`
