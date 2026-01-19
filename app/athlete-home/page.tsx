@@ -38,41 +38,55 @@ export default function AthleteHomePage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Check auth
+    // First, check localStorage for athlete data (fastest check)
+    const model = LocalStorageAPI.getFullHydrationModel();
+    
+    if (!model?.athlete) {
+      // No athlete data - redirect to welcome for hydration
+      console.log('⚠️ Athlete Home: No athlete data in localStorage, redirecting to /welcome');
+      router.replace('/welcome');
+      return;
+    }
+
+    // We have athlete data - set it up
+    setAthlete(model.athlete);
+    setRunCrewId(model.athlete.MyCrew || LocalStorageAPI.getMyCrew());
+    setWeeklyActivities(model.weeklyActivities || []);
+    setWeeklyTotals(model.weeklyTotals || null);
+    
+    // Get crew data
+    const crewData = LocalStorageAPI.getRunCrewData();
+    if (crewData) {
+      setRunCrew(crewData);
+    } else if (model.athlete.runCrewMemberships) {
+      // Find primary crew from memberships
+      const primaryCrewId = model.athlete.MyCrew || LocalStorageAPI.getMyCrew();
+      const membership = model.athlete.runCrewMemberships.find(
+        (m: any) => m.runCrew?.id === primaryCrewId
+      );
+      if (membership?.runCrew) {
+        setRunCrew(membership.runCrew);
+      }
+    }
+
+    // Check Garmin connection (from hydrated model first, then localStorage fallback)
+    const garminFromModel = model.athlete.garmin_is_connected;
+    const garminFromStorage = localStorage.getItem('garminConnected') === 'true';
+    setGarminConnected(garminFromModel || garminFromStorage);
+
+    // Check Firebase auth (but don't redirect immediately - we already have athlete data)
     const unsubscribe = auth.onAuthStateChanged((user) => {
+      // Only redirect if no user AND we've confirmed there's no localStorage data
+      // (This prevents race conditions where Firebase hasn't initialized yet)
       if (!user) {
-        router.replace('/signup');
-        return;
+        const currentModel = LocalStorageAPI.getFullHydrationModel();
+        if (!currentModel?.athlete) {
+          console.log('⚠️ Athlete Home: No Firebase user and no localStorage data, redirecting to /signup');
+          router.replace('/signup');
+        }
+        // If we have localStorage data, keep showing the page (user might be in popup context)
       }
     });
-
-    // Load athlete data from localStorage
-    const model = LocalStorageAPI.getFullHydrationModel();
-    if (model?.athlete) {
-      setAthlete(model.athlete);
-      setRunCrewId(model.athlete.MyCrew || LocalStorageAPI.getMyCrew());
-      setWeeklyActivities(model.weeklyActivities || []);
-      setWeeklyTotals(model.weeklyTotals || null);
-      
-      // Get crew data
-      const crewData = LocalStorageAPI.getRunCrewData();
-      if (crewData) {
-        setRunCrew(crewData);
-      } else if (model.athlete.runCrewMemberships) {
-        // Find primary crew from memberships
-        const primaryCrewId = model.athlete.MyCrew || LocalStorageAPI.getMyCrew();
-        const membership = model.athlete.runCrewMemberships.find(
-          (m: any) => m.runCrew?.id === primaryCrewId
-        );
-        if (membership?.runCrew) {
-          setRunCrew(membership.runCrew);
-        }
-      }
-
-      // Check Garmin connection
-      const garminStatus = localStorage.getItem('garminConnected');
-      setGarminConnected(garminStatus === 'true');
-    }
 
     // Load upcoming races
     loadUpcomingRaces();
