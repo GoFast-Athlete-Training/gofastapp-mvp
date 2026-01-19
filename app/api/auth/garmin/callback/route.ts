@@ -78,7 +78,8 @@ export async function GET(request: Request) {
 
     if (!codeVerifier) {
       console.error(`❌ [CALLBACK] No code verifier found for athleteId: ${athleteId}`);
-      console.error(`❌ [CALLBACK] Available cookies:`, await cookieStore.getAll().then(c => c.map(c => c.name)));
+      const allCookies = cookieStore.getAll();
+      console.error(`❌ [CALLBACK] Available cookies:`, allCookies.map(c => c.name));
       return returnErrorHtml('Session expired. Please try again.');
     }
     console.log(`✅ [CALLBACK] Code verifier found (length: ${codeVerifier.length})`);
