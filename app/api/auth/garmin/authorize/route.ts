@@ -33,8 +33,8 @@ export async function GET(request: Request) {
     console.log('✅ PKCE generated - code_verifier length:', codeVerifier.length, 'code_challenge length:', codeChallenge.length);
     
     // 3. Store code verifier in HTTP-only cookie (keyed by athleteId in cookie name)
-    // CRITICAL: Set domain to .gofastcrushgoals.com so cookie is accessible on both
-    // runcrew.gofastcrushgoals.com and gofast.gofastcrushgoals.com subdomains
+    // CRITICAL: Set domain to .gofastcrushgoals.com so cookie is accessible across all subdomains
+    // Primary domain is pr.gofastcrushgoals.com (consolidated from runcrew/gofast subdomains)
     const cookieStore = await cookies();
     const cookieOptions: any = {
       httpOnly: true,
