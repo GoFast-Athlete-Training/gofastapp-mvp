@@ -33,14 +33,24 @@ export async function GET(request: Request) {
     console.log('✅ PKCE generated - code_verifier length:', codeVerifier.length, 'code_challenge length:', codeChallenge.length);
     
     // 3. Store code verifier in HTTP-only cookie (keyed by athleteId in cookie name)
+    // CRITICAL: Set domain to .gofastcrushgoals.com so cookie is accessible on both
+    // runcrew.gofastcrushgoals.com and gofast.gofastcrushgoals.com subdomains
     const cookieStore = await cookies();
-    cookieStore.set(`garmin_code_verifier_${athleteId}`, codeVerifier, {
+    const cookieOptions: any = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'lax' as const,
       maxAge: 600, // 10 minutes
       path: '/'
-    });
+    };
+    
+    // In production, set domain to allow cookie sharing across subdomains
+    if (process.env.NODE_ENV === 'production') {
+      cookieOptions.domain = '.gofastcrushgoals.com';
+      console.log('🔵 Setting cookie domain to .gofastcrushgoals.com for cross-subdomain access');
+    }
+    
+    cookieStore.set(`garmin_code_verifier_${athleteId}`, codeVerifier, cookieOptions);
 
     console.log('✅ Code verifier stored in cookie');
 
