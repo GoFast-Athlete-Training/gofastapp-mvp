@@ -14,11 +14,7 @@ import {
   Users, 
   Activity, 
   Settings, 
-  User, 
-  Calendar,
-  Trophy,
-  ExternalLink,
-  MapPin
+  User
 } from 'lucide-react';
 import Image from 'next/image';
 import api from '@/lib/api';
@@ -33,7 +29,6 @@ export default function AthleteHomePage() {
   const [garminConnected, setGarminConnected] = useState(false);
   const [connectingGarmin, setConnectingGarmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [upcomingRaces, setUpcomingRaces] = useState<any[]>([]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -88,33 +83,10 @@ export default function AthleteHomePage() {
       }
     });
 
-    // Load upcoming races
-    loadUpcomingRaces();
-
     setLoading(false);
     return () => unsubscribe();
   }, [router]);
 
-  const loadUpcomingRaces = async () => {
-    try {
-      // Get athleteId from localStorage (like "find my runs" pattern)
-      const athleteId = LocalStorageAPI.getAthleteId();
-      if (!athleteId) {
-        setUpcomingRaces([]);
-        return;
-      }
-
-      // Send athleteId in body so server can get athlete's state
-      const response = await api.post('/race-events', { athleteId });
-      if (response.data?.success && response.data?.events) {
-        // Show first 3 upcoming races
-        setUpcomingRaces(response.data.events.slice(0, 3));
-      }
-    } catch (error) {
-      console.log('Could not load upcoming races:', error);
-      setUpcomingRaces([]);
-    }
-  };
 
   // Calculate next run
   const nextRun = useMemo(() => {
@@ -476,63 +448,6 @@ export default function AthleteHomePage() {
             </div>
           )}
 
-          {/* Upcoming Races Section */}
-          {upcomingRaces.length > 0 && (
-            <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Trophy className="h-6 w-6 text-orange-500" />
-                  <h3 className="text-lg font-semibold text-gray-900">Upcoming Races</h3>
-                </div>
-                <button
-                  onClick={() => router.push('/race-events')}
-                  className="text-sm text-orange-600 hover:text-orange-700 font-semibold"
-                >
-                  View All →
-                </button>
-              </div>
-              <div className="space-y-3">
-                {upcomingRaces.map((race) => (
-                  <div
-                    key={race.id}
-                    onClick={() => {
-                      if (race.url) {
-                        window.open(race.url, '_blank', 'noopener,noreferrer');
-                      }
-                    }}
-                    className="flex items-start justify-between p-3 rounded-lg border border-gray-200 hover:border-orange-300 hover:bg-orange-50 cursor-pointer transition"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-gray-900 truncate">{race.name}</h4>
-                      <div className="flex items-center gap-3 text-sm text-gray-600 mt-1">
-                        {race.startDate && (
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {new Date(race.startDate).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                            })}
-                          </span>
-                        )}
-                        {race.location && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
-                            {race.location}
-                          </span>
-                        )}
-                        {race.miles && (
-                          <span className="text-orange-600">{race.miles} miles</span>
-                        )}
-                      </div>
-                    </div>
-                    {race.url && (
-                      <ExternalLink className="h-4 w-4 text-orange-600 ml-2 flex-shrink-0" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </main>
       </div>

@@ -49,14 +49,15 @@ export async function POST(request: Request) {
       );
     }
 
-    // 4. Fetch recent activities from Garmin API
+    // 4. Fetch activities from Garmin API
     // Garmin Wellness API endpoint for activities
     const activitiesUrl = 'https://apis.garmin.com/wellness-api/rest/activities';
     
-    // Get activities from last 7 days
+    // Get activities from last 30 days (more historical data)
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 7);
+    startDate.setDate(startDate.getDate() - 30);
     const startDateStr = startDate.toISOString().split('T')[0];
+    console.log(`🔍 [SYNC] Fetching activities from ${startDateStr} (last 30 days)`);
 
     const response = await fetch(
       `${activitiesUrl}?startDate=${startDateStr}`,
