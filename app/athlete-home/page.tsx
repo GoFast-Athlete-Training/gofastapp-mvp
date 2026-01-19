@@ -3,9 +3,9 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import TopNav from '@/components/shared/TopNav';
 import CrewHero from '@/components/athlete/CrewHero';
 import WeeklyStats from '@/components/athlete/WeeklyStats';
 import LatestActivityCard from '@/components/athlete/LatestActivityCard';
@@ -17,7 +17,6 @@ import {
   User, 
   Calendar,
   Trophy,
-  LogOut,
   ExternalLink,
   MapPin
 } from 'lucide-react';
@@ -145,15 +144,6 @@ export default function AthleteHomePage() {
     return membership?.role === 'admin' || membership?.role === 'manager';
   }, [athlete, runCrewId]);
 
-  const handleSignOut = async () => {
-    try {
-      await signOut(auth);
-      LocalStorageAPI.clearAll();
-      router.replace('/signup');
-    } catch (error) {
-      console.error('Sign out error:', error);
-    }
-  };
 
   const handleGoToCrew = () => {
     if (!runCrewId) {
@@ -280,123 +270,93 @@ export default function AthleteHomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Left Navigation Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen sticky top-0">
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center gap-3 mb-2">
-            <Image
-              src="/logo.jpg"
-              alt="GoFast"
-              width={32}
-              height={32}
-              className="w-8 h-8 rounded-full"
-            />
-            <span className="text-lg font-bold text-gray-900">GoFast</span>
-          </div>
-          <p className="text-xs text-gray-500">Athlete Home</p>
-        </div>
-
-        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-          {/* Home - Active */}
-          <button
-            onClick={() => router.push('/athlete-home')}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium bg-orange-50 text-orange-700 border border-orange-200"
-          >
-            <Home className="h-5 w-5" />
-            <span>Home</span>
-          </button>
-
-          {/* My RunCrews */}
-          <button
-            onClick={() => router.push('/my-runcrews')}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-          >
-            <Users className="h-5 w-5" />
-            <span>My RunCrews</span>
-          </button>
-
-          {/* Discover RunCrews */}
-          <button
-            onClick={() => router.push('/runcrew-discovery')}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-          >
-            <Users className="h-5 w-5" />
-            <span>Discover RunCrews</span>
-          </button>
-
-          {/* Activities */}
-          <button
-            onClick={() => router.push('/activities')}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-          >
-            <Activity className="h-5 w-5" />
-            <span>Activities</span>
-          </button>
-
-          {/* Race Events */}
-          <button
-            onClick={() => router.push('/race-events')}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-          >
-            <Trophy className="h-5 w-5" />
-            <span>Race Events</span>
-          </button>
-
-          {/* Profile */}
-          <button
-            onClick={() => router.push('/profile')}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-          >
-            <User className="h-5 w-5" />
-            <span>Profile</span>
-          </button>
-
-          {/* Settings */}
-          <button
-            onClick={() => router.push('/settings')}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-          >
-            <Settings className="h-5 w-5" />
-            <span>Settings</span>
-          </button>
-        </nav>
-
-        {/* Bottom Section - Profile & Sign Out */}
-        <div className="p-4 border-t border-gray-200">
-          <div className="flex items-center gap-3 mb-3">
-            {athlete.photoURL ? (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <TopNav />
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Navigation Sidebar */}
+        <aside className="w-64 bg-white border-r border-gray-200 flex flex-col overflow-y-auto">
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex items-center gap-3 mb-2">
               <Image
-                src={athlete.photoURL}
-                alt={athlete.firstName || 'Profile'}
+                src="/logo.jpg"
+                alt="GoFast"
                 width={32}
                 height={32}
                 className="w-8 h-8 rounded-full"
               />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white font-semibold text-sm">
-                {(athlete.firstName?.[0] || 'A').toUpperCase()}
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                {athlete.firstName} {athlete.lastName}
-              </p>
-              <p className="text-xs text-gray-500 truncate">@{athlete.gofastHandle}</p>
+              <span className="text-lg font-bold text-gray-900">GoFast</span>
             </div>
+            <p className="text-xs text-gray-500">Athlete Home</p>
           </div>
-          <button
-            onClick={handleSignOut}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-          >
-            <LogOut className="h-5 w-5" />
-            <span>Sign Out</span>
-          </button>
-        </div>
-      </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
+          <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+            {/* Home - Active */}
+            <button
+              onClick={() => router.push('/athlete-home')}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium bg-orange-50 text-orange-700 border border-orange-200"
+            >
+              <Home className="h-5 w-5" />
+              <span>Home</span>
+            </button>
+
+            {/* My RunCrews */}
+            <button
+              onClick={() => router.push('/my-runcrews')}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              <Users className="h-5 w-5" />
+              <span>My RunCrews</span>
+            </button>
+
+            {/* Discover RunCrews */}
+            <button
+              onClick={() => router.push('/runcrew-discovery')}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              <Users className="h-5 w-5" />
+              <span>Discover RunCrews</span>
+            </button>
+
+            {/* Activities */}
+            <button
+              onClick={() => router.push('/activities')}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              <Activity className="h-5 w-5" />
+              <span>Activities</span>
+            </button>
+
+            {/* Race Events */}
+            <button
+              onClick={() => router.push('/race-events')}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              <Trophy className="h-5 w-5" />
+              <span>Race Events</span>
+            </button>
+
+            {/* Profile */}
+            <button
+              onClick={() => router.push('/athlete-edit-profile')}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              <User className="h-5 w-5" />
+              <span>Profile</span>
+            </button>
+
+            {/* Settings */}
+            <button
+              onClick={() => router.push('/settings')}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              <Settings className="h-5 w-5" />
+              <span>Settings</span>
+            </button>
+          </nav>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto">
         <div className="max-w-6xl mx-auto px-6 py-8">
           {/* Welcome Header */}
           <div className="mb-8">
