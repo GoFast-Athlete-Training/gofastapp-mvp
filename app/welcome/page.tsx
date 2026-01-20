@@ -81,13 +81,6 @@ export default function WelcomePage() {
           });
           
           setRunCrewCards(cards);
-          
-          // If no crews exist, redirect to discovery
-          if (cards.length === 0) {
-            router.replace('/runcrew-discovery');
-            return;
-          }
-          
           setIsLoading(false);
           return;
         }
@@ -136,13 +129,6 @@ export default function WelcomePage() {
           });
           
           setRunCrewCards(cards);
-          
-          // If no crews exist, redirect to discovery
-          if (cards.length === 0) {
-            router.replace('/runcrew-discovery');
-            return;
-          }
-          
           setIsLoading(false);
         } else {
           console.error('❌ Welcome: Invalid response from hydrate');
@@ -249,14 +235,22 @@ export default function WelcomePage() {
             <div className="text-6xl mb-4">🏃</div>
             <h2 className="text-3xl font-bold text-gray-900 mb-4">No RunCrews Yet</h2>
             <p className="text-xl text-gray-600 mb-8">
-              It looks like you don't have any crews yet. Head over to our RunCrew directory to explore and find your crew.
+              It looks like you don't have any crews yet. You can explore and find a crew, or head to your home dashboard.
             </p>
-            <Link
-              href="/runcrew-discovery"
-              className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition shadow-lg hover:shadow-xl"
-            >
-              Explore RunCrews
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                href="/runcrew-discovery"
+                className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition shadow-lg hover:shadow-xl"
+              >
+                Find a Crew
+              </Link>
+              <Link
+                href="/athlete-home"
+                className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition shadow-lg hover:shadow-xl"
+              >
+                Go Home
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
