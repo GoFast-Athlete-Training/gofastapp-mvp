@@ -8,6 +8,8 @@ import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 
+const RUNCREW_CREATE_INTENT_KEY = 'runCrewCreateIntent';
+
 export default function AthleteCreateProfilePage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -282,10 +284,10 @@ export default function AthleteCreateProfilePage() {
       // Navigate to runcrew explainer page after profile setup
       console.log('🏃 Navigating to runcrew explainer page...');
       // Check for create crew intent first
-      const createCrewIntent = localStorage.getItem('runCrewCreateIntent');
+      const createCrewIntent = localStorage.getItem(RUNCREW_CREATE_INTENT_KEY);
       if (createCrewIntent) {
         // User was creating a crew - redirect to create crew page
-        localStorage.removeItem('runCrewCreateIntent');
+        localStorage.removeItem(RUNCREW_CREATE_INTENT_KEY);
         router.push('/runcrew/create');
       } else {
         // Check for join intent - if exists, redirect to confirm page
