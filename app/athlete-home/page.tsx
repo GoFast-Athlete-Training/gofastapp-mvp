@@ -13,7 +13,6 @@ import {
   Home, 
   Users, 
   Activity, 
-  Settings, 
   User,
   Trophy
 } from 'lucide-react';
@@ -344,15 +343,6 @@ export default function AthleteHomePage() {
             >
               <User className="h-5 w-5" />
               <span>Profile</span>
-            </button>
-
-            {/* Settings */}
-            <button
-              onClick={() => router.push('/settings')}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
-              <Settings className="h-5 w-5" />
-              <span>Settings</span>
             </button>
           </nav>
         </aside>
