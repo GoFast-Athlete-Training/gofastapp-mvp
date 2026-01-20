@@ -469,6 +469,7 @@ export default function CreateCrewPage() {
         const crewData = {
           id: createdCrew.id,
           name: createdCrew.name,
+          handle: createdCrew.handle, // Include handle for join link generation
           joinCode: createdCrew.joinCode,
           description: createdCrew.description,
           logo: createdCrew.logo || logo,

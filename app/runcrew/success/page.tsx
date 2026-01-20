@@ -21,12 +21,50 @@ function RunCrewSuccessContent() {
     const storedCrew = localStorage.getItem('currentCrew');
     if (storedCrew) {
       try {
-        setCrewData(JSON.parse(storedCrew));
+        const parsed = JSON.parse(storedCrew);
+        setCrewData(parsed);
+        
+        // If handle is missing but we have crewId, fetch it from API
+        if (!parsed.handle && (crewId || parsed.id)) {
+          const idToFetch = crewId || parsed.id;
+          fetch(`/api/runcrew/public/${idToFetch}`)
+            .then(res => res.json())
+            .then(data => {
+              if (data.success && data.runCrew?.handle) {
+                // Update crewData with handle
+                setCrewData({
+                  ...parsed,
+                  handle: data.runCrew.handle,
+                });
+                // Also update localStorage for future use
+                localStorage.setItem('currentCrew', JSON.stringify({
+                  ...parsed,
+                  handle: data.runCrew.handle,
+                }));
+              }
+            })
+            .catch(err => {
+              console.error('Error fetching crew handle:', err);
+            });
+        }
       } catch (e) {
         console.error('Error parsing stored crew:', e);
       }
+    } else if (crewId) {
+      // If no localStorage data but we have crewId, fetch from API
+      fetch(`/api/runcrew/public/${crewId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.runCrew) {
+            setCrewData(data.runCrew);
+            localStorage.setItem('currentCrew', JSON.stringify(data.runCrew));
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching crew data:', err);
+        });
     }
-  }, []);
+  }, [crewId]);
 
   const crewName = crewData?.name || 'Your Crew';
 
