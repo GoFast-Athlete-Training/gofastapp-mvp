@@ -618,7 +618,7 @@ export async function getCrewById(runCrewId: string) {
           },
         },
       },
-      run_crew_runs: {
+      city_runs: {
         orderBy: { date: 'asc' },
         include: {
           Athlete: {
@@ -677,7 +677,7 @@ export async function hydrateCrew(runCrewId: string) {
         },
         take: 1, // Only fetch the latest active announcement
       },
-      run_crew_runs: {
+      city_runs: {
         include: {
           Athlete: {
         select: {
@@ -810,7 +810,7 @@ export async function hydrateCrew(runCrewId: string) {
       })),
     },
     runsBox: {
-      runs: crew.run_crew_runs.map((r: any) => ({
+      runs: crew.city_runs.map((r: any) => ({
         id: r.id,
         title: r.title,
         date: r.date,
@@ -935,10 +935,29 @@ export async function createRun(data: {
   stravaMapUrl?: string | null;
   description?: string | null;
 }) {
-  const run = await prisma.run_crew_runs.create({
+  // Get RunCrew to extract city for citySlug
+  const crew = await prisma.run_crews.findUnique({
+    where: { id: data.runCrewId },
+    select: { city: true },
+  });
+
+  if (!crew) {
+    throw new Error('RunCrew not found');
+  }
+
+  // Generate citySlug from RunCrew's city
+  const citySlug = crew.city
+    ? crew.city
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+    : "unknown"; // Fallback if no city
+
+  const run = await prisma.city_runs.create({
     data: {
+      citySlug,
       runCrewId: data.runCrewId,
-      createdById: data.athleteId, // Map athleteId to createdById (schema field)
+      athleteGeneratedId: data.athleteId, // Use athleteGeneratedId for user-created runs
       title: data.title,
       date: data.date,
       startTimeHour: data.startTimeHour ?? null,

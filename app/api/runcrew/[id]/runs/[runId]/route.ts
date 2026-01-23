@@ -113,7 +113,7 @@ export async function PUT(
 
     // Update the run
     if (Object.keys(updateData).length > 0) {
-      const updated = await prisma.run_crew_runs.update({
+      const updated = await prisma.city_runs.update({
         where: { id: runId },
         data: updateData,
         include: {
@@ -207,7 +207,7 @@ export async function DELETE(
 
     // Delete the run (cascade will delete RSVPs)
     const { prisma } = await import('@/lib/prisma');
-    await prisma.run_crew_runs.delete({
+    await prisma.city_runs.delete({
       where: { id: runId },
     });
 

@@ -289,42 +289,42 @@ model run_crew_run_rsvps {
 // Unified model: handles both public city runs and private crew runs
 // @deprecated Use `city_runs` model name (table name kept as `run_crew_runs` for backwards compatibility)
 model city_runs {
-  id                 String               @id @default(cuid())
-  cityId             String               // Required: all runs belong to a city
-  runCrewId          String?              // Nullable: null = public city run, set = private crew run (app group)
-  runClubSlug        String?              // Nullable: official RunClub affiliation (string ref to RunClub.slug in GoFastCompany)
-  staffId            String?              // Nullable: GoFastCompany staff ID (string ref to CompanyStaff.id in GoFastCompany)
-  createdById        String?              // Nullable: Athlete ID (when user-created in gofastapp-mvp)
-  title              String
-  runType            String               @default("single")
-  date               DateTime
-  startTimeHour      Int?
-  startTimeMinute    Int?
-  startTimePeriod    String?
-  timezone           String?
-  meetUpPoint        String
-  meetUpAddress      String?
-  meetUpPlaceId      String?
-  meetUpLat          Float?
-  meetUpLng          Float?
-  recurrenceRule     String?
-  recurrenceEndsOn   DateTime?
-  recurrenceNote     String?
-  totalMiles         Float?
-  pace               String?
-  stravaMapUrl       String?
-  description        String?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  run_crew_run_rsvps run_crew_run_rsvps[]
-  Athlete            Athlete?             @relation(fields: [createdById], references: [id], onDelete: Cascade)
-  cities             cities               @relation(fields: [cityId], references: [id], onDelete: Cascade)
-  run_crews          run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  id                  String               @id @default(cuid())
+  citySlug            String               // City slug (e.g., "boston", "new-york") - extracted from Google Maps address or user input
+  runCrewId           String?              // Nullable: null = public city run, set = private crew run (app group)
+  runClubSlug         String?              // Nullable: official RunClub affiliation (string ref to RunClub.slug in GoFastCompany)
+  staffGeneratedId    String?              // Nullable: GoFastCompany staff ID (string ref to CompanyStaff.id in GoFastCompany)
+  athleteGeneratedId  String?              // Nullable: Athlete ID (when user-created in gofastapp-mvp)
+  title               String
+  runType             String               @default("single")
+  date                DateTime
+  startTimeHour       Int?
+  startTimeMinute     Int?
+  startTimePeriod     String?
+  timezone            String?
+  meetUpPoint         String
+  meetUpAddress       String?
+  meetUpPlaceId       String?
+  meetUpLat           Float?
+  meetUpLng           Float?
+  recurrenceRule      String?
+  recurrenceEndsOn    DateTime?
+  recurrenceNote      String?
+  totalMiles          Float?
+  pace                String?
+  stravaMapUrl        String?
+  description         String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  run_crew_run_rsvps  run_crew_run_rsvps[]
+  Athlete             Athlete?             @relation(fields: [athleteGeneratedId], references: [id], onDelete: Cascade)
+  run_crews            run_crews?            @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
 
-  @@index([cityId])
+  @@index([citySlug]) // For querying/filtering by city
   @@index([runCrewId])
   @@index([runClubSlug]) // For querying/filtering by RunClub affiliation
-  @@index([staffId]) // For querying/filtering by GoFastCompany staff
+  @@index([staffGeneratedId]) // For querying/filtering by GoFastCompany staff
+  @@index([athleteGeneratedId]) // For querying/filtering by user creator
   @@index([date])
   @@map("run_crew_runs") // Backwards compatibility: table name remains run_crew_runs
 }
@@ -631,7 +631,8 @@ model cities {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  city_runs city_runs[] // All runs (public and private) belong to a city
+  // Note: city_runs now uses citySlug (string) instead of FK to cities
+  // This allows for simpler city handling without requiring city records
 
   @@index([slug])
   @@index([name])

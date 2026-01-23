@@ -12,11 +12,13 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
-      cityId,
+      citySlug, // City slug (e.g., "boston", "new-york") - extracted from Google Maps or user input
+      cityName, // Optional: City name for slug generation if slug not provided
+      state, // Optional: State abbreviation for slug generation
       runCrewId,
       runClubSlug,
-      staffId,
-      createdById,
+      staffGeneratedId,
+      athleteGeneratedId,
       title,
       runType = "single",
       date,
@@ -25,7 +27,7 @@ export async function POST(request: NextRequest) {
       startTimePeriod,
       timezone,
       meetUpPoint,
-      meetUpAddress,
+      meetUpAddress, // Google Maps formatted address - used to extract city if needed
       meetUpPlaceId,
       meetUpLat,
       meetUpLng,
@@ -39,9 +41,9 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate required fields
-    if (!cityId || !cityId.trim()) {
+    if (!citySlug && !cityName && !meetUpAddress) {
       return NextResponse.json(
-        { success: false, error: "cityId is required" },
+        { success: false, error: "citySlug, cityName, or meetUpAddress is required to determine city" },
         { status: 400 }
       );
     }
@@ -67,23 +69,76 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Either staffId (GoFastCompany) or createdById (user) must be provided
-    if (!staffId && !createdById) {
+    // Either staffGeneratedId (GoFastCompany) or athleteGeneratedId (user) must be provided
+    if (!staffGeneratedId && !athleteGeneratedId) {
       return NextResponse.json(
-        { success: false, error: "Either staffId or createdById is required" },
+        { success: false, error: "Either staffGeneratedId or athleteGeneratedId is required" },
         { status: 400 }
       );
     }
 
-    // Verify city exists
-    const city = await prisma.cities.findUnique({
-      where: { id: cityId },
-    });
+    // If athleteGeneratedId is provided, verify athlete exists
+    if (athleteGeneratedId) {
+      const athlete = await prisma.athlete.findUnique({
+        where: { id: athleteGeneratedId },
+      });
 
-    if (!city) {
+      if (!athlete) {
+        return NextResponse.json(
+          { success: false, error: "Athlete not found" },
+          { status: 404 }
+        );
+      }
+    }
+
+    // Generate city slug from various inputs
+    let finalCitySlug: string;
+    
+    if (citySlug) {
+      // Use provided slug (normalize it)
+      finalCitySlug = citySlug
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    } else {
+      // Extract city name from various sources
+      let cityNameToUse: string | null = null;
+      
+      if (cityName) {
+        cityNameToUse = cityName.trim();
+      } else if (meetUpAddress) {
+        // Parse city from Google Maps formatted address
+        // Format: "123 Main St, City, State ZIP, Country"
+        // Try to extract city (usually second-to-last component before country)
+        const addressParts = meetUpAddress.split(",").map((p: string) => p.trim());
+        if (addressParts.length >= 2) {
+          // City is typically the second part (index 1)
+          cityNameToUse = addressParts[1];
+        } else if (addressParts.length === 1) {
+          // Fallback: use the address itself
+          cityNameToUse = addressParts[0];
+        }
+      }
+      
+      if (!cityNameToUse) {
+        return NextResponse.json(
+          { success: false, error: "Could not determine city from provided data" },
+          { status: 400 }
+        );
+      }
+      
+      // Generate slug from city name
+      finalCitySlug = cityNameToUse
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    }
+    
+    if (!finalCitySlug) {
       return NextResponse.json(
-        { success: false, error: "City not found" },
-        { status: 404 }
+        { success: false, error: "Invalid city slug" },
+        { status: 400 }
       );
     }
 
@@ -107,11 +162,11 @@ export async function POST(request: NextRequest) {
     // Create the run
     const run = await prisma.city_runs.create({
       data: {
-        cityId: cityId.trim(),
+        citySlug: finalCitySlug,
         runCrewId: runCrewId?.trim() || null,
         runClubSlug: runClubSlug?.trim() || null,
-        staffId: staffId?.trim() || null,
-        createdById: createdById?.trim() || null,
+        staffGeneratedId: staffGeneratedId?.trim() || null,
+        athleteGeneratedId: athleteGeneratedId?.trim() || null,
         title: title.trim(),
         runType: runType || "single",
         date: runDate,
@@ -133,8 +188,8 @@ export async function POST(request: NextRequest) {
         description: description?.trim() || null,
       },
       include: {
-        cities: true,
         run_crews: true,
+        Athlete: true,
       },
     });
 
