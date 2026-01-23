@@ -1,6 +1,6 @@
 'use client';
 
-import { Info, Users, Archive } from 'lucide-react';
+import { Info, Users, Settings as SettingsIcon } from 'lucide-react';
 import { ReactNode } from 'react';
 import Link from 'next/link';
 
@@ -26,7 +26,7 @@ export default function SettingsAppShell({
   const sections = [
     { id: 'info' as SettingsSection, label: 'Info', icon: Info },
     { id: 'manager' as SettingsSection, label: 'Manager', icon: Users },
-    { id: 'lifecycle' as SettingsSection, label: 'Lifecycle', icon: Archive },
+    { id: 'lifecycle' as SettingsSection, label: 'Advanced', icon: SettingsIcon },
   ];
 
   return (

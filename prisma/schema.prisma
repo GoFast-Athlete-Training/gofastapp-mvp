@@ -54,7 +54,7 @@ model Athlete {
   run_crew_memberships    run_crew_memberships[]
   run_crew_messages       run_crew_messages[]
   run_crew_run_rsvps      run_crew_run_rsvps[]
-  run_crew_runs           run_crew_runs[]
+  city_runs               city_runs[]
   training_days_executed  training_days_executed[]
   training_plans          training_plans[]
   workouts                Workout[]
@@ -233,10 +233,10 @@ model run_crew_events {
   description          String?
   date                 DateTime
   time                 String
-  venue                String                 // Renamed from location
+  venue                String // Renamed from location
   address              String?
-  cost                 Int?                   // Cost in dollars (null/0 = free)
-  additionalDetails    String?                // Any other social details
+  cost                 Int? // Cost in dollars (null/0 = free)
+  additionalDetails    String? // Any other social details
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
   run_crew_event_rsvps run_crew_event_rsvps[]
@@ -275,21 +275,26 @@ model run_crew_messages {
 }
 
 model run_crew_run_rsvps {
-  id            String        @id @default(cuid())
-  runId         String
-  athleteId     String
-  status        String
-  createdAt     DateTime      @default(now())
-  Athlete       Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  run_crew_runs run_crew_runs @relation(fields: [runId], references: [id], onDelete: Cascade)
+  id        String    @id @default(cuid())
+  runId     String
+  athleteId String
+  status    String
+  createdAt DateTime  @default(now())
+  Athlete   Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  city_runs city_runs @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@unique([runId, athleteId])
 }
 
-model run_crew_runs {
+// Unified model: handles both public city runs and private crew runs
+// @deprecated Use `city_runs` model name (table name kept as `run_crew_runs` for backwards compatibility)
+model city_runs {
   id                 String               @id @default(cuid())
-  runCrewId          String
-  createdById        String
+  cityId             String               // Required: all runs belong to a city
+  runCrewId          String?              // Nullable: null = public city run, set = private crew run (app group)
+  runClubSlug        String?              // Nullable: official RunClub affiliation (string ref to RunClub.slug in GoFastCompany)
+  staffId            String?              // Nullable: GoFastCompany staff ID (string ref to CompanyStaff.id in GoFastCompany)
+  createdById        String?              // Nullable: Athlete ID (when user-created in gofastapp-mvp)
   title              String
   runType            String               @default("single")
   date               DateTime
@@ -312,8 +317,16 @@ model run_crew_runs {
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
   run_crew_run_rsvps run_crew_run_rsvps[]
-  Athlete            Athlete              @relation(fields: [createdById], references: [id], onDelete: Cascade)
-  run_crews          run_crews            @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  Athlete            Athlete?             @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  cities             cities               @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  run_crews          run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+
+  @@index([cityId])
+  @@index([runCrewId])
+  @@index([runClubSlug]) // For querying/filtering by RunClub affiliation
+  @@index([staffId]) // For querying/filtering by GoFastCompany staff
+  @@index([date])
+  @@map("run_crew_runs") // Backwards compatibility: table name remains run_crew_runs
 }
 
 model run_crews {
@@ -353,7 +366,7 @@ model run_crews {
   run_crew_events         run_crew_events[]
   run_crew_memberships    run_crew_memberships[]
   run_crew_messages       run_crew_messages[]
-  run_crew_runs           run_crew_runs[]
+  city_runs               city_runs[]
   race_registry           race_registry?            @relation("TrainingForRace", fields: [trainingForRace], references: [id], onDelete: SetNull)
 }
 
@@ -470,22 +483,22 @@ model training_schemas {
 // Workout Model - Coach-authored, reusable workout intent
 // This represents intent, not execution data, and does not depend on training_plan_days
 model Workout {
-  id              String        @id @default(cuid())
-  title           String        // Required
-  workoutType     WorkoutType   // Required
-  description     String?       // Coach notes / intent
-  workoutFormat   WorkoutFormat?
-  totalMiles      Float?
-  warmUpMiles     Float?
-  mainSetMiles    Float?
-  coolDownMiles   Float?
-  effortType      EffortType?
-  effortModifier  Float?        // sec/mi OR RPE
-  athleteId       String        // FK for authorship and lookup
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id             String         @id @default(cuid())
+  title          String // Required
+  workoutType    WorkoutType // Required
+  description    String? // Coach notes / intent
+  workoutFormat  WorkoutFormat?
+  totalMiles     Float?
+  warmUpMiles    Float?
+  mainSetMiles   Float?
+  coolDownMiles  Float?
+  effortType     EffortType?
+  effortModifier Float? // sec/mi OR RPE
+  athleteId      String // FK for authorship and lookup
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  athlete         Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
   @@index([athleteId])
   @@index([workoutType])
@@ -601,4 +614,25 @@ enum EffortType {
   TenKEffort
   FiveKEffort
   RPE
+}
+
+//
+// ─── CITIES (City Reference Model) ────────────────────────────
+//
+// Cities: Lightweight reference model for GTM and public surfacing
+// All runs (both public city runs and private crew runs) belong to a city
+//
+
+model cities {
+  id        String   @id @default(cuid())
+  slug      String   @unique // URL-friendly identifier (e.g., "boston", "new-york")
+  name      String // Display name (e.g., "Boston", "New York")
+  state     String? // State abbreviation (e.g., "MA", "NY")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  city_runs city_runs[] // All runs (public and private) belong to a city
+
+  @@index([slug])
+  @@index([name])
 }

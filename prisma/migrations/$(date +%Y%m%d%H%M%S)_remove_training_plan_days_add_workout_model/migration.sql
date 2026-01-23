@@ -39,3 +39,5 @@ CREATE INDEX "workouts_workoutType_idx" ON "workouts"("workoutType");
 -- AddForeignKey
 ALTER TABLE "workouts" ADD CONSTRAINT "workouts_athleteId_fkey" FOREIGN KEY ("athleteId") REFERENCES "Athlete"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+
+

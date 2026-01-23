@@ -7,16 +7,10 @@
 			"path": "."
 		},
 		{
-			"path": "../GoFastLanding"
-		},
-		{
 			"path": "../../Ignite/IgniteBd-Next-combine"
 		},
 		{
 			"path": "../gofast-contentpublic"
-		},
-		{
-			"path": "../gofastfrontend-mvp1"
 		}
 	],
 	"settings": {}
