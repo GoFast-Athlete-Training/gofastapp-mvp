@@ -43,7 +43,7 @@ export async function GET(
     const { runId } = await params;
 
     // Fetch run with RSVPs
-    const run = await prisma.run_crew_runs.findUnique({
+    const run = await prisma.city_runs.findUnique({
       where: { id: runId },
       include: {
         run_crew_run_rsvps: {
@@ -180,6 +180,68 @@ export async function GET(
     console.error('Error fetching run:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch run', details: error?.message },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/runs/[runId]
+ * 
+ * Authenticated endpoint to delete a run
+ * 
+ * Returns:
+ * {
+ *   success: true
+ * }
+ */
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ runId: string }> }
+) {
+  try {
+    // Verify authentication
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let decodedToken;
+    try {
+      decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
+    } catch {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    // Verify athlete exists (or staff - for GoFastCompany)
+    const athlete = await getAthleteByFirebaseId(decodedToken.uid);
+    if (!athlete) {
+      return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
+    }
+
+    const { runId } = await params;
+
+    // Check if run exists
+    const run = await prisma.city_runs.findUnique({
+      where: { id: runId },
+    });
+
+    if (!run) {
+      return NextResponse.json({ error: 'Run not found' }, { status: 404 });
+    }
+
+    // Delete the run (cascade will delete RSVPs)
+    await prisma.city_runs.delete({
+      where: { id: runId },
+    });
+
+    return NextResponse.json({
+      success: true,
+    });
+  } catch (error: any) {
+    console.error('Error deleting run:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to delete run', details: error?.message },
       { status: 500 }
     );
   }

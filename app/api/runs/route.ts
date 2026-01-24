@@ -45,9 +45,36 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const citySlug = searchParams.get('citySlug') || undefined;
     const day = searchParams.get('day') || undefined;
+    const includeRunClub = searchParams.get('includeRunClub') === 'true';
 
     // Get runs with filters
-    const runs = await getRuns({ citySlug, day });
+    let runs = await getRuns({ citySlug, day });
+
+    // Hydrate RunClub data if requested (for GoFastCompany dashboard)
+    if (includeRunClub) {
+      const { prisma } = await import('@/lib/prisma');
+      const runsWithRunClub = await Promise.all(
+        runs.map(async (run) => {
+          if (!run.runClubSlug) return run;
+          
+          const runClub = await prisma.run_clubs.findUnique({
+            where: { slug: run.runClubSlug },
+            select: {
+              slug: true,
+              name: true,
+              logoUrl: true,
+              city: true,
+            },
+          });
+
+          return {
+            ...run,
+            runClub: runClub || null,
+          };
+        })
+      );
+      runs = runsWithRunClub;
+    }
 
     return NextResponse.json({
       success: true,
