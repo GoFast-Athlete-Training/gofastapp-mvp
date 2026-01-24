@@ -959,7 +959,9 @@ export async function createRun(data: {
       runCrewId: data.runCrewId,
       athleteGeneratedId: data.athleteId, // Use athleteGeneratedId for user-created runs
       title: data.title,
-      date: data.date,
+      isRecurring: false, // RunCrew runs are single runs by default
+      startDate: data.date, // Use date as startDate
+      date: data.date, // Backward compatibility
       startTimeHour: data.startTimeHour ?? null,
       startTimeMinute: data.startTimeMinute ?? null,
       startTimePeriod: data.startTimePeriod ?? null,
