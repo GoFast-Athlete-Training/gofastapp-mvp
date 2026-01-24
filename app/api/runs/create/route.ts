@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
       meetUpPlaceId,
       meetUpLat,
       meetUpLng,
+      endPoint, // Optional end point if different from meet up point
       recurrenceRule, // @deprecated: Use isRecurring + dayOfWeek + startDate + endDate instead
       recurrenceEndsOn, // @deprecated: Use endDate instead
       recurrenceNote,
@@ -197,6 +198,7 @@ export async function POST(request: NextRequest) {
         meetUpPlaceId: meetUpPlaceId?.trim() || null,
         meetUpLat: meetUpLat ? parseFloat(meetUpLat) : null,
         meetUpLng: meetUpLng ? parseFloat(meetUpLng) : null,
+        endPoint: endPoint?.trim() || null,
         recurrenceRule: recurrenceRule?.trim() || null,
         recurrenceEndsOn: recurrenceEndsOn ? new Date(recurrenceEndsOn) : null,
         recurrenceNote: recurrenceNote?.trim() || null,

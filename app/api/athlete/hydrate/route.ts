@@ -104,6 +104,15 @@ export async function POST(request: Request) {
 
     // Extract athlete data (already formatted by domain function)
     const athleteData = hydrated.athlete || {};
+    
+    // Debug logging for memberships
+    console.log(`🔍 HYDRATE [${timestamp}]: Athlete has ${athleteData.runCrewMemberships?.length || 0} memberships`);
+    console.log(`🔍 HYDRATE [${timestamp}]: Memberships:`, JSON.stringify(athleteData.runCrewMemberships?.map((m: any) => ({
+      id: m.id,
+      role: m.role,
+      runCrewId: m.runCrewId,
+      runCrewName: m.runCrew?.name || m.run_crews?.name || 'N/A'
+    })), null, 2));
 
     // Return success response matching MVP1 structure
     return NextResponse.json({ 

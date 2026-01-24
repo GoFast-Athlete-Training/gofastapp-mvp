@@ -67,19 +67,32 @@ export default function WelcomePage() {
           
           // Build RunCrew cards from memberships
           const memberships = existingModel.athlete.runCrewMemberships || [];
-          const cards: RunCrewCard[] = memberships.map((membership: any) => {
-            const runCrew = membership.runCrew || {};
-            return {
-              id: runCrew.id || membership.runCrewId,
-              name: runCrew.name || 'Unknown Crew',
-              description: runCrew.description,
-              logo: runCrew.logo,
-              icon: runCrew.icon,
-              role: membership.role || 'member',
-              membershipId: membership.id,
-            };
-          });
+          console.log(`🔍 Welcome: Found ${memberships.length} memberships in localStorage`);
+          console.log('🔍 Welcome: Memberships data:', JSON.stringify(memberships, null, 2));
           
+          const cards: RunCrewCard[] = memberships
+            .filter((membership: any) => {
+              // Filter out memberships without runCrew data
+              const hasRunCrew = !!(membership.runCrew || membership.run_crews);
+              if (!hasRunCrew) {
+                console.warn('⚠️ Welcome: Skipping membership without runCrew:', membership.id);
+              }
+              return hasRunCrew;
+            })
+            .map((membership: any) => {
+              const runCrew = membership.runCrew || membership.run_crews || {};
+              return {
+                id: runCrew.id || membership.runCrewId,
+                name: runCrew.name || 'Unknown Crew',
+                description: runCrew.description,
+                logo: runCrew.logo,
+                icon: runCrew.icon,
+                role: membership.role || 'member',
+                membershipId: membership.id,
+              };
+            });
+          
+          console.log(`✅ Welcome: Built ${cards.length} RunCrew cards`);
           setRunCrewCards(cards);
           setIsLoading(false);
           return;
@@ -109,25 +122,37 @@ export default function WelcomePage() {
           }
 
           console.log('✅ Welcome: Athlete hydrated successfully, showing selector UI');
+          console.log(`🔍 Welcome: Athlete data has ${athleteData.runCrewMemberships?.length || 0} memberships`);
+          console.log('🔍 Welcome: Memberships data:', JSON.stringify(athleteData.runCrewMemberships, null, 2));
           
           // Set athlete state
           setAthlete(athleteData);
           
           // Build RunCrew cards from memberships
           const memberships = athleteData.runCrewMemberships || [];
-          const cards: RunCrewCard[] = memberships.map((membership: any) => {
-            const runCrew = membership.runCrew || {};
-            return {
-              id: runCrew.id || membership.runCrewId,
-              name: runCrew.name || 'Unknown Crew',
-              description: runCrew.description,
-              logo: runCrew.logo,
-              icon: runCrew.icon,
-              role: membership.role || 'member',
-              membershipId: membership.id,
-            };
-          });
+          const cards: RunCrewCard[] = memberships
+            .filter((membership: any) => {
+              // Filter out memberships without runCrew data
+              const hasRunCrew = !!(membership.runCrew || membership.run_crews);
+              if (!hasRunCrew) {
+                console.warn('⚠️ Welcome: Skipping membership without runCrew:', membership.id);
+              }
+              return hasRunCrew;
+            })
+            .map((membership: any) => {
+              const runCrew = membership.runCrew || membership.run_crews || {};
+              return {
+                id: runCrew.id || membership.runCrewId,
+                name: runCrew.name || 'Unknown Crew',
+                description: runCrew.description,
+                logo: runCrew.logo,
+                icon: runCrew.icon,
+                role: membership.role || 'member',
+                membershipId: membership.id,
+              };
+            });
           
+          console.log(`✅ Welcome: Built ${cards.length} RunCrew cards from ${memberships.length} memberships`);
           setRunCrewCards(cards);
           setIsLoading(false);
         } else {

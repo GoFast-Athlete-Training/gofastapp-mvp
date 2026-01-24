@@ -310,6 +310,7 @@ model city_runs {
   meetUpPlaceId       String?
   meetUpLat           Float?
   meetUpLng           Float?
+  endPoint            String?              // Optional end point if different from meet up point
   recurrenceRule      String?              // @deprecated: Use isRecurring + dayOfWeek + startDate + endDate instead
   recurrenceEndsOn    DateTime?            // @deprecated: Use endDate instead
   recurrenceNote      String?

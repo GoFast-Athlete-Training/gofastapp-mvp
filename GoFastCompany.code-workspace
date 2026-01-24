@@ -11,6 +11,9 @@
 		},
 		{
 			"path": "../gofast-contentpublic"
+		},
+		{
+			"path": "../GoFastLanding"
 		}
 	],
 	"settings": {}

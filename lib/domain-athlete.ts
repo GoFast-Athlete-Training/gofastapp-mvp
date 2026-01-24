@@ -80,6 +80,19 @@ export async function hydrateAthlete(athleteId: string) {
       console.log('✅ HYDRATE ATHLETE: Athlete loaded successfully');
       console.log(`   RunCrew Memberships: ${athlete.run_crew_memberships?.length || 0}`);
       
+      // Log each membership for debugging
+      if (athlete.run_crew_memberships && Array.isArray(athlete.run_crew_memberships)) {
+        athlete.run_crew_memberships.forEach((membership: any, index: number) => {
+          console.log(`   Membership ${index + 1}:`, {
+            id: membership.id,
+            runCrewId: membership.runCrewId,
+            role: membership.role,
+            hasRunCrew: !!membership.run_crews,
+            runCrewName: membership.run_crews?.name || 'N/A'
+          });
+        });
+      }
+      
       // If athlete loaded but run_crew_memberships is undefined, tables might not exist
       if (athlete.run_crew_memberships === undefined) {
         console.warn('⚠️ HYDRATE ATHLETE: runCrewMemberships is undefined - RunCrew tables may not exist');
@@ -142,20 +155,31 @@ export async function hydrateAthlete(athleteId: string) {
 
   // Normalize crews with roles (handle case where tables don't exist)
   const crews = hasRunCrewTables && athlete.run_crew_memberships && Array.isArray(athlete.run_crew_memberships)
-    ? athlete.run_crew_memberships.map((membership: any) => {
-        if (!membership || !membership.run_crews) {
-          console.warn('⚠️ HYDRATE ATHLETE: Invalid membership structure:', membership);
+    ? athlete.run_crew_memberships.map((membership: any, index: number) => {
+        if (!membership) {
+          console.warn(`⚠️ HYDRATE ATHLETE: Membership ${index + 1} is null/undefined`);
           return null;
         }
-        return {
+        if (!membership.run_crews) {
+          console.warn(`⚠️ HYDRATE ATHLETE: Membership ${index + 1} (ID: ${membership.id}) missing run_crews relation:`, {
+            membershipId: membership.id,
+            runCrewId: membership.runCrewId,
+            role: membership.role,
+            hasRunCrew: false
+          });
+          return null;
+        }
+        const crew = {
           ...membership.run_crews,
           role: membership.role || 'member',
           joinedAt: membership.joinedAt,
         };
+        console.log(`✅ HYDRATE ATHLETE: Processed membership ${index + 1}: ${crew.name} (role: ${crew.role})`);
+        return crew;
       }).filter((crew: any) => crew !== null) // Filter out any null entries
     : [];
   
-  console.log(`✅ HYDRATE ATHLETE: Processed ${crews.length} RunCrew memberships`);
+  console.log(`✅ HYDRATE ATHLETE: Processed ${crews.length} RunCrew memberships out of ${athlete.run_crew_memberships?.length || 0} total`);
 
   // Determine MyCrew (primary crew) - first crew or most recent, prioritizing admin crews
   let MyCrew = '';
@@ -199,6 +223,13 @@ export async function hydrateAthlete(athleteId: string) {
     runCrews: crews,
     runCrewCount: crews.length,
     runCrewMemberships: (hasRunCrewTables ? normalizeAthleteMemberships(athlete.run_crew_memberships || []) : []) || [],
+    
+    // Debug: Log membership count
+    _debug: {
+      totalMemberships: athlete.run_crew_memberships?.length || 0,
+      validMemberships: crews.length,
+      membershipsWithRunCrew: athlete.run_crew_memberships?.filter((m: any) => m?.run_crews).length || 0
+    },
     
     // Primary crew context (for localStorage)
     MyCrew: MyCrew,
