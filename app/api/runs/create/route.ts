@@ -30,11 +30,18 @@ export async function POST(request: NextRequest) {
       startTimePeriod,
       timezone,
       meetUpPoint,
-      meetUpAddress, // Google Maps formatted address - used to extract city if needed
+      meetUpAddress, // @deprecated: Google Maps formatted address - kept for backward compatibility
+      meetUpStreetAddress, // Street address (e.g., "1234 Wilson Blvd")
+      meetUpCity, // City name (e.g., "Arlington")
+      meetUpState, // State abbreviation (e.g., "VA")
+      meetUpZip, // ZIP code (e.g., "22201")
       meetUpPlaceId,
       meetUpLat,
       meetUpLng,
       endPoint, // Optional end point if different from meet up point
+      endStreetAddress, // End point street address
+      endCity, // End point city
+      endState, // End point state
       recurrenceRule, // @deprecated: Use isRecurring + dayOfWeek + startDate + endDate instead
       recurrenceEndsOn, // @deprecated: Use endDate instead
       recurrenceNote,
@@ -45,9 +52,10 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate required fields
-    if (!citySlug && !cityName && !meetUpAddress) {
+    // City can come from citySlug, cityName, meetUpCity, or meetUpAddress (backward compatibility)
+    if (!citySlug && !cityName && !meetUpCity && !meetUpAddress) {
       return NextResponse.json(
-        { success: false, error: "citySlug, cityName, or meetUpAddress is required to determine city" },
+        { success: false, error: "citySlug, cityName, meetUpCity, or meetUpAddress is required to determine city" },
         { status: 400 }
       );
     }
@@ -121,8 +129,11 @@ export async function POST(request: NextRequest) {
       
       if (cityName) {
         cityNameToUse = cityName.trim();
+      } else if (meetUpCity) {
+        // Use city field directly (preferred)
+        cityNameToUse = meetUpCity.trim();
       } else if (meetUpAddress) {
-        // Parse city from Google Maps formatted address
+        // Parse city from Google Maps formatted address (backward compatibility)
         // Format: "123 Main St, City, State ZIP, Country"
         // Try to extract city (usually second-to-last component before country)
         const addressParts = meetUpAddress.split(",").map((p: string) => p.trim());
@@ -194,7 +205,11 @@ export async function POST(request: NextRequest) {
         startTimePeriod: startTimePeriod?.trim() || null,
         timezone: timezone?.trim() || null,
         meetUpPoint: meetUpPoint.trim(),
-        meetUpAddress: meetUpAddress?.trim() || null,
+        meetUpAddress: meetUpAddress?.trim() || null, // Backward compatibility
+        meetUpStreetAddress: meetUpStreetAddress?.trim() || null,
+        meetUpCity: meetUpCity?.trim() || null,
+        meetUpState: meetUpState?.trim() || null,
+        meetUpZip: meetUpZip?.trim() || null,
         meetUpPlaceId: meetUpPlaceId?.trim() || null,
         meetUpLat: meetUpLat ? parseFloat(meetUpLat) : null,
         meetUpLng: meetUpLng ? parseFloat(meetUpLng) : null,

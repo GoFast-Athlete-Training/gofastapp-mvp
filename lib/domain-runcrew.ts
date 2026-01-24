@@ -819,6 +819,9 @@ export async function hydrateCrew(runCrewId: string) {
         startTimePeriod: r.startTimePeriod,
         meetUpPoint: r.meetUpPoint,
         meetUpAddress: r.meetUpAddress,
+        meetUpPlaceId: r.meetUpPlaceId,
+        meetUpLat: r.meetUpLat,
+        meetUpLng: r.meetUpLng,
         totalMiles: r.totalMiles,
         pace: r.pace,
         stravaMapUrl: r.stravaMapUrl,
@@ -930,6 +933,9 @@ export async function createRun(data: {
   startTimePeriod?: string | null;
   meetUpPoint?: string | null;
   meetUpAddress?: string | null;
+  meetUpPlaceId?: string | null;
+  meetUpLat?: number | null;
+  meetUpLng?: number | null;
   totalMiles?: number | null;
   pace?: string | null;
   stravaMapUrl?: string | null;
@@ -967,6 +973,9 @@ export async function createRun(data: {
       startTimePeriod: data.startTimePeriod ?? null,
       meetUpPoint: data.meetUpPoint ?? '',
       meetUpAddress: data.meetUpAddress ?? null,
+      meetUpPlaceId: data.meetUpPlaceId ?? null,
+      meetUpLat: data.meetUpLat ?? null,
+      meetUpLng: data.meetUpLng ?? null,
       totalMiles: data.totalMiles ?? null,
       pace: data.pace ?? null,
       stravaMapUrl: data.stravaMapUrl ?? null,

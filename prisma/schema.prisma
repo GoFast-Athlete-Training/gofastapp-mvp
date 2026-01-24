@@ -394,10 +394,14 @@ model city_runs {
   startTimePeriod    String?
   timezone           String?
   meetUpPoint        String
-  meetUpAddress      String?
-  meetUpPlaceId      String?
-  meetUpLat          Float?
-  meetUpLng          Float?
+  meetUpAddress      String? // @deprecated: Use meetUpStreetAddress, meetUpCity, meetUpState instead (kept for backward compatibility)
+  meetUpStreetAddress String? // Street address (e.g., "1234 Wilson Blvd")
+  meetUpCity          String? // City name (e.g., "Arlington")
+  meetUpState         String? // State abbreviation (e.g., "VA")
+  meetUpZip           String? // ZIP code (e.g., "22201")
+  meetUpPlaceId       String?
+  meetUpLat           Float?
+  meetUpLng           Float?
   endPoint           String? // Optional end point if different from meet up point
   recurrenceRule     String? // @deprecated: Use isRecurring + dayOfWeek + startDate + endDate instead
   recurrenceEndsOn   DateTime? // @deprecated: Use endDate instead

@@ -98,6 +98,15 @@ export async function PUT(
     if (body.meetUpAddress !== undefined) {
       updateData.meetUpAddress = body.meetUpAddress?.trim() || null;
     }
+    if (body.meetUpPlaceId !== undefined) {
+      updateData.meetUpPlaceId = body.meetUpPlaceId?.trim() || null;
+    }
+    if (body.meetUpLat !== undefined) {
+      updateData.meetUpLat = body.meetUpLat ? parseFloat(body.meetUpLat) : null;
+    }
+    if (body.meetUpLng !== undefined) {
+      updateData.meetUpLng = body.meetUpLng ? parseFloat(body.meetUpLng) : null;
+    }
     if (body.totalMiles !== undefined) {
       updateData.totalMiles = body.totalMiles ? parseFloat(body.totalMiles) : null;
     }
