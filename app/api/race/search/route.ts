@@ -27,15 +27,15 @@ export async function POST(request: NextRequest) {
         id: true,
         name: true,
         raceType: true,
-        miles: true,
-        date: true,
+        distanceMiles: true,
+        raceDate: true,
         city: true,
         state: true,
         country: true,
       },
       take: 20,
       orderBy: {
-        date: 'asc',
+        raceDate: 'asc',
       },
     });
 
