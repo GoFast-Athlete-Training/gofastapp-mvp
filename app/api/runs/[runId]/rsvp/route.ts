@@ -57,7 +57,7 @@ export async function POST(
     }
 
     // Verify run exists
-    const run = await prisma.city_runs.findUnique({
+    const run = await prisma.run_crew_runs.findUnique({
       where: { id: runId },
     });
 

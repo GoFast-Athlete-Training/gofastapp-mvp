@@ -32,7 +32,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
   }
   
   // First, get all runs matching filters
-  const allRuns = await prisma.city_runs.findMany({
+  const allRuns = await prisma.run_crew_runs.findMany({
     where,
     orderBy: { startDate: 'asc' },
     // Only return public-safe fields

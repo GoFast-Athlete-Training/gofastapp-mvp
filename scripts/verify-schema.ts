@@ -13,12 +13,12 @@ async function verifySchema() {
       { name: 'run_crew_memberships', model: prisma.run_crew_memberships },
       { name: 'run_crew_messages', model: prisma.run_crew_messages },
       { name: 'run_crew_announcements', model: prisma.run_crew_announcements },
-      { name: 'city_runs', model: prisma.city_runs },
+      { name: 'run_crew_runs', model: prisma.run_crew_runs },
       { name: 'run_crew_run_rsvps', model: prisma.run_crew_run_rsvps },
       { name: 'run_crew_events', model: prisma.run_crew_events },
       { name: 'run_crew_event_rsvps', model: prisma.run_crew_event_rsvps },
       { name: 'join_codes', model: prisma.join_codes },
-      { name: 'GoFastCompany', model: prisma.goFastCompany },
+      { name: 'go_fast_companies', model: prisma.go_fast_companies },
     ];
 
     console.log('📊 Testing model access...\n');
@@ -42,7 +42,7 @@ async function verifySchema() {
         include: {
           // TODO: activities will be reintroduced in Schema Phase 3
           run_crew_memberships: true,
-          goFastCompany: true,
+          go_fast_companies: true,
         },
       });
       console.log('✅ Athlete relations work correctly');

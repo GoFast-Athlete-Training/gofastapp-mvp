@@ -43,7 +43,7 @@ export async function GET(
     const { runId } = await params;
 
     // Fetch run with RSVPs
-    const run = await prisma.city_runs.findUnique({
+    const run = await prisma.run_crew_runs.findUnique({
       where: { id: runId },
       include: {
         run_crew_run_rsvps: {
