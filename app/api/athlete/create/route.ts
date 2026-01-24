@@ -133,14 +133,14 @@ export async function POST(request: Request) {
 
     // Step 1: Resolve Canonical Company (Pin to First Company)
     // Always use the first company (oldest by createdAt) as the single source of truth
-    let company = await prisma.goFastCompany.findUnique({
+    let company = await prisma.go_fast_companies.findUnique({
       where: { id: GOFAST_COMPANY_ID },
     });
     
     // If company doesn't exist with the configured ID, find the first company by creation date
     if (!company) {
       console.log("⚠️ ATHLETE CREATE: Configured company ID not found, finding first company by createdAt...");
-      company = await prisma.goFastCompany.findFirst({
+      company = await prisma.go_fast_companies.findFirst({
         orderBy: { createdAt: 'asc' },
       });
       

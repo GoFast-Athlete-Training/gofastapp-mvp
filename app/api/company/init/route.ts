@@ -22,20 +22,20 @@ export async function POST(request: Request) {
     }
 
     // Always use the first company (oldest by createdAt) as the single source of truth
-    let company = await prisma.goFastCompany.findUnique({
+    let company = await prisma.go_fast_companies.findUnique({
       where: { id: GOFAST_COMPANY_ID },
     });
 
     // If company doesn't exist with the configured ID, find the first company by creation date
     if (!company) {
       console.log("⚠️ COMPANY INIT: Configured company ID not found, finding first company by createdAt...");
-      company = await prisma.goFastCompany.findFirst({
+      company = await prisma.go_fast_companies.findFirst({
         orderBy: { createdAt: 'asc' },
       });
       
       if (!company) {
         // Create new company with hardcoded ID if no company exists
-        company = await prisma.goFastCompany.create({
+        company = await prisma.go_fast_companies.create({
           data: {
             id: GOFAST_COMPANY_ID,
             name: 'GoFast',
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     }
 
     // Update existing company to ensure all fields are correct
-    company = await prisma.goFastCompany.update({
+    company = await prisma.go_fast_companies.update({
       where: { id: company.id },
       data: {
         name: 'GoFast',
