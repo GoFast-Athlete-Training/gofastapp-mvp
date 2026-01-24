@@ -296,8 +296,11 @@ model city_runs {
   staffGeneratedId    String?              // Nullable: GoFastCompany staff ID (string ref to CompanyStaff.id in GoFastCompany)
   athleteGeneratedId  String?              // Nullable: Athlete ID (when user-created in gofastapp-mvp)
   title               String
-  runType             String               @default("single")
-  date                DateTime
+  isRecurring         Boolean              @default(false) // true = standing/recurring run, false = single run
+  dayOfWeek           String?              // Day of week for recurring runs (e.g., "Monday", "Tuesday", "Wednesday", etc.)
+  startDate           DateTime             // Start date (for single runs, this is the run date; for recurring, this is when recurrence starts)
+  endDate             DateTime?            // End date for recurring runs (null = no end date, or end of recurrence period)
+  date                DateTime             // @deprecated: Use startDate instead (kept for backward compatibility)
   startTimeHour       Int?
   startTimeMinute     Int?
   startTimePeriod     String?
@@ -307,8 +310,8 @@ model city_runs {
   meetUpPlaceId       String?
   meetUpLat           Float?
   meetUpLng           Float?
-  recurrenceRule      String?
-  recurrenceEndsOn    DateTime?
+  recurrenceRule      String?              // @deprecated: Use isRecurring + dayOfWeek + startDate + endDate instead
+  recurrenceEndsOn    DateTime?            // @deprecated: Use endDate instead
   recurrenceNote      String?
   totalMiles          Float?
   pace                String?
@@ -326,6 +329,9 @@ model city_runs {
   @@index([staffGeneratedId]) // For querying/filtering by GoFastCompany staff
   @@index([athleteGeneratedId]) // For querying/filtering by user creator
   @@index([date])
+  @@index([startDate]) // For querying recurring runs by start date
+  @@index([dayOfWeek]) // For querying recurring runs by day of week
+  @@index([isRecurring]) // For filtering recurring vs single runs
   @@map("run_crew_runs") // Backwards compatibility: table name remains run_crew_runs
 }
 

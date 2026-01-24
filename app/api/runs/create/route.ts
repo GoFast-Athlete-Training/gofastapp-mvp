@@ -20,8 +20,11 @@ export async function POST(request: NextRequest) {
       staffGeneratedId,
       athleteGeneratedId,
       title,
-      runType = "single",
-      date,
+      isRecurring = false, // Boolean: true = recurring/standing run, false = single run
+      dayOfWeek, // String: Day of week for recurring runs (e.g., "Monday", "Tuesday")
+      startDate, // DateTime: Start date (for single runs, this is the run date; for recurring, when recurrence starts)
+      endDate, // DateTime?: End date for recurring runs
+      date, // @deprecated: Use startDate instead (kept for backward compatibility)
       startTimeHour,
       startTimeMinute,
       startTimePeriod,
@@ -31,8 +34,8 @@ export async function POST(request: NextRequest) {
       meetUpPlaceId,
       meetUpLat,
       meetUpLng,
-      recurrenceRule,
-      recurrenceEndsOn,
+      recurrenceRule, // @deprecated: Use isRecurring + dayOfWeek + startDate + endDate instead
+      recurrenceEndsOn, // @deprecated: Use endDate instead
       recurrenceNote,
       totalMiles,
       pace,
@@ -55,9 +58,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!date) {
+    // Use startDate if provided, otherwise fall back to date for backward compatibility
+    const runStartDate = startDate || date;
+    if (!runStartDate) {
       return NextResponse.json(
-        { success: false, error: "date is required" },
+        { success: false, error: "startDate or date is required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate recurring run fields
+    if (isRecurring && !dayOfWeek) {
+      return NextResponse.json(
+        { success: false, error: "dayOfWeek is required for recurring runs" },
         { status: 400 }
       );
     }
@@ -156,8 +169,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Parse date
-    const runDate = new Date(date);
+    // Parse dates
+    const runStartDateObj = new Date(runStartDate);
+    const runEndDateObj = endDate ? new Date(endDate) : null;
+    const runDateObj = date ? new Date(date) : runStartDateObj; // Backward compatibility
 
     // Create the run
     const run = await prisma.city_runs.create({
@@ -168,8 +183,11 @@ export async function POST(request: NextRequest) {
         staffGeneratedId: staffGeneratedId?.trim() || null,
         athleteGeneratedId: athleteGeneratedId?.trim() || null,
         title: title.trim(),
-        runType: runType || "single",
-        date: runDate,
+        isRecurring: isRecurring === true,
+        dayOfWeek: dayOfWeek?.trim() || null,
+        startDate: runStartDateObj,
+        endDate: runEndDateObj,
+        date: runDateObj, // Backward compatibility - sync with startDate
         startTimeHour: startTimeHour ? parseInt(startTimeHour) : null,
         startTimeMinute: startTimeMinute ? parseInt(startTimeMinute) : null,
         startTimePeriod: startTimePeriod?.trim() || null,
