@@ -125,7 +125,18 @@ export default function RunCrewDiscoveryPage() {
       setLoadingRaceData(true);
       const response = await api.get('/runcrew/races');
       if (response.data.success) {
-        setAvailableRaces(response.data.races || []);
+        // Explicitly type the races array to match our state type
+        const races: Array<{
+          id: string;
+          name: string;
+          raceType: string;
+          distanceMiles: number;
+          raceDate: Date | string;
+          city: string | null;
+          state: string | null;
+          country?: string | null;
+        }> = response.data.races || [];
+        setAvailableRaces(races);
       }
     } catch (error: any) {
       console.error('Error fetching races:', error);

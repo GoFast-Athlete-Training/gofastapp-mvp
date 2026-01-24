@@ -114,7 +114,18 @@ export default function PublicGroupsPage() {
       const response = await fetch('/api/runcrew/races');
       const data = await response.json();
       if (data.success) {
-        setAvailableRaces(data.races || []);
+        // Explicitly type the races array to match our state type
+        const races: Array<{
+          id: string;
+          name: string;
+          raceType: string;
+          distanceMiles: number;
+          raceDate: Date | string;
+          city: string | null;
+          state: string | null;
+          country?: string | null;
+        }> = data.races || [];
+        setAvailableRaces(races);
       }
     } catch (error: any) {
       console.error('Error fetching races:', error);
