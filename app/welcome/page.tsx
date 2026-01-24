@@ -57,47 +57,9 @@ export default function WelcomePage() {
         return;
       }
 
-      // Check if already hydrated (user navigating directly to /welcome)
-      if (typeof window !== 'undefined') {
-        const existingModel = LocalStorageAPI.getFullHydrationModel();
-        if (existingModel?.athlete) {
-          // Already hydrated - show selector UI directly
-          console.log('✅ Welcome: Already hydrated, showing selector UI');
-          setAthlete(existingModel.athlete);
-          
-          // Build RunCrew cards from memberships
-          const memberships = existingModel.athlete.runCrewMemberships || [];
-          console.log(`🔍 Welcome: Found ${memberships.length} memberships in localStorage`);
-          console.log('🔍 Welcome: Memberships data:', JSON.stringify(memberships, null, 2));
-          
-          const cards: RunCrewCard[] = memberships
-            .filter((membership: any) => {
-              // Filter out memberships without runCrew data
-              const hasRunCrew = !!(membership.runCrew || membership.run_crews);
-              if (!hasRunCrew) {
-                console.warn('⚠️ Welcome: Skipping membership without runCrew:', membership.id);
-              }
-              return hasRunCrew;
-            })
-            .map((membership: any) => {
-              const runCrew = membership.runCrew || membership.run_crews || {};
-              return {
-                id: runCrew.id || membership.runCrewId,
-                name: runCrew.name || 'Unknown Crew',
-                description: runCrew.description,
-                logo: runCrew.logo,
-                icon: runCrew.icon,
-                role: membership.role || 'member',
-                membershipId: membership.id,
-              };
-            });
-          
-          console.log(`✅ Welcome: Built ${cards.length} RunCrew cards`);
-          setRunCrewCards(cards);
-          setIsLoading(false);
-          return;
-        }
-      }
+      // Always re-hydrate on /welcome page to get fresh data
+      // This ensures we have the latest memberships, especially after joining new crews
+      console.log('🔄 Welcome: Always re-hydrating to get fresh membership data');
 
       // Mark as processing immediately to prevent re-runs
       hasProcessedRef.current = true;
