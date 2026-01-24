@@ -87,20 +87,24 @@ export default function GooglePlacesAutocomplete({
             if (place && place.geometry && place.formatted_address) {
               const placeData = {
                 address: place.formatted_address,
-                name: place.name || '',
+                name: place.name || place.formatted_address, // Use name, fallback to address
                 placeId: place.place_id || '',
                 lat: place.geometry.location.lat(),
                 lng: place.geometry.location.lng(),
               };
 
-              // Trigger onChange to update React state
+              // Set input value to the place NAME (not address) - this is what user sees
+              const displayValue = placeData.name;
+              
+              // Trigger onChange to update React state with the name
               if (inputRef.current) {
                 const syntheticEvent = {
-                  target: { value: place.formatted_address },
+                  target: { value: displayValue },
                 } as React.ChangeEvent<HTMLInputElement>;
                 onChange(syntheticEvent);
               }
 
+              // Call onPlaceSelected callback with full place data (name + address)
               if (onPlaceSelected) {
                 onPlaceSelected(placeData);
               }

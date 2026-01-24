@@ -1023,15 +1023,18 @@ export default function RunCrewAdminPage() {
                       setRunForm({ 
                         ...runForm, 
                         meetUpPoint: placeData.name || placeData.address,
-                        meetUpAddress: placeData.address 
+                        meetUpAddress: placeData.address,
+                        meetUpPlaceId: placeData.placeId,
+                        meetUpLat: placeData.lat.toString(),
+                        meetUpLng: placeData.lng.toString(),
                       });
                     }}
-                    placeholder="Search for a location or type manually..."
+                    placeholder="Search for a location..."
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                     disabled={loadingRuns}
                   />
                   <p className="text-xs text-gray-400 mt-1">
-                    Select from suggestions or type the location name manually
+                    Start typing to see Google Maps suggestions
                   </p>
                 </div>
               </div>

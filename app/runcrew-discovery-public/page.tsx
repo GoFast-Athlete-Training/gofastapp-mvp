@@ -28,8 +28,8 @@ interface DiscoverableRunCrew {
     id: string;
     name: string;
     raceType: string | null;
-    miles: number | null;
-    date: Date | null;
+    distanceMiles: number | null;
+    raceDate: Date | null;
     city: string | null;
     state: string | null;
     country: string | null;
@@ -74,10 +74,11 @@ export default function PublicGroupsPage() {
     id: string;
     name: string;
     raceType: string;
-    miles: number;
-    date: Date | string;
+    distanceMiles: number;
+    raceDate: Date | string;
     city: string | null;
     state: string | null;
+    country?: string | null;
   }>>([]);
   const [raceLocations, setRaceLocations] = useState<{ 
     states: string[]; 

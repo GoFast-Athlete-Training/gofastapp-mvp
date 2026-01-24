@@ -33,8 +33,8 @@ interface DiscoverableRunCrew {
     id: string;
     name: string;
     raceType: string | null;
-    miles: number | null;
-    date: Date | null;
+    distanceMiles: number | null;
+    raceDate: Date | null;
     city: string | null;
     state: string | null;
     country: string | null;
