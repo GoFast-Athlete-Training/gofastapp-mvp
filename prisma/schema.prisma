@@ -9,7 +9,7 @@ datasource db {
 }
 
 model Athlete {
-  id                      String                   @id @default(cuid())
+  id                      String                   @id
   firebaseId              String                   @unique
   email                   String?
   companyId               String
@@ -45,8 +45,8 @@ model Athlete {
   fiveKPace               String?
   weeklyMileage           Int?
   createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
-  goFastCompany           GoFastCompany            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  updatedAt               DateTime
+  go_fast_companies       go_fast_companies        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   athlete_activities      athlete_activities[]
   run_crew_announcements  run_crew_announcements[]
   run_crew_event_rsvps    run_crew_event_rsvps[]
@@ -54,10 +54,10 @@ model Athlete {
   run_crew_memberships    run_crew_memberships[]
   run_crew_messages       run_crew_messages[]
   run_crew_run_rsvps      run_crew_run_rsvps[]
-  city_runs               city_runs[]
+  run_crew_runs           run_crew_runs[]
   training_days_executed  training_days_executed[]
   training_plans          training_plans[]
-  workouts                Workout[]
+  workouts                workouts[]
 }
 
 model ai_roles {
@@ -98,8 +98,20 @@ model athlete_activities {
   Athlete          Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 }
 
-model GoFastCompany {
-  id        String    @id @default(cuid())
+model cities {
+  id        String   @id
+  slug      String   @unique
+  name      String
+  state     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+
+  @@index([name])
+  @@index([slug])
+}
+
+model go_fast_companies {
+  id        String    @id
   name      String?
   slug      String?   @unique
   address   String?
@@ -108,10 +120,8 @@ model GoFastCompany {
   zip       String?
   domain    String?
   createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  updatedAt DateTime
   Athlete   Athlete[]
-
-  @@map("go_fast_companies")
 }
 
 model join_codes {
@@ -146,108 +156,76 @@ model prompt_instructions {
   @@index([promptId, order])
 }
 
-// Unified Race Model - The spine for all race-related functionality
-// Curated race data (not dependent on external APIs like RunSignup)
-// Use registrationUrl as referral link to external registration platforms
 model race_registry {
-  id String @id @default(cuid())
-
-  // Basic Identity
-  name          String
-  slug          String? @unique // URL-friendly: "boston-marathon-2025"
-  description   String?
-  raceType      String // e.g., "5k", "10k", "10m", "half", "marathon", "ultra", "other"
-  distanceMiles Float // Exact distance in miles
-  distanceKm    Float? // Exact distance in kilometers
-
-  // Date & Time
-  raceDate              DateTime // Race date
-  startTime             DateTime? // Actual start time (e.g., "2025-04-21T09:00:00Z")
-  endTime               DateTime? // Expected end time (for cutoff)
-  timezone              String? // e.g., "America/New_York"
-  registrationOpenDate  DateTime? // When registration opens
-  registrationCloseDate DateTime? // When registration closes
-
-  // Location
-  city           String?
-  state          String?
-  country        String? @default("USA")
-  address        String? // Full address
-  startLocation  String? // Start line location name
-  finishLocation String? // Finish line location name
-  startLat       Float?
-  startLng       Float?
-  finishLat      Float?
-  finishLng      Float?
-
-  // Registration & Links
-  registrationUrl    String? // Referral link to registration (RunSignup, Active.com, race website, etc.)
-  officialWebsiteUrl String? // Race official website
-  resultsUrl         String? // Link to results (post-race)
-  courseMapUrl       String? // Course map link
-  stravaSegmentUrl   String? // Strava segment link
-
-  // Course Information
-  elevationGain       Float? // Elevation gain in feet
-  elevationGainMeters Float? // Elevation gain in meters
-  surfaceType         String? // "road", "trail", "track", "mixed"
-  courseType          String? // "loop", "point-to-point", "out-and-back"
-  courseProfile       Json? // Detailed course data (elevation profile, etc.)
-
-  // Weather & Climate
-  typicalWeather     String? // "cool", "hot", "variable"
-  averageTemperature Int? // Average temp in Fahrenheit
-  averageHumidity    Int? // Average humidity percentage
-
-  // Charity & Cause
-  charitySupported   Boolean @default(false)
-  charityName        String? // Name of charity/cause
-  charityUrl         String? // Link to charity
-  charityDescription String? // Description of cause
-
-  // Organization
-  organizerName    String? // Race organizer name
-  organizerEmail   String? // Contact email
-  organizerWebsite String? // Organizer website
-
-  // Pricing (optional)
-  registrationFee   Float? // Registration fee in USD
-  earlyBirdFee      Float? // Early bird pricing
-  earlyBirdDeadline DateTime? // Early bird deadline
-
-  // Capacity & Limits
-  maxParticipants     Int? // Maximum participants
-  currentParticipants Int? // Current registrations (if tracked)
-  ageMinimum          Int? // Minimum age requirement
-  ageMaximum          Int? // Maximum age requirement
-
-  // Status & Flags
-  isActive           Boolean @default(true)
-  isVirtual          Boolean @default(false)
-  isCancelled        Boolean @default(false)
-  cancellationReason String? // Why cancelled
-
-  // Metadata
-  tags  String[] @default([]) // e.g., ["boston", "marathon", "qualifying"]
-  notes String? // Internal notes
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  training_plans          training_plans[]
+  id                      String                    @id
+  name                    String
+  raceType                String
+  city                    String?
+  state                   String?
+  country                 String?                   @default("USA")
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime
+  address                 String?
+  ageMaximum              Int?
+  ageMinimum              Int?
+  averageHumidity         Int?
+  averageTemperature      Int?
+  cancellationReason      String?
+  charityDescription      String?
+  charityName             String?
+  charitySupported        Boolean                   @default(false)
+  charityUrl              String?
+  courseMapUrl            String?
+  courseProfile           Json?
+  courseType              String?
+  currentParticipants     Int?
+  description             String?
+  distanceKm              Float?
+  distanceMiles           Float
+  earlyBirdDeadline       DateTime?
+  earlyBirdFee            Float?
+  elevationGain           Float?
+  elevationGainMeters     Float?
+  endTime                 DateTime?
+  finishLat               Float?
+  finishLng               Float?
+  finishLocation          String?
+  isActive                Boolean                   @default(true)
+  isCancelled             Boolean                   @default(false)
+  isVirtual               Boolean                   @default(false)
+  maxParticipants         Int?
+  notes                   String?
+  officialWebsiteUrl      String?
+  organizerEmail          String?
+  organizerName           String?
+  organizerWebsite        String?
+  raceDate                DateTime
+  registrationCloseDate   DateTime?
+  registrationFee         Float?
+  registrationOpenDate    DateTime?
+  registrationUrl         String?
+  resultsUrl              String?
+  slug                    String?                   @unique
+  startLat                Float?
+  startLng                Float?
+  startLocation           String?
+  startTime               DateTime?
+  stravaSegmentUrl        String?
+  surfaceType             String?
+  tags                    String[]                  @default([])
+  timezone                String?
+  typicalWeather          String?
   run_crew_specific_races run_crew_specific_races[]
-  run_crews_training_for  run_crews[]               @relation("TrainingForRace")
+  run_crews               run_crews[]
+  training_plans          training_plans[]
 
-  @@index([raceDate])
+  @@index([charitySupported])
   @@index([city, state])
+  @@index([isActive])
+  @@index([raceDate])
   @@index([raceType])
   @@index([slug])
-  @@index([isActive])
-  @@index([charitySupported])
   @@index([tags])
-  @@map("race_registry")
 }
 
 model return_json_formats {
@@ -288,21 +266,34 @@ model rule_sets {
   training_gen_prompts training_gen_prompts[]
 }
 
+model run_clubs {
+  slug      String   @id
+  name      String
+  logoUrl   String?
+  city      String?
+  syncedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+
+  @@index([city])
+  @@index([slug])
+}
+
 model run_crew_announcements {
-  id         String    @id @default(cuid())
+  id         String    @id
   runCrewId  String
   authorId   String
   title      String
   content    String
   createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  updatedAt  DateTime
   archivedAt DateTime? @db.Timestamp(6)
   Athlete    Athlete   @relation(fields: [authorId], references: [id], onDelete: Cascade)
   run_crews  run_crews @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
 }
 
 model run_crew_event_rsvps {
-  id              String          @id @default(cuid())
+  id              String          @id
   eventId         String
   athleteId       String
   status          String
@@ -314,34 +305,34 @@ model run_crew_event_rsvps {
 }
 
 model run_crew_events {
-  id                   String                 @id @default(cuid())
+  id                   String                 @id
   runCrewId            String
   organizerId          String
   title                String
-  description          String?
   date                 DateTime
   time                 String
-  venue                String // Renamed from location
   address              String?
-  cost                 Int? // Cost in dollars (null/0 = free)
-  additionalDetails    String? // Any other social details
+  description          String?
   createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
+  updatedAt            DateTime
+  additionalDetails    String?
+  cost                 Int?
+  venue                String
   run_crew_event_rsvps run_crew_event_rsvps[]
   Athlete              Athlete                @relation(fields: [organizerId], references: [id], onDelete: Cascade)
   run_crews            run_crews              @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
 
-  @@index([runCrewId])
   @@index([date])
+  @@index([runCrewId])
 }
 
 model run_crew_memberships {
-  id        String      @id @default(cuid())
+  id        String      @id
   runCrewId String
   athleteId String
   joinedAt  DateTime    @default(now())
   createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  updatedAt DateTime
   role      RunCrewRole @default(member)
   Athlete   Athlete     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   run_crews run_crews   @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
@@ -351,110 +342,96 @@ model run_crew_memberships {
 }
 
 model run_crew_messages {
-  id        String    @id @default(cuid())
+  id        String    @id
   runCrewId String
   athleteId String
   content   String
   createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
   topic     String    @default("general")
+  updatedAt DateTime
   Athlete   Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   run_crews run_crews @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
 }
 
 model run_crew_run_rsvps {
-  id        String    @id @default(cuid())
-  runId     String
-  athleteId String
-  status    String
-  createdAt DateTime  @default(now())
-  Athlete   Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  city_runs city_runs @relation(fields: [runId], references: [id], onDelete: Cascade)
+  id            String        @id
+  runId         String
+  athleteId     String
+  status        String
+  createdAt     DateTime      @default(now())
+  Athlete       Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  run_crew_runs run_crew_runs @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@unique([runId, athleteId])
 }
 
-// Unified model: handles both public city runs and private crew runs
-// @deprecated Use `city_runs` model name (table name kept as `run_crew_runs` for backwards compatibility)
-model city_runs {
-  id                  String               @id @default(cuid())
-  citySlug            String // City slug (e.g., "boston", "new-york") - extracted from Google Maps address or user input
-  runCrewId           String? // Nullable: null = public city run, set = private crew run (app group)
-  runClubSlug         String? // Nullable: official RunClub affiliation (string ref to RunClub.slug in GoFastCompany)
-  staffGeneratedId    String? // Nullable: GoFastCompany staff ID (string ref to CompanyStaff.id in GoFastCompany)
-  athleteGeneratedId  String? // Nullable: Athlete ID (when user-created in gofastapp-mvp)
+model run_crew_runs {
+  id                  String               @id
+  runCrewId           String?
   title               String
-  isRecurring         Boolean              @default(false) // true = standing/recurring run, false = single run
-  dayOfWeek           String? // Day of week for recurring runs (e.g., "Monday", "Tuesday", "Wednesday", etc.)
-  startDate           DateTime // Start date (for single runs, this is the run date; for recurring, this is when recurrence starts)
-  endDate             DateTime? // End date for recurring runs (null = no end date, or end of recurrence period)
-  date                DateTime // @deprecated: Use startDate instead (kept for backward compatibility)
-  startTimeHour       Int?
-  startTimeMinute     Int?
-  startTimePeriod     String?
+  date                DateTime
   timezone            String?
   meetUpPoint         String
-  meetUpAddress       String? // @deprecated: Use meetUpStreetAddress, meetUpCity, meetUpState instead (kept for backward compatibility)
-  meetUpStreetAddress String? // Street address (e.g., "1234 Wilson Blvd")
-  meetUpCity          String? // City name (e.g., "Arlington")
-  meetUpState         String? // State abbreviation (e.g., "VA")
-  meetUpZip           String? // ZIP code (e.g., "22201")
+  meetUpAddress       String?
   meetUpPlaceId       String?
   meetUpLat           Float?
   meetUpLng           Float?
-  endPoint            String? // Optional end point if different from meet up point
-  recurrenceRule      String? // @deprecated: Use isRecurring + dayOfWeek + startDate + endDate instead
-  recurrenceEndsOn    DateTime? // @deprecated: Use endDate instead
+  recurrenceRule      String?
+  recurrenceEndsOn    DateTime?
   recurrenceNote      String?
   totalMiles          Float?
   pace                String?
   stravaMapUrl        String?
   description         String?
   createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  updatedAt           DateTime
+  startTimeHour       Int?
+  startTimeMinute     Int?
+  startTimePeriod     String?
+  runClubSlug         String?
+  athleteGeneratedId  String?
+  staffGeneratedId    String?
+  citySlug            String
+  dayOfWeek           String?
+  endDate             DateTime?
+  isRecurring         Boolean              @default(false)
+  startDate           DateTime
+  endPoint            String?
+  meetUpStreetAddress String?
+  meetUpCity          String?
+  meetUpState         String?
+  meetUpZip           String?
+  endStreetAddress    String?
+  endCity             String?
+  endState            String?
   run_crew_run_rsvps  run_crew_run_rsvps[]
   Athlete             Athlete?             @relation(fields: [athleteGeneratedId], references: [id], onDelete: Cascade)
   run_crews           run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
 
-  @@index([citySlug]) // For querying/filtering by city
-  @@index([runCrewId])
-  @@index([runClubSlug]) // For querying/filtering by RunClub affiliation
-  @@index([staffGeneratedId]) // For querying/filtering by GoFastCompany staff
-  @@index([athleteGeneratedId]) // For querying/filtering by user creator
+  @@index([athleteGeneratedId])
+  @@index([citySlug])
   @@index([date])
-  @@index([startDate]) // For querying recurring runs by start date
-  @@index([dayOfWeek]) // For querying recurring runs by day of week
-  @@index([isRecurring]) // For filtering recurring vs single runs
-  @@map("run_crew_runs") // Backwards compatibility: table name remains run_crew_runs
+  @@index([dayOfWeek])
+  @@index([isRecurring])
+  @@index([runClubSlug])
+  @@index([runCrewId])
+  @@index([staffGeneratedId])
+  @@index([startDate])
 }
 
-// Minimal denormalized copy of AcqRunClub from GoFastCompany
-// Pulled and saved via API route for card/run display
-// Slug is the source of truth (references GoFastCompany AcqRunClub.slug)
-// 
-// NOTE: Only minimal fields needed for display (name, logo, city)
-// All rich data (vibe, neighborhood, etc.) stays in GoFastCompany for SEO/public pages
-model run_clubs {
-  slug String @id // Primary key - matches GoFastCompany AcqRunClub.slug
+model run_crew_specific_races {
+  id             String        @id
+  runCrewId      String
+  raceRegistryId String
+  createdAt      DateTime      @default(now())
+  race_registry  race_registry @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
+  run_crews      run_crews     @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
 
-  // Minimal fields for card/run display
-  name    String // Run club name
-  logoUrl String? // Logo URL for display (from logoUrl or logo field)
-  city    String? // City location (for filtering/display)
-
-  // Sync metadata
-  syncedAt  DateTime @default(now()) // Last time data was pulled from GoFastCompany
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([slug])
-  @@index([city])
-  @@map("run_clubs")
+  @@unique([runCrewId, raceRegistryId])
 }
 
 model run_crews {
-  id                      String                    @id @default(cuid())
-  handle                  String                    @unique // Public-facing identifier (lowercase, user-chosen)
+  id                      String                    @id
   name                    String
   description             String?
   joinCode                String                    @unique
@@ -462,11 +439,9 @@ model run_crews {
   icon                    String?
   archivedAt              DateTime?
   createdAt               DateTime                  @default(now())
-  updatedAt               DateTime                  @updatedAt
+  updatedAt               DateTime
   messageTopics           Json?
   city                    String?
-  easyMilesPace           Int? // Seconds per mile (e.g., 480 for "8:00")
-  crushingItPace          Int? // Seconds per mile (e.g., 420 for "7:00")
   ageMin                  Int?
   ageMax                  Int?
   primaryMeetUpPoint      String?
@@ -481,27 +456,19 @@ model run_crews {
   longRunMilesMax         Float?
   timePreference          TimePreference[]          @default([])
   purpose                 Purpose[]                 @default([])
-  trainingForRace         String? // race_registry.id (nullable)
+  trainingForRace         String?
   trainingForDistance     TrainingForDistance[]     @default([])
+  easyMilesPace           Int?
+  crushingItPace          Int?
+  handle                  String                    @unique
   join_codes              join_codes[]
-  run_crew_specific_races run_crew_specific_races[]
   run_crew_announcements  run_crew_announcements[]
   run_crew_events         run_crew_events[]
   run_crew_memberships    run_crew_memberships[]
   run_crew_messages       run_crew_messages[]
-  city_runs               city_runs[]
-  race_registry           race_registry?            @relation("TrainingForRace", fields: [trainingForRace], references: [id], onDelete: SetNull)
-}
-
-model run_crew_specific_races {
-  id             String        @id @default(cuid())
-  runCrewId      String
-  raceRegistryId String
-  createdAt      DateTime      @default(now())
-  run_crews      run_crews     @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  race_registry  race_registry @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
-
-  @@unique([runCrewId, raceRegistryId])
+  run_crew_runs           run_crew_runs[]
+  run_crew_specific_races run_crew_specific_races[]
+  race_registry           race_registry?            @relation(fields: [trainingForRace], references: [id])
 }
 
 model training_days_executed {
@@ -603,35 +570,46 @@ model training_schemas {
   updatedAt   DateTime
 }
 
-// Workout Model - Coach-authored, reusable workout intent
-// This represents intent, not execution data, and does not depend on training_plan_days
-model Workout {
-  id             String         @id @default(cuid())
-  title          String // Required
-  workoutType    WorkoutType // Required
-  description    String? // Coach notes / intent
+model workouts {
+  id             String         @id
+  title          String
+  workoutType    WorkoutType
+  description    String?
   workoutFormat  WorkoutFormat?
   totalMiles     Float?
   warmUpMiles    Float?
   mainSetMiles   Float?
   coolDownMiles  Float?
   effortType     EffortType?
-  effortModifier Float? // sec/mi OR RPE
-  athleteId      String // FK for authorship and lookup
+  effortModifier Float?
+  athleteId      String
   createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-
-  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  updatedAt      DateTime
+  Athlete        Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
   @@index([athleteId])
   @@index([workoutType])
-  @@map("workouts")
+}
+
+enum EffortType {
+  Easy
+  MarathonEffort
+  HalfMarathonEffort
+  TenKEffort
+  FiveKEffort
+  RPE
 }
 
 enum Gender {
   male
   female
   both
+}
+
+enum Purpose {
+  Training
+  Fun
+  Social
 }
 
 enum RunCrewRole {
@@ -694,12 +672,6 @@ enum State {
   WY
 }
 
-enum Purpose {
-  Training
-  Fun
-  Social
-}
-
 enum TimePreference {
   Morning
   Afternoon
@@ -714,15 +686,6 @@ enum TrainingForDistance {
   Ultra
 }
 
-enum WorkoutType {
-  Easy
-  Tempo
-  Intervals
-  LongRun
-  Speed
-  Strength
-}
-
 enum WorkoutFormat {
   Continuous
   WarmupMainCooldown
@@ -730,33 +693,11 @@ enum WorkoutFormat {
   IntervalsUnstructured
 }
 
-enum EffortType {
+enum WorkoutType {
   Easy
-  MarathonEffort
-  HalfMarathonEffort
-  TenKEffort
-  FiveKEffort
-  RPE
-}
-
-//
-// ─── CITIES (City Reference Model) ────────────────────────────
-//
-// Cities: Lightweight reference model for GTM and public surfacing
-// All runs (both public city runs and private crew runs) belong to a city
-//
-
-model cities {
-  id        String   @id @default(cuid())
-  slug      String   @unique // URL-friendly identifier (e.g., "boston", "new-york")
-  name      String // Display name (e.g., "Boston", "New York")
-  state     String? // State abbreviation (e.g., "MA", "NY")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Note: city_runs now uses citySlug (string) instead of FK to cities
-  // This allows for simpler city handling without requiring city records
-
-  @@index([slug])
-  @@index([name])
+  Tempo
+  Intervals
+  LongRun
+  Speed
+  Strength
 }
