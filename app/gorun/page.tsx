@@ -73,7 +73,7 @@ export default function GoRunPage() {
         setRuns(fetchedRuns);
         
         // Extract unique cities and days
-        const cities = [...new Set(fetchedRuns.map((r: Run) => r.citySlug))].sort();
+        const cities: string[] = [...new Set(fetchedRuns.map((r: Run) => r.citySlug))].sort() as string[];
         setAvailableCities(cities);
         
         const days = new Set<string>();
@@ -179,102 +179,87 @@ export default function GoRunPage() {
         {/* Runs List */}
         {runs.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {runs.map((run) => (
-              <div
-                key={run.id}
-                onClick={() => router.push(`/gorun/${run.id}`)}
-                className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow cursor-pointer"
-              >
-                {/* Run Title */}
-                <h3 className="text-xl font-bold text-gray-900 mb-3">
-                  {run.title}
-                </h3>
+            {runs.map((run) => {
+              // Format city name from citySlug or use meetUpCity
+              const cityName = run.meetUpCity || 
+                run.citySlug.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+              
+              return (
+                <div
+                  key={run.id}
+                  onClick={() => router.push(`/gorun/${run.id}`)}
+                  className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all cursor-pointer border border-gray-200 hover:border-orange-300"
+                >
+                  {/* Run Name */}
+                  <h3 className="text-xl font-bold text-gray-900 mb-4 line-clamp-2">
+                    {run.title}
+                  </h3>
 
-                {/* Date & Time */}
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center gap-2 text-gray-700">
-                    <Calendar className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm">
-                      {run.isRecurring ? (
-                        <span>
-                          Every <span className="font-semibold">{run.dayOfWeek}</span>
-                        </span>
-                      ) : (
-                        formatDate(run.startDate)
-                      )}
-                    </span>
+                  {/* Mileage & Pace */}
+                  <div className="flex items-center gap-4 mb-3">
+                    {run.totalMiles && (
+                      <div className="flex items-center gap-1.5 text-gray-700">
+                        <span className="text-lg">🏃</span>
+                        <span className="font-semibold">{run.totalMiles}</span>
+                        <span className="text-sm text-gray-600">miles</span>
+                      </div>
+                    )}
+                    {run.pace && (
+                      <div className="flex items-center gap-1.5 text-gray-700">
+                        <span className="text-lg">⚡</span>
+                        <span className="font-semibold">{run.pace}</span>
+                      </div>
+                    )}
                   </div>
 
-                  {(run.startTimeHour !== null && run.startTimeMinute !== null) && (
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <Clock className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm">
-                        {formatTime(run.startTimeHour, run.startTimeMinute, run.startTimePeriod)}
+                  {/* City */}
+                  <div className="flex items-center gap-2 text-gray-600 mb-4">
+                    <MapPin className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm font-medium">{cityName}</span>
+                  </div>
+
+                  {/* Date & Time */}
+                  <div className="space-y-1.5 mb-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-gray-400" />
+                      <span>
+                        {run.isRecurring ? (
+                          <span>
+                            Every <span className="font-semibold text-gray-900">{run.dayOfWeek}</span>
+                          </span>
+                        ) : (
+                          formatDate(run.startDate)
+                        )}
                       </span>
                     </div>
-                  )}
+                    {(run.startTimeHour !== null && run.startTimeMinute !== null) && (
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-gray-400" />
+                        <span>{formatTime(run.startTimeHour, run.startTimeMinute, run.startTimePeriod)}</span>
+                      </div>
+                    )}
+                  </div>
 
-                  <div className="flex items-start gap-2 text-gray-700">
-                    <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
-                    <div className="text-sm">
-                      <div className="font-medium">{run.meetUpPoint}</div>
-                      {(run.meetUpStreetAddress || run.meetUpCity) && (
-                        <div className="text-gray-500">
-                          {[run.meetUpStreetAddress, run.meetUpCity, run.meetUpState]
-                            .filter(Boolean)
-                            .join(', ')}
-                        </div>
-                      )}
+                  {/* Location (truncated) */}
+                  <div className="mb-4">
+                    <div className="text-sm text-gray-700 font-medium line-clamp-1">
+                      {run.meetUpPoint}
                     </div>
                   </div>
-                </div>
 
-                {/* Run Details */}
-                <div className="flex flex-wrap gap-3 mb-4">
-                  {run.totalMiles && (
-                    <div className="text-sm text-gray-600">
-                      <span className="font-semibold">{run.totalMiles}</span> miles
-                    </div>
-                  )}
-                  {run.pace && (
-                    <div className="text-sm text-gray-600">
-                      Pace: <span className="font-semibold">{run.pace}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Description */}
-                {run.description && (
-                  <p className="text-sm text-gray-600 mb-4 line-clamp-3">
-                    {run.description}
-                  </p>
-                )}
-
-                {/* Actions */}
-                <div className="flex gap-2">
+                  {/* View Details Button */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       router.push(`/gorun/${run.id}`);
                     }}
-                    className="flex-1 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-semibold transition"
+                    className="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-lg font-semibold transition text-sm"
                   >
                     View Details
                   </button>
-                  {run.stravaMapUrl && (
-                    <a
-                      href={run.stravaMapUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-                    >
-                      <Map className="h-5 w-5 text-gray-600" />
-                    </a>
-                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="bg-white rounded-xl shadow-lg p-12 text-center">

@@ -42,36 +42,9 @@ export async function GET(
 
     const { runId } = await params;
 
-    // Fetch run
+    // Fetch run with RSVPs
     const run = await prisma.city_runs.findUnique({
       where: { id: runId },
-      select: {
-        id: true,
-        title: true,
-        citySlug: true,
-        isRecurring: true,
-        dayOfWeek: true,
-        startDate: true,
-        date: true,
-        endDate: true,
-        runClubSlug: true,
-        runCrewId: true,
-        meetUpPoint: true,
-        meetUpStreetAddress: true,
-        meetUpCity: true,
-        meetUpState: true,
-        meetUpZip: true,
-        meetUpLat: true,
-        meetUpLng: true,
-        startTimeHour: true,
-        startTimeMinute: true,
-        startTimePeriod: true,
-        timezone: true,
-        totalMiles: true,
-        pace: true,
-        description: true,
-        stravaMapUrl: true,
-      },
       include: {
         run_crew_run_rsvps: {
           include: {
@@ -163,6 +136,7 @@ export async function GET(
     // Get current user's RSVP (if authenticated)
     const userRSVP = athlete ? run.run_crew_run_rsvps.find((r: any) => r.athleteId === athlete.id) : null;
     
+    // Format response (exclude sensitive fields)
     return NextResponse.json({
       success: true,
       run: {
@@ -193,7 +167,12 @@ export async function GET(
         stravaMapUrl: run.stravaMapUrl,
         runClub,
         runCrew,
-        rsvps: run.run_crew_run_rsvps,
+        rsvps: run.run_crew_run_rsvps.map((rsvp: any) => ({
+          id: rsvp.id,
+          status: rsvp.status,
+          athleteId: rsvp.athleteId,
+          Athlete: rsvp.Athlete,
+        })),
         currentRSVP: userRSVP?.status || null,
       },
     });

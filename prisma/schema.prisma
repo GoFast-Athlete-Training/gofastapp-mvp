@@ -161,7 +161,7 @@ model race_registry {
   distanceKm    Float? // Exact distance in kilometers
 
   // Date & Time
-  raceDate                DateTime // Race date
+  raceDate              DateTime // Race date
   startTime             DateTime? // Actual start time (e.g., "2025-04-21T09:00:00Z")
   endTime               DateTime? // Expected end time (for cutoff)
   timezone              String? // e.g., "America/New_York"
@@ -377,24 +377,24 @@ model run_crew_run_rsvps {
 // Unified model: handles both public city runs and private crew runs
 // @deprecated Use `city_runs` model name (table name kept as `run_crew_runs` for backwards compatibility)
 model city_runs {
-  id                 String               @id @default(cuid())
-  citySlug           String // City slug (e.g., "boston", "new-york") - extracted from Google Maps address or user input
-  runCrewId          String? // Nullable: null = public city run, set = private crew run (app group)
-  runClubSlug        String? // Nullable: official RunClub affiliation (string ref to RunClub.slug in GoFastCompany)
-  staffGeneratedId   String? // Nullable: GoFastCompany staff ID (string ref to CompanyStaff.id in GoFastCompany)
-  athleteGeneratedId String? // Nullable: Athlete ID (when user-created in gofastapp-mvp)
-  title              String
-  isRecurring        Boolean              @default(false) // true = standing/recurring run, false = single run
-  dayOfWeek          String? // Day of week for recurring runs (e.g., "Monday", "Tuesday", "Wednesday", etc.)
-  startDate          DateTime // Start date (for single runs, this is the run date; for recurring, this is when recurrence starts)
-  endDate            DateTime? // End date for recurring runs (null = no end date, or end of recurrence period)
-  date               DateTime // @deprecated: Use startDate instead (kept for backward compatibility)
-  startTimeHour      Int?
-  startTimeMinute    Int?
-  startTimePeriod    String?
-  timezone           String?
-  meetUpPoint        String
-  meetUpAddress      String? // @deprecated: Use meetUpStreetAddress, meetUpCity, meetUpState instead (kept for backward compatibility)
+  id                  String               @id @default(cuid())
+  citySlug            String // City slug (e.g., "boston", "new-york") - extracted from Google Maps address or user input
+  runCrewId           String? // Nullable: null = public city run, set = private crew run (app group)
+  runClubSlug         String? // Nullable: official RunClub affiliation (string ref to RunClub.slug in GoFastCompany)
+  staffGeneratedId    String? // Nullable: GoFastCompany staff ID (string ref to CompanyStaff.id in GoFastCompany)
+  athleteGeneratedId  String? // Nullable: Athlete ID (when user-created in gofastapp-mvp)
+  title               String
+  isRecurring         Boolean              @default(false) // true = standing/recurring run, false = single run
+  dayOfWeek           String? // Day of week for recurring runs (e.g., "Monday", "Tuesday", "Wednesday", etc.)
+  startDate           DateTime // Start date (for single runs, this is the run date; for recurring, this is when recurrence starts)
+  endDate             DateTime? // End date for recurring runs (null = no end date, or end of recurrence period)
+  date                DateTime // @deprecated: Use startDate instead (kept for backward compatibility)
+  startTimeHour       Int?
+  startTimeMinute     Int?
+  startTimePeriod     String?
+  timezone            String?
+  meetUpPoint         String
+  meetUpAddress       String? // @deprecated: Use meetUpStreetAddress, meetUpCity, meetUpState instead (kept for backward compatibility)
   meetUpStreetAddress String? // Street address (e.g., "1234 Wilson Blvd")
   meetUpCity          String? // City name (e.g., "Arlington")
   meetUpState         String? // State abbreviation (e.g., "VA")
@@ -402,19 +402,19 @@ model city_runs {
   meetUpPlaceId       String?
   meetUpLat           Float?
   meetUpLng           Float?
-  endPoint           String? // Optional end point if different from meet up point
-  recurrenceRule     String? // @deprecated: Use isRecurring + dayOfWeek + startDate + endDate instead
-  recurrenceEndsOn   DateTime? // @deprecated: Use endDate instead
-  recurrenceNote     String?
-  totalMiles         Float?
-  pace               String?
-  stravaMapUrl       String?
-  description        String?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  run_crew_run_rsvps run_crew_run_rsvps[]
-  Athlete            Athlete?             @relation(fields: [athleteGeneratedId], references: [id], onDelete: Cascade)
-  run_crews          run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  endPoint            String? // Optional end point if different from meet up point
+  recurrenceRule      String? // @deprecated: Use isRecurring + dayOfWeek + startDate + endDate instead
+  recurrenceEndsOn    DateTime? // @deprecated: Use endDate instead
+  recurrenceNote      String?
+  totalMiles          Float?
+  pace                String?
+  stravaMapUrl        String?
+  description         String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  run_crew_run_rsvps  run_crew_run_rsvps[]
+  Athlete             Athlete?             @relation(fields: [athleteGeneratedId], references: [id], onDelete: Cascade)
+  run_crews           run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
 
   @@index([citySlug]) // For querying/filtering by city
   @@index([runCrewId])
