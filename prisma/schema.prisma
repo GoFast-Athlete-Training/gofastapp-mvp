@@ -54,7 +54,7 @@ model Athlete {
   run_crew_memberships    run_crew_memberships[]
   run_crew_messages       run_crew_messages[]
   run_crew_run_rsvps      run_crew_run_rsvps[]
-  run_crew_runs           run_crew_runs[]
+  city_runs               city_runs[]
   training_days_executed  training_days_executed[]
   training_plans          training_plans[]
   workouts                workouts[]
@@ -360,12 +360,12 @@ model run_crew_run_rsvps {
   status        String
   createdAt     DateTime      @default(now())
   Athlete       Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  run_crew_runs run_crew_runs @relation(fields: [runId], references: [id], onDelete: Cascade)
+  city_runs city_runs @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@unique([runId, athleteId])
 }
 
-model run_crew_runs {
+model city_runs {
   id                  String               @id
   runCrewId           String?
   title               String
@@ -417,6 +417,7 @@ model run_crew_runs {
   @@index([runCrewId])
   @@index([staffGeneratedId])
   @@index([startDate])
+  @@map("run_crew_runs") // Backwards compatibility: table name remains run_crew_runs
 }
 
 model run_crew_specific_races {
@@ -466,7 +467,7 @@ model run_crews {
   run_crew_events         run_crew_events[]
   run_crew_memberships    run_crew_memberships[]
   run_crew_messages       run_crew_messages[]
-  run_crew_runs           run_crew_runs[]
+  city_runs               city_runs[]
   run_crew_specific_races run_crew_specific_races[]
   race_registry           race_registry?            @relation(fields: [trainingForRace], references: [id])
 }

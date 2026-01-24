@@ -959,7 +959,7 @@ export async function createRun(data: {
         .replace(/^-+|-+$/g, "")
     : "unknown"; // Fallback if no city
 
-    const run = await prisma.run_crew_runs.create({
+    const run = await prisma.city_runs.create({
     data: {
       citySlug,
       runCrewId: data.runCrewId,

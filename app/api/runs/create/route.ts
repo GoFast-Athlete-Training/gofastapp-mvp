@@ -234,7 +234,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the run
-    const run = await prisma.run_crew_runs.create({
+    const run = await prisma.city_runs.create({
       data: {
         citySlug: finalCitySlug,
         runCrewId: runCrewId?.trim() || null,
