@@ -9,20 +9,20 @@ async function initCompany() {
     console.log('🔧 Initializing GoFast Company...\n');
 
     // First, try to find existing company by slug
-    let company = await prisma.goFastCompany.findUnique({
+    let company = await prisma.go_fast_companies.findUnique({
       where: { slug: DEFAULT_COMPANY_SLUG },
     });
 
     if (!company) {
       // Try to find by ID
-      company = await prisma.goFastCompany.findUnique({
+      company = await prisma.go_fast_companies.findUnique({
         where: { id: DEFAULT_COMPANY_ID },
       });
 
       if (!company) {
         // Create new company
         console.log('📝 Creating new GoFast Company...');
-        company = await prisma.goFastCompany.create({
+        company = await prisma.go_fast_companies.create({
           data: {
             id: DEFAULT_COMPANY_ID,
             name: 'GoFast',
@@ -32,12 +32,13 @@ async function initCompany() {
             state: 'VA',
             zip: '22207',
             domain: 'gofastcrushgoals.com',
+            updatedAt: new Date(),
           },
         });
       } else {
         // Update existing company to ensure slug is set
         console.log('🔄 Updating existing company with slug...');
-        company = await prisma.goFastCompany.update({
+        company = await prisma.go_fast_companies.update({
           where: { id: DEFAULT_COMPANY_ID },
           data: {
             slug: DEFAULT_COMPANY_SLUG,
@@ -53,7 +54,7 @@ async function initCompany() {
     } else {
       // Update existing company to ensure all fields are correct
       console.log('🔄 Updating existing GoFast Company...');
-      company = await prisma.goFastCompany.update({
+      company = await prisma.go_fast_companies.update({
         where: { slug: DEFAULT_COMPANY_SLUG },
         data: {
           name: 'GoFast',

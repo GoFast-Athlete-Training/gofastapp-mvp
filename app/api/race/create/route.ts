@@ -4,6 +4,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 
+// Generate a simple unique ID (cuid-like format)
+function generateId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 15);
+  return `c${timestamp}${random}`;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -58,6 +65,7 @@ export async function POST(request: NextRequest) {
       // Create new race in registry
       race = await prisma.race_registry.create({
         data: {
+          id: generateId(),
           name: name.trim(),
           raceType: finalRaceType,
           distanceMiles: distanceMiles,
@@ -65,6 +73,7 @@ export async function POST(request: NextRequest) {
           city: city || null,
           state: state || null,
           country: country || 'USA',
+          updatedAt: new Date(),
         },
       });
     }

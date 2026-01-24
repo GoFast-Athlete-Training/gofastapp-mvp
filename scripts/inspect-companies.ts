@@ -14,7 +14,7 @@ async function inspectCompanies() {
     console.log('\n🔍 Inspecting all companies in database...\n');
 
     // Get all companies ordered by creation date
-    const companies = await prisma.goFastCompany.findMany({
+    const companies = await prisma.go_fast_companies.findMany({
       orderBy: { createdAt: 'asc' },
       include: {
         Athlete: {

@@ -45,6 +45,7 @@ export async function POST(request: Request) {
             state: 'VA',
             zip: '22207',
             domain: 'gofastcrushgoals.com',
+            updatedAt: new Date(),
           },
         });
         console.log('✅ COMPANY INIT: Created new company');

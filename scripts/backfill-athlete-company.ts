@@ -7,14 +7,15 @@ async function backfillAthleteCompany() {
     console.log('🔄 Backfilling companyId for athletes...\n');
 
     // Step 1: Ensure company exists
-    let company = await prisma.goFastCompany.findUnique({
+    let company = await prisma.go_fast_companies.findUnique({
       where: { slug: DEFAULT_COMPANY_SLUG },
     });
 
     if (!company) {
       console.log('⚠️  GoFast Company not found. Creating it first...');
-      company = await prisma.goFastCompany.create({
+      company = await prisma.go_fast_companies.create({
         data: {
+          id: `c${Date.now().toString(36)}${Math.random().toString(36).substring(2, 15)}`,
           name: 'GoFast',
           slug: DEFAULT_COMPANY_SLUG,
           address: '2604 N. George Mason Dr.',
@@ -22,6 +23,7 @@ async function backfillAthleteCompany() {
           state: 'VA',
           zip: '22207',
           domain: 'gofastcrushgoals.com',
+          updatedAt: new Date(),
         },
       });
       console.log(`✅ Created company with ID: ${company.id}\n`);

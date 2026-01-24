@@ -95,6 +95,7 @@ export async function GET(
                     name: clubData.runClub.name,
                     logoUrl: clubData.runClub.logoUrl || clubData.runClub.logo || null,
                     city: clubData.runClub.city || null,
+                    updatedAt: new Date(),
                   },
                   update: {
                     name: clubData.runClub.name,

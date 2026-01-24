@@ -80,6 +80,7 @@ export async function saveRunClub(runClub: {
           logoUrl: runClub.logoUrl || runClub.logo || null,
           city: runClub.city || null,
           syncedAt: new Date(),
+          updatedAt: new Date(),
         },
       });
       return created;

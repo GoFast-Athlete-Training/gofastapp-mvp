@@ -25,7 +25,7 @@ async function checkAthletes() {
         firebaseId: true,
         gofastHandle: true,
         companyId: true,
-        goFastCompany: {
+        go_fast_companies: {
           select: {
             id: true,
             name: true,
@@ -46,7 +46,7 @@ async function checkAthletes() {
       console.log(`   ID: ${athlete.id}`);
       console.log(`   Firebase ID: ${athlete.firebaseId}`);
       console.log(`   Handle: ${athlete.gofastHandle || 'none'}`);
-      console.log(`   Company: ${athlete.goFastCompany?.name || 'Unknown'} (${athlete.companyId || 'MISSING'})`);
+      console.log(`   Company: ${athlete.go_fast_companies?.name || 'Unknown'} (${athlete.companyId || 'MISSING'})`);
       if (!athlete.companyId) {
         console.log(`   ⚠️  WARNING: This athlete has no companyId! Run backfill script.`);
       }

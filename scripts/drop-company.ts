@@ -18,7 +18,7 @@ async function dropCompany() {
     console.log('\n🔍 Identifying companies to drop...\n');
 
     // Get all companies ordered by creation date
-    const companies = await prisma.goFastCompany.findMany({
+    const companies = await prisma.go_fast_companies.findMany({
       orderBy: { createdAt: 'asc' },
       include: {
         Athlete: {
@@ -80,7 +80,7 @@ async function dropCompany() {
     
     // Delete the second company
     console.log(`\n🗑️  Deleting second company...`);
-    await prisma.goFastCompany.delete({
+    await prisma.go_fast_companies.delete({
       where: { id: secondCompany.id },
     });
 

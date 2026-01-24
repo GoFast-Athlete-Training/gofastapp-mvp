@@ -1,6 +1,13 @@
 import { prisma } from './prisma';
 import { normalizeAthleteMemberships } from './normalize-prisma';
 
+// Generate a simple unique ID (cuid-like format)
+function generateId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 15);
+  return `c${timestamp}${random}`;
+}
+
 export async function getAthleteById(athleteId: string) {
   return prisma.athlete.findUnique({
     where: { id: athleteId },
@@ -21,7 +28,11 @@ export async function createAthlete(data: {
   companyId: string;
 }) {
   return prisma.athlete.create({
-    data,
+    data: {
+      ...data,
+      id: generateId(),
+      updatedAt: new Date(),
+    },
   });
 }
 
@@ -35,7 +46,7 @@ export async function hydrateAthlete(athleteId: string) {
     athlete = await prisma.athlete.findUnique({
       where: { id: athleteId },
       include: {
-        goFastCompany: {
+        go_fast_companies: {
           select: {
             id: true,
             name: true,
@@ -123,7 +134,7 @@ export async function hydrateAthlete(athleteId: string) {
         athlete = await prisma.athlete.findUnique({
           where: { id: athleteId },
           include: {
-            goFastCompany: {
+            go_fast_companies: {
               select: {
                 id: true,
                 name: true,

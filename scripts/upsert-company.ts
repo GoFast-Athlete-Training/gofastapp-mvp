@@ -7,13 +7,13 @@ async function upsertGoFastCompany() {
     console.log('🚀 Upserting GoFast Company...\n');
 
     // Check if company exists by slug
-    let company = await prisma.goFastCompany.findUnique({
+    let company = await prisma.go_fast_companies.findUnique({
       where: { slug: DEFAULT_COMPANY_SLUG },
     });
 
     if (company) {
       console.log('📝 Updating existing company...');
-      company = await prisma.goFastCompany.update({
+      company = await prisma.go_fast_companies.update({
         where: { slug: DEFAULT_COMPANY_SLUG },
         data: {
           name: 'GoFast',
@@ -27,8 +27,9 @@ async function upsertGoFastCompany() {
       console.log('✅ Company updated successfully');
     } else {
       console.log('📝 Creating new company...');
-      company = await prisma.goFastCompany.create({
+      company = await prisma.go_fast_companies.create({
         data: {
+          id: `c${Date.now().toString(36)}${Math.random().toString(36).substring(2, 15)}`,
           name: 'GoFast',
           slug: DEFAULT_COMPANY_SLUG,
           address: '2604 N. George Mason Dr.',
@@ -36,6 +37,7 @@ async function upsertGoFastCompany() {
           state: 'VA',
           zip: '22207',
           domain: 'gofastcrushgoals.com',
+          updatedAt: new Date(),
         },
       });
       console.log('✅ Company created successfully');

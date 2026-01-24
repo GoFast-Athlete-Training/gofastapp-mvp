@@ -4,6 +4,13 @@ import { saveRunClub } from "@/lib/save-runclub";
 
 export const dynamic = "force-dynamic";
 
+// Generate a simple unique ID (cuid-like format)
+function generateId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 15);
+  return `c${timestamp}${random}`;
+}
+
 // CORS headers for GoFastCompany
 const corsHeaders = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_COMPANY_APP_URL || 'https://gofasthq.gofastcrushgoals.com',
@@ -236,6 +243,7 @@ export async function POST(request: NextRequest) {
     // Create the run
     const run = await prisma.city_runs.create({
       data: {
+        id: generateId(),
         citySlug: finalCitySlug,
         runCrewId: runCrewId?.trim() || null,
         runClubSlug: finalRunClubSlug,
@@ -268,6 +276,7 @@ export async function POST(request: NextRequest) {
         pace: pace?.trim() || null,
         stravaMapUrl: stravaMapUrl?.trim() || null,
         description: description?.trim() || null,
+        updatedAt: new Date(),
       },
       include: {
         run_crews: true,

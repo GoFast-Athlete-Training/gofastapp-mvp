@@ -279,9 +279,17 @@ export async function createCrew(data: {
     }
   }
 
+  // Generate a simple unique ID (cuid-like format)
+  function generateId(): string {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 15);
+    return `c${timestamp}${random}`;
+  }
+
   // Create the crew
   const crew = await prisma.run_crews.create({
     data: {
+      id: generateId(),
       name: data.name,
       handle,
       description: data.description,
@@ -305,15 +313,18 @@ export async function createCrew(data: {
       longRunMilesMax: data.longRunMilesMax,
       trainingForRace: data.trainingForRace || null,
       trainingForDistance: data.trainingForDistance as any || [],
+      updatedAt: new Date(),
     },
   });
 
   // Create membership with admin role
   await prisma.run_crew_memberships.create({
     data: {
+      id: generateId(),
       runCrewId: crew.id,
       athleteId: data.athleteId,
       role: 'admin',
+      updatedAt: new Date(),
     },
   });
 
@@ -344,12 +355,21 @@ export async function joinCrew(joinCode: string, athleteId: string) {
     return crew;
   }
 
+  // Generate a simple unique ID (cuid-like format)
+  function generateMembershipId(): string {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 15);
+    return `c${timestamp}${random}`;
+  }
+
   // Create membership with member role
   await prisma.run_crew_memberships.create({
     data: {
+      id: generateMembershipId(),
       runCrewId: crew.id,
       athleteId,
       role: 'member',
+      updatedAt: new Date(),
     },
   });
 
@@ -907,12 +927,21 @@ export async function joinCrewById(runCrewId: string, athleteId: string) {
     return crew;
   }
 
+  // Generate a simple unique ID (cuid-like format)
+  function generateMembershipId(): string {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 15);
+    return `c${timestamp}${random}`;
+  }
+
   // Create membership with member role
   await prisma.run_crew_memberships.create({
     data: {
+      id: generateMembershipId(),
       runCrewId: crew.id,
       athleteId,
       role: 'member',
+      updatedAt: new Date(),
     },
   });
 
@@ -959,8 +988,16 @@ export async function createRun(data: {
         .replace(/^-+|-+$/g, "")
     : "unknown"; // Fallback if no city
 
+  // Generate a simple unique ID (cuid-like format)
+  function generateRunId(): string {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 15);
+    return `c${timestamp}${random}`;
+  }
+
     const run = await prisma.city_runs.create({
     data: {
+      id: generateRunId(),
       citySlug,
       runCrewId: data.runCrewId,
       athleteGeneratedId: data.athleteId, // Use athleteGeneratedId for user-created runs
@@ -980,6 +1017,7 @@ export async function createRun(data: {
       pace: data.pace ?? null,
       stravaMapUrl: data.stravaMapUrl ?? null,
       description: data.description ?? null,
+      updatedAt: new Date(),
     },
   });
 
@@ -1020,12 +1058,21 @@ export async function postMessage(data: {
     });
   }
 
+  // Generate a simple unique ID (cuid-like format)
+  function generateMessageId(): string {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 15);
+    return `c${timestamp}${random}`;
+  }
+
   const message = await prisma.run_crew_messages.create({
     data: {
+      id: generateMessageId(),
       runCrewId: data.runCrewId,
       athleteId: data.athleteId,
       content: data.content,
       topic: data.topic || '#general',
+      updatedAt: new Date(),
     },
     include: {
       Athlete: {
@@ -1063,12 +1110,21 @@ export async function postAnnouncement(data: {
     },
   });
 
+  // Generate a simple unique ID (cuid-like format)
+  function generateAnnouncementId(): string {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 15);
+    return `c${timestamp}${random}`;
+  }
+
   const announcement = await prisma.run_crew_announcements.create({
     data: {
+      id: generateAnnouncementId(),
       runCrewId: data.runCrewId,
       authorId: data.authorId, // Schema uses authorId, not athleteId
       title: data.title,
       content: data.content,
+      updatedAt: new Date(),
     },
     include: {
       Athlete: {
@@ -1093,6 +1149,13 @@ export async function rsvpToRun(data: {
   athleteId: string;
   status: 'going' | 'not-going';
 }) {
+  // Generate a simple unique ID (cuid-like format)
+  function generateRsvpId(): string {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 15);
+    return `c${timestamp}${random}`;
+  }
+
   const rsvp = await prisma.run_crew_run_rsvps.upsert({
     where: {
       runId_athleteId: {
@@ -1104,6 +1167,7 @@ export async function rsvpToRun(data: {
       status: data.status,
     },
     create: {
+      id: generateRsvpId(),
       runId: data.runId,
       athleteId: data.athleteId,
       status: data.status,

@@ -67,6 +67,7 @@ export async function fetchAndSaveRunClub(slug: string): Promise<any | null> {
         logoUrl: runClub.logoUrl || runClub.logo || null, // Handle both logoUrl and logo fields
         city: runClub.city || null,
         syncedAt: new Date(),
+        updatedAt: new Date(),
       },
     });
 

@@ -19,7 +19,7 @@ async function migrateAndDropCompany() {
     console.log('='.repeat(60));
 
     // Step 1: Get all companies ordered by creation date
-    const companies = await prisma.goFastCompany.findMany({
+    const companies = await prisma.go_fast_companies.findMany({
       orderBy: { createdAt: 'asc' },
       include: {
         Athlete: {
@@ -120,7 +120,7 @@ async function migrateAndDropCompany() {
     }
 
     if (Object.keys(updateData).length > 2) { // More than just name and slug
-      await prisma.goFastCompany.update({
+      await prisma.go_fast_companies.update({
         where: { id: firstCompany.id },
         data: updateData,
       });
@@ -145,7 +145,7 @@ async function migrateAndDropCompany() {
             continue;
           }
 
-          await prisma.goFastCompany.delete({
+          await prisma.go_fast_companies.delete({
             where: { id: company.id },
           });
           console.log(`   ✅ Deleted company: ${company.id}`);
@@ -157,7 +157,7 @@ async function migrateAndDropCompany() {
 
     // Step 6: Final verification
     console.log(`\n✅ Final Verification:`);
-    const finalCompanies = await prisma.goFastCompany.findMany({
+    const finalCompanies = await prisma.go_fast_companies.findMany({
       orderBy: { createdAt: 'asc' },
       include: {
         Athlete: {

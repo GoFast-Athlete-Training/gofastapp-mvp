@@ -7,7 +7,7 @@ async function checkAthleteById(athleteId: string) {
     const athlete = await prisma.athlete.findUnique({
       where: { id: athleteId },
       include: {
-        goFastCompany: {
+        go_fast_companies: {
           select: {
             id: true,
             name: true,
@@ -41,7 +41,7 @@ async function checkAthleteById(athleteId: string) {
     console.log(`Email: ${athlete.email || 'none'}`);
     console.log(`Name: ${athlete.firstName || ''} ${athlete.lastName || ''}`.trim() || 'No name');
     console.log(`Handle: ${athlete.gofastHandle || 'none'}`);
-    console.log(`Company: ${athlete.goFastCompany?.name || 'Unknown'} (${athlete.companyId || 'MISSING'})`);
+    console.log(`Company: ${athlete.go_fast_companies?.name || 'Unknown'} (${athlete.companyId || 'MISSING'})`);
     console.log(`Created: ${athlete.createdAt}`);
     console.log(`Updated: ${athlete.updatedAt}`);
     console.log(`Garmin Connected: ${athlete.garmin_is_connected ? '✅ Yes' : '❌ No'} (${athlete.garmin_user_id || 'no ID'})`);

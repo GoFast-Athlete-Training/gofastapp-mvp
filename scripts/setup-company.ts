@@ -17,19 +17,19 @@ async function setupCompany() {
 
     // Step 1: Initialize Company
     console.log('\n📦 Step 1: Ensuring GoFastCompany exists...');
-    let company = await prisma.goFastCompany.findUnique({
+    let company = await prisma.go_fast_companies.findUnique({
       where: { slug: DEFAULT_COMPANY_SLUG },
     });
 
     if (!company) {
-      company = await prisma.goFastCompany.findUnique({
+      company = await prisma.go_fast_companies.findUnique({
         where: { id: DEFAULT_COMPANY_ID },
       });
     }
 
     if (!company) {
       console.log('   Creating new company...');
-      company = await prisma.goFastCompany.create({
+      company = await prisma.go_fast_companies.create({
         data: {
           id: DEFAULT_COMPANY_ID,
           name: 'GoFast',
@@ -39,6 +39,7 @@ async function setupCompany() {
           state: 'VA',
           zip: '22207',
           domain: 'gofastcrushgoals.com',
+          updatedAt: new Date(),
         },
       });
       console.log(`   ✅ Company created: ${company.id}`);
