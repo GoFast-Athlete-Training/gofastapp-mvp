@@ -155,12 +155,25 @@ export async function POST(request: Request) {
         trainingForRace: trainingForRace || undefined,
         trainingForDistance: Array.isArray(trainingForDistance) && trainingForDistance.length > 0 ? trainingForDistance : undefined,
       });
-    } catch (err) {
-      console.error('Prisma error:', err);
-      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    } catch (err: any) {
+      console.error('❌ RUNCREW CREATE: Error creating crew:', err);
+      console.error('❌ RUNCREW CREATE: Error details:', err?.message, err?.code);
+      return NextResponse.json({ 
+        success: false,
+        error: 'Failed to create run crew',
+        details: err?.message || 'Unknown error'
+      }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, runCrew: crew });
+    if (!crew) {
+      console.error('❌ RUNCREW CREATE: createCrew returned null/undefined');
+      return NextResponse.json({ 
+        success: false,
+        error: 'Failed to create run crew - no crew returned'
+      }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, runCrew: crew }, { status: 200 });
   } catch (err) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }

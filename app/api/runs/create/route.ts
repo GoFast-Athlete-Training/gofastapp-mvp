@@ -4,6 +4,22 @@ import { saveRunClub } from "@/lib/save-runclub";
 
 export const dynamic = "force-dynamic";
 
+// CORS headers for GoFastCompany
+const corsHeaders = {
+  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_COMPANY_APP_URL || 'https://gofasthq.gofastcrushgoals.com',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Max-Age': '86400',
+};
+
+// Handle OPTIONS preflight request
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
+}
+
 /**
  * POST /api/runs/create
  * Create a new city run (public or private)
@@ -259,13 +275,22 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       run,
+    }, { status: 200 });
+    
+    // Add CORS headers
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      response.headers.set(key, value);
     });
+    
+    return response;
   } catch (error: any) {
     console.error("❌ RUNS CREATE: Error:", error);
-    return NextResponse.json(
+    console.error("❌ RUNS CREATE: Error details:", error?.message, error?.code, error?.stack);
+    
+    const errorResponse = NextResponse.json(
       {
         success: false,
         error: "Failed to create run",
@@ -273,6 +298,13 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
+    
+    // Add CORS headers even on error
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      errorResponse.headers.set(key, value);
+    });
+    
+    return errorResponse;
   }
 }
 
