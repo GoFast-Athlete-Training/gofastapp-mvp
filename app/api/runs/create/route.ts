@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { saveRunClub } from "@/lib/save-runclub";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,8 @@ export async function POST(request: NextRequest) {
       cityName, // Optional: City name for slug generation if slug not provided
       state, // Optional: State abbreviation for slug generation
       runCrewId,
-      runClubSlug,
+      runClubSlug, // @deprecated: Use runClub object instead
+      runClub, // Full RunClub object from GoFastCompany (id, name, logoUrl, city, slug)
       staffGeneratedId,
       athleteGeneratedId,
       title,
@@ -186,12 +188,41 @@ export async function POST(request: NextRequest) {
     const runEndDateObj = endDate ? new Date(endDate) : null;
     const runDateObj = date ? new Date(date) : runStartDateObj; // Backward compatibility
 
+    // If runClub object is provided, ensure RunClub exists in DB (dual save)
+    // GoFastCompany sends full RunClub object when admin selects from dropdown
+    // Smart: Check if exists first, only save if needed
+    let finalRunClubSlug: string | null = null;
+    if (runClub) {
+      // Use full RunClub object (preferred - has id, name, logoUrl, city)
+      finalRunClubSlug = runClub.slug || runClubSlug?.trim() || null;
+      
+      if (finalRunClubSlug) {
+        // Save RunClub data directly from provided object (checks if exists first)
+        // Uses acqRunClubId and full object from GoFastCompany
+        // If already exists, skips save (smart - avoids unnecessary DB writes)
+        await saveRunClub({
+          slug: finalRunClubSlug,
+          name: runClub.name,
+          logoUrl: runClub.logoUrl || runClub.logo || null,
+          city: runClub.city || null,
+        }).catch((error) => {
+          console.warn(`Failed to save RunClub during run creation:`, error);
+          // Continue with run creation even if RunClub save fails
+        });
+      }
+    } else if (runClubSlug) {
+      // Fallback: if only slug provided (backward compatibility)
+      finalRunClubSlug = runClubSlug.trim();
+      // Don't fetch here - fetch/sync is separate concern
+      // RunClub data will be hydrated on display if missing
+    }
+
     // Create the run
     const run = await prisma.city_runs.create({
       data: {
         citySlug: finalCitySlug,
         runCrewId: runCrewId?.trim() || null,
-        runClubSlug: runClubSlug?.trim() || null,
+        runClubSlug: finalRunClubSlug,
         staffGeneratedId: staffGeneratedId?.trim() || null,
         athleteGeneratedId: athleteGeneratedId?.trim() || null,
         title: title.trim(),

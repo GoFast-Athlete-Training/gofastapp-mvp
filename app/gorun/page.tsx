@@ -1,0 +1,296 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { LocalStorageAPI } from '@/lib/localstorage';
+import TopNav from '@/components/shared/TopNav';
+import api from '@/lib/api';
+import { MapPin, Calendar, Clock, Map } from 'lucide-react';
+
+interface Run {
+  id: string;
+  title: string;
+  citySlug: string;
+  isRecurring: boolean;
+  dayOfWeek: string | null;
+  startDate: string;
+  date: string;
+  endDate: string | null;
+  runClubSlug: string | null;
+  runCrewId: string | null;
+  meetUpPoint: string;
+  meetUpStreetAddress: string | null;
+  meetUpCity: string | null;
+  meetUpState: string | null;
+  meetUpZip: string | null;
+  startTimeHour: number | null;
+  startTimeMinute: number | null;
+  startTimePeriod: string | null;
+  timezone: string | null;
+  totalMiles: number | null;
+  pace: string | null;
+  description: string | null;
+  stravaMapUrl: string | null;
+}
+
+export default function GoRunPage() {
+  const router = useRouter();
+  const [runs, setRuns] = useState<Run[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [cityFilter, setCityFilter] = useState<string>('');
+  const [dayFilter, setDayFilter] = useState<string>('');
+  const [availableCities, setAvailableCities] = useState<string[]>([]);
+  const [availableDays, setAvailableDays] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Check if user is authenticated
+    const athleteId = LocalStorageAPI.getAthleteId();
+    if (!athleteId) {
+      router.push('/signup');
+      return;
+    }
+
+    fetchRuns();
+  }, [cityFilter, dayFilter, router]);
+
+  const fetchRuns = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (cityFilter && cityFilter !== 'All Cities') {
+        params.append('citySlug', cityFilter);
+      }
+      if (dayFilter && dayFilter !== 'All Days') {
+        params.append('day', dayFilter);
+      }
+
+      const response = await api.get(`/runs?${params.toString()}`);
+      
+      if (response.data.success) {
+        const fetchedRuns = response.data.runs || [];
+        setRuns(fetchedRuns);
+        
+        // Extract unique cities and days
+        const cities = [...new Set(fetchedRuns.map((r: Run) => r.citySlug))].sort();
+        setAvailableCities(cities);
+        
+        const days = new Set<string>();
+        fetchedRuns.forEach((r: Run) => {
+          if (r.isRecurring && r.dayOfWeek) {
+            days.add(r.dayOfWeek);
+          } else {
+            const date = new Date(r.startDate);
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            days.add(dayNames[date.getDay()]);
+          }
+        });
+        const sortedDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+          .filter(d => days.has(d));
+        setAvailableDays(sortedDays);
+      }
+    } catch (error: any) {
+      console.error('Error fetching runs:', error);
+      if (error.response?.status === 401) {
+        router.push('/signup');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatTime = (hour: number | null, minute: number | null, period: string | null) => {
+    if (hour === null || minute === null) return '';
+    const minStr = minute.toString().padStart(2, '0');
+    return `${hour}:${minStr} ${period || 'AM'}`;
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <TopNav />
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Ready to go run?
+          </h1>
+          <p className="text-gray-600">
+            Select your city and see what's happening
+          </p>
+        </div>
+
+        {/* Filters */}
+        <div className="mb-8 flex flex-wrap gap-4">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              City
+            </label>
+            <select
+              value={cityFilter}
+              onChange={(e) => setCityFilter(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            >
+              <option value="">All Cities</option>
+              {availableCities.map(city => (
+                <option key={city} value={city}>
+                  {city.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Day
+            </label>
+            <select
+              value={dayFilter}
+              onChange={(e) => setDayFilter(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            >
+              <option value="">All Days</option>
+              {availableDays.map(day => (
+                <option key={day} value={day}>
+                  {day}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Runs List */}
+        {runs.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {runs.map((run) => (
+              <div
+                key={run.id}
+                onClick={() => router.push(`/gorun/${run.id}`)}
+                className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow cursor-pointer"
+              >
+                {/* Run Title */}
+                <h3 className="text-xl font-bold text-gray-900 mb-3">
+                  {run.title}
+                </h3>
+
+                {/* Date & Time */}
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <Calendar className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm">
+                      {run.isRecurring ? (
+                        <span>
+                          Every <span className="font-semibold">{run.dayOfWeek}</span>
+                        </span>
+                      ) : (
+                        formatDate(run.startDate)
+                      )}
+                    </span>
+                  </div>
+
+                  {(run.startTimeHour !== null && run.startTimeMinute !== null) && (
+                    <div className="flex items-center gap-2 text-gray-700">
+                      <Clock className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm">
+                        {formatTime(run.startTimeHour, run.startTimeMinute, run.startTimePeriod)}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex items-start gap-2 text-gray-700">
+                    <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                    <div className="text-sm">
+                      <div className="font-medium">{run.meetUpPoint}</div>
+                      {(run.meetUpStreetAddress || run.meetUpCity) && (
+                        <div className="text-gray-500">
+                          {[run.meetUpStreetAddress, run.meetUpCity, run.meetUpState]
+                            .filter(Boolean)
+                            .join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Run Details */}
+                <div className="flex flex-wrap gap-3 mb-4">
+                  {run.totalMiles && (
+                    <div className="text-sm text-gray-600">
+                      <span className="font-semibold">{run.totalMiles}</span> miles
+                    </div>
+                  )}
+                  {run.pace && (
+                    <div className="text-sm text-gray-600">
+                      Pace: <span className="font-semibold">{run.pace}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Description */}
+                {run.description && (
+                  <p className="text-sm text-gray-600 mb-4 line-clamp-3">
+                    {run.description}
+                  </p>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/gorun/${run.id}`);
+                    }}
+                    className="flex-1 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-semibold transition"
+                  >
+                    View Details
+                  </button>
+                  {run.stravaMapUrl && (
+                    <a
+                      href={run.stravaMapUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                    >
+                      <Map className="h-5 w-5 text-gray-600" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow-lg p-12 text-center">
+            <div className="text-6xl mb-4">🏃</div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              No runs found
+            </h2>
+            <p className="text-gray-600">
+              {cityFilter || dayFilter
+                ? 'Try adjusting your filters to see more runs'
+                : 'Check back soon for upcoming runs in your area'}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+

@@ -14,7 +14,8 @@ import {
   Users, 
   Activity, 
   User,
-  Trophy
+  Trophy,
+  MapPin
 } from 'lucide-react';
 import Image from 'next/image';
 import api from '@/lib/api';
@@ -334,6 +335,15 @@ export default function AthleteHomePage() {
             >
               <Trophy className="h-5 w-5" />
               <span>Race Events</span>
+            </button>
+
+            {/* GoRun */}
+            <button
+              onClick={() => router.push('/gorun')}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              <MapPin className="h-5 w-5" />
+              <span>GoRun</span>
             </button>
 
             {/* Profile */}

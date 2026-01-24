@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { fetchAndSaveRunClub } from "@/lib/runclub-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +11,8 @@ export const dynamic = "force-dynamic";
  * 
  * Body: { slug: string } - RunClub slug to pull
  * 
- * Strategy:
- * 1. Fetch RunClub from GoFastCompany API by slug
- * 2. Upsert into gofastapp-mvp run_clubs table
- * 3. Return the saved RunClub data
+ * Note: This endpoint is mainly for manual/admin use.
+ * RunClub data is automatically synced when runs are created (dual save pattern).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -28,73 +26,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get GoFastCompany API URL from environment
-    const gofastCompanyApiUrl = process.env.GOFAST_COMPANY_API_URL || process.env.NEXT_PUBLIC_GOFAST_COMPANY_API_URL;
-    
-    if (!gofastCompanyApiUrl) {
+    const savedRunClub = await fetchAndSaveRunClub(slug);
+
+    if (!savedRunClub) {
       return NextResponse.json(
-        { success: false, error: "GOFAST_COMPANY_API_URL not configured" },
-        { status: 500 }
+        { success: false, error: "Failed to fetch RunClub from GoFastCompany or RunClub not found" },
+        { status: 404 }
       );
     }
-
-    // Fetch AcqRunClub from GoFastCompany API (canonical model)
-    // Note: After consolidation, this will be /api/runclub/by-slug/[slug]
-    // For now, using runclub-public endpoint which will be updated
-    const apiUrl = `${gofastCompanyApiUrl}/api/runclub-public/by-slug/${slug}`;
-    
-    const response = await fetch(apiUrl, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        // TODO: Add auth header if needed
-      },
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        return NextResponse.json(
-          { success: false, error: "RunClub not found in GoFastCompany" },
-          { status: 404 }
-        );
-      }
-      return NextResponse.json(
-        { success: false, error: "Failed to fetch RunClub from GoFastCompany" },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
-    
-    if (!data.success || !data.runClub) {
-      return NextResponse.json(
-        { success: false, error: "Invalid response from GoFastCompany API" },
-        { status: 500 }
-      );
-    }
-
-    const runClub = data.runClub;
-
-    // Upsert into gofastapp-mvp database
-    // Only pull minimal fields needed for card/run display (name, logo, city)
-    // All rich data stays in GoFastCompany for SEO/public pages
-    const savedRunClub = await prisma.run_clubs.upsert({
-      where: { slug },
-      update: {
-        name: runClub.name,
-        logoUrl: runClub.logoUrl || runClub.logo || null, // Handle both logoUrl and logo fields
-        city: runClub.city || null,
-        syncedAt: new Date(),
-      },
-      create: {
-        slug: runClub.slug,
-        name: runClub.name,
-        logoUrl: runClub.logoUrl || runClub.logo || null, // Handle both logoUrl and logo fields
-        city: runClub.city || null,
-        syncedAt: new Date(),
-      },
-    });
 
     return NextResponse.json({
       success: true,
