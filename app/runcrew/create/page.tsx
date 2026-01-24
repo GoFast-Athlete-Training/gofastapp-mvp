@@ -1114,7 +1114,7 @@ export default function CreateCrewPage() {
                       <div>
                         <div className="font-semibold text-gray-900">{selectedRace.name}</div>
                         <div className="text-sm text-gray-600">
-                          {selectedRace.raceType?.toUpperCase()} ({selectedRace.miles} miles) • {formatRaceDate(selectedRace.date)}
+                          {selectedRace.raceType?.toUpperCase()} ({selectedRace.distanceMiles} miles) • {formatRaceDate(selectedRace.raceDate)}
                           {selectedRace.city && ` • ${selectedRace.city}, ${selectedRace.state || selectedRace.country}`}
                         </div>
                       </div>
@@ -1162,7 +1162,7 @@ export default function CreateCrewPage() {
                           >
                             <div className="font-semibold text-gray-900">{race.name}</div>
                             <div className="text-sm text-gray-600">
-                              {race.raceType?.toUpperCase()} ({race.miles} miles) • {formatRaceDate(race.date)}
+                              {race.raceType?.toUpperCase()} ({race.distanceMiles} miles) • {formatRaceDate(race.raceDate)}
                               {race.city && ` • ${race.city}, ${race.state || race.country}`}
                             </div>
                           </button>

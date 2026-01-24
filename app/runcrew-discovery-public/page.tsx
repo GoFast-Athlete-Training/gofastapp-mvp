@@ -489,7 +489,7 @@ export default function PublicGroupsPage() {
                   >
                     <option value="">All races</option>
                     {availableRaces.map((race) => {
-                      const raceDate = race.date ? new Date(race.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+                      const raceDate = race.raceDate ? new Date(race.raceDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
                       return (
                         <option key={race.id} value={race.id}>
                           {race.name}{raceDate ? ` (${raceDate})` : ''}
@@ -716,10 +716,10 @@ export default function PublicGroupsPage() {
                             <div className="pt-2 border-t border-gray-200">
                               <div className="text-xs text-gray-500 mb-1">Training for:</div>
                               <div className="text-sm font-semibold text-gray-900">{crew.race.name}</div>
-                              {crew.race.date && (
+                              {crew.race.raceDate && (
                                 <div className="text-xs text-gray-600">
-                                  {new Date(crew.race.date).toLocaleDateString()}
-                                  {crew.race.miles && ` • ${crew.race.miles} miles`}
+                                  {new Date(crew.race.raceDate).toLocaleDateString()}
+                                  {crew.race.distanceMiles && ` • ${crew.race.distanceMiles} miles`}
                                 </div>
                               )}
                             </div>

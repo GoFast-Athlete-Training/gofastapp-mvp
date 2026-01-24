@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     };
 
     const finalRaceType = raceType?.toLowerCase() || '5k';
-    const miles = milesMap[finalRaceType] || 3.1;
+    const distanceMiles = milesMap[finalRaceType] || 3.1;
 
     // Parse date string and create UTC date (race dates are date-only)
     const raceDate = new Date(date);
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     let race = await prisma.race_registry.findFirst({
       where: {
         name: name.trim(),
-        date: raceDate,
+        raceDate: raceDate,
       },
     });
 
@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
         data: {
           name: name.trim(),
           raceType: finalRaceType,
-          miles: miles,
-          date: raceDate,
+          distanceMiles: distanceMiles,
+          raceDate: raceDate,
           city: city || null,
           state: state || null,
           country: country || 'USA',
@@ -75,8 +75,8 @@ export async function POST(request: NextRequest) {
         id: race.id,
         name: race.name,
         raceType: race.raceType,
-        miles: race.miles,
-        date: race.date,
+        distanceMiles: race.distanceMiles,
+        raceDate: race.raceDate,
         city: race.city,
         state: race.state,
         country: race.country,

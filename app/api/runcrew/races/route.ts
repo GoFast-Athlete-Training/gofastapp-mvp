@@ -17,8 +17,8 @@ import { prisma } from '@/lib/prisma';
  *       id: string,
  *       name: string,
  *       raceType: string,
- *       miles: number,
- *       date: Date,
+ *       distanceMiles: number,
+ *       raceDate: Date,
  *       city: string | null,
  *       state: string | null,
  *       country: string | null
@@ -41,8 +41,8 @@ export async function GET(request: Request) {
             id: true,
             name: true,
             raceType: true,
-            miles: true,
-            date: true,
+            distanceMiles: true,
+            raceDate: true,
             city: true,
             state: true,
             country: true,
@@ -61,8 +61,8 @@ export async function GET(request: Request) {
 
     // Convert to array and sort by date (upcoming first)
     const races = Array.from(raceMap.values()).sort((a, b) => {
-      const dateA = a.date ? new Date(a.date).getTime() : 0;
-      const dateB = b.date ? new Date(b.date).getTime() : 0;
+      const dateA = a.raceDate ? new Date(a.raceDate).getTime() : 0;
+      const dateB = b.raceDate ? new Date(b.raceDate).getTime() : 0;
       return dateA - dateB;
     });
 

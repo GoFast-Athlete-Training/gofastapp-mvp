@@ -146,20 +146,108 @@ model prompt_instructions {
   @@index([promptId, order])
 }
 
+// Unified Race Model - The spine for all race-related functionality
+// Curated race data (not dependent on external APIs like RunSignup)
+// Use registrationUrl as referral link to external registration platforms
 model race_registry {
-  id                      String                    @id @default(cuid())
-  name                    String
-  raceType                String
-  miles                   Float
-  date                    DateTime
-  city                    String?
-  state                   String?
-  country                 String?
-  createdAt               DateTime                  @default(now())
-  updatedAt               DateTime                  @updatedAt
+  id String @id @default(cuid())
+
+  // Basic Identity
+  name          String
+  slug          String? @unique // URL-friendly: "boston-marathon-2025"
+  description   String?
+  raceType      String // e.g., "5k", "10k", "10m", "half", "marathon", "ultra", "other"
+  distanceMiles Float // Exact distance in miles
+  distanceKm    Float? // Exact distance in kilometers
+
+  // Date & Time
+  raceDate                DateTime // Race date
+  startTime             DateTime? // Actual start time (e.g., "2025-04-21T09:00:00Z")
+  endTime               DateTime? // Expected end time (for cutoff)
+  timezone              String? // e.g., "America/New_York"
+  registrationOpenDate  DateTime? // When registration opens
+  registrationCloseDate DateTime? // When registration closes
+
+  // Location
+  city           String?
+  state          String?
+  country        String? @default("USA")
+  address        String? // Full address
+  startLocation  String? // Start line location name
+  finishLocation String? // Finish line location name
+  startLat       Float?
+  startLng       Float?
+  finishLat      Float?
+  finishLng      Float?
+
+  // Registration & Links
+  registrationUrl    String? // Referral link to registration (RunSignup, Active.com, race website, etc.)
+  officialWebsiteUrl String? // Race official website
+  resultsUrl         String? // Link to results (post-race)
+  courseMapUrl       String? // Course map link
+  stravaSegmentUrl   String? // Strava segment link
+
+  // Course Information
+  elevationGain       Float? // Elevation gain in feet
+  elevationGainMeters Float? // Elevation gain in meters
+  surfaceType         String? // "road", "trail", "track", "mixed"
+  courseType          String? // "loop", "point-to-point", "out-and-back"
+  courseProfile       Json? // Detailed course data (elevation profile, etc.)
+
+  // Weather & Climate
+  typicalWeather     String? // "cool", "hot", "variable"
+  averageTemperature Int? // Average temp in Fahrenheit
+  averageHumidity    Int? // Average humidity percentage
+
+  // Charity & Cause
+  charitySupported   Boolean @default(false)
+  charityName        String? // Name of charity/cause
+  charityUrl         String? // Link to charity
+  charityDescription String? // Description of cause
+
+  // Organization
+  organizerName    String? // Race organizer name
+  organizerEmail   String? // Contact email
+  organizerWebsite String? // Organizer website
+
+  // Pricing (optional)
+  registrationFee   Float? // Registration fee in USD
+  earlyBirdFee      Float? // Early bird pricing
+  earlyBirdDeadline DateTime? // Early bird deadline
+
+  // Capacity & Limits
+  maxParticipants     Int? // Maximum participants
+  currentParticipants Int? // Current registrations (if tracked)
+  ageMinimum          Int? // Minimum age requirement
+  ageMaximum          Int? // Maximum age requirement
+
+  // Status & Flags
+  isActive           Boolean @default(true)
+  isVirtual          Boolean @default(false)
+  isCancelled        Boolean @default(false)
+  cancellationReason String? // Why cancelled
+
+  // Metadata
+  tags  String[] @default([]) // e.g., ["boston", "marathon", "qualifying"]
+  notes String? // Internal notes
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
   training_plans          training_plans[]
   run_crew_specific_races run_crew_specific_races[]
   run_crews_training_for  run_crews[]               @relation("TrainingForRace")
+
+  @@index([raceDate])
+  @@index([city, state])
+  @@index([raceType])
+  @@index([slug])
+  @@index([isActive])
+  @@index([charitySupported])
+  @@index([tags])
+  @@map("race_registry")
 }
 
 model return_json_formats {
@@ -289,40 +377,40 @@ model run_crew_run_rsvps {
 // Unified model: handles both public city runs and private crew runs
 // @deprecated Use `city_runs` model name (table name kept as `run_crew_runs` for backwards compatibility)
 model city_runs {
-  id                  String               @id @default(cuid())
-  citySlug            String               // City slug (e.g., "boston", "new-york") - extracted from Google Maps address or user input
-  runCrewId           String?              // Nullable: null = public city run, set = private crew run (app group)
-  runClubSlug         String?              // Nullable: official RunClub affiliation (string ref to RunClub.slug in GoFastCompany)
-  staffGeneratedId    String?              // Nullable: GoFastCompany staff ID (string ref to CompanyStaff.id in GoFastCompany)
-  athleteGeneratedId  String?              // Nullable: Athlete ID (when user-created in gofastapp-mvp)
-  title               String
-  isRecurring         Boolean              @default(false) // true = standing/recurring run, false = single run
-  dayOfWeek           String?              // Day of week for recurring runs (e.g., "Monday", "Tuesday", "Wednesday", etc.)
-  startDate           DateTime             // Start date (for single runs, this is the run date; for recurring, this is when recurrence starts)
-  endDate             DateTime?            // End date for recurring runs (null = no end date, or end of recurrence period)
-  date                DateTime             // @deprecated: Use startDate instead (kept for backward compatibility)
-  startTimeHour       Int?
-  startTimeMinute     Int?
-  startTimePeriod     String?
-  timezone            String?
-  meetUpPoint         String
-  meetUpAddress       String?
-  meetUpPlaceId       String?
-  meetUpLat           Float?
-  meetUpLng           Float?
-  endPoint            String?              // Optional end point if different from meet up point
-  recurrenceRule      String?              // @deprecated: Use isRecurring + dayOfWeek + startDate + endDate instead
-  recurrenceEndsOn    DateTime?            // @deprecated: Use endDate instead
-  recurrenceNote      String?
-  totalMiles          Float?
-  pace                String?
-  stravaMapUrl        String?
-  description         String?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  run_crew_run_rsvps  run_crew_run_rsvps[]
-  Athlete             Athlete?             @relation(fields: [athleteGeneratedId], references: [id], onDelete: Cascade)
-  run_crews            run_crews?            @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  id                 String               @id @default(cuid())
+  citySlug           String // City slug (e.g., "boston", "new-york") - extracted from Google Maps address or user input
+  runCrewId          String? // Nullable: null = public city run, set = private crew run (app group)
+  runClubSlug        String? // Nullable: official RunClub affiliation (string ref to RunClub.slug in GoFastCompany)
+  staffGeneratedId   String? // Nullable: GoFastCompany staff ID (string ref to CompanyStaff.id in GoFastCompany)
+  athleteGeneratedId String? // Nullable: Athlete ID (when user-created in gofastapp-mvp)
+  title              String
+  isRecurring        Boolean              @default(false) // true = standing/recurring run, false = single run
+  dayOfWeek          String? // Day of week for recurring runs (e.g., "Monday", "Tuesday", "Wednesday", etc.)
+  startDate          DateTime // Start date (for single runs, this is the run date; for recurring, this is when recurrence starts)
+  endDate            DateTime? // End date for recurring runs (null = no end date, or end of recurrence period)
+  date               DateTime // @deprecated: Use startDate instead (kept for backward compatibility)
+  startTimeHour      Int?
+  startTimeMinute    Int?
+  startTimePeriod    String?
+  timezone           String?
+  meetUpPoint        String
+  meetUpAddress      String?
+  meetUpPlaceId      String?
+  meetUpLat          Float?
+  meetUpLng          Float?
+  endPoint           String? // Optional end point if different from meet up point
+  recurrenceRule     String? // @deprecated: Use isRecurring + dayOfWeek + startDate + endDate instead
+  recurrenceEndsOn   DateTime? // @deprecated: Use endDate instead
+  recurrenceNote     String?
+  totalMiles         Float?
+  pace               String?
+  stravaMapUrl       String?
+  description        String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  run_crew_run_rsvps run_crew_run_rsvps[]
+  Athlete            Athlete?             @relation(fields: [athleteGeneratedId], references: [id], onDelete: Cascade)
+  run_crews          run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
 
   @@index([citySlug]) // For querying/filtering by city
   @@index([runCrewId])
@@ -334,6 +422,30 @@ model city_runs {
   @@index([dayOfWeek]) // For querying recurring runs by day of week
   @@index([isRecurring]) // For filtering recurring vs single runs
   @@map("run_crew_runs") // Backwards compatibility: table name remains run_crew_runs
+}
+
+// Minimal denormalized copy of AcqRunClub from GoFastCompany
+// Pulled and saved via API route for card/run display
+// Slug is the source of truth (references GoFastCompany AcqRunClub.slug)
+// 
+// NOTE: Only minimal fields needed for display (name, logo, city)
+// All rich data (vibe, neighborhood, etc.) stays in GoFastCompany for SEO/public pages
+model run_clubs {
+  slug String @id // Primary key - matches GoFastCompany AcqRunClub.slug
+
+  // Minimal fields for card/run display
+  name    String // Run club name
+  logoUrl String? // Logo URL for display (from logoUrl or logo field)
+  city    String? // City location (for filtering/display)
+
+  // Sync metadata
+  syncedAt  DateTime @default(now()) // Last time data was pulled from GoFastCompany
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+  @@index([city])
+  @@map("run_clubs")
 }
 
 model run_crews {
