@@ -1,6 +1,15 @@
 import { prisma } from '../prisma';
 
 /**
+ * Generate a simple unique ID (cuid-like format)
+ */
+function generateId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 15);
+  return `c${timestamp}${random}`;
+}
+
+/**
  * Calculate the next occurrence date for a recurring run
  * @param currentDate - The current/previous run date
  * @param dayOfWeek - Day of week (e.g., "Monday", "Tuesday")
@@ -109,6 +118,7 @@ export async function generateNextRecurringRunInstance(recurringRun: {
     // Create next instance
     const nextRun = await prisma.city_runs.create({
       data: {
+        id: generateId(),
         citySlug: recurringRun.citySlug,
         runCrewId: recurringRun.runCrewId,
         runClubSlug: recurringRun.runClubSlug,
