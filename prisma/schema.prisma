@@ -267,13 +267,16 @@ model rule_sets {
 }
 
 model run_clubs {
-  slug      String   @id
+  id        String   @id @default(uuid())
+  slug      String   @unique
   name      String
   logoUrl   String?
   city      String?
   syncedAt  DateTime @default(now())
   createdAt DateTime @default(now())
-  updatedAt DateTime
+  updatedAt DateTime @updatedAt
+
+  runs      city_runs[]
 
   @@index([city])
   @@index([slug])
@@ -388,7 +391,7 @@ model city_runs {
   startTimeHour       Int?
   startTimeMinute     Int?
   startTimePeriod     String?
-  runClubSlug         String?
+  runClubId           String?
   athleteGeneratedId  String?
   staffGeneratedId    String?
   citySlug            String
@@ -407,13 +410,14 @@ model city_runs {
   run_crew_run_rsvps  run_crew_run_rsvps[]
   Athlete             Athlete?             @relation(fields: [athleteGeneratedId], references: [id], onDelete: Cascade)
   run_crews           run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  runClub             run_clubs?           @relation(fields: [runClubId], references: [id], onDelete: SetNull)
 
   @@index([athleteGeneratedId])
   @@index([citySlug])
   @@index([date])
   @@index([dayOfWeek])
   @@index([isRecurring])
-  @@index([runClubSlug])
+  @@index([runClubId])
   @@index([runCrewId])
   @@index([staffGeneratedId])
   @@index([startDate])

@@ -53,6 +53,7 @@ export async function fetchAndSaveRunClub(slug: string): Promise<any | null> {
     // Upsert into gofastapp-mvp database
     // Only save minimal fields needed for card/run display (name, logo, city)
     // All rich data stays in GoFastCompany for SEO/public pages
+    // IMPORTANT: Prisma generates UUID `id` automatically - we NEVER set it manually
     const savedRunClub = await prisma.run_clubs.upsert({
       where: { slug },
       update: {
@@ -62,6 +63,7 @@ export async function fetchAndSaveRunClub(slug: string): Promise<any | null> {
         syncedAt: new Date(),
       },
       create: {
+        // id is NOT set - Prisma generates UUID via @default(uuid())
         slug: runClub.slug,
         name: runClub.name,
         logoUrl: runClub.logoUrl || runClub.logo || null, // Handle both logoUrl and logo fields

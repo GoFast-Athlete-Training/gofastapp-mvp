@@ -88,9 +88,11 @@ export async function GET(
               const clubData = await response.json();
               if (clubData.runClub) {
                 // Save to local DB for next time
+                // IMPORTANT: Prisma generates UUID `id` automatically - we NEVER set it manually
                 await prisma.run_clubs.upsert({
                   where: { slug: run.runClubSlug },
                   create: {
+                    // id is NOT set - Prisma generates UUID via @default(uuid())
                     slug: run.runClubSlug,
                     name: clubData.runClub.name,
                     logoUrl: clubData.runClub.logoUrl || clubData.runClub.logo || null,

@@ -27,11 +27,13 @@ export async function checkRunClubExists(slug: string): Promise<any | null> {
  * Checks if exists first - only saves/updates if needed
  * Called when RunClub object is provided (e.g., from GoFastCompany POST)
  * 
- * @param runClub - RunClub object with: id, slug, name, logoUrl (or logo), city
- * @returns Saved RunClub data or null if save failed
+ * IMPORTANT: Prisma generates the UUID `id` automatically via @default(uuid())
+ * We NEVER set `id` manually - Prisma is the canonical source for IDs
+ * 
+ * @param runClub - RunClub object with: slug, name, logoUrl (or logo), city
+ * @returns Saved RunClub data (with Prisma-generated id) or null if save failed
  */
 export async function saveRunClub(runClub: {
-  id?: string;
   slug: string;
   name: string;
   logoUrl?: string | null;

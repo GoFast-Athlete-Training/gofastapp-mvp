@@ -4,6 +4,8 @@ import { getDayOfWeekFromDate } from '@/lib/utils/dayOfWeek';
 export interface GetRunsFilters {
   citySlug?: string;
   day?: string;
+  runClubSlug?: string; // Filter by slug (for URL compatibility)
+  runClubId?: string; // Filter by ID (preferred)
 }
 
 /**
@@ -16,6 +18,11 @@ export async function getRuns(filters: GetRunsFilters = {}) {
   // City filter
   if (filters.citySlug) {
     where.citySlug = filters.citySlug;
+  }
+  
+  // RunClub filter
+  if (filters.runClubSlug) {
+    where.runClubSlug = filters.runClubSlug;
   }
   
   // Day filter - complex logic for recurring vs single runs
@@ -105,9 +112,11 @@ async function hydrateRunClubs(slugs: string[]) {
       if (response.ok) {
         const clubData = await response.json();
         if (clubData.runClub) {
+          // IMPORTANT: Prisma generates UUID `id` automatically - we NEVER set it manually
           await prisma.run_clubs.upsert({
             where: { slug },
             create: {
+              // id is NOT set - Prisma generates UUID via @default(uuid())
               slug,
               name: clubData.runClub.name,
               logoUrl: clubData.runClub.logoUrl || clubData.runClub.logo || null,

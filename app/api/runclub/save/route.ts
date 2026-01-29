@@ -10,13 +10,14 @@ export const dynamic = "force-dynamic";
  * Called BEFORE creating a run to ensure RunClub exists
  * 
  * Body: { 
- *   id: string,        // AcqRunClub.id from GoFastCompany
- *   slug: string,      // Generated slug
+ *   slug: string,      // Generated slug (used for lookup)
  *   name: string,      // RunClub name
  *   logoUrl?: string,  // Logo URL (or use 'logo' field)
  *   logo?: string,     // Logo field (AcqRunClub uses 'logo')
  *   city?: string      // City name
  * }
+ * 
+ * NOTE: `id` is NOT accepted - Prisma generates UUID automatically via @default(uuid())
  * 
  * Returns: { 
  *   success: true, 
@@ -38,7 +39,8 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, slug, name, logoUrl, logo, city } = body;
+    // id is ignored - Prisma generates UUID automatically
+    const { slug, name, logoUrl, logo, city } = body;
 
     // Validate required fields
     if (!slug || !slug.trim()) {

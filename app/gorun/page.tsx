@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import TopNav from '@/components/shared/TopNav';
 import api from '@/lib/api';
@@ -35,12 +35,21 @@ interface Run {
 
 export default function GoRunPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [runs, setRuns] = useState<Run[]>([]);
   const [loading, setLoading] = useState(true);
   const [cityFilter, setCityFilter] = useState<string>('');
   const [dayFilter, setDayFilter] = useState<string>('');
+  const [runClubSlug, setRunClubSlug] = useState<string | null>(null);
   const [availableCities, setAvailableCities] = useState<string[]>([]);
   const [availableDays, setAvailableDays] = useState<string[]>([]);
+
+  // Read runClubSlug from URL on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const slug = searchParams.get('runClubSlug');
+    setRunClubSlug(slug);
+  }, [searchParams]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -53,7 +62,7 @@ export default function GoRunPage() {
     }
 
     fetchRuns();
-  }, [cityFilter, dayFilter, router]);
+  }, [cityFilter, dayFilter, runClubSlug, router]);
 
   const fetchRuns = async () => {
     try {
@@ -64,6 +73,9 @@ export default function GoRunPage() {
       }
       if (dayFilter && dayFilter !== 'All Days') {
         params.append('day', dayFilter);
+      }
+      if (runClubSlug) {
+        params.append('runClubSlug', runClubSlug);
       }
 
       const response = await api.get(`/runs?${params.toString()}`);
@@ -136,6 +148,34 @@ export default function GoRunPage() {
             Select your city and see what's happening
           </p>
         </div>
+
+        {/* RunClub Filter Banner */}
+        {runClubSlug && (
+          <div className="mb-6 bg-sky-50 border border-sky-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-sky-900">
+                  Showing runs for: <span className="font-semibold">{runClubSlug}</span>
+                </p>
+                <p className="text-xs text-sky-700 mt-1">
+                  Viewing all runs from this run club
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setRunClubSlug(null);
+                  // Remove from URL
+                  const newUrl = new URL(window.location.href);
+                  newUrl.searchParams.delete('runClubSlug');
+                  router.push(newUrl.pathname + newUrl.search);
+                }}
+                className="text-xs text-sky-700 hover:text-sky-900 underline"
+              >
+                Clear filter
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="mb-8 flex flex-wrap gap-4">

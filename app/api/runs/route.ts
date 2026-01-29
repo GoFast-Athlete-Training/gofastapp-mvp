@@ -46,10 +46,11 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const citySlug = searchParams.get('citySlug') || undefined;
     const day = searchParams.get('day') || undefined;
+    const runClubSlug = searchParams.get('runClubSlug') || undefined;
     const includeRunClub = searchParams.get('includeRunClub') === 'true';
 
     // Get runs with filters
-    let runs = await getRuns({ citySlug, day });
+    let runs = await getRuns({ citySlug, day, runClubSlug });
 
     // Hydrate RunClub data if requested (for GoFastCompany dashboard)
     if (includeRunClub) {
