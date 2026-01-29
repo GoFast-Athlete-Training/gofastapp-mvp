@@ -20,9 +20,21 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     where.citySlug = filters.citySlug;
   }
   
-  // RunClub filter
-  if (filters.runClubSlug) {
-    where.runClubSlug = filters.runClubSlug;
+  // RunClub filter - support both slug (URL compatibility) and ID (preferred)
+  if (filters.runClubId) {
+    where.runClubId = filters.runClubId;
+  } else if (filters.runClubSlug) {
+    // If filtering by slug, need to look up ID first
+    const runClub = await prisma.run_clubs.findUnique({
+      where: { slug: filters.runClubSlug },
+      select: { id: true },
+    });
+    if (runClub) {
+      where.runClubId = runClub.id;
+    } else {
+      // No matching run club - return empty
+      return [];
+    }
   }
   
   // Day filter - complex logic for recurring vs single runs
@@ -38,39 +50,23 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     ];
   }
   
-  // First, get all runs matching filters
+  // First, get all runs matching filters with RunClub relation (FK)
   const allRuns = await prisma.city_runs.findMany({
     where,
     orderBy: { startDate: 'asc' },
-    // Only return public-safe fields
-    select: {
-      id: true,
-      title: true,
-      citySlug: true,
-      isRecurring: true,
-      dayOfWeek: true,
-      startDate: true,
-      date: true,
-      endDate: true,
-      runClubSlug: true,
-      meetUpPoint: true,
-      meetUpStreetAddress: true,
-      meetUpCity: true,
-      meetUpState: true,
-      meetUpZip: true,
-      meetUpLat: true,
-      meetUpLng: true,
-      startTimeHour: true,
-      startTimeMinute: true,
-      startTimePeriod: true,
-      timezone: true,
-      totalMiles: true,
-      pace: true,
-      description: true,
-      stravaMapUrl: true,
-      // Exclude sensitive fields:
-      // runCrewId, athleteGeneratedId, staffGeneratedId
+    // Use include to get FK relation, then select specific fields
+    include: {
+      runClub: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          logoUrl: true,
+          city: true,
+        },
+      },
     },
+    // Note: When using include, we get all fields - we'll filter in the return
   });
   
   // Filter single runs by day if day filter is provided
@@ -88,9 +84,38 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     });
   }
   
-  // MVP1: Return runs without RunClub hydration (simpler, no collisions)
-  // RunClub/RunCrew info will be shown on run detail page only
-  return filteredRuns;
+  // Return runs with RunClub relation (via FK)
+  // Filter to only return public-safe fields
+  return filteredRuns.map((run) => ({
+    id: run.id,
+    title: run.title,
+    citySlug: run.citySlug,
+    isRecurring: run.isRecurring,
+    dayOfWeek: run.dayOfWeek,
+    startDate: run.startDate,
+    date: run.date,
+    endDate: run.endDate,
+    runClubId: run.runClubId, // ✅ FK field
+    runClub: run.runClub || null, // ✅ FK relation
+    runClubSlug: run.runClub?.slug || null, // For backward compatibility
+    meetUpPoint: run.meetUpPoint,
+    meetUpStreetAddress: run.meetUpStreetAddress,
+    meetUpCity: run.meetUpCity,
+    meetUpState: run.meetUpState,
+    meetUpZip: run.meetUpZip,
+    meetUpLat: run.meetUpLat,
+    meetUpLng: run.meetUpLng,
+    startTimeHour: run.startTimeHour,
+    startTimeMinute: run.startTimeMinute,
+    startTimePeriod: run.startTimePeriod,
+    timezone: run.timezone,
+    totalMiles: run.totalMiles,
+    pace: run.pace,
+    description: run.description,
+    stravaMapUrl: run.stravaMapUrl,
+    // Exclude sensitive fields:
+    // runCrewId, athleteGeneratedId, staffGeneratedId
+  }));
 }
 
 /**

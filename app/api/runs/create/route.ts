@@ -214,30 +214,42 @@ export async function POST(request: NextRequest) {
     // If runClub object is provided, ensure RunClub exists in DB (dual save)
     // GoFastCompany sends full RunClub object when admin selects from dropdown
     // Smart: Check if exists first, only save if needed
-    let finalRunClubSlug: string | null = null;
+    let finalRunClubId: string | null = null;
     if (runClub) {
       // Use full RunClub object (preferred - has id, name, logoUrl, city)
-      finalRunClubSlug = runClub.slug || runClubSlug?.trim() || null;
+      const clubSlug = runClub.slug || runClubSlug?.trim() || null;
       
-      if (finalRunClubSlug) {
+      if (clubSlug) {
         // Save RunClub data directly from provided object (checks if exists first)
         // Uses acqRunClubId and full object from GoFastCompany
         // If already exists, skips save (smart - avoids unnecessary DB writes)
-        await saveRunClub({
-          slug: finalRunClubSlug,
+        const savedRunClub = await saveRunClub({
+          slug: clubSlug,
           name: runClub.name,
           logoUrl: runClub.logoUrl || runClub.logo || null,
           city: runClub.city || null,
         }).catch((error) => {
           console.warn(`Failed to save RunClub during run creation:`, error);
-          // Continue with run creation even if RunClub save fails
+          return null;
         });
+        
+        // Get the ID from saved run club (Prisma-generated UUID)
+        if (savedRunClub) {
+          finalRunClubId = savedRunClub.id;
+        }
       }
     } else if (runClubSlug) {
       // Fallback: if only slug provided (backward compatibility)
-      finalRunClubSlug = runClubSlug.trim();
-      // Don't fetch here - fetch/sync is separate concern
-      // RunClub data will be hydrated on display if missing
+      // Look up run club by slug to get ID
+      const { prisma } = await import('@/lib/prisma');
+      const existingRunClub = await prisma.run_clubs.findUnique({
+        where: { slug: runClubSlug.trim() },
+        select: { id: true },
+      });
+      if (existingRunClub) {
+        finalRunClubId = existingRunClub.id;
+      }
+      // If not found, will be null - runClub data will be hydrated on display if missing
     }
 
     // Create the run
@@ -246,7 +258,7 @@ export async function POST(request: NextRequest) {
         id: generateId(),
         citySlug: finalCitySlug,
         runCrewId: runCrewId?.trim() || null,
-        runClubSlug: finalRunClubSlug,
+        runClubId: finalRunClubId, // ✅ Use FK instead of runClubSlug
         staffGeneratedId: staffGeneratedId?.trim() || null,
         athleteGeneratedId: athleteGeneratedId?.trim() || null,
         title: title.trim(),

@@ -42,7 +42,7 @@ export async function GET(
 
     const { runId } = await params;
 
-    // Fetch run with RSVPs
+    // Fetch run with RSVPs and RunClub (FK relation)
     const run = await prisma.city_runs.findUnique({
       where: { id: runId },
       include: {
@@ -58,6 +58,15 @@ export async function GET(
             },
           },
         },
+        runClub: {
+          select: {
+            id: true,
+            slug: true,
+            name: true,
+            logoUrl: true,
+            city: true,
+          },
+        },
       },
     });
 
@@ -65,41 +74,31 @@ export async function GET(
       return NextResponse.json({ error: 'Run not found' }, { status: 404 });
     }
 
-    // Hydrate RunClub if exists
-    let runClub = null;
-    if (run.runClubSlug) {
-      runClub = await prisma.run_clubs.findUnique({
-        where: { slug: run.runClubSlug },
-        select: {
-          slug: true,
-          name: true,
-          logoUrl: true,
-          city: true,
-        },
-      });
-
-      // If RunClub not found locally, try to fetch from GoFastCompany
-      if (!runClub) {
-        const gofastCompanyApiUrl = process.env.GOFAST_COMPANY_API_URL || process.env.NEXT_PUBLIC_GOFAST_COMPANY_API_URL;
-        if (gofastCompanyApiUrl) {
-          try {
-            const response = await fetch(`${gofastCompanyApiUrl}/api/runclub/public/${run.runClubSlug}`);
+    // RunClub is already hydrated via FK relation
+    let runClub = run.runClub;
+    
+    // If RunClub not found locally but runClubId exists, try to fetch from GoFastCompany
+    if (!runClub && run.runClubId) {
+      const gofastCompanyApiUrl = process.env.GOFAST_COMPANY_API_URL || process.env.NEXT_PUBLIC_GOFAST_COMPANY_API_URL;
+      if (gofastCompanyApiUrl) {
+        try {
+          // Need to get slug from runClubId - query local DB first
+          const localRunClub = await prisma.run_clubs.findUnique({
+            where: { id: run.runClubId },
+            select: { slug: true },
+          });
+          
+          if (localRunClub?.slug) {
+            const response = await fetch(`${gofastCompanyApiUrl}/api/runclub/public/${localRunClub.slug}`);
             if (response.ok) {
               const clubData = await response.json();
               if (clubData.runClub) {
                 // Save to local DB for next time
                 // IMPORTANT: Prisma generates UUID `id` automatically - we NEVER set it manually
-                await prisma.run_clubs.upsert({
-                  where: { slug: run.runClubSlug },
-                  create: {
-                    // id is NOT set - Prisma generates UUID via @default(uuid())
-                    slug: run.runClubSlug,
-                    name: clubData.runClub.name,
-                    logoUrl: clubData.runClub.logoUrl || clubData.runClub.logo || null,
-                    city: clubData.runClub.city || null,
-                    updatedAt: new Date(),
-                  },
-                  update: {
+                // Use update instead of upsert since we know the ID exists
+                await prisma.run_clubs.update({
+                  where: { id: run.runClubId },
+                  data: {
                     name: clubData.runClub.name,
                     logoUrl: clubData.runClub.logoUrl || clubData.runClub.logo || null,
                     city: clubData.runClub.city || null,
@@ -107,17 +106,22 @@ export async function GET(
                   },
                 });
                 
-                runClub = {
-                  slug: run.runClubSlug,
-                  name: clubData.runClub.name,
-                  logoUrl: clubData.runClub.logoUrl || clubData.runClub.logo || null,
-                  city: clubData.runClub.city || null,
-                };
+                // Re-fetch with updated data
+                runClub = await prisma.run_clubs.findUnique({
+                  where: { id: run.runClubId },
+                  select: {
+                    id: true,
+                    slug: true,
+                    name: true,
+                    logoUrl: true,
+                    city: true,
+                  },
+                });
               }
             }
-          } catch (error) {
-            console.error(`Failed to hydrate RunClub ${run.runClubSlug}:`, error);
           }
+        } catch (error) {
+          console.error(`Failed to hydrate RunClub ${run.runClubId}:`, error);
         }
       }
     }
@@ -151,7 +155,8 @@ export async function GET(
         startDate: run.startDate.toISOString(),
         date: run.date.toISOString(),
         endDate: run.endDate?.toISOString() || null,
-        runClubSlug: run.runClubSlug,
+        runClubId: run.runClubId,
+        runClubSlug: run.runClub?.slug || null, // For backward compatibility
         runCrewId: run.runCrewId,
         meetUpPoint: run.meetUpPoint,
         meetUpStreetAddress: run.meetUpStreetAddress,

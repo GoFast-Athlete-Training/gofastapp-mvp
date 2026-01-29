@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { formatRunTime } from '@/utils/formatTime';
+import { generateRunUrl } from '@/lib/run-url';
 
 interface CityRunCardProps {
   run: {
@@ -33,13 +34,14 @@ export default function CityRunCard({ run, citySlug }: CityRunCardProps) {
   
   // Generate URL for the run detail page
   // Format: /runs/{runId} or /{citySlug}/runs/{runId}
-  const runUrl = citySlug 
+  const runUrl = generateRunUrl(run.id, citySlug);
+  const runPath = citySlug 
     ? `/${citySlug}/runs/${run.id}`
     : `/runs/${run.id}`;
 
   return (
     <div
-      onClick={() => router.push(runUrl)}
+      onClick={() => router.push(runPath)}
       className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
     >
       <div className="flex justify-between items-start mb-2">
@@ -73,17 +75,30 @@ export default function CityRunCard({ run, citySlug }: CityRunCardProps) {
       </div>
       {/* URL display for quick copy/reference */}
       <div className="mt-3 pt-3 border-t border-gray-100">
-        <a
-          href={runUrl}
-          onClick={(e) => {
-            e.stopPropagation();
-            // Allow right-click to copy link
-          }}
-          className="text-xs text-blue-600 hover:text-blue-800 break-all"
-          title="Click to copy URL"
-        >
-          {typeof window !== 'undefined' ? window.location.origin : ''}{runUrl}
-        </a>
+        <div className="flex items-center justify-between gap-2">
+          <a
+            href={runPath}
+            onClick={(e) => {
+              e.stopPropagation();
+              // Allow right-click to copy link
+            }}
+            className="text-xs text-blue-600 hover:text-blue-800 break-all flex-1"
+            title="Right-click to copy URL"
+          >
+            {runUrl}
+          </a>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              navigator.clipboard.writeText(runUrl);
+              // Could add toast notification here
+            }}
+            className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 border border-gray-300 rounded"
+            title="Copy URL"
+          >
+            Copy
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -60,7 +60,7 @@ export async function generateNextRecurringRunInstance(recurringRun: {
   endDate: Date | null;
   citySlug: string;
   runCrewId: string | null;
-  runClubSlug: string | null;
+  runClubId: string | null; // ✅ Use FK instead of runClubSlug
   staffGeneratedId: string | null;
   athleteGeneratedId: string | null;
   meetUpPoint: string;
@@ -121,7 +121,7 @@ export async function generateNextRecurringRunInstance(recurringRun: {
         id: generateId(),
         citySlug: recurringRun.citySlug,
         runCrewId: recurringRun.runCrewId,
-        runClubSlug: recurringRun.runClubSlug,
+        runClubId: recurringRun.runClubId, // ✅ Use FK
         staffGeneratedId: recurringRun.staffGeneratedId,
         athleteGeneratedId: recurringRun.athleteGeneratedId,
         title: recurringRun.title,
@@ -209,7 +209,7 @@ export async function processConcludedRecurringRuns(): Promise<number> {
         endDate: run.endDate,
         citySlug: run.citySlug,
         runCrewId: run.runCrewId,
-        runClubSlug: run.runClubSlug,
+        runClubId: run.runClubId, // ✅ Use FK
         staffGeneratedId: run.staffGeneratedId,
         athleteGeneratedId: run.athleteGeneratedId,
         meetUpPoint: run.meetUpPoint,

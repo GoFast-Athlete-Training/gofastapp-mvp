@@ -53,29 +53,14 @@ export async function GET(request: Request) {
     let runs = await getRuns({ citySlug, day, runClubSlug });
 
     // Hydrate RunClub data if requested (for GoFastCompany dashboard)
+    // Note: RunClub is already included via FK relation in getRuns()
+    // This is just for backward compatibility
     if (includeRunClub) {
-      const { prisma } = await import('@/lib/prisma');
-      const runsWithRunClub = await Promise.all(
-        runs.map(async (run) => {
-          if (!run.runClubSlug) return run;
-          
-          const runClub = await prisma.run_clubs.findUnique({
-            where: { slug: run.runClubSlug },
-            select: {
-              slug: true,
-              name: true,
-              logoUrl: true,
-              city: true,
-            },
-          });
-
-          return {
-            ...run,
-            runClub: runClub || null,
-          };
-        })
-      );
-      runs = runsWithRunClub;
+      runs = runs.map((run) => ({
+        ...run,
+        runClub: run.runClub || null, // Already included via FK
+        runClubSlug: run.runClub?.slug || null, // For backward compatibility
+      }));
     }
 
     return NextResponse.json({

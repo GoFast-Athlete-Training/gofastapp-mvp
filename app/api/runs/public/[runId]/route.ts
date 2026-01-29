@@ -22,36 +22,19 @@ export async function GET(
   try {
     const { runId } = await params;
 
-    // Fetch run (public-safe fields only)
+    // Fetch run with RunClub relation (FK)
     const run = await prisma.city_runs.findUnique({
       where: { id: runId },
-      select: {
-        id: true,
-        title: true,
-        citySlug: true,
-        isRecurring: true,
-        dayOfWeek: true,
-        startDate: true,
-        date: true,
-        endDate: true,
-        runClubSlug: true,
-        meetUpPoint: true,
-        meetUpStreetAddress: true,
-        meetUpCity: true,
-        meetUpState: true,
-        meetUpZip: true,
-        meetUpLat: true,
-        meetUpLng: true,
-        startTimeHour: true,
-        startTimeMinute: true,
-        startTimePeriod: true,
-        timezone: true,
-        totalMiles: true,
-        pace: true,
-        description: true,
-        stravaMapUrl: true,
-        // Exclude sensitive fields:
-        // runCrewId, athleteGeneratedId, staffGeneratedId
+      include: {
+        runClub: {
+          select: {
+            id: true,
+            slug: true,
+            name: true,
+            logoUrl: true,
+            city: true,
+          },
+        },
       },
     });
 
@@ -59,25 +42,38 @@ export async function GET(
       return NextResponse.json({ error: 'Run not found' }, { status: 404 });
     }
 
-    // Optionally hydrate RunClub data
-    let runClub = null;
-    if (run.runClubSlug) {
-      runClub = await prisma.run_clubs.findUnique({
-        where: { slug: run.runClubSlug },
-        select: {
-          slug: true,
-          name: true,
-          logoUrl: true,
-          city: true,
-        },
-      });
-    }
-
+    // Return public-safe fields only
     return NextResponse.json({
       success: true,
       run: {
-        ...run,
-        runClub: runClub || null,
+        id: run.id,
+        title: run.title,
+        citySlug: run.citySlug,
+        isRecurring: run.isRecurring,
+        dayOfWeek: run.dayOfWeek,
+        startDate: run.startDate.toISOString(),
+        date: run.date.toISOString(),
+        endDate: run.endDate?.toISOString() || null,
+        runClubId: run.runClubId,
+        runClubSlug: run.runClub?.slug || null, // For backward compatibility
+        meetUpPoint: run.meetUpPoint,
+        meetUpStreetAddress: run.meetUpStreetAddress,
+        meetUpCity: run.meetUpCity,
+        meetUpState: run.meetUpState,
+        meetUpZip: run.meetUpZip,
+        meetUpLat: run.meetUpLat,
+        meetUpLng: run.meetUpLng,
+        startTimeHour: run.startTimeHour,
+        startTimeMinute: run.startTimeMinute,
+        startTimePeriod: run.startTimePeriod,
+        timezone: run.timezone,
+        totalMiles: run.totalMiles,
+        pace: run.pace,
+        description: run.description,
+        stravaMapUrl: run.stravaMapUrl,
+        runClub: run.runClub || null,
+        // Exclude sensitive fields:
+        // runCrewId, athleteGeneratedId, staffGeneratedId
       },
     });
   } catch (error: any) {
