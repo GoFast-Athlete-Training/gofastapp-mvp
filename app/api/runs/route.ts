@@ -51,6 +51,9 @@ export async function GET(request: Request) {
 
     // Get runs with filters
     let runs = await getRuns({ citySlug, day, runClubSlug });
+    
+    // Debug logging
+    console.log(`[GET /api/runs] Returning ${runs.length} runs`);
 
     // Hydrate RunClub data if requested (for GoFastCompany dashboard)
     // Note: RunClub is already included via FK relation in getRuns()

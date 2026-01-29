@@ -15,6 +15,9 @@ export interface GetRunsFilters {
 export async function getRuns(filters: GetRunsFilters = {}) {
   const where: any = {};
   
+  // Debug: Log the filters being applied
+  console.log('[getRuns] Filters received:', filters);
+  
   // City filter
   if (filters.citySlug) {
     where.citySlug = filters.citySlug;
@@ -51,23 +54,42 @@ export async function getRuns(filters: GetRunsFilters = {}) {
   }
   
   // First, get all runs matching filters with RunClub relation (FK)
-  const allRuns = await prisma.city_runs.findMany({
-    where,
-    orderBy: { startDate: 'asc' },
-    // Use include to get FK relation, then select specific fields
-    include: {
-      runClub: {
-        select: {
-          id: true,
-          slug: true,
-          name: true,
-          logoUrl: true,
-          city: true,
+  // Note: Prisma model `city_runs` maps to table `run_crew_runs` via @@map("run_crew_runs")
+  // The Prisma client automatically handles the table name mapping
+  let allRuns;
+  try {
+    allRuns = await prisma.city_runs.findMany({
+      where,
+      orderBy: { startDate: 'asc' },
+      // Use include to get FK relation, then select specific fields
+      include: {
+        runClub: {
+          select: {
+            id: true,
+            slug: true,
+            name: true,
+            logoUrl: true,
+            city: true,
+          },
         },
       },
-    },
-    // Note: When using include, we get all fields - we'll filter in the return
-  });
+      // Note: When using include, we get all fields - we'll filter in the return
+    });
+    
+    // Debug logging to help troubleshoot
+    console.log(`[getRuns] Found ${allRuns.length} runs with filters:`, JSON.stringify(filters));
+    if (allRuns.length > 0) {
+      console.log(`[getRuns] Sample run IDs:`, allRuns.slice(0, 3).map(r => r.id));
+    } else {
+      // If no runs found, check total count in database for debugging
+      const totalCount = await prisma.city_runs.count();
+      console.log(`[getRuns] No runs found with filters, but total runs in DB: ${totalCount}`);
+    }
+  } catch (error: any) {
+    console.error('[getRuns] Error querying runs:', error);
+    console.error('[getRuns] Error details:', error?.message, error?.code);
+    throw error;
+  }
   
   // Filter single runs by day if day filter is provided
   let filteredRuns = allRuns;
