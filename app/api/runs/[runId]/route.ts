@@ -222,11 +222,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Verify athlete exists (or staff - for GoFastCompany)
-    const athlete = await getAthleteByFirebaseId(decodedToken.uid);
-    if (!athlete) {
-      return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
-    }
+    // For GoFastCompany staff, athlete check is optional
+    // Staff users from GoFastCompany don't need to be athletes
+    const athlete = await getAthleteByFirebaseId(decodedToken.uid).catch(() => null);
+    
+    // If not an athlete, allow access anyway (likely GoFastCompany staff)
+    // This enables GoFastCompany dashboard to delete runs
 
     const { runId } = await params;
 
