@@ -45,7 +45,8 @@ export async function POST(request: NextRequest) {
       staffGeneratedId,
       athleteGeneratedId,
       title,
-      isRecurring = false, // Boolean: true = recurring/standing run, false = single run
+      isRecurring = false, // DEPRECATED: Use runType instead
+      runType, // Enum: 'SINGLE_EVENT' | 'RECURRING' | 'INSTANCE' | 'APPROVED'
       dayOfWeek, // String: Day of week for recurring runs (e.g., "Monday", "Tuesday")
       startDate, // DateTime: Start date (for single runs, this is the run date; for recurring, when recurrence starts)
       endDate, // DateTime?: End date for recurring runs
@@ -102,7 +103,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate recurring run fields
-    if (isRecurring && !dayOfWeek) {
+    // Determine runType: use provided runType, or derive from isRecurring (backward compat)
+    const finalRunType = runType || (isRecurring ? 'RECURRING' : 'SINGLE_EVENT');
+    
+    if (finalRunType === 'RECURRING' && !dayOfWeek) {
       return NextResponse.json(
         { success: false, error: "dayOfWeek is required for recurring runs" },
         { status: 400 }
@@ -262,7 +266,9 @@ export async function POST(request: NextRequest) {
         staffGeneratedId: staffGeneratedId?.trim() || null,
         athleteGeneratedId: athleteGeneratedId?.trim() || null,
         title: title.trim(),
-        isRecurring: isRecurring === true,
+        isRecurring: finalRunType === 'RECURRING', // DEPRECATED: Keep for migration period
+        runType: finalRunType, // ✅ New enum field
+        recurringParentId: null, // Only set for instances created by service
         dayOfWeek: dayOfWeek?.trim() || null,
         startDate: runStartDateObj,
         endDate: runEndDateObj,

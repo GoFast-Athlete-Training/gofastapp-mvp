@@ -7,9 +7,6 @@
 			"path": "."
 		},
 		{
-			"path": "../../Ignite/IgniteBd-Next-combine"
-		},
-		{
 			"path": "../gofast-contentpublic"
 		}
 	],

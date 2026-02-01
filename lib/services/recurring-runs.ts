@@ -61,6 +61,7 @@ export async function generateNextRecurringRunInstance(recurringRun: {
   citySlug: string;
   runCrewId: string | null;
   runClubId: string | null; // ✅ Use FK instead of runClubSlug
+  recurringParentId: string | null; // For instances of instances
   staffGeneratedId: string | null;
   athleteGeneratedId: string | null;
   meetUpPoint: string;
@@ -96,13 +97,11 @@ export async function generateNextRecurringRunInstance(recurringRun: {
     }
 
     // Check if next instance already exists (prevent duplicates)
-    // We check by title, dayOfWeek, meetUpPoint, and date proximity
+    // Check by recurringParentId and date proximity
+    const parentId = recurringRun.recurringParentId || recurringRun.id;
     const existingNextRun = await prisma.city_runs.findFirst({
       where: {
-        title: recurringRun.title,
-        dayOfWeek: recurringRun.dayOfWeek,
-        meetUpPoint: recurringRun.meetUpPoint,
-        isRecurring: true,
+        recurringParentId: parentId,
         date: {
           gte: new Date(nextDate.getTime() - 24 * 60 * 60 * 1000), // Within 1 day
           lte: new Date(nextDate.getTime() + 24 * 60 * 60 * 1000),
@@ -115,7 +114,7 @@ export async function generateNextRecurringRunInstance(recurringRun: {
       return existingNextRun;
     }
 
-    // Create next instance
+    // Create next instance as INSTANCE type (needs approval)
     const nextRun = await prisma.city_runs.create({
       data: {
         id: generateId(),
@@ -125,7 +124,9 @@ export async function generateNextRecurringRunInstance(recurringRun: {
         staffGeneratedId: recurringRun.staffGeneratedId,
         athleteGeneratedId: recurringRun.athleteGeneratedId,
         title: recurringRun.title,
-        isRecurring: true, // Still a recurring run instance
+        isRecurring: true, // DEPRECATED: Keep for migration period
+        runType: 'INSTANCE', // ✅ New: Auto-generated instances need approval
+        recurringParentId: recurringRun.recurringParentId || recurringRun.id, // ✅ Link to parent (or grandparent if instance)
         dayOfWeek: recurringRun.dayOfWeek,
         startDate: nextDate,
         date: nextDate, // Sync with startDate
@@ -173,10 +174,10 @@ export async function processConcludedRecurringRuns(): Promise<number> {
     const now = new Date();
     
     // Find recurring runs where the date has passed
-    // We look for runs where date < now and isRecurring = true
+    // We look for runs where date < now and runType = RECURRING
     const concludedRuns = await prisma.city_runs.findMany({
       where: {
-        isRecurring: true,
+        runType: 'RECURRING', // ✅ Use enum instead of boolean
         date: {
           lt: now, // Date has passed
         },
@@ -210,6 +211,7 @@ export async function processConcludedRecurringRuns(): Promise<number> {
         citySlug: run.citySlug,
         runCrewId: run.runCrewId,
         runClubId: run.runClubId, // ✅ Use FK
+        recurringParentId: run.recurringParentId, // ✅ Pass parent ID
         staffGeneratedId: run.staffGeneratedId,
         athleteGeneratedId: run.athleteGeneratedId,
         meetUpPoint: run.meetUpPoint,

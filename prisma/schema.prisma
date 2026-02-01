@@ -397,7 +397,9 @@ model city_runs {
   citySlug            String
   dayOfWeek           String?
   endDate             DateTime?
-  isRecurring         Boolean              @default(false)
+  isRecurring         Boolean              @default(false) // DEPRECATED: Use runType instead
+  runType             RunType              @default(SINGLE_EVENT)
+  recurringParentId   String?
   startDate           DateTime
   endPoint            String?
   meetUpStreetAddress String?
@@ -411,12 +413,16 @@ model city_runs {
   Athlete             Athlete?             @relation(fields: [athleteGeneratedId], references: [id], onDelete: Cascade)
   run_crews           run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
   runClub             run_clubs?           @relation(fields: [runClubId], references: [id], onDelete: SetNull)
+  recurringParent     city_runs?           @relation("RecurringInstances", fields: [recurringParentId], references: [id], onDelete: SetNull)
+  instances           city_runs[]           @relation("RecurringInstances")
 
   @@index([athleteGeneratedId])
   @@index([citySlug])
   @@index([date])
   @@index([dayOfWeek])
-  @@index([isRecurring])
+  @@index([isRecurring]) // Keep for migration period
+  @@index([runType])
+  @@index([recurringParentId])
   @@index([runClubId])
   @@index([runCrewId])
   @@index([staffGeneratedId])
@@ -705,4 +711,11 @@ enum WorkoutType {
   LongRun
   Speed
   Strength
+}
+
+enum RunType {
+  SINGLE_EVENT
+  RECURRING
+  INSTANCE
+  APPROVED
 }

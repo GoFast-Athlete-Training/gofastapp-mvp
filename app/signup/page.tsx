@@ -8,6 +8,7 @@ import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, si
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import { getOnboardingIntentClient } from '@/lib/onboarding-intent';
 
 const RUNCREW_JOIN_INTENT_HANDLE_KEY = 'runCrewJoinIntentHandle';
 
@@ -39,6 +40,9 @@ function SignupPageContent() {
   const mode: SignupMode = (searchParams?.get('mode') === 'join-crew') ? 'join-crew' : 'default';
   const runCrewHandle = searchParams?.get('handle') || null;
   
+  // Get onboarding intent from cookie
+  const [onboardingIntent, setOnboardingIntent] = useState<'CLUB_LEADER' | 'ATHLETE'>('ATHLETE');
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -55,6 +59,12 @@ function SignupPageContent() {
   
   // Fetch crew name for join-crew mode
   const [crewName, setCrewName] = useState<string | null>(null);
+  
+  // Get onboarding intent on mount
+  useEffect(() => {
+    const intent = getOnboardingIntentClient();
+    setOnboardingIntent(intent);
+  }, []);
   
   useEffect(() => {
     if (mode === 'join-crew' && runCrewHandle) {
@@ -115,7 +125,9 @@ function SignupPageContent() {
             console.log('⚠️ SIGNUP PAGE: Hydrate failed, trying create...', hydrateErr.response?.status);
             // If hydrate fails, try create (might be a new user)
           try {
-            const createRes = await api.post('/athlete/create', {});
+            const createRes = await api.post('/athlete/create', { 
+              onboardingIntent: onboardingIntent === 'CLUB_LEADER' ? 'CLUB_LEADER' : undefined 
+            });
             if (createRes.data?.success) {
               const athlete = createRes.data;
               console.log('✅ SIGNUP PAGE: Athlete created/found via create endpoint');
@@ -127,11 +139,16 @@ function SignupPageContent() {
               // Check for pending crew join intent - redirect to front door (NO auto-join)
               if (redirectToFrontDoorIfIntent(router)) return;
 
-              // Join-crew mode: redirect to front door, default: route based on profile
+              // Join-crew mode: redirect to front door, default: route based on profile and onboarding intent
               if (mode === 'join-crew' && runCrewHandle) {
                 router.replace(`/join/runcrew/${runCrewHandle}`);
               } else if (athlete.data?.gofastHandle) {
-                router.replace('/welcome');
+                // Existing athlete with profile - redirect based on onboarding intent
+                if (onboardingIntent === 'CLUB_LEADER') {
+                  router.replace('/leader');
+                } else {
+                  router.replace('/home');
+                }
               } else {
                 router.replace('/athlete-create-profile');
               }
@@ -195,7 +212,9 @@ function SignupPageContent() {
         if (hydrateErr?.response?.status === 404) {
           console.log('⚠️ SIGNUP: Hydrate failed with 404 (athlete not found), trying create route...');
           try {
-            res = await api.post('/athlete/create', {});
+            res = await api.post('/athlete/create', { 
+              onboardingIntent: onboardingIntent === 'CLUB_LEADER' ? 'CLUB_LEADER' : undefined 
+            });
             console.log('✅ SIGNUP: Create route succeeded');
             athlete = res.data;
           } catch (createErr: any) {
@@ -209,7 +228,9 @@ function SignupPageContent() {
           // Other hydrate errors, try create as fallback
           console.log('⚠️ SIGNUP: Hydrate failed with non-404 error, trying create route...');
           try {
-            res = await api.post('/athlete/create', {});
+            res = await api.post('/athlete/create', { 
+              onboardingIntent: onboardingIntent === 'CLUB_LEADER' ? 'CLUB_LEADER' : undefined 
+            });
             console.log('✅ SIGNUP: Create route succeeded after hydrate error');
             athlete = res.data;
           } catch (createErr: any) {
@@ -240,12 +261,18 @@ function SignupPageContent() {
       // Check for pending crew join intent - redirect to front door (NO auto-join)
       if (redirectToFrontDoorIfIntent(router)) return;
 
-      // Join-crew mode: redirect to front door, default: route based on profile
+      // Join-crew mode: redirect to front door, default: route based on profile and onboarding intent
       if (mode === 'join-crew' && runCrewHandle) {
         router.replace(`/join/runcrew/${runCrewHandle}`);
       } else if (athlete.data?.gofastHandle) {
-        console.log('✅ SIGNUP: Existing athlete with profile → Welcome');
-        router.replace('/welcome');
+        // Existing athlete with profile - redirect based on onboarding intent
+        if (onboardingIntent === 'CLUB_LEADER') {
+          console.log('✅ SIGNUP: Existing athlete with profile → Leader Hub');
+          router.replace('/leader');
+        } else {
+          console.log('✅ SIGNUP: Existing athlete with profile → Welcome');
+          router.replace('/welcome');
+        }
       } else {
         console.log('✅ SIGNUP: New athlete or incomplete profile → Create Profile');
         router.replace('/athlete-create-profile');
@@ -335,7 +362,9 @@ function SignupPageContent() {
         if (hydrateErr?.response?.status === 404) {
           console.log('⚠️ SIGNUP: Hydrate failed with 404 (athlete not found), trying create route...');
           try {
-            res = await api.post('/athlete/create', {});
+            res = await api.post('/athlete/create', { 
+              onboardingIntent: onboardingIntent === 'CLUB_LEADER' ? 'CLUB_LEADER' : undefined 
+            });
             console.log('✅ SIGNUP: Create route succeeded');
             athlete = res.data;
           } catch (createErr: any) {
@@ -349,7 +378,9 @@ function SignupPageContent() {
           // Other hydrate errors, try create as fallback
           console.log('⚠️ SIGNUP: Hydrate failed with non-404 error, trying create route...');
           try {
-            res = await api.post('/athlete/create', {});
+            res = await api.post('/athlete/create', { 
+              onboardingIntent: onboardingIntent === 'CLUB_LEADER' ? 'CLUB_LEADER' : undefined 
+            });
             console.log('✅ SIGNUP: Create route succeeded after hydrate error');
             athlete = res.data;
           } catch (createErr: any) {
@@ -380,14 +411,20 @@ function SignupPageContent() {
       // Check for pending crew join intent - redirect to front door (NO auto-join)
       if (redirectToFrontDoorIfIntent(router)) return;
 
-      // Join-crew mode: redirect to front door, default: route based on profile
+      // Join-crew mode: redirect to front door, default: route based on profile and onboarding intent
       if (mode === 'join-crew' && runCrewHandle) {
         router.replace(`/join/runcrew/${runCrewHandle}`);
       } else if (athlete.data?.gofastHandle) {
-        // Profile complete - store full athlete data and go to welcome
-        console.log('✅ SIGNUP: Existing athlete with profile → Welcome');
-        LocalStorageAPI.setAthlete(athlete.data);
-        router.replace('/welcome');
+        // Profile complete - redirect based on onboarding intent
+        if (onboardingIntent === 'CLUB_LEADER') {
+          console.log('✅ SIGNUP: Existing athlete with profile → Leader Hub');
+          LocalStorageAPI.setAthlete(athlete.data);
+          router.replace('/leader');
+        } else {
+          console.log('✅ SIGNUP: Existing athlete with profile → Welcome');
+          LocalStorageAPI.setAthlete(athlete.data);
+          router.replace('/welcome');
+        }
       } else {
         // No profile - go to profile creation
         // DON'T store athlete data - localStorage is already cleared above
@@ -464,7 +501,9 @@ function SignupPageContent() {
         if (hydrateErr?.response?.status === 404) {
           console.log('⚠️ SIGNIN: Hydrate failed with 404 (athlete not found), trying create route...');
           try {
-            res = await api.post('/athlete/create', {});
+            res = await api.post('/athlete/create', { 
+              onboardingIntent: onboardingIntent === 'CLUB_LEADER' ? 'CLUB_LEADER' : undefined 
+            });
             console.log('✅ SIGNIN: Create route succeeded');
             athlete = res.data;
           } catch (createErr: any) {
@@ -478,7 +517,9 @@ function SignupPageContent() {
           // Other hydrate errors, try create as fallback
           console.log('⚠️ SIGNIN: Hydrate failed with non-404 error, trying create route...');
           try {
-            res = await api.post('/athlete/create', {});
+            res = await api.post('/athlete/create', { 
+              onboardingIntent: onboardingIntent === 'CLUB_LEADER' ? 'CLUB_LEADER' : undefined 
+            });
             console.log('✅ SIGNIN: Create route succeeded after hydrate error');
             athlete = res.data;
           } catch (createErr: any) {
@@ -509,14 +550,20 @@ function SignupPageContent() {
       // Check for pending crew join intent - redirect to front door (NO auto-join)
       if (redirectToFrontDoorIfIntent(router)) return;
 
-      // Join-crew mode: redirect to front door, default: route based on profile
+      // Join-crew mode: redirect to front door, default: route based on profile and onboarding intent
       if (mode === 'join-crew' && runCrewHandle) {
         router.replace(`/join/runcrew/${runCrewHandle}`);
       } else if (athlete.data?.gofastHandle) {
-        // Profile complete - store full athlete data and go to welcome
-        console.log('✅ SIGNIN: Existing athlete with profile → Welcome');
-        LocalStorageAPI.setAthlete(athlete.data);
-        router.replace('/welcome');
+        // Profile complete - redirect based on onboarding intent
+        if (onboardingIntent === 'CLUB_LEADER') {
+          console.log('✅ SIGNIN: Existing athlete with profile → Leader Hub');
+          LocalStorageAPI.setAthlete(athlete.data);
+          router.replace('/leader');
+        } else {
+          console.log('✅ SIGNIN: Existing athlete with profile → Welcome');
+          LocalStorageAPI.setAthlete(athlete.data);
+          router.replace('/welcome');
+        }
       } else {
         // No profile - go to profile creation
         // DON'T store athlete data - localStorage is already cleared above
