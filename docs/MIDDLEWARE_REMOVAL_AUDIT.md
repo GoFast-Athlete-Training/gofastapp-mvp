@@ -27,14 +27,15 @@
 - Client-side intent reading functions
 
 ### What Still Works:
-- **`app/api/athlete/create/route.ts`** - Already gets `onboardingIntent` from request body (not affected)
-- Signup flow - Can still pass intent via request body if needed
 - Authentication flow - Unaffected
+- Signup flow - Works without intent detection
 
 ### Migration Notes:
-- If onboarding intent is still needed, it should be passed explicitly in request bodies
-- No automatic hostname detection anymore
+- All onboarding intent code removed (deprecated for MVP1)
+- May return in MVP2 with better auth handling
+- No automatic hostname detection
 - No cookie-based intent storage
+- No request body intent handling
 
 ---
 

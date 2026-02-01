@@ -12,15 +12,6 @@ export async function POST(request: Request) {
       body = await request.json();
     } catch {}
 
-    // Extract onboarding intent from request body
-    const onboardingIntent = body.onboardingIntent as 'CLUB_LEADER' | 'ATHLETE' | undefined;
-    
-    if (onboardingIntent === 'CLUB_LEADER') {
-      console.log('🎯 ATHLETE CREATE: Onboarding intent detected: CLUB_LEADER');
-      // TODO: Assign CLUB_LEADER role to athlete
-      // For now, we log it - proper role assignment can be implemented later
-    }
-
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       console.error('❌ ATHLETE CREATE: Missing or invalid auth header');
