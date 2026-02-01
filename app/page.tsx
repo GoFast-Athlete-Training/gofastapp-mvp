@@ -6,19 +6,10 @@ import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import Image from 'next/image';
-import { getOnboardingIntentClient } from '@/lib/onboarding-intent';
-
 export default function RootPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [intent, setIntent] = useState<'CLUB_LEADER' | 'ATHLETE'>('ATHLETE');
-
-  useEffect(() => {
-    // Get onboarding intent from cookie
-    const detectedIntent = getOnboardingIntentClient();
-    setIntent(detectedIntent);
-  }, []);
 
   useEffect(() => {
     // Check if user is authenticated
@@ -35,12 +26,7 @@ export default function RootPage() {
       // Show logo for 2 seconds, then route
       const timer = setTimeout(() => {
         if (isAuthenticated) {
-          // Redirect based on intent
-          if (intent === 'CLUB_LEADER') {
-            router.replace('/leader');
-          } else {
-            router.replace('/home');
-          }
+          router.replace('/home');
         } else {
           router.replace('/signup');
         }
@@ -48,16 +34,11 @@ export default function RootPage() {
 
       return () => clearTimeout(timer);
     }
-  }, [isLoading, isAuthenticated, intent, router]);
+  }, [isLoading, isAuthenticated, router]);
 
-  // Determine copy based on intent
-  const headline = intent === 'CLUB_LEADER' 
-    ? 'Claim and manage your run club'
-    : 'Find runs and join crews';
-  
-  const ctaText = intent === 'CLUB_LEADER'
-    ? 'Get Started'
-    : 'Join Now';
+  // Default copy for athletes
+  const headline = 'Find runs and join crews';
+  const ctaText = 'Join Now';
 
   if (isLoading) {
     return (
