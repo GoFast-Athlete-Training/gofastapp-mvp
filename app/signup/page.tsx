@@ -38,6 +38,9 @@ function SignupPageContent() {
   const mode: SignupMode = (searchParams?.get('mode') === 'join-crew') ? 'join-crew' : 'default';
   const runCrewHandle = searchParams?.get('handle') || null;
   
+  // Detect club leader intent from URL param (passed from splash page)
+  const isClubLeaderIntent = searchParams?.get('intent') === 'club-leader';
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -114,7 +117,9 @@ function SignupPageContent() {
             console.log('⚠️ SIGNUP PAGE: Hydrate failed, trying create...', hydrateErr.response?.status);
             // If hydrate fails, try create (might be a new user)
           try {
-            const createRes = await api.post('/athlete/create', {});
+            const createRes = await api.post('/athlete/create', { 
+              onboardingIntent: isClubLeaderIntent ? 'CLUB_LEADER' : undefined 
+            });
             if (createRes.data?.success) {
               const athlete = createRes.data;
               console.log('✅ SIGNUP PAGE: Athlete created/found via create endpoint');
@@ -130,17 +135,17 @@ function SignupPageContent() {
               if (mode === 'join-crew' && runCrewHandle) {
                 router.replace(`/join/runcrew/${runCrewHandle}`);
               } else if (athlete.data?.gofastHandle) {
-                // Existing athlete with profile - redirect to home
-                router.replace('/home');
+                // Existing athlete with profile - route to welcome (will check role)
+                router.replace('/welcome');
               } else {
                 router.replace('/athlete-create-profile');
               }
               return;
-              }
-            } catch (createErr: any) {
-              console.error('❌ SIGNUP PAGE: Both hydrate and create failed', createErr.response?.status);
-              // Stay on signup page, let user try again
             }
+          } catch (createErr: any) {
+            console.error('❌ SIGNUP PAGE: Both hydrate and create failed', createErr.response?.status);
+            // Stay on signup page, let user try again
+          }
           }
         } catch (err: any) {
           console.error('❌ SIGNUP PAGE: Error checking athlete:', err);
@@ -240,15 +245,13 @@ function SignupPageContent() {
       // Check for pending crew join intent - redirect to front door (NO auto-join)
       if (redirectToFrontDoorIfIntent(router)) return;
 
-      // Join-crew mode: redirect to front door, default: route based on profile and onboarding intent
+      // Join-crew mode: redirect to front door, default: route to welcome (which checks role)
       if (mode === 'join-crew' && runCrewHandle) {
         router.replace(`/join/runcrew/${runCrewHandle}`);
       } else if (athlete.data?.gofastHandle) {
-        // Existing athlete with profile - redirect to home
-        console.log('✅ SIGNUP: Existing athlete with profile → Home');
-          console.log('✅ SIGNUP: Existing athlete with profile → Welcome');
-          router.replace('/welcome');
-        }
+        // Existing athlete with profile - route to welcome (will check role and route accordingly)
+        console.log('✅ SIGNUP: Existing athlete with profile → Welcome (role-aware routing)');
+        router.replace('/welcome');
       } else {
         console.log('✅ SIGNUP: New athlete or incomplete profile → Create Profile');
         router.replace('/athlete-create-profile');
@@ -387,13 +390,10 @@ function SignupPageContent() {
       if (mode === 'join-crew' && runCrewHandle) {
         router.replace(`/join/runcrew/${runCrewHandle}`);
       } else if (athlete.data?.gofastHandle) {
-        // Profile complete - redirect to home
-        console.log('✅ SIGNUP: Existing athlete with profile → Home');
+        // Profile complete - route to welcome (will check role and route accordingly)
+        console.log('✅ SIGNUP: Existing athlete with profile → Welcome (role-aware routing)');
         LocalStorageAPI.setAthlete(athlete.data);
-          console.log('✅ SIGNUP: Existing athlete with profile → Welcome');
-          LocalStorageAPI.setAthlete(athlete.data);
-          router.replace('/welcome');
-        }
+        router.replace('/welcome');
       } else {
         // No profile - go to profile creation
         // DON'T store athlete data - localStorage is already cleared above
@@ -519,13 +519,10 @@ function SignupPageContent() {
       if (mode === 'join-crew' && runCrewHandle) {
         router.replace(`/join/runcrew/${runCrewHandle}`);
       } else if (athlete.data?.gofastHandle) {
-        // Profile complete - redirect to home
-        console.log('✅ SIGNIN: Existing athlete with profile → Home');
+        // Profile complete - route to welcome (will check role and route accordingly)
+        console.log('✅ SIGNIN: Existing athlete with profile → Welcome (role-aware routing)');
         LocalStorageAPI.setAthlete(athlete.data);
-          console.log('✅ SIGNIN: Existing athlete with profile → Welcome');
-          LocalStorageAPI.setAthlete(athlete.data);
-          router.replace('/welcome');
-        }
+        router.replace('/welcome');
       } else {
         // No profile - go to profile creation
         // DON'T store athlete data - localStorage is already cleared above
