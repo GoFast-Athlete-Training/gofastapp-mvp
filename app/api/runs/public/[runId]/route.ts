@@ -6,8 +6,10 @@ import { prisma } from '@/lib/prisma';
 /**
  * GET /api/runs/public/[runId]
  * 
- * PUBLIC endpoint to get a single run (no authentication required)
- * Returns public-safe data only
+ * PUBLIC endpoint to get a single CityRun (no authentication required)
+ * Returns public-safe data only (excludes sensitive fields like staffGeneratedId)
+ * 
+ * CityRun is a universal run system - this endpoint allows public viewing
  * 
  * Returns:
  * {
@@ -22,7 +24,7 @@ export async function GET(
   try {
     const { runId } = await params;
 
-    // Fetch run with RunClub relation (FK)
+    // Fetch CityRun with RunClub relation (FK)
     const run = await prisma.city_runs.findUnique({
       where: { id: runId },
       include: {
@@ -39,7 +41,7 @@ export async function GET(
     });
 
     if (!run) {
-      return NextResponse.json({ error: 'Run not found' }, { status: 404 });
+      return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
     }
 
     // Return public-safe fields only
@@ -77,9 +79,9 @@ export async function GET(
       },
     });
   } catch (error: any) {
-    console.error('Error fetching public run:', error);
+    console.error('Error fetching public CityRun:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch run', details: error?.message },
+      { success: false, error: 'Failed to fetch CityRun', details: error?.message },
       { status: 500 }
     );
   }

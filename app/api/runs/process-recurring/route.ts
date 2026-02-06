@@ -7,7 +7,8 @@ import { processConcludedRecurringRuns } from '@/lib/services/recurring-runs';
 /**
  * POST /api/runs/process-recurring
  * 
- * Process concluded recurring runs and generate next instances
+ * Process concluded recurring CityRuns and generate next instances
+ * CityRun is a universal run system - this processes RECURRING type CityRuns
  * Can be called manually or via cron job
  * 
  * Authentication: Optional (for manual calls), required for cron
@@ -29,13 +30,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `Processed recurring runs, created ${createdCount} new instances`,
+      message: `Processed recurring CityRuns, created ${createdCount} new instances`,
       createdCount,
     });
   } catch (error: any) {
-    console.error('Error processing recurring runs:', error);
+    console.error('Error processing recurring CityRuns:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to process recurring runs', details: error?.message },
+      { success: false, error: 'Failed to process recurring CityRuns', details: error?.message },
       { status: 500 }
     );
   }

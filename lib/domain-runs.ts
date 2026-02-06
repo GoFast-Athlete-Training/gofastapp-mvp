@@ -54,8 +54,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
   }
   
   // First, get all runs matching filters with RunClub relation (FK)
-  // Note: Prisma model `city_runs` maps to table `run_crew_runs` via @@map("run_crew_runs")
-  // The Prisma client automatically handles the table name mapping
+  // Note: Prisma model `city_runs` maps to table `city_runs` (migrated from run_crew_runs)
   let allRuns;
   try {
     allRuns = await prisma.city_runs.findMany({

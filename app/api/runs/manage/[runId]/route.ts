@@ -7,7 +7,8 @@ import { adminAuth } from '@/lib/firebaseAdmin';
 /**
  * GET /api/runs/manage/[runId]
  * 
- * Get run details with RSVPs for management
+ * Get CityRun details with RSVPs for management
+ * CityRun is a universal run system - returns full details including all RSVPs
  */
 export async function GET(
   request: Request,
@@ -48,7 +49,7 @@ export async function GET(
             runType: true,
           },
         },
-        run_crew_run_rsvps: {
+        city_run_rsvps: {
           include: {
             Athlete: {
               select: {
@@ -67,20 +68,20 @@ export async function GET(
     });
 
     if (!run) {
-      return NextResponse.json({ error: 'Run not found' }, { status: 404 });
+      return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
     }
 
     return NextResponse.json({
       success: true,
       run: {
         ...run,
-        rsvps: run.run_crew_run_rsvps,
+        rsvps: run.city_run_rsvps,
       },
     });
   } catch (error: any) {
-    console.error('Error fetching run for management:', error);
+    console.error('Error fetching CityRun for management:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch run', details: error?.message },
+      { success: false, error: 'Failed to fetch CityRun', details: error?.message },
       { status: 500 }
     );
   }

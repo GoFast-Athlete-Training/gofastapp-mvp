@@ -29,8 +29,10 @@ export async function OPTIONS() {
 
 /**
  * POST /api/runs/create
- * Create a new city run (public or private)
+ * Create a new CityRun (public or private)
  * Called from GoFastCompany admin interface
+ * 
+ * CityRun is a universal run system - can be public (runClubId set) or private (runCrewId set)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -320,7 +322,7 @@ export async function POST(request: NextRequest) {
     const errorResponse = NextResponse.json(
       {
         success: false,
-        error: "Failed to create run",
+        error: "Failed to create CityRun",
         details: error?.message || "Unknown error",
       },
       { status: 500 }

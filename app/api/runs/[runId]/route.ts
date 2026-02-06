@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma';
 /**
  * GET /api/runs/[runId]
  * 
- * Authenticated endpoint to get a single run with RunClub/RunCrew hydration
+ * Authenticated endpoint to get a single CityRun with RunClub/RunCrew hydration
  * 
  * Returns:
  * {
@@ -47,7 +47,7 @@ export async function GET(
     const run = await prisma.city_runs.findUnique({
       where: { id: runId },
       include: {
-        run_crew_run_rsvps: {
+        city_run_rsvps: {
           include: {
             Athlete: {
               select: {
@@ -72,7 +72,7 @@ export async function GET(
     });
 
     if (!run) {
-      return NextResponse.json({ error: 'Run not found' }, { status: 404 });
+      return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
     }
 
     // RunClub is already hydrated via FK relation
@@ -142,7 +142,7 @@ export async function GET(
     }
 
     // Get current user's RSVP (if authenticated)
-    const userRSVP = athlete ? run.run_crew_run_rsvps.find((r: any) => r.athleteId === athlete.id) : null;
+    const userRSVP = athlete ? run.city_run_rsvps.find((r: any) => r.athleteId === athlete.id) : null;
     
     // Format response (exclude sensitive fields)
     return NextResponse.json({
@@ -176,7 +176,7 @@ export async function GET(
         stravaMapUrl: run.stravaMapUrl,
         runClub,
         runCrew,
-        rsvps: run.run_crew_run_rsvps.map((rsvp: any) => ({
+        rsvps: run.city_run_rsvps.map((rsvp: any) => ({
           id: rsvp.id,
           status: rsvp.status,
           athleteId: rsvp.athleteId,
@@ -186,9 +186,9 @@ export async function GET(
       },
     });
   } catch (error: any) {
-    console.error('Error fetching run:', error);
+    console.error('Error fetching CityRun:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch run', details: error?.message },
+      { success: false, error: 'Failed to fetch CityRun', details: error?.message },
       { status: 500 }
     );
   }
@@ -197,7 +197,8 @@ export async function GET(
 /**
  * DELETE /api/runs/[runId]
  * 
- * Authenticated endpoint to delete a run
+ * Authenticated endpoint to delete a CityRun
+ * Cascade deletes all RSVPs associated with the CityRun
  * 
  * Returns:
  * {
@@ -237,7 +238,7 @@ export async function DELETE(
     });
 
     if (!run) {
-      return NextResponse.json({ error: 'Run not found' }, { status: 404 });
+      return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
     }
 
     // Delete the run (cascade will delete RSVPs)
@@ -249,9 +250,9 @@ export async function DELETE(
       success: true,
     });
   } catch (error: any) {
-    console.error('Error deleting run:', error);
+    console.error('Error deleting CityRun:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to delete run', details: error?.message },
+      { success: false, error: 'Failed to delete CityRun', details: error?.message },
       { status: 500 }
     );
   }

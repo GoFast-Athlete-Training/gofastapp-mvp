@@ -6,8 +6,9 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/runs/by-runclub/[slug]
  * 
- * Get runs associated with a run club by slug
- * Returns upcoming runs only (startDate >= today)
+ * Get CityRuns associated with a RunClub by slug
+ * CityRun is a universal run system - this endpoint filters by RunClub association
+ * Returns upcoming CityRuns only (startDate >= today)
  * 
  * Returns: {
  *   success: true,
@@ -99,11 +100,11 @@ export async function GET(
       runs: publicRuns,
     });
   } catch (error: any) {
-    console.error("Error fetching runs by run club:", error);
+    console.error("Error fetching CityRuns by RunClub:", error);
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to fetch runs",
+        error: "Failed to fetch CityRuns",
         details: error?.message || "Unknown error",
       },
       { status: 500 }

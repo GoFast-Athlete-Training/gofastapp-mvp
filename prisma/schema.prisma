@@ -53,7 +53,7 @@ model Athlete {
   run_crew_events         run_crew_events[]
   run_crew_memberships    run_crew_memberships[]
   run_crew_messages       run_crew_messages[]
-  run_crew_run_rsvps      run_crew_run_rsvps[]
+  city_run_rsvps          city_run_rsvps[]
   city_runs               city_runs[]
   training_days_executed  training_days_executed[]
   training_plans          training_plans[]
@@ -356,14 +356,14 @@ model run_crew_messages {
   run_crews run_crews @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
 }
 
-model run_crew_run_rsvps {
+model city_run_rsvps {
   id            String        @id
   runId         String
   athleteId     String
   status        String
   createdAt     DateTime      @default(now())
   Athlete       Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  city_runs city_runs @relation(fields: [runId], references: [id], onDelete: Cascade)
+  city_runs     city_runs     @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@unique([runId, athleteId])
 }
@@ -409,12 +409,12 @@ model city_runs {
   endStreetAddress    String?
   endCity             String?
   endState            String?
-  run_crew_run_rsvps  run_crew_run_rsvps[]
+  city_run_rsvps      city_run_rsvps[]
   Athlete             Athlete?             @relation(fields: [athleteGeneratedId], references: [id], onDelete: Cascade)
   run_crews           run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
   runClub             run_clubs?           @relation(fields: [runClubId], references: [id], onDelete: SetNull)
   recurringParent     city_runs?           @relation("RecurringInstances", fields: [recurringParentId], references: [id], onDelete: SetNull)
-  instances           city_runs[]           @relation("RecurringInstances")
+  instances           city_runs[]          @relation("RecurringInstances")
 
   @@index([athleteGeneratedId])
   @@index([citySlug])
@@ -427,7 +427,7 @@ model city_runs {
   @@index([runCrewId])
   @@index([staffGeneratedId])
   @@index([startDate])
-  @@map("run_crew_runs") // Backwards compatibility: table name remains run_crew_runs
+  // Table name is now city_runs (migrated from run_crew_runs)
 }
 
 model run_crew_specific_races {

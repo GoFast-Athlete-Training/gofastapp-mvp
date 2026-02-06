@@ -8,7 +8,10 @@ import { prisma } from '@/lib/prisma';
 
 /**
  * POST /api/runs/[runId]/rsvp
- * RSVP to a city run (public run)
+ * RSVP to a CityRun
+ * 
+ * Requires authentication - user must sign in to RSVP
+ * CityRun is a universal run system (public or private)
  */
 export async function POST(
   request: Request,
@@ -56,13 +59,13 @@ export async function POST(
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
 
-    // Verify run exists
+    // Verify CityRun exists
     const run = await prisma.city_runs.findUnique({
       where: { id: runId },
     });
 
     if (!run) {
-      return NextResponse.json({ error: 'Run not found' }, { status: 404 });
+      return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
     }
 
     // Create or update RSVP (same function works for city_runs)
@@ -80,7 +83,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, rsvp });
   } catch (err) {
-    console.error('Error RSVPing to run:', err);
+    console.error('Error RSVPing to CityRun:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

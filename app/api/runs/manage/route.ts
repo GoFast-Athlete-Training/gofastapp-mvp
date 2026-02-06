@@ -7,7 +7,8 @@ import { adminAuth } from '@/lib/firebaseAdmin';
 /**
  * GET /api/runs/manage
  * 
- * List all runs for management (templates + instances)
+ * List all CityRuns for management (templates + instances)
+ * CityRun is a universal run system - this endpoint returns all CityRuns
  * Supports filtering by runType
  * 
  * Query params:
@@ -57,7 +58,7 @@ export async function GET(request: Request) {
         },
         _count: {
           select: {
-            run_crew_run_rsvps: {
+            city_run_rsvps: {
               where: {
                 status: 'going' // Count only "going" RSVPs
               }
@@ -74,7 +75,7 @@ export async function GET(request: Request) {
     // Transform to include rsvpCount
     const runsWithCounts = runs.map(run => ({
       ...run,
-      rsvpCount: run._count.run_crew_run_rsvps,
+      rsvpCount: run._count.city_run_rsvps,
       needsApproval: run.runType === 'INSTANCE',
     }));
 
@@ -83,9 +84,9 @@ export async function GET(request: Request) {
       runs: runsWithCounts,
     });
   } catch (error: any) {
-    console.error('Error fetching runs for management:', error);
+    console.error('Error fetching CityRuns for management:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch runs', details: error?.message },
+      { success: false, error: 'Failed to fetch CityRuns', details: error?.message },
       { status: 500 }
     );
   }

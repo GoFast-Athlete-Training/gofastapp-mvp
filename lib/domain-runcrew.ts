@@ -707,7 +707,7 @@ export async function hydrateCrew(runCrewId: string) {
               photoURL: true,
             },
           },
-          run_crew_run_rsvps: {
+          city_run_rsvps: {
             select: {
               id: true,
               status: true,
@@ -853,7 +853,7 @@ export async function hydrateCrew(runCrewId: string) {
           lastName: r.Athlete.lastName,
           photoURL: r.Athlete.photoURL,
         } : null,
-        rsvps: r.run_crew_run_rsvps ? r.run_crew_run_rsvps.map((rsvp: any) => ({
+        rsvps: r.city_run_rsvps ? r.city_run_rsvps.map((rsvp: any) => ({
           id: rsvp.id,
           status: rsvp.status,
           athleteId: rsvp.athleteId,
@@ -1156,7 +1156,7 @@ export async function rsvpToRun(data: {
     return `c${timestamp}${random}`;
   }
 
-  const rsvp = await prisma.run_crew_run_rsvps.upsert({
+  const rsvp = await prisma.city_run_rsvps.upsert({
     where: {
       runId_athleteId: {
         runId: data.runId,

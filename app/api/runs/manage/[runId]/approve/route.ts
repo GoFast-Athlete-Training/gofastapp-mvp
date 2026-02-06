@@ -7,8 +7,9 @@ import { adminAuth } from '@/lib/firebaseAdmin';
 /**
  * POST /api/runs/manage/[runId]/approve
  * 
- * Approve an INSTANCE run - changes runType to APPROVED
- * Only works on INSTANCE type runs
+ * Approve an INSTANCE CityRun - changes runType to APPROVED
+ * Only works on INSTANCE type CityRuns
+ * CityRun is a universal run system - this approves recurring run instances
  */
 export async function POST(
   request: Request,
@@ -37,12 +38,12 @@ export async function POST(
     });
 
     if (!run) {
-      return NextResponse.json({ error: 'Run not found' }, { status: 404 });
+      return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
     }
 
     if (run.runType !== 'INSTANCE') {
       return NextResponse.json(
-        { error: `Cannot approve run of type ${run.runType}. Only INSTANCE runs can be approved.` },
+        { error: `Cannot approve CityRun of type ${run.runType}. Only INSTANCE CityRuns can be approved.` },
         { status: 400 }
       );
     }
@@ -70,12 +71,12 @@ export async function POST(
     return NextResponse.json({
       success: true,
       run: updatedRun,
-      message: 'Run approved successfully',
+      message: 'CityRun approved successfully',
     });
   } catch (error: any) {
-    console.error('Error approving run:', error);
+    console.error('Error approving CityRun:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to approve run', details: error?.message },
+      { success: false, error: 'Failed to approve CityRun', details: error?.message },
       { status: 500 }
     );
   }

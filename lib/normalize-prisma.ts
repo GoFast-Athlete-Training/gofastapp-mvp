@@ -106,7 +106,7 @@ export function normalizeAnnouncements(announcements: any[]): any[] {
 /**
  * Normalizes a run object:
  * - `Athlete` → `athlete` (lowercase)
- * - `run_crew_run_rsvps` → `rsvps` (simplified)
+ * - `city_run_rsvps` → `rsvps` (simplified)
  */
 export function normalizeRun(run: any): any {
   if (!run) return run;
@@ -125,8 +125,8 @@ export function normalizeRun(run: any): any {
   }
 
   // Normalize RSVPs
-  if (run.run_crew_run_rsvps) {
-    normalized.rsvps = normalizeRsvps(run.run_crew_run_rsvps);
+  if (run.city_run_rsvps) {
+    normalized.rsvps = normalizeRsvps(run.city_run_rsvps);
   } else if (run.rsvps) {
     normalized.rsvps = normalizeRsvps(run.rsvps);
   }

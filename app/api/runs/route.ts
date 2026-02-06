@@ -8,11 +8,13 @@ import { getRuns } from '@/lib/domain-runs';
 /**
  * GET /api/runs
  * 
- * Authenticated endpoint to get runs with optional filters
+ * Authenticated endpoint to get CityRuns with optional filters
+ * CityRun is a universal run system - can be public (runClubId) or private (runCrewId)
  * 
  * Query params:
  * - citySlug (optional) - Filter by city slug
  * - day (optional) - Filter by day of week ("Monday", "Tuesday", etc.)
+ * - runClubSlug (optional) - Filter by RunClub slug
  * 
  * Returns:
  * {
@@ -40,7 +42,7 @@ export async function GET(request: Request) {
     const athlete = await getAthleteByFirebaseId(decodedToken.uid).catch(() => null);
     
     // If not an athlete, allow access anyway (likely GoFastCompany staff)
-    // This enables GoFastCompany dashboard to view runs
+    // This enables GoFastCompany dashboard to view CityRuns
 
     // Parse query params
     const { searchParams } = new URL(request.url);
@@ -71,9 +73,9 @@ export async function GET(request: Request) {
       runs,
     });
   } catch (error: any) {
-    console.error('Error fetching runs:', error);
+    console.error('Error fetching CityRuns:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch runs', details: error?.message },
+      { success: false, error: 'Failed to fetch CityRuns', details: error?.message },
       { status: 500 }
     );
   }
