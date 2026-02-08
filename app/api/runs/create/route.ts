@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { saveRunClub } from "@/lib/save-runclub";
+import { generateUniqueCityRunSlug } from "@/lib/slug-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -258,11 +259,21 @@ export async function POST(request: NextRequest) {
       // If not found, will be null - runClub data will be hydrated on display if missing
     }
 
+    // Generate slug from title
+    let runSlug: string | null = null;
+    try {
+      runSlug = await generateUniqueCityRunSlug(title);
+    } catch (error) {
+      console.warn('Failed to generate slug for CityRun:', error);
+      // Continue without slug - can be generated later
+    }
+
     // Create the run
     const run = await prisma.city_runs.create({
       data: {
         id: generateId(),
         citySlug: finalCitySlug,
+        slug: runSlug, // URL-friendly slug for better shareability
         runCrewId: runCrewId?.trim() || null,
         runClubId: finalRunClubId, // ✅ Use FK instead of runClubSlug
         staffGeneratedId: staffGeneratedId?.trim() || null,

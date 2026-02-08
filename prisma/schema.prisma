@@ -8,6 +8,12 @@ datasource db {
   directUrl = env("DIRECT_DATABASE_URL")
 }
 
+enum AthleteRole {
+  USER          // Default - regular user
+  CLUB_LEADER   // Club leader - can manage their RunClub's CityRuns
+  AMBASSADOR    // Ambassador - can manage their RunClub's CityRuns (future)
+}
+
 model Athlete {
   id                      String                   @id
   firebaseId              String                   @unique
@@ -44,9 +50,12 @@ model Athlete {
   strava_expires_at       Int?
   fiveKPace               String?
   weeklyMileage           Int?
+  role                    AthleteRole               @default(USER)
+  runClubId               String?
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime
   go_fast_companies       go_fast_companies        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  runClub                 run_clubs?               @relation(fields: [runClubId], references: [id], onDelete: SetNull)
   athlete_activities      athlete_activities[]
   run_crew_announcements  run_crew_announcements[]
   run_crew_event_rsvps    run_crew_event_rsvps[]
@@ -70,10 +79,10 @@ model ai_roles {
 }
 
 model athlete_activities {
-  id               String    @id
+  id               String            @id
   athleteId        String
-  sourceActivityId String    @unique
-  source           String    @default("garmin")
+  sourceActivityId String            @unique
+  source           String            @default("garmin")
   activityType     String?
   activityName     String?
   startTime        DateTime?
@@ -95,7 +104,7 @@ model athlete_activities {
   hydratedAt       DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime
-  Athlete          Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  Athlete          Athlete           @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 }
 
 model cities {
@@ -277,6 +286,7 @@ model run_clubs {
   updatedAt DateTime @updatedAt
 
   runs      city_runs[]
+  clubLeaders Athlete[] // Reverse relation for Athlete.runClubId
 
   @@index([city])
   @@index([slug])
@@ -360,12 +370,14 @@ model city_run_rsvps {
   id            String        @id
   runId         String
   athleteId     String
-  status        String
+  status        String        // "going", "not-going", "maybe"
+  checkedInAt   DateTime?     // Timestamp when checked in (null = not checked in)
   createdAt     DateTime      @default(now())
   Athlete       Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   city_runs     city_runs     @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@unique([runId, athleteId])
+  @@index([checkedInAt])
 }
 
 model city_runs {
@@ -386,6 +398,8 @@ model city_runs {
   pace                String?
   stravaMapUrl        String?
   description         String?
+  routePhotos         Json?                // Array of photo URLs: ["url1", "url2", ...]
+  mapImageUrl         String?              // Single map image URL (snip from Strava or uploaded)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime
   startTimeHour       Int?
@@ -395,6 +409,7 @@ model city_runs {
   athleteGeneratedId  String?
   staffGeneratedId    String?
   citySlug            String
+  slug                String?              @unique // URL-friendly slug: "title-of-run" (generated from title)
   dayOfWeek           String?
   endDate             DateTime?
   isRecurring         Boolean              @default(false) // DEPRECATED: Use runType instead
@@ -418,6 +433,7 @@ model city_runs {
 
   @@index([athleteGeneratedId])
   @@index([citySlug])
+  @@index([slug])
   @@index([date])
   @@index([dayOfWeek])
   @@index([isRecurring]) // Keep for migration period

@@ -1,6 +1,8 @@
 /**
  * Generate run URL for a city run
  * 
+ * @deprecated Use generateCityRunUrl from @/lib/slug-utils instead
+ * 
  * @param runId - Run ID (UUID)
  * @param citySlug - Optional city slug (e.g., "dc", "boston")
  * @param baseUrl - Optional base URL (defaults to current origin or env var)
@@ -9,6 +11,10 @@
  * Examples:
  * - With citySlug: "https://gofastapp.com/dc/runs/abc-123-def"
  * - Without citySlug: "https://gofastapp.com/runs/abc-123-def"
+ * 
+ * New format (preferred):
+ * - With RunClub: "/cityrun/{runClubSlug}/{runSlug}"
+ * - Without RunClub: "/cityrun/{runSlug}"
  */
 export function generateRunUrl(
   runId: string,
