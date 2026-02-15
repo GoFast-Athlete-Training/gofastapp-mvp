@@ -414,6 +414,7 @@ model city_runs {
   endDate             DateTime?
   isRecurring         Boolean              @default(false) // DEPRECATED: Use runType instead
   runType             RunType              @default(SINGLE_EVENT)
+  workflowStatus      RunWorkflowStatus    @default(DRAFT)
   recurringParentId   String?
   startDate           DateTime
   endPoint            String?
@@ -438,6 +439,7 @@ model city_runs {
   @@index([dayOfWeek])
   @@index([isRecurring]) // Keep for migration period
   @@index([runType])
+  @@index([workflowStatus])
   @@index([recurringParentId])
   @@index([runClubId])
   @@index([runCrewId])
@@ -734,4 +736,9 @@ enum RunType {
   RECURRING
   INSTANCE
   APPROVED
+}
+
+enum RunWorkflowStatus {
+  DRAFT
+  SUBMITTED
 }

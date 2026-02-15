@@ -281,6 +281,7 @@ export async function POST(request: NextRequest) {
         title: title.trim(),
         isRecurring: finalRunType === 'RECURRING', // DEPRECATED: Keep for migration period
         runType: finalRunType, // ✅ New enum field
+        workflowStatus: 'DRAFT', // Mirror club approval: DRAFT until linked to club schedule / submitted
         recurringParentId: null, // Only set for instances created by service
         dayOfWeek: dayOfWeek?.trim() || null,
         startDate: runStartDateObj,
