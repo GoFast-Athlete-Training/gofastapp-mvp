@@ -445,7 +445,8 @@ model city_runs {
   @@index([runCrewId])
   @@index([staffGeneratedId])
   @@index([startDate])
-  // Table name is now city_runs (migrated from run_crew_runs)
+  // Table name is city_runs (migrated from run_crew_runs). Explicit map so deployed builds never use old name.
+  @@map("city_runs")
 }
 
 model run_crew_specific_races {
@@ -741,4 +742,5 @@ enum RunType {
 enum RunWorkflowStatus {
   DRAFT
   SUBMITTED
+  APPROVED
 }
