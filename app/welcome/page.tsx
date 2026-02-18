@@ -87,6 +87,18 @@ export default function WelcomePage() {
           console.log(`🔍 Welcome: Athlete data has ${athleteData.runCrewMemberships?.length || 0} memberships`);
           console.log('🔍 Welcome: Memberships data:', JSON.stringify(athleteData.runCrewMemberships, null, 2));
           
+          // Check if athlete is a club leader (role-aware routing)
+          // Check 1: Does athlete have CLUB_LEADER role? (future: check athlete.role or athlete.clubLeader flag)
+          // Check 2: Fallback to hostname check
+          const isLeaderSubdomain = typeof window !== 'undefined' && window.location.hostname.startsWith('leader.');
+          const isClubLeader = athleteData.role === 'CLUB_LEADER' || athleteData.clubLeader === true || isLeaderSubdomain;
+          
+          if (isClubLeader) {
+            console.log('🎯 Welcome: Club leader detected, routing to /leader');
+            router.replace('/leader');
+            return;
+          }
+          
           // Set athlete state
           setAthlete(athleteData);
           

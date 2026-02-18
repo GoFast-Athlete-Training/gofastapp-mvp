@@ -48,43 +48,35 @@ export async function POST(request: NextRequest) {
       staffGeneratedId,
       athleteGeneratedId,
       title,
-      isRecurring = false, // DEPRECATED: Use runType instead
-      runType, // Enum: 'SINGLE_EVENT' | 'RECURRING' | 'INSTANCE' | 'APPROVED'
-      dayOfWeek, // String: Day of week for recurring runs (e.g., "Monday", "Tuesday")
-      startDate, // DateTime: Start date (for single runs, this is the run date; for recurring, when recurrence starts)
-      endDate, // DateTime?: End date for recurring runs
-      date, // @deprecated: Use startDate instead (kept for backward compatibility)
+      dayOfWeek,
+      startDate,
+      endDate,
+      date, // backward compat: use startDate if not provided
       startTimeHour,
       startTimeMinute,
       startTimePeriod,
       timezone,
       meetUpPoint,
-      meetUpAddress, // @deprecated: Google Maps formatted address - kept for backward compatibility
-      meetUpStreetAddress, // Street address (e.g., "1234 Wilson Blvd")
-      meetUpCity, // City name (e.g., "Arlington")
-      meetUpState, // State abbreviation (e.g., "VA")
-      meetUpZip, // ZIP code (e.g., "22201")
+      meetUpStreetAddress,
+      meetUpCity,
+      meetUpState,
+      meetUpZip,
       meetUpPlaceId,
       meetUpLat,
       meetUpLng,
-      endPoint, // Optional end point if different from meet up point
-      endStreetAddress, // End point street address
-      endCity, // End point city
-      endState, // End point state
-      recurrenceRule, // @deprecated: Use isRecurring + dayOfWeek + startDate + endDate instead
-      recurrenceEndsOn, // @deprecated: Use endDate instead
-      recurrenceNote,
+      endPoint,
+      endStreetAddress,
+      endCity,
+      endState,
       totalMiles,
       pace,
       stravaMapUrl,
       description,
     } = body;
 
-    // Validate required fields
-    // City can come from citySlug, cityName, meetUpCity, or meetUpAddress (backward compatibility)
-    if (!citySlug && !cityName && !meetUpCity && !meetUpAddress) {
+    if (!citySlug && !cityName && !meetUpCity && !meetUpStreetAddress) {
       return NextResponse.json(
-        { success: false, error: "citySlug, cityName, meetUpCity, or meetUpAddress is required to determine city" },
+        { success: false, error: "citySlug, cityName, meetUpCity, or meetUpStreetAddress is required to determine city" },
         { status: 400 }
       );
     }
@@ -101,17 +93,6 @@ export async function POST(request: NextRequest) {
     if (!runStartDate) {
       return NextResponse.json(
         { success: false, error: "startDate or date is required" },
-        { status: 400 }
-      );
-    }
-
-    // Validate recurring run fields
-    // Determine runType: use provided runType, or derive from isRecurring (backward compat)
-    const finalRunType = runType || (isRecurring ? 'RECURRING' : 'SINGLE_EVENT');
-    
-    if (finalRunType === 'RECURRING' && !dayOfWeek) {
-      return NextResponse.json(
-        { success: false, error: "dayOfWeek is required for recurring runs" },
         { status: 400 }
       );
     }
@@ -162,20 +143,11 @@ export async function POST(request: NextRequest) {
       if (cityName) {
         cityNameToUse = cityName.trim();
       } else if (meetUpCity) {
-        // Use city field directly (preferred)
         cityNameToUse = meetUpCity.trim();
-      } else if (meetUpAddress) {
-        // Parse city from Google Maps formatted address (backward compatibility)
-        // Format: "123 Main St, City, State ZIP, Country"
-        // Try to extract city (usually second-to-last component before country)
-        const addressParts = meetUpAddress.split(",").map((p: string) => p.trim());
-        if (addressParts.length >= 2) {
-          // City is typically the second part (index 1)
-          cityNameToUse = addressParts[1];
-        } else if (addressParts.length === 1) {
-          // Fallback: use the address itself
-          cityNameToUse = addressParts[0];
-        }
+      } else if (meetUpStreetAddress) {
+        const addressParts = meetUpStreetAddress.split(",").map((p: string) => p.trim());
+        if (addressParts.length >= 2) cityNameToUse = addressParts[1];
+        else if (addressParts.length === 1) cityNameToUse = addressParts[0];
       }
       
       if (!cityNameToUse) {
@@ -279,20 +251,16 @@ export async function POST(request: NextRequest) {
         staffGeneratedId: staffGeneratedId?.trim() || null,
         athleteGeneratedId: athleteGeneratedId?.trim() || null,
         title: title.trim(),
-        isRecurring: finalRunType === 'RECURRING', // DEPRECATED: Keep for migration period
-        runType: finalRunType, // ✅ New enum field
-        workflowStatus: 'DRAFT', // Mirror club approval: DRAFT until linked to club schedule / submitted
-        recurringParentId: null, // Only set for instances created by service
+        workflowStatus: 'DRAFT',
         dayOfWeek: dayOfWeek?.trim() || null,
         startDate: runStartDateObj,
         endDate: runEndDateObj,
-        date: runDateObj, // Backward compatibility - sync with startDate
+        date: runDateObj,
         startTimeHour: startTimeHour ? parseInt(startTimeHour) : null,
         startTimeMinute: startTimeMinute ? parseInt(startTimeMinute) : null,
         startTimePeriod: startTimePeriod?.trim() || null,
         timezone: timezone?.trim() || null,
         meetUpPoint: meetUpPoint.trim(),
-        meetUpAddress: meetUpAddress?.trim() || null, // Backward compatibility
         meetUpStreetAddress: meetUpStreetAddress?.trim() || null,
         meetUpCity: meetUpCity?.trim() || null,
         meetUpState: meetUpState?.trim() || null,
@@ -301,9 +269,6 @@ export async function POST(request: NextRequest) {
         meetUpLat: meetUpLat ? parseFloat(meetUpLat) : null,
         meetUpLng: meetUpLng ? parseFloat(meetUpLng) : null,
         endPoint: endPoint?.trim() || null,
-        recurrenceRule: recurrenceRule?.trim() || null,
-        recurrenceEndsOn: recurrenceEndsOn ? new Date(recurrenceEndsOn) : null,
-        recurrenceNote: recurrenceNote?.trim() || null,
         totalMiles: totalMiles ? parseFloat(totalMiles) : null,
         pace: pace?.trim() || null,
         stravaMapUrl: stravaMapUrl?.trim() || null,

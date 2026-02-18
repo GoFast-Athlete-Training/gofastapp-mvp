@@ -4,31 +4,49 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import api from '@/lib/api';
 import TopNav from '@/components/shared/TopNav';
 
 /**
- * Leader Hub - Placeholder page for club leaders
- * 
- * Purpose: Dashboard for users with CLUB_LEADER role
- * Behavior:
+ * Welcome Run Club Leader – front door for users with CLUB_LEADER role
+ *
+ * Purpose: Different front door that checks role status and routes here from /welcome.
  * - Requires authentication
- * - Shows placeholder actions for club management
- * - Assumes user has or is pursuing CLUB_LEADER role
+ * - Verifies role via hydrate; if not CLUB_LEADER, redirects to /welcome
+ * - Shows "Welcome, Run Club Leader" UX and actions for club management
  */
 export default function LeaderHubPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [clubName, setClubName] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        // Not authenticated - redirect to signup
         router.replace('/signup');
         return;
       }
-      setIsAuthenticated(!!user);
-      setIsLoading(false);
+      setIsAuthenticated(true);
+      try {
+        const res = await api.post('/athlete/hydrate');
+        if (res.data?.success && res.data?.athlete) {
+          const a = res.data.athlete;
+          if (a.role !== 'CLUB_LEADER') {
+            router.replace('/welcome');
+            return;
+          }
+          if (a.runClub?.name) setClubName(a.runClub.name);
+        } else {
+          router.replace('/welcome');
+          return;
+        }
+      } catch {
+        router.replace('/welcome');
+        return;
+      } finally {
+        setIsLoading(false);
+      }
     });
 
     return () => unsubscribe();
@@ -46,7 +64,7 @@ export default function LeaderHubPage() {
   }
 
   if (!isAuthenticated) {
-    return null; // Will redirect
+    return null;
   }
 
   return (
@@ -55,10 +73,12 @@ export default function LeaderHubPage() {
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Leader Hub
+            Welcome, Run Club Leader
           </h1>
           <p className="text-white text-xl opacity-90">
-            Manage your run club and connect with your community
+            {clubName
+              ? `Manage ${clubName} and connect with your community`
+              : 'Manage your run club and connect with your community'}
           </p>
         </div>
 
@@ -126,11 +146,10 @@ export default function LeaderHubPage() {
         {/* Additional Info */}
         <div className="mt-12 bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20">
           <h3 className="text-2xl font-bold text-white mb-4 text-center">
-            Getting Started
+            Your front door
           </h3>
           <p className="text-white/90 text-center max-w-2xl mx-auto">
-            As a club leader, you can manage your club's content, organize runs, and build your running community. 
-            Use the options above to get started with managing your club.
+            You’re signed in as a run club leader. Use the options above to manage your club’s content, organize runs, and build your running community.
           </p>
         </div>
       </div>

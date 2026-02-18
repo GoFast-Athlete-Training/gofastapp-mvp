@@ -6,10 +6,27 @@ import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import Image from 'next/image';
+
+/**
+ * Detect if user is on leader subdomain
+ * Simple hostname check - no cookies/middleware needed
+ */
+function isLeaderSubdomain(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname;
+  return hostname.startsWith('leader.');
+}
+
 export default function RootPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLeaderIntent, setIsLeaderIntent] = useState(false);
+
+  useEffect(() => {
+    // Check hostname directly (no cookie/middleware needed)
+    setIsLeaderIntent(isLeaderSubdomain());
+  }, []);
 
   useEffect(() => {
     // Check if user is authenticated
@@ -26,19 +43,25 @@ export default function RootPage() {
       // Show logo for 2 seconds, then route
       const timer = setTimeout(() => {
         if (isAuthenticated) {
-          router.replace('/home');
+          // After auth, role check happens in welcome/hydrate
+          // For now, route to welcome which will check role
+          router.replace('/welcome');
         } else {
-          router.replace('/signup');
+          // Pass intent via URL param (simple, no cookie)
+          const intentParam = isLeaderIntent ? '?intent=club-leader' : '';
+          router.replace(`/signup${intentParam}`);
         }
       }, 1500); // Logo shows for 1.5 seconds, then route
 
       return () => clearTimeout(timer);
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, isLeaderIntent, router]);
 
-  // Default copy for athletes
-  const headline = 'Find runs and join crews';
-  const ctaText = 'Join Now';
+  // Copy based on hostname (no cookie needed)
+  const headline = isLeaderIntent 
+    ? 'Claim and manage your run club'
+    : 'Find runs and join crews';
+  const ctaText = isLeaderIntent ? 'Get Started' : 'Join Now';
 
   if (isLoading) {
     return (

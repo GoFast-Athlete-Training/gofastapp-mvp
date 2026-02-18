@@ -8,6 +8,15 @@
 		},
 		{
 			"path": "../gofast-contentpublic"
+		},
+		{
+			"path": "../../Ignite/IgniteBd-Next-combine"
+		},
+		{
+			"path": "../gofast-runprogram-headcoach"
+		},
+		{
+			"path": "../RunTogehter"
 		}
 	],
 	"settings": {}

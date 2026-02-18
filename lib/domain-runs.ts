@@ -40,18 +40,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     }
   }
   
-  // Day filter - complex logic for recurring vs single runs
-  if (filters.day && filters.day !== 'All Days') {
-    // We'll filter by dayOfWeek for recurring runs
-    // For single runs, we'll filter client-side or use date comparison
-    // For now, include both and filter client-side
-    where.OR = [
-      // Recurring runs: match dayOfWeek
-      { isRecurring: true, dayOfWeek: filters.day },
-      // Single runs: will be filtered client-side by date
-      { isRecurring: false },
-    ];
-  }
+  // Day filter applied client-side from startDate (MVP1: all runs are single events)
   
   // First, get all runs matching filters with RunClub relation (FK)
   // Note: Prisma model `city_runs` maps to table `city_runs` (migrated from run_crew_runs)
@@ -90,19 +79,9 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     throw error;
   }
   
-  // Filter single runs by day if day filter is provided
   let filteredRuns = allRuns;
   if (filters.day && filters.day !== 'All Days') {
-    filteredRuns = allRuns.filter(run => {
-      if (run.isRecurring) {
-        // Already filtered by Prisma query
-        return run.dayOfWeek === filters.day;
-      } else {
-        // Single runs: infer day from startDate
-        const day = getDayOfWeekFromDate(run.startDate);
-        return day === filters.day;
-      }
-    });
+    filteredRuns = allRuns.filter(run => getDayOfWeekFromDate(run.startDate) === filters.day);
   }
   
   // Return runs with RunClub relation (via FK)
@@ -112,7 +91,6 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     slug: run.slug ?? null,
     title: run.title,
     citySlug: run.citySlug,
-    isRecurring: run.isRecurring,
     dayOfWeek: run.dayOfWeek,
     startDate: run.startDate,
     date: run.date,

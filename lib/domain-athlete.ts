@@ -53,6 +53,13 @@ export async function hydrateAthlete(athleteId: string) {
             slug: true,
           },
         },
+        runClub: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
         run_crew_memberships: {
           include: {
             run_crews: {
@@ -135,6 +142,13 @@ export async function hydrateAthlete(athleteId: string) {
           where: { id: athleteId },
           include: {
             go_fast_companies: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+            runClub: {
               select: {
                 id: true,
                 name: true,
@@ -229,6 +243,9 @@ export async function hydrateAthlete(athleteId: string) {
     companyId: athlete.companyId,
     createdAt: athlete.createdAt,
     updatedAt: athlete.updatedAt,
+    role: athlete.role ?? undefined,
+    runClubId: athlete.runClubId ?? undefined,
+    runClub: athlete.runClub ? { id: athlete.runClub.id, name: athlete.runClub.name, slug: athlete.runClub.slug } : undefined,
     
     // RunCrew Memberships (hydrated) - empty if tables don't exist
     runCrews: crews,

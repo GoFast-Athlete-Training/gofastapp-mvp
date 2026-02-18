@@ -59,7 +59,6 @@ export async function GET(
         slug: run.slug ?? null,
         title: run.title,
         citySlug: run.citySlug,
-        isRecurring: run.isRecurring,
         dayOfWeek: run.dayOfWeek,
         startDate: run.startDate.toISOString(),
         date: run.date.toISOString(),

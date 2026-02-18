@@ -95,8 +95,8 @@ export async function PUT(
     if (body.meetUpPoint !== undefined) {
       updateData.meetUpPoint = body.meetUpPoint.trim();
     }
-    if (body.meetUpAddress !== undefined) {
-      updateData.meetUpAddress = body.meetUpAddress?.trim() || null;
+    if (body.meetUpStreetAddress !== undefined) {
+      updateData.meetUpStreetAddress = body.meetUpStreetAddress?.trim() || null;
     }
     if (body.meetUpPlaceId !== undefined) {
       updateData.meetUpPlaceId = body.meetUpPlaceId?.trim() || null;

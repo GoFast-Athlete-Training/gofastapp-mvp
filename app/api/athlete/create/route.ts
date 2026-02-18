@@ -12,6 +12,12 @@ export async function POST(request: Request) {
       body = await request.json();
     } catch {}
 
+    // Extract onboarding intent from request body; assign CLUB_LEADER role so front door routes to /leader
+    const onboardingIntent = body.onboardingIntent as 'CLUB_LEADER' | 'ATHLETE' | undefined;
+    if (onboardingIntent === 'CLUB_LEADER') {
+      console.log('🎯 ATHLETE CREATE: Club leader intent detected – will set role to CLUB_LEADER after upsert');
+    }
+
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       console.error('❌ ATHLETE CREATE: Missing or invalid auth header');
@@ -240,7 +246,7 @@ export async function POST(request: Request) {
     // companyId is always derived from GoFastCompany (ultra container)
     updateData.companyId = company.id;
 
-    const athlete = await prisma.athlete.upsert({
+    let athlete = await prisma.athlete.upsert({
       where: { firebaseId },
       update: updateData,
       create: createData,
@@ -250,6 +256,15 @@ export async function POST(request: Request) {
       console.log('✅ ATHLETE CREATE: Athlete record synced successfully:', athlete.id);
     } else {
       console.log('✅ ATHLETE CREATE: New athlete record created successfully:', athlete.id);
+    }
+
+    // If club leader intent, set role so front door routes to /leader (welcome run club leader UX)
+    if (onboardingIntent === 'CLUB_LEADER') {
+      athlete = await prisma.athlete.update({
+        where: { id: athlete.id },
+        data: { role: 'CLUB_LEADER' },
+      });
+      console.log('✅ ATHLETE CREATE: Role set to CLUB_LEADER for athlete:', athlete.id);
     }
 
     // Format response like MVP1
@@ -272,6 +287,8 @@ export async function POST(request: Request) {
         photoURL: athlete.photoURL,
         bio: athlete.bio,
         instagram: athlete.instagram,
+        role: athlete.role,
+        runClubId: athlete.runClubId ?? undefined,
         createdAt: athlete.createdAt,
         updatedAt: athlete.updatedAt,
       },

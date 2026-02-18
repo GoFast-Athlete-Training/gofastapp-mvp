@@ -78,7 +78,6 @@ export async function GET(
       startTimeMinute: run.startTimeMinute,
       startTimePeriod: run.startTimePeriod,
       meetUpPoint: run.meetUpPoint,
-      meetUpAddress: run.meetUpAddress,
       meetUpStreetAddress: run.meetUpStreetAddress,
       meetUpCity: run.meetUpCity,
       meetUpState: run.meetUpState,

@@ -387,13 +387,9 @@ model city_runs {
   date                DateTime
   timezone            String?
   meetUpPoint         String
-  meetUpAddress       String?
   meetUpPlaceId       String?
   meetUpLat           Float?
   meetUpLng           Float?
-  recurrenceRule      String?
-  recurrenceEndsOn    DateTime?
-  recurrenceNote      String?
   totalMiles          Float?
   pace                String?
   stravaMapUrl        String?
@@ -412,10 +408,7 @@ model city_runs {
   slug                String?              @unique // URL-friendly slug: "title-of-run" (generated from title)
   dayOfWeek           String?
   endDate             DateTime?
-  isRecurring         Boolean              @default(false) // DEPRECATED: Use runType instead
-  runType             RunType              @default(SINGLE_EVENT)
   workflowStatus      RunWorkflowStatus    @default(DRAFT)
-  recurringParentId   String?
   startDate           DateTime
   endPoint            String?
   meetUpStreetAddress String?
@@ -429,18 +422,13 @@ model city_runs {
   Athlete             Athlete?             @relation(fields: [athleteGeneratedId], references: [id], onDelete: Cascade)
   run_crews           run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
   runClub             run_clubs?           @relation(fields: [runClubId], references: [id], onDelete: SetNull)
-  recurringParent     city_runs?           @relation("RecurringInstances", fields: [recurringParentId], references: [id], onDelete: SetNull)
-  instances           city_runs[]          @relation("RecurringInstances")
 
   @@index([athleteGeneratedId])
   @@index([citySlug])
   @@index([slug])
   @@index([date])
   @@index([dayOfWeek])
-  @@index([isRecurring]) // Keep for migration period
-  @@index([runType])
   @@index([workflowStatus])
-  @@index([recurringParentId])
   @@index([runClubId])
   @@index([runCrewId])
   @@index([staffGeneratedId])
@@ -730,13 +718,6 @@ enum WorkoutType {
   LongRun
   Speed
   Strength
-}
-
-enum RunType {
-  SINGLE_EVENT
-  RECURRING
-  INSTANCE
-  APPROVED
 }
 
 enum RunWorkflowStatus {

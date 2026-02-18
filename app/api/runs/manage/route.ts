@@ -12,8 +12,7 @@ import { adminAuth } from '@/lib/firebaseAdmin';
  * Supports filtering by runType
  * 
  * Query params:
- * - runType: Filter by type (SINGLE_EVENT, RECURRING, INSTANCE, APPROVED)
- * - hasParent: Filter instances (true = has recurringParentId)
+ * - workflowStatus: DRAFT | SUBMITTED | APPROVED
  */
 export async function GET(request: Request) {
   try {
@@ -31,17 +30,11 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const runType = searchParams.get('runType');
-    const hasParent = searchParams.get('hasParent');
+    const workflowStatus = searchParams.get('workflowStatus');
 
     const where: any = {};
-    
-    if (runType) {
-      where.runType = runType;
-    }
-    
-    if (hasParent === 'true') {
-      where.recurringParentId = { not: null };
+    if (workflowStatus && ['DRAFT', 'SUBMITTED', 'APPROVED'].includes(workflowStatus)) {
+      where.workflowStatus = workflowStatus;
     }
 
     const runs = await prisma.city_runs.findMany({
@@ -76,7 +69,6 @@ export async function GET(request: Request) {
     const runsWithCounts = runs.map(run => ({
       ...run,
       rsvpCount: run._count.city_run_rsvps,
-      needsApproval: run.runType === 'INSTANCE',
     }));
 
     return NextResponse.json({

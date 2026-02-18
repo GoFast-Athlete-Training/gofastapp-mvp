@@ -838,7 +838,7 @@ export async function hydrateCrew(runCrewId: string) {
         startTimeMinute: r.startTimeMinute,
         startTimePeriod: r.startTimePeriod,
         meetUpPoint: r.meetUpPoint,
-        meetUpAddress: r.meetUpAddress,
+        meetUpStreetAddress: r.meetUpStreetAddress,
         meetUpPlaceId: r.meetUpPlaceId,
         meetUpLat: r.meetUpLat,
         meetUpLng: r.meetUpLng,
@@ -961,7 +961,7 @@ export async function createRun(data: {
   startTimeMinute?: number | null;
   startTimePeriod?: string | null;
   meetUpPoint?: string | null;
-  meetUpAddress?: string | null;
+  meetUpStreetAddress?: string | null;
   meetUpPlaceId?: string | null;
   meetUpLat?: number | null;
   meetUpLng?: number | null;
@@ -1000,16 +1000,16 @@ export async function createRun(data: {
       id: generateRunId(),
       citySlug,
       runCrewId: data.runCrewId,
-      athleteGeneratedId: data.athleteId, // Use athleteGeneratedId for user-created runs
+      athleteGeneratedId: data.athleteId,
       title: data.title,
-      isRecurring: false, // RunCrew runs are single runs by default
-      startDate: data.date, // Use date as startDate
-      date: data.date, // Backward compatibility
+      workflowStatus: 'DRAFT',
+      startDate: data.date,
+      date: data.date,
       startTimeHour: data.startTimeHour ?? null,
       startTimeMinute: data.startTimeMinute ?? null,
       startTimePeriod: data.startTimePeriod ?? null,
       meetUpPoint: data.meetUpPoint ?? '',
-      meetUpAddress: data.meetUpAddress ?? null,
+      meetUpStreetAddress: data.meetUpStreetAddress ?? null,
       meetUpPlaceId: data.meetUpPlaceId ?? null,
       meetUpLat: data.meetUpLat ?? null,
       meetUpLng: data.meetUpLng ?? null,
