@@ -68,7 +68,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const { title, date, startTimeHour, startTimeMinute, startTimePeriod, meetUpPoint, meetUpAddress, meetUpPlaceId, meetUpLat, meetUpLng, totalMiles, pace, stravaMapUrl, description } = body;
+    const { title, date, startTimeHour, startTimeMinute, startTimePeriod, meetUpPoint, meetUpAddress, meetUpStreetAddress, meetUpPlaceId, meetUpLat, meetUpLng, totalMiles, pace, stravaMapUrl, description } = body;
 
     let run;
     try {
@@ -81,7 +81,7 @@ export async function POST(
         startTimeMinute,
         startTimePeriod,
         meetUpPoint,
-        meetUpAddress,
+        meetUpStreetAddress: meetUpStreetAddress || meetUpAddress, // Support both for backward compatibility
         meetUpPlaceId,
         meetUpLat: meetUpLat ? parseFloat(meetUpLat) : null,
         meetUpLng: meetUpLng ? parseFloat(meetUpLng) : null,
