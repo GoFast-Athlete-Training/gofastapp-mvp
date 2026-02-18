@@ -109,6 +109,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
   // Filter to only return public-safe fields
   return filteredRuns.map((run) => ({
     id: run.id,
+    slug: run.slug ?? null,
     title: run.title,
     citySlug: run.citySlug,
     isRecurring: run.isRecurring,

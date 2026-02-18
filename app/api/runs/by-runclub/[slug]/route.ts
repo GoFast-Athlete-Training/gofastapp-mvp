@@ -67,9 +67,10 @@ export async function GET(
       take: 20, // Limit to 20 upcoming runs
     });
 
-    // Transform to public-safe format
+    // Transform to public-safe format (include slug for share URLs)
     const publicRuns = runs.map((run) => ({
       id: run.id,
+      slug: run.slug ?? null,
       title: run.title,
       date: run.date.toISOString(),
       startDate: run.startDate.toISOString(),
