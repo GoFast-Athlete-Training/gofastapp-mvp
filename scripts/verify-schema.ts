@@ -14,7 +14,7 @@ async function verifySchema() {
       { name: 'run_crew_messages', model: prisma.run_crew_messages },
       { name: 'run_crew_announcements', model: prisma.run_crew_announcements },
       { name: 'city_runs', model: prisma.city_runs },
-      { name: 'run_crew_run_rsvps', model: prisma.run_crew_run_rsvps },
+      { name: 'city_run_rsvps', model: prisma.city_run_rsvps },
       { name: 'run_crew_events', model: prisma.run_crew_events },
       { name: 'run_crew_event_rsvps', model: prisma.run_crew_event_rsvps },
       { name: 'join_codes', model: prisma.join_codes },

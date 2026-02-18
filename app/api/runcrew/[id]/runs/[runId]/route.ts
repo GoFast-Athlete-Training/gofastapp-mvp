@@ -126,7 +126,7 @@ export async function PUT(
         where: { id: runId },
         data: updateData,
         include: {
-          run_crew_run_rsvps: {
+          city_run_rsvps: {
             include: {
               Athlete: {
                 select: {

@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
 /**
@@ -174,6 +175,8 @@ export async function GET(
         pace: run.pace,
         description: run.description,
         stravaMapUrl: run.stravaMapUrl,
+        routePhotos: run.routePhotos as string[] | null ?? null,
+        mapImageUrl: run.mapImageUrl ?? null,
         runClub,
         runCrew,
         rsvps: run.city_run_rsvps.map((rsvp: any) => ({
@@ -189,6 +192,91 @@ export async function GET(
     console.error('Error fetching CityRun:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch CityRun', details: error?.message },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PUT /api/runs/[runId]
+ *
+ * Authenticated endpoint to update run photo/map fields (routePhotos, mapImageUrl, stravaMapUrl).
+ * Used by GoFastCompany CityRunManager to save route photos and map image.
+ */
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ runId: string }> }
+) {
+  try {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    try {
+      await adminAuth.verifyIdToken(authHeader.substring(7));
+    } catch {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    const { runId } = await params;
+    const body = await request.json();
+
+    const run = await prisma.city_runs.findUnique({
+      where: { id: runId },
+    });
+
+    if (!run) {
+      return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
+    }
+
+    const updateData: {
+      routePhotos?: string[] | typeof Prisma.JsonNull;
+      mapImageUrl?: string | null;
+      stravaMapUrl?: string | null;
+    } = {};
+
+    if (body.routePhotos !== undefined) {
+      updateData.routePhotos = Array.isArray(body.routePhotos)
+        ? body.routePhotos.filter((u: unknown) => typeof u === 'string')
+        : Prisma.JsonNull;
+    }
+    if (body.mapImageUrl !== undefined) {
+      updateData.mapImageUrl = body.mapImageUrl === null || body.mapImageUrl === ''
+        ? null
+        : String(body.mapImageUrl);
+    }
+    if (body.stravaMapUrl !== undefined) {
+      updateData.stravaMapUrl = body.stravaMapUrl === null || body.stravaMapUrl === ''
+        ? null
+        : String(body.stravaMapUrl);
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({
+        success: true,
+        run: await prisma.city_runs.findUnique({ where: { id: runId } }),
+      });
+    }
+
+    const updated = await prisma.city_runs.update({
+      where: { id: runId },
+      data: updateData,
+    });
+
+    return NextResponse.json({
+      success: true,
+      run: {
+        id: updated.id,
+        routePhotos: updated.routePhotos,
+        mapImageUrl: updated.mapImageUrl,
+        stravaMapUrl: updated.stravaMapUrl,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error updating CityRun photos:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to update run', details: error?.message },
       { status: 500 }
     );
   }
