@@ -176,6 +176,7 @@ export async function GET(
         stravaMapUrl: run.stravaMapUrl,
         routePhotos: run.routePhotos as string[] | null ?? null,
         mapImageUrl: run.mapImageUrl ?? null,
+        staffNotes: run.staffNotes ?? null,
         runClub,
         runCrew,
         rsvps: run.city_run_rsvps.map((rsvp: any) => ({
@@ -199,8 +200,9 @@ export async function GET(
 /**
  * PUT /api/runs/[runId]
  *
- * Authenticated endpoint to update run photo/map fields (routePhotos, mapImageUrl, stravaMapUrl).
- * Used by GoFastCompany CityRunManager to save route photos and map image.
+ * Authenticated endpoint to update run fields.
+ * - Photo/map: routePhotos, mapImageUrl, stravaMapUrl (used by CityRunManager).
+ * - Core content: title, totalMiles, pace, description, meetUp*, end*, date/startDate, time, timezone, dayOfWeek (used by Edit Run in GoFastCompany).
  */
 export async function PUT(
   request: Request,
@@ -229,12 +231,9 @@ export async function PUT(
       return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
     }
 
-    const updateData: {
-      routePhotos?: string[] | typeof Prisma.JsonNull;
-      mapImageUrl?: string | null;
-      stravaMapUrl?: string | null;
-    } = {};
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
+    // Photo/map fields
     if (body.routePhotos !== undefined) {
       updateData.routePhotos = Array.isArray(body.routePhotos)
         ? body.routePhotos.filter((u: unknown) => typeof u === 'string')
@@ -250,8 +249,86 @@ export async function PUT(
         ? null
         : String(body.stravaMapUrl);
     }
+    if (body.staffNotes !== undefined) {
+      updateData.staffNotes = body.staffNotes === null || body.staffNotes === ''
+        ? null
+        : String(body.staffNotes).trim();
+    }
 
-    if (Object.keys(updateData).length === 0) {
+    // Core content (edit run)
+    if (body.title !== undefined && body.title !== null && String(body.title).trim()) {
+      updateData.title = String(body.title).trim();
+    }
+    if (body.totalMiles !== undefined) {
+      updateData.totalMiles = body.totalMiles === null || body.totalMiles === '' ? null : parseFloat(body.totalMiles);
+    }
+    if (body.pace !== undefined) {
+      updateData.pace = body.pace === null || body.pace === '' ? null : String(body.pace);
+    }
+    if (body.description !== undefined) {
+      updateData.description = body.description === null || body.description === '' ? null : String(body.description);
+    }
+    if (body.meetUpPoint !== undefined && body.meetUpPoint !== null && String(body.meetUpPoint).trim()) {
+      updateData.meetUpPoint = String(body.meetUpPoint).trim();
+    }
+    if (body.meetUpStreetAddress !== undefined) {
+      updateData.meetUpStreetAddress = body.meetUpStreetAddress === null || body.meetUpStreetAddress === '' ? null : String(body.meetUpStreetAddress);
+    }
+    if (body.meetUpCity !== undefined) {
+      updateData.meetUpCity = body.meetUpCity === null || body.meetUpCity === '' ? null : String(body.meetUpCity);
+    }
+    if (body.meetUpState !== undefined) {
+      updateData.meetUpState = body.meetUpState === null || body.meetUpState === '' ? null : String(body.meetUpState);
+    }
+    if (body.meetUpZip !== undefined) {
+      updateData.meetUpZip = body.meetUpZip === null || body.meetUpZip === '' ? null : String(body.meetUpZip);
+    }
+    if (body.meetUpPlaceId !== undefined) {
+      updateData.meetUpPlaceId = body.meetUpPlaceId === null || body.meetUpPlaceId === '' ? null : String(body.meetUpPlaceId);
+    }
+    if (body.meetUpLat !== undefined) {
+      updateData.meetUpLat = body.meetUpLat === null || body.meetUpLat === '' ? null : parseFloat(body.meetUpLat);
+    }
+    if (body.meetUpLng !== undefined) {
+      updateData.meetUpLng = body.meetUpLng === null || body.meetUpLng === '' ? null : parseFloat(body.meetUpLng);
+    }
+    if (body.endPoint !== undefined) {
+      updateData.endPoint = body.endPoint === null || body.endPoint === '' ? null : String(body.endPoint);
+    }
+    if (body.endStreetAddress !== undefined) {
+      updateData.endStreetAddress = body.endStreetAddress === null || body.endStreetAddress === '' ? null : String(body.endStreetAddress);
+    }
+    if (body.endCity !== undefined) {
+      updateData.endCity = body.endCity === null || body.endCity === '' ? null : String(body.endCity);
+    }
+    if (body.endState !== undefined) {
+      updateData.endState = body.endState === null || body.endState === '' ? null : String(body.endState);
+    }
+    if (body.timezone !== undefined) {
+      updateData.timezone = body.timezone === null || body.timezone === '' ? null : String(body.timezone);
+    }
+    if (body.dayOfWeek !== undefined) {
+      updateData.dayOfWeek = body.dayOfWeek === null || body.dayOfWeek === '' ? null : String(body.dayOfWeek);
+    }
+    if (body.startTimeHour !== undefined) {
+      updateData.startTimeHour = body.startTimeHour === null || body.startTimeHour === '' ? null : parseInt(body.startTimeHour, 10);
+    }
+    if (body.startTimeMinute !== undefined) {
+      updateData.startTimeMinute = body.startTimeMinute === null || body.startTimeMinute === '' ? null : parseInt(body.startTimeMinute, 10);
+    }
+    if (body.startTimePeriod !== undefined) {
+      updateData.startTimePeriod = body.startTimePeriod === null || body.startTimePeriod === '' ? null : String(body.startTimePeriod);
+    }
+    if (body.date !== undefined && body.date) {
+      const d = new Date(body.date);
+      if (!isNaN(d.getTime())) {
+        updateData.date = d;
+        updateData.startDate = d;
+      }
+    }
+
+    if (Object.keys(updateData).length <= 1) {
+      // only updatedAt
       return NextResponse.json({
         success: true,
         run: await prisma.city_runs.findUnique({ where: { id: runId } }),
@@ -260,20 +337,30 @@ export async function PUT(
 
     const updated = await prisma.city_runs.update({
       where: { id: runId },
-      data: updateData,
+      data: updateData as Parameters<typeof prisma.city_runs.update>[0]['data'],
     });
 
     return NextResponse.json({
       success: true,
       run: {
         id: updated.id,
+        title: updated.title,
+        totalMiles: updated.totalMiles,
+        pace: updated.pace,
+        description: updated.description,
+        meetUpPoint: updated.meetUpPoint,
+        meetUpStreetAddress: updated.meetUpStreetAddress,
+        meetUpCity: updated.meetUpCity,
+        meetUpState: updated.meetUpState,
+        meetUpZip: updated.meetUpZip,
         routePhotos: updated.routePhotos,
         mapImageUrl: updated.mapImageUrl,
         stravaMapUrl: updated.stravaMapUrl,
+        staffNotes: updated.staffNotes,
       },
     });
   } catch (error: any) {
-    console.error('Error updating CityRun photos:', error);
+    console.error('Error updating CityRun:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to update run', details: error?.message },
       { status: 500 }

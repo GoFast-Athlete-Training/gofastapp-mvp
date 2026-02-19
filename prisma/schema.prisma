@@ -396,6 +396,7 @@ model city_runs {
   description         String?
   routePhotos         Json?                // Array of photo URLs: ["url1", "url2", ...]
   mapImageUrl         String?              // Single map image URL (snip from Strava or uploaded)
+  staffNotes          String?              // Data entry note for approver (e.g. "Couldn't get Strava URL")
   createdAt           DateTime             @default(now())
   updatedAt           DateTime
   startTimeHour       Int?

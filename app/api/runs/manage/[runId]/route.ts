@@ -104,7 +104,7 @@ export async function PATCH(
 
     const { runId } = await params;
     const body = await request.json();
-    const { workflowStatus } = body;
+    const { workflowStatus, staffNotes } = body;
 
     if (!workflowStatus || !VALID_WORKFLOW_STATUSES.includes(workflowStatus)) {
       return NextResponse.json(
@@ -122,12 +122,17 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: 'CityRun not found' }, { status: 404 });
     }
 
+    const updateData: { workflowStatus: 'DRAFT' | 'SUBMITTED' | 'APPROVED'; updatedAt: Date; staffNotes?: string | null } = {
+      workflowStatus: workflowStatus as 'DRAFT' | 'SUBMITTED' | 'APPROVED',
+      updatedAt: new Date(),
+    };
+    if (staffNotes !== undefined) {
+      updateData.staffNotes = staffNotes === null || staffNotes === '' ? null : String(staffNotes).trim();
+    }
+
     const updated = await prisma.city_runs.update({
       where: { id: runId },
-      data: {
-        workflowStatus: workflowStatus as 'DRAFT' | 'SUBMITTED' | 'APPROVED',
-        updatedAt: new Date(),
-      },
+      data: updateData,
       include: {
         runClub: {
           select: {
