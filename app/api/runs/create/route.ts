@@ -75,6 +75,8 @@ export async function POST(request: NextRequest) {
       routePhotos,
       mapImageUrl,
       staffNotes,
+      source,
+      sourceUrl,
     } = body;
 
     if (!citySlug && !cityName && !meetUpCity && !meetUpStreetAddress) {
@@ -282,6 +284,8 @@ export async function POST(request: NextRequest) {
         routePhotos: Array.isArray(routePhotos) && routePhotos.length > 0 ? routePhotos : null,
         mapImageUrl: mapImageUrl?.trim() || null,
         staffNotes: staffNotes?.trim() || null,
+        source: source || null,
+        sourceUrl: sourceUrl?.trim() || null,
         updatedAt: new Date(),
       },
       include: {
