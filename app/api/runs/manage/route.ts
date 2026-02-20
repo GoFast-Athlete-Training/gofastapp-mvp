@@ -13,7 +13,15 @@ import { adminAuth } from '@/lib/firebaseAdmin';
  * 
  * Query params:
  * - workflowStatus: DRAFT | SUBMITTED | APPROVED
+ * - pastOnly: "true" = only runs with startDate before today (for adding photos, etc.)
+ * - upcomingOnly: default "true"; "false" = return all runs (no date filter)
  */
+function getStartOfTodayUTC() {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
 export async function GET(request: Request) {
   try {
     // Verify authentication
@@ -31,10 +39,18 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const workflowStatus = searchParams.get('workflowStatus');
+    const pastOnly = searchParams.get('pastOnly') === 'true';
+    const upcomingOnly = searchParams.get('upcomingOnly') !== 'false';
 
     const where: any = {};
     if (workflowStatus && ['DRAFT', 'SUBMITTED', 'APPROVED'].includes(workflowStatus)) {
       where.workflowStatus = workflowStatus;
+    }
+    const startOfToday = getStartOfTodayUTC();
+    if (pastOnly) {
+      where.startDate = { lt: startOfToday };
+    } else if (upcomingOnly) {
+      where.startDate = { gte: startOfToday };
     }
 
     const runs = await prisma.city_runs.findMany({

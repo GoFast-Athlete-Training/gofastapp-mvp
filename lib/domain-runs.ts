@@ -41,7 +41,12 @@ export async function getRuns(filters: GetRunsFilters = {}) {
   }
   
   // Day filter applied client-side from startDate (MVP1: all runs are single events)
-  
+
+  // Public run hydration: only show upcoming runs (startDate >= start of today UTC)
+  const startOfToday = new Date();
+  startOfToday.setUTCHours(0, 0, 0, 0);
+  where.startDate = { gte: startOfToday };
+
   // First, get all runs matching filters with RunClub relation (FK)
   // Note: Prisma model `city_runs` maps to table `city_runs` (migrated from run_crew_runs)
   let allRuns;
