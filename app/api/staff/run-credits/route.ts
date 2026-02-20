@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
         staffIds && staffIds.length > 0
           ? ({ in: staffIds } as { in: string[] })
           : { not: null },
-      workflowStatus: { in: ["SUBMITTED", "APPROVED"] as const },
+      workflowStatus: { in: ["SUBMITTED", "APPROVED"] },
     };
 
     const counts = await prisma.city_runs.groupBy({
