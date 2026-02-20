@@ -81,6 +81,10 @@ export async function getRuns(filters: GetRunsFilters = {}) {
         description: true,
         stravaMapUrl: true,
         workflowStatus: true,
+        postRunActivity: true,
+        routeNeighborhood: true,
+        runType: true,
+        workoutDescription: true,
         runClub: {
           select: {
             id: true,
@@ -145,8 +149,6 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     workflowStatus: run.workflowStatus,
     // Exclude sensitive fields:
     // runCrewId, athleteGeneratedId, staffGeneratedId
-    // Exclude new fields until migration is applied:
-    // postRunActivity, routeNeighborhood, runType, workoutDescription
   }));
 }
 

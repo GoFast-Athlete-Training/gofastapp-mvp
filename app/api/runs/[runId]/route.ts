@@ -84,8 +84,10 @@ export async function GET(
         igPostText: true,
         igPostGraphic: true,
         workflowStatus: true,
-        // Exclude new fields until migration is applied:
-        // postRunActivity, routeNeighborhood, runType, workoutDescription
+        postRunActivity: true,
+        routeNeighborhood: true,
+        runType: true,
+        workoutDescription: true,
         city_run_rsvps: {
           select: {
             id: true,
@@ -205,9 +207,9 @@ export async function GET(
         meetUpCity: run.meetUpCity,
         meetUpState: run.meetUpState,
         meetUpZip: run.meetUpZip,
-        routeNeighborhood: null, // Excluded until migration applied
-        runType: null, // Excluded until migration applied
-        workoutDescription: null, // Excluded until migration applied
+        routeNeighborhood: run.routeNeighborhood ?? null,
+        runType: run.runType ?? null,
+        workoutDescription: run.workoutDescription ?? null,
         meetUpLat: run.meetUpLat,
         meetUpLng: run.meetUpLng,
         startTimeHour: run.startTimeHour,
@@ -217,7 +219,7 @@ export async function GET(
         totalMiles: run.totalMiles,
         pace: run.pace,
         description: run.description,
-        postRunActivity: null, // Excluded until migration applied
+        postRunActivity: run.postRunActivity ?? null,
         stravaMapUrl: run.stravaMapUrl,
         routePhotos: run.routePhotos as string[] | null ?? null,
         mapImageUrl: run.mapImageUrl ?? null,
