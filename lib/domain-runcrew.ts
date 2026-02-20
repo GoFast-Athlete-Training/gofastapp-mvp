@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 import { normalizeCrewResponse } from './normalize-prisma';
 import { secondsToPace } from '@/utils/formatPace';
@@ -1163,8 +1164,11 @@ export async function rsvpToRun(data: {
   const photoUrls = Array.isArray(data.rsvpPhotoUrls)
     ? data.rsvpPhotoUrls.filter((u): u is string => typeof u === 'string')
     : undefined;
-  const updateData: { status: string; rsvpPhotoUrls?: unknown } = { status: data.status };
-  if (photoUrls !== undefined) updateData.rsvpPhotoUrls = photoUrls;
+  
+  const updateData: Record<string, unknown> = { status: data.status };
+  if (photoUrls !== undefined) {
+    updateData.rsvpPhotoUrls = photoUrls.length > 0 ? photoUrls : Prisma.JsonNull;
+  }
 
   const rsvp = await prisma.city_run_rsvps.upsert({
     where: {
