@@ -75,8 +75,12 @@ export async function POST(request: NextRequest) {
       routePhotos,
       mapImageUrl,
       staffNotes,
-      source,
-      sourceUrl,
+      stravaUrl,
+      stravaText,
+      webUrl,
+      webText,
+      igPostText,
+      igPostGraphic,
     } = body;
 
     if (!citySlug && !cityName && !meetUpCity && !meetUpStreetAddress) {
@@ -284,8 +288,12 @@ export async function POST(request: NextRequest) {
         routePhotos: Array.isArray(routePhotos) && routePhotos.length > 0 ? routePhotos : null,
         mapImageUrl: mapImageUrl?.trim() || null,
         staffNotes: staffNotes?.trim() || null,
-        source: source || null,
-        sourceUrl: sourceUrl?.trim() || null,
+        stravaUrl: stravaUrl?.trim() || null,
+        stravaText: stravaText?.trim() || null,
+        webUrl: webUrl?.trim() || null,
+        webText: webText?.trim() || null,
+        igPostText: igPostText?.trim() || null,
+        igPostGraphic: igPostGraphic?.trim() || null,
         updatedAt: new Date(),
       },
       include: {

@@ -5,10 +5,12 @@ export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/runs/ai-generate
- * Generate structured run data from unstructured blob input
+ * Generate structured run data from multiple source inputs
  * 
- * Input: Raw text blob (copy/paste from web, Strava URL, unstructured text)
+ * Input: All available source inputs (stravaUrl, stravaText, webUrl, webText, igPostText, igPostGraphic)
  * Output: Structured run data (title, date, time, location, miles, Strava URL, description, etc.)
+ * 
+ * AI uses ALL sources together for better extraction. Raw sources are stored for founder review.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -25,31 +27,42 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { input } = body;
+    const {
+      stravaUrl,
+      stravaText,
+      webUrl,
+      webText,
+      igPostText,
+      igPostGraphic,
+    } = body;
 
-    if (!input || !input.trim()) {
+    // Combine all text sources for AI processing
+    const allTextSources: string[] = [];
+    if (stravaText?.trim()) allTextSources.push(`[STRAVA TEXT]\n${stravaText.trim()}`);
+    if (webText?.trim()) allTextSources.push(`[WEB TEXT]\n${webText.trim()}`);
+    if (igPostText?.trim()) allTextSources.push(`[IG POST TEXT]\n${igPostText.trim()}`);
+    if (stravaUrl?.trim()) allTextSources.push(`[STRAVA URL]\n${stravaUrl.trim()}`);
+    if (webUrl?.trim()) allTextSources.push(`[WEB URL]\n${webUrl.trim()}`);
+    
+    const combinedInput = allTextSources.join('\n\n---\n\n');
+    
+    if (!combinedInput.trim()) {
       return NextResponse.json(
-        { success: false, error: 'Input is required' },
+        { success: false, error: 'At least one source input is required' },
         { status: 400 }
       );
     }
 
-    // TODO: Implement AI parsing logic
-    // For now, return a placeholder structure
-    // This should:
-    // 1. Parse unstructured text
-    // 2. Extract: title, date, time, location, miles, Strava URL, description
-    // 3. Return structured data
+    // TODO: Implement AI parsing logic (LLM integration)
+    // For now, basic regex parsing combining all sources
+    const inputLower = combinedInput.toLowerCase();
     
-    // Placeholder: Basic parsing logic
-    const inputLower = input.toLowerCase();
+    // Try to extract Strava URL (from stravaUrl field or text)
+    const stravaUrlFromText = combinedInput.match(/https?:\/\/(www\.)?strava\.com\/[^\s]+/i);
+    const extractedStravaUrl = stravaUrl?.trim() || (stravaUrlFromText ? stravaUrlFromText[0] : null);
     
-    // Try to extract Strava URL
-    const stravaUrlMatch = input.match(/https?:\/\/(www\.)?strava\.com\/[^\s]+/i);
-    const stravaUrl = stravaUrlMatch ? stravaUrlMatch[0] : null;
-    
-    // Try to extract date (basic patterns)
-    const dateMatch = input.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
+    // Try to extract date (basic patterns) - check all sources
+    const dateMatch = combinedInput.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);
     let extractedDate = null;
     if (dateMatch) {
       try {
@@ -61,8 +74,8 @@ export async function POST(request: NextRequest) {
       } catch {}
     }
     
-    // Try to extract time
-    const timeMatch = input.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+    // Try to extract time - check all sources
+    const timeMatch = combinedInput.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
     let extractedHour = null;
     let extractedMinute = null;
     let extractedPeriod = "AM";
@@ -74,28 +87,28 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Try to extract miles
-    const milesMatch = input.match(/(\d+\.?\d*)\s*(mile|mi|miles)/i);
+    // Try to extract miles - check all sources
+    const milesMatch = combinedInput.match(/(\d+\.?\d*)\s*(mile|mi|miles)/i);
     const extractedMiles = milesMatch ? milesMatch[1] : null;
     
-    // Try to extract location (look for common location keywords)
+    // Try to extract location - check all sources
     const locationKeywords = ['meet', 'start', 'location', 'at', 'address'];
     let extractedLocation = null;
     for (const keyword of locationKeywords) {
       const regex = new RegExp(`${keyword}[^\\n]*?([A-Z][^\\n]{10,})`, 'i');
-      const match = input.match(regex);
+      const match = combinedInput.match(regex);
       if (match) {
         extractedLocation = match[1].trim();
         break;
       }
     }
     
-    // Extract title (first line or first sentence)
-    const lines = input.split('\n').filter(l => l.trim());
+    // Extract title (first line or first sentence from any source)
+    const lines = combinedInput.split('\n').filter(l => l.trim() && !l.startsWith('['));
     const extractedTitle = lines[0]?.trim() || null;
     
-    // Description is the rest of the input (cleaned up)
-    const extractedDescription = lines.slice(1).join('\n').trim() || input.trim();
+    // Description combines all text sources (cleaned up)
+    const extractedDescription = lines.slice(1).join('\n').trim() || combinedInput.trim();
 
     return NextResponse.json({
       success: true,
@@ -107,10 +120,8 @@ export async function POST(request: NextRequest) {
         startTimePeriod: extractedPeriod,
         meetUpPoint: extractedLocation,
         totalMiles: extractedMiles,
-        stravaMapUrl: stravaUrl,
+        stravaMapUrl: extractedStravaUrl,
         description: extractedDescription,
-        source: stravaUrl ? 'Strava URL' : 'Web/Website',
-        sourceUrl: stravaUrl || null,
       },
     });
   } catch (error: any) {
