@@ -28,7 +28,7 @@ export async function POST(
       body = await request.json();
     } catch {}
 
-    const { status } = body;
+    const { status, rsvpPhotoUrls } = body;
     if (!status || !['going', 'not-going'].includes(status)) {
       return NextResponse.json({ error: 'Invalid status. Must be going or not-going' }, { status: 400 });
     }
@@ -68,13 +68,14 @@ export async function POST(
       return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
     }
 
-    // Create or update RSVP (same function works for city_runs)
+    // Create or update RSVP (same function works for city_runs). Ambassadors: going + rsvpPhotoUrls = $10 credit.
     let rsvp;
     try {
       rsvp = await rsvpToRun({
         runId,
         athleteId: athlete.id,
         status: status as 'going' | 'not-going',
+        rsvpPhotoUrls: Array.isArray(rsvpPhotoUrls) ? rsvpPhotoUrls : undefined,
       });
     } catch (err) {
       console.error('Prisma error:', err);

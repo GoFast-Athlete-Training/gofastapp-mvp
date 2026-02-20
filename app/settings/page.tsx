@@ -5,18 +5,47 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { DollarSign, Hash, Sparkles } from 'lucide-react';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import TopNav from '@/components/shared/TopNav';
+import api from '@/lib/api';
 
 export default function SettingsPage() {
   const router = useRouter();
   const [athlete, setAthlete] = useState<any>(null);
   const [connectingGarmin, setConnectingGarmin] = useState(false);
+  const [ambassadorCredits, setAmbassadorCredits] = useState<{
+    ambassador: boolean;
+    tally: number;
+    amountEarnedDollars: number;
+    periodStart: string | null;
+    amountPerCreditCents: number;
+  } | null>(null);
 
   useEffect(() => {
     const stored = LocalStorageAPI.getAthlete();
     setAthlete(stored);
   }, []);
+
+  useEffect(() => {
+    if (athlete?.role !== 'AMBASSADOR') return;
+    api
+      .get('/me/ambassador-credits')
+      .then((res) => {
+        if (res.data?.success && res.data?.ambassador) {
+          setAmbassadorCredits({
+            ambassador: true,
+            tally: res.data.tally ?? 0,
+            amountEarnedDollars: res.data.amountEarnedDollars ?? 0,
+            periodStart: res.data.periodStart ?? null,
+            amountPerCreditCents: res.data.amountPerCreditCents ?? 1000,
+          });
+        } else {
+          setAmbassadorCredits({ ambassador: false, tally: 0, amountEarnedDollars: 0, periodStart: null, amountPerCreditCents: 1000 });
+        }
+      })
+      .catch(() => setAmbassadorCredits(null));
+  }, [athlete?.role]);
 
   // Direct Garmin OAuth flow (like gofastfrontend-mvp1)
   const connectGarmin = async () => {
@@ -117,6 +146,53 @@ export default function SettingsPage() {
         </div>
 
         <div className="space-y-6">
+          {/* Ambassador: My payment credits (like My Work for data-entry) */}
+          {athlete?.role === 'AMBASSADOR' && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-amber-500" />
+                My payment credits
+              </h2>
+              <p className="text-gray-600 text-sm mb-4">
+                Join a run, post a photo on that run → get $10 credit. Payouts are processed by GoFast.
+              </p>
+              {ambassadorCredits?.ambassador ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
+                      <Hash className="h-4 w-4" />
+                      Credits this period
+                    </div>
+                    <div className="text-2xl font-bold text-gray-900">{ambassadorCredits.tally}</div>
+                    <div className="text-xs text-gray-500">
+                      {ambassadorCredits.periodStart
+                        ? `Since ${new Date(ambassadorCredits.periodStart).toLocaleDateString()}`
+                        : 'All time (no payout yet)'}
+                    </div>
+                  </div>
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
+                      <DollarSign className="h-4 w-4 text-emerald-600" />
+                      Amount earned
+                    </div>
+                    <div className="text-2xl font-bold text-emerald-700">
+                      ${ambassadorCredits.amountEarnedDollars.toFixed(2)}
+                    </div>
+                    <div className="text-xs text-gray-500">${(ambassadorCredits.amountPerCreditCents / 100).toFixed(0)} per qualified run</div>
+                  </div>
+                </div>
+              ) : ambassadorCredits && !ambassadorCredits.ambassador ? null : (
+                <div className="text-gray-500 text-sm">Loading…</div>
+              )}
+              <Link
+                href="/ambassador-welcome"
+                className="inline-block mt-3 text-sm text-sky-600 hover:text-sky-800"
+              >
+                How ambassador credits work →
+              </Link>
+            </div>
+          )}
+
           {/* Profile Settings */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Profile</h2>

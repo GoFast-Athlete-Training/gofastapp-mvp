@@ -56,6 +56,8 @@ model Athlete {
   updatedAt               DateTime
   go_fast_companies       go_fast_companies        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   runClub                 run_clubs?               @relation(fields: [runClubId], references: [id], onDelete: SetNull)
+  ambassador_credits      ambassador_credits[]
+  ambassador_payouts      ambassador_payouts[]
   athlete_activities      athlete_activities[]
   run_crew_announcements  run_crew_announcements[]
   run_crew_event_rsvps    run_crew_event_rsvps[]
@@ -67,6 +69,32 @@ model Athlete {
   training_days_executed  training_days_executed[]
   training_plans          training_plans[]
   workouts                workouts[]
+}
+
+model ambassador_credits {
+  id              String           @id @default(cuid())
+  athleteId       String
+  cityRunRsvpId   String           @unique         // One credit per RSVP (RSVP going + photo)
+  amountCents     Int              @default(1000)  // $10 per qualified run
+  createdAt       DateTime         @default(now())
+  Athlete         Athlete          @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  city_run_rsvps  city_run_rsvps   @relation(fields: [cityRunRsvpId], references: [id], onDelete: Cascade)
+
+  @@index([athleteId])
+  @@index([createdAt])
+}
+
+model ambassador_payouts {
+  id               String    @id @default(cuid())
+  athleteId        String
+  processedAt      DateTime  // When Company paid (period end for credits)
+  amountCents      Int
+  companyPayoutId  String?   // FK/id from GoFast Company payouts table (if synced)
+  createdAt        DateTime  @default(now())
+  Athlete          Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@index([athleteId])
+  @@index([processedAt])
 }
 
 model ai_roles {
@@ -367,14 +395,16 @@ model run_crew_messages {
 }
 
 model city_run_rsvps {
-  id            String        @id
-  runId         String
-  athleteId     String
-  status        String        // "going", "not-going", "maybe"
-  checkedInAt   DateTime?     // Timestamp when checked in (null = not checked in)
-  createdAt     DateTime      @default(now())
-  Athlete       Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  city_runs     city_runs     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  id              String        @id
+  runId           String
+  athleteId       String
+  status          String        // "going", "not-going", "maybe"
+  checkedInAt     DateTime?     // Timestamp when checked in (null = not checked in)
+  rsvpPhotoUrls   Json?         // Photos attendee posted for this run (ambassador credit when going + ≥1 photo)
+  createdAt       DateTime      @default(now())
+  Athlete         Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  city_runs       city_runs     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  ambassador_credits ambassador_credits?
 
   @@unique([runId, athleteId])
   @@index([checkedInAt])

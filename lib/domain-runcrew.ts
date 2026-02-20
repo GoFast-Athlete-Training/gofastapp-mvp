@@ -1141,20 +1141,30 @@ export async function postAnnouncement(data: {
   return announcement;
 }
 
+/** Ambassador credit per qualified run: RSVP going + at least one photo */
+const AMBASSADOR_CREDIT_CENTS = 1000; // $10
+
 /**
- * RSVP to a run
+ * RSVP to a run.
+ * If athlete is AMBASSADOR, status is "going", and rsvpPhotoUrls has ≥1 photo, creates one ambassador credit ($10).
  */
 export async function rsvpToRun(data: {
   runId: string;
   athleteId: string;
   status: 'going' | 'not-going';
+  rsvpPhotoUrls?: string[] | null;
 }) {
-  // Generate a simple unique ID (cuid-like format)
   function generateRsvpId(): string {
     const timestamp = Date.now().toString(36);
     const random = Math.random().toString(36).substring(2, 15);
     return `c${timestamp}${random}`;
   }
+
+  const photoUrls = Array.isArray(data.rsvpPhotoUrls)
+    ? data.rsvpPhotoUrls.filter((u): u is string => typeof u === 'string')
+    : undefined;
+  const updateData: { status: string; rsvpPhotoUrls?: unknown } = { status: data.status };
+  if (photoUrls !== undefined) updateData.rsvpPhotoUrls = photoUrls;
 
   const rsvp = await prisma.city_run_rsvps.upsert({
     where: {
@@ -1163,14 +1173,13 @@ export async function rsvpToRun(data: {
         athleteId: data.athleteId,
       },
     },
-    update: {
-      status: data.status,
-    },
+    update: updateData,
     create: {
       id: generateRsvpId(),
       runId: data.runId,
       athleteId: data.athleteId,
       status: data.status,
+      ...(photoUrls && photoUrls.length > 0 ? { rsvpPhotoUrls: photoUrls } : {}),
     },
     include: {
       Athlete: {
@@ -1179,10 +1188,29 @@ export async function rsvpToRun(data: {
           firstName: true,
           lastName: true,
           photoURL: true,
+          role: true,
         },
       },
     },
   });
+
+  // Ambassador credit: going + ≥1 photo = $10 (one credit per RSVP, idempotent)
+  const qualifies =
+    rsvp.status === 'going' &&
+    rsvp.Athlete?.role === 'AMBASSADOR' &&
+    (Array.isArray(rsvp.rsvpPhotoUrls) ? rsvp.rsvpPhotoUrls.length >= 1 : false);
+
+  if (qualifies) {
+    await prisma.ambassador_credits.upsert({
+      where: { cityRunRsvpId: rsvp.id },
+      create: {
+        athleteId: data.athleteId,
+        cityRunRsvpId: rsvp.id,
+        amountCents: AMBASSADOR_CREDIT_CENTS,
+      },
+      update: {},
+    });
+  }
 
   return rsvp;
 }
