@@ -309,6 +309,7 @@ model run_clubs {
   name      String
   logoUrl   String?
   city      String?
+  description String?
   websiteUrl String?
   instagramUrl String?
   stravaUrl String?

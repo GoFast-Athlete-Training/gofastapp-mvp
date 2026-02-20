@@ -28,6 +28,14 @@ function isMissingCityRunsColumn(error: any) {
   );
 }
 
+function isMissingRunClubsColumn(error: any) {
+  return (
+    error?.code === 'P2022' &&
+    typeof error?.message === 'string' &&
+    error.message.includes('run_clubs.')
+  );
+}
+
 async function logCityRunsRuntimeDiagnostics(context: string) {
   try {
     const rows = (await prisma.$queryRawUnsafe(
@@ -78,38 +86,74 @@ export async function GET(
       dbHost: getDbHost(),
     });
 
-    const run = await prisma.city_runs.findUnique({
-      where: { id: runId },
-      include: {
-        runClub: {
-          select: {
-            id: true,
-            slug: true,
-            name: true,
-            logoUrl: true,
-            city: true,
-            websiteUrl: true,
-            instagramUrl: true,
-            stravaUrl: true,
-          },
-        },
-        city_run_rsvps: {
-          include: {
-            Athlete: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-              },
+    let run: any;
+    try {
+      run = await prisma.city_runs.findUnique({
+        where: { id: runId },
+        include: {
+          runClub: {
+            select: {
+              id: true,
+              slug: true,
+              name: true,
+              logoUrl: true,
+              city: true,
+              description: true,
+              websiteUrl: true,
+              instagramUrl: true,
+              stravaUrl: true,
             },
           },
-          orderBy: {
-            createdAt: 'desc',
+          city_run_rsvps: {
+            include: {
+              Athlete: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
           },
         },
-      },
-    });
+      });
+    } catch (error: any) {
+      if (!isMissingRunClubsColumn(error)) throw error;
+      console.warn('[GET /api/runs/manage/[runId]] run_clubs column missing; retrying without run club URL fields');
+      run = await prisma.city_runs.findUnique({
+        where: { id: runId },
+        include: {
+          runClub: {
+            select: {
+              id: true,
+              slug: true,
+              name: true,
+              logoUrl: true,
+              city: true,
+            },
+          },
+          city_run_rsvps: {
+            include: {
+              Athlete: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+          },
+        },
+      });
+    }
 
     if (!run) {
       return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
@@ -185,24 +229,46 @@ export async function PATCH(
       updateData.staffNotes = staffNotes === null || staffNotes === '' ? null : String(staffNotes).trim();
     }
 
-    const updated = await prisma.city_runs.update({
-      where: { id: runId },
-      data: updateData,
-      include: {
-        runClub: {
-          select: {
-            id: true,
-            slug: true,
-            name: true,
-            logoUrl: true,
-            city: true,
-            websiteUrl: true,
-            instagramUrl: true,
-            stravaUrl: true,
+    let updated: any;
+    try {
+      updated = await prisma.city_runs.update({
+        where: { id: runId },
+        data: updateData,
+        include: {
+          runClub: {
+            select: {
+              id: true,
+              slug: true,
+              name: true,
+              logoUrl: true,
+              city: true,
+              description: true,
+              websiteUrl: true,
+              instagramUrl: true,
+              stravaUrl: true,
+            },
           },
         },
-      },
-    });
+      });
+    } catch (error: any) {
+      if (!isMissingRunClubsColumn(error)) throw error;
+      console.warn('[PATCH /api/runs/manage/[runId]] run_clubs column missing; retrying without run club URL fields');
+      updated = await prisma.city_runs.update({
+        where: { id: runId },
+        data: updateData,
+        include: {
+          runClub: {
+            select: {
+              id: true,
+              slug: true,
+              name: true,
+              logoUrl: true,
+              city: true,
+            },
+          },
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,

@@ -30,6 +30,14 @@ function isMissingCityRunsColumn(error: any) {
   );
 }
 
+function isMissingRunClubsColumn(error: any) {
+  return (
+    error?.code === 'P2022' &&
+    typeof error?.message === 'string' &&
+    error.message.includes('run_clubs.')
+  );
+}
+
 const UNSUPPORTED_CITY_RUN_FIELDS = [
   'postRunActivity',
   'stravaUrl',
@@ -170,6 +178,7 @@ export async function GET(
               name: true,
               logoUrl: true,
               city: true,
+              description: true,
               websiteUrl: true,
               instagramUrl: true,
               stravaUrl: true,
@@ -178,9 +187,11 @@ export async function GET(
         },
       });
     } catch (error: any) {
-      if (!isMissingCityRunsColumn(error)) throw error;
-      console.warn('[GET /api/runs/[runId]] city_runs column missing; retrying with legacy field set');
-      await logCityRunsRuntimeDiagnostics('GET /api/runs/[runId] initial');
+      if (!isMissingCityRunsColumn(error) && !isMissingRunClubsColumn(error)) throw error;
+      console.warn('[GET /api/runs/[runId]] column missing; retrying with legacy field set');
+      if (isMissingCityRunsColumn(error)) {
+        await logCityRunsRuntimeDiagnostics('GET /api/runs/[runId] initial');
+      }
       run = await prisma.city_runs.findUnique({
         where: { id: runId },
         select: {
@@ -235,9 +246,6 @@ export async function GET(
               name: true,
               logoUrl: true,
               city: true,
-              websiteUrl: true,
-              instagramUrl: true,
-              stravaUrl: true,
             },
           },
         },
@@ -276,6 +284,10 @@ export async function GET(
                     name: clubData.runClub.name,
                     logoUrl: clubData.runClub.logoUrl || clubData.runClub.logo || null,
                     city: clubData.runClub.city || null,
+                    description: clubData.runClub.description || null,
+                    websiteUrl: clubData.runClub.websiteUrl || clubData.runClub.url || null,
+                    instagramUrl: clubData.runClub.instagramUrl || clubData.runClub.instagramHandle || null,
+                    stravaUrl: clubData.runClub.stravaUrl || clubData.runClub.stravaClubUrl || null,
                     syncedAt: new Date(),
                   },
                 });
@@ -289,9 +301,7 @@ export async function GET(
                     name: true,
                     logoUrl: true,
                     city: true,
-                    websiteUrl: true,
-                    instagramUrl: true,
-                    stravaUrl: true,
+                    description: true,
                   },
                 });
               }

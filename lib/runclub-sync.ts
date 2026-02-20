@@ -51,8 +51,7 @@ export async function fetchAndSaveRunClub(slug: string): Promise<any | null> {
     const runClub = data.runClub;
 
     // Upsert into gofastapp-mvp database
-    // Only save minimal fields needed for card/run display (name, logo, city)
-    // All rich data stays in GoFastCompany for SEO/public pages
+    // Keep enough fields for run verification and hydration without extra cross-repo fetches.
     // IMPORTANT: Prisma generates UUID `id` automatically - we NEVER set it manually
     const savedRunClub = await prisma.run_clubs.upsert({
       where: { slug },
@@ -60,6 +59,10 @@ export async function fetchAndSaveRunClub(slug: string): Promise<any | null> {
         name: runClub.name,
         logoUrl: runClub.logoUrl || runClub.logo || null, // Handle both logoUrl and logo fields
         city: runClub.city || null,
+        description: runClub.description || null,
+        websiteUrl: runClub.websiteUrl || runClub.url || null,
+        instagramUrl: runClub.instagramUrl || runClub.instagramHandle || null,
+        stravaUrl: runClub.stravaUrl || runClub.stravaClubUrl || null,
         syncedAt: new Date(),
       },
       create: {
@@ -68,6 +71,10 @@ export async function fetchAndSaveRunClub(slug: string): Promise<any | null> {
         name: runClub.name,
         logoUrl: runClub.logoUrl || runClub.logo || null, // Handle both logoUrl and logo fields
         city: runClub.city || null,
+        description: runClub.description || null,
+        websiteUrl: runClub.websiteUrl || runClub.url || null,
+        instagramUrl: runClub.instagramUrl || runClub.instagramHandle || null,
+        stravaUrl: runClub.stravaUrl || runClub.stravaClubUrl || null,
         syncedAt: new Date(),
         updatedAt: new Date(),
       },

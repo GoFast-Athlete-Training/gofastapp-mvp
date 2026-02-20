@@ -14,7 +14,11 @@ export const dynamic = "force-dynamic";
  *   name: string,      // RunClub name
  *   logoUrl?: string,  // Logo URL (or use 'logo' field)
  *   logo?: string,     // Logo field (AcqRunClub uses 'logo')
- *   city?: string      // City name
+ *   city?: string,     // City name
+ *   description?: string,
+ *   websiteUrl?: string,      // or url
+ *   instagramUrl?: string,    // or instagramHandle
+ *   stravaUrl?: string        // or stravaClubUrl
  * }
  * 
  * NOTE: `id` is NOT accepted - Prisma generates UUID automatically via @default(uuid())
@@ -40,7 +44,20 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     // id is ignored - Prisma generates UUID automatically
-    const { slug, name, logoUrl, logo, city } = body;
+    const {
+      slug,
+      name,
+      logoUrl,
+      logo,
+      city,
+      description,
+      websiteUrl,
+      url,
+      instagramUrl,
+      instagramHandle,
+      stravaUrl,
+      stravaClubUrl,
+    } = body;
 
     // Validate required fields
     if (!slug || !slug.trim()) {
@@ -67,6 +84,10 @@ export async function POST(request: NextRequest) {
       name: name.trim(),
       logoUrl: logoUrl || logo || null,
       city: city || null,
+      description: description || null,
+      websiteUrl: websiteUrl || url || null,
+      instagramUrl: instagramUrl || instagramHandle || null,
+      stravaUrl: stravaUrl || stravaClubUrl || null,
     });
 
     if (!savedRunClub) {

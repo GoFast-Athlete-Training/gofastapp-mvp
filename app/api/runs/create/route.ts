@@ -258,6 +258,10 @@ export async function POST(request: NextRequest) {
           name: runClub.name,
           logoUrl: runClub.logoUrl || runClub.logo || null,
           city: runClub.city || null,
+          description: runClub.description || null,
+          websiteUrl: runClub.websiteUrl || runClub.url || null,
+          instagramUrl: runClub.instagramUrl || runClub.instagramHandle || null,
+          stravaUrl: runClub.stravaUrl || runClub.stravaClubUrl || null,
         }).catch((error) => {
           console.warn(`Failed to save RunClub during run creation:`, error);
           return null;

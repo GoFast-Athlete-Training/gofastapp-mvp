@@ -39,6 +39,7 @@ export async function saveRunClub(runClub: {
   logoUrl?: string | null;
   logo?: string | null;
   city?: string | null;
+  description?: string | null;
   websiteUrl?: string | null;
   instagramUrl?: string | null;
   stravaUrl?: string | null;
@@ -59,6 +60,7 @@ export async function saveRunClub(runClub: {
         existing.name !== runClub.name ||
         existing.logoUrl !== logoUrl ||
         existing.city !== (runClub.city || null) ||
+        existing.description !== (runClub.description || null) ||
         existing.websiteUrl !== (runClub.websiteUrl || null) ||
         existing.instagramUrl !== (runClub.instagramUrl || null) ||
         existing.stravaUrl !== (runClub.stravaUrl || null);
@@ -71,6 +73,7 @@ export async function saveRunClub(runClub: {
             name: runClub.name,
             logoUrl: logoUrl,
             city: runClub.city || null,
+            description: runClub.description || null,
             websiteUrl: runClub.websiteUrl || null,
             instagramUrl: runClub.instagramUrl || null,
             stravaUrl: runClub.stravaUrl || null,
@@ -90,6 +93,7 @@ export async function saveRunClub(runClub: {
           name: runClub.name,
           logoUrl: runClub.logoUrl || runClub.logo || null,
           city: runClub.city || null,
+          description: runClub.description || null,
           websiteUrl: runClub.websiteUrl || null,
           instagramUrl: runClub.instagramUrl || null,
           stravaUrl: runClub.stravaUrl || null,
