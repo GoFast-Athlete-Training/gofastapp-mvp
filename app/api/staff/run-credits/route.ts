@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { RunWorkflowStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
         staffIds && staffIds.length > 0
           ? ({ in: staffIds } as { in: string[] })
           : { not: null },
-      workflowStatus: { in: ["SUBMITTED", "APPROVED"] },
+      workflowStatus: { in: [RunWorkflowStatus.SUBMITTED, RunWorkflowStatus.APPROVED] },
     };
 
     const counts = await prisma.city_runs.groupBy({
