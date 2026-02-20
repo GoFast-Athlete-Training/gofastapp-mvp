@@ -4,6 +4,14 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminAuth } from '@/lib/firebaseAdmin';
 
+function isMissingPostRunActivityColumn(error: any) {
+  return (
+    error?.code === 'P2022' &&
+    typeof error?.message === 'string' &&
+    error.message.includes('city_runs.postRunActivity')
+  );
+}
+
 /**
  * GET /api/runs/manage
  * 
@@ -53,67 +61,133 @@ export async function GET(request: Request) {
       where.startDate = { gte: startOfToday };
     }
 
-    const runs = await prisma.city_runs.findMany({
-      where,
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        citySlug: true,
-        dayOfWeek: true,
-        startDate: true,
-        date: true,
-        endDate: true,
-        runClubId: true,
-        meetUpPoint: true,
-        meetUpStreetAddress: true,
-        meetUpCity: true,
-        meetUpState: true,
-        meetUpZip: true,
-        meetUpLat: true,
-        meetUpLng: true,
-        startTimeHour: true,
-        startTimeMinute: true,
-        startTimePeriod: true,
-        timezone: true,
-        totalMiles: true,
-        pace: true,
-        description: true,
-        stravaMapUrl: true,
-        workflowStatus: true,
-        postRunActivity: true,
-        routeNeighborhood: true,
-        runType: true,
-        workoutDescription: true,
-        routePhotos: true,
-        mapImageUrl: true,
-        staffNotes: true,
-        createdAt: true,
-        updatedAt: true,
-        runClub: {
-          select: {
-            id: true,
-            slug: true,
-            name: true,
-            logoUrl: true,
-            city: true,
+    let runs: any[];
+    try {
+      runs = await prisma.city_runs.findMany({
+        where,
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          citySlug: true,
+          dayOfWeek: true,
+          startDate: true,
+          date: true,
+          endDate: true,
+          runClubId: true,
+          meetUpPoint: true,
+          meetUpStreetAddress: true,
+          meetUpCity: true,
+          meetUpState: true,
+          meetUpZip: true,
+          meetUpLat: true,
+          meetUpLng: true,
+          startTimeHour: true,
+          startTimeMinute: true,
+          startTimePeriod: true,
+          timezone: true,
+          totalMiles: true,
+          pace: true,
+          description: true,
+          stravaMapUrl: true,
+          workflowStatus: true,
+          postRunActivity: true,
+          routeNeighborhood: true,
+          runType: true,
+          workoutDescription: true,
+          routePhotos: true,
+          mapImageUrl: true,
+          staffNotes: true,
+          createdAt: true,
+          updatedAt: true,
+          runClub: {
+            select: {
+              id: true,
+              slug: true,
+              name: true,
+              logoUrl: true,
+              city: true,
+            },
           },
-        },
-        _count: {
-          select: {
-            city_run_rsvps: {
-              where: {
-                status: 'going' // Count only "going" RSVPs
+          _count: {
+            select: {
+              city_run_rsvps: {
+                where: {
+                  status: 'going' // Count only "going" RSVPs
+                }
               }
             }
           }
-        }
-      },
-      orderBy: [
-        { date: 'desc' },
-        { createdAt: 'desc' }
-      ],
-    });
+        },
+        orderBy: [
+          { date: 'desc' },
+          { createdAt: 'desc' }
+        ],
+      });
+    } catch (error: any) {
+      if (!isMissingPostRunActivityColumn(error)) throw error;
+      console.warn('[GET /api/runs/manage] postRunActivity missing; retrying without it');
+      runs = await prisma.city_runs.findMany({
+        where,
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          citySlug: true,
+          dayOfWeek: true,
+          startDate: true,
+          date: true,
+          endDate: true,
+          runClubId: true,
+          meetUpPoint: true,
+          meetUpStreetAddress: true,
+          meetUpCity: true,
+          meetUpState: true,
+          meetUpZip: true,
+          meetUpLat: true,
+          meetUpLng: true,
+          startTimeHour: true,
+          startTimeMinute: true,
+          startTimePeriod: true,
+          timezone: true,
+          totalMiles: true,
+          pace: true,
+          description: true,
+          stravaMapUrl: true,
+          workflowStatus: true,
+          routeNeighborhood: true,
+          runType: true,
+          workoutDescription: true,
+          routePhotos: true,
+          mapImageUrl: true,
+          staffNotes: true,
+          createdAt: true,
+          updatedAt: true,
+          runClub: {
+            select: {
+              id: true,
+              slug: true,
+              name: true,
+              logoUrl: true,
+              city: true,
+            },
+          },
+          _count: {
+            select: {
+              city_run_rsvps: {
+                where: {
+                  status: 'going'
+                }
+              }
+            }
+          }
+        },
+        orderBy: [
+          { date: 'desc' },
+          { createdAt: 'desc' }
+        ],
+      });
+    }
 
     // Transform to include rsvpCount
     const runsWithCounts = runs.map(run => ({

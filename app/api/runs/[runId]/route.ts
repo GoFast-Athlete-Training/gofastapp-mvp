@@ -6,6 +6,14 @@ import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
+function isMissingPostRunActivityColumn(error: any) {
+  return (
+    error?.code === 'P2022' &&
+    typeof error?.message === 'string' &&
+    error.message.includes('city_runs.postRunActivity')
+  );
+}
+
 /**
  * GET /api/runs/[runId]
  * 
@@ -46,74 +54,147 @@ export async function GET(
 
     // Fetch run with RSVPs and RunClub (FK relation)
     // Use select instead of include to avoid querying non-existent columns in production
-    const run = await prisma.city_runs.findUnique({
-      where: { id: runId },
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        citySlug: true,
-        dayOfWeek: true,
-        startDate: true,
-        date: true,
-        endDate: true,
-        runClubId: true,
-        runCrewId: true,
-        meetUpPoint: true,
-        meetUpStreetAddress: true,
-        meetUpCity: true,
-        meetUpState: true,
-        meetUpZip: true,
-        meetUpLat: true,
-        meetUpLng: true,
-        startTimeHour: true,
-        startTimeMinute: true,
-        startTimePeriod: true,
-        timezone: true,
-        totalMiles: true,
-        pace: true,
-        description: true,
-        stravaMapUrl: true,
-        routePhotos: true,
-        mapImageUrl: true,
-        staffNotes: true,
-        stravaUrl: true,
-        stravaText: true,
-        webUrl: true,
-        webText: true,
-        igPostText: true,
-        igPostGraphic: true,
-        workflowStatus: true,
-        postRunActivity: true,
-        routeNeighborhood: true,
-        runType: true,
-        workoutDescription: true,
-        city_run_rsvps: {
-          select: {
-            id: true,
-            status: true,
-            athleteId: true,
-            Athlete: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                photoURL: true,
+    let run: any;
+    try {
+      run = await prisma.city_runs.findUnique({
+        where: { id: runId },
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          citySlug: true,
+          dayOfWeek: true,
+          startDate: true,
+          date: true,
+          endDate: true,
+          runClubId: true,
+          runCrewId: true,
+          meetUpPoint: true,
+          meetUpStreetAddress: true,
+          meetUpCity: true,
+          meetUpState: true,
+          meetUpZip: true,
+          meetUpLat: true,
+          meetUpLng: true,
+          startTimeHour: true,
+          startTimeMinute: true,
+          startTimePeriod: true,
+          timezone: true,
+          totalMiles: true,
+          pace: true,
+          description: true,
+          stravaMapUrl: true,
+          routePhotos: true,
+          mapImageUrl: true,
+          staffNotes: true,
+          stravaUrl: true,
+          stravaText: true,
+          webUrl: true,
+          webText: true,
+          igPostText: true,
+          igPostGraphic: true,
+          workflowStatus: true,
+          postRunActivity: true,
+          routeNeighborhood: true,
+          runType: true,
+          workoutDescription: true,
+          city_run_rsvps: {
+            select: {
+              id: true,
+              status: true,
+              athleteId: true,
+              Athlete: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  photoURL: true,
+                },
               },
             },
           },
-        },
-        runClub: {
-          select: {
-            id: true,
-            slug: true,
-            name: true,
-            logoUrl: true,
-            city: true,
+          runClub: {
+            select: {
+              id: true,
+              slug: true,
+              name: true,
+              logoUrl: true,
+              city: true,
+            },
           },
         },
-      },
-    });
+      });
+    } catch (error: any) {
+      if (!isMissingPostRunActivityColumn(error)) throw error;
+      console.warn('[GET /api/runs/[runId]] postRunActivity missing; retrying without it');
+      run = await prisma.city_runs.findUnique({
+        where: { id: runId },
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          citySlug: true,
+          dayOfWeek: true,
+          startDate: true,
+          date: true,
+          endDate: true,
+          runClubId: true,
+          runCrewId: true,
+          meetUpPoint: true,
+          meetUpStreetAddress: true,
+          meetUpCity: true,
+          meetUpState: true,
+          meetUpZip: true,
+          meetUpLat: true,
+          meetUpLng: true,
+          startTimeHour: true,
+          startTimeMinute: true,
+          startTimePeriod: true,
+          timezone: true,
+          totalMiles: true,
+          pace: true,
+          description: true,
+          stravaMapUrl: true,
+          routePhotos: true,
+          mapImageUrl: true,
+          staffNotes: true,
+          stravaUrl: true,
+          stravaText: true,
+          webUrl: true,
+          webText: true,
+          igPostText: true,
+          igPostGraphic: true,
+          workflowStatus: true,
+          routeNeighborhood: true,
+          runType: true,
+          workoutDescription: true,
+          city_run_rsvps: {
+            select: {
+              id: true,
+              status: true,
+              athleteId: true,
+              Athlete: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  photoURL: true,
+                },
+              },
+            },
+          },
+          runClub: {
+            select: {
+              id: true,
+              slug: true,
+              name: true,
+              logoUrl: true,
+              city: true,
+            },
+          },
+        },
+      });
+    }
 
     if (!run) {
       return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
@@ -420,10 +501,21 @@ export async function PUT(
       });
     }
 
-    const updated = await prisma.city_runs.update({
-      where: { id: runId },
-      data: updateData as Parameters<typeof prisma.city_runs.update>[0]['data'],
-    });
+    let updated;
+    try {
+      updated = await prisma.city_runs.update({
+        where: { id: runId },
+        data: updateData as Parameters<typeof prisma.city_runs.update>[0]['data'],
+      });
+    } catch (error: any) {
+      if (!isMissingPostRunActivityColumn(error)) throw error;
+      console.warn('[PUT /api/runs/[runId]] postRunActivity missing; retrying without it');
+      delete updateData.postRunActivity;
+      updated = await prisma.city_runs.update({
+        where: { id: runId },
+        data: updateData as Parameters<typeof prisma.city_runs.update>[0]['data'],
+      });
+    }
 
     return NextResponse.json({
       success: true,

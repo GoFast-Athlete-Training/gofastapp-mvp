@@ -13,6 +13,14 @@ function generateId(): string {
   return `c${timestamp}${random}`;
 }
 
+function isMissingPostRunActivityColumn(error: any) {
+  return (
+    error?.code === 'P2022' &&
+    typeof error?.message === 'string' &&
+    error.message.includes('city_runs.postRunActivity')
+  );
+}
+
 // CORS headers for GoFastCompany
 const corsHeaders = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_COMPANY_APP_URL || 'https://gofasthq.gofastcrushgoals.com',
@@ -254,62 +262,78 @@ export async function POST(request: NextRequest) {
       // Continue without slug - can be generated later
     }
 
+    const createData: Record<string, unknown> = {
+      id: generateId(),
+      citySlug: finalCitySlug,
+      slug: runSlug, // URL-friendly slug for better shareability
+      runCrewId: runCrewId?.trim() || null,
+      runClubId: finalRunClubId, // ✅ Use FK instead of runClubSlug
+      staffGeneratedId: staffGeneratedId?.trim() || null,
+      athleteGeneratedId: athleteGeneratedId?.trim() || null,
+      title: title.trim(),
+      workflowStatus: 'DRAFT',
+      dayOfWeek: dayOfWeek?.trim() || null,
+      startDate: runStartDateObj,
+      endDate: runEndDateObj,
+      date: runDateObj,
+      startTimeHour: startTimeHour ? parseInt(startTimeHour) : null,
+      startTimeMinute: startTimeMinute ? parseInt(startTimeMinute) : null,
+      startTimePeriod: startTimePeriod?.trim() || null,
+      timezone: timezone?.trim() || null,
+      meetUpPoint: meetUpPoint.trim(),
+      meetUpStreetAddress: meetUpStreetAddress?.trim() || null,
+      meetUpCity: meetUpCity?.trim() || null,
+      meetUpState: meetUpState?.trim() || null,
+      meetUpZip: meetUpZip?.trim() || null,
+      routeNeighborhood: routeNeighborhood?.trim() || null,
+      runType: runType?.trim() || null,
+      workoutDescription: workoutDescription?.trim() || null,
+      meetUpPlaceId: meetUpPlaceId?.trim() || null,
+      meetUpLat: meetUpLat ? parseFloat(meetUpLat) : null,
+      meetUpLng: meetUpLng ? parseFloat(meetUpLng) : null,
+      endPoint: endPoint?.trim() || null,
+      endStreetAddress: endStreetAddress?.trim() || null,
+      endCity: endCity?.trim() || null,
+      endState: endState?.trim() || null,
+      totalMiles: totalMiles ? parseFloat(totalMiles) : null,
+      pace: pace?.trim() || null,
+      stravaMapUrl: stravaMapUrl?.trim() || null,
+      description: description?.trim() || null,
+      postRunActivity: postRunActivity?.trim() || null,
+      routePhotos: Array.isArray(routePhotos) && routePhotos.length > 0 ? routePhotos : Prisma.JsonNull,
+      mapImageUrl: mapImageUrl?.trim() || null,
+      staffNotes: staffNotes?.trim() || null,
+      stravaUrl: stravaUrl?.trim() || null,
+      stravaText: stravaText?.trim() || null,
+      webUrl: webUrl?.trim() || null,
+      webText: webText?.trim() || null,
+      igPostText: igPostText?.trim() || null,
+      igPostGraphic: igPostGraphic?.trim() || null,
+      updatedAt: new Date(),
+    };
+
     // Create the run
-    const run = await prisma.city_runs.create({
-      data: {
-        id: generateId(),
-        citySlug: finalCitySlug,
-        slug: runSlug, // URL-friendly slug for better shareability
-        runCrewId: runCrewId?.trim() || null,
-        runClubId: finalRunClubId, // ✅ Use FK instead of runClubSlug
-        staffGeneratedId: staffGeneratedId?.trim() || null,
-        athleteGeneratedId: athleteGeneratedId?.trim() || null,
-        title: title.trim(),
-        workflowStatus: 'DRAFT',
-        dayOfWeek: dayOfWeek?.trim() || null,
-        startDate: runStartDateObj,
-        endDate: runEndDateObj,
-        date: runDateObj,
-        startTimeHour: startTimeHour ? parseInt(startTimeHour) : null,
-        startTimeMinute: startTimeMinute ? parseInt(startTimeMinute) : null,
-        startTimePeriod: startTimePeriod?.trim() || null,
-        timezone: timezone?.trim() || null,
-        meetUpPoint: meetUpPoint.trim(),
-        meetUpStreetAddress: meetUpStreetAddress?.trim() || null,
-        meetUpCity: meetUpCity?.trim() || null,
-        meetUpState: meetUpState?.trim() || null,
-        meetUpZip: meetUpZip?.trim() || null,
-        routeNeighborhood: routeNeighborhood?.trim() || null,
-        runType: runType?.trim() || null,
-        workoutDescription: workoutDescription?.trim() || null,
-        meetUpPlaceId: meetUpPlaceId?.trim() || null,
-        meetUpLat: meetUpLat ? parseFloat(meetUpLat) : null,
-        meetUpLng: meetUpLng ? parseFloat(meetUpLng) : null,
-        endPoint: endPoint?.trim() || null,
-        endStreetAddress: endStreetAddress?.trim() || null,
-        endCity: endCity?.trim() || null,
-        endState: endState?.trim() || null,
-        totalMiles: totalMiles ? parseFloat(totalMiles) : null,
-        pace: pace?.trim() || null,
-        stravaMapUrl: stravaMapUrl?.trim() || null,
-        description: description?.trim() || null,
-        postRunActivity: postRunActivity?.trim() || null,
-        routePhotos: Array.isArray(routePhotos) && routePhotos.length > 0 ? routePhotos : Prisma.JsonNull,
-        mapImageUrl: mapImageUrl?.trim() || null,
-        staffNotes: staffNotes?.trim() || null,
-        stravaUrl: stravaUrl?.trim() || null,
-        stravaText: stravaText?.trim() || null,
-        webUrl: webUrl?.trim() || null,
-        webText: webText?.trim() || null,
-        igPostText: igPostText?.trim() || null,
-        igPostGraphic: igPostGraphic?.trim() || null,
-        updatedAt: new Date(),
-      },
-      include: {
-        run_crews: true,
-        Athlete: true,
-      },
-    });
+    let run;
+    try {
+      run = await prisma.city_runs.create({
+        data: createData as Parameters<typeof prisma.city_runs.create>[0]['data'],
+        include: {
+          run_crews: true,
+          Athlete: true,
+        },
+      });
+    } catch (error: any) {
+      if (!isMissingPostRunActivityColumn(error)) throw error;
+      console.warn('[POST /api/runs/create] postRunActivity missing; retrying without it');
+      delete createData.postRunActivity;
+      run = await prisma.city_runs.create({
+        data: createData as Parameters<typeof prisma.city_runs.create>[0]['data'],
+        include: {
+          run_crews: true,
+          Athlete: true,
+        },
+      });
+    }
 
     const response = NextResponse.json({
       success: true,
