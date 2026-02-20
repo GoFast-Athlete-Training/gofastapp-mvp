@@ -1,5 +1,25 @@
 import { prisma } from './prisma';
 
+const extractFirstHttpUrl = (raw?: string | null): string | null => {
+  if (!raw) return null;
+  const match = raw.match(/https?:\/\/[^\s,]+/i);
+  if (!match) return null;
+  try {
+    return new URL(match[0]).toString();
+  } catch {
+    return null;
+  }
+};
+
+const normalizeInstagramUrl = (raw?: string | null): string | null => {
+  if (!raw) return null;
+  const url = extractFirstHttpUrl(raw);
+  if (url) return url;
+  const handle = raw.trim().replace(/^@/, '');
+  if (!handle || !/^[a-zA-Z0-9._]+$/.test(handle)) return null;
+  return `https://www.instagram.com/${handle}`;
+};
+
 /**
  * Fetch RunClub data from GoFastCompany API and save to gofastapp-mvp
  * Called when a run is created with runClubSlug (dual save pattern)
@@ -49,6 +69,9 @@ export async function fetchAndSaveRunClub(slug: string): Promise<any | null> {
     }
 
     const runClub = data.runClub;
+    const websiteUrl = extractFirstHttpUrl(runClub.websiteUrl || runClub.url || null);
+    const instagramUrl = normalizeInstagramUrl(runClub.instagramUrl || runClub.instagramHandle || null);
+    const stravaUrl = extractFirstHttpUrl(runClub.stravaUrl || runClub.stravaClubUrl || null);
 
     // Upsert into gofastapp-mvp database
     // Keep enough fields for run verification and hydration without extra cross-repo fetches.
@@ -60,9 +83,9 @@ export async function fetchAndSaveRunClub(slug: string): Promise<any | null> {
         logoUrl: runClub.logoUrl || runClub.logo || null, // Handle both logoUrl and logo fields
         city: runClub.city || null,
         description: runClub.description || null,
-        websiteUrl: runClub.websiteUrl || runClub.url || null,
-        instagramUrl: runClub.instagramUrl || runClub.instagramHandle || null,
-        stravaUrl: runClub.stravaUrl || runClub.stravaClubUrl || null,
+        websiteUrl,
+        instagramUrl,
+        stravaUrl,
         syncedAt: new Date(),
       },
       create: {
@@ -72,9 +95,9 @@ export async function fetchAndSaveRunClub(slug: string): Promise<any | null> {
         logoUrl: runClub.logoUrl || runClub.logo || null, // Handle both logoUrl and logo fields
         city: runClub.city || null,
         description: runClub.description || null,
-        websiteUrl: runClub.websiteUrl || runClub.url || null,
-        instagramUrl: runClub.instagramUrl || runClub.instagramHandle || null,
-        stravaUrl: runClub.stravaUrl || runClub.stravaClubUrl || null,
+        websiteUrl,
+        instagramUrl,
+        stravaUrl,
         syncedAt: new Date(),
         updatedAt: new Date(),
       },
