@@ -4,6 +4,49 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminAuth } from '@/lib/firebaseAdmin';
 
+const RUNTIME_COMMIT_SHA =
+  process.env.VERCEL_GIT_COMMIT_SHA ||
+  process.env.RENDER_GIT_COMMIT ||
+  process.env.GITHUB_SHA ||
+  process.env.COMMIT_SHA ||
+  'unknown';
+
+function getDbHost() {
+  const databaseUrl = process.env.DATABASE_URL || '';
+  try {
+    return new URL(databaseUrl).hostname || 'unknown';
+  } catch {
+    return 'unparseable';
+  }
+}
+
+function isMissingCityRunsColumn(error: any) {
+  return (
+    error?.code === 'P2022' &&
+    typeof error?.message === 'string' &&
+    error.message.includes('city_runs.')
+  );
+}
+
+async function logCityRunsRuntimeDiagnostics(context: string) {
+  try {
+    const rows = (await prisma.$queryRawUnsafe(
+      "SELECT column_name FROM information_schema.columns WHERE table_name='city_runs' AND column_name IN ('postRunActivity','stravaUrl','stravaText','webUrl','webText','igPostText','igPostGraphic','routeNeighborhood','runType','workoutDescription') ORDER BY column_name"
+    )) as Array<{ column_name: string }>;
+    console.error(`[${context}] Runtime diagnostics`, {
+      commitSha: RUNTIME_COMMIT_SHA,
+      dbHost: getDbHost(),
+      cityRunsColumns: rows.map((r) => r.column_name),
+    });
+  } catch (diagnosticError: any) {
+    console.error(`[${context}] Failed runtime diagnostics`, {
+      commitSha: RUNTIME_COMMIT_SHA,
+      dbHost: getDbHost(),
+      diagnosticError: diagnosticError?.message,
+    });
+  }
+}
+
 /**
  * GET /api/runs/manage/[runId]
  * 
@@ -29,6 +72,11 @@ export async function GET(
     }
 
     const { runId } = await params;
+    console.log('[GET /api/runs/manage/[runId]] Runtime info', {
+      runId,
+      commitSha: RUNTIME_COMMIT_SHA,
+      dbHost: getDbHost(),
+    });
 
     const run = await prisma.city_runs.findUnique({
       where: { id: runId },
@@ -73,6 +121,9 @@ export async function GET(
       },
     });
   } catch (error: any) {
+    if (isMissingCityRunsColumn(error)) {
+      await logCityRunsRuntimeDiagnostics('GET /api/runs/manage/[runId]');
+    }
     console.error('Error fetching CityRun for management:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch CityRun', details: error?.message },

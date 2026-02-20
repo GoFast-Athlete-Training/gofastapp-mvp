@@ -6,12 +6,57 @@ import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
-function isMissingPostRunActivityColumn(error: any) {
+const RUNTIME_COMMIT_SHA =
+  process.env.VERCEL_GIT_COMMIT_SHA ||
+  process.env.RENDER_GIT_COMMIT ||
+  process.env.GITHUB_SHA ||
+  process.env.COMMIT_SHA ||
+  'unknown';
+
+function getDbHost() {
+  const databaseUrl = process.env.DATABASE_URL || '';
+  try {
+    return new URL(databaseUrl).hostname || 'unknown';
+  } catch {
+    return 'unparseable';
+  }
+}
+
+function isMissingCityRunsColumn(error: any) {
   return (
     error?.code === 'P2022' &&
     typeof error?.message === 'string' &&
-    error.message.includes('city_runs.postRunActivity')
+    error.message.includes('city_runs.')
   );
+}
+
+const UNSUPPORTED_CITY_RUN_FIELDS = [
+  'postRunActivity',
+  'stravaUrl',
+  'stravaText',
+  'webUrl',
+  'webText',
+  'igPostText',
+  'igPostGraphic',
+] as const;
+
+async function logCityRunsRuntimeDiagnostics(context: string) {
+  try {
+    const rows = (await prisma.$queryRawUnsafe(
+      "SELECT column_name FROM information_schema.columns WHERE table_name='city_runs' AND column_name IN ('postRunActivity','stravaUrl','stravaText','webUrl','webText','igPostText','igPostGraphic','routeNeighborhood','runType','workoutDescription') ORDER BY column_name"
+    )) as Array<{ column_name: string }>;
+    console.error(`[${context}] Runtime diagnostics`, {
+      commitSha: RUNTIME_COMMIT_SHA,
+      dbHost: getDbHost(),
+      cityRunsColumns: rows.map((r) => r.column_name),
+    });
+  } catch (diagnosticError: any) {
+    console.error(`[${context}] Failed runtime diagnostics`, {
+      commitSha: RUNTIME_COMMIT_SHA,
+      dbHost: getDbHost(),
+      diagnosticError: diagnosticError?.message,
+    });
+  }
 }
 
 /**
@@ -51,6 +96,11 @@ export async function GET(
     // This enables GoFastCompany dashboard to view run details
 
     const { runId } = await params;
+    console.log('[GET /api/runs/[runId]] Runtime info', {
+      runId,
+      commitSha: RUNTIME_COMMIT_SHA,
+      dbHost: getDbHost(),
+    });
 
     // Fetch run with RSVPs and RunClub (FK relation)
     // Use select instead of include to avoid querying non-existent columns in production
@@ -125,8 +175,9 @@ export async function GET(
         },
       });
     } catch (error: any) {
-      if (!isMissingPostRunActivityColumn(error)) throw error;
-      console.warn('[GET /api/runs/[runId]] postRunActivity missing; retrying without it');
+      if (!isMissingCityRunsColumn(error)) throw error;
+      console.warn('[GET /api/runs/[runId]] city_runs column missing; retrying with legacy field set');
+      await logCityRunsRuntimeDiagnostics('GET /api/runs/[runId] initial');
       run = await prisma.city_runs.findUnique({
         where: { id: runId },
         select: {
@@ -158,16 +209,7 @@ export async function GET(
           routePhotos: true,
           mapImageUrl: true,
           staffNotes: true,
-          stravaUrl: true,
-          stravaText: true,
-          webUrl: true,
-          webText: true,
-          igPostText: true,
-          igPostGraphic: true,
           workflowStatus: true,
-          routeNeighborhood: true,
-          runType: true,
-          workoutDescription: true,
           city_run_rsvps: {
             select: {
               id: true,
@@ -323,6 +365,9 @@ export async function GET(
       },
     });
   } catch (error: any) {
+    if (isMissingCityRunsColumn(error)) {
+      await logCityRunsRuntimeDiagnostics('GET /api/runs/[runId] outer');
+    }
     console.error('Error fetching CityRun:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch CityRun', details: error?.message },
@@ -359,6 +404,7 @@ export async function PUT(
 
     const run = await prisma.city_runs.findUnique({
       where: { id: runId },
+      select: { id: true },
     });
 
     if (!run) {
@@ -497,7 +543,10 @@ export async function PUT(
       // only updatedAt
       return NextResponse.json({
         success: true,
-        run: await prisma.city_runs.findUnique({ where: { id: runId } }),
+        run: await prisma.city_runs.findUnique({
+          where: { id: runId },
+          select: { id: true },
+        }),
       });
     }
 
@@ -508,9 +557,11 @@ export async function PUT(
         data: updateData as Parameters<typeof prisma.city_runs.update>[0]['data'],
       });
     } catch (error: any) {
-      if (!isMissingPostRunActivityColumn(error)) throw error;
-      console.warn('[PUT /api/runs/[runId]] postRunActivity missing; retrying without it');
-      delete updateData.postRunActivity;
+      if (!isMissingCityRunsColumn(error)) throw error;
+      console.warn('[PUT /api/runs/[runId]] city_runs column missing; retrying with supported fields');
+      for (const field of UNSUPPORTED_CITY_RUN_FIELDS) {
+        delete updateData[field];
+      }
       updated = await prisma.city_runs.update({
         where: { id: runId },
         data: updateData as Parameters<typeof prisma.city_runs.update>[0]['data'],
@@ -586,6 +637,7 @@ export async function DELETE(
     // Check if run exists
     const run = await prisma.city_runs.findUnique({
       where: { id: runId },
+      select: { id: true },
     });
 
     if (!run) {

@@ -8,6 +8,49 @@ export interface GetRunsFilters {
   runClubId?: string; // Filter by ID (preferred)
 }
 
+const RUNTIME_COMMIT_SHA =
+  process.env.VERCEL_GIT_COMMIT_SHA ||
+  process.env.RENDER_GIT_COMMIT ||
+  process.env.GITHUB_SHA ||
+  process.env.COMMIT_SHA ||
+  'unknown';
+
+function getDbHost() {
+  const databaseUrl = process.env.DATABASE_URL || '';
+  try {
+    return new URL(databaseUrl).hostname || 'unknown';
+  } catch {
+    return 'unparseable';
+  }
+}
+
+function isMissingCityRunsColumn(error: any) {
+  return (
+    error?.code === 'P2022' &&
+    typeof error?.message === 'string' &&
+    error.message.includes('city_runs.')
+  );
+}
+
+async function logCityRunsRuntimeDiagnostics(context: string) {
+  try {
+    const rows = (await prisma.$queryRawUnsafe(
+      "SELECT column_name FROM information_schema.columns WHERE table_name='city_runs' AND column_name IN ('postRunActivity','stravaUrl','stravaText','webUrl','webText','igPostText','igPostGraphic','routeNeighborhood','runType','workoutDescription') ORDER BY column_name"
+    )) as Array<{ column_name: string }>;
+    console.error(`[${context}] Runtime diagnostics`, {
+      commitSha: RUNTIME_COMMIT_SHA,
+      dbHost: getDbHost(),
+      cityRunsColumns: rows.map((r) => r.column_name),
+    });
+  } catch (diagnosticError: any) {
+    console.error(`[${context}] Failed runtime diagnostics`, {
+      commitSha: RUNTIME_COMMIT_SHA,
+      dbHost: getDbHost(),
+      diagnosticError: diagnosticError?.message,
+    });
+  }
+}
+
 /**
  * Get runs with optional filters
  * Returns public-safe data (excludes sensitive fields)
@@ -16,7 +59,10 @@ export async function getRuns(filters: GetRunsFilters = {}) {
   const where: any = {};
   
   // Debug: Log the filters being applied
-  console.log('[getRuns] Filters received:', filters);
+  console.log('[getRuns] Filters received:', filters, {
+    commitSha: RUNTIME_COMMIT_SHA,
+    dbHost: getDbHost(),
+  });
   
   // City filter
   if (filters.citySlug) {
@@ -108,6 +154,9 @@ export async function getRuns(filters: GetRunsFilters = {}) {
   } catch (error: any) {
     console.error('[getRuns] Error querying runs:', error);
     console.error('[getRuns] Error details:', error?.message, error?.code);
+    if (isMissingCityRunsColumn(error)) {
+      await logCityRunsRuntimeDiagnostics('getRuns');
+    }
     throw error;
   }
   

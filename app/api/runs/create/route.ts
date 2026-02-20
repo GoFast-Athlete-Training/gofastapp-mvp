@@ -13,13 +13,23 @@ function generateId(): string {
   return `c${timestamp}${random}`;
 }
 
-function isMissingPostRunActivityColumn(error: any) {
+function isMissingCityRunsColumn(error: any) {
   return (
     error?.code === 'P2022' &&
     typeof error?.message === 'string' &&
-    error.message.includes('city_runs.postRunActivity')
+    error.message.includes('city_runs.')
   );
 }
+
+const UNSUPPORTED_CITY_RUN_FIELDS = [
+  'postRunActivity',
+  'stravaUrl',
+  'stravaText',
+  'webUrl',
+  'webText',
+  'igPostText',
+  'igPostGraphic',
+] as const;
 
 // CORS headers for GoFastCompany
 const corsHeaders = {
@@ -323,9 +333,11 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (error: any) {
-      if (!isMissingPostRunActivityColumn(error)) throw error;
-      console.warn('[POST /api/runs/create] postRunActivity missing; retrying without it');
-      delete createData.postRunActivity;
+      if (!isMissingCityRunsColumn(error)) throw error;
+      console.warn('[POST /api/runs/create] city_runs column missing; retrying with supported fields');
+      for (const field of UNSUPPORTED_CITY_RUN_FIELDS) {
+        delete createData[field];
+      }
       run = await prisma.city_runs.create({
         data: createData as Parameters<typeof prisma.city_runs.create>[0]['data'],
         include: {
