@@ -45,11 +45,52 @@ export async function GET(
     const { runId } = await params;
 
     // Fetch run with RSVPs and RunClub (FK relation)
+    // Use select instead of include to avoid querying non-existent columns in production
     const run = await prisma.city_runs.findUnique({
       where: { id: runId },
-      include: {
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        citySlug: true,
+        dayOfWeek: true,
+        startDate: true,
+        date: true,
+        endDate: true,
+        runClubId: true,
+        runCrewId: true,
+        meetUpPoint: true,
+        meetUpStreetAddress: true,
+        meetUpCity: true,
+        meetUpState: true,
+        meetUpZip: true,
+        meetUpLat: true,
+        meetUpLng: true,
+        startTimeHour: true,
+        startTimeMinute: true,
+        startTimePeriod: true,
+        timezone: true,
+        totalMiles: true,
+        pace: true,
+        description: true,
+        stravaMapUrl: true,
+        routePhotos: true,
+        mapImageUrl: true,
+        staffNotes: true,
+        stravaUrl: true,
+        stravaText: true,
+        webUrl: true,
+        webText: true,
+        igPostText: true,
+        igPostGraphic: true,
+        workflowStatus: true,
+        // Exclude new fields until migration is applied:
+        // postRunActivity, routeNeighborhood, runType, workoutDescription
         city_run_rsvps: {
-          include: {
+          select: {
+            id: true,
+            status: true,
+            athleteId: true,
             Athlete: {
               select: {
                 id: true,
@@ -164,9 +205,9 @@ export async function GET(
         meetUpCity: run.meetUpCity,
         meetUpState: run.meetUpState,
         meetUpZip: run.meetUpZip,
-        routeNeighborhood: run.routeNeighborhood ?? null,
-        runType: run.runType ?? null,
-        workoutDescription: run.workoutDescription ?? null,
+        routeNeighborhood: null, // Excluded until migration applied
+        runType: null, // Excluded until migration applied
+        workoutDescription: null, // Excluded until migration applied
         meetUpLat: run.meetUpLat,
         meetUpLng: run.meetUpLng,
         startTimeHour: run.startTimeHour,
@@ -176,7 +217,7 @@ export async function GET(
         totalMiles: run.totalMiles,
         pace: run.pace,
         description: run.description,
-        postRunActivity: run.postRunActivity ?? null,
+        postRunActivity: null, // Excluded until migration applied
         stravaMapUrl: run.stravaMapUrl,
         routePhotos: run.routePhotos as string[] | null ?? null,
         mapImageUrl: run.mapImageUrl ?? null,
