@@ -1,0 +1,26 @@
+/**
+ * PARKED FOR FUTURE USE
+ * 
+ * This file contains CreateRunModal copied from GoFastCompany for future athlete run creation.
+ * 
+ * STATUS: NOT IMPLEMENTED - DO NOT USE YET
+ * 
+ * Current State:
+ * - Athletes create runs through runcrews (via /api/runcrew/[id]/runs)
+ * - Athletes can RSVP to runs (working)
+ * - Future: Athletes will be able to create standalone runs
+ * 
+ * When implementing:
+ * 1. Remove staff-specific features (source tracking, strict validation, cockpitRole)
+ * 2. Change productAppApi → api (use gofastapp-mvp's local API client)
+ * 3. Update imports to use gofastapp-mvp's utilities
+ * 4. Test thoroughly
+ * 
+ * Original location: /GoFastCompany/components/runs/CreateRunModal.tsx
+ * Copied: 2026-02-19
+ * 
+ * DO NOT IMPLEMENT UNTIL FUTURE STATE IS DEFINED
+ */
+
+// This file is intentionally empty - the actual component code is in GoFastCompany
+// Copy it here when ready to implement athlete run creation

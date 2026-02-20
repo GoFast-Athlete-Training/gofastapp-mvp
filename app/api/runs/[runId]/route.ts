@@ -177,6 +177,12 @@ export async function GET(
         routePhotos: run.routePhotos as string[] | null ?? null,
         mapImageUrl: run.mapImageUrl ?? null,
         staffNotes: run.staffNotes ?? null,
+        stravaUrl: run.stravaUrl ?? null,
+        stravaText: run.stravaText ?? null,
+        webUrl: run.webUrl ?? null,
+        webText: run.webText ?? null,
+        igPostText: run.igPostText ?? null,
+        igPostGraphic: run.igPostGraphic ?? null,
         runClub,
         runCrew,
         rsvps: run.city_run_rsvps.map((rsvp: any) => ({
@@ -253,6 +259,26 @@ export async function PUT(
       updateData.staffNotes = body.staffNotes === null || body.staffNotes === ''
         ? null
         : String(body.staffNotes).trim();
+    }
+    
+    // Source tracking fields
+    if (body.stravaUrl !== undefined) {
+      updateData.stravaUrl = body.stravaUrl === null || body.stravaUrl === '' ? null : String(body.stravaUrl).trim();
+    }
+    if (body.stravaText !== undefined) {
+      updateData.stravaText = body.stravaText === null || body.stravaText === '' ? null : String(body.stravaText).trim();
+    }
+    if (body.webUrl !== undefined) {
+      updateData.webUrl = body.webUrl === null || body.webUrl === '' ? null : String(body.webUrl).trim();
+    }
+    if (body.webText !== undefined) {
+      updateData.webText = body.webText === null || body.webText === '' ? null : String(body.webText).trim();
+    }
+    if (body.igPostText !== undefined) {
+      updateData.igPostText = body.igPostText === null || body.igPostText === '' ? null : String(body.igPostText).trim();
+    }
+    if (body.igPostGraphic !== undefined) {
+      updateData.igPostGraphic = body.igPostGraphic === null || body.igPostGraphic === '' ? null : String(body.igPostGraphic).trim();
     }
 
     // Core content (edit run)
