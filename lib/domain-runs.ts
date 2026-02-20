@@ -49,13 +49,38 @@ export async function getRuns(filters: GetRunsFilters = {}) {
 
   // First, get all runs matching filters with RunClub relation (FK)
   // Note: Prisma model `city_runs` maps to table `city_runs` (migrated from run_crew_runs)
+  // Use select to only fetch fields that exist (avoiding migration issues)
   let allRuns;
   try {
     allRuns = await prisma.city_runs.findMany({
       where,
       orderBy: { startDate: 'asc' },
-      // Use include to get FK relation, then select specific fields
-      include: {
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        citySlug: true,
+        dayOfWeek: true,
+        startDate: true,
+        date: true,
+        endDate: true,
+        runClubId: true,
+        meetUpPoint: true,
+        meetUpStreetAddress: true,
+        meetUpCity: true,
+        meetUpState: true,
+        meetUpZip: true,
+        meetUpLat: true,
+        meetUpLng: true,
+        startTimeHour: true,
+        startTimeMinute: true,
+        startTimePeriod: true,
+        timezone: true,
+        totalMiles: true,
+        pace: true,
+        description: true,
+        stravaMapUrl: true,
+        workflowStatus: true,
         runClub: {
           select: {
             id: true,
@@ -66,7 +91,6 @@ export async function getRuns(filters: GetRunsFilters = {}) {
           },
         },
       },
-      // Note: When using include, we get all fields - we'll filter in the return
     });
     
     // Debug logging to help troubleshoot
@@ -118,8 +142,11 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     pace: run.pace,
     description: run.description,
     stravaMapUrl: run.stravaMapUrl,
+    workflowStatus: run.workflowStatus,
     // Exclude sensitive fields:
     // runCrewId, athleteGeneratedId, staffGeneratedId
+    // Exclude new fields until migration is applied:
+    // postRunActivity, routeNeighborhood, runType, workoutDescription
   }));
 }
 
