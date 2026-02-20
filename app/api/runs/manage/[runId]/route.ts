@@ -68,6 +68,7 @@ export async function GET(
       success: true,
       run: {
         ...run,
+        routePhotos: Array.isArray(run.routePhotos) ? run.routePhotos : null,
         rsvps: run.city_run_rsvps,
       },
     });
