@@ -170,6 +170,9 @@ export async function GET(
               name: true,
               logoUrl: true,
               city: true,
+              websiteUrl: true,
+              instagramUrl: true,
+              stravaUrl: true,
             },
           },
         },
@@ -232,6 +235,9 @@ export async function GET(
               name: true,
               logoUrl: true,
               city: true,
+              websiteUrl: true,
+              instagramUrl: true,
+              stravaUrl: true,
             },
           },
         },
@@ -283,6 +289,9 @@ export async function GET(
                     name: true,
                     logoUrl: true,
                     city: true,
+                    websiteUrl: true,
+                    instagramUrl: true,
+                    stravaUrl: true,
                   },
                 });
               }
@@ -404,7 +413,7 @@ export async function PUT(
 
     const run = await prisma.city_runs.findUnique({
       where: { id: runId },
-      select: { id: true },
+      select: { id: true, runClubId: true },
     });
 
     if (!run) {
@@ -539,6 +548,17 @@ export async function PUT(
       }
     }
 
+    const runClubUpdateData: Record<string, string | null> = {};
+    if (body.runClubWebsiteUrl !== undefined) {
+      runClubUpdateData.websiteUrl = body.runClubWebsiteUrl === null || body.runClubWebsiteUrl === '' ? null : String(body.runClubWebsiteUrl).trim();
+    }
+    if (body.runClubInstagramUrl !== undefined) {
+      runClubUpdateData.instagramUrl = body.runClubInstagramUrl === null || body.runClubInstagramUrl === '' ? null : String(body.runClubInstagramUrl).trim();
+    }
+    if (body.runClubStravaUrl !== undefined) {
+      runClubUpdateData.stravaUrl = body.runClubStravaUrl === null || body.runClubStravaUrl === '' ? null : String(body.runClubStravaUrl).trim();
+    }
+
     if (Object.keys(updateData).length <= 1) {
       // only updatedAt
       return NextResponse.json({
@@ -566,6 +586,17 @@ export async function PUT(
         where: { id: runId },
         data: updateData as Parameters<typeof prisma.city_runs.update>[0]['data'],
       });
+    }
+
+    if (run.runClubId && Object.keys(runClubUpdateData).length > 0) {
+      try {
+        await prisma.run_clubs.update({
+          where: { id: run.runClubId },
+          data: runClubUpdateData,
+        });
+      } catch (runClubError: any) {
+        console.error('[PUT /api/runs/[runId]] Failed updating run club sources:', runClubError?.message || runClubError);
+      }
     }
 
     return NextResponse.json({

@@ -1,0 +1,3 @@
+ALTER TABLE "run_clubs" ADD COLUMN IF NOT EXISTS "websiteUrl" TEXT;
+ALTER TABLE "run_clubs" ADD COLUMN IF NOT EXISTS "instagramUrl" TEXT;
+ALTER TABLE "run_clubs" ADD COLUMN IF NOT EXISTS "stravaUrl" TEXT;

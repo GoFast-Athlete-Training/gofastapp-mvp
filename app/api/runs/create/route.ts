@@ -31,6 +31,32 @@ const UNSUPPORTED_CITY_RUN_FIELDS = [
   'igPostGraphic',
 ] as const;
 
+function slugifyCity(city: string): string {
+  return city
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function normalizeCitySlug(city: string | null, stateValue: string | null): string {
+  if (!city) return "";
+
+  const normalizedCity = city.toLowerCase().trim();
+  const normalizedState = (stateValue || "").toUpperCase().trim();
+
+  if (
+    normalizedCity === "district of columbia" ||
+    normalizedCity === "dc" ||
+    ((normalizedCity === "washington" || normalizedCity === "washington dc" || normalizedCity === "washington, dc") &&
+      normalizedState === "DC")
+  ) {
+    return "dc";
+  }
+
+  return slugifyCity(city);
+}
+
 // CORS headers for GoFastCompany
 const corsHeaders = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_COMPANY_APP_URL || 'https://gofasthq.gofastcrushgoals.com',
@@ -163,11 +189,7 @@ export async function POST(request: NextRequest) {
     
     if (citySlug) {
       // Use provided slug (normalize it)
-      finalCitySlug = citySlug
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "");
+      finalCitySlug = slugifyCity(citySlug);
     } else {
       // Extract city name from various sources
       let cityNameToUse: string | null = null;
@@ -190,10 +212,7 @@ export async function POST(request: NextRequest) {
       }
       
       // Generate slug from city name
-      finalCitySlug = cityNameToUse
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "");
+      finalCitySlug = normalizeCitySlug(cityNameToUse, meetUpState || state || null);
     }
     
     if (!finalCitySlug) {

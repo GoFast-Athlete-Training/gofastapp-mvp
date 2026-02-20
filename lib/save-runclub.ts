@@ -39,6 +39,9 @@ export async function saveRunClub(runClub: {
   logoUrl?: string | null;
   logo?: string | null;
   city?: string | null;
+  websiteUrl?: string | null;
+  instagramUrl?: string | null;
+  stravaUrl?: string | null;
 }): Promise<any | null> {
   if (!runClub.slug || !runClub.name) {
     console.warn('RunClub missing required fields (slug or name)');
@@ -55,7 +58,10 @@ export async function saveRunClub(runClub: {
       const needsUpdate = 
         existing.name !== runClub.name ||
         existing.logoUrl !== logoUrl ||
-        existing.city !== (runClub.city || null);
+        existing.city !== (runClub.city || null) ||
+        existing.websiteUrl !== (runClub.websiteUrl || null) ||
+        existing.instagramUrl !== (runClub.instagramUrl || null) ||
+        existing.stravaUrl !== (runClub.stravaUrl || null);
       
       if (needsUpdate) {
         // Update if data changed
@@ -65,6 +71,9 @@ export async function saveRunClub(runClub: {
             name: runClub.name,
             logoUrl: logoUrl,
             city: runClub.city || null,
+            websiteUrl: runClub.websiteUrl || null,
+            instagramUrl: runClub.instagramUrl || null,
+            stravaUrl: runClub.stravaUrl || null,
             syncedAt: new Date(),
           },
         });
@@ -81,6 +90,9 @@ export async function saveRunClub(runClub: {
           name: runClub.name,
           logoUrl: runClub.logoUrl || runClub.logo || null,
           city: runClub.city || null,
+          websiteUrl: runClub.websiteUrl || null,
+          instagramUrl: runClub.instagramUrl || null,
+          stravaUrl: runClub.stravaUrl || null,
           syncedAt: new Date(),
           updatedAt: new Date(),
         },

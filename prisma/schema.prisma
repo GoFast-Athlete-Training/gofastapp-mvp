@@ -309,6 +309,9 @@ model run_clubs {
   name      String
   logoUrl   String?
   city      String?
+  websiteUrl String?
+  instagramUrl String?
+  stravaUrl String?
   syncedAt  DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
