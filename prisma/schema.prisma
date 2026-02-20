@@ -397,6 +397,8 @@ model city_runs {
   routePhotos         Json?                // Array of photo URLs: ["url1", "url2", ...]
   mapImageUrl         String?              // Single map image URL (snip from Strava or uploaded)
   staffNotes          String?              // Data entry note for approver (e.g. "Couldn't get Strava URL")
+  source              RunSource?           // How was this run created? (STRAVA, WEB, MANUAL, AI_GENERATED, IMPORT)
+  sourceUrl           String?              // URL if source is STRAVA or WEB (for traceability)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime
   startTimeHour       Int?
@@ -725,4 +727,12 @@ enum RunWorkflowStatus {
   DRAFT
   SUBMITTED
   APPROVED
+}
+
+enum RunSource {
+  STRAVA
+  WEB
+  MANUAL
+  AI_GENERATED
+  IMPORT
 }
