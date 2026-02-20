@@ -394,6 +394,7 @@ model city_runs {
   pace                String?
   stravaMapUrl        String?
   description         String?
+  postRunActivity     String?              // Post-run activity (e.g. "light social at X", "coffee at Y")
   routePhotos         Json?                // Array of photo URLs: ["url1", "url2", ...]
   mapImageUrl         String?              // Single map image URL (snip from Strava or uploaded)
   staffNotes          String?              // Data entry note for approver (e.g. "Couldn't get Strava URL")
@@ -423,6 +424,9 @@ model city_runs {
   meetUpCity          String?
   meetUpState         String?
   meetUpZip           String?
+  routeNeighborhood String?              // Neighborhood/area route goes through (e.g. "Arlington Heights", "Back Bay") - gives run flavor
+  runType             String?              // Type of run location: "track", "trail", "neighborhood", "park"
+  workoutDescription  String?              // Workout focus/description (e.g. "emphasizes speed training for those want to increase threshold")
   endStreetAddress    String?
   endCity             String?
   endState            String?

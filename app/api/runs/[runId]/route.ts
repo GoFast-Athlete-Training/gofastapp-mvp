@@ -164,6 +164,9 @@ export async function GET(
         meetUpCity: run.meetUpCity,
         meetUpState: run.meetUpState,
         meetUpZip: run.meetUpZip,
+        routeNeighborhood: run.routeNeighborhood ?? null,
+        runType: run.runType ?? null,
+        workoutDescription: run.workoutDescription ?? null,
         meetUpLat: run.meetUpLat,
         meetUpLng: run.meetUpLng,
         startTimeHour: run.startTimeHour,
@@ -173,6 +176,7 @@ export async function GET(
         totalMiles: run.totalMiles,
         pace: run.pace,
         description: run.description,
+        postRunActivity: run.postRunActivity ?? null,
         stravaMapUrl: run.stravaMapUrl,
         routePhotos: run.routePhotos as string[] | null ?? null,
         mapImageUrl: run.mapImageUrl ?? null,
@@ -294,6 +298,9 @@ export async function PUT(
     if (body.description !== undefined) {
       updateData.description = body.description === null || body.description === '' ? null : String(body.description);
     }
+    if (body.postRunActivity !== undefined) {
+      updateData.postRunActivity = body.postRunActivity === null || body.postRunActivity === '' ? null : String(body.postRunActivity).trim();
+    }
     if (body.meetUpPoint !== undefined && body.meetUpPoint !== null && String(body.meetUpPoint).trim()) {
       updateData.meetUpPoint = String(body.meetUpPoint).trim();
     }
@@ -308,6 +315,15 @@ export async function PUT(
     }
     if (body.meetUpZip !== undefined) {
       updateData.meetUpZip = body.meetUpZip === null || body.meetUpZip === '' ? null : String(body.meetUpZip);
+    }
+    if (body.routeNeighborhood !== undefined) {
+      updateData.routeNeighborhood = body.routeNeighborhood === null || body.routeNeighborhood === '' ? null : String(body.routeNeighborhood).trim();
+    }
+    if (body.runType !== undefined) {
+      updateData.runType = body.runType === null || body.runType === '' ? null : String(body.runType).trim();
+    }
+    if (body.workoutDescription !== undefined) {
+      updateData.workoutDescription = body.workoutDescription === null || body.workoutDescription === '' ? null : String(body.workoutDescription).trim();
     }
     if (body.meetUpPlaceId !== undefined) {
       updateData.meetUpPlaceId = body.meetUpPlaceId === null || body.meetUpPlaceId === '' ? null : String(body.meetUpPlaceId);
