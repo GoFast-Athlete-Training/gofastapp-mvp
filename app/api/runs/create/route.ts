@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { saveRunClub } from "@/lib/save-runclub";
 import { generateUniqueCityRunSlug } from "@/lib/slug-utils";
@@ -293,7 +294,7 @@ export async function POST(request: NextRequest) {
         stravaMapUrl: stravaMapUrl?.trim() || null,
         description: description?.trim() || null,
         postRunActivity: postRunActivity?.trim() || null,
-        routePhotos: Array.isArray(routePhotos) && routePhotos.length > 0 ? routePhotos : null,
+        routePhotos: Array.isArray(routePhotos) && routePhotos.length > 0 ? routePhotos : Prisma.JsonNull,
         mapImageUrl: mapImageUrl?.trim() || null,
         staffNotes: staffNotes?.trim() || null,
         stravaUrl: stravaUrl?.trim() || null,
