@@ -6,6 +6,8 @@ import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { normalizeWebsiteUrl, normalizeStravaUrl, normalizeInstagramUrl } from '@/lib/runclub-urls';
+import { saveRunClub } from '@/lib/save-runclub';
+import { resolveCityRunEvent } from '@/lib/cityrun-event-resolver';
 
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
@@ -110,6 +112,100 @@ export async function GET(
       commitSha: RUNTIME_COMMIT_SHA,
       dbHost: getDbHost(),
     });
+
+    const resolvedEvent = await resolveCityRunEvent(runId);
+    if (resolvedEvent) {
+      const run = resolvedEvent.city_runs;
+      if (!run) {
+        return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
+      }
+      const eventRsvps = await prisma.city_run_event_rsvps.findMany({
+        where: { cityRunEventId: resolvedEvent.id },
+        select: {
+          id: true,
+          status: true,
+          athleteId: true,
+          Athlete: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              photoURL: true,
+            },
+          },
+        },
+      }).catch(() => []);
+
+      let runCrew = null;
+      if (run.runCrewId) {
+        runCrew = await prisma.run_crews.findUnique({
+          where: { id: run.runCrewId },
+          select: {
+            id: true,
+            name: true,
+            logo: true,
+            handle: true,
+          },
+        });
+      }
+
+      const userRSVP = athlete ? eventRsvps.find((r: any) => r.athleteId === athlete.id) : null;
+      return NextResponse.json({
+        success: true,
+        run: {
+          id: resolvedEvent.id,
+          cityRunId: run.id,
+          cityRunEventId: resolvedEvent.id,
+          slug: resolvedEvent.slug ?? null,
+          title: run.title,
+          citySlug: run.citySlug,
+          dayOfWeek: run.dayOfWeek,
+          startDate: resolvedEvent.eventDate.toISOString(),
+          date: resolvedEvent.eventDate.toISOString(),
+          endDate: run.endDate?.toISOString() || null,
+          runClubId: run.runClubId,
+          runClubSlug: run.runClub?.slug || null,
+          runCrewId: run.runCrewId,
+          meetUpPoint: resolvedEvent.meetUpPoint,
+          meetUpStreetAddress: resolvedEvent.meetUpStreetAddress,
+          meetUpCity: resolvedEvent.meetUpCity,
+          meetUpState: resolvedEvent.meetUpState,
+          meetUpZip: resolvedEvent.meetUpZip,
+          routeNeighborhood: resolvedEvent.routeNeighborhood ?? null,
+          runType: resolvedEvent.runType ?? null,
+          workoutDescription: resolvedEvent.workoutDescription ?? null,
+          meetUpLat: resolvedEvent.meetUpLat,
+          meetUpLng: resolvedEvent.meetUpLng,
+          startTimeHour: resolvedEvent.startTimeHour,
+          startTimeMinute: resolvedEvent.startTimeMinute,
+          startTimePeriod: resolvedEvent.startTimePeriod,
+          timezone: resolvedEvent.timezone,
+          totalMiles: resolvedEvent.totalMiles,
+          pace: resolvedEvent.pace,
+          description: resolvedEvent.description,
+          postRunActivity: resolvedEvent.postRunActivity ?? null,
+          stravaMapUrl: resolvedEvent.stravaMapUrl,
+          routePhotos: resolvedEvent.routePhotos as string[] | null ?? null,
+          mapImageUrl: resolvedEvent.mapImageUrl ?? null,
+          staffNotes: resolvedEvent.staffNotes ?? null,
+          stravaUrl: resolvedEvent.stravaUrl ?? null,
+          stravaText: resolvedEvent.stravaText ?? null,
+          webUrl: resolvedEvent.webUrl ?? null,
+          webText: resolvedEvent.webText ?? null,
+          igPostText: resolvedEvent.igPostText ?? null,
+          igPostGraphic: resolvedEvent.igPostGraphic ?? null,
+          runClub: run.runClub ?? null,
+          runCrew,
+          rsvps: eventRsvps.map((rsvp: any) => ({
+            id: rsvp.id,
+            status: rsvp.status,
+            athleteId: rsvp.athleteId,
+            Athlete: rsvp.Athlete,
+          })),
+          currentRSVP: userRSVP?.status || null,
+        },
+      });
+    }
 
     // Fetch run with RSVPs and RunClub (FK relation)
     // Use select instead of include to avoid querying non-existent columns in production

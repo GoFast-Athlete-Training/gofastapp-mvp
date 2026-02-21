@@ -23,6 +23,14 @@ function isMissingCityRunsColumn(error: any) {
   );
 }
 
+function isMissingCityRunEventsTable(error: any) {
+  return (
+    error?.code === 'P2021' &&
+    typeof error?.message === 'string' &&
+    error.message.includes('city_run_events')
+  );
+}
+
 const UNSUPPORTED_CITY_RUN_FIELDS = [
   'postRunActivity',
   'stravaUrl',
@@ -318,7 +326,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generate slug from title
+    // Generate slug from title.
     let runSlug: string | null = null;
     try {
       runSlug = await generateUniqueCityRunSlug(title);
@@ -402,9 +410,65 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    let event: any = null;
+    try {
+      event = await prisma.city_run_events.create({
+        data: {
+          id: run.id,
+          cityRunId: run.id,
+          eventDate: runStartDateObj,
+          timezone: timezone?.trim() || null,
+          meetUpPoint: meetUpPoint.trim(),
+          meetUpPlaceId: meetUpPlaceId?.trim() || null,
+          meetUpLat: meetUpLat ? parseFloat(meetUpLat) : null,
+          meetUpLng: meetUpLng ? parseFloat(meetUpLng) : null,
+          totalMiles: totalMiles ? parseFloat(totalMiles) : null,
+          pace: pace?.trim() || null,
+          stravaMapUrl: stravaMapUrl?.trim() || null,
+          description: description?.trim() || null,
+          postRunActivity: postRunActivity?.trim() || null,
+          routePhotos: Array.isArray(routePhotos) && routePhotos.length > 0 ? routePhotos : Prisma.JsonNull,
+          mapImageUrl: mapImageUrl?.trim() || null,
+          staffNotes: staffNotes?.trim() || null,
+          stravaUrl: stravaUrl?.trim() || null,
+          stravaText: stravaText?.trim() || null,
+          webUrl: webUrl?.trim() || null,
+          webText: webText?.trim() || null,
+          igPostText: igPostText?.trim() || null,
+          igPostGraphic: igPostGraphic?.trim() || null,
+          updatedAt: new Date(),
+          startTimeHour: startTimeHour ? parseInt(startTimeHour) : null,
+          startTimeMinute: startTimeMinute ? parseInt(startTimeMinute) : null,
+          startTimePeriod: startTimePeriod?.trim() || null,
+          slug: runSlug,
+          workflowStatus: 'DEVELOP',
+          endPoint: endPoint?.trim() || null,
+          meetUpStreetAddress: meetUpStreetAddress?.trim() || null,
+          meetUpCity: meetUpCity?.trim() || null,
+          meetUpState: meetUpState?.trim() || null,
+          meetUpZip: meetUpZip?.trim() || null,
+          routeNeighborhood: routeNeighborhood?.trim() || null,
+          runType: runType?.trim() || null,
+          workoutDescription: workoutDescription?.trim() || null,
+          endStreetAddress: endStreetAddress?.trim() || null,
+          endCity: endCity?.trim() || null,
+          endState: endState?.trim() || null,
+          generationSource: 'MANUAL',
+        },
+      });
+    } catch (eventError: any) {
+      if (!isMissingCityRunEventsTable(eventError)) {
+        throw eventError;
+      }
+      console.warn('[POST /api/runs/create] city_run_events table missing; skipping event creation');
+    }
+
     const response = NextResponse.json({
       success: true,
       run,
+      cityRunId: run.id,
+      cityRunEventId: event?.id ?? run.id,
+      event: event || null,
     }, { status: 200 });
     
     // Add CORS headers

@@ -5,6 +5,13 @@ import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
 import { rsvpToRun } from '@/lib/domain-runcrew';
 import { prisma } from '@/lib/prisma';
+import { resolveCityRunEventId } from '@/lib/cityrun-event-resolver';
+
+function generateId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 15);
+  return `c${timestamp}${random}`;
+}
 
 /**
  * POST /api/runs/[runId]/rsvp
@@ -59,27 +66,59 @@ export async function POST(
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
 
-    // Verify CityRun exists
-    const run = await prisma.city_runs.findUnique({
-      where: { id: runId },
-    });
-
-    if (!run) {
-      return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
+    // Event-first RSVP path. Resolve incoming legacy id/slug to canonical event id.
+    const eventId = await resolveCityRunEventId(runId);
+    let rsvp: any;
+    if (eventId) {
+      try {
+        rsvp = await prisma.city_run_event_rsvps.upsert({
+          where: {
+            cityRunEventId_athleteId: {
+              cityRunEventId: eventId,
+              athleteId: athlete.id,
+            },
+          },
+          update: {
+            status,
+            rsvpPhotoUrls: Array.isArray(rsvpPhotoUrls) ? rsvpPhotoUrls : null,
+          },
+          create: {
+            id: generateId(),
+            cityRunEventId: eventId,
+            athleteId: athlete.id,
+            status,
+            rsvpPhotoUrls: Array.isArray(rsvpPhotoUrls) ? rsvpPhotoUrls : null,
+          },
+        });
+      } catch (err: any) {
+        // If new table is not available yet, fallback to legacy RSVP flow.
+        const missingTable = err?.code === 'P2021' || (typeof err?.message === 'string' && err.message.includes('city_run_event_rsvps'));
+        if (!missingTable) {
+          console.error('Prisma error:', err);
+          return NextResponse.json({ error: 'DB error' }, { status: 500 });
+        }
+      }
     }
 
-    // Create or update RSVP (same function works for city_runs). Ambassadors: going + rsvpPhotoUrls = $10 credit.
-    let rsvp;
-    try {
-      rsvp = await rsvpToRun({
-        runId,
-        athleteId: athlete.id,
-        status: status as 'going' | 'not-going',
-        rsvpPhotoUrls: Array.isArray(rsvpPhotoUrls) ? rsvpPhotoUrls : undefined,
+    if (!rsvp) {
+      // Legacy fallback while split rolls out.
+      const run = await prisma.city_runs.findUnique({
+        where: { id: runId },
       });
-    } catch (err) {
-      console.error('Prisma error:', err);
-      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+      if (!run) {
+        return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
+      }
+      try {
+        rsvp = await rsvpToRun({
+          runId,
+          athleteId: athlete.id,
+          status: status as 'going' | 'not-going',
+          rsvpPhotoUrls: Array.isArray(rsvpPhotoUrls) ? rsvpPhotoUrls : undefined,
+        });
+      } catch (err) {
+        console.error('Prisma error:', err);
+        return NextResponse.json({ error: 'DB error' }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ success: true, rsvp });

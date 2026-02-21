@@ -65,6 +65,7 @@ model Athlete {
   run_crew_memberships    run_crew_memberships[]
   run_crew_messages       run_crew_messages[]
   city_run_rsvps          city_run_rsvps[]
+  city_run_event_rsvps    city_run_event_rsvps[]
   city_runs               city_runs[]
   training_days_executed  training_days_executed[]
   training_plans          training_plans[]
@@ -465,6 +466,7 @@ model city_runs {
   endCity             String?
   endState            String?
   city_run_rsvps      city_run_rsvps[]
+  city_run_events     city_run_events[]
   Athlete             Athlete?             @relation(fields: [athleteGeneratedId], references: [id], onDelete: Cascade)
   run_crews           run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
   runClub             run_clubs?           @relation(fields: [runClubId], references: [id], onDelete: SetNull)
@@ -481,6 +483,76 @@ model city_runs {
   @@index([startDate])
   // Table name is city_runs (migrated from run_crew_runs). Explicit map so deployed builds never use old name.
   @@map("city_runs")
+}
+
+model city_run_events {
+  id                  String            @id
+  cityRunId           String
+  eventDate           DateTime
+  timezone            String?
+  meetUpPoint         String
+  meetUpPlaceId       String?
+  meetUpLat           Float?
+  meetUpLng           Float?
+  totalMiles          Float?
+  pace                String?
+  stravaMapUrl        String?
+  description         String?
+  postRunActivity     String?
+  routePhotos         Json?
+  mapImageUrl         String?
+  staffNotes          String?
+  stravaUrl           String?
+  stravaText          String?
+  webUrl              String?
+  webText             String?
+  igPostText          String?
+  igPostGraphic       String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime
+  startTimeHour       Int?
+  startTimeMinute     Int?
+  startTimePeriod     String?
+  slug                String?           @unique
+  workflowStatus      RunWorkflowStatus @default(DEVELOP)
+  endPoint            String?
+  meetUpStreetAddress String?
+  meetUpCity          String?
+  meetUpState         String?
+  meetUpZip           String?
+  routeNeighborhood   String?
+  runType             String?
+  workoutDescription  String?
+  endStreetAddress    String?
+  endCity             String?
+  endState            String?
+  generationSource    String?           @default("MANUAL")
+  isCancelled         Boolean           @default(false)
+  city_runs           city_runs         @relation(fields: [cityRunId], references: [id], onDelete: Cascade)
+  city_run_event_rsvps city_run_event_rsvps[]
+
+  @@unique([cityRunId, eventDate])
+  @@index([cityRunId])
+  @@index([eventDate])
+  @@index([workflowStatus])
+  @@map("city_run_events")
+}
+
+model city_run_event_rsvps {
+  id             String          @id
+  cityRunEventId String
+  athleteId      String
+  status         String          // "going", "not-going", "maybe"
+  checkedInAt    DateTime?
+  rsvpPhotoUrls  Json?
+  createdAt      DateTime        @default(now())
+  Athlete        Athlete         @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  city_run_events city_run_events @relation(fields: [cityRunEventId], references: [id], onDelete: Cascade)
+
+  @@unique([cityRunEventId, athleteId])
+  @@index([checkedInAt])
+  @@index([cityRunEventId])
+  @@map("city_run_event_rsvps")
 }
 
 model run_crew_specific_races {
