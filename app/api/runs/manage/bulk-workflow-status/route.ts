@@ -4,13 +4,13 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminAuth } from '@/lib/firebaseAdmin';
 
-const VALID_WORKFLOW_STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED'] as const;
+const VALID_WORKFLOW_STATUSES = ['DEVELOP', 'PENDING', 'SUBMITTED', 'APPROVED'] as const;
 
 /**
  * POST /api/runs/manage/bulk-workflow-status
  *
- * Bulk update workflow status for multiple runs (e.g. "send back to queue" = DRAFT).
- * Body: { runIds: string[], workflowStatus: "DRAFT" | "SUBMITTED" | "APPROVED" }
+ * Bulk update workflow status for multiple runs.
+ * Body: { runIds: string[], workflowStatus: "DEVELOP" | "PENDING" | "SUBMITTED" | "APPROVED" }
  */
 export async function POST(request: Request) {
   try {
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
     if (!workflowStatus || !VALID_WORKFLOW_STATUSES.includes(workflowStatus)) {
       return NextResponse.json(
-        { success: false, error: 'workflowStatus required: DRAFT, SUBMITTED, or APPROVED' },
+        { success: false, error: 'workflowStatus required: DEVELOP, PENDING, SUBMITTED, or APPROVED' },
         { status: 400 }
       );
     }
@@ -55,9 +55,11 @@ export async function POST(request: Request) {
       updated: result.count,
       workflowStatus,
       message:
-        workflowStatus === 'DRAFT'
-          ? `${result.count} run(s) sent back to queue`
-          : `Updated ${result.count} run(s) to ${workflowStatus}`,
+        workflowStatus === 'PENDING'
+          ? `${result.count} run(s) sent for rework (Pending)`
+          : workflowStatus === 'DEVELOP'
+            ? `${result.count} run(s) restaged to Develop`
+            : `Updated ${result.count} run(s) to ${workflowStatus}`,
     });
   } catch (error: any) {
     console.error('Error bulk updating run workflow status:', error);

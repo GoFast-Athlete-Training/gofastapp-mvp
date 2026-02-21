@@ -451,7 +451,7 @@ model city_runs {
   slug                String?              @unique // URL-friendly slug: "title-of-run" (generated from title)
   dayOfWeek           String?
   endDate             DateTime?
-  workflowStatus      RunWorkflowStatus    @default(DRAFT)
+  workflowStatus      RunWorkflowStatus    @default(DEVELOP)
   startDate           DateTime
   endPoint            String?
   meetUpStreetAddress String?
@@ -767,7 +767,8 @@ enum WorkoutType {
 }
 
 enum RunWorkflowStatus {
-  DRAFT
+  DEVELOP
+  PENDING
   SUBMITTED
   APPROVED
 }

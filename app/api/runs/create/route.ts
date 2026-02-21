@@ -304,7 +304,7 @@ export async function POST(request: NextRequest) {
       staffGeneratedId: staffGeneratedId?.trim() || null,
       athleteGeneratedId: athleteGeneratedId?.trim() || null,
       title: title.trim(),
-      workflowStatus: 'DRAFT',
+      workflowStatus: 'DEVELOP',
       dayOfWeek: dayOfWeek?.trim() || null,
       startDate: runStartDateObj,
       endDate: runEndDateObj,

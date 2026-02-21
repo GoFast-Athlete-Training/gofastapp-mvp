@@ -179,11 +179,11 @@ export async function GET(
   }
 }
 
-const VALID_WORKFLOW_STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED'] as const;
+const VALID_WORKFLOW_STATUSES = ['DEVELOP', 'PENDING', 'SUBMITTED', 'APPROVED'] as const;
 
 /**
  * PATCH /api/runs/manage/[runId]
- * Update run workflow status (DRAFT -> SUBMITTED -> APPROVED). Used by GoFastCompany for submit/approve flow.
+ * Update run workflow status (DEVELOP -> PENDING -> SUBMITTED -> APPROVED). Used by GoFastCompany workflow flow.
  */
 export async function PATCH(
   request: Request,
@@ -207,7 +207,7 @@ export async function PATCH(
 
     if (!workflowStatus || !VALID_WORKFLOW_STATUSES.includes(workflowStatus)) {
       return NextResponse.json(
-        { success: false, error: 'workflowStatus required: DRAFT, SUBMITTED, or APPROVED' },
+        { success: false, error: 'workflowStatus required: DEVELOP, PENDING, SUBMITTED, or APPROVED' },
         { status: 400 }
       );
     }
@@ -221,8 +221,8 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: 'CityRun not found' }, { status: 404 });
     }
 
-    const updateData: { workflowStatus: 'DRAFT' | 'SUBMITTED' | 'APPROVED'; updatedAt: Date; staffNotes?: string | null } = {
-      workflowStatus: workflowStatus as 'DRAFT' | 'SUBMITTED' | 'APPROVED',
+    const updateData: { workflowStatus: 'DEVELOP' | 'PENDING' | 'SUBMITTED' | 'APPROVED'; updatedAt: Date; staffNotes?: string | null } = {
+      workflowStatus: workflowStatus as 'DEVELOP' | 'PENDING' | 'SUBMITTED' | 'APPROVED',
       updatedAt: new Date(),
     };
     if (staffNotes !== undefined) {
@@ -273,7 +273,16 @@ export async function PATCH(
     return NextResponse.json({
       success: true,
       run: updated,
-      message: workflowStatus === 'SUBMITTED' ? 'Run submitted for approval' : workflowStatus === 'APPROVED' ? 'Run approved' : 'Run status updated',
+      message:
+        workflowStatus === 'SUBMITTED'
+          ? 'Run submitted for approval'
+          : workflowStatus === 'APPROVED'
+            ? 'Run approved'
+            : workflowStatus === 'PENDING'
+              ? 'Run moved to pending'
+              : workflowStatus === 'DEVELOP'
+                ? 'Run restaged to develop'
+                : 'Run status updated',
     });
   } catch (error: any) {
     console.error('Error updating run workflow status:', error);

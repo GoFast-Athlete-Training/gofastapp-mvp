@@ -20,7 +20,7 @@ function isMissingPostRunActivityColumn(error: any) {
  * Supports filtering by runType
  * 
  * Query params:
- * - workflowStatus: DRAFT | SUBMITTED | APPROVED
+ * - workflowStatus: DEVELOP | PENDING | SUBMITTED | APPROVED
  * - pastOnly: "true" = only runs with startDate before today (for adding photos, etc.)
  * - upcomingOnly: default "true"; "false" = return all runs (no date filter)
  */
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
     const upcomingOnly = searchParams.get('upcomingOnly') !== 'false';
 
     const where: any = {};
-    if (workflowStatus && ['DRAFT', 'SUBMITTED', 'APPROVED'].includes(workflowStatus)) {
+    if (workflowStatus && ['DEVELOP', 'PENDING', 'SUBMITTED', 'APPROVED'].includes(workflowStatus)) {
       where.workflowStatus = workflowStatus;
     }
     const startOfToday = getStartOfTodayUTC();
