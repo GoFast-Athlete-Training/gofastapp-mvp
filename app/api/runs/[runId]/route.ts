@@ -5,7 +5,7 @@ import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { normalizeWebsiteUrl, normalizeStravaUrl } from '@/lib/runclub-urls';
+import { normalizeWebsiteUrl, normalizeStravaUrl, normalizeInstagramUrl } from '@/lib/runclub-urls';
 
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
@@ -281,6 +281,7 @@ export async function GET(
                 // Use update instead of upsert since we know the ID exists
                 const websiteUrl = normalizeWebsiteUrl(clubData.runClub.websiteUrl, clubData.runClub.url);
                 const stravaUrl = normalizeStravaUrl(clubData.runClub.stravaUrl, clubData.runClub.stravaClubUrl);
+                const instagramUrl = normalizeInstagramUrl(clubData.runClub.instagramUrl || clubData.runClub.instagramHandle || null);
                 await prisma.run_clubs.update({
                   where: { id: run.runClubId },
                   data: {
@@ -289,7 +290,7 @@ export async function GET(
                     city: clubData.runClub.city || null,
                     description: clubData.runClub.description || null,
                     websiteUrl,
-                    instagramUrl: clubData.runClub.instagramUrl || clubData.runClub.instagramHandle || null,
+                    instagramUrl,
                     stravaUrl,
                     syncedAt: new Date(),
                   },
@@ -566,7 +567,8 @@ export async function PUT(
       runClubUpdateData.websiteUrl = body.runClubWebsiteUrl === null || body.runClubWebsiteUrl === '' ? null : String(body.runClubWebsiteUrl).trim();
     }
     if (body.runClubInstagramUrl !== undefined) {
-      runClubUpdateData.instagramUrl = body.runClubInstagramUrl === null || body.runClubInstagramUrl === '' ? null : String(body.runClubInstagramUrl).trim();
+      const raw = body.runClubInstagramUrl === null || body.runClubInstagramUrl === '' ? null : String(body.runClubInstagramUrl).trim();
+      runClubUpdateData.instagramUrl = raw ? normalizeInstagramUrl(raw) : null;
     }
     if (body.runClubStravaUrl !== undefined) {
       runClubUpdateData.stravaUrl = body.runClubStravaUrl === null || body.runClubStravaUrl === '' ? null : String(body.runClubStravaUrl).trim();

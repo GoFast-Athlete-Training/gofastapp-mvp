@@ -1,5 +1,5 @@
 import { prisma } from './prisma';
-import { normalizeStravaUrl } from './runclub-urls';
+import { normalizeStravaUrl, normalizeInstagramUrl } from './runclub-urls';
 
 const extractFirstHttpUrl = (raw?: string | null): string | null => {
   if (!raw) return null;
@@ -10,15 +10,6 @@ const extractFirstHttpUrl = (raw?: string | null): string | null => {
   } catch {
     return null;
   }
-};
-
-const normalizeInstagramUrl = (raw?: string | null): string | null => {
-  if (!raw) return null;
-  const url = extractFirstHttpUrl(raw);
-  if (url) return url;
-  const handle = raw.trim().replace(/^@/, '');
-  if (!handle || !/^[a-zA-Z0-9._]+$/.test(handle)) return null;
-  return `https://www.instagram.com/${handle}`;
 };
 
 /**

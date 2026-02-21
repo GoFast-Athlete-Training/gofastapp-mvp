@@ -64,3 +64,51 @@ export function normalizeStravaUrl(
     return null;
   }
 }
+
+const INSTAGRAM_BASE = "https://www.instagram.com";
+
+/**
+ * Normalize Instagram URL for storage: strip query params and locale junk (?hl=en, etc).
+ * Store canonical form: https://www.instagram.com/dojoofpain (no trailing slash, no ? or #).
+ * Accepts full URL or handle (e.g. @dojoofpain or dojoofpain).
+ */
+export function normalizeInstagramUrl(raw?: string | null): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const url = extractFirstHttpUrl(trimmed);
+  if (url) {
+    try {
+      const u = new URL(url);
+      const host = u.hostname.toLowerCase();
+      if (!host.includes("instagram.com")) return null;
+      const pathSegments = u.pathname.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
+      const handle = pathSegments[0];
+      if (!handle || !/^[a-zA-Z0-9._]+$/.test(handle)) return null;
+      return `${INSTAGRAM_BASE}/${handle}`;
+    } catch {
+      return null;
+    }
+  }
+  const handle = trimmed.replace(/^@/, "").trim();
+  if (!handle || !/^[a-zA-Z0-9._]+$/.test(handle)) return null;
+  return `${INSTAGRAM_BASE}/${handle}`;
+}
+
+/**
+ * Infer Instagram handle from a stored URL for display (e.g. "dojoofpain" from https://www.instagram.com/dojoofpain).
+ */
+export function instagramHandleFromUrl(instagramUrl?: string | null): string | null {
+  if (!instagramUrl?.trim()) return null;
+  const url = extractFirstHttpUrl(instagramUrl.trim());
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (!u.hostname.toLowerCase().includes("instagram.com")) return null;
+    const pathSegments = u.pathname.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
+    const handle = pathSegments[0];
+    return handle && /^[a-zA-Z0-9._]+$/.test(handle) ? handle : null;
+  } catch {
+    return null;
+  }
+}
