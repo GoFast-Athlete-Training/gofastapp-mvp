@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { saveRunClub } from "@/lib/save-runclub";
-import { normalizeWebsiteUrl, normalizeStravaUrl } from "@/lib/runclub-urls";
+import { normalizeWebsiteUrl, normalizeStravaUrl, normalizeInstagramUrl } from "@/lib/runclub-urls";
 import { generateUniqueCityRunSlug } from "@/lib/slug-utils";
 import { findExistingRun } from "@/lib/run-duplicate-check";
 
@@ -255,9 +255,10 @@ export async function POST(request: NextRequest) {
         // Save RunClub data directly from provided object (checks if exists first)
         // Uses acqRunClubId and full object from GoFastCompany
         // If already exists, skips save (smart - avoids unnecessary DB writes)
-        // Normalize so we never persist "D.C." in websiteUrl or Instagram in stravaUrl (copy from acq_run_clubs can be wrong)
+        // Normalize so we never persist "D.C." in websiteUrl, Instagram in stravaUrl, or ?hl=en in instagramUrl
         const websiteUrl = normalizeWebsiteUrl(runClub.websiteUrl, runClub.url);
         const stravaUrl = normalizeStravaUrl(runClub.stravaUrl, runClub.stravaClubUrl);
+        const instagramUrl = normalizeInstagramUrl(runClub.instagramUrl || runClub.instagramHandle || null);
         const savedRunClub = await saveRunClub({
           slug: clubSlug,
           name: runClub.name,
@@ -265,7 +266,7 @@ export async function POST(request: NextRequest) {
           city: runClub.city || null,
           description: runClub.description || null,
           websiteUrl,
-          instagramUrl: runClub.instagramUrl || runClub.instagramHandle || null,
+          instagramUrl,
           stravaUrl,
         }).catch((error) => {
           console.warn(`Failed to save RunClub during run creation:`, error);
