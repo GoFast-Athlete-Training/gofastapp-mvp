@@ -5,6 +5,7 @@ import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { normalizeWebsiteUrl, normalizeStravaUrl } from '@/lib/runclub-urls';
 
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
@@ -278,6 +279,8 @@ export async function GET(
                 // Save to local DB for next time
                 // IMPORTANT: Prisma generates UUID `id` automatically - we NEVER set it manually
                 // Use update instead of upsert since we know the ID exists
+                const websiteUrl = normalizeWebsiteUrl(clubData.runClub.websiteUrl, clubData.runClub.url);
+                const stravaUrl = normalizeStravaUrl(clubData.runClub.stravaUrl, clubData.runClub.stravaClubUrl);
                 await prisma.run_clubs.update({
                   where: { id: run.runClubId },
                   data: {
@@ -285,9 +288,9 @@ export async function GET(
                     logoUrl: clubData.runClub.logoUrl || clubData.runClub.logo || null,
                     city: clubData.runClub.city || null,
                     description: clubData.runClub.description || null,
-                    websiteUrl: clubData.runClub.websiteUrl || clubData.runClub.url || null,
+                    websiteUrl,
                     instagramUrl: clubData.runClub.instagramUrl || clubData.runClub.instagramHandle || null,
-                    stravaUrl: clubData.runClub.stravaUrl || clubData.runClub.stravaClubUrl || null,
+                    stravaUrl,
                     syncedAt: new Date(),
                   },
                 });

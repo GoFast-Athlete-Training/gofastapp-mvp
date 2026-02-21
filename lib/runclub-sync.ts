@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { normalizeStravaUrl } from './runclub-urls';
 
 const extractFirstHttpUrl = (raw?: string | null): string | null => {
   if (!raw) return null;
@@ -71,7 +72,8 @@ export async function fetchAndSaveRunClub(slug: string): Promise<any | null> {
     const runClub = data.runClub;
     const websiteUrl = extractFirstHttpUrl(runClub.websiteUrl || runClub.url || null);
     const instagramUrl = normalizeInstagramUrl(runClub.instagramUrl || runClub.instagramHandle || null);
-    const stravaUrl = extractFirstHttpUrl(runClub.stravaUrl || runClub.stravaClubUrl || null);
+    // Don't persist Instagram URLs into stravaUrl (acq_run_clubs sometimes has IG pasted in stravaClubUrl)
+    const stravaUrl = normalizeStravaUrl(runClub.stravaUrl, runClub.stravaClubUrl);
 
     // Upsert into gofastapp-mvp database
     // Keep enough fields for run verification and hydration without extra cross-repo fetches.

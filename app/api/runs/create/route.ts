@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { saveRunClub } from "@/lib/save-runclub";
+import { normalizeWebsiteUrl, normalizeStravaUrl } from "@/lib/runclub-urls";
 import { generateUniqueCityRunSlug } from "@/lib/slug-utils";
+import { findExistingRun } from "@/lib/run-duplicate-check";
 
 export const dynamic = "force-dynamic";
 
@@ -253,15 +255,18 @@ export async function POST(request: NextRequest) {
         // Save RunClub data directly from provided object (checks if exists first)
         // Uses acqRunClubId and full object from GoFastCompany
         // If already exists, skips save (smart - avoids unnecessary DB writes)
+        // Normalize so we never persist "D.C." in websiteUrl or Instagram in stravaUrl (copy from acq_run_clubs can be wrong)
+        const websiteUrl = normalizeWebsiteUrl(runClub.websiteUrl, runClub.url);
+        const stravaUrl = normalizeStravaUrl(runClub.stravaUrl, runClub.stravaClubUrl);
         const savedRunClub = await saveRunClub({
           slug: clubSlug,
           name: runClub.name,
           logoUrl: runClub.logoUrl || runClub.logo || null,
           city: runClub.city || null,
           description: runClub.description || null,
-          websiteUrl: runClub.websiteUrl || runClub.url || null,
+          websiteUrl,
           instagramUrl: runClub.instagramUrl || runClub.instagramHandle || null,
-          stravaUrl: runClub.stravaUrl || runClub.stravaClubUrl || null,
+          stravaUrl,
         }).catch((error) => {
           console.warn(`Failed to save RunClub during run creation:`, error);
           return null;
@@ -284,6 +289,32 @@ export async function POST(request: NextRequest) {
         finalRunClubId = existingRunClub.id;
       }
       // If not found, will be null - runClub data will be hydrated on display if missing
+    }
+
+    // Per-club duplicate check (same club + same title+date or same webUrl)
+    if (finalRunClubId) {
+      const existing = await findExistingRun(prisma, {
+        runClubId: finalRunClubId,
+        title: title.trim(),
+        startDate: runStartDateObj,
+        webUrl: webUrl?.trim() || null,
+      });
+      if (existing) {
+        const response = NextResponse.json(
+          {
+            success: false,
+            duplicate: true,
+            error: "A run for this club with the same title and date (or same source URL) already exists.",
+            existingRunId: existing.id,
+            existingRun: { id: existing.id, title: existing.title, startDate: existing.startDate },
+          },
+          { status: 409 }
+        );
+        Object.entries(corsHeaders).forEach(([key, value]) => {
+          response.headers.set(key, value);
+        });
+        return response;
+      }
     }
 
     // Generate slug from title
