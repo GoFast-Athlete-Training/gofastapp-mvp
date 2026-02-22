@@ -65,7 +65,8 @@ model Athlete {
   run_crew_memberships    run_crew_memberships[]
   run_crew_messages       run_crew_messages[]
   city_run_rsvps          city_run_rsvps[]
-  city_run_event_rsvps    city_run_event_rsvps[]
+  city_run_messages       city_run_messages[]
+  city_run_checkins       city_run_checkins[]
   city_runs               city_runs[]
   training_days_executed  training_days_executed[]
   training_plans          training_plans[]
@@ -318,8 +319,9 @@ model run_clubs {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  runs      city_runs[]
-  clubLeaders Athlete[] // Reverse relation for Athlete.runClubId
+  runs         city_runs[]
+  clubLeaders  Athlete[]          // Reverse relation for Athlete.runClubId
+  runSetups    city_run_setups[]  // Recurring series this club owns
 
   @@index([city])
   @@index([slug])
@@ -399,11 +401,47 @@ model run_crew_messages {
   run_crews run_crews @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
 }
 
+model city_run_checkins {
+  id          String    @id
+  runId       String
+  athleteId   String
+  checkedInAt DateTime  @default(now())
+  runPhotoUrl String?   // athlete's photo from this run
+  runShouts   String?   // post-run shout-out / comment
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  Athlete     Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  city_runs   city_runs @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, athleteId])
+  @@index([runId])
+  @@index([athleteId])
+  @@map("city_run_checkins")
+}
+
+model city_run_messages {
+  id        String     @id
+  runId     String
+  athleteId String
+  content   String
+  topic     String     @default("general")
+  createdAt DateTime   @default(now())
+  updatedAt DateTime
+  Athlete   Athlete    @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  city_runs city_runs  @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([athleteId])
+  @@index([topic])
+  @@map("city_run_messages")
+}
+
 model city_run_rsvps {
   id              String        @id
   runId           String
   athleteId       String
   status          String        // "going", "not-going", "maybe"
+  occurrenceDate  DateTime?     // null = standalone run; set = recurring (the specific occurrence date)
   checkedInAt     DateTime?     // Timestamp when checked in (null = not checked in)
   rsvpPhotoUrls   Json?         // Photos attendee posted for this run (ambassador credit when going + ≥1 photo)
   createdAt       DateTime      @default(now())
@@ -413,6 +451,7 @@ model city_run_rsvps {
 
   @@unique([runId, athleteId])
   @@index([checkedInAt])
+  @@index([occurrenceDate])
 }
 
 model city_runs {
@@ -465,11 +504,14 @@ model city_runs {
   endStreetAddress    String?
   endCity             String?
   endState            String?
+  cityRunSetupId      String?              // null = standalone; set = recurring (FK to city_run_setups)
   city_run_rsvps      city_run_rsvps[]
-  city_run_events     city_run_events[]
+  city_run_messages   city_run_messages[]
+  city_run_checkins   city_run_checkins[]
   Athlete             Athlete?             @relation(fields: [athleteGeneratedId], references: [id], onDelete: Cascade)
   run_crews           run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
   runClub             run_clubs?           @relation(fields: [runClubId], references: [id], onDelete: SetNull)
+  cityRunSetup        city_run_setups?     @relation(fields: [cityRunSetupId], references: [id], onDelete: SetNull)
 
   @@index([athleteGeneratedId])
   @@index([citySlug])
@@ -481,78 +523,23 @@ model city_runs {
   @@index([runCrewId])
   @@index([staffGeneratedId])
   @@index([startDate])
+  @@index([cityRunSetupId])
   // Table name is city_runs (migrated from run_crew_runs). Explicit map so deployed builds never use old name.
   @@map("city_runs")
 }
 
-model city_run_events {
-  id                  String            @id
-  cityRunId           String
-  eventDate           DateTime
-  timezone            String?
-  meetUpPoint         String
-  meetUpPlaceId       String?
-  meetUpLat           Float?
-  meetUpLng           Float?
-  totalMiles          Float?
-  pace                String?
-  stravaMapUrl        String?
-  description         String?
-  postRunActivity     String?
-  routePhotos         Json?
-  mapImageUrl         String?
-  staffNotes          String?
-  stravaUrl           String?
-  stravaText          String?
-  webUrl              String?
-  webText             String?
-  igPostText          String?
-  igPostGraphic       String?
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime
-  startTimeHour       Int?
-  startTimeMinute     Int?
-  startTimePeriod     String?
-  slug                String?           @unique
-  workflowStatus      RunWorkflowStatus @default(DEVELOP)
-  endPoint            String?
-  meetUpStreetAddress String?
-  meetUpCity          String?
-  meetUpState         String?
-  meetUpZip           String?
-  routeNeighborhood   String?
-  runType             String?
-  workoutDescription  String?
-  endStreetAddress    String?
-  endCity             String?
-  endState            String?
-  generationSource    String?           @default("MANUAL")
-  isCancelled         Boolean           @default(false)
-  city_runs           city_runs         @relation(fields: [cityRunId], references: [id], onDelete: Cascade)
-  city_run_event_rsvps city_run_event_rsvps[]
+model city_run_setups {
+  id         String      @id
+  dayOfWeek  String      // "MONDAY" | "TUESDAY" | ... | "SUNDAY"
+  runClubId  String?     // which club owns this recurring series
+  name       String?     // optional series label, e.g. "Tuesday Tempo"
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime
+  city_runs  city_runs[]
+  runClub    run_clubs?  @relation(fields: [runClubId], references: [id], onDelete: SetNull)
 
-  @@unique([cityRunId, eventDate])
-  @@index([cityRunId])
-  @@index([eventDate])
-  @@index([workflowStatus])
-  @@map("city_run_events")
-}
-
-model city_run_event_rsvps {
-  id             String          @id
-  cityRunEventId String
-  athleteId      String
-  status         String          // "going", "not-going", "maybe"
-  checkedInAt    DateTime?
-  rsvpPhotoUrls  Json?
-  createdAt      DateTime        @default(now())
-  Athlete        Athlete         @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  city_run_events city_run_events @relation(fields: [cityRunEventId], references: [id], onDelete: Cascade)
-
-  @@unique([cityRunEventId, athleteId])
-  @@index([checkedInAt])
-  @@index([cityRunEventId])
-  @@map("city_run_event_rsvps")
+  @@index([runClubId])
+  @@map("city_run_setups")
 }
 
 model run_crew_specific_races {

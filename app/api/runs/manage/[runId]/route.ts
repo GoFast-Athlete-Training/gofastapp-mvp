@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminAuth } from '@/lib/firebaseAdmin';
-import { resolveCityRunEvent } from '@/lib/cityrun-event-resolver';
 
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
@@ -86,64 +85,6 @@ export async function GET(
       commitSha: RUNTIME_COMMIT_SHA,
       dbHost: getDbHost(),
     });
-
-    const resolvedEvent = await resolveCityRunEvent(runId);
-    if (resolvedEvent) {
-      const run = resolvedEvent.city_runs;
-      if (!run) {
-        return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
-      }
-      const rsvps = await prisma.city_run_event_rsvps.findMany({
-        where: { cityRunEventId: resolvedEvent.id },
-        include: {
-          Athlete: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      }).catch(() => []);
-
-      return NextResponse.json({
-        success: true,
-        run: {
-          ...run,
-          id: resolvedEvent.id,
-          cityRunId: run.id,
-          cityRunEventId: resolvedEvent.id,
-          slug: resolvedEvent.slug ?? run.slug ?? null,
-          startDate: resolvedEvent.eventDate,
-          date: resolvedEvent.eventDate,
-          meetUpPoint: resolvedEvent.meetUpPoint,
-          meetUpStreetAddress: resolvedEvent.meetUpStreetAddress,
-          meetUpCity: resolvedEvent.meetUpCity,
-          meetUpState: resolvedEvent.meetUpState,
-          meetUpZip: resolvedEvent.meetUpZip,
-          meetUpLat: resolvedEvent.meetUpLat,
-          meetUpLng: resolvedEvent.meetUpLng,
-          startTimeHour: resolvedEvent.startTimeHour,
-          startTimeMinute: resolvedEvent.startTimeMinute,
-          startTimePeriod: resolvedEvent.startTimePeriod,
-          timezone: resolvedEvent.timezone,
-          totalMiles: resolvedEvent.totalMiles,
-          pace: resolvedEvent.pace,
-          description: resolvedEvent.description,
-          stravaMapUrl: resolvedEvent.stravaMapUrl,
-          postRunActivity: resolvedEvent.postRunActivity,
-          routeNeighborhood: resolvedEvent.routeNeighborhood,
-          runType: resolvedEvent.runType,
-          workoutDescription: resolvedEvent.workoutDescription,
-          routePhotos: Array.isArray(resolvedEvent.routePhotos) ? resolvedEvent.routePhotos : null,
-          mapImageUrl: resolvedEvent.mapImageUrl,
-          staffNotes: resolvedEvent.staffNotes,
-          rsvps,
-        },
-      });
-    }
 
     let run: any;
     try {
