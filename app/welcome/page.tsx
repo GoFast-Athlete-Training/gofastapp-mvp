@@ -65,8 +65,11 @@ export default function WelcomePage() {
       hasProcessedRef.current = true;
 
       try {
-        // Call hydrate endpoint once (Firebase token automatically added by api interceptor)
-        const response = await api.post('/athlete/hydrate');
+        // Get token explicitly — don't rely on interceptor timing
+        const token = await firebaseUser.getIdToken();
+        const response = await api.post('/athlete/hydrate', {}, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         
         if (response.data?.success && response.data?.athlete) {
           const athleteData = response.data.athlete;
@@ -172,8 +175,10 @@ export default function WelcomePage() {
             return;
           }
         } else if (error?.response?.status === 401) {
-          // 401 = unauthorized, redirect to signup
-          router.replace('/signup');
+          // 401 here means the token didn't work — don't redirect to /signup
+          // (that creates a /welcome ↔ /signup loop). Show error instead.
+          setError('Authentication error. Please sign out and sign in again.');
+          setIsLoading(false);
         } else {
           // Other errors, show error state
           setError(error?.response?.data?.error || error?.message || 'Failed to load athlete data');

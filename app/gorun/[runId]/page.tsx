@@ -7,6 +7,7 @@ import TopNav from '@/components/shared/TopNav';
 import CityRunGoingContainer from '@/components/runs/CityRunGoingContainer';
 import CityRunPostRunContainer from '@/components/runs/CityRunPostRunContainer';
 import api from '@/lib/api';
+import { auth } from '@/lib/firebase';
 import { MapPin, Clock, Calendar, Map, ArrowLeft } from 'lucide-react';
 
 interface RunClub {
@@ -81,7 +82,34 @@ export default function GoRunPage() {
 
   useEffect(() => {
     if (!runId) return;
-    fetchAll();
+
+    const athleteId = LocalStorageAPI.getAthleteId();
+    if (athleteId) {
+      // Already hydrated — go straight to fetching run data
+      fetchAll();
+      return;
+    }
+
+    // No athleteId in localStorage. Check if Firebase has an auth'd user
+    // and self-hydrate right here — don't rely on /welcome having run first.
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      unsubscribe(); // only need this once
+      if (user) {
+        try {
+          const token = await user.getIdToken();
+          const res = await api.post('/api/athlete/hydrate', {}, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.data?.success && res.data?.athlete) {
+            LocalStorageAPI.setFullHydrationModel({ athlete: res.data.athlete });
+          }
+        } catch (e) {
+          // Not hydrated — continue as unauthenticated, fetchAll still works
+          console.warn('gorun: hydration failed, continuing as guest', e);
+        }
+      }
+      fetchAll();
+    });
   }, [runId]);
 
   const fetchAll = async () => {
