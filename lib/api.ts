@@ -16,11 +16,10 @@ const api = axios.create({
  */
 function waitForAuthUser(timeoutMs = 3000): Promise<import('firebase/auth').User | null> {
   return new Promise((resolve) => {
-    // Already resolved — return immediately
-    if (auth.currentUser !== undefined) {
-      resolve(auth.currentUser);
-      return;
-    }
+    // NOTE: auth.currentUser starts as null (not undefined) while Firebase is
+    // still rehydrating the session — DO NOT early-return on null here.
+    // onAuthStateChanged fires synchronously if auth is already resolved,
+    // so this is safe and fast for both fresh loads and navigations.
     const timer = setTimeout(() => {
       unsubscribe();
       resolve(null);

@@ -115,25 +115,34 @@ export default function GoRunPage() {
   const fetchAll = async () => {
     try {
       setLoading(true);
-      const [runRes, checkinRes] = await Promise.all([
-        api.get(`/runs/${runId}`),
-        api.get(`/runs/${runId}/checkin`),
-      ]);
 
+      // Run fetch is the critical path — fail fast if this 404s or errors
+      const runRes = await api.get(`/runs/${runId}`);
       if (!runRes.data.success || !runRes.data.run) {
         setError('Run not found');
         return;
       }
-
       setRun(runRes.data.run);
 
-      if (checkinRes.data.success) {
-        setCheckins(checkinRes.data.checkins || []);
-        setMyCheckin(checkinRes.data.myCheckin ?? null);
+      // Checkin fetch is secondary — a 401/500 here (e.g. missing migration on
+      // preview DB, or unauthenticated guest) must NOT kill the run page
+      try {
+        const checkinRes = await api.get(`/runs/${runId}/checkin`);
+        if (checkinRes.data.success) {
+          setCheckins(checkinRes.data.checkins || []);
+          setMyCheckin(checkinRes.data.myCheckin ?? null);
+        }
+      } catch (checkinErr: any) {
+        console.warn(
+          'gorun: checkin fetch failed (status=%s) — showing run without checkin state',
+          checkinErr?.response?.status,
+          checkinErr?.response?.data,
+        );
       }
     } catch (err: any) {
+      console.error('gorun: run fetch failed', err?.response?.status, err?.response?.data, err?.message);
       if (err.response?.status === 404) setError('Run not found');
-      else setError('Failed to load run');
+      else setError(`Failed to load run (${err?.response?.status ?? err?.message ?? 'unknown'})`);
     } finally {
       setLoading(false);
     }
