@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
 async function main() {
@@ -66,7 +67,7 @@ async function main() {
         stravaMapUrl: run.stravaMapUrl,
         description: run.description,
         postRunActivity: run.postRunActivity,
-        routePhotos: run.routePhotos,
+        routePhotos: run.routePhotos ?? Prisma.JsonNull,
         mapImageUrl: run.mapImageUrl,
         staffNotes: run.staffNotes,
         stravaUrl: run.stravaUrl,
@@ -112,7 +113,7 @@ async function main() {
       update: {
         status: rsvp.status,
         checkedInAt: rsvp.checkedInAt,
-        rsvpPhotoUrls: rsvp.rsvpPhotoUrls,
+        rsvpPhotoUrls: rsvp.rsvpPhotoUrls ?? Prisma.JsonNull,
       },
       create: {
         id: rsvp.id,
@@ -120,7 +121,7 @@ async function main() {
         athleteId: rsvp.athleteId,
         status: rsvp.status,
         checkedInAt: rsvp.checkedInAt,
-        rsvpPhotoUrls: rsvp.rsvpPhotoUrls,
+        rsvpPhotoUrls: rsvp.rsvpPhotoUrls ?? Prisma.JsonNull,
         createdAt: rsvp.createdAt,
       },
     });

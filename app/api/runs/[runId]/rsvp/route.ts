@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
 import { rsvpToRun } from '@/lib/domain-runcrew';
@@ -70,6 +71,7 @@ export async function POST(
     const eventId = await resolveCityRunEventId(runId);
     let rsvp: any;
     if (eventId) {
+      const normalizedRsvpPhotoUrls = Array.isArray(rsvpPhotoUrls) ? rsvpPhotoUrls : Prisma.JsonNull;
       try {
         rsvp = await prisma.city_run_event_rsvps.upsert({
           where: {
@@ -80,14 +82,14 @@ export async function POST(
           },
           update: {
             status,
-            rsvpPhotoUrls: Array.isArray(rsvpPhotoUrls) ? rsvpPhotoUrls : null,
+            rsvpPhotoUrls: normalizedRsvpPhotoUrls,
           },
           create: {
             id: generateId(),
             cityRunEventId: eventId,
             athleteId: athlete.id,
             status,
-            rsvpPhotoUrls: Array.isArray(rsvpPhotoUrls) ? rsvpPhotoUrls : null,
+            rsvpPhotoUrls: normalizedRsvpPhotoUrls,
           },
         });
       } catch (err: any) {
