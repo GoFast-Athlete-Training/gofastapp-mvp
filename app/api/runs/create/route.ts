@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
       athleteGeneratedId,
       title,
       dayOfWeek,
+      instanceType,
       startDate,
       endDate,
       date, // backward compat: use startDate if not provided
@@ -338,6 +339,7 @@ export async function POST(request: NextRequest) {
       title: title.trim(),
       workflowStatus: 'DEVELOP',
       dayOfWeek: dayOfWeek?.trim() || null,
+      instanceType: (instanceType === 'SERIES' ? 'SERIES' : 'STANDALONE') as 'SERIES' | 'STANDALONE',
       startDate: runStartDateObj,
       endDate: runEndDateObj,
       date: runDateObj,

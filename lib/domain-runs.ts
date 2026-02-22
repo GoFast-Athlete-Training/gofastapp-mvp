@@ -107,6 +107,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
         title: true,
         gofastCity: true,
         dayOfWeek: true,
+        instanceType: true,
         startDate: true,
         date: true,
         endDate: true,
@@ -137,6 +138,13 @@ export async function getRuns(filters: GetRunsFilters = {}) {
             name: true,
             logoUrl: true,
             city: true,
+          },
+        },
+        cityRunSetup: {
+          select: {
+            id: true,
+            dayOfWeek: true,
+            name: true,
           },
         },
       },
@@ -172,7 +180,10 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     slug: run.slug ?? null,
     title: run.title,
     gofastCity: run.gofastCity,
-    dayOfWeek: run.dayOfWeek,
+    // For series: dayOfWeek from setup is source of truth; fallback to run.dayOfWeek (legacy)
+    dayOfWeek: run.cityRunSetup?.dayOfWeek ?? run.dayOfWeek,
+    instanceType: run.instanceType ?? 'STANDALONE',
+    cityRunSetup: run.cityRunSetup ? { id: run.cityRunSetup.id, dayOfWeek: run.cityRunSetup.dayOfWeek, name: run.cityRunSetup.name } : null,
     startDate: run.startDate,
     date: run.date,
     endDate: run.endDate,

@@ -124,6 +124,7 @@ export async function GET(
           title: true,
           gofastCity: true,
           dayOfWeek: true,
+          instanceType: true,
           startDate: true,
           date: true,
           endDate: true,
@@ -188,6 +189,13 @@ export async function GET(
             stravaUrl: true,
           },
         },
+        cityRunSetup: {
+          select: {
+            id: true,
+            dayOfWeek: true,
+            name: true,
+          },
+        },
       },
     });
     } catch (error: any) {
@@ -204,6 +212,7 @@ export async function GET(
           title: true,
           gofastCity: true,
           dayOfWeek: true,
+          instanceType: true,
           startDate: true,
           date: true,
           endDate: true,
@@ -250,6 +259,13 @@ export async function GET(
               name: true,
               logoUrl: true,
               city: true,
+            },
+          },
+          cityRunSetup: {
+            select: {
+              id: true,
+              dayOfWeek: true,
+              name: true,
             },
           },
         },
@@ -344,7 +360,10 @@ export async function GET(
         id: run.id,
         title: run.title,
         gofastCity: run.gofastCity,
-        dayOfWeek: run.dayOfWeek,
+        // For series: dayOfWeek from setup is source of truth; fallback to run.dayOfWeek (legacy)
+        dayOfWeek: run.cityRunSetup?.dayOfWeek ?? run.dayOfWeek,
+        instanceType: run.instanceType ?? 'STANDALONE',
+        cityRunSetup: run.cityRunSetup ? { id: run.cityRunSetup.id, dayOfWeek: run.cityRunSetup.dayOfWeek, name: run.cityRunSetup.name } : null,
         startDate: run.startDate.toISOString(),
         date: run.date.toISOString(),
         endDate: run.endDate?.toISOString() || null,
@@ -572,6 +591,9 @@ export async function PUT(
     }
     if (body.dayOfWeek !== undefined) {
       updateData.dayOfWeek = body.dayOfWeek === null || body.dayOfWeek === '' ? null : String(body.dayOfWeek);
+    }
+    if (body.instanceType !== undefined && (body.instanceType === 'SERIES' || body.instanceType === 'STANDALONE')) {
+      updateData.instanceType = body.instanceType;
     }
     if (body.startTimeHour !== undefined) {
       updateData.startTimeHour = body.startTimeHour === null || body.startTimeHour === '' ? null : parseInt(body.startTimeHour, 10);
