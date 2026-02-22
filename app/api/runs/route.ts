@@ -12,7 +12,7 @@ import { getRuns } from '@/lib/domain-runs';
  * CityRun is a universal run system - can be public (runClubId) or private (runCrewId)
  * 
  * Query params:
- * - citySlug (optional) - Filter by city slug
+ * - gofastCity (optional) - Filter by city slug
  * - day (optional) - Filter by day of week ("Monday", "Tuesday", etc.)
  * - runClubSlug (optional) - Filter by RunClub slug
  * 
@@ -46,13 +46,13 @@ export async function GET(request: Request) {
 
     // Parse query params
     const { searchParams } = new URL(request.url);
-    const citySlug = searchParams.get('citySlug') || undefined;
+    const gofastCity = searchParams.get('gofastCity') || undefined;
     const day = searchParams.get('day') || undefined;
     const runClubSlug = searchParams.get('runClubSlug') || undefined;
     const includeRunClub = searchParams.get('includeRunClub') === 'true';
 
     // Get runs with filters
-    let runs = await getRuns({ citySlug, day, runClubSlug });
+    let runs = await getRuns({ gofastCity, day, runClubSlug });
     
     // Debug logging
     console.log(`[GET /api/runs] Returning ${runs.length} runs`);

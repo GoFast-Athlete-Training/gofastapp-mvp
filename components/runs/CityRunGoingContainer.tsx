@@ -44,7 +44,7 @@ interface Run {
   dayOfWeek: string | null;
   date: string;
   startDate: string;
-  citySlug: string;
+  gofastCity: string;
   meetUpPoint: string;
   meetUpStreetAddress: string | null;
   meetUpCity: string | null;
@@ -90,7 +90,12 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
   const [checkingIn, setCheckingIn] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const runIsPast = new Date(run.date) < new Date();
+  const [runIsPast, setRunIsPast] = useState(false);
+
+  useEffect(() => {
+    const runPlus4h = new Date(new Date(run.date).getTime() + 4 * 60 * 60 * 1000);
+    setRunIsPast(runPlus4h < new Date());
+  }, [run.date]);
 
   const going = rsvps.filter(r => r.status === 'going');
   const myRsvp = rsvps.find(r => r.athleteId === athleteId);

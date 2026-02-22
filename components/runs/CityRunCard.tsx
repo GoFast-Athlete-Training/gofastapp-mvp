@@ -24,19 +24,19 @@ interface CityRunCardProps {
       logoUrl?: string | null;
     } | null;
   };
-  citySlug?: string; // Optional: for URL generation
+  gofastCity?: string; // Optional: for URL generation
 }
 
-export default function CityRunCard({ run, citySlug }: CityRunCardProps) {
+export default function CityRunCard({ run, gofastCity }: CityRunCardProps) {
   const router = useRouter();
 
   const timeStr = formatRunTime(run);
   
   // Generate URL for the run detail page
-  // Format: /runs/{runId} or /{citySlug}/runs/{runId}
-  const runUrl = generateRunUrl(run.id, citySlug);
-  const runPath = citySlug 
-    ? `/${citySlug}/runs/${run.id}`
+  // Format: /runs/{runId} or /{gofastCity}/runs/{runId}
+  const runUrl = generateRunUrl(run.id, gofastCity);
+  const runPath = gofastCity 
+    ? `/${gofastCity}/runs/${run.id}`
     : `/runs/${run.id}`;
 
   return (

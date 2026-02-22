@@ -49,7 +49,7 @@ export async function GET(
         id: run.id,
         slug: run.slug ?? null,
         title: run.title,
-        citySlug: run.citySlug,
+        gofastCity: run.gofastCity,
         dayOfWeek: run.dayOfWeek,
         startDate: run.startDate.toISOString(),
         date: run.date.toISOString(),

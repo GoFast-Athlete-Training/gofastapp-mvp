@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
-      citySlug, // City slug (e.g., "boston", "new-york") - extracted from Google Maps or user input
+      gofastCity, // City slug (e.g., "boston", "new-york") - extracted from Google Maps or user input
       cityName, // Optional: City name for slug generation if slug not provided
       state, // Optional: State abbreviation for slug generation
       runCrewId,
@@ -134,9 +134,9 @@ export async function POST(request: NextRequest) {
       igPostGraphic,
     } = body;
 
-    if (!citySlug && !cityName && !meetUpCity && !meetUpStreetAddress) {
+    if (!gofastCity && !cityName && !meetUpCity && !meetUpStreetAddress) {
       return NextResponse.json(
-        { success: false, error: "citySlug, cityName, meetUpCity, or meetUpStreetAddress is required to determine city" },
+        { success: false, error: "gofastCity, cityName, meetUpCity, or meetUpStreetAddress is required to determine city" },
         { status: 400 }
       );
     }
@@ -189,9 +189,9 @@ export async function POST(request: NextRequest) {
     // Generate city slug from various inputs
     let finalCitySlug: string;
     
-    if (citySlug) {
+    if (gofastCity) {
       // Use provided slug (normalize it)
-      finalCitySlug = slugifyCity(citySlug);
+      finalCitySlug = slugifyCity(gofastCity);
     } else {
       // Extract city name from various sources
       let cityNameToUse: string | null = null;
@@ -329,7 +329,7 @@ export async function POST(request: NextRequest) {
 
     const createData: Record<string, unknown> = {
       id: generateId(),
-      citySlug: finalCitySlug,
+      gofastCity: finalCitySlug,
       slug: runSlug, // URL-friendly slug for better shareability
       runCrewId: runCrewId?.trim() || null,
       runClubId: finalRunClubId, // ✅ Use FK instead of runClubSlug

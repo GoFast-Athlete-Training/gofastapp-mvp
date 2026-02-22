@@ -36,7 +36,7 @@ interface Checkin {
 interface Run {
   id: string;
   title: string;
-  citySlug: string;
+  gofastCity: string;
   isRecurring: boolean;
   dayOfWeek: string | null;
   startDate: string;
@@ -129,6 +129,19 @@ export default function GoRunPage() {
     }
   };
 
+  const handleCheckin = async () => {
+    if (!run) return;
+    setRsvpLoading(true);
+    try {
+      await api.post(`/runs/${run.id}/checkin`, {});
+      await fetchAll(); // re-fetch → myCheckin set → routes to CityRunPostRunContainer
+    } catch (err: any) {
+      console.error('Checkin error:', err);
+    } finally {
+      setRsvpLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -179,7 +192,7 @@ export default function GoRunPage() {
     );
   }
 
-  return <CityRunPreRSVP run={run} onRsvp={handleRsvp} rsvpLoading={rsvpLoading} onBack={() => router.push('/gorun')} />;
+  return <CityRunPreRSVP run={run} onRsvp={handleRsvp} onCheckin={handleCheckin} rsvpLoading={rsvpLoading} onBack={() => router.push('/gorun')} />;
 }
 
 // ─── Pre-RSVP Container ────────────────────────────────────────────────────────
@@ -187,15 +200,23 @@ export default function GoRunPage() {
 function CityRunPreRSVP({
   run,
   onRsvp,
+  onCheckin,
   rsvpLoading,
   onBack,
 }: {
   run: Run;
   onRsvp: (status: 'going' | 'not-going') => void;
+  onCheckin: () => void;
   rsvpLoading: boolean;
   onBack: () => void;
 }) {
   const going = (run.rsvps || []).filter((r: any) => r.status === 'going');
+  const [runIsPast, setRunIsPast] = useState(false);
+
+  useEffect(() => {
+    const runPlus4h = new Date(new Date(run.date).getTime() + 4 * 60 * 60 * 1000);
+    setRunIsPast(runPlus4h < new Date());
+  }, [run.date]);
 
   const formatTime = () => {
     if (run.startTimeHour === null || run.startTimeMinute === null) return null;
@@ -295,18 +316,29 @@ function CityRunPreRSVP({
           </div>
         )}
 
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <p className="text-sm text-gray-500 mb-4">RSVP to join the run chat and see who's going.</p>
-          <div className="flex gap-3">
+        {runIsPast ? (
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <p className="text-sm text-gray-500 mb-4">This run already happened. Were you there?</p>
+            <button
+              onClick={onCheckin}
+              disabled={rsvpLoading}
+              className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 disabled:opacity-50 transition"
+            >
+              {rsvpLoading ? 'Loading…' : "See the crew's recap →"}
+            </button>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <p className="text-sm text-gray-500 mb-4">RSVP to join the run chat and see who's going.</p>
             <button
               onClick={() => onRsvp('going')}
               disabled={rsvpLoading}
-              className="flex-1 py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 disabled:opacity-50 transition"
+              className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 disabled:opacity-50 transition"
             >
               {rsvpLoading ? 'Saving…' : "I'm going"}
             </button>
           </div>
-        </div>
+        )}
 
       </div>
     </div>

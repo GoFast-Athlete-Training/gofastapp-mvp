@@ -971,7 +971,7 @@ export async function createRun(data: {
   stravaMapUrl?: string | null;
   description?: string | null;
 }) {
-  // Get RunCrew to extract city for citySlug
+  // Get RunCrew to extract city for gofastCity
   const crew = await prisma.run_crews.findUnique({
     where: { id: data.runCrewId },
     select: { city: true },
@@ -981,8 +981,8 @@ export async function createRun(data: {
     throw new Error('RunCrew not found');
   }
 
-  // Generate citySlug from RunCrew's city
-  const citySlug = crew.city
+  // Generate gofastCity from RunCrew's city
+  const gofastCity = crew.city
     ? crew.city
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
@@ -999,7 +999,7 @@ export async function createRun(data: {
     const run = await prisma.city_runs.create({
     data: {
       id: generateRunId(),
-      citySlug,
+      gofastCity,
       runCrewId: data.runCrewId,
       athleteGeneratedId: data.athleteId,
       title: data.title,

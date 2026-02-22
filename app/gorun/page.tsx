@@ -10,7 +10,7 @@ import { MapPin, Calendar, Clock, Map } from 'lucide-react';
 interface Run {
   id: string;
   title: string;
-  citySlug: string;
+  gofastCity: string;
   isRecurring: boolean;
   dayOfWeek: string | null;
   startDate: string;
@@ -69,7 +69,7 @@ function GoRunPageContent() {
       setLoading(true);
       const params = new URLSearchParams();
       if (cityFilter && cityFilter !== 'All Cities') {
-        params.append('citySlug', cityFilter);
+        params.append('gofastCity', cityFilter);
       }
       if (dayFilter && dayFilter !== 'All Days') {
         params.append('day', dayFilter);
@@ -85,7 +85,7 @@ function GoRunPageContent() {
         setRuns(fetchedRuns);
         
         // Extract unique cities and days
-        const cities: string[] = [...new Set(fetchedRuns.map((r: Run) => r.citySlug))].sort() as string[];
+        const cities: string[] = [...new Set(fetchedRuns.map((r: Run) => r.gofastCity))].sort() as string[];
         setAvailableCities(cities);
         
         const days = new Set<string>();
@@ -220,9 +220,9 @@ function GoRunPageContent() {
         {runs.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {runs.map((run) => {
-              // Format city name from citySlug or use meetUpCity
+              // Format city name from gofastCity or use meetUpCity
               const cityName = run.meetUpCity || 
-                run.citySlug.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                run.gofastCity.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
               
               return (
                 <div

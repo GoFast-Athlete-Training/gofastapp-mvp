@@ -2,7 +2,7 @@ import { prisma } from './prisma';
 import { getDayOfWeekFromDate } from '@/lib/utils/dayOfWeek';
 
 export interface GetRunsFilters {
-  citySlug?: string;
+  gofastCity?: string;
   day?: string;
   runClubSlug?: string; // Filter by slug (for URL compatibility)
   runClubId?: string; // Filter by ID (preferred)
@@ -65,8 +65,8 @@ export async function getRuns(filters: GetRunsFilters = {}) {
   });
   
   // City filter
-  if (filters.citySlug) {
-    where.citySlug = filters.citySlug;
+  if (filters.gofastCity) {
+    where.gofastCity = filters.gofastCity;
   }
   
   // RunClub filter - support both slug (URL compatibility) and ID (preferred)
@@ -105,7 +105,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
         id: true,
         slug: true,
         title: true,
-        citySlug: true,
+        gofastCity: true,
         dayOfWeek: true,
         startDate: true,
         date: true,
@@ -171,7 +171,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     id: run.id,
     slug: run.slug ?? null,
     title: run.title,
-    citySlug: run.citySlug,
+    gofastCity: run.gofastCity,
     dayOfWeek: run.dayOfWeek,
     startDate: run.startDate,
     date: run.date,
