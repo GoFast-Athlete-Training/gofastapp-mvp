@@ -89,13 +89,15 @@ export async function GET(
     // Verify authentication
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
+      console.warn('[GET /api/runs/[runId]] 401: no Bearer token');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     let decodedToken;
     try {
       decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    } catch {
+    } catch (err: any) {
+      console.warn('[GET /api/runs/[runId]] 401: token invalid or expired', err?.code || err?.message);
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 

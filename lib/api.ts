@@ -14,7 +14,7 @@ const api = axios.create({
  * authenticated — Firebase restores the session asynchronously. If we fire a
  * request before that happens we get 401s for fully authenticated users.
  */
-function waitForAuthUser(timeoutMs = 3000): Promise<import('firebase/auth').User | null> {
+function waitForAuthUser(timeoutMs = 5000): Promise<import('firebase/auth').User | null> {
   return new Promise((resolve) => {
     // NOTE: auth.currentUser starts as null (not undefined) while Firebase is
     // still rehydrating the session — DO NOT early-return on null here.
@@ -40,10 +40,10 @@ api.interceptors.request.use(async (config) => {
     return config;
   }
 
-  // Get current user — wait briefly if Firebase hasn't restored session yet
+  // Get current user — wait for Firebase to restore session (refresh token persists in localStorage)
   let user = auth.currentUser;
   if (!user) {
-    user = await waitForAuthUser(3000);
+    user = await waitForAuthUser(5000);
   }
 
   if (user) {
@@ -59,12 +59,30 @@ api.interceptors.request.use(async (config) => {
 });
 
 // ── Response interceptor ───────────────────────────────────────────────────────
-// DO NOT redirect on 401 here. Doing so causes /signup ↔ /welcome loops for
-// users who ARE authenticated but whose token wasn't ready. Let individual
-// pages / callers handle auth errors in context.
+// DO NOT redirect on 401. On 401, retry the request once with a force-refreshed
+// token (Firebase uses the refresh token to get a new ID token). Handles "I'm
+// logged in but my token expired" without asking the user to sign in again.
+const RETRY_KEY = '__authRetry';
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(error),
+  async (error) => {
+    const config = error.config;
+    if (error?.response?.status === 401 && config && !config[RETRY_KEY]) {
+      const user = auth.currentUser;
+      if (user) {
+        try {
+          const token = await user.getIdToken(true);
+          config[RETRY_KEY] = true;
+          config.headers['Authorization'] = `Bearer ${token}`;
+          return api.request(config);
+        } catch (refreshErr) {
+          console.warn('API: Token refresh failed on 401 retry', refreshErr);
+        }
+      }
+    }
+    return Promise.reject(error);
+  },
 );
 
 export default api;

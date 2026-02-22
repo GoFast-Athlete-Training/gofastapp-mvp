@@ -83,29 +83,25 @@ export default function GoRunPage() {
   useEffect(() => {
     if (!runId) return;
 
-    const athleteId = LocalStorageAPI.getAthleteId();
-    if (athleteId) {
-      // Already hydrated — go straight to fetching run data
-      fetchAll();
-      return;
-    }
-
-    // No athleteId in localStorage. Check if Firebase has an auth'd user
-    // and self-hydrate right here — don't rely on /welcome having run first.
+    // Always wait for Firebase to resolve before fetching run. Otherwise we can
+    // fire GET /api/runs/[runId] before auth has restored (e.g. athleteId in
+    // localStorage but currentUser still null) and get 401.
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      unsubscribe(); // only need this once
+      unsubscribe();
       if (user) {
-        try {
-          const token = await user.getIdToken();
-          const res = await api.post('/api/athlete/hydrate', {}, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (res.data?.success && res.data?.athlete) {
-            LocalStorageAPI.setFullHydrationModel({ athlete: res.data.athlete });
+        const athleteId = LocalStorageAPI.getAthleteId();
+        if (!athleteId) {
+          try {
+            const token = await user.getIdToken();
+            const res = await api.post('/api/athlete/hydrate', {}, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.data?.success && res.data?.athlete) {
+              LocalStorageAPI.setFullHydrationModel({ athlete: res.data.athlete });
+            }
+          } catch (e) {
+            console.warn('gorun: hydration failed, continuing as guest', e);
           }
-        } catch (e) {
-          // Not hydrated — continue as unauthenticated, fetchAll still works
-          console.warn('gorun: hydration failed, continuing as guest', e);
         }
       }
       fetchAll();

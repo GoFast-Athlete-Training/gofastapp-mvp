@@ -46,14 +46,38 @@ export default function JoinRunPage() {
       .finally(() => setRunLoading(false));
   }, [slug]);
 
-  // Auth check — resolves quietly; CTA skeleton hides the wait
+  // Auth check — Firebase often fires once with null while restoring from persistence,
+  // then fires again with the user. Don't treat the first null as "not logged in";
+  // only set auth state when we have a user, or after a short wait still null.
   useEffect(() => {
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setIsLoggedIn(!!user);
-      setAuthResolved(true);
-      unsubscribe();
+      if (cancelled) return;
+      if (user) {
+        if (timeoutId) clearTimeout(timeoutId);
+        setIsLoggedIn(true);
+        setAuthResolved(true);
+        unsubscribe();
+        return;
+      }
+      // null: might be restoring. Wait a bit before showing "sign in"
+      if (timeoutId) return;
+      timeoutId = setTimeout(() => {
+        if (cancelled) return;
+        timeoutId = null;
+        setIsLoggedIn(false);
+        setAuthResolved(true);
+        unsubscribe();
+      }, 1200);
     });
-    return unsubscribe;
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+      unsubscribe();
+    };
   }, []);
 
   const handleConfirmRsvp = async () => {
