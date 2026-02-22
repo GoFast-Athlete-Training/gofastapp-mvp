@@ -153,41 +153,43 @@ export async function GET(
           webText: true,
           igPostText: true,
           igPostGraphic: true,
-          workflowStatus: true,
-          postRunActivity: true,
-          routeNeighborhood: true,
-          runType: true,
-          workoutDescription: true,
-          city_run_rsvps: {
-            select: {
-              id: true,
-              status: true,
-              athleteId: true,
-              Athlete: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                  photoURL: true,
-                },
+        workflowStatus: true,
+        postRunActivity: true,
+        routeNeighborhood: true,
+        runType: true,
+        workoutDescription: true,
+        locationId: true,
+        location: { select: { id: true, name: true } },
+        city_run_rsvps: {
+          select: {
+            id: true,
+            status: true,
+            athleteId: true,
+            Athlete: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                photoURL: true,
               },
             },
           },
-          runClub: {
-            select: {
-              id: true,
-              slug: true,
-              name: true,
-              logoUrl: true,
-              city: true,
-              description: true,
-              websiteUrl: true,
-              instagramUrl: true,
-              stravaUrl: true,
-            },
+        },
+        runClub: {
+          select: {
+            id: true,
+            slug: true,
+            name: true,
+            logoUrl: true,
+            city: true,
+            description: true,
+            websiteUrl: true,
+            instagramUrl: true,
+            stravaUrl: true,
           },
         },
-      });
+      },
+    });
     } catch (error: any) {
       if (!isMissingCityRunsColumn(error) && !isMissingRunClubsColumn(error)) throw error;
       console.warn('[GET /api/runs/[runId]] column missing; retrying with legacy field set');
@@ -357,6 +359,8 @@ export async function GET(
         routeNeighborhood: run.routeNeighborhood ?? null,
         runType: run.runType ?? null,
         workoutDescription: run.workoutDescription ?? null,
+        locationId: run.locationId ?? null,
+        location: run.location ?? null,
         meetUpLat: run.meetUpLat,
         meetUpLng: run.meetUpLng,
         startTimeHour: run.startTimeHour,
@@ -428,7 +432,7 @@ export async function PUT(
 
     const run = await prisma.city_runs.findUnique({
       where: { id: runId },
-      select: { id: true, runClubId: true },
+      select: { id: true, runClubId: true, gofastCity: true },
     });
 
     if (!run) {
@@ -436,6 +440,29 @@ export async function PUT(
     }
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
+
+    // runLocationName: string input → upsert run_locations → set locationId FK
+    if (body.runLocationName !== undefined) {
+      const locationName = body.runLocationName === null || body.runLocationName === '' ? null : String(body.runLocationName).trim();
+      if (locationName) {
+        try {
+          const citySlug = run.gofastCity || 'unknown';
+          const nameSlug = locationName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          const slug = `${citySlug}-${nameSlug}`;
+          const location = await prisma.run_locations.upsert({
+            where: { slug },
+            create: { slug, name: locationName, gofastCity: citySlug },
+            update: {},
+            select: { id: true },
+          });
+          updateData.locationId = location.id;
+        } catch (locErr: any) {
+          console.warn('[PUT /api/runs/[runId]] run_locations upsert failed (non-blocking):', locErr?.message);
+        }
+      } else {
+        updateData.locationId = null;
+      }
+    }
 
     // Photo/map fields
     if (body.routePhotos !== undefined) {
