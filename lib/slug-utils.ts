@@ -27,24 +27,42 @@ export function generateSlug(title: string): string {
 }
 
 /**
+ * Date to URL-safe code (YYYY-MM-DD) for use in slugs so same-title runs on different days are unique.
+ */
+function dateToSlugCode(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
  * Generate unique slug for CityRun
  * 
- * Checks if slug exists, and if so, adds number suffix until unique
+ * Uses title + optional date code (YYYY-MM-DD) so "Club Thursday" on different dates get unique slugs.
+ * If slug exists, adds number suffix until unique.
  * 
  * @param title - Run title
- * @param excludeRunId - Optional run ID to exclude from uniqueness check (for updates)
+ * @param options - Optional: excludeRunId (for updates), date (run date for uniqueness)
  * @returns Unique slug
  * 
  * Examples:
- * - "Morning Run" → "morning-run"
- * - "Morning Run" (if exists) → "morning-run-1"
- * - "Morning Run" (if both exist) → "morning-run-2"
+ * - "Club Thursday" + date 2026-02-21 → "club-thursday-2026-02-21"
+ * - "Club Thursday" (no date) → "club-thursday"
+ * - If "club-thursday-2026-02-21" exists → "club-thursday-2026-02-21-1"
  */
 export async function generateUniqueCityRunSlug(
   title: string,
-  excludeRunId?: string
+  options?: { excludeRunId?: string; date?: Date | string | null }
 ): Promise<string> {
-  const baseSlug = generateSlug(title);
+  const excludeRunId = options?.excludeRunId;
+  const date = options?.date;
+  const titlePart = generateSlug(title);
+  const dateCode =
+    date != null && !Number.isNaN(new Date(date).getTime())
+      ? dateToSlugCode(new Date(date))
+      : '';
+  const baseSlug = dateCode ? `${titlePart}-${dateCode}` : titlePart;
   let slug = baseSlug;
   let counter = 1;
 
@@ -54,16 +72,13 @@ export async function generateUniqueCityRunSlug(
       select: { id: true }
     });
 
-    // If not found, or if it's the same run (for updates), use this slug
     if (!existing || (excludeRunId && existing.id === excludeRunId)) {
       return slug;
     }
 
-    // If exists, add number suffix
     slug = `${baseSlug}-${counter}`;
     counter++;
 
-    // Safety check - prevent infinite loop
     if (counter > 1000) {
       throw new Error('Unable to generate unique slug after 1000 attempts');
     }
