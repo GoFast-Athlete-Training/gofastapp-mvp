@@ -81,10 +81,6 @@ export default function GoRunPage() {
 
   useEffect(() => {
     if (!runId) return;
-    if (!athleteId) {
-      router.push('/signup');
-      return;
-    }
     fetchAll();
   }, [runId]);
 
@@ -108,8 +104,7 @@ export default function GoRunPage() {
         setMyCheckin(checkinRes.data.myCheckin ?? null);
       }
     } catch (err: any) {
-      if (err.response?.status === 401) router.push('/signup');
-      else if (err.response?.status === 404) setError('Run not found');
+      if (err.response?.status === 404) setError('Run not found');
       else setError('Failed to load run');
     } finally {
       setLoading(false);
