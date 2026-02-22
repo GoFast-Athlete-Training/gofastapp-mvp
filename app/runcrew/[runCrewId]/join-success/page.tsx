@@ -32,7 +32,7 @@ export default function JoinSuccessPage() {
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
-        router.push('/signup');
+        console.warn('// REDIRECT DISABLED: /signup');
         return;
       }
 

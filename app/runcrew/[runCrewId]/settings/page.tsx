@@ -96,7 +96,7 @@ export default function RunCrewSettingsPage() {
 
       if (!firebaseUser) {
         hasFetchedRef.current = true;
-        router.push('/signup');
+        console.warn('// REDIRECT DISABLED: /signup');
         return;
       }
 
@@ -105,7 +105,7 @@ export default function RunCrewSettingsPage() {
       // NEW CANON: athleteId from localStorage only
       const athleteId = LocalStorageAPI.getAthleteId();
       if (!athleteId) {
-        router.push('/signup');
+        console.warn('// REDIRECT DISABLED: /signup');
         return;
       }
 

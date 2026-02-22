@@ -40,7 +40,7 @@ export default function AthleteEditProfilePage() {
 
         if (!stored || !storedAthleteId) {
           console.warn('⚠️ EDIT PROFILE: Missing profile or athleteId, routing to signup');
-          router.replace('/signup');
+          console.warn('// REDIRECT DISABLED: /signup');
           return;
         }
 
@@ -133,7 +133,7 @@ export default function AthleteEditProfilePage() {
       
       if (!firebaseUser) {
         setError('No user logged in. Please sign in first.');
-        router.replace('/signup');
+        console.warn('// REDIRECT DISABLED: /signup');
         return;
       }
 

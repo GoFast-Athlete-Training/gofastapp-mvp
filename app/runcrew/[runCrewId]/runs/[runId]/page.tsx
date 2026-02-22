@@ -59,7 +59,7 @@ export default function RunDetailPage() {
       if (!firebaseUser) {
         hasFetchedRef.current = true;
         console.warn('⚠️ RUN DETAIL: No Firebase user - redirecting to signup');
-        router.push('/signup');
+        console.warn('// REDIRECT DISABLED: /signup');
         return;
       }
 
@@ -70,7 +70,7 @@ export default function RunDetailPage() {
       const athleteId = LocalStorageAPI.getAthleteId();
       if (!athleteId) {
         console.warn('⚠️ RUN DETAIL: No athleteId in localStorage - redirecting to signup');
-        router.push('/signup');
+        console.warn('// REDIRECT DISABLED: /signup');
         return;
       }
 

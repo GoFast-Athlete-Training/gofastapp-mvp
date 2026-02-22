@@ -18,7 +18,7 @@ export default function HomePage() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
         // Not authenticated - redirect to signup
-        router.replace('/signup');
+        console.warn('// REDIRECT DISABLED: /signup');
         return;
       }
       // Redirect to athlete-home (the actual athlete dashboard)

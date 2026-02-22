@@ -42,7 +42,7 @@ export default function RaceEventsPage() {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       // No Firebase user - redirect to signup
       if (!firebaseUser) {
-        router.push('/signup');
+        console.warn('// REDIRECT DISABLED: /signup');
         return;
       }
 
@@ -55,7 +55,7 @@ export default function RaceEventsPage() {
         const athleteId = LocalStorageAPI.getAthleteId();
         if (!athleteId) {
           console.warn('⚠️ No athleteId in localStorage - redirecting to signup');
-          router.push('/signup');
+          console.warn('// REDIRECT DISABLED: /signup');
           return;
         }
 

@@ -45,7 +45,7 @@ export default function RootPage() {
         if (isAuthenticated) {
           // After auth, role check happens in welcome/hydrate
           // For now, route to welcome which will check role
-          router.replace('/welcome');
+          console.warn('// REDIRECT DISABLED: /welcome');
         } else {
           // Pass intent via URL param (simple, no cookie)
           const intentParam = isLeaderIntent ? '?intent=club-leader' : '';
@@ -92,7 +92,7 @@ export default function RootPage() {
         </p>
         {!isAuthenticated && (
           <button
-            onClick={() => router.push('/signup')}
+            onClick={() => console.warn('// REDIRECT DISABLED: /signup')}
             className="bg-white text-sky-600 px-8 py-4 rounded-xl font-bold text-lg shadow-2xl hover:bg-sky-50 transition transform hover:scale-105"
           >
             {ctaText}

@@ -24,13 +24,13 @@ export default function ProfilePage() {
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        router.push('/signup');
+        console.warn('// REDIRECT DISABLED: /signup');
         return;
       }
 
       // If no athlete data, redirect to signup
       if (!athleteProfile) {
-        router.push('/signup');
+        console.warn('// REDIRECT DISABLED: /signup');
         return;
       }
     });

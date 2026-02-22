@@ -97,7 +97,7 @@ export default function RunCrewMemberPage() {
       if (!firebaseUser) {
         hasFetchedRef.current = true;
         console.warn('⚠️ MEMBER PAGE: No Firebase user - redirecting to signup');
-        router.push('/signup');
+        console.warn('// REDIRECT DISABLED: /signup');
         return;
       }
 
@@ -108,7 +108,7 @@ export default function RunCrewMemberPage() {
       const athleteId = LocalStorageAPI.getAthleteId();
       if (!athleteId) {
         console.warn('⚠️ MEMBER PAGE: No athleteId in localStorage - redirecting to signup');
-        router.push('/signup');
+        console.warn('// REDIRECT DISABLED: /signup');
         return;
       }
 

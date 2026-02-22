@@ -53,7 +53,7 @@ export default function WelcomePage() {
       // No Firebase user - redirect to signup
       if (!firebaseUser) {
         hasProcessedRef.current = true;
-        router.replace('/signup');
+        console.warn('// REDIRECT DISABLED: /signup');
         return;
       }
 
@@ -171,7 +171,7 @@ export default function WelcomePage() {
           } catch (createErr: any) {
             console.error('❌ Welcome: Create route also failed:', createErr?.response?.status || createErr?.message);
             // If create also fails, redirect to signup to start fresh
-            router.replace('/signup');
+            console.warn('// REDIRECT DISABLED: /signup');
             return;
           }
         } else if (error?.response?.status === 401) {
@@ -210,7 +210,7 @@ export default function WelcomePage() {
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Error Loading Account</h1>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
-            onClick={() => router.push('/signup')}
+            onClick={() => console.warn('// REDIRECT DISABLED: /signup')}
             className="bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 transition"
           >
             Go to Signup

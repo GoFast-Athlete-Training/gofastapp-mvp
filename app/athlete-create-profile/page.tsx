@@ -222,7 +222,7 @@ export default function AthleteCreateProfilePage() {
       
       if (!firebaseUser) {
         setError('No user logged in. Please sign in first.');
-        router.replace('/signup');
+        console.warn('// REDIRECT DISABLED: /signup');
         return;
       }
       

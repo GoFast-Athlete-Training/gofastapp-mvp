@@ -57,7 +57,7 @@ function GoRunPageContent() {
     // Check if user is authenticated
     const athleteId = LocalStorageAPI.getAthleteId();
     if (!athleteId) {
-      router.push('/signup');
+      console.warn('// REDIRECT DISABLED: /signup');
       return;
     }
 
@@ -105,7 +105,7 @@ function GoRunPageContent() {
     } catch (error: any) {
       console.error('Error fetching runs:', error);
       if (error.response?.status === 401) {
-        router.push('/signup');
+        console.warn('// REDIRECT DISABLED: /signup');
       }
     } finally {
       setLoading(false);
