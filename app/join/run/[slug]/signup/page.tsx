@@ -13,7 +13,6 @@ import {
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
-import { LocalStorageAPI } from '@/lib/localstorage';
 import { Calendar, Clock, MapPin } from 'lucide-react';
 
 /**
@@ -59,22 +58,17 @@ function JoinRunSignupContent() {
       .finally(() => setRunLoading(false));
   }, [slug]);
 
-  // If already authenticated, skip straight to RSVP
+  // Already authenticated — use Firebase uid to find-or-create athlete, then RSVP
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       unsubscribe();
       if (!user) return;
-      // User already authed — hydrate then RSVP
       try {
-        const token = await user.getIdToken();
-        const hydrateRes = await api.post('/athlete/hydrate', {}, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
-          LocalStorageAPI.setFullHydrationModel({ athlete: hydrateRes.data.athlete });
-        }
-      } catch { /* already hydrated or no athlete yet — proceed anyway */ }
-      await rsvpAndNavigate();
+        await handlePostAuth(user);
+      } catch (err) {
+        console.error('Already-authed path failed:', err);
+        // Fall through — let user interact with the form
+      }
     });
     return unsubscribe;
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -99,34 +93,47 @@ function JoinRunSignupContent() {
     }
   };
 
-  /** Shared post-auth handler: hydrate/create athlete → store → RSVP → navigate */
-  const handlePostAuth = async (firebaseUser: any, firstName?: string, lastName?: string) => {
+  /**
+   * Post-auth: find-or-create the athlete record using the Firebase UID,
+   * store just the athleteId, then RSVP and go.
+   *
+   * This is intentionally lighter than the /welcome hydration flow —
+   * we don't need weekly activities or the full model here.
+   * Firebase gives us the uid; we just need to resolve that to a GoFast athleteId.
+   */
+  const handlePostAuth = async (firebaseUser: any) => {
     const token = await firebaseUser.getIdToken(true);
-    localStorage.setItem('firebaseToken', token);
 
-    let athlete: any;
+    let athleteId: string | null = null;
 
+    // Find existing athlete by Firebase UID
     try {
       const hydrateRes = await api.post('/athlete/hydrate', {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
-        athlete = { athleteId: hydrateRes.data.athlete.athleteId || hydrateRes.data.athlete.id, data: hydrateRes.data.athlete };
-        LocalStorageAPI.setFullHydrationModel({ athlete: hydrateRes.data.athlete });
-      } else throw new Error('bad hydrate');
-    } catch {
-      // New user — create athlete record
+        athleteId = hydrateRes.data.athlete.athleteId || hydrateRes.data.athlete.id;
+      }
+    } catch (hydrateErr: any) {
+      if (hydrateErr?.response?.status !== 404) {
+        console.warn('Hydrate failed with non-404:', hydrateErr?.response?.status);
+      }
+    }
+
+    // Create if not found
+    if (!athleteId) {
       const createRes = await api.post('/athlete/create', {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      athlete = createRes.data;
+      athleteId = createRes.data?.athleteId;
     }
 
-    // Store auth state
-    localStorage.removeItem('fullHydrationModel');
+    if (!athleteId) throw new Error('Could not resolve athlete');
+
+    // Store the minimum needed — welcome can do full hydration later if they go there
     localStorage.setItem('firebaseId', firebaseUser.uid);
-    localStorage.setItem('athleteId', athlete.athleteId);
-    localStorage.setItem('email', athlete.data?.email || firebaseUser.email || '');
+    localStorage.setItem('athleteId', athleteId);
+    localStorage.setItem('email', firebaseUser.email || '');
 
     await rsvpAndNavigate();
   };
