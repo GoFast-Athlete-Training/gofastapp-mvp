@@ -505,6 +505,7 @@ model city_runs {
   endCity             String?
   endState            String?
   cityRunSetupId      String?              // null = standalone; set = recurring (FK to city_run_setups)
+  locationId          String?              // FK to run_locations (auto-seeded or manually linked)
   city_run_rsvps      city_run_rsvps[]
   city_run_messages   city_run_messages[]
   city_run_checkins   city_run_checkins[]
@@ -512,6 +513,7 @@ model city_runs {
   run_crews           run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
   runClub             run_clubs?           @relation(fields: [runClubId], references: [id], onDelete: SetNull)
   cityRunSetup        city_run_setups?     @relation(fields: [cityRunSetupId], references: [id], onDelete: SetNull)
+  location            run_locations?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
 
   @@index([athleteGeneratedId])
   @@index([gofastCity])
@@ -524,6 +526,7 @@ model city_runs {
   @@index([staffGeneratedId])
   @@index([startDate])
   @@index([cityRunSetupId])
+  @@index([locationId])
   // Table name is city_runs (migrated from run_crew_runs). Explicit map so deployed builds never use old name.
   @@map("city_runs")
 }
@@ -830,4 +833,80 @@ enum RunWorkflowStatus {
   PENDING
   SUBMITTED
   APPROVED
+}
+
+enum RouteShape {
+  LOOP
+  OUT_AND_BACK
+  POINT_TO_POINT
+}
+
+enum RouteTerrain {
+  FLAT
+  ROLLING
+  HILLY
+  MIXED
+}
+
+enum RouteSurface {
+  PAVED
+  TRAIL
+  GRAVEL
+  MIXED
+}
+
+enum RouteTraffic {
+  NO_CARS
+  LOW_TRAFFIC
+  MODERATE_TRAFFIC
+  HIGH_TRAFFIC
+}
+
+enum RouteLighting {
+  FULLY_LIT
+  PARTIALLY_LIT
+  UNLIT
+}
+
+enum RouteShade {
+  FULL_SHADE
+  PARTIAL_SHADE
+  EXPOSED
+}
+
+enum RouteVibe {
+  SPEED_WORK
+  TEMPO
+  LONG_RUN
+  RECOVERY
+  SOCIAL
+  BEGINNER_FRIENDLY
+}
+
+// Route/location catalogue. Created manually or auto-seeded from run meetUpPoint/title.
+// Raw on creation (just name + gofastCity); attributes filled in over time.
+model run_locations {
+  id          String         @id @default(cuid())
+  gofastCity  String                               // "dc", "arlington" — same slug pattern as city_runs
+  name        String                               // "Haines Point", "Custis Trail"
+  slug        String         @unique               // auto-generated from name
+  runType     String?                              // "park" | "track" | "trail" | "neighborhood"
+  shape       RouteShape?
+  terrain     RouteTerrain?
+  surface     RouteSurface?
+  traffic     RouteTraffic?
+  lighting    RouteLighting?
+  shade       RouteShade?
+  vibes       RouteVibe[]    @default([])          // SPEED_WORK, TEMPO, LONG_RUN, etc.
+  loopMiles   Float?                               // distance of one loop/segment
+  notes       String?                              // editorial: "Fast flat loop. No cars. Speed work venue."
+  stravaUrl   String?
+  meetUpPoint String?                              // default start/meet-up description
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  city_runs   city_runs[]
+
+  @@index([gofastCity])
+  @@index([slug])
+  @@map("run_locations")
 }
