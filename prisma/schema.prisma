@@ -535,9 +535,11 @@ model city_runs {
 
 model city_run_setups {
   id         String      @id
-  dayOfWeek  String      // "MONDAY" | "TUESDAY" | ... | "SUNDAY"
+  dayOfWeek  String      // "MONDAY" | "TUESDAY" | ... | "SUNDAY" (canonical)
   runClubId  String?     // which club owns this recurring series
   name       String?     // optional series label, e.g. "Tuesday Tempo"
+  startDate  DateTime?   // optional: when this series starts; null = from whenever
+  endDate    DateTime?   // optional: when this series ends; null = forever / never changing
   createdAt  DateTime    @default(now())
   updatedAt  DateTime
   city_runs  city_runs[]

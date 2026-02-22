@@ -5,6 +5,7 @@ import { saveRunClub } from "@/lib/save-runclub";
 import { normalizeWebsiteUrl, normalizeStravaUrl, normalizeInstagramUrl } from "@/lib/runclub-urls";
 import { generateUniqueCityRunSlug } from "@/lib/slug-utils";
 import { findExistingRun } from "@/lib/run-duplicate-check";
+import { toCanonicalDayOfWeek } from "@/lib/utils/dayOfWeekConverter";
 
 export const dynamic = "force-dynamic";
 
@@ -338,7 +339,7 @@ export async function POST(request: NextRequest) {
       athleteGeneratedId: athleteGeneratedId?.trim() || null,
       title: title.trim(),
       workflowStatus: 'DEVELOP',
-      dayOfWeek: dayOfWeek?.trim() || null,
+      dayOfWeek: toCanonicalDayOfWeek(dayOfWeek) ?? (dayOfWeek?.trim() || null) as string | null,
       instanceType: (instanceType === 'SERIES' ? 'SERIES' : 'STANDALONE') as 'SERIES' | 'STANDALONE',
       startDate: runStartDateObj,
       endDate: runEndDateObj,

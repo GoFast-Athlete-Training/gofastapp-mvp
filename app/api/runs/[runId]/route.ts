@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { normalizeWebsiteUrl, normalizeStravaUrl, normalizeInstagramUrl } from '@/lib/runclub-urls';
 import { saveRunClub } from '@/lib/save-runclub';
+import { toCanonicalDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
@@ -590,7 +591,8 @@ export async function PUT(
       updateData.timezone = body.timezone === null || body.timezone === '' ? null : String(body.timezone);
     }
     if (body.dayOfWeek !== undefined) {
-      updateData.dayOfWeek = body.dayOfWeek === null || body.dayOfWeek === '' ? null : String(body.dayOfWeek);
+      const canonical = body.dayOfWeek === null || body.dayOfWeek === '' ? null : toCanonicalDayOfWeek(body.dayOfWeek);
+      updateData.dayOfWeek = canonical ?? (body.dayOfWeek === null || body.dayOfWeek === '' ? null : String(body.dayOfWeek));
     }
     if (body.instanceType !== undefined && (body.instanceType === 'SERIES' || body.instanceType === 'STANDALONE')) {
       updateData.instanceType = body.instanceType;

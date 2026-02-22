@@ -1,5 +1,6 @@
 import { prisma } from './prisma';
 import { getDayOfWeekFromDate } from '@/lib/utils/dayOfWeek';
+import { sameDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 
 export interface GetRunsFilters {
   gofastCity?: string;
@@ -167,10 +168,16 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     }
     throw error;
   }
-  
+
   let filteredRuns = allRuns;
   if (filters.day && filters.day !== 'All Days') {
-    filteredRuns = allRuns.filter(run => getDayOfWeekFromDate(run.startDate) === filters.day);
+    filteredRuns = allRuns.filter((run) => {
+      const runDay =
+        run.instanceType === 'SERIES'
+          ? (run.cityRunSetup?.dayOfWeek ?? run.dayOfWeek)
+          : getDayOfWeekFromDate(run.startDate);
+      return sameDayOfWeek(runDay, filters.day);
+    });
   }
   
   // Return runs with RunClub relation (via FK)
@@ -180,7 +187,6 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     slug: run.slug ?? null,
     title: run.title,
     gofastCity: run.gofastCity,
-    // For series: dayOfWeek from setup is source of truth; fallback to run.dayOfWeek (legacy)
     dayOfWeek: run.cityRunSetup?.dayOfWeek ?? run.dayOfWeek,
     instanceType: run.instanceType ?? 'STANDALONE',
     cityRunSetup: run.cityRunSetup ? { id: run.cityRunSetup.id, dayOfWeek: run.cityRunSetup.dayOfWeek, name: run.cityRunSetup.name } : null,
