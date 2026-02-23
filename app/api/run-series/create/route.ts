@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
           id: generateId(),
           ...setupData,
           slug,
-          workflowStatus: 'STUBBED',
+          workflowStatus: 'DEVELOP',
         },
       });
     }

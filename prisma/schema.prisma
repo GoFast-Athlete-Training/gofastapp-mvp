@@ -548,7 +548,7 @@ model run_series {
   startTimePeriod     String?              // "AM" | "PM"
   startDate           DateTime?            // when this series began; null = from whenever
   endDate             DateTime?            // when this series ends; null = forever
-  workflowStatus      SeriesWorkflowStatus @default(STUBBED) // STUBBED = just created; PENDING = assigned to VA cue
+  workflowStatus      RunWorkflowStatus    @default(DEVELOP)  // mirrors city_runs: DEVELOP → PENDING → SUBMITTED → APPROVED
   createdAt           DateTime             @default(now())
   updatedAt           DateTime
   city_runs           city_runs[]
@@ -561,10 +561,6 @@ model run_series {
   @@map("run_series")
 }
 
-enum SeriesWorkflowStatus {
-  STUBBED  // founder just created; edit / AI generate / create run here
-  PENDING  // assigned; shows in VA cue
-}
 
 model run_crew_specific_races {
   id             String        @id

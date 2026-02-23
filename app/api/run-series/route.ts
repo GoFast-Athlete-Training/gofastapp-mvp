@@ -27,9 +27,11 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const workflowStatus = url.searchParams.get('workflowStatus');
 
-    const where: { workflowStatus?: 'STUBBED' | 'PENDING' } = {};
-    if (workflowStatus === 'STUBBED' || workflowStatus === 'PENDING') {
-      where.workflowStatus = workflowStatus;
+    const validStatuses = ['DEVELOP', 'PENDING', 'SUBMITTED', 'APPROVED'] as const;
+    type SeriesStatus = typeof validStatuses[number];
+    const where: { workflowStatus?: SeriesStatus } = {};
+    if (validStatuses.includes(workflowStatus as SeriesStatus)) {
+      where.workflowStatus = workflowStatus as SeriesStatus;
     }
 
     const series = await prisma.run_series.findMany({

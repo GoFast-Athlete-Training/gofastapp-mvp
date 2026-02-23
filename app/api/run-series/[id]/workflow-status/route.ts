@@ -6,7 +6,7 @@ import { adminAuth } from '@/lib/firebaseAdmin';
 
 /**
  * PATCH /api/run-series/[id]/workflow-status
- * Set workflowStatus (e.g. PENDING = assign to VA cue). Body: { workflowStatus: "PENDING" | "STUBBED" }.
+ * Set workflowStatus. Same 4-stage enum as city_runs: DEVELOP | PENDING | SUBMITTED | APPROVED.
  */
 export async function PATCH(
   request: NextRequest,
@@ -27,9 +27,10 @@ export async function PATCH(
     const body = await request.json();
     const workflowStatus = body.workflowStatus;
 
-    if (!workflowStatus || !['STUBBED', 'PENDING'].includes(workflowStatus)) {
+    const validStatuses = ['DEVELOP', 'PENDING', 'SUBMITTED', 'APPROVED'];
+    if (!workflowStatus || !validStatuses.includes(workflowStatus)) {
       return NextResponse.json(
-        { success: false, error: 'workflowStatus must be STUBBED or PENDING' },
+        { success: false, error: 'workflowStatus must be one of: DEVELOP, PENDING, SUBMITTED, APPROVED' },
         { status: 400 }
       );
     }
@@ -41,7 +42,7 @@ export async function PATCH(
 
     const series = await prisma.run_series.update({
       where: { id },
-      data: { workflowStatus: workflowStatus as 'STUBBED' | 'PENDING', updatedAt: new Date() },
+      data: { workflowStatus: workflowStatus as 'DEVELOP' | 'PENDING' | 'SUBMITTED' | 'APPROVED', updatedAt: new Date() },
       include: {
         runClub: {
           select: {
