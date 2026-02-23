@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       runClubId,
+      runClubSlug, // Preferred: slug from GoFastCompany acq_run_clubs maps to run_clubs.slug
       dayOfWeek,
       name,
       description,
@@ -76,8 +77,8 @@ export async function POST(request: NextRequest) {
       createFirstRun = true,
     } = body;
 
-    if (!runClubId?.trim()) {
-      return NextResponse.json({ success: false, error: 'runClubId is required' }, { status: 400 });
+    if (!runClubSlug?.trim() && !runClubId?.trim()) {
+      return NextResponse.json({ success: false, error: 'runClubSlug or runClubId is required' }, { status: 400 });
     }
     if (!dayOfWeek?.trim()) {
       return NextResponse.json({ success: false, error: 'dayOfWeek is required' }, { status: 400 });
@@ -89,25 +90,40 @@ export async function POST(request: NextRequest) {
 
     const canonicalDay = toCanonicalDayOfWeek(dayOfWeek) ?? dayOfWeek.trim().toUpperCase();
 
-    // Verify run club exists
-    const runClub = await prisma.run_clubs.findUnique({
-      where: { id: runClubId.trim() },
-      select: { id: true, name: true, slug: true, city: true },
-    });
+    // Look up run club by slug first (preferred - matches GoFastCompany acq_run_clubs.slug → run_clubs.slug)
+    // Fallback to ID lookup if slug not provided
+    let runClub = null;
+    if (runClubSlug?.trim()) {
+      runClub = await prisma.run_clubs.findUnique({
+        where: { slug: runClubSlug.trim() },
+        select: { id: true, name: true, slug: true, city: true },
+      });
+    }
+    if (!runClub && runClubId?.trim()) {
+      // Fallback: try ID lookup (may be from run_clubs if already synced)
+      runClub = await prisma.run_clubs.findUnique({
+        where: { id: runClubId.trim() },
+        select: { id: true, name: true, slug: true, city: true },
+      });
+    }
     if (!runClub) {
-      return NextResponse.json({ success: false, error: 'Run club not found' }, { status: 404 });
+      return NextResponse.json({ 
+        success: false, 
+        error: `Run club not found${runClubSlug ? ` (slug: ${runClubSlug})` : ''}${runClubId ? ` (id: ${runClubId})` : ''}. Club may need to be synced to product app first.` 
+      }, { status: 404 });
     }
 
     // Find or create the setup for this (runClubId + dayOfWeek) pair
+    // Use the looked-up runClub.id (from run_clubs table)
     let setup = await prisma.run_series.findFirst({
-      where: { runClubId: runClubId.trim(), dayOfWeek: canonicalDay },
+      where: { runClubId: runClub.id, dayOfWeek: canonicalDay },
     });
 
     const baseName = name?.trim() || `${runClub.name} ${canonicalDay.charAt(0) + canonicalDay.slice(1).toLowerCase()} Run`;
 
     const setupData = {
       dayOfWeek: canonicalDay,
-      runClubId: runClubId.trim(),
+      runClubId: runClub.id, // Use looked-up runClub.id from run_clubs table
       name: baseName,
       description: description?.trim() || null,
       gofastCity: gofastCity?.trim() || null,
@@ -176,7 +192,7 @@ export async function POST(request: NextRequest) {
       data: {
         id: runId,
         runSeriesId: setup.id,
-        runClubId: runClubId.trim(),
+        runClubId: runClub.id, // Use looked-up runClub.id from run_clubs table
         staffGeneratedId: staffGeneratedId.trim(),
         title: runTitle,
         workflowStatus: 'DEVELOP',
