@@ -11,22 +11,23 @@ A `city_run` never asks "am I a series run or a standalone?" It's just a run —
 The **parent relationship** answers the question:
 
 ```
-city_runs.cityRunSetupId = null      → standalone (no parent, one-off event)
-city_runs.cityRunSetupId = "abc123"  → series occurrence (parent is city_run_setups)
+city_runs.runSeriesId = null      → standalone (no parent, one-off event)
+city_runs.runSeriesId = "abc123"  → series occurrence (parent is run_series)
 ```
 
 There is no `instanceType` enum. The FK presence IS the type. This means:
 - No toggle anywhere that asks "series or standalone?"
 - No dual-write to keep in sync
-- Filtering is just `WHERE cityRunSetupId IS NOT NULL` vs `IS NULL`
+- Filtering is just `WHERE runSeriesId IS NOT NULL` vs `IS NULL`
 
 ---
 
 ## Schema
 
 ```
-city_run_setups (the series)
+run_series (the series template)
   id
+  slug              — URL-friendly e.g. "dc-run-crew-tuesday"
   dayOfWeek         — "TUESDAY", "SATURDAY", etc. (canonical)
   runClubId         — which club owns this
   name              — e.g. "Tuesday Tempo"
@@ -37,104 +38,85 @@ city_run_setups (the series)
   meetUpPlaceId, meetUpLat, meetUpLng
   startTimeHour, startTimeMinute, startTimePeriod  — same every week
   startDate, endDate — optional: when this series runs
+  workflowStatus    — RunWorkflowStatus: DEVELOP → PENDING → SUBMITTED → APPROVED
 
-city_runs (an occurrence)
+city_runs (one specific event)
   id
-  title             — e.g. "Tuesday Tempo – Mar 4"  (seeded from setup name + date)
-  date              — specific occurrence date (the only date field on a run)
-  dayOfWeek         — canonical, seeded from setup
-  cityRunSetupId    — null = standalone; set = series occurrence
-  gofastCity, meetUpPoint, etc.  — seeded from setup, can be overridden per occurrence
-  description       — seeded from setup, VA can refine per occurrence
-  workflowStatus    — DEVELOP → PENDING → APPROVED → PUBLISHED
-  runClubId         — FK to run_clubs
+  slug
+  runSeriesId       — FK to run_series; null = standalone
+  runClubId
+  date              — the actual run date (single field, not startDate/endDate)
+  workflowStatus    — RunWorkflowStatus: DEVELOP → PENDING → SUBMITTED → APPROVED
+  title, description
+  meetUpPoint, meetUpStreetAddress, ...  (seeded from run_series, can override)
+  startTimeHour, startTimeMinute, startTimePeriod
 ```
 
 ---
 
-## Data flow: runSchedule → series → run
+## Workflow status (same 4-stage enum on both models)
 
 ```
-acq_run_clubs.runSchedule (string)
-        │
-        ▼
-parseRunSchedule() → RunScheduleEntry[]
-        │
-        └── entry without URL → "Set up this series"
-                │
-                ▼
-        city_run_setups created (or found if already exists for club+day)
-                │
-                ▼
-        city_run seeded from setup
-        (title = "Series Name – Date", location/time/description inherited)
-                │
-                ▼
-        run URL written back into runSchedule string
-        entry now shows "View run" instead of "Set up this series"
+DEVELOP   → founder just created / seeded; nobody working on it yet
+PENDING   → assigned to VA cue; VA is actively developing it
+SUBMITTED → VA submitted for founder approval
+APPROVED  → live / published
 ```
+
+For `run_series`: the series itself moves through this pipeline independently of its individual `city_runs`.  
+For `city_runs`: each occurrence has its own status.
 
 ---
 
-## Downstream UX (gofastapp-mvp — future build)
+## Public link architecture (IMPORTANT — next build)
 
-### 1. Club onboarding flow
+> **This is the key unlock that changes how "See details" works.**
 
-```
-"Do you have any standing runs?"
-├── Yes → Series setup
-│         form: name, day, location, time, description
-│         creates: city_run_setups
-│         then: "Ready to launch your first actual run?"
-│               → most fields pre-filled from series
-│               → optional: add this week's specific route
-│               → creates: city_run linked to setup
-│
-└── No → "Just a run?" → CreateRun form (no series)
-          creates: city_run with cityRunSetupId = null
-```
+### Old assumption (wrong)
+Club page → "See details" → `/gorun/[runId]` → RSVP
 
-### 2. Edge case: standalone run that wants to graduate
+This assumed the primary entry point was always an individual run. That breaks down when the series is the persistent thing and individual runs are derived.
+
+### Correct model (series-first)
 
 ```
-User creates a run (cityRunSetupId = null)
-  ↓
-Later: "Make this a series?"
-  ↓
-Series setup form with REVERSE INFERENCE
-  (prefills series fields from the existing run's location/time/description)
-  ↓
-On save:
-  1. Creates city_run_setups with inferred data
-  2. Updates existing city_run: SET cityRunSetupId = new setup id
-  3. Run is now a series occurrence — no duplicate created
+Public club page
+  └── recurring slot (e.g. "Every Tuesday 7pm")
+       └── "See details" → /series/[series.slug]   ← PUBLIC SERIES CONTAINER (next build)
+            ├── Series info (day, time, location, description)
+            ├── "Next run in this series" card
+            │     └── date + "RSVP for this run" → /gorun/[runId]
+            └── "RSVP for all runs in this series"
+                  └── creates series_membership → auto-RSVP on each new city_run
 ```
 
-### 3. Public run page: /gorun/[runId]
+### Why this matters for the codebase
+
+1. **"See details" from club page** will link to `/series/[slug]` not `/gorun/[runId]`.  
+   The series is the stable, persistent entity. Individual runs come and go.
+
+2. **`/series/[slug]` public container** (to build) needs:
+   - `run_series` data (day, time, location, name, description)
+   - Next upcoming `city_run` where `runSeriesId = series.id AND date >= today`
+   - All upcoming occurrences list
+   - RSVP entry points at both the series level and per-run level
+
+3. **`/gorun/[runId]` public container** (exists) should show:
+   - Left: run-specific details (this specific date, route, etc.)
+   - Right: "Part of [Series Name]" → links to `/series/[slug]`
+
+4. **The link is NOT as simple as "here's your run URL"** — the primary shareable/linkable thing for a recurring run club is the series page, not a specific run date.
+
+---
+
+## Series memberships (future — auto-RSVP)
 
 ```
-┌─────────────────────────────┬──────────────────────────┐
-│  Run details (left)         │  Series panel (right)    │
-│                             │  only if cityRunSetupId  │
-│  - Title                    │  is set                  │
-│  - Date                     │                          │
-│  - Location / map           │  "Part of: Tuesday Tempo"│
-│  - Distance / pace          │  Every Tuesday · 6:30 AM │
-│  - Description              │  Union Market, DC        │
-│  - RSVP / checkin           │  [series description]    │
-│                             │  Hosted by [club logo]   │
-└─────────────────────────────┴──────────────────────────┘
-```
-
-Layout is single-column for standalone runs, two-column when part of a series.
-
-### 4. Series membership + auto-RSVP (future)
-
-```
-series_memberships table
+series_memberships
   id
-  seriesId    → FK to city_run_setups
-  athleteId   → FK to athletes
+  userId
+  runSeriesId
+  status: 'active' | 'paused' | 'cancelled'
   joinedAt
 
 Flow:
@@ -151,16 +133,17 @@ Result: join the series once, automatically going to every occurrence.
 
 ## What belongs where
 
-| Field | city_run_setups (series) | city_runs (occurrence) |
-|-------|--------------------------|------------------------|
-| Day of week | Source of truth | Seeded from setup |
-| Location (meetUpPoint etc.) | Universal — same corner every week | Seeded, can override if one-off location |
+| Field | run_series | city_runs (occurrence) |
+|-------|------------|------------------------|
+| Day of week | Source of truth | Seeded from series |
+| Location (meetUpPoint etc.) | Universal — same corner every week | Seeded, can override if one-off |
 | Start time | Universal | Seeded, can override |
 | Series description | Template | Seeded; VA refines per occurrence |
-| Route (specific) | — | Occurrence-only (this week's actual route) |
+| Route (specific) | — | Occurrence-only |
 | Date | — | Occurrence-only |
 | Title | Series name | "Series Name – Date" |
-| workflowStatus | — | Occurrence-only (DEVELOP → PUBLISHED) |
+| workflowStatus | Series pipeline | Occurrence pipeline (independent) |
+| slug | Series-level URL | Run-level URL |
 
 ---
 
@@ -168,31 +151,33 @@ Result: join the series once, automatically going to every occurrence.
 
 ```typescript
 // Is this run part of a series?
-const isSeries = run.cityRunSetupId != null;
+const isSeries = run.runSeriesId != null;
 
 // All series runs for a club
-prisma.city_runs.findMany({ where: { runClubId, cityRunSetupId: { not: null } } })
+prisma.city_runs.findMany({ where: { runClubId, runSeriesId: { not: null } } })
 
 // All standalone runs
-prisma.city_runs.findMany({ where: { cityRunSetupId: null } })
+prisma.city_runs.findMany({ where: { runSeriesId: null } })
 
 // All runs in a specific series
-prisma.city_runs.findMany({ where: { cityRunSetupId: setupId }, orderBy: { date: 'asc' } })
+prisma.city_runs.findMany({ where: { runSeriesId: seriesId }, orderBy: { date: 'asc' } })
 
-// Next occurrence of a series
+// Next occurrence of a series (for the series public container card)
 prisma.city_runs.findFirst({
-  where: { cityRunSetupId: setupId, date: { gte: new Date() } },
+  where: { runSeriesId: seriesId, date: { gte: new Date() } },
   orderBy: { date: 'asc' }
 })
 ```
 
 ---
 
-## Implementation order
+## Implementation status
 
-1. **Schema** — `city_run_setups` fields + drop `instanceType` ✅ done
-2. **Admin (GoFastCompany)** — runSchedule → CreateSeriesAndRunModal → series + first run ✅ done
-3. **Public container** — series panel on `/gorun/[runId]` when FK set ✅ done
-4. **Club onboarding** — series setup page in gofastapp-mvp (future)
-5. **Reverse inference** — standalone → attach to series (future)
-6. **Series memberships** — auto-RSVP on series join (future)
+1. **Schema** — `run_series` (renamed from `city_run_setups`), `runSeriesId` FK, `RunWorkflowStatus` on both models ✅
+2. **Admin seeding (GoFastCompany)** — runSchedule → schedule page → CreateSeriesAndRunModal → `run_series` stub (DEVELOP) ✅
+3. **Admin workflow** — Develop → Run Series → Assign (PENDING) for VA cue ✅
+4. **Public run container** — series panel on `/gorun/[runId]` when FK set ✅
+5. **Public series container** — `/series/[slug]` with next-run card + RSVP entry points ⬜ next build
+6. **Club page "See details" link** — update to point to `/series/[slug]` ⬜ next build
+7. **Reverse inference** — standalone run → attach to existing series ⬜ future
+8. **Series memberships** — auto-RSVP on series join ⬜ future
