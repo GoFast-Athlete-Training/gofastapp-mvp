@@ -14,7 +14,7 @@ export type RunDuplicateCheckParams = {
 export async function findExistingRun(
   prisma: PrismaClient,
   params: RunDuplicateCheckParams
-): Promise<{ id: string; title: string; startDate: Date } | null> {
+): Promise<{ id: string; title: string; date: Date } | null> {
   const { runClubId, title, startDate, webUrl } = params;
   if (!runClubId) return null;
 
@@ -31,7 +31,7 @@ export async function findExistingRun(
         runClubId,
         webUrl: { equals: webUrl.trim(), mode: "insensitive" },
       },
-      select: { id: true, title: true, startDate: true },
+      select: { id: true, title: true, date: true },
     });
     if (byUrl) return byUrl;
   }
@@ -40,9 +40,9 @@ export async function findExistingRun(
   const runs = await prisma.city_runs.findMany({
     where: {
       runClubId,
-      startDate: { gte: dayStart, lt: dayEnd },
+      date: { gte: dayStart, lt: dayEnd },
     },
-    select: { id: true, title: true, startDate: true },
+    select: { id: true, title: true, date: true },
   });
   for (const run of runs) {
     if (run.title.trim().toLowerCase() === normalizedTitle) return run;

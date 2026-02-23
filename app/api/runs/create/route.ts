@@ -302,7 +302,7 @@ export async function POST(request: NextRequest) {
             duplicate: true,
             error: "A run for this club with the same title and date (or same source URL) already exists.",
             existingRunId: existing.id,
-            existingRun: { id: existing.id, title: existing.title, startDate: existing.startDate },
+            existingRun: { id: existing.id, title: existing.title, date: existing.date },
           },
           { status: 409 }
         );
@@ -316,7 +316,7 @@ export async function POST(request: NextRequest) {
     // Generate slug from title.
     let runSlug: string | null = null;
     try {
-      runSlug = await generateUniqueCityRunSlug(title, { date: runStartDateObj });
+      runSlug = await generateUniqueCityRunSlug(title, { date: runDateObj });
     } catch (error) {
       console.warn('Failed to generate slug for CityRun:', error);
       // Continue without slug - can be generated later

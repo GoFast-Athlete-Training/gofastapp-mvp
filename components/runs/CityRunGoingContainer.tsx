@@ -43,7 +43,6 @@ interface Run {
   title: string;
   dayOfWeek: string | null;
   date: string;
-  startDate: string;
   gofastCity: string;
   meetUpPoint: string;
   meetUpStreetAddress: string | null;

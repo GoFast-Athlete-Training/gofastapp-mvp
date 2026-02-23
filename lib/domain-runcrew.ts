@@ -1004,7 +1004,6 @@ export async function createRun(data: {
       athleteGeneratedId: data.athleteId,
       title: data.title,
       workflowStatus: 'DEVELOP',
-      startDate: data.date,
       date: data.date,
       startTimeHour: data.startTimeHour ?? null,
       startTimeMinute: data.startTimeMinute ?? null,
