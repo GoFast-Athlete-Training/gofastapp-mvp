@@ -108,7 +108,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
         title: true,
         gofastCity: true,
         dayOfWeek: true,
-        cityRunSetupId: true,
+        runSeriesId: true,
         date: true,
         runClubId: true,
         meetUpPoint: true,
@@ -139,7 +139,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
             city: true,
           },
         },
-        cityRunSetup: {
+        runSeries: {
           select: {
             id: true,
             dayOfWeek: true,
@@ -171,8 +171,8 @@ export async function getRuns(filters: GetRunsFilters = {}) {
   if (filters.day && filters.day !== 'All Days') {
     filteredRuns = allRuns.filter((run) => {
       // If run has a parent series, day of week comes from the setup; otherwise derive from date
-      const runDay = run.cityRunSetupId != null
-        ? (run.cityRunSetup?.dayOfWeek ?? run.dayOfWeek)
+      const runDay = run.runSeriesId != null
+        ? (run.runSeries?.dayOfWeek ?? run.dayOfWeek)
         : getDayOfWeekFromDate(run.date);
       return sameDayOfWeek(runDay, filters.day);
     });
@@ -185,9 +185,9 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     slug: run.slug ?? null,
     title: run.title,
     gofastCity: run.gofastCity,
-    dayOfWeek: run.cityRunSetup?.dayOfWeek ?? run.dayOfWeek,
-    cityRunSetupId: run.cityRunSetupId ?? null,
-    cityRunSetup: run.cityRunSetup ? { id: run.cityRunSetup.id, dayOfWeek: run.cityRunSetup.dayOfWeek, name: run.cityRunSetup.name } : null,
+    dayOfWeek: run.runSeries?.dayOfWeek ?? run.dayOfWeek,
+    runSeriesId: run.runSeriesId ?? null,
+    runSeries: run.runSeries ? { id: run.runSeries.id, dayOfWeek: run.runSeries.dayOfWeek, name: run.runSeries.name } : null,
     date: run.date,
     runClubId: run.runClubId, // ✅ FK field
     runClub: run.runClub || null, // ✅ FK relation

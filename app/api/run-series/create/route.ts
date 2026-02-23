@@ -21,7 +21,7 @@ export async function OPTIONS() {
 }
 
 /**
- * POST /api/run-setups/create
+ * POST /api/run-series/create
  *
  * Create or find an existing city_run_setups for a (runClubId + dayOfWeek) pair.
  * Returns the setup + a seeded city_run stub (workflowStatus: DEVELOP).
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find or create the setup for this (runClubId + dayOfWeek) pair
-    let setup = await prisma.city_run_setups.findFirst({
+    let setup = await prisma.run_series.findFirst({
       where: { runClubId: runClubId.trim(), dayOfWeek: canonicalDay },
     });
 
@@ -123,12 +123,12 @@ export async function POST(request: NextRequest) {
 
     if (setup) {
       // Update existing setup with any new info provided
-      setup = await prisma.city_run_setups.update({
+      setup = await prisma.run_series.update({
         where: { id: setup.id },
         data: setupData,
       });
     } else {
-      setup = await prisma.city_run_setups.create({
+      setup = await prisma.run_series.create({
         data: { id: generateId(), ...setupData },
       });
     }
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
     const run = await prisma.city_runs.create({
       data: {
         id: runId,
-        cityRunSetupId: setup.id,
+        runSeriesId: setup.id,
         runClubId: runClubId.trim(),
         staffGeneratedId: staffGeneratedId.trim(),
         title: runTitle,
@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
     Object.entries(corsHeaders).forEach(([k, v]) => response.headers.set(k, v));
     return response;
   } catch (error: any) {
-    console.error('[POST /api/run-setups/create] Error:', error);
+    console.error('[POST /api/run-series/create] Error:', error);
     const response = NextResponse.json(
       { success: false, error: 'Failed to create series setup', details: error?.message },
       { status: 500 }

@@ -55,8 +55,8 @@ interface Run {
   gofastCity: string;
   dayOfWeek: string | null;
   date: string;
-  cityRunSetupId: string | null;
-  cityRunSetup: RunSeries | null;
+  runSeriesId: string | null;
+  runSeries: RunSeries | null;
   runClubSlug: string | null;
   runCrewId: string | null;
   meetUpPoint: string;
@@ -269,7 +269,7 @@ function CityRunPreRSVP({
   const formatDate = (d: string) =>
     new Date(d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
-  const isSeries = run.cityRunSetupId != null;
+  const isSeries = run.runSeriesId != null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -387,9 +387,9 @@ function CityRunPreRSVP({
         </div>{/* end left column */}
 
         {/* ── Right column: Series panel (only if part of a series) ── */}
-        {isSeries && run.cityRunSetup && (
+        {isSeries && run.runSeries && (
           <div className="lg:col-span-1 space-y-4">
-            <SeriesPanel series={run.cityRunSetup} runClub={run.runClub} />
+            <SeriesPanel series={run.runSeries} runClub={run.runClub} />
           </div>
         )}
 

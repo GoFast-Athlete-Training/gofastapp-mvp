@@ -189,7 +189,7 @@ export async function GET(
             stravaUrl: true,
           },
         },
-        cityRunSetup: {
+        runSeries: {
           select: {
             id: true,
             dayOfWeek: true,
@@ -267,7 +267,7 @@ export async function GET(
               city: true,
             },
           },
-          cityRunSetup: {
+          runSeries: {
             select: {
               id: true,
               dayOfWeek: true,
@@ -376,9 +376,9 @@ export async function GET(
         title: run.title,
         gofastCity: run.gofastCity,
         // For series: dayOfWeek from setup is source of truth; fallback to run.dayOfWeek (legacy)
-        dayOfWeek: run.cityRunSetup?.dayOfWeek ?? run.dayOfWeek,
-        cityRunSetupId: run.cityRunSetupId ?? null,
-        cityRunSetup: run.cityRunSetup ? { id: run.cityRunSetup.id, dayOfWeek: run.cityRunSetup.dayOfWeek, name: run.cityRunSetup.name, meetUpPoint: run.cityRunSetup.meetUpPoint, startTimeHour: run.cityRunSetup.startTimeHour, startTimeMinute: run.cityRunSetup.startTimeMinute, startTimePeriod: run.cityRunSetup.startTimePeriod, description: run.cityRunSetup.description } : null,
+        dayOfWeek: run.runSeries?.dayOfWeek ?? run.dayOfWeek,
+        runSeriesId: run.runSeriesId ?? null,
+        runSeries: run.runSeries ? { id: run.runSeries.id, dayOfWeek: run.runSeries.dayOfWeek, name: run.runSeries.name, meetUpPoint: run.runSeries.meetUpPoint, startTimeHour: run.runSeries.startTimeHour, startTimeMinute: run.runSeries.startTimeMinute, startTimePeriod: run.runSeries.startTimePeriod, description: run.runSeries.description } : null,
         date: run.date.toISOString(),
         runClubId: run.runClubId,
         runClubSlug: run.runClub?.slug || null, // For backward compatibility

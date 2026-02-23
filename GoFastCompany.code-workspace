@@ -11,6 +11,9 @@
 		},
 		{
 			"path": "../RunTogehter"
+		},
+		{
+			"path": "../runtogether-platform"
 		}
 	],
 	"settings": {}

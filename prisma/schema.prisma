@@ -321,7 +321,7 @@ model run_clubs {
 
   runs         city_runs[]
   clubLeaders  Athlete[]          // Reverse relation for Athlete.runClubId
-  runSetups    city_run_setups[]  // Recurring series this club owns
+  runSeries    run_series[]       // Recurring series this club owns
 
   @@index([city])
   @@index([slug])
@@ -502,7 +502,7 @@ model city_runs {
   endStreetAddress    String?
   endCity             String?
   endState            String?
-  cityRunSetupId      String?              // null = standalone; set = recurring (FK to city_run_setups)
+  runSeriesId         String?              // null = standalone; set = series occurrence (FK to run_series)
   locationId          String?              // FK to run_locations (auto-seeded or manually linked)
   city_run_rsvps      city_run_rsvps[]
   city_run_messages   city_run_messages[]
@@ -510,7 +510,7 @@ model city_runs {
   Athlete             Athlete?             @relation(fields: [athleteGeneratedId], references: [id], onDelete: Cascade)
   run_crews           run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
   runClub             run_clubs?           @relation(fields: [runClubId], references: [id], onDelete: SetNull)
-  cityRunSetup        city_run_setups?     @relation(fields: [cityRunSetupId], references: [id], onDelete: SetNull)
+  runSeries           run_series?          @relation(fields: [runSeriesId], references: [id], onDelete: SetNull)
   location            run_locations?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
 
   @@index([athleteGeneratedId])
@@ -522,13 +522,13 @@ model city_runs {
   @@index([runClubId])
   @@index([runCrewId])
   @@index([staffGeneratedId])
-  @@index([cityRunSetupId])
+  @@index([runSeriesId])
   @@index([locationId])
   // Table name is city_runs (migrated from run_crew_runs). Explicit map so deployed builds never use old name.
   @@map("city_runs")
 }
 
-model city_run_setups {
+model run_series {
   id                  String      @id
   dayOfWeek           String      // "MONDAY" | "TUESDAY" | ... | "SUNDAY" (canonical)
   runClubId           String?     // which club owns this recurring series
@@ -555,7 +555,7 @@ model city_run_setups {
   @@index([runClubId])
   @@index([gofastCity])
   @@index([dayOfWeek])
-  @@map("city_run_setups")
+  @@map("run_series")
 }
 
 model run_crew_specific_races {

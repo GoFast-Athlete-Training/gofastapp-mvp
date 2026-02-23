@@ -5,11 +5,11 @@ import { prisma } from '@/lib/prisma';
 import { adminAuth } from '@/lib/firebaseAdmin';
 
 /**
- * GET /api/run-setups
+ * GET /api/run-series
  *
- * List all city_run_setups (recurring series) for dashboard / godview.
+ * List all run_series (recurring series) for dashboard / godview.
  * Same auth as GET /api/runs (Bearer token).
- * Used by GoFastCompany run dashboard "Run Recurring (all city setup)" card.
+ * Used by GoFastCompany run dashboard "Run Series" card.
  */
 export async function GET(request: Request) {
   try {
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const setups = await prisma.city_run_setups.findMany({
+    const series = await prisma.run_series.findMany({
       orderBy: [{ runClubId: 'asc' }, { dayOfWeek: 'asc' }],
       include: {
         runClub: {
@@ -42,7 +42,7 @@ export async function GET(request: Request) {
       },
     });
 
-    const payload = setups.map((s) => ({
+    const payload = series.map((s) => ({
       id: s.id,
       dayOfWeek: s.dayOfWeek,
       name: s.name,
@@ -55,12 +55,12 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      runSetups: payload,
+      runSeries: payload,
     });
   } catch (error: any) {
-    console.error('[GET /api/run-setups] Error:', error);
+    console.error('[GET /api/run-series] Error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch run setups', details: error?.message },
+      { success: false, error: 'Failed to fetch run series', details: error?.message },
       { status: 500 }
     );
   }
