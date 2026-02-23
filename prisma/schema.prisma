@@ -490,7 +490,6 @@ model city_runs {
   gofastCity          String
   slug                String?              @unique // URL-friendly slug: "title-of-run" (generated from title)
   dayOfWeek           String?
-  instanceType        InstanceType         @default(STANDALONE)  // Series vs standalone (single run)
   workflowStatus      RunWorkflowStatus    @default(DEVELOP)
   endPoint            String?
   meetUpStreetAddress String?
@@ -519,7 +518,6 @@ model city_runs {
   @@index([slug])
   @@index([date])
   @@index([dayOfWeek])
-  @@index([instanceType])
   @@index([workflowStatus])
   @@index([runClubId])
   @@index([runCrewId])
@@ -848,11 +846,6 @@ enum RunWorkflowStatus {
   PENDING
   SUBMITTED
   APPROVED
-}
-
-enum InstanceType {
-  STANDALONE
-  SERIES
 }
 
 enum RouteShape {

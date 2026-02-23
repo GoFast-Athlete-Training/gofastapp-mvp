@@ -8,7 +8,7 @@ import CityRunGoingContainer from '@/components/runs/CityRunGoingContainer';
 import CityRunPostRunContainer from '@/components/runs/CityRunPostRunContainer';
 import api from '@/lib/api';
 import { auth } from '@/lib/firebase';
-import { MapPin, Clock, Calendar, Map, ArrowLeft } from 'lucide-react';
+import { MapPin, Clock, Calendar, Map, ArrowLeft, Repeat } from 'lucide-react';
 
 interface RunClub {
   slug: string;
@@ -34,15 +34,29 @@ interface Checkin {
   Athlete?: { id: string; firstName: string; lastName: string; photoURL: string | null };
 }
 
+interface RunSeries {
+  id: string;
+  name: string | null;
+  dayOfWeek: string;
+  description: string | null;
+  meetUpPoint: string | null;
+  meetUpStreetAddress: string | null;
+  meetUpCity: string | null;
+  meetUpState: string | null;
+  startTimeHour: number | null;
+  startTimeMinute: number | null;
+  startTimePeriod: string | null;
+  gofastCity: string | null;
+}
+
 interface Run {
   id: string;
   title: string;
   gofastCity: string;
-  isRecurring: boolean;
   dayOfWeek: string | null;
-  startDate: string;
   date: string;
-  endDate: string | null;
+  cityRunSetupId: string | null;
+  cityRunSetup: RunSeries | null;
   runClubSlug: string | null;
   runCrewId: string | null;
   meetUpPoint: string;
@@ -255,10 +269,16 @@ function CityRunPreRSVP({
   const formatDate = (d: string) =>
     new Date(d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
+  const isSeries = run.cityRunSetupId != null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNav />
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+      <div className={`mx-auto px-4 py-6 ${isSeries ? 'max-w-5xl' : 'max-w-2xl'}`}>
+        <div className={`${isSeries ? 'grid grid-cols-1 lg:grid-cols-3 gap-6' : 'space-y-4'}`}>
+
+        {/* ── Left / main column ── */}
+        <div className={`${isSeries ? 'lg:col-span-2' : ''} space-y-4`}>
 
         <button onClick={onBack} className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition text-sm">
           <ArrowLeft className="h-4 w-4" /> Back to Runs
@@ -283,11 +303,7 @@ function CityRunPreRSVP({
           <div className="space-y-3 text-gray-700">
             <div className="flex items-center gap-3">
               <Calendar className="h-4 w-4 text-gray-400" />
-              <span>
-                {run.isRecurring && run.dayOfWeek
-                  ? `Every ${run.dayOfWeek} · Next: ${formatDate(run.date)}`
-                  : formatDate(run.startDate)}
-              </span>
+              <span>{formatDate(run.date)}</span>
             </div>
             {formatTime() && (
               <div className="flex items-center gap-3">
@@ -368,6 +384,84 @@ function CityRunPreRSVP({
           </div>
         )}
 
+        </div>{/* end left column */}
+
+        {/* ── Right column: Series panel (only if part of a series) ── */}
+        {isSeries && run.cityRunSetup && (
+          <div className="lg:col-span-1 space-y-4">
+            <SeriesPanel series={run.cityRunSetup} runClub={run.runClub} />
+          </div>
+        )}
+
+        </div>{/* end grid */}
+      </div>
+    </div>
+  );
+}
+
+// ─── Series Panel ─────────────────────────────────────────────────────────────
+
+function SeriesPanel({ series, runClub }: { series: RunSeries; runClub?: RunClub | null }) {
+  const timeStr = series.startTimeHour != null
+    ? `${series.startTimeHour}:${String(series.startTimeMinute ?? 0).padStart(2, '0')} ${series.startTimePeriod ?? 'AM'}`
+    : null;
+
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-5 border border-orange-100">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="p-1.5 bg-orange-50 rounded-lg">
+          <Repeat className="h-4 w-4 text-orange-500" />
+        </div>
+        <div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide">Part of a series</div>
+          <div className="font-semibold text-gray-900 text-sm">{series.name ?? 'Recurring Run'}</div>
+        </div>
+      </div>
+
+      <div className="space-y-3 text-sm text-gray-600">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+          <span>Every {capitalize(series.dayOfWeek)}</span>
+        </div>
+        {timeStr && (
+          <div className="flex items-center gap-2">
+            <Clock className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+            <span>{timeStr}</span>
+          </div>
+        )}
+        {series.meetUpPoint && (
+          <div className="flex items-start gap-2">
+            <MapPin className="h-3.5 w-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
+            <span>
+              {series.meetUpPoint}
+              {series.meetUpCity && <span className="text-gray-400"> · {series.meetUpCity}{series.meetUpState ? `, ${series.meetUpState}` : ''}</span>}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {series.description && (
+        <p className="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-500 leading-relaxed">
+          {series.description}
+        </p>
+      )}
+
+      {runClub && (
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <p className="text-xs text-gray-400 mb-2">Hosted by</p>
+          <div className="flex items-center gap-2">
+            {runClub.logoUrl && (
+              <img src={runClub.logoUrl} alt={runClub.name} className="w-7 h-7 rounded-full object-cover" />
+            )}
+            <span className="text-sm font-medium text-gray-700">{runClub.name}</span>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 pt-4 border-t border-gray-100">
+        <p className="text-xs text-gray-500">This is a recurring run — same time, same place every {capitalize(series.dayOfWeek)}.</p>
       </div>
     </div>
   );

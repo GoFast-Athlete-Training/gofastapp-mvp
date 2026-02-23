@@ -127,7 +127,6 @@ export async function GET(
           title: true,
           gofastCity: true,
           dayOfWeek: true,
-          instanceType: true,
           date: true,
           runClubId: true,
           runCrewId: true,
@@ -195,6 +194,15 @@ export async function GET(
             id: true,
             dayOfWeek: true,
             name: true,
+            description: true,
+            meetUpPoint: true,
+            meetUpStreetAddress: true,
+            meetUpCity: true,
+            meetUpState: true,
+            startTimeHour: true,
+            startTimeMinute: true,
+            startTimePeriod: true,
+            gofastCity: true,
           },
         },
       },
@@ -213,7 +221,6 @@ export async function GET(
           title: true,
           gofastCity: true,
           dayOfWeek: true,
-          instanceType: true,
           date: true,
           runClubId: true,
           runCrewId: true,
@@ -265,6 +272,15 @@ export async function GET(
               id: true,
               dayOfWeek: true,
               name: true,
+              description: true,
+              meetUpPoint: true,
+              meetUpStreetAddress: true,
+              meetUpCity: true,
+              meetUpState: true,
+              startTimeHour: true,
+              startTimeMinute: true,
+              startTimePeriod: true,
+              gofastCity: true,
             },
           },
         },
@@ -361,8 +377,8 @@ export async function GET(
         gofastCity: run.gofastCity,
         // For series: dayOfWeek from setup is source of truth; fallback to run.dayOfWeek (legacy)
         dayOfWeek: run.cityRunSetup?.dayOfWeek ?? run.dayOfWeek,
-        instanceType: run.instanceType ?? 'STANDALONE',
-        cityRunSetup: run.cityRunSetup ? { id: run.cityRunSetup.id, dayOfWeek: run.cityRunSetup.dayOfWeek, name: run.cityRunSetup.name } : null,
+        cityRunSetupId: run.cityRunSetupId ?? null,
+        cityRunSetup: run.cityRunSetup ? { id: run.cityRunSetup.id, dayOfWeek: run.cityRunSetup.dayOfWeek, name: run.cityRunSetup.name, meetUpPoint: run.cityRunSetup.meetUpPoint, startTimeHour: run.cityRunSetup.startTimeHour, startTimeMinute: run.cityRunSetup.startTimeMinute, startTimePeriod: run.cityRunSetup.startTimePeriod, description: run.cityRunSetup.description } : null,
         date: run.date.toISOString(),
         runClubId: run.runClubId,
         runClubSlug: run.runClub?.slug || null, // For backward compatibility
@@ -589,9 +605,6 @@ export async function PUT(
     if (body.dayOfWeek !== undefined) {
       const canonical = body.dayOfWeek === null || body.dayOfWeek === '' ? null : toCanonicalDayOfWeek(body.dayOfWeek);
       updateData.dayOfWeek = canonical ?? (body.dayOfWeek === null || body.dayOfWeek === '' ? null : String(body.dayOfWeek));
-    }
-    if (body.instanceType !== undefined && (body.instanceType === 'SERIES' || body.instanceType === 'STANDALONE')) {
-      updateData.instanceType = body.instanceType;
     }
     if (body.startTimeHour !== undefined) {
       updateData.startTimeHour = body.startTimeHour === null || body.startTimeHour === '' ? null : parseInt(body.startTimeHour, 10);

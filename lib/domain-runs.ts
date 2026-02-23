@@ -92,7 +92,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
   // Public run hydration: only show upcoming runs (startDate >= start of today UTC)
   const startOfToday = new Date();
   startOfToday.setUTCHours(0, 0, 0, 0);
-  where.startDate = { gte: startOfToday };
+  where.date = { gte: startOfToday };
 
   // First, get all runs matching filters with RunClub relation (FK)
   // Note: Prisma model `city_runs` maps to table `city_runs` (migrated from run_crew_runs)
@@ -101,17 +101,15 @@ export async function getRuns(filters: GetRunsFilters = {}) {
   try {
     allRuns = await prisma.city_runs.findMany({
       where,
-      orderBy: { startDate: 'asc' },
+      orderBy: { date: 'asc' },
       select: {
         id: true,
         slug: true,
         title: true,
         gofastCity: true,
         dayOfWeek: true,
-        instanceType: true,
-        startDate: true,
+        cityRunSetupId: true,
         date: true,
-        endDate: true,
         runClubId: true,
         meetUpPoint: true,
         meetUpStreetAddress: true,
@@ -172,10 +170,10 @@ export async function getRuns(filters: GetRunsFilters = {}) {
   let filteredRuns = allRuns;
   if (filters.day && filters.day !== 'All Days') {
     filteredRuns = allRuns.filter((run) => {
-      const runDay =
-        run.instanceType === 'SERIES'
-          ? (run.cityRunSetup?.dayOfWeek ?? run.dayOfWeek)
-          : getDayOfWeekFromDate(run.startDate);
+      // If run has a parent series, day of week comes from the setup; otherwise derive from date
+      const runDay = run.cityRunSetupId != null
+        ? (run.cityRunSetup?.dayOfWeek ?? run.dayOfWeek)
+        : getDayOfWeekFromDate(run.date);
       return sameDayOfWeek(runDay, filters.day);
     });
   }
@@ -188,11 +186,9 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     title: run.title,
     gofastCity: run.gofastCity,
     dayOfWeek: run.cityRunSetup?.dayOfWeek ?? run.dayOfWeek,
-    instanceType: run.instanceType ?? 'STANDALONE',
+    cityRunSetupId: run.cityRunSetupId ?? null,
     cityRunSetup: run.cityRunSetup ? { id: run.cityRunSetup.id, dayOfWeek: run.cityRunSetup.dayOfWeek, name: run.cityRunSetup.name } : null,
-    startDate: run.startDate,
     date: run.date,
-    endDate: run.endDate,
     runClubId: run.runClubId, // ✅ FK field
     runClub: run.runClub || null, // ✅ FK relation
     runClubSlug: run.runClub?.slug || null, // For backward compatibility

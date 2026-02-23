@@ -155,7 +155,6 @@ export async function POST(request: NextRequest) {
         runClubId: runClubId.trim(),
         staffGeneratedId: staffGeneratedId.trim(),
         title: runTitle,
-        instanceType: 'SERIES',
         workflowStatus: 'DEVELOP',
         dayOfWeek: canonicalDay,
         date: runDate,
