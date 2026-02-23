@@ -46,8 +46,9 @@ export async function OPTIONS() {
  *   startTimePeriod     string  (optional) — "AM" | "PM"
  *   seriesStartDate     string  (optional) — ISO date when series began
  *   seriesEndDate       string  (optional) — ISO date when series ends
- *   staffGeneratedId    string  (required) — creating staff member
- *   firstRunDate        string  (optional) — ISO date for the first city_run stub; defaults to next occurrence of dayOfWeek
+ *   staffGeneratedId    string  (optional when createFirstRun=false) — creating staff member (required when creating first run)
+ *   firstRunDate        string  (optional) — ISO date for the first city_run stub; only used when createFirstRun=true
+ *   createFirstRun      boolean (optional, default true) — if false, only create/update run_series; do not create first city_run (MVP1: series-only, no dual mutation)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -72,6 +73,7 @@ export async function POST(request: NextRequest) {
       seriesEndDate,
       staffGeneratedId,
       firstRunDate,
+      createFirstRun = true,
     } = body;
 
     if (!runClubId?.trim()) {
@@ -80,8 +82,9 @@ export async function POST(request: NextRequest) {
     if (!dayOfWeek?.trim()) {
       return NextResponse.json({ success: false, error: 'dayOfWeek is required' }, { status: 400 });
     }
-    if (!staffGeneratedId?.trim()) {
-      return NextResponse.json({ success: false, error: 'staffGeneratedId is required' }, { status: 400 });
+    const createRun = createFirstRun !== false;
+    if (createRun && !staffGeneratedId?.trim()) {
+      return NextResponse.json({ success: false, error: 'staffGeneratedId is required when creating first run' }, { status: 400 });
     }
 
     const canonicalDay = toCanonicalDayOfWeek(dayOfWeek) ?? dayOfWeek.trim().toUpperCase();
@@ -100,10 +103,12 @@ export async function POST(request: NextRequest) {
       where: { runClubId: runClubId.trim(), dayOfWeek: canonicalDay },
     });
 
+    const baseName = name?.trim() || `${runClub.name} ${canonicalDay.charAt(0) + canonicalDay.slice(1).toLowerCase()} Run`;
+
     const setupData = {
       dayOfWeek: canonicalDay,
       runClubId: runClubId.trim(),
-      name: name?.trim() || `${runClub.name} ${canonicalDay.charAt(0) + canonicalDay.slice(1).toLowerCase()} Run`,
+      name: baseName,
       description: description?.trim() || null,
       gofastCity: gofastCity?.trim() || null,
       meetUpPoint: meetUpPoint?.trim() || null,
@@ -122,18 +127,37 @@ export async function POST(request: NextRequest) {
     };
 
     if (setup) {
-      // Update existing setup with any new info provided
       setup = await prisma.run_series.update({
         where: { id: setup.id },
         data: setupData,
       });
     } else {
+      const slugBase = slugifyForSeries((runClub.slug || runClub.id) + '-' + canonicalDay.toLowerCase());
+      const slug = await generateUniqueSeriesSlug(prisma, slugBase);
       setup = await prisma.run_series.create({
-        data: { id: generateId(), ...setupData },
+        data: {
+          id: generateId(),
+          ...setupData,
+          slug,
+          workflowStatus: 'STUBBED',
+        },
       });
     }
 
-    // Create the first city_run stub seeded from setup
+    // MVP1: series-only — no dual mutation. When createFirstRun is false, return just the series.
+    if (!createRun) {
+      const response = NextResponse.json({
+        success: true,
+        setup,
+        run: null,
+        isNewSetup: !setup,
+        seriesOnly: true,
+      });
+      Object.entries(corsHeaders).forEach(([k, v]) => response.headers.set(k, v));
+      return response;
+    }
+
+    // Create the first city_run stub seeded from setup (when createFirstRun !== false)
     const runDate = firstRunDate
       ? new Date(firstRunDate)
       : getNextOccurrence(canonicalDay);
@@ -214,4 +238,18 @@ function getNextOccurrence(canonicalDay: string): Date {
 
 function slugify(str: string): string {
   return str.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function slugifyForSeries(str: string): string {
+  return str.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'series';
+}
+
+async function generateUniqueSeriesSlug(prisma: { run_series: { findFirst: (args: { where: { slug: string } }) => Promise<{ id: string } | null> } }, base: string): Promise<string> {
+  let slug = base;
+  let n = 1;
+  while (await prisma.run_series.findFirst({ where: { slug } })) {
+    slug = `${base}-${n}`;
+    n++;
+  }
+  return slug;
 }

@@ -24,7 +24,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    const url = new URL(request.url);
+    const workflowStatus = url.searchParams.get('workflowStatus');
+
+    const where: { workflowStatus?: 'STUBBED' | 'PENDING' } = {};
+    if (workflowStatus === 'STUBBED' || workflowStatus === 'PENDING') {
+      where.workflowStatus = workflowStatus;
+    }
+
     const series = await prisma.run_series.findMany({
+      where,
       orderBy: [{ runClubId: 'asc' }, { dayOfWeek: 'asc' }],
       include: {
         runClub: {
@@ -44,9 +53,11 @@ export async function GET(request: Request) {
 
     const payload = series.map((s) => ({
       id: s.id,
+      slug: s.slug,
       dayOfWeek: s.dayOfWeek,
       name: s.name,
       runClubId: s.runClubId,
+      workflowStatus: s.workflowStatus,
       startDate: s.startDate?.toISOString() ?? null,
       endDate: s.endDate?.toISOString() ?? null,
       runClub: s.runClub,

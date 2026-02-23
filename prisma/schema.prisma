@@ -529,33 +529,41 @@ model city_runs {
 }
 
 model run_series {
-  id                  String      @id
-  dayOfWeek           String      // "MONDAY" | "TUESDAY" | ... | "SUNDAY" (canonical)
-  runClubId           String?     // which club owns this recurring series
-  name                String?     // series label, e.g. "Tuesday Tempo"
-  description         String?     // series blurb — seeds each new occurrence's description
-  gofastCity          String?     // city slug (e.g. "dc", "arlington") — same for all occurrences
-  meetUpPoint         String?     // canonical meeting location name (same corner every week)
+  id                  String               @id
+  slug                String?              @unique // URL-friendly e.g. "dc-run-crew-tuesday" (club slug + day)
+  dayOfWeek           String               // "MONDAY" | "TUESDAY" | ... | "SUNDAY" (canonical)
+  runClubId           String?              // which club owns this recurring series
+  name                String?              // series label, e.g. "Tuesday Tempo"
+  description         String?              // series blurb — seeds each new occurrence's description
+  gofastCity          String?              // city slug (e.g. "dc", "arlington") — same for all occurrences
+  meetUpPoint         String?              // canonical meeting location name (same corner every week)
   meetUpStreetAddress String?
   meetUpCity          String?
   meetUpState         String?
   meetUpPlaceId       String?
   meetUpLat           Float?
   meetUpLng           Float?
-  startTimeHour       Int?        // canonical run time (same every week)
+  startTimeHour       Int?                 // canonical run time (same every week)
   startTimeMinute     Int?
-  startTimePeriod     String?     // "AM" | "PM"
-  startDate           DateTime?   // when this series began; null = from whenever
-  endDate             DateTime?   // when this series ends; null = forever
-  createdAt           DateTime    @default(now())
+  startTimePeriod     String?              // "AM" | "PM"
+  startDate           DateTime?            // when this series began; null = from whenever
+  endDate             DateTime?            // when this series ends; null = forever
+  workflowStatus      SeriesWorkflowStatus @default(STUBBED) // STUBBED = just created; PENDING = assigned to VA cue
+  createdAt           DateTime             @default(now())
   updatedAt           DateTime
   city_runs           city_runs[]
-  runClub             run_clubs?  @relation(fields: [runClubId], references: [id], onDelete: SetNull)
+  runClub             run_clubs?           @relation(fields: [runClubId], references: [id], onDelete: SetNull)
 
   @@index([runClubId])
   @@index([gofastCity])
   @@index([dayOfWeek])
+  @@index([workflowStatus])
   @@map("run_series")
+}
+
+enum SeriesWorkflowStatus {
+  STUBBED  // founder just created; edit / AI generate / create run here
+  PENDING  // assigned; shows in VA cue
 }
 
 model run_crew_specific_races {
