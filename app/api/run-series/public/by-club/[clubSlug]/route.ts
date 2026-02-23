@@ -32,10 +32,11 @@ export async function GET(
       select: { id: true },
     });
 
+    // No 404: club may exist in content-public but not yet in product run_clubs; return empty so UI shows "coming soon"
     if (!club) {
       return NextResponse.json(
-        { success: false, error: 'Club not found' },
-        { status: 404, headers: corsHeaders }
+        { success: true, byDay: {} },
+        { headers: corsHeaders }
       );
     }
 
