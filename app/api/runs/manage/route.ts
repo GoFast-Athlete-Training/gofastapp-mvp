@@ -56,9 +56,9 @@ export async function GET(request: Request) {
     }
     const startOfToday = getStartOfTodayUTC();
     if (pastOnly) {
-      where.startDate = { lt: startOfToday };
+      where.date = { lt: startOfToday };
     } else if (upcomingOnly) {
-      where.startDate = { gte: startOfToday };
+      where.date = { gte: startOfToday };
     }
 
     let runs: any[];
@@ -72,9 +72,7 @@ export async function GET(request: Request) {
           gofastCity: true,
           dayOfWeek: true,
           instanceType: true,
-          startDate: true,
           date: true,
-          endDate: true,
           runClubId: true,
           meetUpPoint: true,
           meetUpStreetAddress: true,
@@ -137,9 +135,7 @@ export async function GET(request: Request) {
           gofastCity: true,
           dayOfWeek: true,
           instanceType: true,
-          startDate: true,
           date: true,
-          endDate: true,
           runClubId: true,
           meetUpPoint: true,
           meetUpStreetAddress: true,

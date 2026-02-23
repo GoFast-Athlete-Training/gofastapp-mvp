@@ -98,9 +98,7 @@ export async function POST(request: NextRequest) {
       title,
       dayOfWeek,
       instanceType,
-      startDate,
-      endDate,
-      date, // backward compat: use startDate if not provided
+      date,
       startTimeHour,
       startTimeMinute,
       startTimePeriod,
@@ -150,11 +148,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use startDate if provided, otherwise fall back to date for backward compatibility
-    const runStartDate = startDate || date;
-    if (!runStartDate) {
+    if (!date) {
       return NextResponse.json(
-        { success: false, error: "startDate or date is required" },
+        { success: false, error: "date is required" },
         { status: 400 }
       );
     }
@@ -240,10 +236,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Parse dates
-    const runStartDateObj = new Date(runStartDate);
-    const runEndDateObj = endDate ? new Date(endDate) : null;
-    const runDateObj = date ? new Date(date) : runStartDateObj; // Backward compatibility
+    // Parse date
+    const runDateObj = new Date(date);
 
     // If runClub object is provided, ensure RunClub exists in DB (dual save)
     // GoFastCompany sends full RunClub object when admin selects from dropdown
@@ -299,7 +293,7 @@ export async function POST(request: NextRequest) {
       const existing = await findExistingRun(prisma, {
         runClubId: finalRunClubId,
         title: title.trim(),
-        startDate: runStartDateObj,
+        startDate: runDateObj,
         webUrl: webUrl?.trim() || null,
       });
       if (existing) {
@@ -341,8 +335,6 @@ export async function POST(request: NextRequest) {
       workflowStatus: 'DEVELOP',
       dayOfWeek: toCanonicalDayOfWeek(dayOfWeek) ?? (dayOfWeek?.trim() || null) as string | null,
       instanceType: (instanceType === 'SERIES' ? 'SERIES' : 'STANDALONE') as 'SERIES' | 'STANDALONE',
-      startDate: runStartDateObj,
-      endDate: runEndDateObj,
       date: runDateObj,
       startTimeHour: startTimeHour ? parseInt(startTimeHour) : null,
       startTimeMinute: startTimeMinute ? parseInt(startTimeMinute) : null,

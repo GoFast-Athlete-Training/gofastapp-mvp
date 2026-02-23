@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
  * 
  * Get CityRuns associated with a RunClub by slug
  * CityRun is a universal run system - this endpoint filters by RunClub association
- * Returns upcoming CityRuns only (startDate >= today)
+ * Returns upcoming CityRuns only (date >= today)
  * 
  * Returns: {
  *   success: true,
@@ -49,7 +49,7 @@ export async function GET(
     const runs = await prisma.city_runs.findMany({
       where: {
         runClubId: runClub.id,
-        startDate: { gte: today },
+        date: { gte: today },
       },
       include: {
         runClub: {
@@ -62,7 +62,7 @@ export async function GET(
         },
       },
       orderBy: {
-        startDate: "asc",
+        date: "asc",
       },
       take: 20, // Limit to 20 upcoming runs
     });
@@ -73,7 +73,6 @@ export async function GET(
       slug: run.slug ?? null,
       title: run.title,
       date: run.date.toISOString(),
-      startDate: run.startDate.toISOString(),
       startTimeHour: run.startTimeHour,
       startTimeMinute: run.startTimeMinute,
       startTimePeriod: run.startTimePeriod,

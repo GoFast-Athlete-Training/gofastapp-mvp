@@ -128,9 +128,7 @@ export async function GET(
           gofastCity: true,
           dayOfWeek: true,
           instanceType: true,
-          startDate: true,
           date: true,
-          endDate: true,
           runClubId: true,
           runCrewId: true,
           meetUpPoint: true,
@@ -216,9 +214,7 @@ export async function GET(
           gofastCity: true,
           dayOfWeek: true,
           instanceType: true,
-          startDate: true,
           date: true,
-          endDate: true,
           runClubId: true,
           runCrewId: true,
           meetUpPoint: true,
@@ -367,9 +363,7 @@ export async function GET(
         dayOfWeek: run.cityRunSetup?.dayOfWeek ?? run.dayOfWeek,
         instanceType: run.instanceType ?? 'STANDALONE',
         cityRunSetup: run.cityRunSetup ? { id: run.cityRunSetup.id, dayOfWeek: run.cityRunSetup.dayOfWeek, name: run.cityRunSetup.name } : null,
-        startDate: run.startDate.toISOString(),
         date: run.date.toISOString(),
-        endDate: run.endDate?.toISOString() || null,
         runClubId: run.runClubId,
         runClubSlug: run.runClub?.slug || null, // For backward compatibility
         runCrewId: run.runCrewId,
@@ -612,7 +606,6 @@ export async function PUT(
       const d = new Date(body.date);
       if (!isNaN(d.getTime())) {
         updateData.date = d;
-        updateData.startDate = d;
       }
     }
 

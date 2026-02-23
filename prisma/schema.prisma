@@ -491,9 +491,7 @@ model city_runs {
   slug                String?              @unique // URL-friendly slug: "title-of-run" (generated from title)
   dayOfWeek           String?
   instanceType        InstanceType         @default(STANDALONE)  // Series vs standalone (single run)
-  endDate             DateTime?
   workflowStatus      RunWorkflowStatus    @default(DEVELOP)
-  startDate           DateTime
   endPoint            String?
   meetUpStreetAddress String?
   meetUpCity          String?
@@ -526,7 +524,6 @@ model city_runs {
   @@index([runClubId])
   @@index([runCrewId])
   @@index([staffGeneratedId])
-  @@index([startDate])
   @@index([cityRunSetupId])
   @@index([locationId])
   // Table name is city_runs (migrated from run_crew_runs). Explicit map so deployed builds never use old name.
@@ -534,18 +531,32 @@ model city_runs {
 }
 
 model city_run_setups {
-  id         String      @id
-  dayOfWeek  String      // "MONDAY" | "TUESDAY" | ... | "SUNDAY" (canonical)
-  runClubId  String?     // which club owns this recurring series
-  name       String?     // optional series label, e.g. "Tuesday Tempo"
-  startDate  DateTime?   // optional: when this series starts; null = from whenever
-  endDate    DateTime?   // optional: when this series ends; null = forever / never changing
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime
-  city_runs  city_runs[]
-  runClub    run_clubs?  @relation(fields: [runClubId], references: [id], onDelete: SetNull)
+  id                  String      @id
+  dayOfWeek           String      // "MONDAY" | "TUESDAY" | ... | "SUNDAY" (canonical)
+  runClubId           String?     // which club owns this recurring series
+  name                String?     // series label, e.g. "Tuesday Tempo"
+  description         String?     // series blurb — seeds each new occurrence's description
+  gofastCity          String?     // city slug (e.g. "dc", "arlington") — same for all occurrences
+  meetUpPoint         String?     // canonical meeting location name (same corner every week)
+  meetUpStreetAddress String?
+  meetUpCity          String?
+  meetUpState         String?
+  meetUpPlaceId       String?
+  meetUpLat           Float?
+  meetUpLng           Float?
+  startTimeHour       Int?        // canonical run time (same every week)
+  startTimeMinute     Int?
+  startTimePeriod     String?     // "AM" | "PM"
+  startDate           DateTime?   // when this series began; null = from whenever
+  endDate             DateTime?   // when this series ends; null = forever
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime
+  city_runs           city_runs[]
+  runClub             run_clubs?  @relation(fields: [runClubId], references: [id], onDelete: SetNull)
 
   @@index([runClubId])
+  @@index([gofastCity])
+  @@index([dayOfWeek])
   @@map("city_run_setups")
 }
 
