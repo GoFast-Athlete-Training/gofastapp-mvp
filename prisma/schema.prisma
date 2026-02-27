@@ -313,15 +313,16 @@ model run_clubs {
   city      String?
   description String?
   websiteUrl String?
+  runUrl    String?              // "Runs" page URL — single source of truth for where run/series info came from (seed/hydrate for data entry)
   instagramUrl String?
-  stravaUrl String?
+  stravaUrl String?              // Club Strava — source for AI; data entry can look up
   syncedAt  DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   runs         city_runs[]
   clubLeaders  Athlete[]          // Reverse relation for Athlete.runClubId
-  runSeries    run_series[]       // Recurring series this club owns
+  runSeries    run_series[]       // Recurring series this club owns (run_series.runClubId → run_clubs)
 
   @@index([city])
   @@index([slug])

@@ -34,6 +34,9 @@ export async function GET(
             name: true,
             logoUrl: true,
             city: true,
+            websiteUrl: true,
+            runUrl: true,
+            stravaUrl: true,
           },
         },
         _count: { select: { city_runs: true } },
@@ -102,7 +105,12 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
-    const existing = await prisma.run_series.findUnique({ where: { id } });
+    const existing = await prisma.run_series.findUnique({
+      where: { id },
+      include: {
+        runClub: { select: { slug: true } },
+      },
+    });
     if (!existing) {
       return NextResponse.json({ error: 'Run series not found' }, { status: 404 });
     }
@@ -110,6 +118,16 @@ export async function PUT(
     const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
     };
+
+    // Backfill slug if missing (e.g. series created before unique-slug logic)
+    if (!existing.slug?.trim()) {
+      const slugBase = slugifyForSeries(
+        (existing.runClub?.slug || existing.runClubId || id) + '-' + (existing.dayOfWeek || '').toLowerCase()
+      );
+      const slug = await generateUniqueSeriesSlug(prisma, slugBase);
+      updateData.slug = slug;
+    }
+
     const allowed = [
       'name', 'description', 'gofastCity', 'meetUpPoint', 'meetUpStreetAddress',
       'meetUpCity', 'meetUpState', 'meetUpPlaceId', 'meetUpLat', 'meetUpLng',
@@ -140,6 +158,9 @@ export async function PUT(
             name: true,
             logoUrl: true,
             city: true,
+            websiteUrl: true,
+            runUrl: true,
+            stravaUrl: true,
           },
         },
         _count: { select: { city_runs: true } },
@@ -180,4 +201,21 @@ export async function PUT(
       { status: 500 }
     );
   }
+}
+
+function slugifyForSeries(str: string): string {
+  return str.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'series';
+}
+
+async function generateUniqueSeriesSlug(
+  prisma: { run_series: { findFirst: (args: { where: { slug: string } }) => Promise<{ id: string } | null> } },
+  base: string
+): Promise<string> {
+  let slug = base;
+  let n = 1;
+  while (await prisma.run_series.findFirst({ where: { slug } })) {
+    slug = `${base}-${n}`;
+    n++;
+  }
+  return slug;
 }
