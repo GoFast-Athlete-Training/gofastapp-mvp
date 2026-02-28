@@ -166,9 +166,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Find or create the setup for this (runClubId + dayOfWeek) pair
+    // For multi-site support: if meetUpCity is provided, also match by city to allow multiple series per day
     // Use the looked-up runClub.id (from run_clubs table) - THIS IS THE FK
+    const whereClause: any = { runClubId: runClub.id, dayOfWeek: canonicalDay };
+    if (meetUpCity?.trim()) {
+      // Multi-site: match by city too, so same club can have multiple Tuesday runs at different locations
+      whereClause.meetUpCity = meetUpCity.trim();
+    }
     let setup = await prisma.run_series.findFirst({
-      where: { runClubId: runClub.id, dayOfWeek: canonicalDay },
+      where: whereClause,
     });
 
     const baseName = name?.trim() || `${runClub.name} ${canonicalDay.charAt(0) + canonicalDay.slice(1).toLowerCase()} Run`;
