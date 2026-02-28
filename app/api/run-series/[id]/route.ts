@@ -205,6 +205,60 @@ function slugifyForSeries(str: string): string {
   return str.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'series';
 }
 
+/**
+ * DELETE /api/run-series/[id]
+ * Delete a run_series (cascade deletes associated city_runs).
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    try {
+      await adminAuth.verifyIdToken(authHeader.substring(7));
+    } catch {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    const { id } = await params;
+    
+    const existing = await prisma.run_series.findUnique({
+      where: { id },
+      include: {
+        _count: { select: { city_runs: true } },
+      },
+    });
+    
+    if (!existing) {
+      return NextResponse.json({ error: 'Run series not found' }, { status: 404 });
+    }
+
+    // Delete the series (cascade will delete associated city_runs)
+    await prisma.run_series.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Deleted run series and ${existing._count.city_runs} associated run(s)`,
+    });
+  } catch (error: any) {
+    console.error('[DELETE /api/run-series/[id]] Error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to delete run series', details: error?.message },
+      { status: 500 }
+    );
+  }
+}
+
+function slugifyForSeries(str: string): string {
+  return str.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'series';
+}
+
 async function generateUniqueSeriesSlug(
   prisma: { run_series: { findFirst: (args: { where: { slug: string } }) => Promise<{ id: string } | null> } },
   base: string
