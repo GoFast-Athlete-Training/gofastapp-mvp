@@ -156,8 +156,17 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
+    // CRITICAL: Ensure runClub.id exists - this is the FK that links series to club
+    if (!runClub.id) {
+      console.error('[run-series/create] runClub exists but has no id:', runClub);
+      return NextResponse.json({
+        success: false,
+        error: `Run club has no ID. This should never happen.`,
+      }, { status: 500 });
+    }
+
     // Find or create the setup for this (runClubId + dayOfWeek) pair
-    // Use the looked-up runClub.id (from run_clubs table)
+    // Use the looked-up runClub.id (from run_clubs table) - THIS IS THE FK
     let setup = await prisma.run_series.findFirst({
       where: { runClubId: runClub.id, dayOfWeek: canonicalDay },
     });
@@ -166,7 +175,7 @@ export async function POST(request: NextRequest) {
 
     const setupData = {
       dayOfWeek: canonicalDay,
-      runClubId: runClub.id, // Use looked-up runClub.id from run_clubs table
+      runClubId: runClub.id, // FK: Links this series to run_clubs table - CRITICAL for hydration
       name: baseName,
       description: description?.trim() || null,
       gofastCity: gofastCity?.trim() || null,
@@ -190,6 +199,10 @@ export async function POST(request: NextRequest) {
         where: { id: setup.id },
         data: setupData,
       });
+      // Verify FK was set
+      if (!setup.runClubId) {
+        console.error('[run-series/create] Updated series but runClubId is null!', { seriesId: setup.id, runClubId: runClub.id });
+      }
     } else {
       const slugBase = slugifyForSeries((runClub.slug || runClub.id) + '-' + canonicalDay.toLowerCase());
       const slug = await generateUniqueSeriesSlug(prisma, slugBase);
@@ -201,6 +214,11 @@ export async function POST(request: NextRequest) {
           workflowStatus: 'DEVELOP',
         },
       });
+      // Verify FK was set
+      if (!setup.runClubId) {
+        console.error('[run-series/create] Created series but runClubId is null!', { seriesId: setup.id, runClubId: runClub.id, setupData });
+        throw new Error('Failed to set runClubId FK on series creation');
+      }
     }
 
     // MVP1: series-only — no dual mutation. When createFirstRun is false, return just the series.
