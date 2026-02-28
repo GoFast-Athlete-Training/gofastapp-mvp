@@ -311,7 +311,8 @@ model run_clubs {
   name      String
   logoUrl   String?
   city      String?
-  description String?
+  description String?              // General club description (for downstream display)
+  allRunsDescription String?      // Overall description for this club's run series (not per individual run) — drives run_series.description
   websiteUrl String?
   runUrl    String?              // "Runs" page URL — single source of truth for where run/series info came from (seed/hydrate for data entry)
   instagramUrl String?

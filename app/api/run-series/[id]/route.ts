@@ -35,8 +35,7 @@ export async function GET(
             logoUrl: true,
             city: true,
             websiteUrl: true,
-            runUrl: true,
-            stravaUrl: true,
+            // runUrl/stravaUrl: on acq_run_clubs (Company). Omit here so product works if run_clubs migration not applied.
           },
         },
         _count: { select: { city_runs: true } },
@@ -159,8 +158,7 @@ export async function PUT(
             logoUrl: true,
             city: true,
             websiteUrl: true,
-            runUrl: true,
-            stravaUrl: true,
+            // runUrl/stravaUrl: on acq_run_clubs (Company). Omit here so product works if run_clubs migration not applied.
           },
         },
         _count: { select: { city_runs: true } },

@@ -29,8 +29,9 @@ export async function OPTIONS() {
  * Called from GoFastCompany SeriesSetupWizard ("Set Up This Series").
  *
  * Body:
- *   runClubId           string  (required)
- *   dayOfWeek           string  (required) — any format, normalised to canonical
+ *   runClub             object  (optional) — source of truth from GoFastCompany acq_run_clubs; upserted to run_clubs then used for runClubId
+ *   runClubId           string  (required if no runClub)
+ *   runClubSlug         string  (optional) — preferred lookup when runClub not provided
  *   name                string  (optional) — series label e.g. "Tuesday Tempo"
  *   description         string  (optional) — series blurb; seeds first run description
  *   gofastCity          string  (optional) — city slug
@@ -54,8 +55,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
+      runClub: runClubPayload, // Source of truth from Company acq_run_clubs; upsert to run_clubs
       runClubId,
-      runClubSlug, // Preferred: slug from GoFastCompany acq_run_clubs maps to run_clubs.slug
+      runClubSlug,
       dayOfWeek,
       name,
       description,
@@ -77,8 +79,8 @@ export async function POST(request: NextRequest) {
       createFirstRun = true,
     } = body;
 
-    if (!runClubSlug?.trim() && !runClubId?.trim()) {
-      return NextResponse.json({ success: false, error: 'runClubSlug or runClubId is required' }, { status: 400 });
+    if (!runClubPayload && !runClubSlug?.trim() && !runClubId?.trim()) {
+      return NextResponse.json({ success: false, error: 'runClub (source of truth), runClubSlug, or runClubId is required' }, { status: 400 });
     }
     if (!dayOfWeek?.trim()) {
       return NextResponse.json({ success: false, error: 'dayOfWeek is required' }, { status: 400 });
@@ -90,26 +92,67 @@ export async function POST(request: NextRequest) {
 
     const canonicalDay = toCanonicalDayOfWeek(dayOfWeek) ?? dayOfWeek.trim().toUpperCase();
 
-    // Look up run club by slug first (preferred - matches GoFastCompany acq_run_clubs.slug → run_clubs.slug)
-    // Fallback to ID lookup if slug not provided
-    let runClub = null;
-    if (runClubSlug?.trim()) {
+    // If Company sent runClub (acq_run_clubs source of truth), upsert run_clubs so runClubId is consistent downstream
+    let runClub: { id: string; name: string; slug: string | null; city: string | null } | null = null;
+
+    if (runClubPayload && typeof runClubPayload === 'object') {
+      const rc = runClubPayload as Record<string, unknown>;
+      const id = rc.id != null ? String(rc.id).trim() : null;
+      const nameVal = rc.name != null ? String(rc.name).trim() : 'Unnamed';
+      const slugVal = rc.slug != null ? String(rc.slug).trim() : (id || nameVal.toLowerCase().replace(/\s+/g, '-'));
+      const slugFinal = slugVal || id || `club-${Date.now()}`;
+      const updateData = {
+        name: nameVal,
+        slug: slugFinal,
+        city: rc.city != null ? String(rc.city).trim() || null : null,
+        websiteUrl: rc.websiteUrl != null ? String(rc.websiteUrl).trim() || null : null,
+        runUrl: rc.runUrl != null ? String(rc.runUrl).trim() || null : null,
+        stravaUrl: rc.stravaUrl != null ? String(rc.stravaUrl).trim() || null : null,
+        description: rc.description != null ? String(rc.description).trim() || null : null,
+        allRunsDescription: rc.allRunsDescription != null ? String(rc.allRunsDescription).trim() || null : null,  // Description of the runs themselves — drives downstream run_series
+        logoUrl: rc.logoUrl != null ? String(rc.logoUrl).trim() || null : null,
+        syncedAt: new Date(),
+      };
+      if (id) {
+        runClub = await prisma.run_clubs.upsert({
+          where: { id },
+          create: { id, ...updateData },
+          update: updateData,
+          select: { id: true, name: true, slug: true, city: true },
+        });
+      } else {
+        const existing = await prisma.run_clubs.findUnique({ where: { slug: slugFinal } });
+        if (existing) {
+          runClub = await prisma.run_clubs.update({
+            where: { id: existing.id },
+            data: updateData,
+            select: { id: true, name: true, slug: true, city: true },
+          });
+        } else {
+          runClub = await prisma.run_clubs.create({
+            data: { ...updateData, slug: slugFinal },
+            select: { id: true, name: true, slug: true, city: true },
+          });
+        }
+      }
+    }
+
+    if (!runClub && runClubSlug?.trim()) {
       runClub = await prisma.run_clubs.findUnique({
         where: { slug: runClubSlug.trim() },
         select: { id: true, name: true, slug: true, city: true },
       });
     }
     if (!runClub && runClubId?.trim()) {
-      // Fallback: try ID lookup (may be from run_clubs if already synced)
       runClub = await prisma.run_clubs.findUnique({
         where: { id: runClubId.trim() },
         select: { id: true, name: true, slug: true, city: true },
       });
     }
     if (!runClub) {
-      return NextResponse.json({ 
-        success: false, 
-        error: `Run club not found${runClubSlug ? ` (slug: ${runClubSlug})` : ''}${runClubId ? ` (id: ${runClubId})` : ''}. Club may need to be synced to product app first.` 
+      return NextResponse.json({
+        success: false,
+        error: `Run club not found. Complete series starter (Set run series for this club) so runClub is synced.`,
       }, { status: 404 });
     }
 
