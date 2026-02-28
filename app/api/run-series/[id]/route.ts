@@ -35,7 +35,9 @@ export async function GET(
             logoUrl: true,
             city: true,
             websiteUrl: true,
-            // runUrl/stravaUrl: on acq_run_clubs (Company). Omit here so product works if run_clubs migration not applied.
+            runUrl: true,
+            allRunsDescription: true,
+            stravaUrl: true,
           },
         },
         _count: { select: { city_runs: true } },
@@ -128,7 +130,7 @@ export async function PUT(
     }
 
     const allowed = [
-      'name', 'description', 'gofastCity', 'meetUpPoint', 'meetUpStreetAddress',
+      'name', 'description', 'seriesRunRawText', 'gofastCity', 'meetUpPoint', 'meetUpStreetAddress',
       'meetUpCity', 'meetUpState', 'meetUpPlaceId', 'meetUpLat', 'meetUpLng',
       'startTimeHour', 'startTimeMinute', 'startTimePeriod', 'startDate', 'endDate', 'slug',
     ];
@@ -158,7 +160,9 @@ export async function PUT(
             logoUrl: true,
             city: true,
             websiteUrl: true,
-            // runUrl/stravaUrl: on acq_run_clubs (Company). Omit here so product works if run_clubs migration not applied.
+            runUrl: true,
+            allRunsDescription: true,
+            stravaUrl: true,
           },
         },
         _count: { select: { city_runs: true } },
@@ -173,6 +177,7 @@ export async function PUT(
         dayOfWeek: series.dayOfWeek,
         name: series.name,
         description: series.description,
+        seriesRunRawText: series.seriesRunRawText,
         runClubId: series.runClubId,
         workflowStatus: series.workflowStatus,
         gofastCity: series.gofastCity,

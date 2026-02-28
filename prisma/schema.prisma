@@ -537,6 +537,7 @@ model run_series {
   runClubId           String?              // which club owns this recurring series
   name                String?              // series label, e.g. "Tuesday Tempo"
   description         String?              // series blurb — seeds each new occurrence's description
+  seriesRunRawText    String?              // series-specific raw text (neighborhood, meetup details, etc.) — persisted
   gofastCity          String?              // city slug (e.g. "dc", "arlington") — same for all occurrences
   meetUpPoint         String?              // canonical meeting location name (same corner every week)
   meetUpStreetAddress String?
