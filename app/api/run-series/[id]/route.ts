@@ -56,6 +56,7 @@ export async function GET(
         dayOfWeek: series.dayOfWeek,
         name: series.name,
         description: series.description,
+        seriesRunRawText: series.seriesRunRawText,
         runClubId: series.runClubId,
         workflowStatus: series.workflowStatus,
         gofastCity: series.gofastCity,
@@ -258,10 +259,6 @@ export async function DELETE(
       { status: 500 }
     );
   }
-}
-
-function slugifyForSeries(str: string): string {
-  return str.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'series';
 }
 
 async function generateUniqueSeriesSlug(
