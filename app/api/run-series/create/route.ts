@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     const canonicalDay = toCanonicalDayOfWeek(dayOfWeek) ?? dayOfWeek.trim().toUpperCase();
 
     // If Company sent runClub (acq_run_clubs source of truth), upsert run_clubs so runClubId is consistent downstream
-    let runClub: { id: string; name: string; slug: string | null; city: string | null } | null = null;
+    let runClub: { id: string; name: string; slug: string | null; city: string | null; allRunsDescription: string | null } | null = null;
 
     if (runClubPayload && typeof runClubPayload === 'object') {
       const rc = runClubPayload as Record<string, unknown>;
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
           where: { id },
           create: { id, ...updateData },
           update: updateData,
-          select: { id: true, name: true, slug: true, city: true },
+          select: { id: true, name: true, slug: true, city: true, allRunsDescription: true },
         });
       } else {
         const existing = await prisma.run_clubs.findUnique({ where: { slug: slugFinal } });
@@ -126,12 +126,12 @@ export async function POST(request: NextRequest) {
           runClub = await prisma.run_clubs.update({
             where: { id: existing.id },
             data: updateData,
-            select: { id: true, name: true, slug: true, city: true },
+            select: { id: true, name: true, slug: true, city: true, allRunsDescription: true },
           });
         } else {
           runClub = await prisma.run_clubs.create({
             data: { ...updateData, slug: slugFinal },
-            select: { id: true, name: true, slug: true, city: true },
+            select: { id: true, name: true, slug: true, city: true, allRunsDescription: true },
           });
         }
       }
@@ -140,13 +140,13 @@ export async function POST(request: NextRequest) {
     if (!runClub && runClubSlug?.trim()) {
       runClub = await prisma.run_clubs.findUnique({
         where: { slug: runClubSlug.trim() },
-        select: { id: true, name: true, slug: true, city: true },
+        select: { id: true, name: true, slug: true, city: true, allRunsDescription: true },
       });
     }
     if (!runClub && runClubId?.trim()) {
       runClub = await prisma.run_clubs.findUnique({
         where: { id: runClubId.trim() },
-        select: { id: true, name: true, slug: true, city: true },
+        select: { id: true, name: true, slug: true, city: true, allRunsDescription: true },
       });
     }
     if (!runClub) {
@@ -173,11 +173,14 @@ export async function POST(request: NextRequest) {
 
     const baseName = name?.trim() || `${runClub.name} ${canonicalDay.charAt(0) + canonicalDay.slice(1).toLowerCase()} Run`;
 
+    // Use provided description, or fall back to run_clubs.allRunsDescription (backwards compatible)
+    const seriesDescription = description?.trim() || runClub.allRunsDescription || null;
+
     const setupData = {
       dayOfWeek: canonicalDay,
       runClubId: runClub.id, // FK: Links this series to run_clubs table - CRITICAL for hydration
       name: baseName,
-      description: description?.trim() || null,
+      description: seriesDescription, // Derived from run_clubs.allRunsDescription if not provided
       gofastCity: gofastCity?.trim() || null,
       meetUpPoint: meetUpPoint?.trim() || null,
       meetUpStreetAddress: meetUpStreetAddress?.trim() || null,
