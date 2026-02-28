@@ -37,6 +37,14 @@ export async function GET(
           stravaUrl: true,
         },
       },
+      runSeries: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          dayOfWeek: true,
+        },
+      },
     };
 
     let run = await prisma.city_runs.findUnique({ where: { id: segment }, include });
@@ -76,6 +84,18 @@ export async function GET(
         runType: run.runType ?? null,
         workoutDescription: run.workoutDescription ?? null,
         runClub: run.runClub || null,
+        runSeries: run.runSeries ? {
+          id: run.runSeries.id,
+          slug: run.runSeries.slug,
+          name: run.runSeries.name,
+          dayOfWeek: run.runSeries.dayOfWeek,
+        } : null,
+        instanceType: run.runSeriesId ? 'SERIES' : 'STANDALONE',
+        cityRunSetup: run.runSeries ? {
+          id: run.runSeries.id,
+          dayOfWeek: run.runSeries.dayOfWeek,
+          name: run.runSeries.name,
+        } : null,
       },
     });
   } catch (error: any) {
