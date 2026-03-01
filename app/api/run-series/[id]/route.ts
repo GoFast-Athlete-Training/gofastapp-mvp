@@ -123,9 +123,13 @@ export async function PUT(
 
     // Backfill slug if missing (e.g. series created before unique-slug logic)
     if (!existing.slug?.trim()) {
-      const slugBase = slugifyForSeries(
-        (existing.runClub?.slug || existing.runClubId || id) + '-' + (existing.dayOfWeek || '').toLowerCase()
-      );
+      const clubSlugBase = existing.runClub?.slug || existing.runClubId || id;
+      const daySlug = (existing.dayOfWeek || '').toLowerCase();
+      // Include city in slug for multi-site clubs (when meetUpCity is present)
+      const citySlug = existing.meetUpCity 
+        ? `-${existing.meetUpCity.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` 
+        : '';
+      const slugBase = slugifyForSeries(`${clubSlugBase}-${daySlug}${citySlug}`);
       const slug = await generateUniqueSeriesSlug(prisma, slugBase);
       updateData.slug = slug;
     }
