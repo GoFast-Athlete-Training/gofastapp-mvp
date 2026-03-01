@@ -67,6 +67,10 @@ export async function GET(
         meetUpPlaceId: series.meetUpPlaceId,
         meetUpLat: series.meetUpLat,
         meetUpLng: series.meetUpLng,
+        endPoint: series.endPoint,
+        endStreetAddress: series.endStreetAddress,
+        endCity: series.endCity,
+        endState: series.endState,
         startTimeHour: series.startTimeHour,
         startTimeMinute: series.startTimeMinute,
         startTimePeriod: series.startTimePeriod,
@@ -137,6 +141,7 @@ export async function PUT(
     const allowed = [
       'name', 'description', 'seriesRunRawText', 'gofastCity', 'meetUpPoint', 'meetUpStreetAddress',
       'meetUpCity', 'meetUpState', 'meetUpPlaceId', 'meetUpLat', 'meetUpLng',
+      'endPoint', 'endStreetAddress', 'endCity', 'endState',
       'startTimeHour', 'startTimeMinute', 'startTimePeriod', 'startDate', 'endDate', 'slug',
     ];
     for (const key of allowed) {
@@ -193,6 +198,10 @@ export async function PUT(
         meetUpPlaceId: series.meetUpPlaceId,
         meetUpLat: series.meetUpLat,
         meetUpLng: series.meetUpLng,
+        endPoint: series.endPoint,
+        endStreetAddress: series.endStreetAddress,
+        endCity: series.endCity,
+        endState: series.endState,
         startTimeHour: series.startTimeHour,
         startTimeMinute: series.startTimeMinute,
         startTimePeriod: series.startTimePeriod,

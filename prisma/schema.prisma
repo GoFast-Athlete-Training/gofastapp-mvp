@@ -546,6 +546,10 @@ model run_series {
   meetUpPlaceId       String?
   meetUpLat           Float?
   meetUpLng           Float?
+  endPoint            String?              // end/finish location (null = same as meetUpPoint)
+  endStreetAddress    String?
+  endCity             String?
+  endState            String?
   startTimeHour       Int?                 // canonical run time (same every week)
   startTimeMinute     Int?
   startTimePeriod     String?              // "AM" | "PM"
