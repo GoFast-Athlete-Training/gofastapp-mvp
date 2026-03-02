@@ -56,7 +56,9 @@ export async function POST(request: NextRequest) {
       runUrl: rc.runUrl != null ? String(rc.runUrl).trim() || null : null,
       stravaUrl: rc.stravaUrl != null ? String(rc.stravaUrl).trim() || null : null,
       description: rc.description != null ? String(rc.description).trim() || null : null,
-      allRunsDescription: rc.allRunsDescription != null ? String(rc.allRunsDescription).trim() || null : null,
+      allRunsDescription: rc.allRunsDescription != null && rc.allRunsDescription !== '' 
+        ? String(rc.allRunsDescription).trim() || null 
+        : null,
       logoUrl: rc.logoUrl != null ? String(rc.logoUrl).trim() || null : null,
       syncedAt: new Date(),
     };
@@ -68,6 +70,13 @@ export async function POST(request: NextRequest) {
 
     let runClub;
     if (id) {
+      // Log what we're about to upsert
+      console.log('🔄 PRODUCT SYNC: Upserting run club with updateData:', {
+        id,
+        allRunsDescription: updateData.allRunsDescription ? `${updateData.allRunsDescription.substring(0, 100)}...` : null,
+        allRunsDescriptionLength: updateData.allRunsDescription?.length || 0,
+      });
+      
       runClub = await prisma.run_clubs.upsert({
         where: { id },
         create: { id, ...updateData },
@@ -79,6 +88,13 @@ export async function POST(request: NextRequest) {
           city: true,
           allRunsDescription: true,
         },
+      });
+      
+      // Log what was actually saved
+      console.log('🔄 PRODUCT SYNC: After upsert, runClub.allRunsDescription:', {
+        id: runClub.id,
+        allRunsDescription: runClub.allRunsDescription ? `${runClub.allRunsDescription.substring(0, 100)}...` : null,
+        allRunsDescriptionLength: runClub.allRunsDescription?.length || 0,
       });
     } else {
       const existing = await prisma.run_clubs.findUnique({ where: { slug: slugFinal } });
