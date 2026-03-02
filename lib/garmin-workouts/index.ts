@@ -16,5 +16,14 @@ export * from "./types";
 export * from "./garmin-training-service";
 export * from "./api-client";
 export * from "./activity-mapper";
-// Legacy converters (deprecated)
-export * from "./converters";
+// Legacy converters (deprecated) - only export non-conflicting functions
+export {
+  mapWorkoutTypeToSport,
+  mapIntensity,
+  getTargetConfig,
+  buildSimpleStep,
+  buildIntervalStep,
+  buildRecoveryStep,
+  buildRepeatStep,
+  convertWorkoutToGarminFormat,
+} from "./converters";

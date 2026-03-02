@@ -17,41 +17,10 @@ import {
   OurWorkout,
   PlannedData,
   Athlete,
+  convertPaceToSecondsPerKm,
+  convertMilesToMeters,
 } from "./types";
 import { assembleGarminWorkout, Workout, WorkoutSegment } from "./garmin-training-service";
-
-// ============================================================================
-// PACE CONVERSION
-// ============================================================================
-
-/**
- * Convert pace string "X:XX/mile" to seconds per kilometer
- * Example: "5:30/mile" → 330 seconds/mile → 531 seconds/km
- */
-export function convertPaceToSecondsPerKm(paceString: string): number {
-  // Parse "5:30/mile" or "5:30" format
-  const match = paceString.match(/(\d+):(\d+)/);
-  if (!match) {
-    throw new Error(`Invalid pace format: ${paceString}`);
-  }
-  
-  const minutes = parseInt(match[1], 10);
-  const seconds = parseInt(match[2], 10);
-  const totalSecondsPerMile = minutes * 60 + seconds;
-  
-  // Convert to seconds per kilometer
-  // 1 mile = 1.60934 km
-  const secondsPerKm = totalSecondsPerMile * 1.60934;
-  
-  return Math.round(secondsPerKm);
-}
-
-/**
- * Convert miles to meters
- */
-export function convertMilesToMeters(miles: number): number {
-  return Math.round(miles * 1609.34);
-}
 
 // ============================================================================
 // MAPPERS
