@@ -71,6 +71,7 @@ model Athlete {
   training_days_executed  training_days_executed[]
   training_plans          training_plans[]
   workouts                workouts[]
+  workout_segments        workout_segments[]
 }
 
 model ambassador_credits {
@@ -722,24 +723,40 @@ model training_schemas {
 }
 
 model workouts {
-  id             String         @id
-  title          String
-  workoutType    WorkoutType
-  description    String?
-  workoutFormat  WorkoutFormat?
-  totalMiles     Float?
-  warmUpMiles    Float?
-  mainSetMiles   Float?
-  coolDownMiles  Float?
-  effortType     EffortType?
-  effortModifier Float?
-  athleteId      String
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime
-  Athlete        Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  id               String            @id @default(cuid())
+  title            String
+  workoutType      WorkoutType
+  description      String?
+  athleteId        String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  Athlete          Athlete           @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  segments         workout_segments[]
 
   @@index([athleteId])
   @@index([workoutType])
+}
+
+model workout_segments {
+  id               String            @id @default(cuid())
+  workoutId        String
+  stepOrder        Int               // Order in workout (1, 2, 3...)
+  title            String            // e.g., "Warmup", "Main Set", "Cooldown", "Interval"
+  // Duration
+  durationType     String            // "DISTANCE" or "TIME"
+  durationValue    Float             // Miles (if DISTANCE) or minutes (if TIME)
+  // Targets (generic - matches Garmin structure)
+  targets          Json?             // Array of target objects: [{ type: "PACE", valueLow: 480, valueHigh: 500 }, { type: "HEART_RATE", valueLow: 160, valueHigh: 180 }]
+  // Repeat capability
+  repeatCount      Int?              // Repeat this segment N times (for intervals)
+  // Metadata
+  notes            String?           // User notes for this segment
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  workout          workouts          @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+
+  @@index([workoutId])
+  @@index([workoutId, stepOrder])
 }
 
 enum EffortType {

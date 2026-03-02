@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
-import { Home, Settings } from 'lucide-react';
+import { Home, Settings, Calendar } from 'lucide-react';
 
 interface TopNavProps {
   showBack?: boolean;
@@ -61,7 +61,7 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
             )}
           </div>
 
-          {/* Right: Home, Settings, Profile & Actions */}
+          {/* Right: Home, Workouts, Settings, Profile & Actions */}
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Home Icon */}
             <Link
@@ -70,6 +70,15 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
               title="Home"
             >
               <Home className="h-5 w-5" />
+            </Link>
+
+            {/* Workouts Icon */}
+            <Link
+              href="/workouts"
+              className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
+              title="Workouts"
+            >
+              <Calendar className="h-5 w-5" />
             </Link>
 
             {/* Settings Icon */}
