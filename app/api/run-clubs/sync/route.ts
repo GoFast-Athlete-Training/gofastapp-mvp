@@ -71,35 +71,85 @@ export async function POST(request: NextRequest) {
     });
 
     let runClub;
+    
+    // Strategy: Try ID first, but if that fails or ID doesn't match, use slug-based matching
     if (id) {
-      // Log what we're about to upsert
-      console.log('🔄 PRODUCT SYNC: Upserting run club with updateData:', {
-        id,
-        allRunsDescription: updateData.allRunsDescription ? `${updateData.allRunsDescription.substring(0, 100)}...` : null,
-        allRunsDescriptionLength: updateData.allRunsDescription?.length || 0,
-      });
-      
-      runClub = await prisma.run_clubs.upsert({
+      // First check if club exists with this ID
+      const existingById = await prisma.run_clubs.findUnique({ 
         where: { id },
-        create: { id, ...updateData },
-        update: updateData,
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          city: true,
-          allRunsDescription: true,
-        },
+        select: { id: true, slug: true },
       });
       
-      // Verify what was actually saved by querying the database again
+      if (existingById) {
+        // ID exists, use ID-based upsert
+        console.log('🔄 PRODUCT SYNC: Found by ID, using ID-based upsert:', { id, slug: existingById.slug });
+        
+        runClub = await prisma.run_clubs.upsert({
+          where: { id },
+          create: { id, ...updateData },
+          update: updateData,
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            city: true,
+            allRunsDescription: true,
+          },
+        });
+      } else {
+        // ID doesn't exist, try slug-based matching
+        console.log('🔄 PRODUCT SYNC: ID not found, trying slug-based matching:', { id, slug: slugFinal });
+        
+        const existingBySlug = await prisma.run_clubs.findUnique({ 
+          where: { slug: slugFinal },
+          select: { id: true, slug: true },
+        });
+        
+        if (existingBySlug) {
+          // Found by slug, update the existing record
+          console.log('✅ PRODUCT SYNC: Found by slug, updating existing record:', { 
+            existingId: existingBySlug.id, 
+            slug: existingBySlug.slug,
+            sentId: id 
+          });
+          
+          runClub = await prisma.run_clubs.update({
+            where: { id: existingBySlug.id },
+            data: updateData,
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              city: true,
+              allRunsDescription: true,
+            },
+          });
+        } else {
+          // Neither ID nor slug exists, create new with the provided ID
+          console.log('🔄 PRODUCT SYNC: Neither ID nor slug found, creating new record:', { id, slug: slugFinal });
+          
+          runClub = await prisma.run_clubs.create({
+            data: { id, ...updateData },
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              city: true,
+              allRunsDescription: true,
+            },
+          });
+        }
+      }
+      
+      // Verify what was actually saved
       const verified = await prisma.run_clubs.findUnique({
-        where: { id },
+        where: { id: runClub.id },
         select: { allRunsDescription: true },
       });
       
-      console.log('🔄 PRODUCT SYNC: After upsert, verified from database:', {
+      console.log('🔄 PRODUCT SYNC: After upsert/update, verified from database:', {
         id: runClub.id,
+        slug: runClub.slug,
         allRunsDescription: verified?.allRunsDescription ? `${verified.allRunsDescription.substring(0, 100)}...` : null,
         allRunsDescriptionLength: verified?.allRunsDescription?.length || 0,
         matchesExpected: verified?.allRunsDescription === updateData.allRunsDescription,
