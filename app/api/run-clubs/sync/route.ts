@@ -48,8 +48,8 @@ export async function POST(request: NextRequest) {
       allRunsDescriptionValue: rc.allRunsDescription,
     });
 
-    // Extract Company ID from payload (id field contains Company's acq_run_clubs.id)
-    const companyRunClubId = id || null;
+    // Extract Company ID from payload (companyRunClubId field, or id if not provided)
+    const companyRunClubId = rc.companyRunClubId || id || null;
     
     const updateData = {
       name: nameVal,
