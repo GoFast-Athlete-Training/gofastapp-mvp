@@ -14,6 +14,7 @@
  */
 
 import { prisma } from "../prisma";
+import { Prisma } from "@prisma/client";
 
 /**
  * Link a Garmin activity to a training day
@@ -197,7 +198,7 @@ export async function getSyncedTrainingDays(athleteId: string) {
       athleteId,
       plannedData: {
         path: ["garminSyncedAt"],
-        not: null,
+        not: Prisma.JsonNull,
       },
     },
   });
