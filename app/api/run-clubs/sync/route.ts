@@ -40,6 +40,14 @@ export async function POST(request: NextRequest) {
     const slugVal = rc.slug != null ? String(rc.slug).trim() : (id || nameVal.toLowerCase().replace(/\s+/g, '-'));
     const slugFinal = slugVal || id || `club-${Date.now()}`;
 
+    console.log('🔄 PRODUCT SYNC: Received run club payload:', {
+      id,
+      name: nameVal,
+      allRunsDescription: rc.allRunsDescription ? `${String(rc.allRunsDescription).substring(0, 50)}...` : null,
+      allRunsDescriptionType: typeof rc.allRunsDescription,
+      allRunsDescriptionValue: rc.allRunsDescription,
+    });
+
     const updateData = {
       name: nameVal,
       slug: slugFinal,
@@ -52,6 +60,11 @@ export async function POST(request: NextRequest) {
       logoUrl: rc.logoUrl != null ? String(rc.logoUrl).trim() || null : null,
       syncedAt: new Date(),
     };
+
+    console.log('🔄 PRODUCT SYNC: Processed updateData:', {
+      id,
+      allRunsDescription: updateData.allRunsDescription ? `${updateData.allRunsDescription.substring(0, 50)}...` : null,
+    });
 
     let runClub;
     if (id) {
@@ -94,6 +107,12 @@ export async function POST(request: NextRequest) {
         });
       }
     }
+
+    console.log('✅ PRODUCT SYNC: Successfully saved run club:', {
+      id: runClub.id,
+      name: runClub.name,
+      allRunsDescription: runClub.allRunsDescription ? `${runClub.allRunsDescription.substring(0, 50)}...` : null,
+    });
 
     const response = NextResponse.json({
       success: true,
