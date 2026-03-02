@@ -193,7 +193,7 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       series: {
         id: series.id,
