@@ -109,17 +109,21 @@ export function getTargetConfig(
   targetType?: GarminTargetType;
   targetValueLow?: number;
   targetValueHigh?: number;
+  targetValueType?: GarminValueType;
   secondaryTargetType?: GarminTargetType;
   secondaryTargetValueLow?: number;
   secondaryTargetValueHigh?: number;
+  secondaryTargetValueType?: GarminValueType;
 } {
   const config: {
     targetType?: GarminTargetType;
     targetValueLow?: number;
     targetValueHigh?: number;
+    targetValueType?: GarminValueType;
     secondaryTargetType?: GarminTargetType;
     secondaryTargetValueLow?: number;
     secondaryTargetValueHigh?: number;
+    secondaryTargetValueType?: GarminValueType;
   } = {};
 
   // Priority 1: Use paceGoals if provided
