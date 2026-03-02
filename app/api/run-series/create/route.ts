@@ -98,6 +98,16 @@ export async function POST(request: NextRequest) {
     if (runClubPayload && typeof runClubPayload === 'object') {
       const rc = runClubPayload as Record<string, unknown>;
       const id = rc.id != null ? String(rc.id).trim() : null;
+      
+      // CRITICAL: If runClubPayload is provided, Company ID MUST be included!
+      // Company ID = Product app ID (original genius design)
+      if (!id) {
+        return NextResponse.json({
+          success: false,
+          error: 'runClub.id (Company ID) is required when runClub payload is provided. Company ID = Product app ID.',
+        }, { status: 400 });
+      }
+      
       const nameVal = rc.name != null ? String(rc.name).trim() : 'Unnamed';
       const slugVal = rc.slug != null ? String(rc.slug).trim() : (id || nameVal.toLowerCase().replace(/\s+/g, '-'));
       const slugFinal = slugVal || id || `club-${Date.now()}`;
@@ -113,28 +123,14 @@ export async function POST(request: NextRequest) {
         logoUrl: rc.logoUrl != null ? String(rc.logoUrl).trim() || null : null,
         syncedAt: new Date(),
       };
-      if (id) {
-        runClub = await prisma.run_clubs.upsert({
-          where: { id },
-          create: { id, ...updateData },
-          update: updateData,
-          select: { id: true, name: true, slug: true, city: true, allRunsDescription: true },
-        });
-      } else {
-        const existing = await prisma.run_clubs.findUnique({ where: { slug: slugFinal } });
-        if (existing) {
-          runClub = await prisma.run_clubs.update({
-            where: { id: existing.id },
-            data: updateData,
-            select: { id: true, name: true, slug: true, city: true, allRunsDescription: true },
-          });
-        } else {
-          runClub = await prisma.run_clubs.create({
-            data: { ...updateData, slug: slugFinal },
-            select: { id: true, name: true, slug: true, city: true, allRunsDescription: true },
-          });
-        }
-      }
+      
+      // Use Company ID directly as Product app ID (original genius design!)
+      runClub = await prisma.run_clubs.upsert({
+        where: { id },
+        create: { id, ...updateData }, // Company ID = Product app ID!
+        update: updateData,
+        select: { id: true, name: true, slug: true, city: true, allRunsDescription: true },
+      });
     }
 
     if (!runClub && runClubSlug?.trim()) {
