@@ -56,9 +56,11 @@ export async function POST(request: NextRequest) {
       runUrl: rc.runUrl != null ? String(rc.runUrl).trim() || null : null,
       stravaUrl: rc.stravaUrl != null ? String(rc.stravaUrl).trim() || null : null,
       description: rc.description != null ? String(rc.description).trim() || null : null,
-      allRunsDescription: rc.allRunsDescription != null && rc.allRunsDescription !== '' 
-        ? String(rc.allRunsDescription).trim() || null 
-        : null,
+      allRunsDescription: (() => {
+        if (rc.allRunsDescription == null) return null;
+        const trimmed = String(rc.allRunsDescription).trim();
+        return trimmed.length > 0 ? trimmed : null;
+      })(),
       logoUrl: rc.logoUrl != null ? String(rc.logoUrl).trim() || null : null,
       syncedAt: new Date(),
     };
@@ -90,12 +92,21 @@ export async function POST(request: NextRequest) {
         },
       });
       
-      // Log what was actually saved
-      console.log('🔄 PRODUCT SYNC: After upsert, runClub.allRunsDescription:', {
-        id: runClub.id,
-        allRunsDescription: runClub.allRunsDescription ? `${runClub.allRunsDescription.substring(0, 100)}...` : null,
-        allRunsDescriptionLength: runClub.allRunsDescription?.length || 0,
+      // Verify what was actually saved by querying the database again
+      const verified = await prisma.run_clubs.findUnique({
+        where: { id },
+        select: { allRunsDescription: true },
       });
+      
+      console.log('🔄 PRODUCT SYNC: After upsert, verified from database:', {
+        id: runClub.id,
+        allRunsDescription: verified?.allRunsDescription ? `${verified.allRunsDescription.substring(0, 100)}...` : null,
+        allRunsDescriptionLength: verified?.allRunsDescription?.length || 0,
+        matchesExpected: verified?.allRunsDescription === updateData.allRunsDescription,
+      });
+      
+      // Update runClub with verified value
+      runClub.allRunsDescription = verified?.allRunsDescription || null;
     } else {
       const existing = await prisma.run_clubs.findUnique({ where: { slug: slugFinal } });
       if (existing) {
