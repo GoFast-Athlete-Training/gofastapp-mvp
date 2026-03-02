@@ -321,7 +321,6 @@ model run_clubs {
   runUrl    String?              // "Runs" page URL — single source of truth for where run/series info came from (seed/hydrate for data entry)
   instagramUrl String?
   stravaUrl String?              // Club Strava — source for AI; data entry can look up
-  companyRunClubId String?        // Bidirectional ID mapping: Company's acq_run_clubs.id
   syncedAt  DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -332,7 +331,6 @@ model run_clubs {
 
   @@index([city])
   @@index([slug])
-  @@index([companyRunClubId])
 }
 
 model run_crew_announcements {

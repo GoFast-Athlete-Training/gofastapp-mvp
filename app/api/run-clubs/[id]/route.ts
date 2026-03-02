@@ -121,7 +121,6 @@ export async function PUT(
     if (body.runUrl !== undefined) updateData.runUrl = body.runUrl?.trim() || null;
     if (body.stravaUrl !== undefined) updateData.stravaUrl = body.stravaUrl?.trim() || null;
     if (body.logoUrl !== undefined) updateData.logoUrl = body.logoUrl?.trim() || null;
-    if (body.companyRunClubId !== undefined) updateData.companyRunClubId = body.companyRunClubId?.trim() || null;
 
     console.log('🔄 PUT: Updating run_clubs:', {
       id,
@@ -138,7 +137,6 @@ export async function PUT(
         slug: true,
         city: true,
         allRunsDescription: true,
-        companyRunClubId: true,
       },
     });
 

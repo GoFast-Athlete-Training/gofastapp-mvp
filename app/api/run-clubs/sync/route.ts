@@ -48,9 +48,6 @@ export async function POST(request: NextRequest) {
       allRunsDescriptionValue: rc.allRunsDescription,
     });
 
-    // Extract Company ID from payload (companyRunClubId field, or id if not provided)
-    const companyRunClubId = rc.companyRunClubId || id || null;
-    
     const updateData = {
       name: nameVal,
       slug: slugFinal,
@@ -65,7 +62,6 @@ export async function POST(request: NextRequest) {
         return trimmed.length > 0 ? trimmed : null;
       })(),
       logoUrl: rc.logoUrl != null ? String(rc.logoUrl).trim() || null : null,
-      companyRunClubId: companyRunClubId, // Bidirectional ID mapping: Company's acq_run_clubs.id
       syncedAt: new Date(),
     };
 
@@ -74,127 +70,29 @@ export async function POST(request: NextRequest) {
       allRunsDescription: updateData.allRunsDescription ? `${updateData.allRunsDescription.substring(0, 50)}...` : null,
     });
 
+    // Original genius design: Company ID = Product app ID!
+    // When id is provided, it's the Company ID - use it directly as Product app ID
     let runClub;
     
-    // Strategy: Use bidirectional ID mapping for compatibility
-    // 1. Try Product app ID (if provided and exists)
-    // 2. Try Company ID via companyRunClubId (bidirectional mapping)
-    // 3. Try slug-based matching (fallback)
-    // 4. Create new record
-    
     if (id) {
-      // First check if club exists with this Product app ID
-      const existingById = await prisma.run_clubs.findUnique({ 
-        where: { id },
-        select: { id: true, slug: true, companyRunClubId: true },
+      // Simple upsert: Company ID = Product app ID
+      console.log('🔄 PRODUCT SYNC: Using ID-based upsert (Company ID = Product app ID):', { 
+        id, 
+        slug: slugFinal 
       });
       
-      if (existingById) {
-        // Product app ID exists, use ID-based upsert
-        console.log('🔄 PRODUCT SYNC: Found by Product app ID, using ID-based upsert:', { 
-          id, 
-          slug: existingById.slug,
-          companyRunClubId: existingById.companyRunClubId 
-        });
-        
-        runClub = await prisma.run_clubs.upsert({
-          where: { id },
-          create: { id, ...updateData },
-          update: updateData,
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            city: true,
-            allRunsDescription: true,
-            companyRunClubId: true,
-          },
-        });
-      } else {
-        // Product app ID doesn't exist, try Company ID via bidirectional mapping
-        console.log('🔄 PRODUCT SYNC: Product app ID not found, trying Company ID via bidirectional mapping:', { 
-          companyId: id, 
-          slug: slugFinal 
-        });
-        
-        const existingByCompanyId = await prisma.run_clubs.findFirst({ 
-          where: { companyRunClubId: id },
-          select: { id: true, slug: true, companyRunClubId: true },
-        });
-        
-        if (existingByCompanyId) {
-          // Found by Company ID (bidirectional mapping), update the existing record
-          console.log('✅ PRODUCT SYNC: Found by Company ID (bidirectional mapping), updating existing record:', { 
-            productAppId: existingByCompanyId.id, 
-            companyId: id,
-            slug: existingByCompanyId.slug 
-          });
-          
-          runClub = await prisma.run_clubs.update({
-            where: { id: existingByCompanyId.id },
-            data: updateData,
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              city: true,
-              allRunsDescription: true,
-              companyRunClubId: true,
-            },
-          });
-        } else {
-          // Try slug-based matching as fallback
-          console.log('🔄 PRODUCT SYNC: Company ID not found, trying slug-based matching:', { 
-            companyId: id, 
-            slug: slugFinal 
-          });
-          
-          const existingBySlug = await prisma.run_clubs.findUnique({ 
-            where: { slug: slugFinal },
-            select: { id: true, slug: true, companyRunClubId: true },
-          });
-          
-          if (existingBySlug) {
-            // Found by slug, update the existing record
-            console.log('✅ PRODUCT SYNC: Found by slug, updating existing record:', { 
-              productAppId: existingBySlug.id, 
-              companyId: id,
-              slug: existingBySlug.slug 
-            });
-            
-            runClub = await prisma.run_clubs.update({
-              where: { id: existingBySlug.id },
-              data: updateData,
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-                city: true,
-                allRunsDescription: true,
-                companyRunClubId: true,
-              },
-            });
-          } else {
-            // Neither ID nor slug exists, create new with the provided Company ID
-            console.log('🔄 PRODUCT SYNC: Neither ID nor slug found, creating new record:', { 
-              companyId: id, 
-              slug: slugFinal 
-            });
-            
-            runClub = await prisma.run_clubs.create({
-              data: { id, ...updateData },
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-                city: true,
-                allRunsDescription: true,
-                companyRunClubId: true,
-              },
-            });
-          }
-        }
-      }
+      runClub = await prisma.run_clubs.upsert({
+        where: { id },
+        create: { id, ...updateData },
+        update: updateData,
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          city: true,
+          allRunsDescription: true,
+        },
+      });
       
       // Verify what was actually saved
       const verified = await prisma.run_clubs.findUnique({
@@ -202,7 +100,7 @@ export async function POST(request: NextRequest) {
         select: { allRunsDescription: true },
       });
       
-      console.log('🔄 PRODUCT SYNC: After upsert/update, verified from database:', {
+      console.log('🔄 PRODUCT SYNC: After upsert, verified from database:', {
         id: runClub.id,
         slug: runClub.slug,
         allRunsDescription: verified?.allRunsDescription ? `${verified.allRunsDescription.substring(0, 100)}...` : null,
@@ -213,6 +111,7 @@ export async function POST(request: NextRequest) {
       // Update runClub with verified value
       runClub.allRunsDescription = verified?.allRunsDescription || null;
     } else {
+      // No ID provided - slug-based matching (fallback)
       const existing = await prisma.run_clubs.findUnique({ where: { slug: slugFinal } });
       if (existing) {
         runClub = await prisma.run_clubs.update({
@@ -224,7 +123,6 @@ export async function POST(request: NextRequest) {
             slug: true,
             city: true,
             allRunsDescription: true,
-            companyRunClubId: true,
           },
         });
       } else {
@@ -236,7 +134,6 @@ export async function POST(request: NextRequest) {
             slug: true,
             city: true,
             allRunsDescription: true,
-            companyRunClubId: true,
           },
         });
       }
