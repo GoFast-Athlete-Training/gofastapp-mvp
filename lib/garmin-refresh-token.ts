@@ -123,6 +123,7 @@ export async function refreshGarminToken(
 
 /**
  * Get valid access token, refreshing if necessary
+ * Uses test tokens if garmin_use_test_tokens is true (for evaluation/testing)
  */
 export async function getValidAccessToken(athleteId: string): Promise<string | null> {
   const athlete = await prisma.athlete.findUnique({
@@ -131,10 +132,19 @@ export async function getValidAccessToken(athleteId: string): Promise<string | n
       garmin_access_token: true,
       garmin_expires_in: true,
       garmin_connected_at: true,
-      garmin_refresh_token: true
+      garmin_refresh_token: true,
+      garmin_test_access_token: true,
+      garmin_use_test_tokens: true
     }
   });
 
+  // If using test tokens, return test token directly (no refresh needed for test tokens)
+  if (athlete?.garmin_use_test_tokens && athlete.garmin_test_access_token) {
+    console.log(`🧪 Using test token for athlete ${athleteId}`);
+    return athlete.garmin_test_access_token;
+  }
+
+  // Use production tokens (original logic unchanged)
   if (!athlete?.garmin_access_token) {
     return null;
   }

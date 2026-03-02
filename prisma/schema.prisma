@@ -32,18 +32,22 @@ model Athlete {
   bio                     String?
   instagram               String?
   garmin_user_id          String?                  @unique
-  garmin_access_token     String?
-  garmin_refresh_token    String?
-  garmin_expires_in       Int?
-  garmin_scope            String?
-  garmin_connected_at     DateTime?
-  garmin_last_sync_at     DateTime?
-  garmin_is_connected     Boolean                  @default(false)
-  garmin_disconnected_at  DateTime?
-  garmin_permissions      Json?
-  garmin_user_profile     Json?
-  garmin_user_sleep       Json?
-  garmin_user_preferences Json?
+  garmin_access_token      String?
+  garmin_refresh_token     String?
+  garmin_expires_in        Int?
+  garmin_scope             String?
+  garmin_connected_at      DateTime?
+  garmin_last_sync_at      DateTime?
+  garmin_is_connected      Boolean                  @default(false)
+  garmin_disconnected_at   DateTime?
+  garmin_permissions       Json?
+  garmin_user_profile      Json?
+  garmin_user_sleep        Json?
+  garmin_user_preferences  Json?
+  // Test tokens (for evaluation/testing - won't overwrite production tokens)
+  garmin_test_access_token String?
+  garmin_test_user_id      String?
+  garmin_use_test_tokens   Boolean                  @default(false)
   strava_id               Int?                     @unique
   strava_access_token     String?
   strava_refresh_token    String?
@@ -71,7 +75,6 @@ model Athlete {
   training_days_executed  training_days_executed[]
   training_plans          training_plans[]
   workouts                workouts[]
-  workout_segments        workout_segments[]
 }
 
 model ambassador_credits {
@@ -727,6 +730,7 @@ model workouts {
   title            String
   workoutType      WorkoutType
   description      String?
+  stravaUrl        String?           // Strava route URL for this workout
   athleteId        String
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt

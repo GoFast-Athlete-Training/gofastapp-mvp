@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Activity, Calendar } from "lucide-react";
 import Link from "next/link";
 import TopNav from "@/components/shared/TopNav";
+import api from "@/lib/api";
 
 export default function WorkoutsPage() {
   const router = useRouter();
@@ -61,11 +62,20 @@ function PlanView() {
   const [workouts, setWorkouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // TODO: Fetch workouts from API
   useEffect(() => {
-    // fetchWorkouts();
-    setLoading(false);
+    fetchWorkouts();
   }, []);
+
+  const fetchWorkouts = async () => {
+    try {
+      const response = await api.get("/api/workouts");
+      setWorkouts(response.data.workouts || []);
+    } catch (error: any) {
+      console.error("Error fetching workouts:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div>
@@ -102,11 +112,10 @@ function PlanView() {
                 <p className="text-gray-600 mb-4">{workout.description}</p>
               )}
               <div className="flex gap-4 text-sm text-gray-500">
-                {workout.totalMiles && (
-                  <span>{workout.totalMiles} miles</span>
-                )}
-                {workout.garminSyncedAt && (
-                  <span className="text-green-600">✓ Synced to Garmin</span>
+                {workout.segments && workout.segments.length > 0 && (
+                  <span>
+                    {workout.segments.length} segment{workout.segments.length !== 1 ? "s" : ""}
+                  </span>
                 )}
               </div>
             </div>

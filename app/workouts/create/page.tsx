@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Trash2, Repeat } from "lucide-react";
 import Link from "next/link";
 import TopNav from "@/components/shared/TopNav";
+import api from "@/lib/api";
 // Garmin conversion handled server-side by garmin-training-service.ts
 
 interface WorkoutSegment {
@@ -21,6 +22,7 @@ export default function CreateWorkoutPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [stravaUrl, setStravaUrl] = useState("");
   
   // Overall workout goals
   const [overallMiles, setOverallMiles] = useState<number>(0);
@@ -58,10 +60,48 @@ export default function CreateWorkoutPage() {
     setSaving(true);
 
     try {
+      // Build targets array from pace/HR inputs
+      const buildTargets = (pace?: string, hrMin?: number, hrMax?: number) => {
+        const targets: Array<{
+          type: string;
+          valueLow?: number;
+          valueHigh?: number;
+        }> = [];
+
+        // Add pace target if provided (convert to seconds/km)
+        if (pace) {
+          // Parse pace string like "8:00/mile" to seconds/km
+          const match = pace.match(/(\d+):(\d+)/);
+          if (match) {
+            const minutes = parseInt(match[1], 10);
+            const seconds = parseInt(match[2], 10);
+            const totalSecondsPerMile = minutes * 60 + seconds;
+            const secondsPerKm = Math.round(totalSecondsPerMile * 1.60934);
+            targets.push({
+              type: "PACE",
+              valueLow: secondsPerKm - 10, // ±10 seconds tolerance
+              valueHigh: secondsPerKm + 10,
+            });
+          }
+        }
+
+        // Add HR target if provided
+        if (hrMin !== undefined && hrMax !== undefined) {
+          targets.push({
+            type: "HEART_RATE",
+            valueLow: hrMin,
+            valueHigh: hrMax,
+          });
+        }
+
+        return targets.length > 0 ? targets : undefined;
+      };
+
       // Build workout data
       const workoutData = {
         title: name,
         description,
+        stravaUrl: stravaUrl || undefined,
         workoutType: "Easy", // Default, could be selectable
         segments: useSegments
           ? segments.map((seg, index) => ({
@@ -69,9 +109,7 @@ export default function CreateWorkoutPage() {
               title: seg.title,
               durationType: "DISTANCE", // Could be TIME if needed
               durationValue: seg.miles,
-              paceTarget: seg.pace,
-              hrMin: seg.hrMin,
-              hrMax: seg.hrMax,
+              targets: buildTargets(seg.pace, seg.hrMin, seg.hrMax),
               repeatCount: seg.repeatCount,
             }))
           : [
@@ -80,23 +118,15 @@ export default function CreateWorkoutPage() {
                 title: "Main Set",
                 durationType: "DISTANCE",
                 durationValue: overallMiles,
-                paceTarget: overallPace || undefined,
-                hrMin: overallHrMin,
-                hrMax: overallHrMax,
+                targets: buildTargets(overallPace, overallHrMin, overallHrMax),
               },
             ],
       };
 
-      // TODO: Save to API
-      const response = await fetch("/api/workouts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(workoutData),
-      });
+      // Save to API
+      const response = await api.post("/api/workouts", workoutData);
 
-      if (!response.ok) throw new Error("Failed to create workout");
-
-      const workout = await response.json();
+      const { workout } = response.data;
       router.push(`/workouts/${workout.id}`);
     } catch (error) {
       console.error("Error creating workout:", error);
@@ -151,6 +181,23 @@ export default function CreateWorkoutPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               placeholder="Optional description..."
             />
+          </div>
+
+          {/* Strava URL */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Strava Route URL
+            </label>
+            <input
+              type="url"
+              value={stravaUrl}
+              onChange={(e) => setStravaUrl(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              placeholder="https://www.strava.com/routes/..."
+            />
+            <p className="mt-1 text-sm text-gray-500">
+              Optional: Link to Strava route for this workout
+            </p>
           </div>
 
           {/* Overall Goals */}

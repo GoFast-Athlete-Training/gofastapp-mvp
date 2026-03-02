@@ -29,9 +29,13 @@ export async function POST(
       return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
     }
 
-    if (!athlete.garmin_is_connected || !athlete.garmin_user_id) {
+    // Check for connection (production or test)
+    const hasProductionConnection = athlete.garmin_is_connected && athlete.garmin_user_id;
+    const hasTestConnection = athlete.garmin_use_test_tokens && athlete.garmin_test_user_id;
+    
+    if (!hasProductionConnection && !hasTestConnection) {
       return NextResponse.json(
-        { error: "Garmin not connected" },
+        { error: "Garmin not connected (production or test)" },
         { status: 400 }
       );
     }
