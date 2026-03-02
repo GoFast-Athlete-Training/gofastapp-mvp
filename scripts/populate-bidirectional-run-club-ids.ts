@@ -11,11 +11,33 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { Client } from 'pg';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
-// Load environment variables
+// Load environment variables from Product app
 dotenv.config({ path: path.join(__dirname, '../.env') });
+
+// Try to load Company database URL from Company repo's .env if COMPANY_DATABASE_URL not set
+let companyDbUrl = process.env.COMPANY_DATABASE_URL;
+if (!companyDbUrl) {
+  const companyEnvPath = path.join(__dirname, '../../GoFastCompany/.env');
+  try {
+    const companyEnv = dotenv.config({ path: companyEnvPath });
+    if (companyEnv.parsed?.DATABASE_URL) {
+      companyDbUrl = companyEnv.parsed.DATABASE_URL;
+      console.log('📝 Loaded COMPANY_DATABASE_URL from GoFastCompany/.env\n');
+    }
+  } catch (e) {
+    // Company .env not found, will use DATABASE_URL as fallback
+  }
+}
+
+// Fallback to Product app DATABASE_URL if Company URL not found
+if (!companyDbUrl) {
+  companyDbUrl = process.env.DATABASE_URL;
+  console.log('⚠️  Using Product app DATABASE_URL for Company (may not work if different databases)\n');
+}
 
 // Product app Prisma client (uses Product app schema)
 const productPrisma = new PrismaClient({
@@ -26,15 +48,9 @@ const productPrisma = new PrismaClient({
   },
 });
 
-// Company database connection (raw SQL via Prisma - different schema)
-// Use COMPANY_DATABASE_URL if available, otherwise assume same database
-const companyDbUrl = process.env.COMPANY_DATABASE_URL || process.env.DATABASE_URL;
-const companyPrisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: companyDbUrl,
-    },
-  },
+// Company database connection (raw PostgreSQL client - different schema/database)
+const companyClient = new Client({
+  connectionString: companyDbUrl,
 });
 
 interface RunClubMatch {
@@ -47,37 +63,41 @@ interface RunClubMatch {
 async function populateBidirectionalIds() {
   console.log('🚀 Starting bidirectional ID population for run clubs...\n');
 
+  // Connect to Company database
+  await companyClient.connect();
+  console.log('✅ Connected to Company database\n');
+
   try {
-    // Fetch all run_clubs from Product app
-    const productClubs = await productPrisma.run_clubs.findMany({
-      where: {
-        slug: { not: null },
-      },
-      select: {
-        id: true,
-        slug: true,
-        name: true,
-        companyRunClubId: true,
-      },
-      orderBy: { name: 'asc' },
-    });
+    // Fetch all run_clubs from Product app (using raw SQL since Prisma client may not be regenerated)
+    const productResult = await productPrisma.$queryRaw<Array<{
+      id: string;
+      slug: string;
+      name: string;
+      companyRunClubId: string | null;
+    }>>`
+      SELECT id, slug, name, "companyRunClubId"
+      FROM run_clubs
+      ORDER BY name ASC
+    `;
+    
+    const productClubs = productResult.map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      companyRunClubId: row.companyRunClubId,
+    }));
 
     console.log(`📊 Found ${productClubs.length} run clubs in Product app\n`);
 
     // Fetch all acq_run_clubs from Company (using raw SQL since different schema)
-    const companyResult = await companyPrisma.$queryRaw<Array<{
-      id: string;
-      slug: string | null;
-      name: string;
-      runClubId: string | null;
-    }>>`
+    const companyResult = await companyClient.query(`
       SELECT id, slug, name, "runClubId"
       FROM acq_run_clubs
       WHERE slug IS NOT NULL
       ORDER BY name ASC
-    `;
+    `);
     
-    const companyClubs = companyResult.map((row) => ({
+    const companyClubs = companyResult.rows.map((row: any) => ({
       id: row.id,
       slug: row.slug,
       name: row.name,
@@ -113,7 +133,8 @@ async function populateBidirectionalIds() {
 
     // Match Product → Company
     for (const productClub of productClubs) {
-      if (!productClub.slug) {
+      // Slug is required in Product app, but check anyway for safety
+      if (!productClub.slug || productClub.slug.trim() === '') {
         productNoMatch.push(`${productClub.name} (${productClub.id}) - no slug`);
         continue;
       }
@@ -128,13 +149,14 @@ async function populateBidirectionalIds() {
           companySlug: companyClub.slug,
         });
 
-        // Update Product app if not already set
+        // Update Product app if not already set (using raw SQL)
         if (productClub.companyRunClubId !== companyClub.id) {
           try {
-            await productPrisma.run_clubs.update({
-              where: { id: productClub.id },
-              data: { companyRunClubId: companyClub.id },
-            });
+            await productPrisma.$executeRaw`
+              UPDATE run_clubs 
+              SET "companyRunClubId" = ${companyClub.id}
+              WHERE id = ${productClub.id}
+            `;
             productUpdated.push(`${productClub.name} (${productClub.slug})`);
             console.log(`✅ Updated Product: ${productClub.name} → Company ID: ${companyClub.id}`);
           } catch (error: any) {
@@ -147,11 +169,10 @@ async function populateBidirectionalIds() {
         // Update Company if not already set (using raw SQL)
         if (companyClub.runClubId !== productClub.id) {
           try {
-            await companyPrisma.$executeRaw`
-              UPDATE acq_run_clubs 
-              SET "runClubId" = ${productClub.id}
-              WHERE id = ${companyClub.id}
-            `;
+            await companyClient.query(
+              `UPDATE acq_run_clubs SET "runClubId" = $1 WHERE id = $2`,
+              [productClub.id, companyClub.id]
+            );
             companyUpdated.push(`${companyClub.name} (${companyClub.slug})`);
             console.log(`✅ Updated Company: ${companyClub.name} → Product ID: ${productClub.id}`);
           } catch (error: any) {
@@ -204,7 +225,7 @@ async function populateBidirectionalIds() {
     throw error;
   } finally {
     await productPrisma.$disconnect();
-    await companyPrisma.$disconnect();
+    await companyClient.end();
   }
 }
 
