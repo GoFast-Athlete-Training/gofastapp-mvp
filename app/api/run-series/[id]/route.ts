@@ -4,6 +4,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminAuth } from '@/lib/firebaseAdmin';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_COMPANY_APP_URL || 'https://gofasthq.gofastcrushgoals.com',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders });
+}
+
 /**
  * GET /api/run-series/[id]
  * Fetch a single run_series by id (for CityRunSeriesManage / edit).
@@ -48,7 +58,7 @@ export async function GET(
       return NextResponse.json({ error: 'Run series not found' }, { status: 404 });
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       series: {
         id: series.id,
@@ -81,12 +91,15 @@ export async function GET(
         runCount: series._count.city_runs,
       },
     });
+    Object.entries(corsHeaders).forEach(([k, v]) => response.headers.set(k, v));
+    return response;
   } catch (error: any) {
     console.error('[GET /api/run-series/[id]] Error:', error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { success: false, error: 'Failed to fetch run series', details: error?.message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
+    return response;
   }
 }
 
@@ -213,12 +226,15 @@ export async function PUT(
         runCount: series._count.city_runs,
       },
     });
+    Object.entries(corsHeaders).forEach(([k, v]) => response.headers.set(k, v));
+    return response;
   } catch (error: any) {
     console.error('[PUT /api/run-series/[id]] Error:', error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { success: false, error: 'Failed to update run series', details: error?.message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
+    return response;
   }
 }
 
