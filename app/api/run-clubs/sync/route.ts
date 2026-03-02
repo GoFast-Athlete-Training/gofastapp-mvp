@@ -48,6 +48,9 @@ export async function POST(request: NextRequest) {
       allRunsDescriptionValue: rc.allRunsDescription,
     });
 
+    // Extract Company ID from payload (id field contains Company's acq_run_clubs.id)
+    const companyRunClubId = id || null;
+    
     const updateData = {
       name: nameVal,
       slug: slugFinal,
@@ -62,6 +65,7 @@ export async function POST(request: NextRequest) {
         return trimmed.length > 0 ? trimmed : null;
       })(),
       logoUrl: rc.logoUrl != null ? String(rc.logoUrl).trim() || null : null,
+      companyRunClubId: companyRunClubId, // Bidirectional ID mapping: Company's acq_run_clubs.id
       syncedAt: new Date(),
     };
 
@@ -72,17 +76,26 @@ export async function POST(request: NextRequest) {
 
     let runClub;
     
-    // Strategy: Try ID first, but if that fails or ID doesn't match, use slug-based matching
+    // Strategy: Use bidirectional ID mapping for compatibility
+    // 1. Try Product app ID (if provided and exists)
+    // 2. Try Company ID via companyRunClubId (bidirectional mapping)
+    // 3. Try slug-based matching (fallback)
+    // 4. Create new record
+    
     if (id) {
-      // First check if club exists with this ID
+      // First check if club exists with this Product app ID
       const existingById = await prisma.run_clubs.findUnique({ 
         where: { id },
-        select: { id: true, slug: true },
+        select: { id: true, slug: true, companyRunClubId: true },
       });
       
       if (existingById) {
-        // ID exists, use ID-based upsert
-        console.log('🔄 PRODUCT SYNC: Found by ID, using ID-based upsert:', { id, slug: existingById.slug });
+        // Product app ID exists, use ID-based upsert
+        console.log('🔄 PRODUCT SYNC: Found by Product app ID, using ID-based upsert:', { 
+          id, 
+          slug: existingById.slug,
+          companyRunClubId: existingById.companyRunClubId 
+        });
         
         runClub = await prisma.run_clubs.upsert({
           where: { id },
@@ -94,27 +107,31 @@ export async function POST(request: NextRequest) {
             slug: true,
             city: true,
             allRunsDescription: true,
+            companyRunClubId: true,
           },
         });
       } else {
-        // ID doesn't exist, try slug-based matching
-        console.log('🔄 PRODUCT SYNC: ID not found, trying slug-based matching:', { id, slug: slugFinal });
-        
-        const existingBySlug = await prisma.run_clubs.findUnique({ 
-          where: { slug: slugFinal },
-          select: { id: true, slug: true },
+        // Product app ID doesn't exist, try Company ID via bidirectional mapping
+        console.log('🔄 PRODUCT SYNC: Product app ID not found, trying Company ID via bidirectional mapping:', { 
+          companyId: id, 
+          slug: slugFinal 
         });
         
-        if (existingBySlug) {
-          // Found by slug, update the existing record
-          console.log('✅ PRODUCT SYNC: Found by slug, updating existing record:', { 
-            existingId: existingBySlug.id, 
-            slug: existingBySlug.slug,
-            sentId: id 
+        const existingByCompanyId = await prisma.run_clubs.findFirst({ 
+          where: { companyRunClubId: id },
+          select: { id: true, slug: true, companyRunClubId: true },
+        });
+        
+        if (existingByCompanyId) {
+          // Found by Company ID (bidirectional mapping), update the existing record
+          console.log('✅ PRODUCT SYNC: Found by Company ID (bidirectional mapping), updating existing record:', { 
+            productAppId: existingByCompanyId.id, 
+            companyId: id,
+            slug: existingByCompanyId.slug 
           });
           
           runClub = await prisma.run_clubs.update({
-            where: { id: existingBySlug.id },
+            where: { id: existingByCompanyId.id },
             data: updateData,
             select: {
               id: true,
@@ -122,22 +139,60 @@ export async function POST(request: NextRequest) {
               slug: true,
               city: true,
               allRunsDescription: true,
+              companyRunClubId: true,
             },
           });
         } else {
-          // Neither ID nor slug exists, create new with the provided ID
-          console.log('🔄 PRODUCT SYNC: Neither ID nor slug found, creating new record:', { id, slug: slugFinal });
-          
-          runClub = await prisma.run_clubs.create({
-            data: { id, ...updateData },
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              city: true,
-              allRunsDescription: true,
-            },
+          // Try slug-based matching as fallback
+          console.log('🔄 PRODUCT SYNC: Company ID not found, trying slug-based matching:', { 
+            companyId: id, 
+            slug: slugFinal 
           });
+          
+          const existingBySlug = await prisma.run_clubs.findUnique({ 
+            where: { slug: slugFinal },
+            select: { id: true, slug: true, companyRunClubId: true },
+          });
+          
+          if (existingBySlug) {
+            // Found by slug, update the existing record
+            console.log('✅ PRODUCT SYNC: Found by slug, updating existing record:', { 
+              productAppId: existingBySlug.id, 
+              companyId: id,
+              slug: existingBySlug.slug 
+            });
+            
+            runClub = await prisma.run_clubs.update({
+              where: { id: existingBySlug.id },
+              data: updateData,
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                city: true,
+                allRunsDescription: true,
+                companyRunClubId: true,
+              },
+            });
+          } else {
+            // Neither ID nor slug exists, create new with the provided Company ID
+            console.log('🔄 PRODUCT SYNC: Neither ID nor slug found, creating new record:', { 
+              companyId: id, 
+              slug: slugFinal 
+            });
+            
+            runClub = await prisma.run_clubs.create({
+              data: { id, ...updateData },
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                city: true,
+                allRunsDescription: true,
+                companyRunClubId: true,
+              },
+            });
+          }
         }
       }
       
@@ -169,6 +224,7 @@ export async function POST(request: NextRequest) {
             slug: true,
             city: true,
             allRunsDescription: true,
+            companyRunClubId: true,
           },
         });
       } else {
@@ -180,6 +236,7 @@ export async function POST(request: NextRequest) {
             slug: true,
             city: true,
             allRunsDescription: true,
+            companyRunClubId: true,
           },
         });
       }
