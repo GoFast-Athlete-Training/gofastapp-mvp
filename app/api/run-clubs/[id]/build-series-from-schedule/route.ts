@@ -183,7 +183,7 @@ export async function POST(
     const entries = parseRunSchedule(club.runSchedule);
     if (entries.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'No valid schedule entries found', runClubId },
+        { success: false, error: 'No valid schedule entries found', runClubId: id },
         { status: 400, headers: corsHeaders }
       );
     }
