@@ -233,16 +233,21 @@ export async function POST(
     const results = [];
     for (const entry of entries) {
       const canonicalDay = toCanonicalDay(entry.day);
-      const city = isMultiSite ? (club.city?.trim() || null) : null;
-      const meetUpCity = isMultiSite ? city : null;
-      const meetUpState = isMultiSite && meetUpCity ? null : null; // Could add state if available
 
-      const dayKey = city ? `${canonicalDay}:${city.toLowerCase()}` : canonicalDay;
+      // entry.city = the full place string from the parser:
+      //   "D.C. Jefferson by the Washington Monument" (city + location combined).
+      // meetUpPoint = the canonical location name — the whole place string goes here.
+      // meetUpCity  = structured city field — only set if multi-site (same day, multiple locations).
+      const placeString = entry.city?.trim() || null;
+      const meetUpPoint = placeString || null;
+      const meetUpCity = isMultiSite ? (club.city?.trim() || null) : null;
+
+      const dayKey = meetUpCity ? `${canonicalDay}:${meetUpCity.toLowerCase()}` : canonicalDay;
       const existingSeriesId = existingByDay.get(dayKey);
 
       const { hour: startTimeHour, minute: startTimeMinute, period: startTimePeriod } = parseTime(entry.time);
 
-      const citySuffix = isMultiSite && city ? ` (${city})` : '';
+      const citySuffix = isMultiSite && meetUpCity ? ` (${meetUpCity})` : '';
       const seriesName = `${club.name || 'Run Club'} ${entry.day} Run${citySuffix}`;
 
       const clubSlugBase = club.slug || club.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'run-club';
@@ -260,8 +265,8 @@ export async function POST(
             startTimeHour,
             startTimeMinute,
             startTimePeriod: startTimePeriod as 'AM' | 'PM' | null,
+            meetUpPoint,
             meetUpCity,
-            meetUpState,
           },
         });
         results.push({ action: 'updated', seriesId: updated.id, dayOfWeek: canonicalDay });
@@ -278,8 +283,8 @@ export async function POST(
             startTimeHour,
             startTimeMinute,
             startTimePeriod: startTimePeriod as 'AM' | 'PM' | null,
+            meetUpPoint,
             meetUpCity,
-            meetUpState,
             createdAt: now,
             updatedAt: now,
           },
