@@ -39,8 +39,7 @@ export default function AthleteHomePage() {
     
     if (!model?.athlete) {
       // No athlete data - redirect to welcome for hydration
-      console.log('⚠️ Athlete Home: No athlete data in localStorage, redirecting to /welcome');
-      console.warn('// REDIRECT DISABLED: /welcome');
+      router.replace('/welcome');
       return;
     }
 
@@ -77,8 +76,7 @@ export default function AthleteHomePage() {
       if (!user) {
         const currentModel = LocalStorageAPI.getFullHydrationModel();
         if (!currentModel?.athlete) {
-          console.log('⚠️ Athlete Home: No Firebase user and no localStorage data, redirecting to /signup');
-          console.warn('// REDIRECT DISABLED: /signup');
+          router.replace('/signup');
         }
         // If we have localStorage data, keep showing the page (user might be in popup context)
       }
@@ -261,7 +259,7 @@ export default function AthleteHomePage() {
         <div className="text-center">
           <p className="text-gray-600 mb-4">Please sign in to continue</p>
           <button
-            onClick={() => console.warn('// REDIRECT DISABLED: /signup')}
+            onClick={() => router.replace('/signup')}
             className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600"
           >
             Sign In

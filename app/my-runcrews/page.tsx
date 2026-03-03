@@ -60,7 +60,7 @@ export default function MyRunCrewsPage() {
           setLoading(false);
         } else {
           // No data - redirect to welcome for hydration
-          console.warn('// REDIRECT DISABLED: /welcome');
+          router.replace('/welcome');
         }
       }
     }, 3000); // 3 second timeout
@@ -71,7 +71,7 @@ export default function MyRunCrewsPage() {
 
       // No Firebase user - redirect to signup
       if (!firebaseUser) {
-        console.warn('// REDIRECT DISABLED: /signup');
+        router.replace('/signup');
         return;
       }
 
@@ -106,7 +106,7 @@ export default function MyRunCrewsPage() {
           }
         } else {
           // No data in localStorage - need to hydrate, redirect to welcome
-          console.warn('// REDIRECT DISABLED: /welcome');
+          router.replace('/welcome');
           return;
         }
       }

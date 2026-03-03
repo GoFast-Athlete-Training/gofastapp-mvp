@@ -141,21 +141,21 @@ function parseTime(timeStr: string | null | undefined): { hour: number | null; m
 }
 
 /**
- * POST /api/run-clubs/[runClubId]/build-series-from-schedule
+ * POST /api/run-clubs/[id]/build-series-from-schedule
  *
  * Build all series for a club from its runSchedule (club-scoped).
  * Parses runSchedule, matches existing series by dayOfWeek, creates/updates as needed.
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ runClubId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { runClubId } = await params;
+    const { id } = await params;
 
     // Load club with runSchedule
     const club = await prisma.run_clubs.findUnique({
-      where: { id: runClubId },
+      where: { id },
       select: {
         id: true,
         name: true,
@@ -167,14 +167,14 @@ export async function POST(
 
     if (!club) {
       return NextResponse.json(
-        { success: false, error: 'Club not found', runClubId },
+        { success: false, error: 'Club not found', runClubId: id },
         { status: 404, headers: corsHeaders }
       );
     }
 
     if (!club.runSchedule || !club.runSchedule.trim()) {
       return NextResponse.json(
-        { success: false, error: 'Club has no runSchedule', runClubId },
+        { success: false, error: 'Club has no runSchedule', runClubId: id },
         { status: 400, headers: corsHeaders }
       );
     }
@@ -274,7 +274,7 @@ export async function POST(
     return NextResponse.json(
       {
         success: true,
-        runClubId: club.id,
+        runClubId: id,
         results,
         summary: {
           total: results.length,

@@ -664,8 +664,7 @@ export default function RunCrewDiscoveryPage() {
                       const athleteId = LocalStorageAPI.getAthleteId();
                       if (!athleteId) {
                         // Should be hydrated, but if not, redirect to welcome to re-hydrate
-                        console.warn('⚠️ Discovery: athleteId not found in localStorage, redirecting to welcome');
-                        console.warn('// REDIRECT DISABLED: /welcome');
+                        router.replace('/welcome');
                         return;
                       }
 

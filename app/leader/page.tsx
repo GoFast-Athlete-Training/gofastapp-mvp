@@ -24,7 +24,7 @@ export default function LeaderHubPage() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        console.warn('// REDIRECT DISABLED: /signup');
+        router.replace('/signup');
         return;
       }
       setIsAuthenticated(true);
@@ -33,16 +33,16 @@ export default function LeaderHubPage() {
         if (res.data?.success && res.data?.athlete) {
           const a = res.data.athlete;
           if (a.role !== 'CLUB_LEADER') {
-            console.warn('// REDIRECT DISABLED: /welcome');
+            router.replace('/welcome');
             return;
           }
           if (a.runClub?.name) setClubName(a.runClub.name);
         } else {
-          console.warn('// REDIRECT DISABLED: /welcome');
+          router.replace('/welcome');
           return;
         }
       } catch {
-        console.warn('// REDIRECT DISABLED: /welcome');
+        router.replace('/welcome');
         return;
       } finally {
         setIsLoading(false);
