@@ -258,6 +258,7 @@ export async function POST(
         results.push({ action: 'updated', seriesId: updated.id, dayOfWeek: canonicalDay });
       } else {
         // Create new series
+        const now = new Date();
         const created = await prisma.run_series.create({
           data: {
             id: generateId(),
@@ -270,6 +271,8 @@ export async function POST(
             startTimePeriod: startTimePeriod as 'AM' | 'PM' | null,
             meetUpCity,
             meetUpState,
+            createdAt: now,
+            updatedAt: now,
           },
         });
         results.push({ action: 'created', seriesId: created.id, dayOfWeek: canonicalDay });
