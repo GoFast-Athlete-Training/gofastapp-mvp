@@ -14,11 +14,14 @@ function generateId(): string {
 }
 
 export interface ActivitySummary {
-  activityId: string | number;
+  activityId?: string | number;
+  summaryId?: string | number; // Garmin sometimes sends this instead of/in addition to activityId
   userId?: string;
   activityType?: string;
   activityName?: string;
   startTime?: string | number;
+  startTimeInSeconds?: number; // Garmin PUSH uses Unix seconds
+  startTimeOffsetInSeconds?: number;
   duration?: number;
   distance?: number;
   calories?: number;
@@ -58,9 +61,9 @@ export async function handleActivitySummary(
         continue;
       }
 
-      const sourceActivityId = activity.activityId?.toString();
+      const sourceActivityId = (activity.activityId ?? activity.summaryId)?.toString();
       if (!sourceActivityId) {
-        console.warn('⚠️ No activityId found in activity summary');
+        console.warn('⚠️ No activityId/summaryId found in activity summary');
         skipped++;
         continue;
       }
@@ -71,9 +74,46 @@ export async function handleActivitySummary(
       }
 
       const now = new Date();
-      const startTime = activity.startTime
-        ? new Date(typeof activity.startTime === 'string' ? activity.startTime : (activity.startTime as number) * 1000)
+      const startTimeRaw = activity.startTime ?? activity.startTimeInSeconds;
+      const startTime = startTimeRaw != null
+        ? new Date(
+            typeof startTimeRaw === 'string'
+              ? startTimeRaw
+              : (startTimeRaw as number) < 1e12
+                ? (startTimeRaw as number) * 1000
+                : (startTimeRaw as number)
+          )
         : null;
+
+      // Normalize Garmin Data Generator / API field names into our schema (accept both styles)
+      const duration =
+        activity.duration != null ? Number(activity.duration)
+        : (activity as any).durationInSeconds != null ? Number((activity as any).durationInSeconds)
+        : undefined;
+      const distance =
+        activity.distance != null ? Number(activity.distance)
+        : (activity as any).distanceInMeters != null ? Number((activity as any).distanceInMeters)
+        : undefined;
+      const calories =
+        activity.calories != null ? Number(activity.calories)
+        : (activity as any).activeKilocalories != null ? Math.round(Number((activity as any).activeKilocalories))
+        : undefined;
+      const averageSpeed =
+        activity.averageSpeed != null ? Number(activity.averageSpeed)
+        : (activity as any).averageSpeedInMetersPerSecond != null ? Number((activity as any).averageSpeedInMetersPerSecond)
+        : undefined;
+      const averageHeartRate =
+        activity.averageHeartRate != null ? Number(activity.averageHeartRate)
+        : (activity as any).averageHeartRateInBeatsPerMinute != null ? Math.round(Number((activity as any).averageHeartRateInBeatsPerMinute))
+        : undefined;
+      const maxHeartRate =
+        activity.maxHeartRate != null ? Number(activity.maxHeartRate)
+        : (activity as any).maxHeartRateInBeatsPerMinute != null ? Math.round(Number((activity as any).maxHeartRateInBeatsPerMinute))
+        : undefined;
+      const elevationGain =
+        activity.elevationGain != null ? Number(activity.elevationGain)
+        : (activity as any).totalElevationGainInMeters != null ? Number((activity as any).totalElevationGainInMeters)
+        : undefined;
 
       await prisma.athlete_activities.create({
         data: {
@@ -84,13 +124,13 @@ export async function handleActivitySummary(
           activityType: activity.activityType ?? undefined,
           activityName: activity.activityName ?? undefined,
           startTime,
-          duration: activity.duration != null ? Math.round(Number(activity.duration)) : undefined,
-          distance: activity.distance != null ? Number(activity.distance) : undefined,
-          calories: activity.calories != null ? Math.round(Number(activity.calories)) : undefined,
-          averageSpeed: activity.averageSpeed != null ? Number(activity.averageSpeed) : undefined,
-          averageHeartRate: activity.averageHeartRate != null ? Math.round(Number(activity.averageHeartRate)) : undefined,
-          maxHeartRate: activity.maxHeartRate != null ? Math.round(Number(activity.maxHeartRate)) : undefined,
-          elevationGain: activity.elevationGain != null ? Number(activity.elevationGain) : undefined,
+          duration: duration != null ? Math.round(duration) : undefined,
+          distance: distance ?? undefined,
+          calories: calories ?? undefined,
+          averageSpeed: averageSpeed ?? undefined,
+          averageHeartRate: averageHeartRate ?? undefined,
+          maxHeartRate: maxHeartRate ?? undefined,
+          elevationGain: elevationGain ?? undefined,
           steps: activity.steps != null ? Math.round(Number(activity.steps)) : undefined,
           summaryData: activity as object,
           updatedAt: now,

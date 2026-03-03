@@ -11,13 +11,22 @@ const DEBUG = process.env.GARMIN_DEBUG === 'true';
 
 /**
  * POST /api/garmin/webhook
- * 
+ *
  * Unified webhook endpoint for all Garmin events.
  * Responds with 200 OK immediately (<3 seconds), then processes asynchronously.
+ *
+ * To see if Garmin is sending: check server logs for "Garmin webhook POST received".
+ * Set GARMIN_DEBUG=true for full payload logging.
  */
 export async function POST(request: Request) {
   const startTime = Date.now();
-  
+
+  // Log immediately so we can see in Vercel/server logs whether Garmin is hitting this endpoint at all
+  console.log('📩 Garmin webhook POST received', {
+    timestamp: new Date().toISOString(),
+    contentType: request.headers.get('content-type') ?? 'none',
+  });
+
   // 1. Acknowledge Garmin immediately (required for webhook compliance)
   const acknowledgeResponse = NextResponse.json({ success: true }, { status: 200 });
 
@@ -35,26 +44,42 @@ export async function POST(request: Request) {
 }
 
 /**
- * Process webhook data asynchronously
+ * Process webhook data asynchronously.
+ * Supports both PING (callbackURL to fetch) and PUSH (inline activity data).
  */
 async function processWebhookData(request: Request) {
   try {
     const body = await request.json();
-    
+    const keys = Object.keys(body);
+    const activities = body.activities;
+    const hasActivitiesArray = Array.isArray(activities) && activities.length > 0;
+    const firstActivity = hasActivitiesArray ? activities[0] : null;
+    const isPing = firstActivity && 'callbackURL' in firstActivity && firstActivity.callbackURL;
+
+    // Always log enough to see if we got activities and whether it's PING vs PUSH (for debugging empty DB)
+    const topLevelUserId = body.userId ?? null;
+    const firstActivityUserId = firstActivity && typeof firstActivity === 'object' && 'userId' in firstActivity ? (firstActivity as any).userId : null;
+    console.log('📩 Garmin webhook payload', {
+      keys,
+      activitiesCount: hasActivitiesArray ? activities.length : 0,
+      mode: isPing ? 'PING (callbackURL)' : hasActivitiesArray ? 'PUSH (inline)' : 'none',
+      userId: topLevelUserId ?? firstActivityUserId ?? '(none)',
+      hasBodyUserId: topLevelUserId != null,
+      hasFirstActivityUserId: firstActivityUserId != null,
+      timestamp: new Date().toISOString(),
+    });
+
     if (DEBUG) {
-      console.log('📩 Garmin webhook received:', {
-        keys: Object.keys(body),
-        timestamp: new Date().toISOString(),
-        body: JSON.stringify(body, null, 2)
-      });
-    } else {
-      console.log('📩 Garmin webhook received:', {
-        keys: Object.keys(body),
-        timestamp: new Date().toISOString()
-      });
+      console.log('📩 Garmin webhook body:', JSON.stringify(body, null, 2));
     }
 
-    // Detect event type and route to appropriate handler
+    // Garmin PING: activities contain callbackURL; we must fetch each URL to get the actual data
+    if (hasActivitiesArray && isPing) {
+      await handlePingActivities(activities, body.userId);
+      return;
+    }
+
+    // Detect event type and route to appropriate handler (PUSH or other)
     const eventType = detectEventType(body);
     
     if (DEBUG) {
@@ -62,12 +87,14 @@ async function processWebhookData(request: Request) {
     }
 
     switch (eventType) {
-      case 'ACTIVITY_SUMMARY':
-        await handleActivitySummary(
+      case 'ACTIVITY_SUMMARY': {
+        const result = await handleActivitySummary(
           body.activities || [],
           body.userId
         );
+        console.log('📩 Garmin ACTIVITY_SUMMARY result', { ...result, userId: body.userId ?? '(none)' });
         break;
+      }
 
       case 'ACTIVITY_DETAIL':
         await handleActivityDetail(
@@ -166,4 +193,48 @@ function detectEventType(body: any): string {
 
   // Default to unknown
   return 'UNKNOWN';
+}
+
+/**
+ * Handle Garmin PING: fetch activity data from each callbackURL, then save.
+ * Garmin sends { activities: [{ userId, callbackURL }] } and we must GET the URL to get the actual activity/activities.
+ */
+async function handlePingActivities(
+  activities: Array<{ userId?: string; callbackURL?: string }>,
+  userId?: string
+): Promise<void> {
+  const garminUserId = userId ?? activities[0]?.userId;
+  if (!garminUserId) {
+    console.warn('⚠️ Garmin PING: no userId in payload or activities');
+    return;
+  }
+
+  const allFetched: any[] = [];
+  for (const item of activities) {
+    const url = item?.callbackURL;
+    if (!url) continue;
+    try {
+      const res = await fetch(url, { method: 'GET' });
+      if (!res.ok) {
+        console.warn(`⚠️ Garmin PING fetch failed: ${res.status} ${url.slice(0, 80)}...`);
+        continue;
+      }
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        allFetched.push(...data);
+      } else if (data && typeof data === 'object') {
+        allFetched.push(data);
+      }
+    } catch (err: any) {
+      console.error('❌ Garmin PING fetch error:', err?.message, url?.slice(0, 80));
+    }
+  }
+
+  if (allFetched.length === 0) {
+    console.log('📩 Garmin PING: no activity data returned from callbackURLs');
+    return;
+  }
+
+  const result = await handleActivitySummary(allFetched, garminUserId);
+  console.log('📩 Garmin PING processed', { fetched: allFetched.length, ...result });
 }
