@@ -36,7 +36,10 @@ export async function GET(request: Request) {
     const activities = await prisma.athlete_activities.findMany({
       where: {
         athleteId: athlete.id,
-        startTime: { gte: ninetyDaysAgo },
+        OR: [
+          { startTime: null },
+          { startTime: { gte: ninetyDaysAgo } },
+        ],
       },
       orderBy: { startTime: 'desc' },
       take: 200,
