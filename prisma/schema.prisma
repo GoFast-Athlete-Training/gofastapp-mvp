@@ -317,6 +317,7 @@ model run_clubs {
   city      String?
   description String?              // General club description (for downstream display)
   allRunsDescription String?      // Overall description for this club's run series (not per individual run) — drives run_series.description
+  runSchedule String?              // Copy of acq_run_clubs.runSchedule from Company — used to build/update series (club-scoped)
   websiteUrl String?
   runUrl    String?              // "Runs" page URL — single source of truth for where run/series info came from (seed/hydrate for data entry)
   instagramUrl String?
