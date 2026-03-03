@@ -229,18 +229,47 @@ export async function POST(
     });
     const isMultiSite = Array.from(dayCounts.values()).some((count) => count > 1);
 
+    // Split a full place string (e.g. "D.C. Jefferson by the Washington Monument") into
+    // structured city + location using the same heuristic as the Company app edit page.
+    function splitPlaceString(placeText: string): { city: string; location: string } {
+      const commonCityPatterns = [
+        /^D\.C\./i, /^Washington$/i, /^Arlington$/i, /^Georgetown$/i,
+        /^Bethesda$/i, /^Alexandria$/i, /^Fairfax$/i, /^Vienna$/i,
+        /^Reston$/i, /^Tysons$/i, /^McLean$/i, /^Silver\s+Spring$/i,
+        /^Rockville$/i, /^Gaithersburg$/i,
+      ];
+      const tokens = placeText.trim().split(/\s+/);
+      const firstToken = tokens[0];
+      const isCityPattern = commonCityPatterns.some((p) => p.test(firstToken));
+      const isAbbreviation = /^[A-Z]\.([A-Z]\.)?$/i.test(firstToken);
+
+      if (tokens.length >= 2 && firstToken.toLowerCase() === 'washington' && tokens[1] === 'D.C.') {
+        return { city: firstToken, location: tokens.slice(1).join(' ') };
+      } else if ((isCityPattern || isAbbreviation) && tokens.length > 1) {
+        return { city: firstToken, location: tokens.slice(1).join(' ') };
+      } else if (tokens.length === 1 && (isCityPattern || isAbbreviation)) {
+        return { city: firstToken, location: '' };
+      } else {
+        return { city: '', location: placeText };
+      }
+    }
+
     // Process each entry
     const results = [];
     for (const entry of entries) {
       const canonicalDay = toCanonicalDay(entry.day);
 
-      // entry.city = the full place string from the parser:
-      //   "D.C. Jefferson by the Washington Monument" (city + location combined).
-      // meetUpPoint = the canonical location name — the whole place string goes here.
-      // meetUpCity  = structured city field — only set if multi-site (same day, multiple locations).
-      const placeString = entry.city?.trim() || null;
-      const meetUpPoint = placeString || null;
-      const meetUpCity = isMultiSite ? (club.city?.trim() || null) : null;
+      // entry.city = the full place blob from the parser: "D.C. Jefferson by the Washington Monument"
+      // Split into structured city + location:
+      //   meetUpCity  = "D.C."
+      //   meetUpPoint = "Jefferson by the Washington Monument"
+      const placeString = entry.city?.trim() || '';
+      const { city: parsedCity, location: parsedLocation } = placeString
+        ? splitPlaceString(placeString)
+        : { city: '', location: '' };
+
+      const meetUpCity = parsedCity || (isMultiSite ? (club.city?.trim() || null) : null) || null;
+      const meetUpPoint = parsedLocation || null;
 
       const dayKey = meetUpCity ? `${canonicalDay}:${meetUpCity.toLowerCase()}` : canonicalDay;
       const existingSeriesId = existingByDay.get(dayKey);
@@ -252,11 +281,10 @@ export async function POST(
 
       const clubSlugBase = club.slug || club.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'run-club';
       const daySlug = canonicalDay.toLowerCase();
-      const citySlug = isMultiSite && club.city ? `-${club.city.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : '';
+      const citySlug = meetUpCity ? `-${meetUpCity.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : '';
       const seriesSlug = `${clubSlugBase}-${daySlug}${citySlug}`;
 
       if (existingSeriesId) {
-        // Update existing series
         const updated = await prisma.run_series.update({
           where: { id: existingSeriesId },
           data: {
@@ -271,7 +299,6 @@ export async function POST(
         });
         results.push({ action: 'updated', seriesId: updated.id, dayOfWeek: canonicalDay });
       } else {
-        // Create new series
         const now = new Date();
         const created = await prisma.run_series.create({
           data: {
