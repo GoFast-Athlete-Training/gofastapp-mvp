@@ -5,6 +5,13 @@ import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
 import { getValidAccessToken } from '@/lib/garmin-refresh-token';
 import { prisma } from '@/lib/prisma';
+import { activityExists } from '@/lib/garmin-events/dedupe';
+
+function generateId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 15);
+  return `c${timestamp}${random}`;
+}
 
 /**
  * POST /api/garmin/sync
@@ -88,60 +95,54 @@ export async function POST(request: Request) {
       );
     }
 
-    // TODO: Activities will be reintroduced in Schema Phase 3
-    // 5. Process and save activities
+    // 5. Process and save activities to athlete_activities
     let saved = 0;
     let skipped = 0;
     let errors = 0;
+    const now = new Date();
 
-    // TODO: Re-enable activity saving when AthleteActivity model is reintroduced
-    // for (const activity of activities) {
-    //   try {
-    //     const sourceActivityId = activity.activityId?.toString() || activity.id?.toString();
-    //     
-    //     if (!sourceActivityId) {
-    //       skipped++;
-    //       continue;
-    //     }
+    for (const activity of activities) {
+      try {
+        const sourceActivityId = activity.activityId?.toString() || activity.id?.toString();
+        if (!sourceActivityId) {
+          skipped++;
+          continue;
+        }
+        if (await activityExists(sourceActivityId)) {
+          skipped++;
+          continue;
+        }
+        const startTime = activity.startTime
+          ? new Date(typeof activity.startTime === 'number' && activity.startTime < 1e12 ? activity.startTime * 1000 : activity.startTime)
+          : null;
 
-    //     // Check if already exists
-    //     const existing = await prisma.athleteActivity.findUnique({
-    //       where: { sourceActivityId }
-    //     });
-
-    //     if (existing) {
-    //       skipped++;
-    //       continue;
-    //     }
-
-    //     // Create activity record
-    //     await prisma.athleteActivity.create({
-    //       data: {
-    //         athleteId: athlete.id,
-    //         sourceActivityId,
-    //         source: 'garmin',
-    //         activityType: activity.activityType,
-    //         activityName: activity.activityName,
-    //         startTime: activity.startTime ? new Date(activity.startTime) : null,
-    //         duration: activity.duration,
-    //         distance: activity.distance,
-    //         calories: activity.calories,
-    //         averageSpeed: activity.averageSpeed,
-    //         averageHeartRate: activity.averageHeartRate,
-    //         maxHeartRate: activity.maxHeartRate,
-    //         elevationGain: activity.elevationGain,
-    //         steps: activity.steps,
-    //         summaryData: activity
-    //       }
-    //     });
-
-    //     saved++;
-
-    //   } catch (error: any) {
-    //     errors++;
-    //     console.error(`❌ Error saving activity:`, error);
-    //   }
-    // }
+        await prisma.athlete_activities.create({
+          data: {
+            id: generateId(),
+            athleteId: athlete.id,
+            sourceActivityId,
+            source: 'garmin',
+            activityType: activity.activityType ?? undefined,
+            activityName: activity.activityName ?? undefined,
+            startTime,
+            duration: activity.duration != null ? Math.round(Number(activity.duration)) : undefined,
+            distance: activity.distance != null ? Number(activity.distance) : undefined,
+            calories: activity.calories != null ? Math.round(Number(activity.calories)) : undefined,
+            averageSpeed: activity.averageSpeed != null ? Number(activity.averageSpeed) : undefined,
+            averageHeartRate: activity.averageHeartRate != null ? Math.round(Number(activity.averageHeartRate)) : undefined,
+            maxHeartRate: activity.maxHeartRate != null ? Math.round(Number(activity.maxHeartRate)) : undefined,
+            elevationGain: activity.elevationGain != null ? Number(activity.elevationGain) : undefined,
+            steps: activity.steps != null ? Math.round(Number(activity.steps)) : undefined,
+            summaryData: activity as object,
+            updatedAt: now,
+          },
+        });
+        saved++;
+      } catch (error: any) {
+        errors++;
+        console.error('❌ Error saving activity:', error);
+      }
+    }
 
     // 6. Update last sync time
     await prisma.athlete.update({

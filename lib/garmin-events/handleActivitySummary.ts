@@ -1,11 +1,17 @@
 /**
  * Handle ACTIVITY_SUMMARY webhook events
- * Processes activity summary data from Garmin
+ * Processes activity summary data from Garmin and stores in athlete_activities.
  */
 
 import { prisma } from '../prisma';
 import { getAthleteByGarminUserId } from '../domain-garmin';
 import { activityExists } from './dedupe';
+
+function generateId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 15);
+  return `c${timestamp}${random}`;
+}
 
 export interface ActivitySummary {
   activityId: string | number;
@@ -59,41 +65,39 @@ export async function handleActivitySummary(
         continue;
       }
 
-      // TODO: Activities will be reintroduced in Schema Phase 3
-      // Check for duplicates
-      // if (await activityExists(sourceActivityId)) {
-      //   console.log(`⏭️ Activity ${sourceActivityId} already exists, skipping`);
-      //   skipped++;
-      //   continue;
-      // }
+      if (await activityExists(sourceActivityId)) {
+        skipped++;
+        continue;
+      }
 
-      // TODO: Re-enable activity saving when AthleteActivity model is reintroduced
-      // Create activity record
-      // await prisma.athleteActivity.create({
-      //   data: {
-      //     athleteId: athlete.id,
-      //     sourceActivityId,
-      //     source: 'garmin',
-      //     activityType: activity.activityType,
-      //     activityName: activity.activityName,
-      //     startTime: activity.startTime 
-      //       ? new Date(typeof activity.startTime === 'string' ? activity.startTime : activity.startTime * 1000)
-      //       : null,
-      //     duration: activity.duration,
-      //     distance: activity.distance,
-      //     calories: activity.calories,
-      //     averageSpeed: activity.averageSpeed,
-      //     averageHeartRate: activity.averageHeartRate,
-      //     maxHeartRate: activity.maxHeartRate,
-      //     elevationGain: activity.elevationGain,
-      //     steps: activity.steps,
-      //     summaryData: activity
-      //   }
-      // });
+      const now = new Date();
+      const startTime = activity.startTime
+        ? new Date(typeof activity.startTime === 'string' ? activity.startTime : (activity.startTime as number) * 1000)
+        : null;
 
-      // processed++;
-      // console.log(`✅ Activity ${sourceActivityId} saved for athlete ${athlete.id}`);
-      skipped++;
+      await prisma.athlete_activities.create({
+        data: {
+          id: generateId(),
+          athleteId: athlete.id,
+          sourceActivityId,
+          source: 'garmin',
+          activityType: activity.activityType ?? undefined,
+          activityName: activity.activityName ?? undefined,
+          startTime,
+          duration: activity.duration != null ? Math.round(Number(activity.duration)) : undefined,
+          distance: activity.distance != null ? Number(activity.distance) : undefined,
+          calories: activity.calories != null ? Math.round(Number(activity.calories)) : undefined,
+          averageSpeed: activity.averageSpeed != null ? Number(activity.averageSpeed) : undefined,
+          averageHeartRate: activity.averageHeartRate != null ? Math.round(Number(activity.averageHeartRate)) : undefined,
+          maxHeartRate: activity.maxHeartRate != null ? Math.round(Number(activity.maxHeartRate)) : undefined,
+          elevationGain: activity.elevationGain != null ? Number(activity.elevationGain) : undefined,
+          steps: activity.steps != null ? Math.round(Number(activity.steps)) : undefined,
+          summaryData: activity as object,
+          updatedAt: now,
+        },
+      });
+
+      processed++;
 
     } catch (error: any) {
       errors++;

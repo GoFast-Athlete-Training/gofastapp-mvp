@@ -174,9 +174,60 @@ export async function hydrateAthlete(athleteId: string) {
     return null;
   }
 
-  // TODO: Activities will be reintroduced in Schema Phase 3
-  // Calculate weekly totals
-  const weeklyTotals = { distance: 0, duration: 0, activities: 0 };
+  // Load activity stream (last 30 days) for weekly totals and list
+  let activityList: Array<{ startTime: Date | null; duration: number | null; distance: number | null; activityType: string | null; activityName: string | null; id: string; sourceActivityId: string }> = [];
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    activityList = await prisma.athlete_activities.findMany({
+      where: { athleteId: athlete.id, startTime: { gte: thirtyDaysAgo } },
+      orderBy: { startTime: 'desc' },
+      select: {
+        id: true,
+        sourceActivityId: true,
+        activityType: true,
+        activityName: true,
+        startTime: true,
+        duration: true,
+        distance: true,
+      },
+    });
+  } catch {
+    // Table or relation may not exist in some envs
+  }
+
+  const METERS_PER_MILE = 1609.34;
+  const now = new Date();
+  const startOfThisWeek = new Date(now);
+  startOfThisWeek.setHours(0, 0, 0, 0);
+  startOfThisWeek.setDate(now.getDate() - now.getDay());
+  const endOfThisWeek = new Date(startOfThisWeek);
+  endOfThisWeek.setDate(endOfThisWeek.getDate() + 7);
+
+  const thisWeekActivities = activityList.filter(
+    (a) => a.startTime && a.startTime >= startOfThisWeek && a.startTime < endOfThisWeek
+  );
+  const totalDistanceMeters = thisWeekActivities.reduce((sum, a) => sum + (a.distance ?? 0), 0);
+  const totalDurationSeconds = thisWeekActivities.reduce((sum, a) => sum + (a.duration ?? 0), 0);
+  const weeklyTotals = {
+    distance: totalDistanceMeters,
+    duration: totalDurationSeconds,
+    activities: thisWeekActivities.length,
+    totalDistance: totalDistanceMeters,
+    totalDistanceMiles: (totalDistanceMeters / METERS_PER_MILE).toFixed(2),
+    totalDuration: totalDurationSeconds,
+    totalCalories: 0,
+    activityCount: thisWeekActivities.length,
+  };
+  const weeklyActivities = activityList.slice(0, 50).map((a) => ({
+    id: a.id,
+    sourceActivityId: a.sourceActivityId,
+    activityType: a.activityType,
+    activityName: a.activityName,
+    startTime: a.startTime,
+    duration: a.duration,
+    distance: a.distance,
+  }));
 
   // Normalize crews with roles (handle case where tables don't exist)
   const crews = hasRunCrewTables && athlete.run_crew_memberships && Array.isArray(athlete.run_crew_memberships)
@@ -262,17 +313,10 @@ export async function hydrateAthlete(athleteId: string) {
     // Primary crew context (for localStorage)
     MyCrew: MyCrew,
     
-    // TODO: Activities will be reintroduced in Schema Phase 3
-    // Weekly Activities (last 7 days)
-    weeklyActivities: [],
-    weeklyActivityCount: 0,
-    weeklyTotals: {
-      totalDistance: 0,
-      totalDistanceMiles: '0.00',
-      totalDuration: 0,
-      totalCalories: 0,
-      activityCount: 0,
-    },
+    // Activity stream and weekly totals (from athlete_activities)
+    weeklyActivities,
+    weeklyActivityCount: weeklyActivities.length,
+    weeklyTotals,
     
     // Garmin connection status
     garmin_is_connected: athlete.garmin_is_connected || false,

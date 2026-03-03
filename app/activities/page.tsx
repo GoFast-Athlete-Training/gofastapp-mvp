@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import TopNav from '@/components/shared/TopNav';
+import api from '@/lib/api';
+
+const METERS_PER_MILE = 1609.34;
 
 export default function ActivitiesPage() {
   const router = useRouter();
@@ -14,17 +17,22 @@ export default function ActivitiesPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Check Garmin connection status
     const model = LocalStorageAPI.getFullHydrationModel();
     const garminFromModel = model?.athlete?.garmin_is_connected;
     const garminFromStorage = localStorage.getItem('garminConnected') === 'true';
-    const isConnected = garminFromModel || garminFromStorage;
-    setGarminConnected(isConnected);
+    setGarminConnected(garminFromModel || garminFromStorage);
 
-    // Get activities from localStorage (set during hydration)
-    const weeklyActivities = model?.weeklyActivities || [];
-    setActivities(weeklyActivities);
-    setLoading(false);
+    (async () => {
+      try {
+        const response = await api.get('/activities');
+        const list = response.data?.activities ?? [];
+        setActivities(Array.isArray(list) ? list : []);
+      } catch {
+        setActivities([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
 
@@ -45,20 +53,47 @@ export default function ActivitiesPage() {
         </div>
         
         {activities.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {activities.map((activity, index) => (
-              <div key={activity.id || index} className="bg-white rounded-lg shadow p-6">
-                <div className="font-medium">{activity.activityName || 'Activity'}</div>
-                <div className="text-sm text-gray-600">
-                  {activity.activityType}
-                </div>
-                {activity.distance && (
-                  <div className="text-sm text-gray-500">
-                    {(activity.distance / 1609.34).toFixed(2)} miles
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">
+              Your activity stream — synced from Garmin. New runs and workouts appear here automatically.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activities.map((activity, index) => (
+                <div
+                  key={activity.id || activity.sourceActivityId || index}
+                  className="bg-white rounded-lg shadow p-5 border border-gray-100 hover:border-orange-200 transition-colors"
+                >
+                  <div className="font-medium text-gray-900">
+                    {activity.activityName || activity.activityType || 'Activity'}
                   </div>
-                )}
-              </div>
-            ))}
+                  {activity.startTime && (
+                    <div className="text-sm text-gray-500 mt-1">
+                      {new Date(activity.startTime).toLocaleDateString(undefined, {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </div>
+                  )}
+                  <div className="mt-2 flex flex-wrap gap-3 text-sm">
+                    {activity.distance != null && (
+                      <span className="text-orange-600 font-medium">
+                        {(activity.distance / METERS_PER_MILE).toFixed(2)} mi
+                      </span>
+                    )}
+                    {activity.duration != null && (
+                      <span className="text-gray-600">
+                        {Math.floor(activity.duration / 60)} min
+                      </span>
+                    )}
+                    {activity.activityType && (
+                      <span className="text-gray-500">{activity.activityType}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl shadow-lg p-12 text-center border-2 border-orange-200">

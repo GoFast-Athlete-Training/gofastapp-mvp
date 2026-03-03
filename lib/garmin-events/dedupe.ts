@@ -6,20 +6,16 @@
 import { prisma } from '../prisma';
 
 /**
- * TODO: Activities will be reintroduced in Schema Phase 3
- * Check if activity already exists by sourceActivityId
+ * Check if activity already exists by sourceActivityId (avoids duplicate webhook/sync saves).
  */
 export async function activityExists(
   sourceActivityId: string
 ): Promise<boolean> {
-  // TODO: Re-enable when AthleteActivity model is reintroduced
-  // const existing = await prisma.athleteActivity.findUnique({
-  //   where: { sourceActivityId },
-  //   select: { id: true }
-  // });
-  
-  // return !!existing;
-  return false;
+  const existing = await prisma.athlete_activities.findUnique({
+    where: { sourceActivityId },
+    select: { id: true },
+  });
+  return !!existing;
 }
 
 /**

@@ -14,13 +14,15 @@ export async function OPTIONS() {
 }
 
 /**
- * POST /api/run-clubs/sync
+ * POST /api/run-clubs/update
  *
- * Syncs a run club from Company (acq_run_clubs) to Product (run_clubs).
- * This is a dedicated endpoint for hydrating run clubs without creating series.
- *
+ * Receives run club data from Company app (prodpush).
+ * Product app owns parse/save - it's Product's DB!
+ * 
+ * If data is jacked, Product app and services handle it: "Go to work boys and get this ready"
+ * 
  * Body:
- *   runClub  object  (required) — source of truth from GoFastCompany acq_run_clubs
+ *   runClub  object  (required) — data from GoFastCompany acq_run_clubs
  */
 export async function POST(request: NextRequest) {
   try {
@@ -40,14 +42,15 @@ export async function POST(request: NextRequest) {
     const slugVal = rc.slug != null ? String(rc.slug).trim() : (id || nameVal.toLowerCase().replace(/\s+/g, '-'));
     const slugFinal = slugVal || id || `club-${Date.now()}`;
 
-    console.log('🔄 PRODUCT SYNC: Received run club payload:', {
+    console.log('📥 PRODUCT UPDATE: Received run club payload:', {
       id,
       name: nameVal,
       allRunsDescription: rc.allRunsDescription ? `${String(rc.allRunsDescription).substring(0, 50)}...` : null,
-      allRunsDescriptionType: typeof rc.allRunsDescription,
-      allRunsDescriptionValue: rc.allRunsDescription,
+      runSchedule: rc.runSchedule ? `${String(rc.runSchedule).substring(0, 50)}...` : null,
+      fieldsReceived: Object.keys(rc).length,
     });
 
+    // Product app owns parse/validate/transform - all the magic happens here
     const updateData = {
       name: nameVal,
       slug: slugFinal,
@@ -70,9 +73,10 @@ export async function POST(request: NextRequest) {
       syncedAt: new Date(),
     };
 
-    console.log('🔄 PRODUCT SYNC: Processed updateData:', {
+    console.log('📥 PRODUCT UPDATE: Processed updateData:', {
       id,
       allRunsDescription: updateData.allRunsDescription ? `${updateData.allRunsDescription.substring(0, 50)}...` : null,
+      runSchedule: updateData.runSchedule ? `${updateData.runSchedule.substring(0, 50)}...` : null,
     });
 
     // Original genius design: Company ID = Product app ID!
@@ -86,7 +90,7 @@ export async function POST(request: NextRequest) {
       // Check if club with this slug already exists (might have different ID)
       const existingBySlug = await prisma.run_clubs.findUnique({ where: { slug: slugFinal } });
       
-      console.log('🔄 PRODUCT SYNC: Checking existing clubs:', {
+      console.log('📥 PRODUCT UPDATE: Checking existing clubs:', {
         id,
         slug: slugFinal,
         existsById: !!existingById,
@@ -97,7 +101,7 @@ export async function POST(request: NextRequest) {
       
       // If slug exists with different ID, update that club instead (slug conflict resolution)
       if (existingBySlug && existingBySlug.id !== id) {
-        console.log('⚠️ PRODUCT SYNC: Slug conflict - updating existing club by slug:', {
+        console.log('⚠️ PRODUCT UPDATE: Slug conflict - updating existing club by slug:', {
           existingId: existingBySlug.id,
           newId: id,
           slug: slugFinal,
@@ -113,11 +117,14 @@ export async function POST(request: NextRequest) {
             slug: true,
             city: true,
             allRunsDescription: true,
+            runSchedule: true, // Include runSchedule
+            runUrl: true,
+            logoUrl: true,
           },
         });
       } else if (existingById) {
         // Club with this ID exists - update it
-        console.log('🔄 PRODUCT SYNC: Updating existing club by ID:', { id });
+        console.log('📥 PRODUCT UPDATE: Updating existing club by ID:', { id });
         runClub = await prisma.run_clubs.update({
           where: { id },
           data: updateData,
@@ -127,11 +134,14 @@ export async function POST(request: NextRequest) {
             slug: true,
             city: true,
             allRunsDescription: true,
+            runSchedule: true, // Include runSchedule
+            runUrl: true,
+            logoUrl: true,
           },
         });
       } else {
         // No existing club - create new one
-        console.log('🔄 PRODUCT SYNC: Creating new club:', { id, slug: slugFinal });
+        console.log('📥 PRODUCT UPDATE: Creating new club:', { id, slug: slugFinal });
         runClub = await prisma.run_clubs.create({
           data: { id, ...updateData },
           select: {
@@ -140,26 +150,36 @@ export async function POST(request: NextRequest) {
             slug: true,
             city: true,
             allRunsDescription: true,
+            runSchedule: true, // Include runSchedule
+            runUrl: true,
+            logoUrl: true,
           },
         });
       }
       
-      // Verify what was actually saved
+      // Verify what was actually saved (ALL fields, not just allRunsDescription)
       const verified = await prisma.run_clubs.findUnique({
         where: { id: runClub.id },
-        select: { allRunsDescription: true },
+        select: {
+          allRunsDescription: true,
+          runSchedule: true, // Verify runSchedule too
+        },
       });
       
-      console.log('🔄 PRODUCT SYNC: After save, verified from database:', {
+      console.log('📥 PRODUCT UPDATE: After save, verified from database:', {
         id: runClub.id,
         slug: runClub.slug,
         allRunsDescription: verified?.allRunsDescription ? `${verified.allRunsDescription.substring(0, 100)}...` : null,
         allRunsDescriptionLength: verified?.allRunsDescription?.length || 0,
-        matchesExpected: verified?.allRunsDescription === updateData.allRunsDescription,
+        runSchedule: verified?.runSchedule ? `${verified.runSchedule.substring(0, 100)}...` : null,
+        runScheduleLength: verified?.runSchedule?.length || 0,
+        allRunsDescriptionMatches: verified?.allRunsDescription === updateData.allRunsDescription,
+        runScheduleMatches: verified?.runSchedule === updateData.runSchedule,
       });
       
-      // Update runClub with verified value
+      // Update runClub with verified values
       runClub.allRunsDescription = verified?.allRunsDescription || null;
+      runClub.runSchedule = verified?.runSchedule || null;
     } else {
       // No ID provided - slug-based matching (fallback)
       const existing = await prisma.run_clubs.findUnique({ where: { slug: slugFinal } });
@@ -173,6 +193,9 @@ export async function POST(request: NextRequest) {
             slug: true,
             city: true,
             allRunsDescription: true,
+            runSchedule: true, // Include runSchedule
+            runUrl: true,
+            logoUrl: true,
           },
         });
       } else {
@@ -184,15 +207,19 @@ export async function POST(request: NextRequest) {
             slug: true,
             city: true,
             allRunsDescription: true,
+            runSchedule: true, // Include runSchedule
+            runUrl: true,
+            logoUrl: true,
           },
         });
       }
     }
 
-    console.log('✅ PRODUCT SYNC: Successfully saved run club:', {
+    console.log('✅ PRODUCT UPDATE: Successfully saved run club:', {
       id: runClub.id,
       name: runClub.name,
       allRunsDescription: runClub.allRunsDescription ? `${runClub.allRunsDescription.substring(0, 50)}...` : null,
+      runSchedule: runClub.runSchedule ? `${runClub.runSchedule.substring(0, 50)}...` : null,
     });
 
     const response = NextResponse.json({
@@ -202,9 +229,9 @@ export async function POST(request: NextRequest) {
     Object.entries(corsHeaders).forEach(([k, v]) => response.headers.set(k, v));
     return response;
   } catch (error: any) {
-    console.error('[sync-run-clubs] Error:', error);
+    console.error('[update-run-clubs] Error:', error);
     const response = NextResponse.json(
-      { success: false, error: error?.message || 'Failed to sync run club' },
+      { success: false, error: error?.message || 'Failed to update run club' },
       { status: 500, headers: corsHeaders }
     );
     return response;

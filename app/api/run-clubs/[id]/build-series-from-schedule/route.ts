@@ -157,6 +157,8 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const dayOfWeekFilter = searchParams.get('dayOfWeek'); // Optional filter for single day
 
     // Load club with runSchedule
     const club = await prisma.run_clubs.findUnique({
@@ -185,10 +187,17 @@ export async function POST(
     }
 
     // Parse schedule
-    const entries = parseRunSchedule(club.runSchedule);
+    let entries = parseRunSchedule(club.runSchedule);
+    
+    // Filter by dayOfWeek if provided
+    if (dayOfWeekFilter) {
+      const canonicalFilterDay = toCanonicalDay(dayOfWeekFilter);
+      entries = entries.filter((entry) => toCanonicalDay(entry.day) === canonicalFilterDay);
+    }
+    
     if (entries.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'No valid schedule entries found', runClubId: id },
+        { success: false, error: dayOfWeekFilter ? `No schedule entries found for ${dayOfWeekFilter}` : 'No valid schedule entries found', runClubId: id },
         { status: 400, headers: corsHeaders }
       );
     }

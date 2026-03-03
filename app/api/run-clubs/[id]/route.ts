@@ -39,7 +39,15 @@ export async function GET(
 
     const runClub = await prisma.run_clubs.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        city: true,
+        allRunsDescription: true,
+        runSchedule: true, // Include runSchedule
+        runUrl: true,
+        logoUrl: true,
         runSeries: {
           select: {
             id: true,
