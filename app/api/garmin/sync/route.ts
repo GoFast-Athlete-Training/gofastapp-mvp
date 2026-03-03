@@ -6,6 +6,7 @@ import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
 import { getValidAccessToken } from '@/lib/garmin-refresh-token';
 import { prisma } from '@/lib/prisma';
 import { activityExists } from '@/lib/garmin-events/dedupe';
+import { normalizeActivityFields } from '@/lib/garmin-events/normalizeActivityFields';
 
 function generateId(): string {
   const timestamp = Date.now().toString(36);
@@ -112,9 +113,7 @@ export async function POST(request: Request) {
           skipped++;
           continue;
         }
-        const startTime = activity.startTime
-          ? new Date(typeof activity.startTime === 'number' && activity.startTime < 1e12 ? activity.startTime * 1000 : activity.startTime)
-          : null;
+        const norm = normalizeActivityFields(activity);
 
         await prisma.athlete_activities.create({
           data: {
@@ -124,15 +123,15 @@ export async function POST(request: Request) {
             source: 'garmin',
             activityType: activity.activityType ?? undefined,
             activityName: activity.activityName ?? undefined,
-            startTime,
-            duration: activity.duration != null ? Math.round(Number(activity.duration)) : undefined,
-            distance: activity.distance != null ? Number(activity.distance) : undefined,
-            calories: activity.calories != null ? Math.round(Number(activity.calories)) : undefined,
-            averageSpeed: activity.averageSpeed != null ? Number(activity.averageSpeed) : undefined,
-            averageHeartRate: activity.averageHeartRate != null ? Math.round(Number(activity.averageHeartRate)) : undefined,
-            maxHeartRate: activity.maxHeartRate != null ? Math.round(Number(activity.maxHeartRate)) : undefined,
-            elevationGain: activity.elevationGain != null ? Number(activity.elevationGain) : undefined,
-            steps: activity.steps != null ? Math.round(Number(activity.steps)) : undefined,
+            startTime: norm.startTime,
+            duration: norm.duration,
+            distance: norm.distance,
+            calories: norm.calories,
+            averageSpeed: norm.averageSpeed,
+            averageHeartRate: norm.averageHeartRate,
+            maxHeartRate: norm.maxHeartRate,
+            elevationGain: norm.elevationGain,
+            steps: norm.steps,
             summaryData: activity as object,
             updatedAt: now,
           },

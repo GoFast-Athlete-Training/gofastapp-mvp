@@ -6,6 +6,7 @@
 import { prisma } from '../prisma';
 import { getAthleteByGarminUserId } from '../domain-garmin';
 import { activityExists } from './dedupe';
+import { normalizeActivityFields } from './normalizeActivityFields';
 
 function generateId(): string {
   const timestamp = Date.now().toString(36);
@@ -74,46 +75,7 @@ export async function handleActivitySummary(
       }
 
       const now = new Date();
-      const startTimeRaw = activity.startTime ?? activity.startTimeInSeconds;
-      const startTime = startTimeRaw != null
-        ? new Date(
-            typeof startTimeRaw === 'string'
-              ? startTimeRaw
-              : (startTimeRaw as number) < 1e12
-                ? (startTimeRaw as number) * 1000
-                : (startTimeRaw as number)
-          )
-        : null;
-
-      // Normalize Garmin Data Generator / API field names into our schema (accept both styles)
-      const duration =
-        activity.duration != null ? Number(activity.duration)
-        : (activity as any).durationInSeconds != null ? Number((activity as any).durationInSeconds)
-        : undefined;
-      const distance =
-        activity.distance != null ? Number(activity.distance)
-        : (activity as any).distanceInMeters != null ? Number((activity as any).distanceInMeters)
-        : undefined;
-      const calories =
-        activity.calories != null ? Number(activity.calories)
-        : (activity as any).activeKilocalories != null ? Math.round(Number((activity as any).activeKilocalories))
-        : undefined;
-      const averageSpeed =
-        activity.averageSpeed != null ? Number(activity.averageSpeed)
-        : (activity as any).averageSpeedInMetersPerSecond != null ? Number((activity as any).averageSpeedInMetersPerSecond)
-        : undefined;
-      const averageHeartRate =
-        activity.averageHeartRate != null ? Number(activity.averageHeartRate)
-        : (activity as any).averageHeartRateInBeatsPerMinute != null ? Math.round(Number((activity as any).averageHeartRateInBeatsPerMinute))
-        : undefined;
-      const maxHeartRate =
-        activity.maxHeartRate != null ? Number(activity.maxHeartRate)
-        : (activity as any).maxHeartRateInBeatsPerMinute != null ? Math.round(Number((activity as any).maxHeartRateInBeatsPerMinute))
-        : undefined;
-      const elevationGain =
-        activity.elevationGain != null ? Number(activity.elevationGain)
-        : (activity as any).totalElevationGainInMeters != null ? Number((activity as any).totalElevationGainInMeters)
-        : undefined;
+      const norm = normalizeActivityFields(activity);
 
       await prisma.athlete_activities.create({
         data: {
@@ -123,15 +85,15 @@ export async function handleActivitySummary(
           source: 'garmin',
           activityType: activity.activityType ?? undefined,
           activityName: activity.activityName ?? undefined,
-          startTime,
-          duration: duration != null ? Math.round(duration) : undefined,
-          distance: distance ?? undefined,
-          calories: calories ?? undefined,
-          averageSpeed: averageSpeed ?? undefined,
-          averageHeartRate: averageHeartRate ?? undefined,
-          maxHeartRate: maxHeartRate ?? undefined,
-          elevationGain: elevationGain ?? undefined,
-          steps: activity.steps != null ? Math.round(Number(activity.steps)) : undefined,
+          startTime: norm.startTime,
+          duration: norm.duration,
+          distance: norm.distance,
+          calories: norm.calories,
+          averageSpeed: norm.averageSpeed,
+          averageHeartRate: norm.averageHeartRate,
+          maxHeartRate: norm.maxHeartRate,
+          elevationGain: norm.elevationGain,
+          steps: norm.steps,
           summaryData: activity as object,
           updatedAt: now,
         },
