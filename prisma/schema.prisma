@@ -313,8 +313,10 @@ model run_clubs {
   id        String   @id @default(uuid())
   slug      String   @unique
   name      String
-  logoUrl   String?
-  city      String?
+  logoUrl      String?
+  city         String?
+  state        String?
+  neighborhood String?
   description String?              // General club description (for downstream display)
   allRunsDescription String?      // Overall description for this club's run series (not per individual run) — drives run_series.description
   runSchedule String?              // Copy of acq_run_clubs.runSchedule from Company — used to build/update series (club-scoped)
