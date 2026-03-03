@@ -98,9 +98,9 @@ Logo Click → /my-runcrews
 
 ### Rule 6: Signup/Login Flow
 ```
-Authenticated → /welcome (hydrate) → /my-runcrews
+Authenticated → /welcome (hydrate) → /athlete-home
 ```
-**Rationale:** Hydrate once, then show selector
+**Rationale:** Splash checks auth; welcome hydrates athlete + memberships once; then redirect to athlete-home. See **APP_AUTH_AND_HYDRATION_FLOW.md** (Company docs) for full flow: splash auth, what hydrate returns, signup → profile → athlete-home.
 
 ### Rule 7: No Crews Fallback
 ```
@@ -125,7 +125,7 @@ User Action
 │
 ├─ Profile Creation (new user) → /runcrew (discovery)
 │
-├─ Authenticated (signup/login) → /welcome → /my-runcrews
+├─ Authenticated (signup/login) → /welcome (hydrate) → /athlete-home
 │
 └─ Lost/Need Navigation → /my-runcrews
 ```

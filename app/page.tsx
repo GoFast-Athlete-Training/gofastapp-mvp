@@ -93,7 +93,7 @@ export default function RootPage() {
         )}
         {!isAuthenticated && (
           <button
-            onClick={() => console.warn('// REDIRECT DISABLED: /signup')}
+            onClick={() => router.replace(isLeaderIntent ? '/signup?intent=club-leader' : '/signup')}
             className="bg-white text-sky-600 px-8 py-4 rounded-xl font-bold text-lg shadow-2xl hover:bg-sky-50 transition transform hover:scale-105"
           >
             {ctaText}
