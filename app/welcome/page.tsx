@@ -2,41 +2,21 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
-import TopNav from '@/components/shared/TopNav';
-
-interface RunCrewCard {
-  id: string;
-  name: string;
-  description?: string;
-  logo?: string;
-  icon?: string;
-  role: 'admin' | 'member' | 'manager';
-  membershipId: string;
-}
 
 /**
- * Welcome Page - Front Door Handler
- * 
- * Purpose: Hydrate athlete data and show RunCrew selector UI
- * Behavior:
- * - Wait for Firebase auth
- * - Call /api/athlete/hydrate once
- * - Store athlete data in localStorage
- * - Show RunCrew selector UI (same as /my-runcrews) with "Welcome back" message
- * - If no crews, redirect to discovery
+ * Welcome Page - Hydration only, then athlete-home
+ *
+ * Flow: Wait for auth → hydrate athlete (resolve memberships) → store in localStorage → redirect to athlete-home.
  */
 export default function WelcomePage() {
   const router = useRouter();
   const hasProcessedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [runCrewCards, setRunCrewCards] = useState<RunCrewCard[]>([]);
-  const [athlete, setAthlete] = useState<any>(null);
 
   useEffect(() => {
     // Prevent multiple executions
@@ -53,7 +33,7 @@ export default function WelcomePage() {
       // No Firebase user - redirect to signup
       if (!firebaseUser) {
         hasProcessedRef.current = true;
-        console.warn('// REDIRECT DISABLED: /signup');
+        router.replace('/signup');
         return;
       }
 
@@ -86,52 +66,9 @@ export default function WelcomePage() {
             localStorage.setItem('garminConnected', String(athleteData.garminConnected));
           }
 
-          console.log('✅ Welcome: Athlete hydrated successfully, showing selector UI');
-          console.log(`🔍 Welcome: Athlete data has ${athleteData.runCrewMemberships?.length || 0} memberships`);
-          console.log('🔍 Welcome: Memberships data:', JSON.stringify(athleteData.runCrewMemberships, null, 2));
-          
-          // Check if athlete is a club leader (role-aware routing)
-          // Check 1: Does athlete have CLUB_LEADER role? (future: check athlete.role or athlete.clubLeader flag)
-          // Check 2: Fallback to hostname check
-          const isLeaderSubdomain = typeof window !== 'undefined' && window.location.hostname.startsWith('leader.');
-          const isClubLeader = athleteData.role === 'CLUB_LEADER' || athleteData.clubLeader === true || isLeaderSubdomain;
-          
-          if (isClubLeader) {
-            console.log('🎯 Welcome: Club leader detected, routing to /leader');
-            router.replace('/leader');
-            return;
-          }
-          
-          // Set athlete state
-          setAthlete(athleteData);
-          
-          // Build RunCrew cards from memberships
-          const memberships = athleteData.runCrewMemberships || [];
-          const cards: RunCrewCard[] = memberships
-            .filter((membership: any) => {
-              // Filter out memberships without runCrew data
-              const hasRunCrew = !!(membership.runCrew || membership.run_crews);
-              if (!hasRunCrew) {
-                console.warn('⚠️ Welcome: Skipping membership without runCrew:', membership.id);
-              }
-              return hasRunCrew;
-            })
-            .map((membership: any) => {
-              const runCrew = membership.runCrew || membership.run_crews || {};
-              return {
-                id: runCrew.id || membership.runCrewId,
-                name: runCrew.name || 'Unknown Crew',
-                description: runCrew.description,
-                logo: runCrew.logo,
-                icon: runCrew.icon,
-                role: membership.role || 'member',
-                membershipId: membership.id,
-              };
-            });
-          
-          console.log(`✅ Welcome: Built ${cards.length} RunCrew cards from ${memberships.length} memberships`);
-          setRunCrewCards(cards);
-          setIsLoading(false);
+          // Hydrate done, memberships resolved — send to athlete-home
+          router.replace('/athlete-home');
+          return;
         } else {
           console.error('❌ Welcome: Invalid response from hydrate');
           setError('Failed to load athlete data');
@@ -170,8 +107,7 @@ export default function WelcomePage() {
             }
           } catch (createErr: any) {
             console.error('❌ Welcome: Create route also failed:', createErr?.response?.status || createErr?.message);
-            // If create also fails, redirect to signup to start fresh
-            console.warn('// REDIRECT DISABLED: /signup');
+            router.replace('/signup');
             return;
           }
         } else if (error?.response?.status === 401) {
@@ -196,7 +132,7 @@ export default function WelcomePage() {
         <div className="text-center">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Welcome back</h1>
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-white text-lg">Loading your RunCrews...</p>
+          <p className="text-white text-lg">Loading...</p>
         </div>
       </div>
     );
@@ -210,7 +146,7 @@ export default function WelcomePage() {
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Error Loading Account</h1>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
-            onClick={() => console.warn('// REDIRECT DISABLED: /signup')}
+            onClick={() => router.replace('/signup')}
             className="bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 transition"
           >
             Go to Signup
@@ -220,124 +156,6 @@ export default function WelcomePage() {
     );
   }
 
-  // Show RunCrew selector UI (same as my-runcrews but with "Welcome back" message)
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600">
-      <TopNav />
-      <div className="max-w-6xl mx-auto px-6 py-12">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Welcome back{athlete?.firstName ? `, ${athlete.firstName}` : ''}!
-          </h1>
-          <p className="text-white text-xl opacity-90">
-            Which RunCrew do you want to check on?
-          </p>
-        </div>
-
-        {runCrewCards.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-lg p-8 text-center max-w-2xl mx-auto">
-            <div className="text-6xl mb-4">🏃</div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">No RunCrews Yet</h2>
-            <p className="text-xl text-gray-600 mb-8">
-              It looks like you don't have any crews yet. You can explore and find a crew, or head to your home dashboard.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                href="/runcrew-discovery"
-                className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition shadow-lg hover:shadow-xl"
-              >
-                Find a Crew
-              </Link>
-              <Link
-                href="/athlete-home"
-                className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition shadow-lg hover:shadow-xl"
-              >
-                Go Home
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {runCrewCards.map((crew) => (
-              <div
-                key={crew.id}
-                className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
-              >
-                {/* Crew Header with Logo/Icon */}
-                <div className="p-6 bg-gradient-to-br from-orange-50 to-orange-100">
-                  <div className="flex items-center gap-4 mb-4">
-                    {crew.logo ? (
-                      <img
-                        src={crew.logo}
-                        alt={crew.name}
-                        className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-md"
-                      />
-                    ) : crew.icon ? (
-                      <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center text-3xl border-2 border-white shadow-md">
-                        {crew.icon}
-                      </div>
-                    ) : (
-                      <div className="w-16 h-16 rounded-full bg-orange-500 flex items-center justify-center text-3xl text-white border-2 border-white shadow-md">
-                        🏃
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold text-gray-900">{crew.name}</h3>
-                      {crew.role === 'admin' && (
-                        <span className="inline-block mt-1 px-2 py-1 bg-orange-500 text-white text-xs font-semibold rounded">
-                          Admin
-                        </span>
-                      )}
-                      {crew.role === 'manager' && (
-                        <span className="inline-block mt-1 px-2 py-1 bg-blue-500 text-white text-xs font-semibold rounded">
-                          Manager
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {crew.description && (
-                    <p className="text-sm text-gray-600 line-clamp-2">{crew.description}</p>
-                  )}
-                </div>
-
-                {/* Action Buttons */}
-                <div className="p-6 space-y-3">
-                  <Link
-                    href={`/runcrew/${crew.id}/member`}
-                    className="block w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold text-center transition"
-                  >
-                    View as Member
-                  </Link>
-                  {crew.role === 'admin' || crew.role === 'manager' ? (
-                    <Link
-                      href={`/runcrew/${crew.id}/admin`}
-                      className="block w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-3 rounded-lg font-semibold text-center transition"
-                    >
-                      View as Admin
-                    </Link>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Action Options */}
-        <div className="mt-12 text-center space-x-4">
-          <Link
-            href="/runcrew-discovery"
-            className="inline-block bg-white hover:bg-gray-50 text-gray-900 px-6 py-3 rounded-lg font-semibold transition shadow-md"
-          >
-            Explore RunCrews
-          </Link>
-          <Link
-            href="/runcrew/create"
-            className="inline-block bg-white hover:bg-gray-50 text-gray-900 px-6 py-3 rounded-lg font-semibold transition shadow-md"
-          >
-            + Create RunCrew
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
+  // Success path redirects; only loading or error reach here
+  return null;
 }

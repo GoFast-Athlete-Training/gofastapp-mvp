@@ -43,9 +43,8 @@ export default function RootPage() {
       // Show logo for 2 seconds, then route
       const timer = setTimeout(() => {
         if (isAuthenticated) {
-          // After auth, role check happens in welcome/hydrate
-          // For now, route to welcome which will check role
-          console.warn('// REDIRECT DISABLED: /welcome');
+          // Hydrate and then land on athlete-home (welcome redirects there)
+          router.replace('/welcome');
         } else {
           // Pass intent via URL param (simple, no cookie)
           const intentParam = isLeaderIntent ? '?intent=club-leader' : '';
@@ -57,10 +56,10 @@ export default function RootPage() {
     }
   }, [isLoading, isAuthenticated, isLeaderIntent, router]);
 
-  // Copy based on hostname (no cookie needed)
-  const headline = isLeaderIntent 
+  // Splash copy — pace group, train, PR
+  const headline = isLeaderIntent
     ? 'Claim and manage your run club'
-    : 'Find runs and join crews';
+    : 'Find your pace group. Train hard. PR.';
   const ctaText = isLeaderIntent ? 'Get Started' : 'Join Now';
 
   if (isLoading) {
@@ -87,9 +86,11 @@ export default function RootPage() {
         <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">
           {headline}
         </h1>
-        <p className="text-xl md:text-2xl text-white/90 mb-8">
-          Run with others. PR.
-        </p>
+        {!isLeaderIntent && (
+          <p className="text-xl md:text-2xl text-white/90 mb-8">
+            Find runs. Join crews. Race.
+          </p>
+        )}
         {!isAuthenticated && (
           <button
             onClick={() => console.warn('// REDIRECT DISABLED: /signup')}

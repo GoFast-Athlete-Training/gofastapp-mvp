@@ -273,8 +273,8 @@ export default function AthleteHomePage() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Navigation Sidebar */}
-        <aside className="w-64 bg-white border-r border-gray-200 flex flex-col overflow-y-auto">
+        {/* Left Navigation Sidebar — primary way to find runs, crews, workouts, races */}
+        <aside className="w-64 bg-white border-r-2 border-gray-200 flex flex-col overflow-y-auto shrink-0">
           <div className="p-4 border-b border-gray-200">
             <div className="flex items-center gap-3 mb-2">
               <Image
@@ -286,7 +286,8 @@ export default function AthleteHomePage() {
               />
               <span className="text-lg font-bold text-gray-900">GoFast</span>
             </div>
-            <p className="text-xs text-gray-500">Athlete Home</p>
+            <p className="text-xs font-medium text-gray-700">Athlete Home</p>
+            <p className="text-xs text-gray-500 mt-0.5">Use the menu to find runs, crews, and races.</p>
           </div>
 
           <nav className="flex-1 p-2 space-y-1 overflow-y-auto">

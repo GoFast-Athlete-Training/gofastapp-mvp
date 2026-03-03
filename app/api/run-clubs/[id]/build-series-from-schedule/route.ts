@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { toCanonicalDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +11,12 @@ const corsHeaders = {
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders });
+}
+
+function generateId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 15);
+  return `c${timestamp}${random}`;
 }
 
 /**
@@ -255,6 +260,7 @@ export async function POST(
         // Create new series
         const created = await prisma.run_series.create({
           data: {
+            id: generateId(),
             runClubId: club.id,
             dayOfWeek: canonicalDay,
             name: seriesName,
@@ -264,7 +270,6 @@ export async function POST(
             startTimePeriod: startTimePeriod as 'AM' | 'PM' | null,
             meetUpCity,
             meetUpState,
-            createFirstRun: false,
           },
         });
         results.push({ action: 'created', seriesId: created.id, dayOfWeek: canonicalDay });
