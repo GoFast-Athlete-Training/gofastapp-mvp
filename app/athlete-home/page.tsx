@@ -13,6 +13,7 @@ import {
   Home, 
   Users, 
   Activity, 
+  Dumbbell,
   User,
   Trophy,
   MapPin
@@ -325,6 +326,15 @@ export default function AthleteHomePage() {
             >
               <Activity className="h-5 w-5" />
               <span>Activities</span>
+            </button>
+
+            {/* Workouts */}
+            <button
+              onClick={() => router.push('/workouts')}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              <Dumbbell className="h-5 w-5" />
+              <span>Workouts</span>
             </button>
 
             {/* Race Events */}
