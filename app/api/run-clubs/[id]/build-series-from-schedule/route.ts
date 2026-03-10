@@ -256,87 +256,218 @@ export async function POST(
 
     // Process each entry
     const results = [];
-    for (const entry of entries) {
+    const usedSlugs = new Set<string>(); // Track slugs to prevent duplicates
+    
+    for (let idx = 0; idx < entries.length; idx++) {
+      const entry = entries[idx];
       const canonicalDay = toCanonicalDay(entry.day);
 
-      // entry.city = the full place blob from the parser: "D.C. Jefferson by the Washington Monument"
-      // Split into structured city + location:
-      //   meetUpCity  = "D.C."
-      //   meetUpPoint = "Jefferson by the Washington Monument"
-      const placeString = entry.city?.trim() || '';
-      const { city: parsedCity, location: parsedLocation } = placeString
-        ? splitPlaceString(placeString)
-        : { city: '', location: '' };
+      try {
+        // entry.city = the full place blob from the parser: "D.C. Jefferson by the Washington Monument"
+        // Split into structured city + location:
+        //   meetUpCity  = "D.C."
+        //   meetUpPoint = "Jefferson by the Washington Monument"
+        const placeString = entry.city?.trim() || '';
+        const { city: parsedCity, location: parsedLocation } = placeString
+          ? splitPlaceString(placeString)
+          : { city: '', location: '' };
 
-      const meetUpCity = parsedCity || (isMultiSite ? (club.city?.trim() || null) : null) || null;
-      const meetUpPoint = parsedLocation || null;
+        const meetUpCity = parsedCity || (isMultiSite ? (club.city?.trim() || null) : null) || null;
+        const meetUpPoint = parsedLocation || null;
 
-      const dayKey = meetUpCity ? `${canonicalDay}:${meetUpCity.toLowerCase()}` : canonicalDay;
-      const existingSeriesId = existingByDay.get(dayKey);
+        const dayKey = meetUpCity ? `${canonicalDay}:${meetUpCity.toLowerCase()}` : canonicalDay;
+        const existingSeriesId = existingByDay.get(dayKey);
 
-      const { hour: startTimeHour, minute: startTimeMinute, period: startTimePeriod } = parseTime(entry.time);
+        const { hour: startTimeHour, minute: startTimeMinute, period: startTimePeriod } = parseTime(entry.time);
 
-      const citySuffix = isMultiSite && meetUpCity ? ` (${meetUpCity})` : '';
-      const seriesName = `${club.name || 'Run Club'} ${entry.day} Run${citySuffix}`;
+        const citySuffix = isMultiSite && meetUpCity ? ` (${meetUpCity})` : '';
+        const seriesName = `${club.name || 'Run Club'} ${entry.day} Run${citySuffix}`;
 
-      const clubSlugBase = club.slug || club.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'run-club';
-      const daySlug = canonicalDay.toLowerCase();
-      const citySlug = meetUpCity ? `-${meetUpCity.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : '';
-      const seriesSlug = `${clubSlugBase}-${daySlug}${citySlug}`;
+        const clubSlugBase = club.slug || club.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'run-club';
+        const daySlug = canonicalDay.toLowerCase();
+        const citySlug = meetUpCity ? `-${meetUpCity.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : '';
+        
+        // Generate unique slug - add index suffix if slug already used
+        let seriesSlug = `${clubSlugBase}-${daySlug}${citySlug}`;
+        let slugSuffix = 1;
+        while (usedSlugs.has(seriesSlug)) {
+          seriesSlug = `${clubSlugBase}-${daySlug}${citySlug}-${slugSuffix}`;
+          slugSuffix++;
+        }
+        usedSlugs.add(seriesSlug);
 
-      if (existingSeriesId) {
-        const updated = await prisma.run_series.update({
-          where: { id: existingSeriesId },
-          data: {
-            name: seriesName,
-            slug: seriesSlug,
-            startTimeHour,
-            startTimeMinute,
-            startTimePeriod: startTimePeriod as 'AM' | 'PM' | null,
-            meetUpPoint,
-            meetUpCity,
-          },
+        if (existingSeriesId) {
+          const updated = await prisma.run_series.update({
+            where: { id: existingSeriesId },
+            data: {
+              name: seriesName,
+              slug: seriesSlug,
+              startTimeHour,
+              startTimeMinute,
+              startTimePeriod: startTimePeriod as 'AM' | 'PM' | null,
+              meetUpPoint,
+              meetUpCity,
+            },
+          });
+          results.push({ action: 'updated', seriesId: updated.id, dayOfWeek: canonicalDay });
+        } else {
+          // Check if slug already exists in DB (race condition protection)
+          const existingBySlug = await prisma.run_series.findUnique({
+            where: { slug: seriesSlug },
+            select: { id: true },
+          });
+          
+          if (existingBySlug) {
+            // Slug conflict - use existing series
+            const updated = await prisma.run_series.update({
+              where: { id: existingBySlug.id },
+              data: {
+                name: seriesName,
+                startTimeHour,
+                startTimeMinute,
+                startTimePeriod: startTimePeriod as 'AM' | 'PM' | null,
+                meetUpPoint,
+                meetUpCity,
+              },
+            });
+            results.push({ action: 'updated', seriesId: updated.id, dayOfWeek: canonicalDay });
+          } else {
+            const now = new Date();
+            try {
+              const created = await prisma.run_series.create({
+                data: {
+                  id: generateId(),
+                  runClubId: club.id,
+                  dayOfWeek: canonicalDay,
+                  name: seriesName,
+                  slug: seriesSlug,
+                  startTimeHour,
+                  startTimeMinute,
+                  startTimePeriod: startTimePeriod as 'AM' | 'PM' | null,
+                  meetUpPoint,
+                  meetUpCity,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+              });
+              results.push({ action: 'created', seriesId: created.id, dayOfWeek: canonicalDay });
+            } catch (createError: any) {
+              // Handle unique constraint violation (duplicate slug)
+              if (createError?.code === 'P2002') {
+                console.warn(`[build-series-from-schedule] Slug conflict for ${seriesSlug}, trying to find existing series`);
+                // Try to find existing series by slug and update it
+                const existingBySlug = await prisma.run_series.findUnique({
+                  where: { slug: seriesSlug },
+                  select: { id: true, runClubId: true },
+                });
+                
+                if (existingBySlug && existingBySlug.runClubId === club.id) {
+                  // Update existing series
+                  const updated = await prisma.run_series.update({
+                    where: { id: existingBySlug.id },
+                    data: {
+                      name: seriesName,
+                      startTimeHour,
+                      startTimeMinute,
+                      startTimePeriod: startTimePeriod as 'AM' | 'PM' | null,
+                      meetUpPoint,
+                      meetUpCity,
+                    },
+                  });
+                  results.push({ action: 'updated', seriesId: updated.id, dayOfWeek: canonicalDay });
+                } else {
+                  // Generate new unique slug
+                  let newSlug = seriesSlug;
+                  let suffix = 1;
+                  while (true) {
+                    const checkSlug = `${seriesSlug}-${suffix}`;
+                    const exists = await prisma.run_series.findUnique({
+                      where: { slug: checkSlug },
+                      select: { id: true },
+                    });
+                    if (!exists) {
+                      newSlug = checkSlug;
+                      break;
+                    }
+                    suffix++;
+                  }
+                  
+                  const created = await prisma.run_series.create({
+                    data: {
+                      id: generateId(),
+                      runClubId: club.id,
+                      dayOfWeek: canonicalDay,
+                      name: seriesName,
+                      slug: newSlug,
+                      startTimeHour,
+                      startTimeMinute,
+                      startTimePeriod: startTimePeriod as 'AM' | 'PM' | null,
+                      meetUpPoint,
+                      meetUpCity,
+                      createdAt: now,
+                      updatedAt: now,
+                    },
+                  });
+                  results.push({ action: 'created', seriesId: created.id, dayOfWeek: canonicalDay });
+                }
+              } else {
+                throw createError; // Re-throw if not a slug conflict
+              }
+            }
+          }
+        }
+      } catch (error: any) {
+        console.error(`[build-series-from-schedule] Error processing entry ${idx + 1} (${entry.day}):`, {
+          error: error?.message,
+          code: error?.code,
+          meta: error?.meta,
+          entry: entry.day,
+          time: entry.time,
+          city: entry.city,
         });
-        results.push({ action: 'updated', seriesId: updated.id, dayOfWeek: canonicalDay });
-      } else {
-        const now = new Date();
-        const created = await prisma.run_series.create({
-          data: {
-            id: generateId(),
-            runClubId: club.id,
-            dayOfWeek: canonicalDay,
-            name: seriesName,
-            slug: seriesSlug,
-            startTimeHour,
-            startTimeMinute,
-            startTimePeriod: startTimePeriod as 'AM' | 'PM' | null,
-            meetUpPoint,
-            meetUpCity,
-            createdAt: now,
-            updatedAt: now,
-          },
+        // Continue processing other entries even if one fails
+        results.push({ 
+          action: 'error', 
+          dayOfWeek: canonicalDay, 
+          error: error?.message || 'Unknown error',
+          code: error?.code,
+          entry: entry.day,
         });
-        results.push({ action: 'created', seriesId: created.id, dayOfWeek: canonicalDay });
       }
     }
 
+    const errors = results.filter((r) => r.action === 'error');
+    const hasErrors = errors.length > 0;
+    
     return NextResponse.json(
       {
-        success: true,
+        success: !hasErrors,
         runClubId: id,
         results,
         summary: {
           total: results.length,
           created: results.filter((r) => r.action === 'created').length,
           updated: results.filter((r) => r.action === 'updated').length,
+          errors: errors.length,
         },
+        ...(hasErrors && { errorDetails: errors }),
       },
-      { headers: corsHeaders }
+      { headers: corsHeaders, status: hasErrors ? 207 : 200 } // 207 = Multi-Status (partial success)
     );
   } catch (error: any) {
-    console.error('[build-series-from-schedule] Error:', error);
+    console.error('[build-series-from-schedule] Error:', {
+      error: error?.message,
+      stack: error?.stack,
+      code: error?.code,
+      meta: error?.meta,
+      runClubId: id,
+    });
     return NextResponse.json(
-      { success: false, error: error?.message || 'Failed to build series from schedule' },
+      { 
+        success: false, 
+        error: error?.message || 'Failed to build series from schedule',
+        details: error?.code === 'P2002' ? 'Duplicate slug detected - series may already exist' : error?.code,
+      },
       { status: 500, headers: corsHeaders }
     );
   }
