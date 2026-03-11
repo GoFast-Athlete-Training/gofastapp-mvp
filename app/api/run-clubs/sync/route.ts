@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
         return trimmed.length > 0 ? trimmed : null;
       })(),
       logoUrl: rc.logoUrl != null ? String(rc.logoUrl).trim() || null : null,
+      instagramUrl: rc.instagramUrl != null ? String(rc.instagramUrl).trim() || null : null,
       syncedAt: new Date(),
     };
 
