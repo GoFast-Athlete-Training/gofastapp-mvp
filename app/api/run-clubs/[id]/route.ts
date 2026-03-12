@@ -61,6 +61,7 @@ export async function GET(
             startTimePeriod: true,
             meetUpPoint: true,
             meetUpCity: true,
+            stravaUrl: true,
           },
           orderBy: { dayOfWeek: 'asc' },
         },

@@ -307,6 +307,7 @@ export async function POST(
               startTimePeriod: startTimePeriod as 'AM' | 'PM' | null,
               meetUpPoint,
               meetUpCity,
+              stravaUrl: entry.url || null,
             },
           });
           results.push({ action: 'updated', seriesId: updated.id, dayOfWeek: canonicalDay });
@@ -328,6 +329,7 @@ export async function POST(
                 startTimePeriod: startTimePeriod as 'AM' | 'PM' | null,
                 meetUpPoint,
                 meetUpCity,
+                stravaUrl: entry.url || null,
               },
             });
             results.push({ action: 'updated', seriesId: updated.id, dayOfWeek: canonicalDay });
@@ -341,11 +343,13 @@ export async function POST(
                   dayOfWeek: canonicalDay,
                   name: seriesName,
                   slug: seriesSlug,
+                  workflowStatus: 'PENDING',
                   startTimeHour,
                   startTimeMinute,
                   startTimePeriod: startTimePeriod as 'AM' | 'PM' | null,
                   meetUpPoint,
                   meetUpCity,
+                  stravaUrl: entry.url || null,
                   createdAt: now,
                   updatedAt: now,
                 },
@@ -372,6 +376,7 @@ export async function POST(
                       startTimePeriod: startTimePeriod as 'AM' | 'PM' | null,
                       meetUpPoint,
                       meetUpCity,
+                      stravaUrl: entry.url || null,
                     },
                   });
                   results.push({ action: 'updated', seriesId: updated.id, dayOfWeek: canonicalDay });
@@ -404,6 +409,7 @@ export async function POST(
                       startTimePeriod: startTimePeriod as 'AM' | 'PM' | null,
                       meetUpPoint,
                       meetUpCity,
+                      stravaUrl: entry.url || null,
                       createdAt: now,
                       updatedAt: now,
                     },
