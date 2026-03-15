@@ -155,8 +155,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const { id } = await params;
     const { searchParams } = new URL(request.url);
     const dayOfWeekFilter = searchParams.get('dayOfWeek'); // Optional filter for single day
 
