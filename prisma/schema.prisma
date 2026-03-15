@@ -258,9 +258,10 @@ model race_registry {
   tags                    String[]                  @default([])
   timezone                String?
   typicalWeather          String?
-  run_crew_specific_races run_crew_specific_races[]
-  run_crews               run_crews[]
-  training_plans          training_plans[]
+  run_crew_specific_races  run_crew_specific_races[]
+  run_crews                run_crews[]
+  training_plans           training_plans[]
+  race_trainer_groups      race_trainer_groups[]
 
   @@index([charitySupported])
   @@index([city, state])
@@ -930,6 +931,61 @@ enum RouteVibe {
   RECOVERY
   SOCIAL
   BEGINNER_FRIENDLY
+}
+
+// ─── RaceBuildTrainer ────────────────────────────────────────────────────────
+//
+// A training group anchored to a specific race. Members "bolt to" this group
+// to train together for the event. Distinct from run_crews (organic/ongoing);
+// this is race-first and time-bounded (ends at race date).
+//
+// Race data source: race_registry (product catalog). The companyRaceId links
+// back to GoFastCompany's curated race content (races.id) for public page
+// cross-referencing.
+
+model race_trainer_groups {
+  id             String                    @id @default(cuid())
+  raceId         String                    // FK → race_registry (product catalog)
+  companyRaceId  String?                   // Optional reference to GoFastCompany races.id
+  name           String                    // e.g. "Training for Boston 2026"
+  handle         String                    @unique  // URL-safe slug
+  description    String?
+  logo           String?
+  joinCode       String                    @unique
+  city           String?
+  state          String?
+  isActive       Boolean                   @default(true)
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  race_registry          race_registry              @relation(fields: [raceId], references: [id])
+  race_trainer_members   race_trainer_members[]
+
+  @@index([raceId])
+  @@index([companyRaceId])
+  @@map("race_trainer_groups")
+}
+
+model race_trainer_members {
+  id             String                    @id @default(cuid())
+  groupId        String
+  userId         String                    // FK → users (app user)
+  role           RaceTrainerRole           @default(MEMBER)
+  joinedAt       DateTime                  @default(now())
+
+  race_trainer_groups    race_trainer_groups        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([groupId])
+  @@index([userId])
+  @@map("race_trainer_members")
+}
+
+enum RaceTrainerRole {
+  MEMBER
+  PACER
+  COACH
+  ADMIN
 }
 
 // Route/location catalogue. Created manually or auto-seeded from run meetUpPoint/title.

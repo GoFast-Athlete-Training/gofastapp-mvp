@@ -23,6 +23,9 @@
 		},
 		{
 			"path": "../gofast_runprogram_parent"
+		},
+		{
+			"path": "../../Ignite/IgniteBd-Next-combine"
 		}
 	],
 	"settings": {}
