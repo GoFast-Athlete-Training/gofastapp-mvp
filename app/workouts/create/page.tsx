@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2, Repeat } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import TopNav from "@/components/shared/TopNav";
 import api from "@/lib/api";
 // Garmin conversion handled server-side by garmin-training-service.ts
+
+const WORKOUT_TYPES = ["Easy", "Tempo", "LongRun", "Intervals", "Speed", "Strength"] as const;
 
 interface WorkoutSegment {
   id: string;
@@ -18,12 +20,32 @@ interface WorkoutSegment {
   repeatCount?: number; // For intervals: repeat this segment N times
 }
 
+/** Convert seconds per km (from API target) to "M:SS/mile" for display */
+function secondsPerKmToPaceString(secondsPerKm: number): string {
+  const secPerMile = secondsPerKm / 1.60934;
+  const m = Math.floor(secPerMile / 60);
+  const s = Math.round(secPerMile % 60);
+  return `${m}:${s.toString().padStart(2, "0")}/mile`;
+}
+
 export default function CreateWorkoutPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [stravaUrl, setStravaUrl] = useState("");
-  
+  const [workoutType, setWorkoutType] = useState<string>("Easy");
+
+  // AI generate panel — blob (Runna/coach/Strava paste) or structured
+  const [sourceText, setSourceText] = useState("");
+  const [aiWorkoutType, setAiWorkoutType] = useState<string>("Tempo");
+  const [aiTotalMiles, setAiTotalMiles] = useState<string>("8");
+  const [aiGoalPace, setAiGoalPace] = useState("");
+  const [aiRaceTime, setAiRaceTime] = useState("");
+  const [aiRaceDistance, setAiRaceDistance] = useState("marathon");
+  const [aiFreeform, setAiFreeform] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+
   // Overall workout goals
   const [overallMiles, setOverallMiles] = useState<number>(0);
   const [overallPace, setOverallPace] = useState("");
@@ -53,6 +75,87 @@ export default function CreateWorkoutPage() {
 
   const updateSegment = (id: string, updates: Partial<WorkoutSegment>) => {
     setSegments(segments.map((s) => (s.id === id ? { ...s, ...updates } : s)));
+  };
+
+  const handleGenerate = async () => {
+    setGenerateError(null);
+    const hasPaste = sourceText.trim().length > 0;
+    if (!hasPaste) {
+      const totalMiles = parseFloat(aiTotalMiles);
+      if (!totalMiles || totalMiles <= 0) {
+        setGenerateError("Enter a valid total distance (miles) or paste a workout description.");
+        return;
+      }
+      if (!aiGoalPace?.trim() && !aiRaceTime?.trim()) {
+        setGenerateError("Enter goal pace (e.g. 7:30/mile) or race time (e.g. 3:30:00), or paste a workout.");
+        return;
+      }
+    }
+    setGenerating(true);
+    try {
+      const body: Record<string, unknown> = hasPaste
+        ? { sourceText: sourceText.trim() }
+        : {
+            workoutType: aiWorkoutType,
+            totalMiles: parseFloat(aiTotalMiles),
+            freeformPrompt: aiFreeform.trim() || undefined,
+          };
+      if (!hasPaste) {
+        if (aiGoalPace.trim()) (body as Record<string, unknown>).goalPace = aiGoalPace.trim();
+        else {
+          (body as Record<string, unknown>).raceTime = aiRaceTime.trim();
+          (body as Record<string, unknown>).raceDistance = aiRaceDistance.trim() || "marathon";
+        }
+      }
+      const { data } = await api.post<{
+        segments: Array<{
+          stepOrder: number;
+          title: string;
+          durationType: string;
+          durationValue: number;
+          targets?: Array<{ type: string; valueLow?: number; valueHigh?: number }>;
+          repeatCount?: number;
+        }>;
+        suggestedTitle: string;
+        suggestedDescription: string;
+      }>("/api/workouts/ai-generate", body);
+      const formSegments: WorkoutSegment[] = data.segments.map((seg, i) => {
+        let pace: string | undefined;
+        const paceTarget = seg.targets?.find((t) => t.type === "PACE");
+        if (paceTarget?.valueLow != null) {
+          const mid = (paceTarget.valueLow + (paceTarget.valueHigh ?? paceTarget.valueLow)) / 2;
+          pace = secondsPerKmToPaceString(mid);
+        }
+        return {
+          id: `ai_${i}_${Date.now()}`,
+          title: seg.title,
+          miles: seg.durationValue,
+          pace,
+          repeatCount: seg.repeatCount ?? undefined,
+        };
+      });
+      setSegments(formSegments);
+      setName(data.suggestedTitle);
+      setDescription(data.suggestedDescription);
+      if (!hasPaste) {
+        setWorkoutType(aiWorkoutType);
+        setOverallMiles(parseFloat(aiTotalMiles));
+      } else {
+        const totalFromSegments = data.segments.reduce(
+          (sum, s) => sum + (s.durationType === "DISTANCE" ? s.durationValue * (s.repeatCount ?? 1) : 0),
+          0
+        );
+        setOverallMiles(totalFromSegments);
+      }
+      setUseSegments(true);
+    } catch (err: unknown) {
+      const message = err && typeof err === "object" && "response" in err
+        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+        : null;
+      setGenerateError(message || "Failed to generate workout");
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -102,7 +205,7 @@ export default function CreateWorkoutPage() {
         title: name,
         description,
         stravaUrl: stravaUrl || undefined,
-        workoutType: "Easy", // Default, could be selectable
+        workoutType: workoutType || "Easy",
         segments: useSegments
           ? segments.map((seg, index) => ({
               stepOrder: index + 1,
@@ -154,6 +257,114 @@ export default function CreateWorkoutPage() {
         <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">Create Workout</h1>
 
+          {/* AI Generate */}
+          <div className="mb-8 p-4 rounded-lg border border-orange-200 bg-orange-50/50">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-orange-500" />
+              AI Generate Workout
+            </h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Paste from Runna, coach, or Strava
+              </label>
+              <textarea
+                value={sourceText}
+                onChange={(e) => setSourceText(e.target.value)}
+                rows={4}
+                placeholder="e.g. You have 15 miles today — 2 mile warmup, 10 miles at marathon pace, 3 mile cooldown"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                Paste your workout description and we’ll match it to our format (warmup, build, main set, cooldown).
+              </p>
+            </div>
+            <p className="text-sm font-medium text-gray-700 mb-2">Or use structured inputs:</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Workout Type</label>
+                <select
+                  value={aiWorkoutType}
+                  onChange={(e) => setAiWorkoutType(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                >
+                  {WORKOUT_TYPES.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Total Miles</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.5"
+                  value={aiTotalMiles}
+                  onChange={(e) => setAiTotalMiles(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Goal Pace (e.g., 7:30/mile)</label>
+                <input
+                  type="text"
+                  value={aiGoalPace}
+                  onChange={(e) => setAiGoalPace(e.target.value)}
+                  placeholder="7:30/mile"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                />
+              </div>
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Or Race Time (e.g., 3:30:00)</label>
+                  <input
+                    type="text"
+                    value={aiRaceTime}
+                    onChange={(e) => setAiRaceTime(e.target.value)}
+                    placeholder="3:30:00"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </div>
+                <div className="w-28">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Distance</label>
+                  <select
+                    value={aiRaceDistance}
+                    onChange={(e) => setAiRaceDistance(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  >
+                    <option value="marathon">Marathon</option>
+                    <option value="half">Half</option>
+                    <option value="10k">10k</option>
+                    <option value="5k">5k</option>
+                    <option value="mile">Mile</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Optional: describe anything specific</label>
+              <textarea
+                value={aiFreeform}
+                onChange={(e) => setAiFreeform(e.target.value)}
+                rows={2}
+                placeholder="e.g., more warmup, fewer intervals..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              />
+            </div>
+            {generateError && (
+              <p className="text-sm text-red-600 mb-2">{generateError}</p>
+            )}
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={generating}
+              className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {generating ? "Generating..." : "Generate Workout"}
+            </button>
+          </div>
+
           {/* Name */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -198,6 +409,20 @@ export default function CreateWorkoutPage() {
             <p className="mt-1 text-sm text-gray-500">
               Optional: Link to Strava route for this workout
             </p>
+          </div>
+
+          {/* Workout Type */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Workout Type</label>
+            <select
+              value={workoutType}
+              onChange={(e) => setWorkoutType(e.target.value)}
+              className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            >
+              {WORKOUT_TYPES.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
           </div>
 
           {/* Overall Goals */}
