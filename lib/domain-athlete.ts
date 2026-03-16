@@ -291,6 +291,7 @@ export async function hydrateAthlete(athleteId: string) {
     photoURL: athlete.photoURL,
     bio: athlete.bio,
     instagram: athlete.instagram,
+    phoneNumber: athlete.phoneNumber ?? undefined,
     companyId: athlete.companyId,
     createdAt: athlete.createdAt,
     updatedAt: athlete.updatedAt,
