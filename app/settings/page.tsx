@@ -205,6 +205,18 @@ export default function SettingsPage() {
             </Link>
           </div>
 
+          {/* Race goal */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Race goal</h2>
+            <p className="text-gray-600 mb-4">Set your goal race and target time for personalized workout suggestions.</p>
+            <Link
+              href="/settings/race-goal"
+              className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
+            >
+              Set race goal
+            </Link>
+          </div>
+
           {/* Integrations */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Integrations</h2>

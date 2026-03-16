@@ -79,7 +79,7 @@ export async function PUT(
       }
     }
 
-    // Update athlete profile
+    // Update athlete profile (fiveKPace, weeklyMileage optional — for workout generator fallback)
     const updated = await updateAthlete(athleteId, {
       firstName: body.firstName,
       lastName: body.lastName,
@@ -93,6 +93,8 @@ export async function PUT(
       bio: body.bio || null,
       instagram: body.instagram || null,
       photoURL: body.photoURL || null,
+      ...(body.fiveKPace !== undefined && { fiveKPace: body.fiveKPace === "" ? null : body.fiveKPace }),
+      ...(body.weeklyMileage !== undefined && { weeklyMileage: body.weeklyMileage == null ? null : Number(body.weeklyMileage) }),
     });
 
     return NextResponse.json({

@@ -153,13 +153,18 @@ Each segment must have: stepOrder (1-based), title, durationType ("DISTANCE" or 
 }
 
 /** Parse a pasted workout description (Runna, coach, Strava) into our segment model via OpenAI. */
-async function parseSourceTextWithOpenAI(sourceText: string): Promise<AiGenerateResponse> {
+async function parseSourceTextWithOpenAI(
+  sourceText: string,
+  workoutType: string = "Easy"
+): Promise<AiGenerateResponse> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is required to parse workout from description");
   }
 
   const systemPrompt = `You are a running coach. The user pasted a workout description (e.g. from Runna, a coach, or Strava) like "15 miles today - 2 mile warmup, 10 at marathon pace, 3 cooldown". Your job is to parse it into our structured workout format.
+
+The user has indicated workout type: ${workoutType}. Prefer segment titles that match this type (e.g. Warmup, Rest, Interval, Cooldown) and bias suggestedTitle toward ${workoutType} when appropriate.
 
 Output ONLY a single JSON object (no markdown, no code block):
 {
@@ -253,7 +258,7 @@ export async function POST(request: NextRequest) {
       (goalPace != null && String(goalPace).trim() || (raceTime != null && raceDistance != null));
 
     if (hasSourceText) {
-      const result = await parseSourceTextWithOpenAI(String(sourceText).trim());
+      const result = await parseSourceTextWithOpenAI(String(sourceText).trim(), workoutType);
       return NextResponse.json(result);
     }
 

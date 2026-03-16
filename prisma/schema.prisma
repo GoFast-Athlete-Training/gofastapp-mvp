@@ -75,6 +75,7 @@ model Athlete {
   training_days_executed  training_days_executed[]
   training_plans          training_plans[]
   workouts                workouts[]
+  race_goal_intent        race_goal_intent?
 }
 
 model ambassador_credits {
@@ -262,6 +263,7 @@ model race_registry {
   run_crews                run_crews[]
   training_plans           training_plans[]
   race_trainer_groups      race_trainer_groups[]
+  race_goal_intent         race_goal_intent[]
 
   @@index([charitySupported])
   @@index([city, state])
@@ -270,6 +272,21 @@ model race_registry {
   @@index([raceType])
   @@index([slug])
   @@index([tags])
+}
+
+model race_goal_intent {
+  id          String         @id @default(cuid())
+  athleteId   String         @unique
+  raceId      String?
+  goalTime    String?
+  goalPace5K  String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  Athlete     Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  race_registry race_registry? @relation(fields: [raceId], references: [id], onDelete: SetNull)
+
+  @@index([athleteId])
+  @@index([raceId])
 }
 
 model return_json_formats {
@@ -874,8 +891,6 @@ enum WorkoutType {
   Tempo
   Intervals
   LongRun
-  Speed
-  Strength
 }
 
 enum RunWorkflowStatus {
