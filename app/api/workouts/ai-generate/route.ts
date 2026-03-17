@@ -103,10 +103,9 @@ function formatPaceFromSecondsPerMile(secPerMile: number): string {
 function buildSuggestedTitle(
   workoutType: string,
   totalMiles: number,
-  paces: TrainingPaces
+  _paces: TrainingPaces
 ): string {
-  const paceStr = formatPaceFromSecondsPerMile(paces.goalSecondsPerMile);
-  return `${totalMiles} Mile ${workoutType} @ ${paceStr}`;
+  return `${workoutType} ${totalMiles} Miles`;
 }
 
 function buildSuggestedDescription(
@@ -229,6 +228,8 @@ async function parseSourceTextWithOpenAI(
 
 The user has indicated workout type: ${workoutType}. Prefer segment titles that match this type (e.g. Warmup, Rest, Interval, Cooldown) and bias suggestedTitle toward ${workoutType} when appropriate.
 
+Heart rate zones (use for HEART_RATE targets when user says "zone N" or "zN" or "easy/zone 2" etc.): Zone 1: 100-115 bpm, Zone 2: 115-130 bpm, Zone 3: 130-145 bpm, Zone 4: 145-160 bpm, Zone 5: 160-175 bpm. If the description mentions a zone (e.g. "zone 2", "keep it in z2") add a target: { "type": "HEART_RATE", "valueLow": <min>, "valueHigh": <max> } in bpm. You can have both PACE and HEART_RATE in the same segment targets array.
+
 Output ONLY a single JSON object (no markdown, no code block):
 {
   "segments": [
@@ -236,15 +237,17 @@ Output ONLY a single JSON object (no markdown, no code block):
     { "stepOrder": 2, "title": "Main", "durationType": "DISTANCE", "durationValue": 10, "targets": [ { "type": "PACE", "valueLow": 450, "valueHigh": 480 } ] },
     { "stepOrder": 3, "title": "Cooldown", "durationType": "DISTANCE", "durationValue": 3, "targets": [ { "type": "PACE", "valueLow": 520, "valueHigh": 560 } ] }
   ],
-  "suggestedTitle": "15 Mile Long Run",
+  "suggestedTitle": "Easy 15 Miles",
   "suggestedDescription": "2 mi warmup, 10 mi marathon pace, 3 mi cooldown"
 }
 
 Rules:
 - Each segment: stepOrder (1-based), title (e.g. Warmup, Main Set, Cooldown, Interval, Recovery), durationType ("DISTANCE" or "TIME"), durationValue (miles for DISTANCE, minutes for TIME).
+- Prefer splitting into Warmup + Main + Cooldown when the description implies a main effort (e.g. "6 mile easy" → Warmup ~10%, main easy ~80%, Cooldown ~10%; "10 miles with 5 at tempo" → warmup, main tempo block, cooldown). Only use a single segment when the user clearly describes one block (e.g. "just 3 miles easy").
 - For intervals/repeats use repeatCount on that segment (e.g. 6x800m = one segment with durationValue 0.5 miles, repeatCount 6).
-- targets: array of { "type": "PACE", "valueLow": N, "valueHigh": N } in seconds per kilometer. Infer reasonable paces from context (e.g. warmup/cooldown ~8:30/mi = ~530 sec/km, marathon pace ~7:30/mi = ~467 sec/km, tempo ~7:00/mi = ~436 sec/km). Use ±10 sec/km range.
-- suggestedTitle: short workout name. suggestedDescription: one line summarizing the workout.`;
+- PACE targets: valueLow and valueHigh in seconds per kilometer. If the user gives a pace RANGE (e.g. "8:15-8:45", "between 8:15 and 8:45/mile"), convert both ends to sec/km and use those exact values for valueLow and valueHigh. If only a single pace is given, use ±10 sec/km range. Conversion: 8:00/mile = 298 sec/km, 8:30/mile = 317 sec/km, 9:00/mile = 336 sec/km.
+- HEART_RATE targets: valueLow and valueHigh in bpm. Use the zone table above when the user mentions zone 1-5.
+- suggestedTitle: short name like "Easy 6 Miles" or "Tempo Intervals", no pace in the title. suggestedDescription: one line summarizing the workout.`;
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",

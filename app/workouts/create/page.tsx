@@ -6,6 +6,8 @@ import { ArrowLeft, Plus, Trash2, Sparkles, FileText, Zap } from "lucide-react";
 import Link from "next/link";
 import TopNav from "@/components/shared/TopNav";
 import api from "@/lib/api";
+import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
+import { HR_ZONE_RANGES } from "@/lib/hr-zones";
 
 const WORKOUT_TYPES = ["Easy", "Tempo", "LongRun", "Intervals"] as const;
 
@@ -19,9 +21,21 @@ interface WorkoutSegment {
   repeatCount?: number;
 }
 
-/** Convert seconds per km (from API target) to "M:SS/mile" for display */
-function secondsPerKmToPaceString(secondsPerKm: number): string {
+/** Convert seconds per km (from API target) to "M:SS" (no suffix) */
+function secondsPerKmToPacePart(secondsPerKm: number): string {
   const secPerMile = secondsPerKm / 1.60934;
+  const m = Math.floor(secPerMile / 60);
+  const s = Math.round(secPerMile % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/** Convert seconds per km to "M:SS/mile" for display */
+function secondsPerKmToPaceString(secondsPerKm: number): string {
+  return `${secondsPerKmToPacePart(secondsPerKm)}/mile`;
+}
+
+/** Format sec/mile as "M:SS/mile" (for clarification-built segments) */
+function formatSecPerMileToPaceString(secPerMile: number): string {
   const m = Math.floor(secPerMile / 60);
   const s = Math.round(secPerMile % 60);
   return `${m}:${s.toString().padStart(2, "0")}/mile`;
@@ -41,14 +55,21 @@ function apiSegmentsToForm(segments: ApiSegment[]): WorkoutSegment[] {
     let pace: string | undefined;
     const paceTarget = seg.targets?.find((t) => t.type === "PACE");
     if (paceTarget?.valueLow != null) {
-      const mid = (paceTarget.valueLow + (paceTarget.valueHigh ?? paceTarget.valueLow)) / 2;
-      pace = secondsPerKmToPaceString(mid);
+      const high = paceTarget.valueHigh ?? paceTarget.valueLow;
+      if (paceTarget.valueLow !== high) {
+        pace = `${secondsPerKmToPacePart(paceTarget.valueLow)}-${secondsPerKmToPacePart(high)}/mile`;
+      } else {
+        pace = secondsPerKmToPaceString(paceTarget.valueLow);
+      }
     }
+    const hrTarget = seg.targets?.find((t) => t.type === "HEART_RATE");
     return {
       id: `seg_${i}_${Date.now()}`,
       title: seg.title,
       miles: seg.durationValue,
       pace,
+      hrMin: hrTarget?.valueLow,
+      hrMax: hrTarget?.valueHigh,
       repeatCount: seg.repeatCount ?? undefined,
     };
   });
@@ -74,6 +95,14 @@ export default function CreateWorkoutPage() {
 
   const [saving, setSaving] = useState(false);
 
+  // Clarification panel (when AI returns a single generic segment)
+  const [showClarificationPanel, setShowClarificationPanel] = useState(false);
+  const [clarificationTotalMiles, setClarificationTotalMiles] = useState(0);
+  const [clarificationWarmup, setClarificationWarmup] = useState(true);
+  const [clarificationCooldown, setClarificationCooldown] = useState(true);
+  const [clarificationPace, setClarificationPace] = useState("");
+  const [clarificationHrZone, setClarificationHrZone] = useState<number | "">("");
+
   const addSegment = () => {
     setSegments([
       ...segments,
@@ -87,6 +116,64 @@ export default function CreateWorkoutPage() {
 
   const updateSegment = (id: string, updates: Partial<WorkoutSegment>) => {
     setSegments(segments.map((s) => (s.id === id ? { ...s, ...updates } : s)));
+  };
+
+  function buildSegmentsFromClarification(): WorkoutSegment[] {
+    const total = Math.max(0, clarificationTotalMiles);
+    if (total === 0) return [];
+    const round = (n: number) => Math.round(n * 100) / 100;
+    let pace: string | undefined;
+    try {
+      if (clarificationPace.trim()) {
+        const secPerMile = parsePaceToSecondsPerMile(clarificationPace.trim());
+        pace = formatSecPerMileToPaceString(secPerMile);
+      }
+    } catch {
+      // leave pace undefined
+    }
+    const hrRange =
+      clarificationHrZone !== "" && clarificationHrZone >= 1 && clarificationHrZone <= 5
+        ? HR_ZONE_RANGES[clarificationHrZone as number]
+        : null;
+    const hrMin = hrRange?.min;
+    const hrMax = hrRange?.max;
+    const base = { pace, hrMin, hrMax };
+    const ts = Date.now();
+    if (clarificationWarmup && clarificationCooldown) {
+      const warmupMiles = round(total * 0.1);
+      const cooldownMiles = round(total * 0.1);
+      const mainMiles = round(total - warmupMiles - cooldownMiles);
+      return [
+        { id: `seg_0_${ts}`, title: "Warmup", miles: warmupMiles, ...base },
+        { id: `seg_1_${ts}`, title: "Main", miles: mainMiles, ...base },
+        { id: `seg_2_${ts}`, title: "Cooldown", miles: cooldownMiles, ...base },
+      ];
+    }
+    if (clarificationWarmup) {
+      const warmupMiles = round(total * 0.1);
+      const mainMiles = round(total - warmupMiles);
+      return [
+        { id: `seg_0_${ts}`, title: "Warmup", miles: warmupMiles, ...base },
+        { id: `seg_1_${ts}`, title: "Main", miles: mainMiles, ...base },
+      ];
+    }
+    if (clarificationCooldown) {
+      const mainMiles = round(total * 0.9);
+      const cooldownMiles = round(total - mainMiles);
+      return [
+        { id: `seg_0_${ts}`, title: "Main", miles: mainMiles, ...base },
+        { id: `seg_1_${ts}`, title: "Cooldown", miles: cooldownMiles, ...base },
+      ];
+    }
+    return [{ id: `seg_0_${ts}`, title: "Main", miles: total, ...base }];
+  }
+
+  const handleApplyClarification = () => {
+    const next = buildSegmentsFromClarification();
+    if (next.length > 0) {
+      setSegments(next);
+      setShowClarificationPanel(false);
+    }
   };
 
   const handleDerive = async () => {
@@ -107,9 +194,23 @@ export default function CreateWorkoutPage() {
         workoutType,
         sourceText: text,
       });
-      setSegments(apiSegmentsToForm(data.segments));
+      const formSegments = apiSegmentsToForm(data.segments);
+      setSegments(formSegments);
       setName(data.suggestedTitle);
       setDescription(data.suggestedDescription);
+      const isWeakParse =
+        data.segments.length === 1 &&
+        !/warmup|cooldown|interval|tempo/i.test(data.segments[0].title ?? "");
+      if (isWeakParse && data.segments[0]) {
+        setShowClarificationPanel(true);
+        setClarificationTotalMiles(data.segments[0].durationValue ?? 0);
+        setClarificationWarmup(true);
+        setClarificationCooldown(true);
+        setClarificationPace("");
+        setClarificationHrZone("");
+      } else {
+        setShowClarificationPanel(false);
+      }
     } catch (err: unknown) {
       let display = "Failed to derive workout";
       if (err && typeof err === "object" && "response" in err) {
@@ -149,6 +250,7 @@ export default function CreateWorkoutPage() {
         setSegments(apiSegmentsToForm(data.segments));
         setName(data.suggestedTitle ?? "");
         setDescription(data.suggestedDescription ?? "");
+        setShowClarificationPanel(false);
       }
     } catch (err: unknown) {
       const msg =
@@ -172,17 +274,35 @@ export default function CreateWorkoutPage() {
       const buildTargets = (pace?: string, hrMin?: number, hrMax?: number) => {
         const targets: Array<{ type: string; valueLow?: number; valueHigh?: number }> = [];
         if (pace) {
-          const match = pace.match(/(\d+):(\d+)/);
-          if (match) {
-            const minutes = parseInt(match[1], 10);
-            const seconds = parseInt(match[2], 10);
-            const totalSecondsPerMile = minutes * 60 + seconds;
-            const secondsPerKm = Math.round(totalSecondsPerMile * 1.60934);
+          const rangeMatch = pace.match(/(\d+):(\d+)-(\d+):(\d+)/);
+          if (rangeMatch) {
+            const toSecKm = (m: number, s: number) =>
+              Math.round((m * 60 + s) * 1.60934);
+            const secKmLow = toSecKm(
+              parseInt(rangeMatch[1], 10),
+              parseInt(rangeMatch[2], 10)
+            );
+            const secKmHigh = toSecKm(
+              parseInt(rangeMatch[3], 10),
+              parseInt(rangeMatch[4], 10)
+            );
             targets.push({
               type: "PACE",
-              valueLow: secondsPerKm - 10,
-              valueHigh: secondsPerKm + 10,
+              valueLow: Math.min(secKmLow, secKmHigh),
+              valueHigh: Math.max(secKmLow, secKmHigh),
             });
+          } else {
+            const singleMatch = pace.match(/(\d+):(\d+)/);
+            if (singleMatch) {
+              const minutes = parseInt(singleMatch[1], 10);
+              const seconds = parseInt(singleMatch[2], 10);
+              const secondsPerKm = Math.round((minutes * 60 + seconds) * 1.60934);
+              targets.push({
+                type: "PACE",
+                valueLow: secondsPerKm - 10,
+                valueHigh: secondsPerKm + 10,
+              });
+            }
           }
         }
         if (hrMin !== undefined && hrMax !== undefined) {
@@ -277,6 +397,88 @@ export default function CreateWorkoutPage() {
               </button>
             </div>
 
+            {/* Clarification panel when AI returned a single generic segment */}
+            {showClarificationPanel && (
+              <div className="p-4 rounded-lg border border-amber-200 bg-amber-50/50">
+                <h3 className="font-medium text-gray-900 mb-2">Add a bit more detail</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  We got one block from your paste. Add warmup/cooldown and optional pace or HR zone to build segments.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Total miles</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min={0}
+                      value={clarificationTotalMiles || ""}
+                      onChange={(e) =>
+                        setClarificationTotalMiles(parseFloat(e.target.value) || 0)
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="block text-sm font-medium text-gray-700">Include</label>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={clarificationWarmup}
+                        onChange={(e) => setClarificationWarmup(e.target.checked)}
+                        className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                      />
+                      Warmup
+                    </label>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={clarificationCooldown}
+                        onChange={(e) => setClarificationCooldown(e.target.checked)}
+                        className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                      />
+                      Cooldown
+                    </label>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Pace (e.g. 8:30/mile)</label>
+                    <input
+                      type="text"
+                      value={clarificationPace}
+                      onChange={(e) => setClarificationPace(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                      placeholder="8:30 or 8:15-8:45"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Heart rate zone</label>
+                    <select
+                      value={clarificationHrZone === "" ? "" : String(clarificationHrZone)}
+                      onChange={(e) =>
+                        setClarificationHrZone(
+                          e.target.value === "" ? "" : (parseInt(e.target.value, 10) as number)
+                        )
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                    >
+                      <option value="">None</option>
+                      {[1, 2, 3, 4, 5].map((z) => (
+                        <option key={z} value={z}>
+                          Zone {z}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleApplyClarification}
+                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium"
+                >
+                  Apply
+                </button>
+              </div>
+            )}
+
             {/* Get a workout from GoFast */}
             <div className="p-4 rounded-lg border border-gray-200 bg-orange-50/30">
               <h3 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
@@ -362,10 +564,23 @@ export default function CreateWorkoutPage() {
             </p>
 
             <div className="space-y-4">
-              {segments.map((segment, index) => (
+              {segments.map((segment, index) => {
+                const role = segment.title && /warmup|warm-up|warm up/i.test(segment.title)
+                  ? "Warmup"
+                  : segment.title && /cooldown|cool-down|cool down/i.test(segment.title)
+                    ? "Cooldown"
+                    : null;
+                return (
                 <div key={segment.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-medium text-gray-900">Segment {index + 1}</h3>
+                    <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                      Segment {index + 1}
+                      {role && (
+                        <span className="text-xs font-normal px-2 py-0.5 rounded bg-gray-200 text-gray-600">
+                          {role}
+                        </span>
+                      )}
+                    </h3>
                     <button
                       type="button"
                       onClick={() => removeSegment(segment.id)}
@@ -446,7 +661,8 @@ export default function CreateWorkoutPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           </div>
 
