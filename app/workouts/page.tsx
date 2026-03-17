@@ -68,7 +68,7 @@ function PlanView() {
 
   const fetchWorkouts = async () => {
     try {
-      const response = await api.get("/api/workouts");
+      const response = await api.get("workouts");
       setWorkouts(response.data.workouts || []);
     } catch (error: any) {
       console.error("Error fetching workouts:", error);

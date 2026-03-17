@@ -103,7 +103,7 @@ export default function CreateWorkoutPage() {
         segments: ApiSegment[];
         suggestedTitle: string;
         suggestedDescription: string;
-      }>("/api/workouts/ai-generate", {
+      }>("workouts/ai-generate", {
         workoutType,
         sourceText: text,
       });
@@ -140,7 +140,7 @@ export default function CreateWorkoutPage() {
       const { data } = await api.post<
         | { segments: ApiSegment[]; suggestedTitle: string; suggestedDescription: string }
         | { needsPace: true; message: string }
-      >("/api/workouts/gofast-generate", { workoutType });
+      >("workouts/gofast-generate", { workoutType });
       if ("needsPace" in data && data.needsPace) {
         setNeedsPace(data.message ?? "Set a goal race or 5k pace in settings.");
         return;
@@ -206,7 +206,7 @@ export default function CreateWorkoutPage() {
         })),
       };
 
-      const response = await api.post("/api/workouts", workoutData);
+      const response = await api.post("workouts", workoutData);
       const { workout } = response.data;
       router.push(`/workouts/${workout.id}`);
     } catch (error) {

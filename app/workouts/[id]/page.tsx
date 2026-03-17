@@ -52,7 +52,7 @@ export default function WorkoutDetailPage() {
 
   const fetchWorkout = async () => {
     try {
-      const response = await api.get("/api/workouts");
+      const response = await api.get("workouts");
       const { workouts } = response.data;
       const found = workouts.find((w: Workout) => w.id === workoutId);
       if (found) {
@@ -81,7 +81,7 @@ export default function WorkoutDetailPage() {
     setPushStatus(null);
 
     try {
-      const response = await api.post(`/api/workouts/${workoutId}/push-to-garmin`);
+      const response = await api.post(`workouts/${workoutId}/push-to-garmin`);
       const { garminWorkoutId } = response.data;
 
       setPushStatus({
