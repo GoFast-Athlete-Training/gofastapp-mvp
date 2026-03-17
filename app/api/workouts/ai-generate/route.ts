@@ -4,6 +4,8 @@ import { adminAuth } from "@/lib/firebaseAdmin";
 import {
   resolveGoalPaceSecondsPerMile,
   getTrainingPaces,
+  parsePaceToSecondsPerMile,
+  secondsPerMileToSecondsPerKm,
   type TrainingPaces,
 } from "@/lib/workout-generator/pace-calculator";
 import {
@@ -47,9 +49,15 @@ function normalizeBlobRequest(body: AiGenerateRequestBody): { sourceText: string
   return { sourceText, workoutType };
 }
 
+/** Convert pace string "8:15" to internal value (sec/mile * 1.60934) for API targets */
+function paceStringToInternalValue(paceStr: string): number {
+  const secPerMile = parsePaceToSecondsPerMile(paceStr.trim());
+  return secondsPerMileToSecondsPerKm(secPerMile);
+}
+
 /**
  * Normalize OpenAI blob response to our API contract (ApiSegment[], suggestedTitle, suggestedDescription).
- * Handles malformed or extra keys from the model so we always return a valid AiGenerateResponse.
+ * Handles malformed or extra keys. If AI returns PACE targets as paceLow/paceHigh strings (M:SS/mile), converts to valueLow/valueHigh.
  */
 function normalizeOpenAIBlobResponse(parsed: unknown, sourceText: string): AiGenerateResponse {
   const obj = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
@@ -66,11 +74,31 @@ function normalizeOpenAIBlobResponse(parsed: unknown, sourceText: string): AiGen
         typeof seg.durationValue === "number" && seg.durationValue > 0
           ? seg.durationValue
           : 0;
-      const targets = Array.isArray(seg.targets)
-        ? (seg.targets as Array<{ type?: string; valueLow?: number; valueHigh?: number }>).filter(
-            (t) => t && typeof t.type === "string"
-          )
-        : undefined;
+      const rawTargets = Array.isArray(seg.targets) ? seg.targets : [];
+      const targets: Array<{ type: string; valueLow?: number; valueHigh?: number }> = [];
+      for (const t of rawTargets) {
+        if (!t || typeof t !== "object" || typeof (t as Record<string, unknown>).type !== "string")
+          continue;
+        const tt = t as Record<string, unknown>;
+        const type = String(tt.type);
+        if (type === "PACE") {
+          const paceLow = typeof tt.paceLow === "string" ? tt.paceLow.trim() : null;
+          const paceHigh = typeof tt.paceHigh === "string" ? tt.paceHigh.trim() : null;
+          if (paceLow || paceHigh) {
+            try {
+              const low = paceLow ? paceStringToInternalValue(paceLow) : (paceHigh ? paceStringToInternalValue(paceHigh) : 0);
+              const high = paceHigh ? paceStringToInternalValue(paceHigh) : low;
+              targets.push({ type: "PACE", valueLow: Math.min(low, high), valueHigh: Math.max(low, high) });
+            } catch {
+              // skip invalid pace
+            }
+          } else if (typeof tt.valueLow === "number" && typeof tt.valueHigh === "number") {
+            targets.push({ type: "PACE", valueLow: tt.valueLow, valueHigh: tt.valueHigh });
+          }
+        } else if (type === "HEART_RATE" && typeof tt.valueLow === "number" && typeof tt.valueHigh === "number") {
+          targets.push({ type: "HEART_RATE", valueLow: tt.valueLow, valueHigh: tt.valueHigh });
+        }
+      }
       const repeatCount =
         typeof seg.repeatCount === "number" && seg.repeatCount >= 1 ? seg.repeatCount : undefined;
       return {
@@ -78,7 +106,7 @@ function normalizeOpenAIBlobResponse(parsed: unknown, sourceText: string): AiGen
         title,
         durationType,
         durationValue,
-        targets: targets?.length ? targets : undefined,
+        targets: targets.length ? targets : undefined,
         repeatCount,
       } as ApiSegment;
     })
@@ -230,12 +258,12 @@ The user has indicated workout type: ${workoutType}. Prefer segment titles that 
 
 Heart rate zones (use for HEART_RATE targets when user says "zone N" or "zN" or "easy/zone 2" etc.): Zone 1: 100-115 bpm, Zone 2: 115-130 bpm, Zone 3: 130-145 bpm, Zone 4: 145-160 bpm, Zone 5: 160-175 bpm. If the description mentions a zone (e.g. "zone 2", "keep it in z2") add a target: { "type": "HEART_RATE", "valueLow": <min>, "valueHigh": <max> } in bpm. You can have both PACE and HEART_RATE in the same segment targets array.
 
-Output ONLY a single JSON object (no markdown, no code block):
+Output ONLY a single JSON object (no markdown, no code block). For PACE targets use paceLow and paceHigh as M:SS/mile strings (e.g. "8:15", "8:45"):
 {
   "segments": [
-    { "stepOrder": 1, "title": "Warmup", "durationType": "DISTANCE", "durationValue": 2, "targets": [ { "type": "PACE", "valueLow": 520, "valueHigh": 560 } ] },
-    { "stepOrder": 2, "title": "Main", "durationType": "DISTANCE", "durationValue": 10, "targets": [ { "type": "PACE", "valueLow": 450, "valueHigh": 480 } ] },
-    { "stepOrder": 3, "title": "Cooldown", "durationType": "DISTANCE", "durationValue": 3, "targets": [ { "type": "PACE", "valueLow": 520, "valueHigh": 560 } ] }
+    { "stepOrder": 1, "title": "Warmup", "durationType": "DISTANCE", "durationValue": 2, "targets": [ { "type": "PACE", "paceLow": "8:45", "paceHigh": "9:00" } ] },
+    { "stepOrder": 2, "title": "Main", "durationType": "DISTANCE", "durationValue": 10, "targets": [ { "type": "PACE", "paceLow": "7:30", "paceHigh": "7:45" } ] },
+    { "stepOrder": 3, "title": "Cooldown", "durationType": "DISTANCE", "durationValue": 3, "targets": [ { "type": "PACE", "paceLow": "8:45", "paceHigh": "9:00" } ] }
   ],
   "suggestedTitle": "Easy 15 Miles",
   "suggestedDescription": "2 mi warmup, 10 mi marathon pace, 3 mi cooldown"
@@ -245,7 +273,7 @@ Rules:
 - Each segment: stepOrder (1-based), title (e.g. Warmup, Main Set, Cooldown, Interval, Recovery), durationType ("DISTANCE" or "TIME"), durationValue (miles for DISTANCE, minutes for TIME).
 - Prefer splitting into Warmup + Main + Cooldown when the description implies a main effort (e.g. "6 mile easy" → Warmup ~10%, main easy ~80%, Cooldown ~10%; "10 miles with 5 at tempo" → warmup, main tempo block, cooldown). Only use a single segment when the user clearly describes one block (e.g. "just 3 miles easy").
 - For intervals/repeats use repeatCount on that segment (e.g. 6x800m = one segment with durationValue 0.5 miles, repeatCount 6).
-- PACE targets: valueLow and valueHigh in seconds per kilometer. If the user gives a pace RANGE (e.g. "8:15-8:45", "between 8:15 and 8:45/mile"), convert both ends to sec/km and use those exact values for valueLow and valueHigh. If only a single pace is given, use ±10 sec/km range. Conversion: 8:00/mile = 298 sec/km, 8:30/mile = 317 sec/km, 9:00/mile = 336 sec/km.
+- PACE targets: use "paceLow" and "paceHigh" as strings in M:SS per mile (e.g. "8:15", "8:45"). If the user gives a range use both ends; if single pace use the same value for both.
 - HEART_RATE targets: valueLow and valueHigh in bpm. Use the zone table above when the user mentions zone 1-5.
 - suggestedTitle: short name like "Easy 6 Miles" or "Tempo Intervals", no pace in the title. suggestedDescription: one line summarizing the workout.`;
 
