@@ -261,21 +261,29 @@ Heart rate zones (use for HEART_RATE targets when user says "zone N" or "zN" or 
 Output ONLY a single JSON object (no markdown, no code block). For PACE targets use paceLow and paceHigh as M:SS/mile strings (e.g. "8:15", "8:45"):
 {
   "segments": [
+    { "stepOrder": 1, "title": "Main", "durationType": "DISTANCE", "durationValue": 6, "targets": [ { "type": "PACE", "paceLow": "8:15", "paceHigh": "8:45" } ] }
+  ],
+  "suggestedTitle": "easy run - 6 miles",
+  "suggestedDescription": "6 miles easy at 8:15-8:45 pace"
+}
+
+When the user explicitly mentions warmup or cooldown (e.g. "2 mi warmup", "cooldown 2 miles"), use multiple segments with titles "Warmup", "Main", "Cooldown". Example with warmup/cooldown:
+{
+  "segments": [
     { "stepOrder": 1, "title": "Warmup", "durationType": "DISTANCE", "durationValue": 2, "targets": [ { "type": "PACE", "paceLow": "8:45", "paceHigh": "9:00" } ] },
     { "stepOrder": 2, "title": "Main", "durationType": "DISTANCE", "durationValue": 10, "targets": [ { "type": "PACE", "paceLow": "7:30", "paceHigh": "7:45" } ] },
     { "stepOrder": 3, "title": "Cooldown", "durationType": "DISTANCE", "durationValue": 3, "targets": [ { "type": "PACE", "paceLow": "8:45", "paceHigh": "9:00" } ] }
   ],
-  "suggestedTitle": "Easy 15 Miles",
+  "suggestedTitle": "marathon pace - 15 miles",
   "suggestedDescription": "2 mi warmup, 10 mi marathon pace, 3 mi cooldown"
 }
 
 Rules:
-- Each segment: stepOrder (1-based), title (e.g. Warmup, Main Set, Cooldown, Interval, Recovery), durationType ("DISTANCE" or "TIME"), durationValue (miles for DISTANCE, minutes for TIME).
-- Prefer splitting into Warmup + Main + Cooldown when the description implies a main effort (e.g. "6 mile easy" → Warmup ~10%, main easy ~80%, Cooldown ~10%; "10 miles with 5 at tempo" → warmup, main tempo block, cooldown). Only use a single segment when the user clearly describes one block (e.g. "just 3 miles easy").
-- For intervals/repeats use repeatCount on that segment (e.g. 6x800m = one segment with durationValue 0.5 miles, repeatCount 6).
-- PACE targets: use "paceLow" and "paceHigh" as strings in M:SS per mile (e.g. "8:15", "8:45"). If the user gives a range use both ends; if single pace use the same value for both.
-- HEART_RATE targets: valueLow and valueHigh in bpm. Use the zone table above when the user mentions zone 1-5.
-- suggestedTitle: short name like "Easy 6 Miles" or "Tempo Intervals", no pace in the title. suggestedDescription: one line summarizing the workout.`;
+- Default: If the user does NOT explicitly mention warmup or cooldown (or warm-up, cool-down), return ONE segment only with title "Main" or "Main Work" or "Easy" containing the full distance. Do not infer or add Warmup/Cooldown.
+- Only output segments titled "Warmup" or "Cooldown" when the user's text explicitly mentions them (e.g. "2 mile warmup", "warm up 1 mi", "cooldown 2 miles").
+- Each segment: stepOrder (1-based), title, durationType ("DISTANCE" or "TIME"), durationValue (miles or minutes), targets. For intervals use repeatCount (e.g. 6x800m = durationValue 0.5 miles, repeatCount 6).
+- PACE targets: "paceLow" and "paceHigh" as M:SS/mile strings (e.g. "8:15", "8:45"). HEART_RATE: valueLow/valueHigh in bpm when user mentions zone 1-5.
+- suggestedTitle: short, literal, based on user wording (e.g. "easy run - 6 miles", "tempo - 8 miles"). NEVER include pace, times, or heart rate in the title. suggestedDescription: one line summary; pace/details may go here.`;
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",

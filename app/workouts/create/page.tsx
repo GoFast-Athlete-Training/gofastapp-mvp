@@ -15,8 +15,10 @@ const WORKOUT_TYPES = ["Easy", "Tempo", "LongRun", "Intervals"] as const;
 
 export interface SlotData {
   miles: number;
-  paceLow?: string;
-  paceHigh?: string;
+  /** PACE target min (sec/km); display as M:SS in UI */
+  paceValueLow?: number;
+  /** PACE target max (sec/km); display as M:SS in UI */
+  paceValueHigh?: number;
   hrMin?: number;
   hrMax?: number;
   repeatCount?: number;
@@ -31,8 +33,8 @@ type ApiSegment = {
   repeatCount?: number;
 };
 
-/** Internal PACE value (sec/mile * 1.60934) to "M:SS" for display */
-function internalValueToPacePart(value: number): string {
+/** Sec/km (API value) to "M:SS"/mile for display */
+function secPerKmToPaceDisplay(value: number): string {
   const secPerMile = value / 1.60934;
   const m = Math.floor(secPerMile / 60);
   const s = Math.round(secPerMile % 60);
@@ -50,20 +52,14 @@ function apiSegmentsToSlots(
   for (const seg of segments) {
     const title = (seg.title ?? "").toLowerCase();
     const miles = typeof seg.durationValue === "number" && seg.durationValue > 0 ? seg.durationValue : 0;
-    let paceLow: string | undefined;
-    let paceHigh: string | undefined;
     const paceTarget = seg.targets?.find((t) => t.type === "PACE");
-    if (paceTarget?.valueLow != null) {
-      paceLow = internalValueToPacePart(paceTarget.valueLow);
-      paceHigh = paceTarget.valueHigh != null
-        ? internalValueToPacePart(paceTarget.valueHigh)
-        : paceLow;
-    }
+    const paceValueLow = paceTarget?.valueLow;
+    const paceValueHigh = paceTarget?.valueHigh != null ? paceTarget.valueHigh : paceValueLow;
     const hrTarget = seg.targets?.find((t) => t.type === "HEART_RATE");
     const slot: SlotData = {
       miles,
-      paceLow,
-      paceHigh,
+      paceValueLow,
+      paceValueHigh,
       hrMin: hrTarget?.valueLow,
       hrMax: hrTarget?.valueHigh,
       repeatCount: seg.repeatCount ?? undefined,
@@ -77,8 +73,8 @@ function apiSegmentsToSlots(
       if (mainWork) {
         mainWork = {
           miles: mainWork.miles + miles,
-          paceLow: mainWork.paceLow || slot.paceLow,
-          paceHigh: mainWork.paceHigh || slot.paceHigh,
+          paceValueLow: mainWork.paceValueLow ?? slot.paceValueLow,
+          paceValueHigh: mainWork.paceValueHigh ?? slot.paceValueHigh,
           hrMin: mainWork.hrMin ?? slot.hrMin,
           hrMax: mainWork.hrMax ?? slot.hrMax,
           repeatCount: mainWork.repeatCount ?? slot.repeatCount,
@@ -94,12 +90,9 @@ function apiSegmentsToSlots(
 
 function slotOneLine(slot: SlotData): string {
   const mi = slot.miles ? `${slot.miles} mi` : "";
-  const pace =
-    slot.paceLow && slot.paceHigh
-      ? slot.paceLow === slot.paceHigh
-        ? `${slot.paceLow}/mi`
-        : `${slot.paceLow}-${slot.paceHigh}/mi`
-      : "";
+  const low = slot.paceValueLow != null ? secPerKmToPaceDisplay(slot.paceValueLow) : "";
+  const high = slot.paceValueHigh != null ? secPerKmToPaceDisplay(slot.paceValueHigh) : "";
+  const pace = low && high ? (low === high ? `${low}/mi` : `${low}-${high}/mi`) : "";
   return [mi, pace].filter(Boolean).join(" — ") || "—";
 }
 
@@ -118,6 +111,9 @@ export default function CreateWorkoutPage() {
   const [deriveError, setDeriveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [editingSlot, setEditingSlot] = useState<"warmup" | "mainWork" | "cooldown" | null>(null);
+  /** While editing a slot, M:SS strings for pace inputs (so user can type partial values) */
+  const [editingPaceLowStr, setEditingPaceLowStr] = useState("");
+  const [editingPaceHighStr, setEditingPaceHighStr] = useState("");
 
   const hasSlots = warmup !== null || mainWork !== null || cooldown !== null;
 
@@ -181,18 +177,10 @@ export default function CreateWorkoutPage() {
     try {
       const buildTargets = (slot: SlotData) => {
         const targets: Array<{ type: string; valueLow?: number; valueHigh?: number }> = [];
-        if (slot.paceLow?.trim() || slot.paceHigh?.trim()) {
-          try {
-            const low = slot.paceLow?.trim()
-              ? secondsPerMileToSecondsPerKm(parsePaceToSecondsPerMile(slot.paceLow.trim()))
-              : 0;
-            const high = slot.paceHigh?.trim()
-              ? secondsPerMileToSecondsPerKm(parsePaceToSecondsPerMile(slot.paceHigh.trim()))
-              : low;
-            if (low || high) targets.push({ type: "PACE", valueLow: low || high, valueHigh: high || low });
-          } catch {
-            // skip invalid pace
-          }
+        if (slot.paceValueLow != null || slot.paceValueHigh != null) {
+          const low = slot.paceValueLow ?? slot.paceValueHigh ?? 0;
+          const high = slot.paceValueHigh ?? slot.paceValueLow ?? low;
+          if (low || high) targets.push({ type: "PACE", valueLow: low, valueHigh: high });
         }
         if (slot.hrMin != null && slot.hrMax != null) {
           targets.push({ type: "HEART_RATE", valueLow: slot.hrMin, valueHigh: slot.hrMax });
@@ -358,6 +346,8 @@ export default function CreateWorkoutPage() {
                               onClick={() => {
                                 setSlot(key, { miles: 0 });
                                 setEditingSlot(key);
+                                setEditingPaceLowStr("");
+                                setEditingPaceHighStr("");
                               }}
                               className="text-sm px-3 py-1.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
                             >
@@ -367,7 +357,16 @@ export default function CreateWorkoutPage() {
                             <>
                               <button
                                 type="button"
-                                onClick={() => setEditingSlot(isEditing ? null : key)}
+                                onClick={() => {
+                                  if (isEditing) {
+                                    setEditingSlot(null);
+                                  } else {
+                                    setEditingSlot(key);
+                                    const s = getSlot(key);
+                                    setEditingPaceLowStr(s?.paceValueLow != null ? secPerKmToPaceDisplay(s.paceValueLow) : "");
+                                    setEditingPaceHighStr(s?.paceValueHigh != null ? secPerKmToPaceDisplay(s.paceValueHigh) : "");
+                                  }
+                                }}
                                 className="text-sm px-3 py-1.5 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 inline-flex items-center gap-1"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
@@ -397,31 +396,47 @@ export default function CreateWorkoutPage() {
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Target low (e.g. 8:15)</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Target min (M:SS/mi)</label>
                             <input
                               type="text"
-                              value={slot?.paceLow ?? ""}
-                              onChange={(e) =>
-                                setSlot(key, {
-                                  ...(getSlot(key) ?? { miles: 0 }),
-                                  paceLow: e.target.value,
-                                })
-                              }
+                              value={editingSlot === key ? editingPaceLowStr : (slot?.paceValueLow != null ? secPerKmToPaceDisplay(slot.paceValueLow) : "")}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                if (editingSlot === key) setEditingPaceLowStr(v);
+                                try {
+                                  if (v.trim()) {
+                                    const secKm = secondsPerMileToSecondsPerKm(parsePaceToSecondsPerMile(v.trim()));
+                                    setSlot(key, { ...(getSlot(key) ?? { miles: 0 }), paceValueLow: secKm });
+                                  } else {
+                                    setSlot(key, { ...(getSlot(key) ?? { miles: 0 }), paceValueLow: undefined });
+                                  }
+                                } catch {
+                                  // keep typing; slot not updated until valid
+                                }
+                              }}
                               placeholder="8:15"
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Target high (e.g. 8:45)</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Target max (M:SS/mi)</label>
                             <input
                               type="text"
-                              value={slot?.paceHigh ?? ""}
-                              onChange={(e) =>
-                                setSlot(key, {
-                                  ...(getSlot(key) ?? { miles: 0 }),
-                                  paceHigh: e.target.value,
-                                })
-                              }
+                              value={editingSlot === key ? editingPaceHighStr : (slot?.paceValueHigh != null ? secPerKmToPaceDisplay(slot.paceValueHigh) : "")}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                if (editingSlot === key) setEditingPaceHighStr(v);
+                                try {
+                                  if (v.trim()) {
+                                    const secKm = secondsPerMileToSecondsPerKm(parsePaceToSecondsPerMile(v.trim()));
+                                    setSlot(key, { ...(getSlot(key) ?? { miles: 0 }), paceValueHigh: secKm });
+                                  } else {
+                                    setSlot(key, { ...(getSlot(key) ?? { miles: 0 }), paceValueHigh: undefined });
+                                  }
+                                } catch {
+                                  // keep typing; slot not updated until valid
+                                }
+                              }}
                               placeholder="8:45"
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                             />
