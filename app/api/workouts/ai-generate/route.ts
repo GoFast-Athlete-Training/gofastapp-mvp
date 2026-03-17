@@ -31,6 +31,69 @@ export interface AiGenerateResponse {
   suggestedDescription: string;
 }
 
+/** Allowed workout types for blob path; contract with create page. */
+const BLOB_WORKOUT_TYPES = ["Easy", "Tempo", "LongRun", "Intervals"] as const;
+
+/**
+ * Normalize request body for blob path. Contract: { sourceText, workoutType } only.
+ * Ensures workoutType is one of BLOB_WORKOUT_TYPES; defaults to "Easy".
+ */
+function normalizeBlobRequest(body: AiGenerateRequestBody): { sourceText: string; workoutType: string } {
+  const rawType = body.workoutType ?? "Easy";
+  const workoutType = BLOB_WORKOUT_TYPES.includes(rawType as (typeof BLOB_WORKOUT_TYPES)[number])
+    ? rawType
+    : "Easy";
+  const sourceText = body.sourceText != null ? String(body.sourceText).trim() : "";
+  return { sourceText, workoutType };
+}
+
+/**
+ * Normalize OpenAI blob response to our API contract (ApiSegment[], suggestedTitle, suggestedDescription).
+ * Handles malformed or extra keys from the model so we always return a valid AiGenerateResponse.
+ */
+function normalizeOpenAIBlobResponse(parsed: unknown, sourceText: string): AiGenerateResponse {
+  const obj = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+  const rawSegments = Array.isArray(obj.segments) ? obj.segments : [];
+  const segments: ApiSegment[] = rawSegments
+    .map((s: unknown, i: number) => {
+      if (!s || typeof s !== "object") return null;
+      const seg = s as Record<string, unknown>;
+      const stepOrder = typeof seg.stepOrder === "number" ? seg.stepOrder : i + 1;
+      const title = typeof seg.title === "string" ? seg.title : "Segment";
+      const durationType =
+        seg.durationType === "TIME" ? "TIME" : "DISTANCE";
+      const durationValue =
+        typeof seg.durationValue === "number" && seg.durationValue > 0
+          ? seg.durationValue
+          : 0;
+      const targets = Array.isArray(seg.targets)
+        ? (seg.targets as Array<{ type?: string; valueLow?: number; valueHigh?: number }>).filter(
+            (t) => t && typeof t.type === "string"
+          )
+        : undefined;
+      const repeatCount =
+        typeof seg.repeatCount === "number" && seg.repeatCount >= 1 ? seg.repeatCount : undefined;
+      return {
+        stepOrder,
+        title,
+        durationType,
+        durationValue,
+        targets: targets?.length ? targets : undefined,
+        repeatCount,
+      } as ApiSegment;
+    })
+    .filter((s): s is ApiSegment => s !== null && s.durationValue > 0);
+  const suggestedTitle =
+    typeof obj.suggestedTitle === "string" && obj.suggestedTitle.trim()
+      ? obj.suggestedTitle.trim()
+      : "Parsed Workout";
+  const suggestedDescription =
+    typeof obj.suggestedDescription === "string" && obj.suggestedDescription.trim()
+      ? obj.suggestedDescription.trim()
+      : sourceText.slice(0, 200);
+  return { segments, suggestedTitle, suggestedDescription };
+}
+
 function formatPaceFromSecondsPerMile(secPerMile: number): string {
   const m = Math.floor(secPerMile / 60);
   const s = Math.round(secPerMile % 60);
@@ -210,15 +273,17 @@ Rules:
   if (!content) throw new Error("Empty AI response");
 
   const cleaned = content.replace(/^```json\s*/i, "").replace(/\s*```\s*$/i, "").trim();
-  const parsed = JSON.parse(cleaned) as AiGenerateResponse;
-  if (!Array.isArray(parsed.segments) || parsed.segments.length === 0) {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    throw new Error("AI did not return valid JSON");
+  }
+  const result = normalizeOpenAIBlobResponse(parsed, sourceText);
+  if (result.segments.length === 0) {
     throw new Error("AI did not return valid segments");
   }
-  return {
-    segments: parsed.segments,
-    suggestedTitle: parsed.suggestedTitle ?? "Parsed Workout",
-    suggestedDescription: parsed.suggestedDescription ?? sourceText.slice(0, 200),
-  };
+  return result;
 }
 
 /**
@@ -242,8 +307,6 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json()) as AiGenerateRequestBody;
     const {
-      sourceText,
-      workoutType = "Easy",
       totalMiles,
       goalPace,
       raceTime,
@@ -251,14 +314,15 @@ export async function POST(request: NextRequest) {
       freeformPrompt,
     } = body;
 
-    const hasSourceText = sourceText != null && String(sourceText).trim().length > 0;
+    const { sourceText, workoutType } = normalizeBlobRequest(body);
+    const hasSourceText = sourceText.length > 0;
     const hasStructured =
       totalMiles != null &&
       totalMiles > 0 &&
       (goalPace != null && String(goalPace).trim() || (raceTime != null && raceDistance != null));
 
     if (hasSourceText) {
-      const result = await parseSourceTextWithOpenAI(String(sourceText).trim(), workoutType);
+      const result = await parseSourceTextWithOpenAI(sourceText, workoutType);
       return NextResponse.json(result);
     }
 

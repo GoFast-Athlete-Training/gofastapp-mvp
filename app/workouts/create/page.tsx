@@ -111,11 +111,22 @@ export default function CreateWorkoutPage() {
       setName(data.suggestedTitle);
       setDescription(data.suggestedDescription);
     } catch (err: unknown) {
-      const msg =
-        err && typeof err === "object" && "response" in err
-          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
-          : null;
-      setDeriveError(msg || "Failed to derive workout");
+      let display = "Failed to derive workout";
+      if (err && typeof err === "object" && "response" in err) {
+        const res = (err as { response?: { status?: number; data?: unknown } }).response;
+        const status = res?.status;
+        const data = res?.data;
+        const serverMessage =
+          typeof data === "object" && data !== null && "error" in data && typeof (data as { error?: unknown }).error === "string"
+            ? (data as { error: string }).error
+            : typeof data === "string"
+              ? data.slice(0, 200) + (data.length > 200 ? "…" : "")
+              : null;
+        if (status != null || serverMessage) {
+          display = [status != null ? `Status: ${status}` : null, serverMessage || "No details from server"].filter(Boolean).join(" — ");
+        }
+      }
+      setDeriveError(display);
     } finally {
       setDeriving(false);
     }
