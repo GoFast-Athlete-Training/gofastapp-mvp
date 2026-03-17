@@ -141,7 +141,7 @@ export interface GarminWorkoutResponse {
 export interface OurWorkout {
   id: string;
   title: string;
-  workoutType: string; // "Intervals" | "Tempo" | "LongRun" | "Easy" | "Speed" | "Strength"
+  workoutType: string; // "Intervals" | "Tempo" | "LongRun" | "Easy"
   workoutFormat?: string; // "Continuous" | "WarmupMainCooldown" | "Progression" | "IntervalsUnstructured"
   description?: string;
   totalMiles?: number;

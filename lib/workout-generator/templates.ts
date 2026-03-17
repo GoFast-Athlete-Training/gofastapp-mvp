@@ -18,8 +18,6 @@ export interface SegmentDescriptor {
 const M800 = 0.4971;
 /** 400m in miles */
 const M400 = 0.24855;
-/** 200m in miles */
-const M200 = 0.12428;
 
 function easy(
   totalMiles: number,
@@ -87,51 +85,11 @@ function intervals(
   ];
 }
 
-function speed(
-  totalMiles: number,
-  _paces: TrainingPaces
-): SegmentDescriptor[] {
-  const warmupMiles = round(totalMiles * 0.15, 2);
-  const cooldownMiles = round(totalMiles * 0.1, 2);
-  const numReps = 8;
-  const workMiles = M400;
-  const recoveryMiles = M200;
-  const reps: SegmentDescriptor[] = [];
-  for (let i = 0; i < numReps; i++) {
-    reps.push({
-      title: "Speed",
-      durationType: "DISTANCE",
-      durationValue: round(workMiles, 2),
-      paceZone: "speed",
-    });
-    reps.push({
-      title: "Recovery",
-      durationType: "DISTANCE",
-      durationValue: round(recoveryMiles, 2),
-      paceZone: "recovery",
-    });
-  }
-  return [
-    { title: "Warmup", durationType: "DISTANCE", durationValue: warmupMiles, paceZone: "easy" },
-    ...reps,
-    { title: "Cooldown", durationType: "DISTANCE", durationValue: cooldownMiles, paceZone: "easy" },
-  ];
-}
-
-function strength(
-  totalMiles: number,
-  p: TrainingPaces
-): SegmentDescriptor[] {
-  return easy(totalMiles, p);
-}
-
 const TEMPLATES: Record<string, (totalMiles: number, paces: TrainingPaces) => SegmentDescriptor[]> = {
   Easy: easy,
   Tempo: tempo,
   LongRun: longRun,
   Intervals: intervals,
-  Speed: speed,
-  Strength: strength,
 };
 
 export type WorkoutTypeKey = keyof typeof TEMPLATES;

@@ -16,16 +16,10 @@
 			"path": "../runtogether-platform"
 		},
 		{
-			"path": "../gofast-runprogram-headcoach"
-		},
-		{
-			"path": "../gofast-runprogram-coach"
-		},
-		{
-			"path": "../gofast_runprogram_parent"
-		},
-		{
 			"path": "../../Ignite/IgniteBd-Next-combine"
+		},
+		{
+			"path": "../trainingmvp"
 		}
 	],
 	"settings": {}
