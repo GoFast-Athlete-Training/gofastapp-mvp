@@ -4,6 +4,45 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 
+function pushRaceToCompanyUpstream(race: {
+  id: string;
+  name: string;
+  raceDate: Date;
+  city: string | null;
+  state: string | null;
+}) {
+  const raw =
+    process.env.NEXT_PUBLIC_COMPANY_APP_URL ||
+    process.env.GOFAST_COMPANY_API_URL ||
+    '';
+  const base = raw.replace(/\/$/, '');
+  if (!base) return;
+
+  const secret = process.env.RACE_UPSTREAM_SECRET?.trim();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (secret) {
+    headers.Authorization = `Bearer ${secret}`;
+  }
+
+  const body = JSON.stringify({
+    prodRaceId: race.id,
+    name: race.name,
+    raceDate: race.raceDate.toISOString(),
+    cityName: race.city,
+    state: race.state,
+  });
+
+  void fetch(`${base}/api/race/receive-upstream`, {
+    method: 'POST',
+    headers,
+    body,
+  }).catch(() => {
+    /* non-blocking */
+  });
+}
+
 // Generate a simple unique ID (cuid-like format)
 function generateId(): string {
   const timestamp = Date.now().toString(36);
@@ -18,9 +57,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let decodedToken;
     try {
-      decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
+      await adminAuth.verifyIdToken(authHeader.substring(7));
     } catch {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
@@ -77,6 +115,14 @@ export async function POST(request: NextRequest) {
         },
       });
     }
+
+    pushRaceToCompanyUpstream({
+      id: race.id,
+      name: race.name,
+      raceDate: race.raceDate,
+      city: race.city,
+      state: race.state,
+    });
 
     return NextResponse.json({
       success: true,

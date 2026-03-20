@@ -375,7 +375,7 @@ export default function AthleteHomePage() {
               <p className="text-gray-600">Here&apos;s what&apos;s happening with your RunCrews</p>
             </div>
 
-            {primaryGoal && (
+            {primaryGoal ? (
               <div className="mb-8 bg-white rounded-xl shadow-md border border-orange-100 p-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
@@ -400,6 +400,19 @@ export default function AthleteHomePage() {
                     </Link>
                   </div>
                 </div>
+              </div>
+            ) : (
+              <div className="mb-8 bg-white rounded-xl shadow-md border border-dashed border-orange-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900">Set a race goal</h2>
+                <p className="text-sm text-gray-600 mt-2 max-w-xl">
+                  Pick a race and goal time to get personalized training paces and workout suggestions.
+                </p>
+                <Link
+                  href="/settings/race-goal"
+                  className="inline-block mt-4 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                >
+                  Set goal
+                </Link>
               </div>
             )}
 

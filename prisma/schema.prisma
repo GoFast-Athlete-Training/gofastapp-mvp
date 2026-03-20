@@ -260,6 +260,8 @@ model race_registry {
   tags                    String[]                  @default([])
   timezone                String?
   typicalWeather          String?
+  /// When set, matches GoFastCompany races.id (canonical editorial record).
+  companyRaceId           String?                   @unique
   run_crew_specific_races  run_crew_specific_races[]
   run_crews                run_crews[]
   training_plans           training_plans[]
