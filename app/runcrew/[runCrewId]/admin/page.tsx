@@ -117,10 +117,13 @@ export default function RunCrewAdminPage() {
       );
 
       setMembership(currentMembership);
-      
-      // Set current user profile for header display
-      const athlete = LocalStorageAPI.getAthlete();
-      setCurrentUser(athlete);
+
+      try {
+        const profRes = await api.get(`/athlete/${athleteId}`);
+        if (profRes.data?.athlete) setCurrentUser(profRes.data.athlete);
+      } catch {
+        setCurrentUser(null);
+      }
 
       console.log(`✅ ADMIN PAGE: Crew loaded successfully: ${crewData.runCrewBaseInfo?.name}`);
       setLoading(false);

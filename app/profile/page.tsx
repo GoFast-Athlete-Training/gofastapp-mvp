@@ -16,27 +16,26 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const athlete = LocalStorageAPI.getAthleteProfile();
-      setAthleteProfile(athlete);
+    const id = LocalStorageAPI.getAthleteId();
+    if (!id) {
+      router.replace('/welcome');
       setLoading(false);
+      return;
     }
+    api
+      .get(`/athlete/${id}`)
+      .then((res) => {
+        if (res.data?.athlete) setAthleteProfile(res.data.athlete);
+      })
+      .catch(() => router.replace('/welcome'))
+      .finally(() => setLoading(false));
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        console.warn('// REDIRECT DISABLED: /signup');
-        return;
-      }
-
-      // If no athlete data, redirect to signup
-      if (!athleteProfile) {
-        console.warn('// REDIRECT DISABLED: /signup');
-        return;
-      }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) router.replace('/signup');
     });
 
     return () => unsubscribe();
-  }, [router, athleteProfile]);
+  }, [router]);
 
   if (loading) {
     return (

@@ -4,6 +4,7 @@
 import { useRouter } from 'next/navigation';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import { useEffect, useState } from 'react';
+import api from '@/lib/api';
 
 /**
  * Minimal Settings Page - Phase 1
@@ -16,10 +17,20 @@ export default function MinimalSettingsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = LocalStorageAPI.getAthlete();
-    setAthlete(stored);
-    setLoading(false);
-  }, []);
+    const id = LocalStorageAPI.getAthleteId();
+    if (!id) {
+      router.replace('/welcome');
+      setLoading(false);
+      return;
+    }
+    api
+      .get(`/athlete/${id}`)
+      .then((res) => {
+        if (res.data?.athlete) setAthlete(res.data.athlete);
+      })
+      .catch(() => router.replace('/welcome'))
+      .finally(() => setLoading(false));
+  }, [router]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">

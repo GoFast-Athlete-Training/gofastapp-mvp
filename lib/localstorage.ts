@@ -1,300 +1,75 @@
 'use client';
 
-// LocalStorage API - Client-side only
-// No hooks, no global state - just clean reads/writes
+/** Keys used across join/signup flows — keep in sync with those pages */
+export const RUNCREW_JOIN_INTENT_KEY = 'runCrewJoinIntent';
+export const RUNCREW_JOIN_INTENT_HANDLE_KEY = 'runCrewJoinIntentHandle';
+export const RUNCREW_CREATE_INTENT_KEY = 'runCrewCreateIntent';
+
+const ATHLETE_ID_KEY = 'athleteId';
 
 export const LocalStorageAPI = {
-  // MVP1-compatible methods
-  setAthlete(athlete: any) {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('athlete', JSON.stringify(athlete));
-    }
-  },
-
-  getAthlete() {
-    if (typeof window !== 'undefined') {
-      const data = localStorage.getItem('athlete');
-      return data ? JSON.parse(data) : null;
-    }
-    return null;
-  },
-
   setAthleteId(id: string) {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('athleteId', id);
+      localStorage.setItem(ATHLETE_ID_KEY, id);
     }
   },
 
   getAthleteId() {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('athleteId');
+      return localStorage.getItem(ATHLETE_ID_KEY);
     }
     return null;
   },
 
-  setAthleteProfile(athlete: any) {
+  setRunCrewJoinIntent(crewId: string) {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('athleteProfile', JSON.stringify(athlete));
-      // Also set as 'athlete' for compatibility
-      localStorage.setItem('athlete', JSON.stringify(athlete));
+      localStorage.setItem(RUNCREW_JOIN_INTENT_KEY, crewId);
     }
   },
 
-  getAthleteProfile() {
+  getRunCrewJoinIntent() {
     if (typeof window !== 'undefined') {
-      const data = localStorage.getItem('athleteProfile');
-      return data ? JSON.parse(data) : null;
+      return localStorage.getItem(RUNCREW_JOIN_INTENT_KEY);
     }
     return null;
   },
 
-  setCrews(crews: any[]) {
+  removeRunCrewJoinIntent() {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('crews', JSON.stringify(crews));
+      localStorage.removeItem(RUNCREW_JOIN_INTENT_KEY);
+      localStorage.removeItem(RUNCREW_JOIN_INTENT_HANDLE_KEY);
     }
   },
 
-  getCrews() {
+  setRunCrewJoinIntentHandle(handle: string) {
     if (typeof window !== 'undefined') {
-      const data = localStorage.getItem('crews');
-      return data ? JSON.parse(data) : null;
+      localStorage.setItem(RUNCREW_JOIN_INTENT_HANDLE_KEY, handle);
+    }
+  },
+
+  getRunCrewJoinIntentHandle() {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(RUNCREW_JOIN_INTENT_HANDLE_KEY);
     }
     return null;
   },
 
-  setHydrationTimestamp(timestamp: number) {
+  setRunCrewCreateIntent(value: string) {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('hydrationTimestamp', timestamp.toString());
+      localStorage.setItem(RUNCREW_CREATE_INTENT_KEY, value);
     }
   },
 
-  getHydrationTimestamp() {
+  getRunCrewCreateIntent() {
     if (typeof window !== 'undefined') {
-      const data = localStorage.getItem('hydrationTimestamp');
-      return data ? parseInt(data, 10) : null;
+      return localStorage.getItem(RUNCREW_CREATE_INTENT_KEY);
     }
     return null;
   },
 
-  setPrimaryCrew(crew: any) {
+  removeRunCrewCreateIntent() {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('primaryCrew', JSON.stringify(crew));
-    }
-  },
-
-  getPrimaryCrew() {
-    if (typeof window !== 'undefined') {
-      const data = localStorage.getItem('primaryCrew');
-      return data ? JSON.parse(data) : null;
-    }
-    return null;
-  },
-
-  /**
-   * setFullHydrationModel - Store the complete Prisma model from /api/athlete/hydrate
-   * This captures the entire athlete object tree including all relations
-   */
-  setFullHydrationModel(model: { athlete: any; weeklyActivities?: any[]; weeklyTotals?: any }) {
-    if (typeof window === 'undefined') return;
-    if (!model || !model.athlete) {
-      console.warn('⚠️ LocalStorageAPI: No athlete in model');
-      return;
-    }
-
-    const { athlete, weeklyActivities, weeklyTotals } = model;
-
-    // Store the entire athlete object
-    this.setAthleteProfile(athlete);
-    this.setAthleteId(athlete.id || athlete.athleteId || '');
-
-    // Store crews if they exist (from runCrewMemberships or runCrews)
-    if (athlete.runCrews) {
-      this.setCrews(athlete.runCrews);
-    } else if (athlete.runCrewMemberships) {
-      // Extract crews from memberships (role is now in membership)
-      const crews = athlete.runCrewMemberships.map((m: any) => ({
-        ...m.runCrew,
-        role: m.role || 'member',
-        joinedAt: m.joinedAt,
-      }));
-      this.setCrews(crews);
-    }
-
-    // Cache run crew memberships (with embedded roles)
-    if (athlete.runCrewMemberships) {
-      localStorage.setItem('runCrewMemberships', JSON.stringify(athlete.runCrewMemberships));
-    }
-
-    // HYDRATION V2: Use clean crew context from backend
-    const MyCrew = athlete.MyCrew || '';
-
-    localStorage.setItem('MyCrew', MyCrew);
-
-    // Legacy keys for backward compatibility
-    localStorage.setItem('runCrewId', MyCrew);
-
-    // Store full crew data if MyCrew ID exists and we have runCrewMemberships
-    if (MyCrew && athlete.runCrewMemberships) {
-      const crewMembership = athlete.runCrewMemberships.find(
-        (membership: any) => membership.runCrew?.id === MyCrew
-      );
-      if (crewMembership?.runCrew) {
-        this.setRunCrewData(crewMembership.runCrew);
-        console.log('✅ LocalStorageAPI: Stored full crew data for:', crewMembership.runCrew.name);
-      }
-    }
-
-    // Store weekly data if provided
-    if (weeklyActivities) {
-      localStorage.setItem('weeklyActivities', JSON.stringify(weeklyActivities));
-    }
-    if (weeklyTotals) {
-      localStorage.setItem('weeklyTotals', JSON.stringify(weeklyTotals));
-    }
-
-    // Version marker
-    localStorage.setItem('hydrationVersion', 'hydration-v2');
-
-    this.setHydrationTimestamp(Date.now());
-    console.log('✅ LocalStorageAPI: Full hydration model stored');
-  },
-
-  // HYDRATION V2: Setters and getters for new keys
-  setMyCrew(crewId: string) {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('MyCrew', crewId);
-      // Also set legacy key for backward compatibility
-      localStorage.setItem('runCrewId', crewId);
-    }
-  },
-
-  getMyCrew() {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('MyCrew');
-    }
-    return null;
-  },
-
-  setMyCrewManagerId(managerId: string) {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('MyCrewManagerId', managerId);
-      // Also set legacy key for backward compatibility
-      localStorage.setItem('runCrewManagerId', managerId);
-    }
-  },
-
-  getMyCrewManagerId() {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('MyCrewManagerId');
-    }
-    return null;
-  },
-
-  // Legacy keys for backward compatibility
-  setRunCrewId(crewId: string) {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('runCrewId', crewId);
-      // Also set V2 key
-      localStorage.setItem('MyCrew', crewId);
-    }
-  },
-
-  getRunCrewId() {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('runCrewId');
-    }
-    return null;
-  },
-
-  setRunCrewManagerId(managerId: string) {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('runCrewManagerId', managerId);
-      // Also set V2 key
-      localStorage.setItem('MyCrewManagerId', managerId);
-    }
-  },
-
-  getRunCrewManagerId() {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('runCrewManagerId');
-    }
-    return null;
-  },
-
-  // Crew data methods
-  setRunCrewData(crew: any) {
-    if (typeof window !== 'undefined') {
-      if (crew) {
-        localStorage.setItem('runCrewData', JSON.stringify(crew));
-      } else {
-        localStorage.removeItem('runCrewData');
-      }
-    }
-  },
-
-  getRunCrewData() {
-    if (typeof window !== 'undefined') {
-      const data = localStorage.getItem('runCrewData');
-      return data ? JSON.parse(data) : null;
-    }
-    return null;
-  },
-
-  clearRunCrewData() {
-    if (typeof window !== 'undefined') {
-      // Clear all crew-related keys
-      localStorage.removeItem('runCrewData');
-      localStorage.removeItem('runCrewId');
-      localStorage.removeItem('MyCrew');
-      localStorage.removeItem('runCrewMemberships');
-
-      // Also clear any crew-specific hydration caches
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('crew_') && key.includes('_hydration')) {
-          keysToRemove.push(key);
-        }
-      }
-      keysToRemove.forEach((key) => localStorage.removeItem(key));
-
-      console.log('✅ LocalStorageAPI: Cleared all crew data and related caches');
-    }
-  },
-
-  /**
-   * getFullHydrationModel - Retrieve the complete hydration model
-   */
-  getFullHydrationModel() {
-    if (typeof window === 'undefined') {
-      return {
-        athlete: null,
-        weeklyActivities: [],
-        weeklyTotals: null,
-        runCrewMemberships: [],
-      };
-    }
-
-    try {
-      const athlete = JSON.parse(localStorage.getItem('athleteProfile') || 'null');
-      const weeklyActivities = JSON.parse(localStorage.getItem('weeklyActivities') || '[]');
-      const weeklyTotals = JSON.parse(localStorage.getItem('weeklyTotals') || 'null');
-      const runCrewMemberships = JSON.parse(localStorage.getItem('runCrewMemberships') || '[]');
-
-      return {
-        athlete,
-        weeklyActivities,
-        weeklyTotals,
-        runCrewMemberships,
-      };
-    } catch (error) {
-      console.error('❌ LocalStorageAPI: Failed to parse hydration model', error);
-      return {
-        athlete: null,
-        weeklyActivities: [],
-        weeklyTotals: null,
-        runCrewMemberships: [],
-      };
+      localStorage.removeItem(RUNCREW_CREATE_INTENT_KEY);
     }
   },
 
@@ -304,4 +79,3 @@ export const LocalStorageAPI = {
     }
   },
 };
-

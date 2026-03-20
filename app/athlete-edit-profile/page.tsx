@@ -31,22 +31,21 @@ export default function AthleteEditProfilePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Load existing profile data
   useEffect(() => {
-    const loadProfile = () => {
-      try {
-        const stored = LocalStorageAPI.getAthlete();
-        const storedAthleteId = LocalStorageAPI.getAthleteId();
-
-        if (!stored || !storedAthleteId) {
-          console.warn('⚠️ EDIT PROFILE: Missing profile or athleteId, routing to signup');
-          console.warn('// REDIRECT DISABLED: /signup');
+    const storedAthleteId = LocalStorageAPI.getAthleteId();
+    if (!storedAthleteId) {
+      router.replace('/welcome');
+      return;
+    }
+    setAthleteId(storedAthleteId);
+    api
+      .get(`/athlete/${storedAthleteId}`)
+      .then((res) => {
+        const stored = res.data?.athlete;
+        if (!stored) {
+          router.replace('/welcome');
           return;
         }
-
-        setAthleteId(storedAthleteId);
-
-        // Pre-fill form with existing data
         setFormData({
           firstName: stored.firstName || '',
           lastName: stored.lastName || '',
@@ -60,18 +59,14 @@ export default function AthleteEditProfilePage() {
           bio: stored.bio || '',
           instagram: stored.instagram || '',
           profilePhoto: null,
-          profilePhotoPreview: stored.photoURL || auth.currentUser?.photoURL || null
+          profilePhotoPreview: stored.photoURL || auth.currentUser?.photoURL || null,
         });
-
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error loading profile:', error);
+      })
+      .catch(() => {
         setError('Error loading profile. Please try again.');
         router.push('/profile');
-      }
-    };
-
-    loadProfile();
+      })
+      .finally(() => setIsLoading(false));
   }, [router]);
 
   const handleInputChange = (field: string, value: string) => {
@@ -157,11 +152,7 @@ export default function AthleteEditProfilePage() {
         photoURL: photoURL
       });
       
-      const profileData = profileRes.data;
-      console.log('✅ Profile updated:', profileData);
-      
-      // Update localStorage with new data
-      LocalStorageAPI.setAthlete(profileData.athlete);
+      console.log('✅ Profile updated:', profileRes.data);
 
       // Navigate back to profile page
       console.log('🏠 Navigating back to profile...');

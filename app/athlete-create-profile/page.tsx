@@ -8,8 +8,6 @@ import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 
-const RUNCREW_CREATE_INTENT_KEY = 'runCrewCreateIntent';
-
 export default function AthleteCreateProfilePage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -229,8 +227,7 @@ export default function AthleteCreateProfilePage() {
       // Step 1: Get athlete ID from localStorage (already created during signup)
       // Don't call /athlete/create here - it could overwrite names with stale Firebase displayName
       const storedAthleteId = LocalStorageAPI.getAthleteId();
-      const storedAthlete = LocalStorageAPI.getAthlete();
-      
+
       let athleteId = storedAthleteId;
       
       // Only call /athlete/create if we don't have an athleteId
@@ -270,24 +267,14 @@ export default function AthleteCreateProfilePage() {
         photoURL: photoURL,
       });
       
-      const profileData = profileRes.data;
-      console.log('✅ Step 2 - Profile updated:', profileData);
-
-      // Store athlete data (EXACTLY like MVP1)
-      LocalStorageAPI.setAthlete(profileData.athlete);
-      LocalStorageAPI.setFullHydrationModel({
-        athlete: profileData.athlete,
-        weeklyActivities: [],
-        weeklyTotals: {},
-      });
+      console.log('✅ Step 2 - Profile updated:', profileRes.data);
 
       // Navigate to runcrew explainer page after profile setup
       console.log('🏃 Navigating to runcrew explainer page...');
       // Check for create crew intent first
-      const createCrewIntent = localStorage.getItem(RUNCREW_CREATE_INTENT_KEY);
+      const createCrewIntent = LocalStorageAPI.getRunCrewCreateIntent();
       if (createCrewIntent) {
-        // User was creating a crew - redirect to create crew page
-        localStorage.removeItem(RUNCREW_CREATE_INTENT_KEY);
+        LocalStorageAPI.removeRunCrewCreateIntent();
         router.push('/runcrew/create');
       } else {
         // Check for join intent - if exists, redirect to confirm page

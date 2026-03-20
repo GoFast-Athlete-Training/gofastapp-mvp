@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import api from '@/lib/api';
 // MVP1: Settings deprecated
 // import { Settings } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -13,10 +14,14 @@ export default function AthleteHeader() {
   const [athleteProfile, setAthleteProfile] = useState<any>(null);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const athlete = LocalStorageAPI.getAthleteProfile();
-      setAthleteProfile(athlete);
-    }
+    const id = LocalStorageAPI.getAthleteId();
+    if (!id) return;
+    api
+      .get(`/athlete/${id}`)
+      .then((res) => {
+        if (res.data?.athlete) setAthleteProfile(res.data.athlete);
+      })
+      .catch(() => {});
   }, []);
 
   const handleSignOut = async () => {

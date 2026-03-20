@@ -31,17 +31,21 @@ export default function ActivitiesPage() {
   const [garminConnected, setGarminConnected] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const model = LocalStorageAPI.getFullHydrationModel();
-    const garminFromModel = model?.athlete?.garmin_is_connected;
-    const garminFromStorage = localStorage.getItem('garminConnected') === 'true';
-    setGarminConnected(garminFromModel || garminFromStorage);
-
     (async () => {
+      const athleteId = LocalStorageAPI.getAthleteId();
+      if (!athleteId) {
+        router.replace('/welcome');
+        return;
+      }
       try {
-        const response = await api.get('/activities');
-        const list = response.data?.activities ?? [];
+        const [profRes, actRes] = await Promise.all([
+          api.get(`/athlete/${athleteId}`),
+          api.get('/activities'),
+        ]);
+        const row = profRes.data?.athlete;
+        const garminFromStorage = typeof window !== 'undefined' && localStorage.getItem('garminConnected') === 'true';
+        setGarminConnected(!!row?.garmin_is_connected || garminFromStorage);
+        const list = actRes.data?.activities ?? [];
         setActivities(Array.isArray(list) ? list : []);
       } catch {
         setActivities([]);
@@ -49,7 +53,7 @@ export default function ActivitiesPage() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [router]);
 
   const weekStats = useMemo(() => {
     const start = getStartOfThisWeek();

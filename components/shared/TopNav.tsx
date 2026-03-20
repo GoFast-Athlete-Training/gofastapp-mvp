@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import api from '@/lib/api';
 import { Home, Settings, Calendar } from 'lucide-react';
 
 interface TopNavProps {
@@ -19,10 +20,14 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
   const [athleteProfile, setAthleteProfile] = useState<any>(null);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const athlete = LocalStorageAPI.getAthleteProfile();
-      setAthleteProfile(athlete);
-    }
+    const id = LocalStorageAPI.getAthleteId();
+    if (!id) return;
+    api
+      .get(`/athlete/${id}`)
+      .then((res) => {
+        if (res.data?.athlete) setAthleteProfile(res.data.athlete);
+      })
+      .catch(() => {});
   }, []);
 
   const handleSignOut = async () => {

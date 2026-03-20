@@ -22,10 +22,27 @@ export default function SettingsPage() {
     amountPerCreditCents: number;
   } | null>(null);
 
+  const refreshAthlete = () => {
+    const id = LocalStorageAPI.getAthleteId();
+    if (!id) return;
+    api.get(`/athlete/${id}`).then((res) => {
+      if (res.data?.athlete) setAthlete(res.data.athlete);
+    });
+  };
+
   useEffect(() => {
-    const stored = LocalStorageAPI.getAthlete();
-    setAthlete(stored);
-  }, []);
+    const id = LocalStorageAPI.getAthleteId();
+    if (!id) {
+      router.replace('/welcome');
+      return;
+    }
+    api
+      .get(`/athlete/${id}`)
+      .then((res) => {
+        if (res.data?.athlete) setAthlete(res.data.athlete);
+      })
+      .catch(() => router.replace('/welcome'));
+  }, [router]);
 
   useEffect(() => {
     if (athlete?.role !== 'AMBASSADOR') return;
@@ -67,7 +84,7 @@ export default function SettingsPage() {
       const firebaseToken = await currentUser.getIdToken();
       
       // Call authorize endpoint to get auth URL (with popup flag)
-      const response = await fetch('/api/auth/garmin/authorize?popup=true', {
+      const response = await fetch(`/api/auth/garmin/authorize?athleteId=${athlete.id}&popup=true`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${firebaseToken}`
@@ -103,8 +120,7 @@ export default function SettingsPage() {
           clearInterval(checkPopup);
           setConnectingGarmin(false);
           // Refresh athlete data to check connection status
-          const stored = LocalStorageAPI.getAthlete();
-          setAthlete(stored);
+          refreshAthlete();
         }
       }, 500);
 
@@ -115,9 +131,7 @@ export default function SettingsPage() {
           clearInterval(checkPopup);
           if (!popup.closed) popup.close();
           setConnectingGarmin(false);
-          // Refresh athlete data
-          const stored = LocalStorageAPI.getAthlete();
-          setAthlete(stored);
+          refreshAthlete();
           window.removeEventListener('message', messageHandler);
         } else if (event.data.type === 'GARMIN_OAUTH_ERROR') {
           clearInterval(checkPopup);

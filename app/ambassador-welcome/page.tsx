@@ -5,12 +5,17 @@ import Link from 'next/link';
 import { Sparkles, MapPin, Camera, DollarSign, ArrowRight } from 'lucide-react';
 import TopNav from '@/components/shared/TopNav';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import api from '@/lib/api';
 
 export default function AmbassadorWelcomePage() {
   const [athlete, setAthlete] = useState<any>(null);
 
   useEffect(() => {
-    setAthlete(LocalStorageAPI.getAthlete());
+    const id = LocalStorageAPI.getAthleteId();
+    if (!id) return;
+    api.get(`/athlete/${id}`).then((res) => {
+      if (res.data?.athlete) setAthlete(res.data.athlete);
+    });
   }, []);
 
   const isAmbassador = athlete?.role === 'AMBASSADOR';

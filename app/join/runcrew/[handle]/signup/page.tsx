@@ -185,7 +185,7 @@ export default function JoinCrewSignupExplainerPage() {
         // Check if profile is complete (has gofastHandle)
         if (athleteData?.gofastHandle) {
           // Profile complete - store full athlete data and go to confirmation
-          LocalStorageAPI.setAthlete(athleteData);
+          LocalStorageAPI.setAthleteId(athleteId);
           router.push(`/join/runcrew/${handle}/confirm`);
         } else {
           // No profile - go to profile creation (will redirect to confirm after)
@@ -331,7 +331,7 @@ export default function JoinCrewSignupExplainerPage() {
         // Check if profile is complete (has gofastHandle)
         if (athleteData?.gofastHandle) {
           // Profile complete - store full athlete data and go to confirmation
-          LocalStorageAPI.setAthlete(athleteData);
+          LocalStorageAPI.setAthleteId(athleteId);
           router.push(`/join/runcrew/${handle}/confirm`);
         } else {
           // No profile - go to profile creation (will redirect to confirm after)

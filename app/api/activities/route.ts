@@ -13,6 +13,13 @@ import { prisma } from '@/lib/prisma';
  */
 export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const limitRaw = searchParams.get('limit');
+    const take = Math.min(
+      200,
+      Math.max(1, limitRaw ? parseInt(limitRaw, 10) || 200 : 200)
+    );
+
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -42,7 +49,7 @@ export async function GET(request: Request) {
         ],
       },
       orderBy: { startTime: 'desc' },
-      take: 200,
+      take,
       select: {
         id: true,
         sourceActivityId: true,

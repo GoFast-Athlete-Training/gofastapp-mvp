@@ -290,19 +290,6 @@ export default function RunCrewSettingsPage() {
       if (response.data.success) {
         setDeletedCrewName(crewName);
         setShowDeleteConfirm(false);
-        // Refresh localStorage to get updated crew list
-        try {
-          const hydrateRes = await api.post('/athlete/hydrate');
-          if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
-            LocalStorageAPI.setFullHydrationModel({
-              athlete: hydrateRes.data.athlete,
-              weeklyActivities: hydrateRes.data.athlete.weeklyActivities || [],
-              weeklyTotals: hydrateRes.data.athlete.weeklyTotals || null,
-            });
-          }
-        } catch (hydrateErr) {
-          console.error('Error refreshing data:', hydrateErr);
-        }
         setShowDeleteSuccess(true);
       }
     } catch (err: any) {
@@ -325,19 +312,6 @@ export default function RunCrewSettingsPage() {
       const response = await api.post(`/runcrew/${runCrewId}/leave`);
       if (response.data.success) {
         showToast('You have left the crew');
-        // Refresh localStorage to get updated crew list
-        try {
-          const hydrateRes = await api.post('/athlete/hydrate');
-          if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
-            LocalStorageAPI.setFullHydrationModel({
-              athlete: hydrateRes.data.athlete,
-              weeklyActivities: hydrateRes.data.athlete.weeklyActivities || [],
-              weeklyTotals: hydrateRes.data.athlete.weeklyTotals || null,
-            });
-          }
-        } catch (hydrateErr) {
-          console.error('Error refreshing data:', hydrateErr);
-        }
         router.push('/my-runcrews');
       }
     } catch (err: any) {
@@ -818,27 +792,11 @@ export default function RunCrewSettingsPage() {
                           const response = await api.post(`/runcrew/${runCrewId}/archive`);
                           if (response.data.success) {
                             showToast('RunCrew archived successfully');
-                            // Refresh localStorage to get updated crew list
                             try {
-                              const hydrateRes = await api.post('/athlete/hydrate');
-                              if (hydrateRes.data?.success && hydrateRes.data?.athlete) {
-                                LocalStorageAPI.setFullHydrationModel({
-                                  athlete: hydrateRes.data.athlete,
-                                  weeklyActivities: hydrateRes.data.athlete.weeklyActivities || [],
-                                  weeklyTotals: hydrateRes.data.athlete.weeklyTotals || null,
-                                });
-                                // Check if user still has crews (including archived)
-                                const memberships = hydrateRes.data.athlete.runCrewMemberships || [];
-                                if (memberships.length > 0) {
-                                  router.push('/my-runcrews');
-                                } else {
-                                  router.push('/runcrew-discovery');
-                                }
-                              } else {
-                                router.push('/my-runcrews');
-                              }
-                            } catch (hydrateErr) {
-                              console.error('Error refreshing data:', hydrateErr);
+                              const memRes = await api.get('/me/memberships');
+                              const n = memRes.data?.memberships?.length ?? 0;
+                              router.push(n > 0 ? '/my-runcrews' : '/runcrew-discovery');
+                            } catch {
                               router.push('/my-runcrews');
                             }
                           }
@@ -1043,40 +1001,18 @@ export default function RunCrewSettingsPage() {
               </p>
             </div>
             <div className="space-y-3">
-              {/* Check if user has other crews remaining */}
-              {(() => {
-                const model = LocalStorageAPI.getFullHydrationModel();
-                const memberships = model?.athlete?.runCrewMemberships || [];
-                const hasOtherCrews = memberships.length > 0;
-                
-                if (hasOtherCrews) {
-                  return (
-                    <button
-                      onClick={() => router.push('/my-runcrews')}
-                      className="w-full px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition"
-                    >
-                      My RunCrews
-                    </button>
-                  );
-                } else {
-                  return (
-                    <>
-                      <button
-                        onClick={() => router.push('/runcrew/create')}
-                        className="w-full px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition"
-                      >
-                        Create Another RunCrew
-                      </button>
-                      <button
-                        onClick={() => router.push('/runcrew-discovery')}
-                        className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
-                      >
-                        Join a RunCrew
-                      </button>
-                    </>
-                  );
-                }
-              })()}
+              <button
+                onClick={() => router.push('/my-runcrews')}
+                className="w-full px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition"
+              >
+                My RunCrews
+              </button>
+              <button
+                onClick={() => router.push('/runcrew-discovery')}
+                className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
+              >
+                Discover RunCrews
+              </button>
             </div>
           </div>
         </div>

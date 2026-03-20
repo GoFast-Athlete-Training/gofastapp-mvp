@@ -52,8 +52,8 @@ export default function RaceGoalPage() {
   const [goalPace5K, setGoalPace5K] = useState("");
 
   useEffect(() => {
-    const stored = LocalStorageAPI.getAthlete();
-    if (stored?.id) setAthleteId(stored.id);
+    const id = LocalStorageAPI.getAthleteId();
+    if (id) setAthleteId(id);
   }, []);
 
   useEffect(() => {
@@ -62,7 +62,7 @@ export default function RaceGoalPage() {
       return;
     }
     api
-      .get<{ goals: AthleteGoalRow[] }>(`/api/goals?status=ACTIVE`)
+      .get<{ goals: AthleteGoalRow[] }>(`/goals?status=ACTIVE`)
       .then((res) => {
         const list = res.data?.goals ?? [];
         const g = list[0] ?? null;
@@ -109,7 +109,7 @@ export default function RaceGoalPage() {
         "5k";
 
       if (goal?.id) {
-        const res = await api.put<{ goal: AthleteGoalRow }>(`/api/goals/${goal.id}`, {
+        const res = await api.put<{ goal: AthleteGoalRow }>(`/goals/${goal.id}`, {
           raceRegistryId: selectedRace?.id ?? null,
           goalTime: goalTime.trim() || null,
           distance,
@@ -120,7 +120,7 @@ export default function RaceGoalPage() {
           setGoalPace5K(formatSecPerMile(res.data.goal.goalPace5K));
         }
       } else {
-        const res = await api.post<{ goal: AthleteGoalRow }>(`/api/goals`, {
+        const res = await api.post<{ goal: AthleteGoalRow }>(`/goals`, {
           distance,
           goalTime: goalTime.trim() || null,
           raceRegistryId: selectedRace?.id ?? null,

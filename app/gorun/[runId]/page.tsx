@@ -107,14 +107,14 @@ export default function GoRunPage() {
         if (!athleteId) {
           try {
             const token = await user.getIdToken();
-            const res = await api.post('/api/athlete/hydrate', {}, {
+            const res = await api.get('/athlete/me', {
               headers: { Authorization: `Bearer ${token}` },
             });
-            if (res.data?.success && res.data?.athlete) {
-              LocalStorageAPI.setFullHydrationModel({ athlete: res.data.athlete });
+            if (res.data?.success && res.data?.athleteId) {
+              LocalStorageAPI.setAthleteId(res.data.athleteId);
             }
           } catch (e) {
-            console.warn('gorun: hydration failed, continuing as guest', e);
+            console.warn('gorun: /athlete/me failed, continuing as guest', e);
           }
         }
       }

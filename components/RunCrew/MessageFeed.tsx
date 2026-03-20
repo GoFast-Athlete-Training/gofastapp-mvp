@@ -35,9 +35,7 @@ export default function MessageFeed({ crewId, topics = ['#general', '#runs', '#t
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Get current user ID
-    const athlete = LocalStorageAPI.getAthlete();
-    setCurrentUserId(athlete?.id || null);
+    setCurrentUserId(LocalStorageAPI.getAthleteId());
   }, []);
 
   useEffect(() => {

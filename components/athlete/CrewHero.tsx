@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Users, Calendar, Clock, MapPin } from 'lucide-react';
-import { LocalStorageAPI } from '@/lib/localstorage';
 
 interface CrewHeroProps {
   crew: any;
@@ -11,22 +10,22 @@ interface CrewHeroProps {
   nextRunAttendees: any[];
   isCrewAdmin: boolean;
   runCrewId: string | null;
+  /** Memberships from GET /api/me/memberships (for admin nav without localStorage) */
+  membershipsForNav?: { role: string; runCrew: { id: string; name?: string; icon?: string } }[];
 }
 
-export default function CrewHero({ crew, nextRun, nextRunAttendees, isCrewAdmin, runCrewId }: CrewHeroProps) {
+export default function CrewHero({
+  crew,
+  nextRun,
+  nextRunAttendees,
+  isCrewAdmin,
+  runCrewId,
+  membershipsForNav = [],
+}: CrewHeroProps) {
   const router = useRouter();
   const [showCrewSelector, setShowCrewSelector] = useState(false);
   const [adminCrews, setAdminCrews] = useState<any[]>([]);
-  const [athlete, setAthlete] = useState<any>(null);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const model = LocalStorageAPI.getFullHydrationModel();
-      setAthlete(model);
-    }
-  }, []);
-
-  // Determine admin status from prop (passed from parent)
   const actualIsAdmin = isCrewAdmin;
 
   const handleGoToCrew = (e?: React.MouseEvent) => {
@@ -44,17 +43,11 @@ export default function CrewHero({ crew, nextRun, nextRunAttendees, isCrewAdmin,
       return;
     }
 
-    // Check if user is admin/manager from identity data (already in localStorage)
-    const model = LocalStorageAPI.getFullHydrationModel();
-    const memberships = model?.runCrewMemberships || [];
-    
-    const adminCrewsList = memberships
-      .map((membership: any) => {
-        return {
-          ...membership.runCrew,
-          role: membership.role || 'member',
-        };
-      })
+    const adminCrewsList = membershipsForNav
+      .map((membership) => ({
+        ...membership.runCrew,
+        role: membership.role || 'member',
+      }))
       .filter((c: any) => c.role === 'admin' || c.role === 'manager');
 
     console.log('🔵 Admin/Manager crews found:', adminCrewsList.length);
