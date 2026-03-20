@@ -7,6 +7,7 @@ import { prisma } from '../prisma';
 import { getAthleteByGarminUserId } from '../domain-garmin';
 import { activityExists } from './dedupe';
 import { normalizeActivityFields } from './normalizeActivityFields';
+import { tryMatchActivityToTrainingWorkout } from '../training/match-activity-to-workout';
 
 function generateId(): string {
   const timestamp = Date.now().toString(36);
@@ -77,7 +78,7 @@ export async function handleActivitySummary(
       const now = new Date();
       const norm = normalizeActivityFields(activity);
 
-      await prisma.athlete_activities.create({
+      const created = await prisma.athlete_activities.create({
         data: {
           id: generateId(),
           athleteId: athlete.id,
@@ -98,6 +99,12 @@ export async function handleActivitySummary(
           updatedAt: now,
         },
       });
+
+      try {
+        await tryMatchActivityToTrainingWorkout(created.id);
+      } catch (matchErr) {
+        console.warn('tryMatchActivityToTrainingWorkout:', matchErr);
+      }
 
       processed++;
 

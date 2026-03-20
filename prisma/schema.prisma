@@ -141,6 +141,7 @@ model athlete_activities {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime
   Athlete          Athlete           @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  matched_workout  workouts?         @relation("WorkoutMatchedActivity")
 }
 
 model cities {
@@ -748,10 +749,19 @@ model training_plans {
   currentWeeklyMileage Int?
   startDate            DateTime
   totalWeeks           Int
+  /// AI-generated phase ranges: [{ name, startWeek, endWeek }]
+  phases               Json?
+  /// AI-generated weekly schedule strings: [{ weekNumber, phase, schedule }]
+  planWeeks            Json?
+  /// Baseline 5K pace at plan creation (e.g. "8:30")
+  current5KPace        String?
+  /// Snapshot of preferred training days 1=Mon..7=Sun
+  preferredDays        Int[]                  @default([])
   createdAt            DateTime               @default(now())
   updatedAt            DateTime
   training_plan_phases training_plan_phases[]
   training_plan_weeks  training_plan_weeks[]
+  planned_workouts     workouts[]
   Athlete              Athlete                @relation(fields: [athleteId], references: [id])
   race_registry        race_registry?         @relation(fields: [raceId], references: [id])
   athlete_goal         AthleteGoal?           @relation(fields: [athleteGoalId], references: [id], onDelete: SetNull)
@@ -769,19 +779,37 @@ model training_schemas {
 }
 
 model workouts {
-  id               String            @id @default(cuid())
-  title            String
-  workoutType      WorkoutType
-  description      String?
-  stravaUrl        String?           // Strava route URL for this workout
-  athleteId        String
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  Athlete          Athlete           @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  segments         workout_segments[]
+  id                        String              @id @default(cuid())
+  title                     String
+  workoutType               WorkoutType
+  description               String?
+  stravaUrl                 String?             // Strava route URL for this workout
+  athleteId                 String
+  /// Training plan this workout belongs to (null = standalone)
+  planId                    String?
+  /// Scheduled calendar date for plan workouts
+  date                      DateTime?
+  /// base | build | peak | taper
+  phase                     String?
+  /// Garmin field: planned total distance in meters (source of truth before segment expansion)
+  estimatedDistanceInMeters Float?
+  /// Matched activity after a run (promoted snapshot fields below)
+  matchedActivityId         String?             @unique
+  actualDistanceMeters      Float?
+  actualAvgPaceSecPerMile   Int?
+  actualAverageHeartRate    Int?
+  actualDurationSeconds     Int?
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+  Athlete                   Athlete             @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  training_plans            training_plans?     @relation(fields: [planId], references: [id], onDelete: SetNull)
+  matched_activity          athlete_activities? @relation("WorkoutMatchedActivity", fields: [matchedActivityId], references: [id], onDelete: SetNull)
+  segments                  workout_segments[]
 
   @@index([athleteId])
   @@index([workoutType])
+  @@index([planId])
+  @@index([planId, date])
 }
 
 model workout_segments {

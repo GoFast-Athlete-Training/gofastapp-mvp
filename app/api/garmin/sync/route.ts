@@ -7,6 +7,7 @@ import { getValidAccessToken } from '@/lib/garmin-refresh-token';
 import { prisma } from '@/lib/prisma';
 import { activityExists } from '@/lib/garmin-events/dedupe';
 import { normalizeActivityFields } from '@/lib/garmin-events/normalizeActivityFields';
+import { tryMatchActivityToTrainingWorkout } from '@/lib/training/match-activity-to-workout';
 
 function generateId(): string {
   const timestamp = Date.now().toString(36);
@@ -115,7 +116,7 @@ export async function POST(request: Request) {
         }
         const norm = normalizeActivityFields(activity);
 
-        await prisma.athlete_activities.create({
+        const created = await prisma.athlete_activities.create({
           data: {
             id: generateId(),
             athleteId: athlete.id,
@@ -136,6 +137,11 @@ export async function POST(request: Request) {
             updatedAt: now,
           },
         });
+        try {
+          await tryMatchActivityToTrainingWorkout(created.id);
+        } catch (matchErr) {
+          console.warn('tryMatchActivityToTrainingWorkout:', matchErr);
+        }
         saved++;
       } catch (error: any) {
         errors++;
