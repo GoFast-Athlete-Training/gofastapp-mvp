@@ -75,7 +75,8 @@ model Athlete {
   training_days_executed  training_days_executed[]
   training_plans          training_plans[]
   workouts                workouts[]
-  race_goal_intent        race_goal_intent?
+  athlete_goals           AthleteGoal[]
+  training_preferences    TrainingPreferences?
 }
 
 model ambassador_credits {
@@ -263,7 +264,7 @@ model race_registry {
   run_crews                run_crews[]
   training_plans           training_plans[]
   race_trainer_groups      race_trainer_groups[]
-  race_goal_intent         race_goal_intent[]
+  athlete_goals            AthleteGoal[]
 
   @@index([charitySupported])
   @@index([city, state])
@@ -274,19 +275,40 @@ model race_registry {
   @@index([tags])
 }
 
-model race_goal_intent {
-  id          String         @id @default(cuid())
-  athleteId   String         @unique
-  raceId      String?
-  goalTime    String?
-  goalPace5K  String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  Athlete     Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  race_registry race_registry? @relation(fields: [raceId], references: [id], onDelete: SetNull)
+/// Universal athlete goal (1:N). Goal paces derived and stored on create/update.
+model AthleteGoal {
+  id               String         @id @default(cuid())
+  athleteId        String
+  distance         String
+  goalTime         String?
+  goalRacePace     Int?
+  goalPace5K       Int?
+  targetByDate     DateTime
+  raceRegistryId   String?
+  status           String         @default("ACTIVE")
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  Athlete          Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  race_registry    race_registry? @relation(fields: [raceRegistryId], references: [id], onDelete: SetNull)
+  training_plans   training_plans[]
 
   @@index([athleteId])
-  @@index([raceId])
+  @@index([athleteId, status])
+  @@index([raceRegistryId])
+  @@map("athlete_goals")
+}
+
+/// Athlete-level schedule / volume preferences (1:1), independent of any training plan.
+model TrainingPreferences {
+  id                   String   @id @default(cuid())
+  athleteId            String   @unique
+  preferredDays        Int[]
+  weeklyMileageTarget  Int?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  Athlete              Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@map("training_preferences")
 }
 
 model return_json_formats {
@@ -719,22 +741,20 @@ model training_plans {
   id                   String                 @id
   athleteId            String
   raceId               String?
+  athleteGoalId        String?
   name                 String
-  goalTime             String?
-  goalRacePace         Int?
-  predictedRacePace    Int?
-  current5KPace        String?
   currentWeeklyMileage Int?
-  preferredDays        Int[]
   startDate            DateTime
   totalWeeks           Int
-  goalPace5K           String?
   createdAt            DateTime               @default(now())
   updatedAt            DateTime
   training_plan_phases training_plan_phases[]
   training_plan_weeks  training_plan_weeks[]
   Athlete              Athlete                @relation(fields: [athleteId], references: [id])
   race_registry        race_registry?         @relation(fields: [raceId], references: [id])
+  athlete_goal         AthleteGoal?           @relation(fields: [athleteGoalId], references: [id], onDelete: SetNull)
+
+  @@index([athleteGoalId])
 }
 
 model training_schemas {

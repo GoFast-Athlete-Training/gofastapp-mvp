@@ -17,18 +17,28 @@ type RaceRegistry = {
   state?: string | null;
 };
 
-type RaceGoalIntent = {
+type AthleteGoalRow = {
   id: string;
   athleteId: string;
-  raceId: string | null;
+  distance: string;
   goalTime: string | null;
-  goalPace5K: string | null;
+  goalRacePace: number | null;
+  goalPace5K: number | null;
+  raceRegistryId: string | null;
+  targetByDate: string;
+  status: string;
   race_registry?: RaceRegistry | null;
 };
 
+function formatSecPerMile(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}:${s.toString().padStart(2, "0")}/mile`;
+}
+
 export default function RaceGoalPage() {
   const [athleteId, setAthleteId] = useState<string | null>(null);
-  const [intent, setIntent] = useState<RaceGoalIntent | null>(null);
+  const [goal, setGoal] = useState<AthleteGoalRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,14 +62,17 @@ export default function RaceGoalPage() {
       return;
     }
     api
-      .get<{ race_goal_intent: RaceGoalIntent | null }>(`/api/athlete/${athleteId}/race-goal-intent`)
+      .get<{ goals: AthleteGoalRow[] }>(`/api/goals?status=ACTIVE`)
       .then((res) => {
-        const i = res.data?.race_goal_intent ?? null;
-        setIntent(i ?? null);
-        if (i) {
-          setGoalTime(i.goalTime ?? "");
-          setGoalPace5K(i.goalPace5K ?? "");
-          if (i.race_registry) setSelectedRace(i.race_registry);
+        const list = res.data?.goals ?? [];
+        const g = list[0] ?? null;
+        setGoal(g);
+        if (g) {
+          setGoalTime(g.goalTime ?? "");
+          setGoalPace5K(
+            g.goalPace5K != null ? formatSecPerMile(g.goalPace5K) : ""
+          );
+          if (g.race_registry) setSelectedRace(g.race_registry);
         }
       })
       .catch(() => setError("Failed to load race goal"))
@@ -87,15 +100,37 @@ export default function RaceGoalPage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await api.put<{ race_goal_intent: RaceGoalIntent }>(
-        `/api/athlete/${athleteId}/race-goal-intent`,
-        {
-          raceId: selectedRace?.id ?? null,
+      const targetByDate = selectedRace?.raceDate
+        ? new Date(selectedRace.raceDate).toISOString()
+        : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+      const distance =
+        selectedRace?.raceType?.trim() ||
+        goal?.distance ||
+        "5k";
+
+      if (goal?.id) {
+        const res = await api.put<{ goal: AthleteGoalRow }>(`/api/goals/${goal.id}`, {
+          raceRegistryId: selectedRace?.id ?? null,
           goalTime: goalTime.trim() || null,
-          goalPace5K: goalPace5K.trim() || null,
+          distance,
+          targetByDate,
+        });
+        setGoal(res.data.goal);
+        if (res.data.goal.goalPace5K != null) {
+          setGoalPace5K(formatSecPerMile(res.data.goal.goalPace5K));
         }
-      );
-      setIntent(res.data.race_goal_intent);
+      } else {
+        const res = await api.post<{ goal: AthleteGoalRow }>(`/api/goals`, {
+          distance,
+          goalTime: goalTime.trim() || null,
+          raceRegistryId: selectedRace?.id ?? null,
+          targetByDate,
+        });
+        setGoal(res.data.goal);
+        if (res.data.goal.goalPace5K != null) {
+          setGoalPace5K(formatSecPerMile(res.data.goal.goalPace5K));
+        }
+      }
     } catch (e: unknown) {
       const msg = e && typeof e === "object" && "response" in e
         ? (e as { response?: { data?: { error?: string } } }).response?.data?.error
@@ -201,16 +236,20 @@ export default function RaceGoalPage() {
             <p className="mt-1 text-xs text-gray-500">Use H:MM:SS for marathon/half or MM:SS for 5k/10k</p>
           </div>
 
-          {/* Optional 5k pace */}
+          {/* Derived equivalent 5K pace (read-only after save) */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Goal 5k pace (optional)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Equivalent goal 5K pace (derived)
+            </label>
             <input
               type="text"
               value={goalPace5K}
-              onChange={(e) => setGoalPace5K(e.target.value)}
-              placeholder="e.g. 7:30/mile"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              readOnly
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700"
             />
+            <p className="mt-1 text-xs text-gray-500">
+              Computed from your goal time and distance when you save.
+            </p>
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}

@@ -33,8 +33,8 @@ export function parseRaceTimeToSeconds(timeString: string): number {
   return parts[0] * 3600 + parts[1] * 60 + (parts[2] ?? 0);
 }
 
-/** Standard race distances in miles */
-const RACE_DISTANCES_MILES: Record<string, number> = {
+/** Standard race distances in miles (keys lowercased / trimmed) */
+export const RACE_DISTANCES_MILES: Record<string, number> = {
   marathon: 26.21875,
   half: 13.109375,
   "half marathon": 13.109375,
@@ -42,6 +42,20 @@ const RACE_DISTANCES_MILES: Record<string, number> = {
   "5k": 3.10686,
   mile: 1,
 };
+
+/** Map catalog distance in miles to pace-calculator race key */
+export function distanceMilesToPaceRaceKey(distanceMiles: number): string {
+  if (distanceMiles >= 25 && distanceMiles <= 27) return "marathon";
+  if (distanceMiles >= 12.5 && distanceMiles <= 14) return "half";
+  if (distanceMiles >= 6 && distanceMiles <= 6.5) return "10k";
+  if (distanceMiles >= 3 && distanceMiles <= 3.2) return "5k";
+  if (distanceMiles >= 0.9 && distanceMiles <= 1.1) return "mile";
+  if (distanceMiles > 20) return "marathon";
+  if (distanceMiles > 10) return "half";
+  if (distanceMiles > 5) return "10k";
+  if (distanceMiles > 2) return "5k";
+  return "5k";
+}
 
 /** Derive goal pace (sec/mile) from race finish time and distance */
 export function raceTimeToGoalPaceSecondsPerMile(
