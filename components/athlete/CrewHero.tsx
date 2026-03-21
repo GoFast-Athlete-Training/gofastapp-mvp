@@ -1,5 +1,9 @@
 'use client';
 
+/**
+ * @deprecated RunCrew-era hero. Not used on athlete home after Runner OS refactor; kept for runcrew pages.
+ */
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Users, Calendar, Clock, MapPin } from 'lucide-react';

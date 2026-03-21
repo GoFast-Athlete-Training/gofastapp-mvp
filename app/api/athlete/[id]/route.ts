@@ -43,7 +43,16 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    return NextResponse.json({ success: true, athlete });
+    // Never send OAuth / test bearer tokens to the client
+    const raw = athlete as Record<string, unknown>;
+    const {
+      garmin_access_token: _ga,
+      garmin_refresh_token: _gr,
+      garmin_test_access_token: _gt,
+      ...athleteSafe
+    } = raw;
+
+    return NextResponse.json({ success: true, athlete: athleteSafe });
   } catch (err) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }

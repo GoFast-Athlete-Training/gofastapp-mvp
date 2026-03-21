@@ -1,5 +1,9 @@
 'use client';
 
+/**
+ * @deprecated RunCrew RSVP; athlete home uses execution-first layout instead.
+ */
+
 import { useRouter } from 'next/navigation';
 
 interface RSVPCardProps {

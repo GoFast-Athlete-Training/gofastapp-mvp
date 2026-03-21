@@ -1,10 +1,11 @@
 /**
  * Handle ACTIVITY_DETAIL webhook events
- * Processes detailed activity data from Garmin
+ * Hydrates athlete_activities.detailData for lap/sample-based evaluation.
  */
 
-import { prisma } from '../prisma';
-import { getAthleteByGarminUserId } from '../domain-garmin';
+import { prisma } from "../prisma";
+import { getAthleteByGarminUserId } from "../domain-garmin";
+import { evaluateLapSegmentsAfterDetail } from "../training/evaluate-lap-segments";
 
 export interface ActivityDetail {
   activityId: string | number;
@@ -27,7 +28,7 @@ export async function handleActivityDetail(
     try {
       const garminUserId = userId || detail.userId;
       if (!garminUserId) {
-        console.warn('⚠️ No userId found in activity detail');
+        console.warn("⚠️ No userId found in activity detail");
         skipped++;
         continue;
       }
@@ -41,33 +42,38 @@ export async function handleActivityDetail(
 
       const activityId = detail.activityId?.toString();
       if (!activityId) {
-        console.warn('⚠️ No activityId found in activity detail');
+        console.warn("⚠️ No activityId found in activity detail");
         skipped++;
         continue;
       }
 
-      // TODO: Activities will be reintroduced in Schema Phase 3
-      // Update existing activity with detail data
-      // const updateResult = await prisma.athleteActivity.updateMany({
-      //   where: {
-      //     athleteId: athlete.id,
-      //     sourceActivityId: activityId
-      //   },
-      //   data: {
-      //     detailData: detail,
-      //     hydratedAt: new Date()
-      //   }
-      // });
+      const updateResult = await prisma.athlete_activities.updateMany({
+        where: {
+          athleteId: athlete.id,
+          sourceActivityId: activityId,
+        },
+        data: {
+          detailData: detail as object,
+          hydratedAt: new Date(),
+        },
+      });
 
-      // if (updateResult.count > 0) {
-      //   processed++;
-      //   console.log(`✅ Activity detail ${activityId} updated for athlete ${athlete.id}`);
-      // } else {
-      //   skipped++;
-      //   console.warn(`⚠️ Activity ${activityId} not found, skipping detail update`);
-      // }
-      skipped++;
-
+      if (updateResult.count > 0) {
+        const row = await prisma.athlete_activities.findFirst({
+          where: { athleteId: athlete.id, sourceActivityId: activityId },
+        });
+        if (row) {
+          try {
+            await evaluateLapSegmentsAfterDetail(row.id);
+          } catch (lapErr) {
+            console.warn("evaluateLapSegmentsAfterDetail:", lapErr);
+          }
+        }
+        processed++;
+      } else {
+        skipped++;
+        console.warn(`⚠️ Activity ${activityId} not found for detail update`);
+      }
     } catch (error: any) {
       errors++;
       console.error(`❌ Error processing activity detail:`, error);
@@ -76,4 +82,3 @@ export async function handleActivityDetail(
 
   return { processed, skipped, errors };
 }
-

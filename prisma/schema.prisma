@@ -119,6 +119,8 @@ model athlete_activities {
   athleteId        String
   sourceActivityId String            @unique
   source           String            @default("garmin")
+  /// RECEIVED | MATCHED | UNMATCHED | INELIGIBLE — ingest → promote lifecycle
+  ingestionStatus  String            @default("RECEIVED")
   activityType     String?
   activityName     String?
   startTime        DateTime?
@@ -142,6 +144,8 @@ model athlete_activities {
   updatedAt        DateTime
   Athlete          Athlete           @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   matched_workout  workouts?         @relation("WorkoutMatchedActivity")
+
+  @@index([athleteId, ingestionStatus])
 }
 
 model cities {
@@ -793,12 +797,23 @@ model workouts {
   phase                     String?
   /// Garmin field: planned total distance in meters (source of truth before segment expansion)
   estimatedDistanceInMeters Float?
+  /// Garmin Training API workout id after push-to-garmin (links activity → planned workout)
+  garminWorkoutId           Int?
   /// Matched activity after a run (promoted snapshot fields below)
   matchedActivityId         String?             @unique
   actualDistanceMeters      Float?
   actualAvgPaceSecPerMile   Int?
   actualAverageHeartRate    Int?
   actualDurationSeconds     Int?
+  actualMaxHeartRate        Int?
+  actualElevationGain       Float?
+  actualCalories            Int?
+  actualSteps               Int?
+  /// Phase-1 evaluation: overall pace vs main segment target (sec/mile delta semantics: target - actual, positive = beat target)
+  derivedPerformanceDeltaSeconds  Int?
+  derivedPerformanceDirection     String?
+  derivedAgainstTargetPace        Int?
+  evaluationEligibleFlag          Boolean             @default(false)
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
   Athlete                   Athlete             @relation(fields: [athleteId], references: [id], onDelete: Cascade)
@@ -810,6 +825,7 @@ model workouts {
   @@index([workoutType])
   @@index([planId])
   @@index([planId, date])
+  @@index([athleteId, garminWorkoutId])
 }
 
 model workout_segments {

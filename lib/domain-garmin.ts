@@ -45,9 +45,16 @@ export async function getGarminConnection(athleteId: string) {
   return athlete;
 }
 
+/**
+ * Resolve athlete by production Garmin user id, or by test sandbox user id (webhooks in test mode).
+ */
 export async function getAthleteByGarminUserId(garminUserId: string) {
-  return prisma.athlete.findUnique({
+  const prod = await prisma.athlete.findUnique({
     where: { garmin_user_id: garminUserId },
+  });
+  if (prod) return prod;
+  return prisma.athlete.findFirst({
+    where: { garmin_test_user_id: garminUserId },
   });
 }
 

@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import TopNav from '@/components/shared/TopNav';
-import CrewHero from '@/components/athlete/CrewHero';
 import WeeklyStats from '@/components/athlete/WeeklyStats';
 import LatestActivityCard from '@/components/athlete/LatestActivityCard';
-import { Home, Users, Activity, Dumbbell, User, Trophy, MapPin } from 'lucide-react';
+import AthleteSidebar from '@/components/athlete/AthleteSidebar';
+import UpcomingRuns from '@/components/athlete/UpcomingRuns';
+import PerformanceSnapshot from '@/components/athlete/PerformanceSnapshot';
+import QuickActions from '@/components/athlete/QuickActions';
 import Image from 'next/image';
 import api from '@/lib/api';
 import Link from 'next/link';
@@ -50,17 +52,13 @@ function formatSecPerMile(sec: number | null | undefined): string {
 export default function AthleteHomePage() {
   const router = useRouter();
   const [athlete, setAthlete] = useState<any>(null);
-  const [runCrewId, setRunCrewId] = useState<string | null>(null);
-  const [runCrew, setRunCrew] = useState<any>(null);
   const [weeklyActivities, setWeeklyActivities] = useState<any[]>([]);
   const [weeklyTotals, setWeeklyTotals] = useState<any>(null);
+  const [workoutsList, setWorkoutsList] = useState<any[]>([]);
   const [garminConnected, setGarminConnected] = useState(false);
   const [connectingGarmin, setConnectingGarmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [primaryGoal, setPrimaryGoal] = useState<any>(null);
-  const [membershipsForCrewNav, setMembershipsForCrewNav] = useState<
-    { role: string; runCrew: { id: string; name?: string; icon?: string } }[]
-  >([]);
 
   const loadHome = useCallback(async () => {
     const athleteId = LocalStorageAPI.getAthleteId();
@@ -71,11 +69,11 @@ export default function AthleteHomePage() {
 
     setLoading(true);
     try {
-      const [profileRes, memRes, actRes, goalsRes] = await Promise.all([
+      const [profileRes, actRes, goalsRes, workoutsRes] = await Promise.all([
         api.get(`/athlete/${athleteId}`),
-        api.get('/me/memberships'),
         api.get('/activities?limit=50'),
         api.get('/goals?status=ACTIVE'),
+        api.get('/workouts'),
       ]);
 
       const row = profileRes.data?.athlete;
@@ -84,32 +82,7 @@ export default function AthleteHomePage() {
         return;
       }
 
-      const memberships = memRes.data?.memberships ?? [];
-      const primaryCrewId: string | null = memRes.data?.primaryCrewId ?? null;
-
-      const runCrewMemberships = memberships.map((m: any) => ({
-        runCrew: m.runCrew,
-        role: m.role,
-      }));
-
-      setMembershipsForCrewNav(
-        memberships.map((m: any) => ({
-          role: m.role,
-          runCrew: {
-            id: m.runCrew.id,
-            name: m.runCrew.name,
-            icon: m.runCrew.icon,
-          },
-        }))
-      );
-
-      setAthlete({ ...row, runCrewMemberships });
-      setRunCrewId(primaryCrewId);
-
-      const primaryMembership = primaryCrewId
-        ? memberships.find((m: any) => m.runCrewId === primaryCrewId)
-        : null;
-      setRunCrew(primaryMembership?.runCrew ?? null);
+      setAthlete(row);
 
       const activities = actRes.data?.activities ?? [];
       setWeeklyActivities(activities);
@@ -118,8 +91,14 @@ export default function AthleteHomePage() {
       const goals = goalsRes.data?.goals ?? [];
       setPrimaryGoal(goals[0] ?? null);
 
-      const garminFromStorage = typeof window !== 'undefined' && localStorage.getItem('garminConnected') === 'true';
-      setGarminConnected(!!row.garmin_is_connected || garminFromStorage);
+      const w = workoutsRes.data?.workouts ?? [];
+      setWorkoutsList(w);
+
+      const garminFromStorage =
+        typeof window !== 'undefined' && localStorage.getItem('garminConnected') === 'true';
+      // Tokens stripped from API; infer test mode from flag only (tokens exist server-side).
+      const testGarminReady = !!row.garmin_use_test_tokens;
+      setGarminConnected(!!row.garmin_is_connected || testGarminReady || garminFromStorage);
     } catch (e) {
       console.error('athlete-home load failed', e);
       router.replace('/welcome');
@@ -141,48 +120,29 @@ export default function AthleteHomePage() {
     return () => unsub();
   }, [router]);
 
-  const nextRun = useMemo(() => {
-    if (!runCrew?.runs) return null;
-    const now = new Date();
-    const upcoming = runCrew.runs
-      .filter((run: any) => {
-        if (!run.date) return false;
-        return new Date(run.date) >= now;
+  const upcomingWorkouts = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const withDate = workoutsList.filter((w) => w.date != null);
+    const upcoming = withDate
+      .filter((w) => {
+        const d = new Date(w.date);
+        return !Number.isNaN(d.getTime()) && d >= start;
       })
-      .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    return upcoming[0] || null;
-  }, [runCrew]);
-
-  const nextRunAttendees = useMemo(() => {
-    if (!nextRun?.rsvps) return [];
-    return nextRun.rsvps
-      .filter((rsvp: any) => rsvp.status === 'going')
-      .slice(0, 3)
-      .map((rsvp: any) => rsvp.athlete);
-  }, [nextRun]);
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(0, 5);
+    if (upcoming.length >= 3) return upcoming;
+    const rest = withDate
+      .filter((w) => new Date(w.date) < start && !w.matchedActivityId)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 2);
+    return [...upcoming, ...rest].slice(0, 5);
+  }, [workoutsList]);
 
   const latestActivity = useMemo(() => {
     if (!weeklyActivities?.length) return null;
     return weeklyActivities[0];
   }, [weeklyActivities]);
-
-  const isCrewAdmin = useMemo(() => {
-    if (!athlete?.runCrewMemberships || !runCrewId) return false;
-    const membership = athlete.runCrewMemberships.find((m: any) => m.runCrew?.id === runCrewId);
-    return membership?.role === 'admin' || membership?.role === 'manager';
-  }, [athlete, runCrewId]);
-
-  const handleGoToCrew = () => {
-    if (!runCrewId) {
-      router.push('/runcrew-discovery');
-      return;
-    }
-    if (isCrewAdmin) {
-      router.push(`/runcrew/${runCrewId}/admin`);
-    } else {
-      router.push(`/runcrew/${runCrewId}`);
-    }
-  };
 
   const handleConnectGarmin = async () => {
     const athleteId = LocalStorageAPI.getAthleteId();
@@ -298,82 +258,23 @@ export default function AthleteHomePage() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
       <div className="flex flex-1 overflow-hidden">
-        <aside className="w-64 bg-white border-r-2 border-gray-200 flex flex-col overflow-y-auto shrink-0">
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex items-center gap-3 mb-2">
-              <Image src="/logo.jpg" alt="GoFast" width={32} height={32} className="w-8 h-8 rounded-full" />
-              <span className="text-lg font-bold text-gray-900">GoFast</span>
-            </div>
-            <p className="text-xs font-medium text-gray-700">Athlete Home</p>
-            <p className="text-xs text-gray-500 mt-0.5">Use the menu to find runs, crews, and races.</p>
-          </div>
-
-          <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-            <button
-              onClick={() => router.push('/athlete-home')}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium bg-orange-50 text-orange-700 border border-orange-200"
-            >
-              <Home className="h-5 w-5" />
-              <span>Home</span>
-            </button>
-            <button
-              onClick={() => router.push('/my-runcrews')}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
-              <Users className="h-5 w-5" />
-              <span>My RunCrews</span>
-            </button>
-            <button
-              onClick={() => router.push('/runcrew-discovery')}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
-              <Users className="h-5 w-5" />
-              <span>Discover RunCrews</span>
-            </button>
-            <button
-              onClick={() => router.push('/activities')}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
-              <Activity className="h-5 w-5" />
-              <span>Activities</span>
-            </button>
-            <button
-              onClick={() => router.push('/workouts')}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
-              <Dumbbell className="h-5 w-5" />
-              <span>Workouts</span>
-            </button>
-            <button
-              onClick={() => router.push('/race-events')}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
-              <Trophy className="h-5 w-5" />
-              <span>Race Events</span>
-            </button>
-            <button
-              onClick={() => router.push('/gorun')}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
-              <MapPin className="h-5 w-5" />
-              <span>GoRun</span>
-            </button>
-            <button
-              onClick={() => router.push('/athlete-edit-profile')}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
-              <User className="h-5 w-5" />
-              <span>Profile</span>
-            </button>
-          </nav>
-        </aside>
+        <AthleteSidebar />
 
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-6xl mx-auto px-6 py-8">
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome back, {athlete.firstName}!</h1>
-              <p className="text-gray-600">Here&apos;s what&apos;s happening with your RunCrews</p>
+              <p className="text-gray-600">Here&apos;s your training overview</p>
             </div>
+
+            <UpcomingRuns workouts={upcomingWorkouts} />
+
+            <PerformanceSnapshot
+              fiveKPace={athlete.fiveKPace}
+              goalRacePaceSecPerMile={primaryGoal?.goalRacePace ?? null}
+            />
+
+            <QuickActions />
 
             {primaryGoal ? (
               <div className="mb-8 bg-white rounded-xl shadow-md border border-orange-100 p-6">
@@ -390,12 +291,14 @@ export default function AthleteHomePage() {
                   </div>
                   <div className="text-right text-sm">
                     <p className="text-gray-600">
-                      Race pace <span className="font-semibold text-gray-900">{formatSecPerMile(primaryGoal.goalRacePace)}</span>
+                      Race pace{' '}
+                      <span className="font-semibold text-gray-900">{formatSecPerMile(primaryGoal.goalRacePace)}</span>
                     </p>
-                    {goalDaysLeft != null && (
-                      <p className="text-gray-500 mt-1">{goalDaysLeft} days to target</p>
-                    )}
-                    <Link href="/settings/race-goal" className="text-orange-600 font-medium mt-2 inline-block hover:underline">
+                    {goalDaysLeft != null && <p className="text-gray-500 mt-1">{goalDaysLeft} days to target</p>}
+                    <Link
+                      href="/settings/race-goal"
+                      className="text-orange-600 font-medium mt-2 inline-block hover:underline"
+                    >
                       Edit goal
                     </Link>
                   </div>
@@ -405,7 +308,7 @@ export default function AthleteHomePage() {
               <div className="mb-8 bg-white rounded-xl shadow-md border border-dashed border-orange-200 p-6">
                 <h2 className="text-lg font-semibold text-gray-900">Set a race goal</h2>
                 <p className="text-sm text-gray-600 mt-2 max-w-xl">
-                  Pick a race and goal time to get personalized training paces and workout suggestions.
+                  Train for a goal — pick a race and target time to align workouts and pacing.
                 </p>
                 <Link
                   href="/settings/race-goal"
@@ -415,17 +318,6 @@ export default function AthleteHomePage() {
                 </Link>
               </div>
             )}
-
-            <div className="mb-8">
-              <CrewHero
-                crew={runCrew}
-                nextRun={nextRun}
-                nextRunAttendees={nextRunAttendees}
-                isCrewAdmin={isCrewAdmin}
-                runCrewId={runCrewId}
-                membershipsForNav={membershipsForCrewNav}
-              />
-            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               {garminConnected && weeklyTotals && (
@@ -445,8 +337,10 @@ export default function AthleteHomePage() {
                     className="rounded-lg flex-shrink-0"
                   />
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">Connect Garmin to Track Activities</h3>
-                    <p className="text-gray-600">Sync your runs automatically and see your stats on the leaderboard</p>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">Connect Garmin</h3>
+                    <p className="text-gray-600">
+                      Push workouts to your watch and sync completed runs automatically.
+                    </p>
                   </div>
                   <button
                     onClick={handleConnectGarmin}
@@ -454,32 +348,6 @@ export default function AthleteHomePage() {
                     className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition disabled:opacity-50 whitespace-nowrap"
                   >
                     {connectingGarmin ? 'Connecting...' : 'Connect →'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {runCrew && nextRun && (
-              <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-6 mb-8">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">Your crew is running soon — RSVP now</h3>
-                    <p className="text-gray-600">
-                      {nextRun.title || 'Upcoming run'} on{' '}
-                      {nextRun.date
-                        ? new Date(nextRun.date).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            month: 'short',
-                            day: 'numeric',
-                          })
-                        : 'Date TBD'}
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleGoToCrew}
-                    className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition"
-                  >
-                    RSVP →
                   </button>
                 </div>
               </div>

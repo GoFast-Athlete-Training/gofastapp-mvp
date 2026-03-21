@@ -1,5 +1,9 @@
 'use client';
 
+/**
+ * @deprecated Superseded by TopNav; do not use in new screens.
+ */
+
 import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';

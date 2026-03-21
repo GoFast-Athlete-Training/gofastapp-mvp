@@ -84,6 +84,7 @@ export async function handleActivitySummary(
           athleteId: athlete.id,
           sourceActivityId,
           source: 'garmin',
+          ingestionStatus: 'RECEIVED',
           activityType: activity.activityType ?? undefined,
           activityName: activity.activityName ?? undefined,
           startTime: norm.startTime,

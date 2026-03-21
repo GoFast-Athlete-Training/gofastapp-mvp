@@ -1,4 +1,7 @@
 /**
+ * @deprecated Orphaned — references training_days_executed (trainingmvp). Not imported by gofastapp-mvp API routes.
+ * Activity ↔ workout promotion lives in lib/training/match-activity-to-workout.ts + workouts.garminWorkoutId.
+ *
  * Activity Mapper Service
  * Maps Garmin activityId back to our training_days_executed
  * 

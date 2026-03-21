@@ -104,12 +104,14 @@ export async function POST(
     const client = new GarminWorkoutApiClient(accessToken);
     const { workoutId: garminWorkoutId } = await client.createWorkout(garminWorkout);
 
-    // Note: We don't store garminWorkoutId on the workout anymore
-    // Garmin connection status lives on the Athlete model
+    await prisma.workouts.update({
+      where: { id: workout.id },
+      data: { garminWorkoutId },
+    });
 
     return NextResponse.json({
       success: true,
-      workout,
+      workout: { ...workout, garminWorkoutId },
       garminWorkoutId,
     });
   } catch (error: any) {

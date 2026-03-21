@@ -1,5 +1,9 @@
 'use client';
 
+/**
+ * @deprecated Unused on current athlete home; keep for optional profile prompts.
+ */
+
 import { useRouter } from 'next/navigation';
 
 interface ProfileCalloutProps {
