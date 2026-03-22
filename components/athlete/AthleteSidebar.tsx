@@ -9,10 +9,10 @@ const navItems: { label: string; href: string; icon: typeof Home }[] = [
   { label: "Goals", href: "/settings/race-goal", icon: Target },
   { label: "Training", href: "/workouts", icon: Dumbbell },
   { label: "Training Pod", href: "/my-runcrews", icon: Users },
-  { label: "Races", href: "/race-events", icon: Trophy },
+  { label: "Races", href: "/races", icon: Trophy },
   { label: "Gear", href: "/athlete-edit-profile", icon: Shirt },
-  { label: "Ask a Coach", href: "/settings", icon: MessageCircle },
-  { label: "Training Journal", href: "/activities", icon: BookOpen },
+  { label: "Ask a Coach", href: "/ask-coach", icon: MessageCircle },
+  { label: "Training Journal", href: "/journal", icon: BookOpen },
 ];
 
 export default function AthleteSidebar() {

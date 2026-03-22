@@ -78,6 +78,7 @@ model Athlete {
   workouts                workouts[]
   athlete_goals           AthleteGoal[]
   training_preferences    TrainingPreferences?
+  run_journal_entries     run_journal_entries[]
 }
 
 model ambassador_credits {
@@ -304,6 +305,21 @@ model AthleteGoal {
   @@index([athleteId, status])
   @@index([raceRegistryId])
   @@map("athlete_goals")
+}
+
+/// Free-form training journal entries (Runner OS).
+model run_journal_entries {
+  id        String   @id @default(cuid())
+  athleteId String
+  date      DateTime @default(now())
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Athlete   Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@index([athleteId])
+  @@index([athleteId, date])
+  @@map("run_journal_entries")
 }
 
 /// Athlete-level schedule / volume preferences (1:1), independent of any training plan.
