@@ -63,48 +63,73 @@ export default function AthleteHomePage() {
   const loadHome = useCallback(async () => {
     const athleteId = LocalStorageAPI.getAthleteId();
     if (!athleteId) {
+      // No identity at all — welcome needs to resolve it
       router.replace('/welcome');
       return;
     }
 
     setLoading(true);
-    try {
-      const [profileRes, actRes, goalsRes, workoutsRes] = await Promise.all([
-        api.get(`/athlete/${athleteId}`),
-        api.get('/activities?limit=50'),
-        api.get('/goals?status=ACTIVE'),
-        api.get('/workouts'),
-      ]);
 
-      const row = profileRes.data?.athlete;
+    // ── Identity fetch (must succeed) ──────────────────────────────────────
+    let row: any = null;
+    try {
+      const profileRes = await api.get(`/athlete/${athleteId}`);
+      row = profileRes.data?.athlete;
       if (!row) {
+        // Profile missing — identity is invalid, must re-resolve
         router.replace('/welcome');
         return;
       }
-
       setAthlete(row);
+    } catch (profileErr: any) {
+      const status = profileErr?.response?.status;
+      if (status === 404 || status === 401) {
+        // Identity failure — go back to welcome to re-resolve
+        router.replace('/welcome');
+        return;
+      }
+      // Network hiccup on the profile itself — show error state, don't loop
+      console.error('athlete-home: profile fetch failed', profileErr);
+      setLoading(false);
+      return;
+    }
 
-      const activities = actRes.data?.activities ?? [];
+    // ── Secondary data fetches (can fail softly) ───────────────────────────
+    // Failures here show empty states in UI. Welcome is never involved.
+    const [actRes, goalsRes, workoutsRes] = await Promise.allSettled([
+      api.get('/activities?limit=50'),
+      api.get('/goals?status=ACTIVE'),
+      api.get('/workouts'),
+    ]);
+
+    if (actRes.status === 'fulfilled') {
+      const activities = actRes.value.data?.activities ?? [];
       setWeeklyActivities(activities);
       setWeeklyTotals(computeWeeklyTotalsFromActivities(activities));
-
-      const goals = goalsRes.data?.goals ?? [];
-      setPrimaryGoal(goals[0] ?? null);
-
-      const w = workoutsRes.data?.workouts ?? [];
-      setWorkoutsList(w);
-
-      const garminFromStorage =
-        typeof window !== 'undefined' && localStorage.getItem('garminConnected') === 'true';
-      // Tokens stripped from API; infer test mode from flag only (tokens exist server-side).
-      const testGarminReady = !!row.garmin_use_test_tokens;
-      setGarminConnected(!!row.garmin_is_connected || testGarminReady || garminFromStorage);
-    } catch (e) {
-      console.error('athlete-home load failed', e);
-      router.replace('/welcome');
-    } finally {
-      setLoading(false);
+    } else {
+      console.warn('athlete-home: activities fetch failed', actRes.reason);
     }
+
+    if (goalsRes.status === 'fulfilled') {
+      const goals = goalsRes.value.data?.goals ?? [];
+      setPrimaryGoal(goals[0] ?? null);
+    } else {
+      console.warn('athlete-home: goals fetch failed', goalsRes.reason);
+    }
+
+    if (workoutsRes.status === 'fulfilled') {
+      setWorkoutsList(workoutsRes.value.data?.workouts ?? []);
+    } else {
+      console.warn('athlete-home: workouts fetch failed', workoutsRes.reason);
+    }
+
+    const garminFromStorage =
+      typeof window !== 'undefined' && localStorage.getItem('garminConnected') === 'true';
+    // Tokens stripped from API; infer test mode from flag only (tokens exist server-side).
+    const testGarminReady = !!row.garmin_use_test_tokens;
+    setGarminConnected(!!row.garmin_is_connected || testGarminReady || garminFromStorage);
+
+    setLoading(false);
   }, [router]);
 
   useEffect(() => {

@@ -7,8 +7,33 @@ import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 
+const SESSION_GATE_KEY = 'gofast_uid_resolved';
+
+function getSessionGate(): { uid: string; athleteId: string } | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_GATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setSessionGate(uid: string, athleteId: string) {
+  try {
+    sessionStorage.setItem(SESSION_GATE_KEY, JSON.stringify({ uid, athleteId }));
+  } catch {}
+}
+
+function clearSessionGate() {
+  try {
+    sessionStorage.removeItem(SESSION_GATE_KEY);
+  } catch {}
+}
+
 /**
- * Welcome — auth gate: resolve athleteId, store only athleteId, redirect to athlete-home.
+ * Welcome — auth gate: resolve athleteId once per session, store it, redirect to athlete-home.
+ * Uses a sessionStorage gate so remounts (e.g. bounced from athlete-home on a data error)
+ * short-circuit instantly without re-running /athlete/me.
  */
 export default function WelcomePage() {
   const router = useRouter();
@@ -28,7 +53,17 @@ export default function WelcomePage() {
 
       if (!firebaseUser) {
         hasProcessedRef.current = true;
+        clearSessionGate();
         router.replace('/signup');
+        return;
+      }
+
+      // ── Session gate: if we already resolved this uid+athleteId this session, skip /athlete/me ──
+      const storedAthleteId = LocalStorageAPI.getAthleteId();
+      const gate = getSessionGate();
+      if (gate && gate.uid === firebaseUser.uid && gate.athleteId === storedAthleteId && storedAthleteId) {
+        hasProcessedRef.current = true;
+        router.replace('/athlete-home');
         return;
       }
 
@@ -42,6 +77,7 @@ export default function WelcomePage() {
 
         if (response.data?.success && response.data?.athleteId) {
           LocalStorageAPI.setAthleteId(response.data.athleteId);
+          setSessionGate(firebaseUser.uid, response.data.athleteId);
           router.replace('/athlete-home');
           return;
         }
@@ -64,6 +100,7 @@ export default function WelcomePage() {
 
               localStorage.setItem('firebaseId', firebaseUser.uid);
               LocalStorageAPI.setAthleteId(createRes.data.athleteId);
+              setSessionGate(firebaseUser.uid, createRes.data.athleteId);
               localStorage.setItem('email', createRes.data.data?.email || firebaseUser.email || '');
 
               router.replace('/athlete-create-profile');
