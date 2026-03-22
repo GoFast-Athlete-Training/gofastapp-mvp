@@ -131,11 +131,110 @@ export async function POST(request: NextRequest) {
       webText,
       igPostText,
       igPostGraphic,
+      routeId,
+      workoutId,
+      newRoute,
     } = body;
 
-    if (!gofastCity && !cityName && !meetUpCity && !meetUpStreetAddress) {
+    const hadExplicitCity = !!(
+      gofastCity?.trim() ||
+      cityName?.trim() ||
+      meetUpCity?.trim() ||
+      meetUpStreetAddress?.trim()
+    );
+
+    let resolvedRouteId: string | null = null;
+    if (newRoute && typeof newRoute === "object" && typeof (newRoute as { name?: string }).name === "string") {
+      const nr = newRoute as {
+        name: string;
+        stravaUrl?: string;
+        distanceMiles?: number | string;
+        stravaMapUrl?: string;
+        mapImageUrl?: string;
+        routePhotos?: unknown[];
+        routeNeighborhood?: string;
+        runType?: string;
+        gofastCity?: string;
+      };
+      if (!nr.name?.trim()) {
+        return NextResponse.json(
+          { success: false, error: "newRoute.name is required when newRoute is provided" },
+          { status: 400 }
+        );
+      }
+      if (!athleteGeneratedId) {
+        return NextResponse.json(
+          { success: false, error: "athleteGeneratedId is required to create newRoute" },
+          { status: 400 }
+        );
+      }
+      if (routeId?.trim()) {
+        return NextResponse.json(
+          { success: false, error: "Provide only one of newRoute or routeId" },
+          { status: 400 }
+        );
+      }
+      const created = await prisma.routes.create({
+        data: {
+          name: nr.name.trim(),
+          stravaUrl: nr.stravaUrl?.trim() || null,
+          distanceMiles:
+            nr.distanceMiles != null && nr.distanceMiles !== ""
+              ? parseFloat(String(nr.distanceMiles))
+              : null,
+          stravaMapUrl: nr.stravaMapUrl?.trim() || null,
+          mapImageUrl: nr.mapImageUrl?.trim() || null,
+          routePhotos:
+            Array.isArray(nr.routePhotos) && nr.routePhotos.length > 0
+              ? (nr.routePhotos as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
+          routeNeighborhood: nr.routeNeighborhood?.trim() || null,
+          runType: nr.runType?.trim() || null,
+          gofastCity: nr.gofastCity?.trim() || null,
+          createdByAthleteId: athleteGeneratedId.trim(),
+          updatedAt: new Date(),
+        },
+      });
+      resolvedRouteId = created.id;
+    } else if (routeId?.trim()) {
+      const r = await prisma.routes.findUnique({ where: { id: routeId.trim() } });
+      if (!r) {
+        return NextResponse.json({ success: false, error: "routeId not found" }, { status: 404 });
+      }
+      resolvedRouteId = r.id;
+    }
+
+    let resolvedWorkoutId: string | null = null;
+    if (workoutId?.trim()) {
+      const w = await prisma.workouts.findUnique({ where: { id: workoutId.trim() } });
+      if (!w) {
+        return NextResponse.json({ success: false, error: "workoutId not found" }, { status: 404 });
+      }
+      resolvedWorkoutId = w.id;
+    }
+
+    let routeCityFallback: string | null = null;
+    if (resolvedRouteId) {
+      const rc = await prisma.routes.findUnique({
+        where: { id: resolvedRouteId },
+        select: { gofastCity: true },
+      });
+      routeCityFallback = rc?.gofastCity?.trim() || null;
+    }
+
+    if (
+      !gofastCity?.trim() &&
+      !cityName?.trim() &&
+      !meetUpCity?.trim() &&
+      !meetUpStreetAddress?.trim() &&
+      !routeCityFallback
+    ) {
       return NextResponse.json(
-        { success: false, error: "gofastCity, cityName, meetUpCity, or meetUpStreetAddress is required to determine city" },
+        {
+          success: false,
+          error:
+            "gofastCity, cityName, meetUpCity, meetUpStreetAddress, or a route with gofastCity is required to determine city",
+        },
         { status: 400 }
       );
     }
@@ -185,10 +284,12 @@ export async function POST(request: NextRequest) {
 
     // Generate city slug from various inputs
     let finalCitySlug: string;
-    
-    if (gofastCity) {
+
+    if (gofastCity?.trim()) {
       // Use provided slug (normalize it)
       finalCitySlug = slugifyCity(gofastCity);
+    } else if (routeCityFallback && !hadExplicitCity) {
+      finalCitySlug = slugifyCity(routeCityFallback);
     } else {
       // Extract city name from various sources
       let cityNameToUse: string | null = null;
@@ -367,8 +468,39 @@ export async function POST(request: NextRequest) {
       webText: webText?.trim() || null,
       igPostText: igPostText?.trim() || null,
       igPostGraphic: igPostGraphic?.trim() || null,
+      routeId: resolvedRouteId,
+      workoutId: resolvedWorkoutId,
       updatedAt: new Date(),
     };
+
+    if (resolvedRouteId) {
+      const routeRow = await prisma.routes.findUnique({ where: { id: resolvedRouteId } });
+      if (routeRow) {
+        if (!createData.stravaUrl && routeRow.stravaUrl) createData.stravaUrl = routeRow.stravaUrl;
+        if (createData.totalMiles == null && routeRow.distanceMiles != null) {
+          createData.totalMiles = routeRow.distanceMiles;
+        }
+        if (!createData.stravaMapUrl && routeRow.stravaMapUrl) {
+          createData.stravaMapUrl = routeRow.stravaMapUrl;
+        }
+        if (!createData.mapImageUrl && routeRow.mapImageUrl) {
+          createData.mapImageUrl = routeRow.mapImageUrl;
+        }
+        const noPhotos =
+          !createData.routePhotos ||
+          createData.routePhotos === Prisma.JsonNull ||
+          (Array.isArray(createData.routePhotos) && createData.routePhotos.length === 0);
+        if (noPhotos && routeRow.routePhotos) {
+          createData.routePhotos = routeRow.routePhotos;
+        }
+        if (!createData.routeNeighborhood && routeRow.routeNeighborhood) {
+          createData.routeNeighborhood = routeRow.routeNeighborhood;
+        }
+        if (!createData.runType && routeRow.runType) {
+          createData.runType = routeRow.runType;
+        }
+      }
+    }
 
     // Create the run
     let run;

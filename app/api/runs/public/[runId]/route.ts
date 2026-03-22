@@ -45,6 +45,41 @@ export async function GET(
           dayOfWeek: true,
         },
       },
+      route: {
+        select: {
+          id: true,
+          name: true,
+          stravaUrl: true,
+          distanceMiles: true,
+          stravaMapUrl: true,
+          mapImageUrl: true,
+          routePhotos: true,
+          routeNeighborhood: true,
+          runType: true,
+          gofastCity: true,
+        },
+      },
+      workout: {
+        select: {
+          id: true,
+          title: true,
+          workoutType: true,
+          description: true,
+          segments: {
+            orderBy: { stepOrder: "asc" as const },
+            select: {
+              id: true,
+              stepOrder: true,
+              title: true,
+              durationType: true,
+              durationValue: true,
+              targets: true,
+              repeatCount: true,
+              notes: true,
+            },
+          },
+        },
+      },
     };
 
     let run = await prisma.city_runs.findUnique({ where: { id: segment }, include });
@@ -83,6 +118,31 @@ export async function GET(
         routeNeighborhood: run.routeNeighborhood ?? null,
         runType: run.runType ?? null,
         workoutDescription: run.workoutDescription ?? null,
+        routeId: run.routeId ?? null,
+        workoutId: run.workoutId ?? null,
+        route: run.route
+          ? {
+              id: run.route.id,
+              name: run.route.name,
+              stravaUrl: run.route.stravaUrl,
+              distanceMiles: run.route.distanceMiles,
+              stravaMapUrl: run.route.stravaMapUrl,
+              mapImageUrl: run.route.mapImageUrl,
+              routePhotos: run.route.routePhotos as string[] | null,
+              routeNeighborhood: run.route.routeNeighborhood,
+              runType: run.route.runType,
+              gofastCity: run.route.gofastCity,
+            }
+          : null,
+        workout: run.workout
+          ? {
+              id: run.workout.id,
+              title: run.workout.title,
+              workoutType: run.workout.workoutType,
+              description: run.workout.description,
+              segments: run.workout.segments ?? [],
+            }
+          : null,
         runClub: run.runClub || null,
         runSeries: run.runSeries ? {
           id: run.runSeries.id,
