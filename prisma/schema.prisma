@@ -858,7 +858,6 @@ model workouts {
   title                     String
   workoutType               WorkoutType
   description               String?
-  stravaUrl                 String?             // Strava route URL for this workout
   athleteId                 String
   /// Training plan this workout belongs to (null = standalone)
   planId                    String?

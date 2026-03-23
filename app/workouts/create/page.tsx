@@ -101,7 +101,6 @@ export default function CreateWorkoutPage() {
   const [workoutType, setWorkoutType] = useState<string>("Easy");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [stravaUrl, setStravaUrl] = useState("");
   const [warmup, setWarmup] = useState<SlotData | null>(null);
   const [mainWork, setMainWork] = useState<SlotData | null>(null);
   const [cooldown, setCooldown] = useState<SlotData | null>(null);
@@ -214,7 +213,6 @@ export default function CreateWorkoutPage() {
       const workoutData = {
         title: name,
         description,
-        stravaUrl: stravaUrl || undefined,
         workoutType: workoutType || "Easy",
         segments,
       };
@@ -304,16 +302,6 @@ export default function CreateWorkoutPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
                 </div>
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Strava route URL</label>
-                <input
-                  type="url"
-                  value={stravaUrl}
-                  onChange={(e) => setStravaUrl(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                />
               </div>
 
               <div className="mb-6">

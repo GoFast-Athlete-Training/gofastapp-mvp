@@ -66,7 +66,6 @@ export async function POST(request: NextRequest) {
     const {
       title,
       description,
-      stravaUrl,
       workoutType = "Easy",
       segments, // Array of segment objects
     } = body;
@@ -88,7 +87,6 @@ export async function POST(request: NextRequest) {
         id: `workout_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         title,
         description,
-        stravaUrl: stravaUrl || null,
         workoutType: workoutType as any,
         athleteId: athlete.id,
         segments: {

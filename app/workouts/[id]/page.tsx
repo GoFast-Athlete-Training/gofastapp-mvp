@@ -28,7 +28,6 @@ interface Workout {
   title: string;
   workoutType: string;
   description?: string;
-  stravaUrl?: string;
   segments: WorkoutSegment[];
 }
 
@@ -162,19 +161,6 @@ export default function WorkoutDetailPage() {
                 <span className="inline-block px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
                   {workout.workoutType}
                 </span>
-                {workout.stravaUrl && (
-                  <a
-                    href={workout.stravaUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-orange-600 hover:text-orange-700"
-                  >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.599h-5.677L2.098 24.188H7.87l-1.149-2.774 5.15-10.172h-3.066l-1.149-2.774z"/>
-                    </svg>
-                    View Strava Route
-                  </a>
-                )}
               </div>
             </div>
 
