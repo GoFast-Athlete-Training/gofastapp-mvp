@@ -4,7 +4,11 @@ import { getAthleteByFirebaseId } from "@/lib/domain-athlete";
 import { adminAuth } from "@/lib/firebaseAdmin";
 import { assembleGarminWorkout } from "@/lib/garmin-workouts/garmin-training-service";
 import { GarminApiError } from "@/lib/garmin-workouts/api-client";
-import { GarminConnectionError, getGarminClient } from "@/lib/garmin-workouts/get-garmin-client";
+import {
+  GarminConnectionError,
+  getGarminClient,
+  getGarminClientForMode,
+} from "@/lib/garmin-workouts/get-garmin-client";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +60,7 @@ export async function POST(
     }
 
     // Resolve Garmin context (token + canonical Garmin user identity)
-    const { client, garminUserId, tokenMode } = await getGarminClient(athlete.id);
+    let { client, garminUserId, tokenMode } = await getGarminClient(athlete.id);
 
     // Assemble Garmin workout from workout + segments
     const garminWorkout = assembleGarminWorkout({
@@ -90,7 +94,36 @@ export async function POST(
       tokenMode,
       endpoint: "/training-api/workout",
     });
-    const { workoutId: garminWorkoutId } = await client.createWorkout(garminWorkout);
+    let garminWorkoutId: number;
+    try {
+      const result = await client.createWorkout(garminWorkout);
+      garminWorkoutId = result.workoutId;
+    } catch (pushError: unknown) {
+      const shouldFallbackToProd =
+        pushError instanceof GarminApiError &&
+        tokenMode === "test" &&
+        /unable to read oauth header/i.test(pushError.details);
+
+      if (!shouldFallbackToProd) {
+        throw pushError;
+      }
+
+      console.warn("[GarminPush] Test token rejected by Garmin; retrying with production token");
+      const fallback = await getGarminClientForMode(athlete.id, { preferTest: false });
+      client = fallback.client;
+      garminUserId = fallback.garminUserId;
+      tokenMode = fallback.tokenMode;
+
+      console.log("[GarminPush] Retrying workout push", {
+        workoutId: workout.id,
+        athleteId: athlete.id,
+        garminUserId,
+        tokenMode,
+        endpoint: "/training-api/workout",
+      });
+      const retryResult = await client.createWorkout(garminWorkout);
+      garminWorkoutId = retryResult.workoutId;
+    }
 
     await prisma.workouts.update({
       where: { id: workout.id },
