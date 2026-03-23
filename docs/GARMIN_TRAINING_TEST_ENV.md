@@ -53,3 +53,20 @@ So webhook `userId` must equal the stored test user id when using sandbox.
 ## UI “connected” state
 
 The athlete API strips secret tokens from JSON. The app treats `garmin_use_test_tokens === true` as “training test mode enabled” for showing Garmin-connected UI alongside `garmin_is_connected`.
+
+## Push workout — what the logs mean
+
+- **`🧪 Using test token for athlete …`** — `getValidAccessToken` is correctly using `garmin_test_access_token` (not production OAuth refresh). This is **not** an error; it confirms test mode.
+- **Training API URL** — Workout create must hit the **Training API** host path, e.g. `https://apis.garmin.com/training-api/workout` (see `lib/garmin-workouts/api-client.ts`). Posting to `https://apis.garmin.com/workout` hits the wrong route (often **404**).
+- **Optional env** — `GARMIN_TRAINING_API_BASE` (default `https://apis.garmin.com/training-api`) if Garmin changes the base path.
+
+### If push still fails after URL fix
+
+| HTTP | Likely cause |
+|------|----------------|
+| **401** | Expired or invalid Bearer (renew eval token, or refresh prod token). |
+| **403** | App not approved for Training API or missing scope (e.g. partner training write). |
+| **404** | Wrong base path or endpoint. |
+| **400 / 422** | JSON shape / enums don’t match Garmin’s schema (see `assembleGarminWorkout` payload). |
+
+API errors from the client now include **status, full URL, and body snippet** in the thrown message (and `details` on the `500` JSON from `POST /api/workouts/[id]/push-to-garmin`).
