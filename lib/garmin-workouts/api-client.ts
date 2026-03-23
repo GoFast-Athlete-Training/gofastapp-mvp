@@ -8,6 +8,27 @@
 
 import { GarminWorkout, GarminWorkoutSchedule } from "./types";
 
+export class GarminApiError extends Error {
+  status: number;
+  url: string;
+  details: string;
+  rawBody?: string;
+
+  constructor(params: {
+    status: number;
+    url: string;
+    details: string;
+    rawBody?: string;
+  }) {
+    super(`Garmin Training API ${params.status} ${params.url}: ${params.details}`);
+    this.name = "GarminApiError";
+    this.status = params.status;
+    this.url = params.url;
+    this.details = params.details;
+    this.rawBody = params.rawBody;
+  }
+}
+
 /** Full base including `/training-api` — override with GARMIN_TRAINING_API_BASE if Garmin changes host/path */
 function defaultTrainingApiBase(): string {
   return (
@@ -50,20 +71,23 @@ export class GarminWorkoutApiClient {
 
     if (!response.ok) {
       const raw = await response.text();
-      let message = response.statusText;
+      let details = response.statusText;
       try {
         const parsed = JSON.parse(raw) as { message?: string; error?: string; errors?: unknown };
-        message =
+        details =
           parsed.message ||
           parsed.error ||
           (typeof parsed.errors === "string" ? parsed.errors : JSON.stringify(parsed.errors)) ||
           raw.slice(0, 500);
       } catch {
-        if (raw) message = raw.slice(0, 500);
+        if (raw) details = raw.slice(0, 500);
       }
-      throw new Error(
-        `Garmin Training API ${response.status} ${url}: ${message || "Unknown error"}`
-      );
+      throw new GarminApiError({
+        status: response.status,
+        url,
+        details: details || "Unknown error",
+        rawBody: raw || undefined,
+      });
     }
 
     return response.json() as Promise<T>;

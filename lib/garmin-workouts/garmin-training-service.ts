@@ -42,7 +42,6 @@ export interface Workout {
   title: string;
   workoutType: string;
   description?: string;
-  athleteId: string;
   segments: WorkoutSegment[];
 }
 
