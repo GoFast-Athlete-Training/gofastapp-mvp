@@ -151,6 +151,31 @@ export function paceTargetFromSecondsPerMile(
   return paceTargetFromSecondsPerKm(secKm, toleranceSecKm);
 }
 
+/**
+ * Format stored PACE target values for UI.
+ * Segment `valueLow` / `valueHigh` use the same encoding as the API/Garmin layer
+ * (seconds per km via {@link secondsPerMileToSecondsPerKm}).
+ */
+export function formatStoredPaceAsMinPerMile(storedSecKm: number): string {
+  const secPerMile = storedSecKm / 1.60934;
+  let totalSec = Math.round(secPerMile);
+  let minutes = Math.floor(totalSec / 60);
+  let seconds = totalSec % 60;
+  if (seconds === 60) {
+    minutes += 1;
+    seconds = 0;
+  }
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+/** Human-readable pace range e.g. "8:15–8:45 /mi" */
+export function formatPaceTargetRangeForDisplay(valueLow: number, valueHigh: number): string {
+  const lo = formatStoredPaceAsMinPerMile(valueLow);
+  const hi = formatStoredPaceAsMinPerMile(valueHigh);
+  if (lo === hi) return `${lo} /mi`;
+  return `${lo}–${hi} /mi`;
+}
+
 /** Resolve goal pace: either from explicit pace string or from race time + distance */
 export function resolveGoalPaceSecondsPerMile(options: {
   goalPace?: string;

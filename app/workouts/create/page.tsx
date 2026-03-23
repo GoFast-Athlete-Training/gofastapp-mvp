@@ -9,6 +9,7 @@ import api from "@/lib/api";
 import {
   parsePaceToSecondsPerMile,
   secondsPerMileToSecondsPerKm,
+  formatStoredPaceAsMinPerMile,
 } from "@/lib/workout-generator/pace-calculator";
 
 const WORKOUT_TYPES = ["Easy", "Tempo", "LongRun", "Intervals"] as const;
@@ -33,12 +34,9 @@ type ApiSegment = {
   repeatCount?: number;
 };
 
-/** Sec/km (API value) to "M:SS"/mile for display */
+/** Sec/km (stored API value) to "M:SS" per mile — shared with workout detail */
 function secPerKmToPaceDisplay(value: number): string {
-  const secPerMile = value / 1.60934;
-  const m = Math.floor(secPerMile / 60);
-  const s = Math.round(secPerMile % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
+  return formatStoredPaceAsMinPerMile(value);
 }
 
 /** Map AI-derived segments into fixed warmup / mainWork / cooldown slots */
@@ -219,7 +217,7 @@ export default function CreateWorkoutPage() {
 
       const response = await api.post("workouts", workoutData);
       const { workout } = response.data;
-      router.push(`/workouts/${workout.id}`);
+      router.push(`/workouts/${workout.id}?created=1`);
     } catch (error) {
       console.error("Error creating workout:", error);
       alert("Failed to create workout");
