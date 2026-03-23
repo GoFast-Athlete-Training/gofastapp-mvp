@@ -77,6 +77,7 @@ model Athlete {
   training_plans          training_plans[]
   workouts                workouts[]
   athlete_goals           AthleteGoal[]
+  athlete_race_signups    athlete_race_signups[]
   training_preferences    TrainingPreferences?
   run_journal_entries     run_journal_entries[]
 }
@@ -274,6 +275,7 @@ model race_registry {
   training_plans           training_plans[]
   race_trainer_groups      race_trainer_groups[]
   athlete_goals            AthleteGoal[]
+  athlete_race_signups     athlete_race_signups[]
 
   @@index([charitySupported])
   @@index([city, state])
@@ -300,11 +302,33 @@ model AthleteGoal {
   Athlete          Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   race_registry    race_registry? @relation(fields: [raceRegistryId], references: [id], onDelete: SetNull)
   training_plans   training_plans[]
+  athlete_race_signups athlete_race_signups[]
 
   @@index([athleteId])
   @@index([athleteId, status])
   @@index([raceRegistryId])
   @@map("athlete_goals")
+}
+
+/// Self-declared "I'm doing this race" — independent of goals/plans.
+model athlete_race_signups {
+  id              String   @id @default(cuid())
+  athleteId       String
+  raceRegistryId  String
+  selfDeclaredAt  DateTime @default(now())
+  goalId          String?
+  notifyEnabled   Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  Athlete        Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  race_registry  race_registry  @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
+  athlete_goal   AthleteGoal?   @relation(fields: [goalId], references: [id], onDelete: SetNull)
+
+  @@unique([athleteId, raceRegistryId])
+  @@index([athleteId])
+  @@index([raceRegistryId])
+  @@map("athlete_race_signups")
 }
 
 /// Free-form training journal entries (Runner OS).
