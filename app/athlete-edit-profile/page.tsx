@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import AthleteAppShell from '@/components/athlete/AthleteAppShell';
 
 export default function AthleteEditProfilePage() {
   const router = useRouter();
@@ -182,18 +183,21 @@ export default function AthleteEditProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading profile...</p>
+      <AthleteAppShell>
+        <div className="flex min-h-[50vh] items-center justify-center px-6 py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4" />
+            <p className="text-gray-600">Loading profile...</p>
+          </div>
         </div>
-      </div>
+      </AthleteAppShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
-      <div className="max-w-2xl w-full bg-white rounded-2xl shadow-lg p-8">
+    <AthleteAppShell>
+      <div className="max-w-2xl w-full mx-auto px-4 sm:px-6 py-8">
+        <div className="bg-white rounded-2xl shadow-lg p-8">
         {/* Header */}
         <div className="text-center mb-8">
           <Image
@@ -467,8 +471,9 @@ export default function AthleteEditProfilePage() {
             </button>
           </div>
         </form>
+        </div>
       </div>
-    </div>
+    </AthleteAppShell>
   );
 }
 

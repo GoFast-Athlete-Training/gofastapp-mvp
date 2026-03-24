@@ -5,6 +5,25 @@ import { adminAuth } from "@/lib/firebaseAdmin";
 
 export const dynamic = "force-dynamic";
 
+/** Optional schedule: YYYY-MM-DD (UTC noon) or ISO datetime; invalid values omitted */
+function parseOptionalWorkoutDate(input: unknown): Date | undefined {
+  if (input == null || input === "") return undefined;
+  if (typeof input !== "string") return undefined;
+  const s = input.trim();
+  if (!s) return undefined;
+  const isoDay = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (isoDay) {
+    const y = Number(isoDay[1]);
+    const m = Number(isoDay[2]);
+    const d = Number(isoDay[3]);
+    if (y < 1970 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return undefined;
+    return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  }
+  const parsed = new Date(s);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed;
+}
+
 /**
  * GET /api/workouts
  * List workouts for the authenticated athlete
@@ -68,7 +87,10 @@ export async function POST(request: NextRequest) {
       description,
       workoutType = "Easy",
       segments, // Array of segment objects
+      date: dateRaw,
     } = body;
+
+    const scheduleDate = parseOptionalWorkoutDate(dateRaw);
 
     if (!title) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
@@ -89,6 +111,7 @@ export async function POST(request: NextRequest) {
         description,
         workoutType: workoutType as any,
         athleteId: athlete.id,
+        ...(scheduleDate ? { date: scheduleDate } : {}),
         segments: {
           create: segments.map((seg: any, index: number) => ({
             id: `segment_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`,

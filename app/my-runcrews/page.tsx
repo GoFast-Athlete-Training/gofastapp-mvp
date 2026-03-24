@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
-import TopNav from '@/components/shared/TopNav';
+import AthleteAppShell from '@/components/athlete/AthleteAppShell';
 import api from '@/lib/api';
 
 interface RunCrewCard {
@@ -85,23 +85,25 @@ export default function MyRunCrewsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+      <AthleteAppShell>
+        <div className="flex min-h-[50vh] items-center justify-center px-6 py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4" />
+            <p className="text-gray-600">Loading...</p>
+          </div>
         </div>
-      </div>
+      </AthleteAppShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600">
-      <TopNav />
-      <div className="max-w-6xl mx-auto px-6 py-12">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+    <AthleteAppShell>
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        <div className="text-center mb-10">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
             Hey {athlete?.firstName || 'runner'} — which RunCrew do you want to check on?
           </h1>
+          <p className="text-gray-600 text-sm md:text-base">Pick a crew to open member or admin view.</p>
         </div>
 
         {runCrewCards.length === 0 ? (
@@ -185,22 +187,22 @@ export default function MyRunCrewsPage() {
         )}
 
         {/* Action Options */}
-        <div className="mt-12 text-center space-x-4">
+        <div className="mt-12 flex flex-wrap justify-center gap-4">
           <Link
             href="/runcrew-discovery"
-            className="inline-block bg-white hover:bg-gray-50 text-gray-900 px-6 py-3 rounded-lg font-semibold transition shadow-md"
+            className="inline-block bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-lg font-semibold transition shadow-md"
           >
             Explore RunCrews
           </Link>
           <Link
             href="/runcrew/create"
-            className="inline-block bg-white hover:bg-gray-50 text-gray-900 px-6 py-3 rounded-lg font-semibold transition shadow-md"
+            className="inline-block border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 px-6 py-3 rounded-lg font-semibold transition"
           >
             + Create RunCrew
           </Link>
         </div>
       </div>
-    </div>
+    </AthleteAppShell>
   );
 }
 

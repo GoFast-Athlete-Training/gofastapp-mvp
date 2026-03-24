@@ -62,6 +62,17 @@ export default function WorkoutsPage() {
   );
 }
 
+function formatPlanDateLabel(iso: string | null | undefined): string {
+  if (iso == null || iso === "") return "Unscheduled";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "Unscheduled";
+  return d.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 function PlanView() {
   const router = useRouter();
   const [workouts, setWorkouts] = useState<any[]>([]);
@@ -112,11 +123,12 @@ function PlanView() {
               className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer"
               onClick={() => router.push(`/workouts/${workout.id}`)}
             >
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">{workout.title}</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-1">{workout.title}</h3>
+              <p className="text-sm text-gray-500 mb-2">{formatPlanDateLabel(workout.date)}</p>
               {workout.description && (
                 <p className="text-gray-600 mb-4">{workout.description}</p>
               )}
-              <div className="flex gap-4 text-sm text-gray-500">
+              <div className="flex flex-wrap gap-4 text-sm text-gray-500">
                 {workout.segments && workout.segments.length > 0 && (
                   <span>
                     {workout.segments.length} segment{workout.segments.length !== 1 ? "s" : ""}

@@ -276,23 +276,23 @@ export default function RaceGoalEditor({
 
   if (loading || !athleteId) {
     return (
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+      <div>
         <p className="text-gray-600">Loading…</p>
-      </main>
+      </div>
     );
   }
 
   const isOnboarding = variant === "onboarding";
 
   return (
-    <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+    <div>
       {!isOnboarding && (
         <Link
-          href="/settings"
+          href="/athlete-home"
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
-          Back to Settings
+          Back to dashboard
         </Link>
       )}
 
@@ -530,6 +530,6 @@ export default function RaceGoalEditor({
           {saving ? "Saving…" : isOnboarding ? "Save & continue" : "Save"}
         </button>
       </div>
-    </main>
+    </div>
   );
 }

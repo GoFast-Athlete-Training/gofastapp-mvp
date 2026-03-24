@@ -34,8 +34,20 @@ interface Workout {
   title: string;
   workoutType: string;
   description?: string;
+  date?: string | null;
   garminWorkoutId?: number | null;
   segments: WorkoutSegment[];
+}
+
+function formatWorkoutScheduleLong(iso: string | null | undefined): string | null {
+  if (iso == null || iso === "") return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
 }
 
 function formatTargetLine(target: NonNullable<WorkoutSegment["targets"]>[0]): string {
@@ -264,6 +276,8 @@ export default function WorkoutDetailPage() {
   const alreadyOnGarmin =
     workout.garminWorkoutId != null && workout.garminWorkoutId !== undefined;
 
+  const scheduleLabel = formatWorkoutScheduleLong(workout.date);
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
@@ -331,6 +345,9 @@ export default function WorkoutDetailPage() {
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 break-words">
                 {workout.title}
               </h1>
+              {scheduleLabel && (
+                <p className="text-lg text-gray-700 font-medium mb-2">{scheduleLabel}</p>
+              )}
               {workout.description && (
                 <p className="text-gray-600 mb-4 break-words">{workout.description}</p>
               )}

@@ -108,6 +108,8 @@ export default function CreateWorkoutPage() {
   const [deriving, setDeriving] = useState(false);
   const [deriveError, setDeriveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  /** YYYY-MM-DD from date input; optional, shown on home & workout cards */
+  const [scheduledDate, setScheduledDate] = useState("");
   const [editingSlot, setEditingSlot] = useState<"warmup" | "mainWork" | "cooldown" | null>(null);
   /** While editing a slot, M:SS strings for pace inputs (so user can type partial values) */
   const [editingPaceLowStr, setEditingPaceLowStr] = useState("");
@@ -214,6 +216,7 @@ export default function CreateWorkoutPage() {
         description,
         workoutType: workoutType || "Easy",
         segments,
+        ...(scheduledDate.trim() ? { date: scheduledDate.trim() } : {}),
       };
 
       const response = await api.post("workouts", workoutData);
@@ -244,6 +247,22 @@ export default function CreateWorkoutPage() {
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">Create Workout</h1>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="workout-schedule-date">
+              Schedule (optional)
+            </label>
+            <input
+              id="workout-schedule-date"
+              type="date"
+              value={scheduledDate}
+              onChange={(e) => setScheduledDate(e.target.value)}
+              className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              If you pick a day, this workout shows on your home dashboard (e.g. Tue, Mar 25) so it&apos;s clear which day it&apos;s for.
+            </p>
+          </div>
 
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">Workout type</label>

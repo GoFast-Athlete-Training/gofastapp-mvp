@@ -1,13 +1,14 @@
 "use client";
 
-import TopNav from "@/components/shared/TopNav";
+import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import RaceGoalEditor from "@/components/athlete/RaceGoalEditor";
 
 export default function RaceGoalPage() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <TopNav />
-      <RaceGoalEditor variant="settings" />
-    </div>
+    <AthleteAppShell>
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+        <RaceGoalEditor variant="settings" />
+      </div>
+    </AthleteAppShell>
   );
 }
