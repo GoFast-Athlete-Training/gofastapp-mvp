@@ -4,6 +4,29 @@ Production OAuth uses `GARMIN_CLIENT_ID` and `GARMIN_CLIENT_SECRET` (refresh flo
 
 For **sandbox or evaluation** credentials, tokens are stored on the **Athlete** row (not only in env):
 
+## Production: apply DB migrations
+
+If logs show **`P2022`** / `The column Athlete.garmin_test_linked_email does not exist`, production never ran the migration that adds that column. Apply migrations using the **same** `DATABASE_URL` as your deployed app:
+
+```bash
+cd gofastapp-mvp
+export DATABASE_URL='postgresql://...'   # production connection string
+npm run prisma:migrate
+# equivalent: npx prisma migrate deploy --schema=./prisma/schema.prisma
+```
+
+**Manual SQL** (Postgres), if you cannot run Prisma from CI:
+
+```sql
+ALTER TABLE "Athlete" ADD COLUMN IF NOT EXISTS "garmin_test_linked_email" TEXT;
+```
+
+Then mark the migration as applied so future `migrate deploy` stays in sync:
+
+```bash
+npx prisma migrate resolve --applied 20260328120000_athlete_garmin_test_linked_email --schema=./prisma/schema.prisma
+```
+
 | DB field | Purpose |
 |----------|---------|
 | `garmin_test_access_token` | Bearer token for API calls when test mode is on |
