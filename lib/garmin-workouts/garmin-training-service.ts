@@ -90,7 +90,7 @@ function buildStepsFromSegments(segments: WorkoutSegment[]): GarminWorkoutStep[]
       // Add repeat step
       steps.push({
         stepOrder: garminStepOrder++,
-        type: "REPEAT",
+        type: "WorkoutRepeatStep",
         repeatType: segment.durationType === "DISTANCE" 
           ? GarminRepeatType.DISTANCE 
           : GarminRepeatType.TIME,
@@ -115,7 +115,7 @@ function buildStepsFromSegments(segments: WorkoutSegment[]): GarminWorkoutStep[]
 function buildSegmentStep(stepOrder: number, segment: WorkoutSegment): GarminWorkoutStep {
   const step: GarminWorkoutStep = {
     stepOrder,
-    type: "STEP",
+    type: "WorkoutStep",
     intensity: mapIntensityFromTitle(segment.title),
     description: segment.title,
     durationType: segment.durationType === "DISTANCE" 

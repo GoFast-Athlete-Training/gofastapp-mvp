@@ -66,7 +66,7 @@ export enum GarminRepeatType {
 
 export interface GarminWorkoutStep {
   stepOrder: number;
-  type: string; // "STEP" or "REPEAT"
+  type: string; // "WorkoutStep" or "WorkoutRepeatStep"
   intensity?: GarminIntensity;
   description?: string;
   
