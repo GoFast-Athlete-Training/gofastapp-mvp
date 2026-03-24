@@ -70,6 +70,9 @@ export default function RacesPage() {
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [submittingRaceId, setSubmittingRaceId] = useState<string | null>(null);
   const [removingSignupId, setRemovingSignupId] = useState<string | null>(null);
+  const [goalPromptSignupId, setGoalPromptSignupId] = useState<string | null>(null);
+  const [goalPromptTime, setGoalPromptTime] = useState("");
+  const [savingGoalSignupId, setSavingGoalSignupId] = useState<string | null>(null);
 
   const signedRaceIds = useMemo(
     () => new Set(signups.map((s) => s.raceRegistryId)),
@@ -134,6 +137,8 @@ export default function RacesPage() {
         raceRegistryId: raceId,
       });
       if (data.signup) {
+        setGoalPromptSignupId(data.signup.id);
+        setGoalPromptTime("");
         setSignups((prev) => {
           const rest = prev.filter((s) => s.raceRegistryId !== raceId);
           return [...rest, data.signup].sort(
@@ -150,10 +155,46 @@ export default function RacesPage() {
     }
   }
 
+  async function saveGoalForSignup(signup: Signup) {
+    if (!goalPromptTime.trim()) {
+      return;
+    }
+    setSavingGoalSignupId(signup.id);
+    try {
+      const { data: goalRes } = await api.post<{ goal: { id: string } }>("/goals", {
+        name: signup.race_registry.name,
+        distance: "",
+        goalTime: goalPromptTime.trim(),
+        raceRegistryId: signup.raceRegistryId,
+      });
+      const goalId = goalRes.goal?.id;
+      if (!goalId) return;
+      const { data: patchRes } = await api.patch<{ signup: Signup }>(
+        `/race-signups/${signup.id}`,
+        { goalId }
+      );
+      if (patchRes.signup) {
+        setSignups((prev) =>
+          prev.map((s) => (s.id === signup.id ? patchRes.signup : s))
+        );
+      }
+      setGoalPromptSignupId(null);
+      setGoalPromptTime("");
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingGoalSignupId(null);
+    }
+  }
+
   async function onImOut(signupId: string) {
     setRemovingSignupId(signupId);
     try {
       await api.delete(`/race-signups/${signupId}`);
+      if (goalPromptSignupId === signupId) {
+        setGoalPromptSignupId(null);
+        setGoalPromptTime("");
+      }
       setSignups((prev) => prev.filter((s) => s.id !== signupId));
     } catch (e) {
       console.error(e);
@@ -179,7 +220,7 @@ export default function RacesPage() {
                 </p>
               </div>
               <Link
-                href="/settings/race-goal"
+                href="/goals"
                 className="text-sm text-orange-600 font-medium hover:underline shrink-0"
               >
                 Pace / goal settings
@@ -233,6 +274,55 @@ export default function RacesPage() {
                         <p className="text-xs text-gray-600 mt-2">
                           {r.distanceMiles} mi · {r.raceType}
                         </p>
+                        {!s.goalId && goalPromptSignupId !== s.id && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGoalPromptSignupId(s.id);
+                              setGoalPromptTime("");
+                            }}
+                            className="mt-3 text-xs font-medium text-orange-600 hover:text-orange-800"
+                          >
+                            Set goal time
+                          </button>
+                        )}
+                        {goalPromptSignupId === s.id && !s.goalId && (
+                          <div className="mt-3 pt-3 border-t border-orange-100 space-y-2">
+                            <p className="text-xs font-medium text-gray-800">
+                              Goal time for {r.name}?
+                            </p>
+                            <input
+                              type="text"
+                              value={goalPromptTime}
+                              onChange={(e) => setGoalPromptTime(e.target.value)}
+                              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500"
+                            />
+                            <p className="text-[10px] text-gray-500">
+                              H:MM:SS or MM:SS — powers workout paces.
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                disabled={!goalPromptTime.trim() || savingGoalSignupId === s.id}
+                                onClick={() => saveGoalForSignup(s)}
+                                className="px-3 py-1.5 rounded-md bg-orange-500 text-white text-xs font-medium hover:bg-orange-600 disabled:opacity-50"
+                              >
+                                {savingGoalSignupId === s.id ? "Saving…" : "Save goal"}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={savingGoalSignupId === s.id}
+                                onClick={() => {
+                                  setGoalPromptSignupId(null);
+                                  setGoalPromptTime("");
+                                }}
+                                className="px-3 py-1.5 rounded-md border border-gray-200 text-gray-700 text-xs font-medium hover:bg-gray-50"
+                              >
+                                Skip for now
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

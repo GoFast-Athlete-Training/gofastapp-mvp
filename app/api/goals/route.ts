@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
     if (error) return error;
 
     let body: {
+      name?: string | null;
       distance?: string;
       goalTime?: string | null;
       targetByDate?: string;
@@ -91,6 +92,7 @@ export async function POST(request: NextRequest) {
 
     try {
       const goal = await createGoal(athlete!.id, {
+        name: body.name,
         distance: body.distance ?? "",
         goalTime: body.goalTime,
         targetByDate,

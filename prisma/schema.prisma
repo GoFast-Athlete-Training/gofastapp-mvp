@@ -291,6 +291,7 @@ model race_registry {
 model AthleteGoal {
   id               String         @id @default(cuid())
   athleteId        String
+  name             String?
   distance         String
   goalTime         String?
   goalRacePace     Int?

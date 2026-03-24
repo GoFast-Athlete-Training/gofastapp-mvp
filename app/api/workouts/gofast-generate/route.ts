@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
         {
           needsPace: true,
           message:
-            "Set an active goal (Settings → Race goal) with a goal time, or add your 5K pace in profile.",
+            "Set an active goal on /goals with a goal time, or add your 5K pace in profile.",
         } as GoFastGenerateNeedsPace,
         { status: 200 }
       );

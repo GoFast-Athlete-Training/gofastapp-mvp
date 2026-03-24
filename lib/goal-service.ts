@@ -65,6 +65,7 @@ export async function getPrimaryGoalForWorkout(athleteId: string) {
 }
 
 export type CreateGoalInput = {
+  name?: string | null;
   distance: string;
   goalTime?: string | null;
   targetByDate: Date;
@@ -73,6 +74,11 @@ export type CreateGoalInput = {
 };
 
 export async function createGoal(athleteId: string, input: CreateGoalInput) {
+  await prisma.athleteGoal.updateMany({
+    where: { athleteId, status: "ACTIVE" },
+    data: { status: "ARCHIVED", updatedAt: new Date() },
+  });
+
   let targetByDate = input.targetByDate;
   let distance = input.distance.trim();
   let distanceMiles: number | null = null;
@@ -101,9 +107,12 @@ export async function createGoal(athleteId: string, input: CreateGoalInput) {
     distanceMiles,
   });
 
+  const nameTrimmed = input.name?.trim() ? input.name!.trim() : null;
+
   return prisma.athleteGoal.create({
     data: {
       athleteId,
+      name: nameTrimmed,
       distance,
       goalTime: input.goalTime?.trim() || null,
       goalRacePace,
@@ -130,6 +139,7 @@ export async function createGoal(athleteId: string, input: CreateGoalInput) {
 }
 
 export type UpdateGoalInput = Partial<{
+  name: string | null;
   distance: string;
   goalTime: string | null;
   targetByDate: Date;
@@ -174,6 +184,9 @@ export async function updateGoal(
   return prisma.athleteGoal.update({
     where: { id: goalId },
     data: {
+      ...(patch.name !== undefined && {
+        name: patch.name?.trim() ? patch.name.trim() : null,
+      }),
       ...(patch.distance !== undefined && { distance: patch.distance }),
       ...(patch.goalTime !== undefined && { goalTime: patch.goalTime?.trim() || null }),
       ...(patch.targetByDate !== undefined && { targetByDate: patch.targetByDate }),
