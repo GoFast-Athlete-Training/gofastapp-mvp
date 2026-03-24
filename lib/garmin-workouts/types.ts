@@ -46,14 +46,6 @@ export enum GarminTargetType {
   // ... other target types (18 total options)
 }
 
-export enum GarminValueType {
-  TIME = "TIME",
-  DISTANCE = "DISTANCE",
-  CALORIES = "CALORIES",
-  HEART_RATE = "HEART_RATE",
-  PACE = "PACE",
-}
-
 export enum GarminRepeatType {
   DISTANCE = "DISTANCE",
   TIME = "TIME",
@@ -73,21 +65,19 @@ export interface GarminWorkoutStep {
   // Duration (HOW LONG)
   durationType?: GarminDurationType;
   durationValue?: number;
-  durationValueType?: GarminValueType;
-  
+  // Training API: do not send durationValueType/targetValueType — server ValueType is unit enums (METER, etc.), not TIME/DISTANCE/PACE.
+
   // Target (WHAT TO AIM FOR)
   targetType?: GarminTargetType;
   targetValue?: number;           // Single target value
   targetValueLow?: number;         // Lower bound
   targetValueHigh?: number;        // Upper bound
-  targetValueType?: GarminValueType;
-  
+
   // Secondary target (can have BOTH pace AND HR!)
   secondaryTargetType?: GarminTargetType;
   secondaryTargetValue?: number;
   secondaryTargetValueLow?: number;
   secondaryTargetValueHigh?: number;
-  secondaryTargetValueType?: GarminValueType;
   
   // For intervals/repeats
   repeatType?: GarminRepeatType;

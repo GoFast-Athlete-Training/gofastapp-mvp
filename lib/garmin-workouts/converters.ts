@@ -11,7 +11,6 @@ import {
   GarminIntensity,
   GarminDurationType,
   GarminTargetType,
-  GarminValueType,
   GarminSport,
   GarminRepeatType,
   OurWorkout,
@@ -78,21 +77,17 @@ export function getTargetConfig(
   targetType?: GarminTargetType;
   targetValueLow?: number;
   targetValueHigh?: number;
-  targetValueType?: GarminValueType;
   secondaryTargetType?: GarminTargetType;
   secondaryTargetValueLow?: number;
   secondaryTargetValueHigh?: number;
-  secondaryTargetValueType?: GarminValueType;
 } {
   const config: {
     targetType?: GarminTargetType;
     targetValueLow?: number;
     targetValueHigh?: number;
-    targetValueType?: GarminValueType;
     secondaryTargetType?: GarminTargetType;
     secondaryTargetValueLow?: number;
     secondaryTargetValueHigh?: number;
-    secondaryTargetValueType?: GarminValueType;
   } = {};
 
   // Priority 1: Use paceGoals if provided
@@ -104,7 +99,6 @@ export function getTargetConfig(
       config.targetType = GarminTargetType.PACE;
       config.targetValueLow = convertPaceToSecondsPerKm(minPace);
       config.targetValueHigh = convertPaceToSecondsPerKm(maxPace);
-      config.targetValueType = GarminValueType.PACE;
     }
   }
 
@@ -119,13 +113,11 @@ export function getTargetConfig(
         config.secondaryTargetType = GarminTargetType.HEART_RATE;
         config.secondaryTargetValueLow = hrMin;
         config.secondaryTargetValueHigh = hrMax;
-        config.secondaryTargetValueType = GarminValueType.HEART_RATE;
       } else {
         // HR is primary target
         config.targetType = GarminTargetType.HEART_RATE;
         config.targetValueLow = hrMin;
         config.targetValueHigh = hrMax;
-        config.targetValueType = GarminValueType.HEART_RATE;
       }
     }
   }
@@ -155,11 +147,10 @@ export function buildSimpleStep(
 ): GarminWorkoutStep {
   const step: GarminWorkoutStep = {
     stepOrder,
-    type: "STEP",
+    type: "WorkoutStep",
     intensity,
     durationType: GarminDurationType.DISTANCE,
     durationValue: convertMilesToMeters(distanceMiles),
-    durationValueType: GarminValueType.DISTANCE,
   };
 
   if (description) {
@@ -169,7 +160,6 @@ export function buildSimpleStep(
   // Add targets
   if (targetConfig.targetType) {
     step.targetType = targetConfig.targetType;
-    step.targetValueType = targetConfig.targetValueType;
     if (targetConfig.targetValueLow !== undefined) {
       step.targetValueLow = targetConfig.targetValueLow;
     }
@@ -181,7 +171,6 @@ export function buildSimpleStep(
   // Add secondary target (e.g., HR if pace is primary)
   if (targetConfig.secondaryTargetType) {
     step.secondaryTargetType = targetConfig.secondaryTargetType;
-    step.secondaryTargetValueType = targetConfig.secondaryTargetValueType;
     if (targetConfig.secondaryTargetValueLow !== undefined) {
       step.secondaryTargetValueLow = targetConfig.secondaryTargetValueLow;
     }
@@ -221,16 +210,14 @@ export function buildRecoveryStep(
 ): GarminWorkoutStep {
   return {
     stepOrder,
-    type: "STEP",
+    type: "WorkoutStep",
     intensity: GarminIntensity.INTERVAL_REST,
     description: description || "Recovery",
     durationType: GarminDurationType.DISTANCE,
     durationValue: distanceMeters,
-    durationValueType: GarminValueType.DISTANCE,
     targetType: GarminTargetType.HEART_RATE,
     targetValueLow: 120,
     targetValueHigh: 140,
-    targetValueType: GarminValueType.HEART_RATE,
   };
 }
 
@@ -244,7 +231,7 @@ export function buildRepeatStep(
 ): GarminWorkoutStep {
   return {
     stepOrder,
-    type: "REPEAT",
+    type: "WorkoutRepeatStep",
     repeatType,
     repeatValue,
   };

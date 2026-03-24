@@ -12,7 +12,6 @@ import {
   GarminIntensity,
   GarminDurationType,
   GarminTargetType,
-  GarminValueType,
   GarminSport,
   GarminRepeatType,
   convertPaceToSecondsPerKm,
@@ -124,9 +123,6 @@ function buildSegmentStep(stepOrder: number, segment: WorkoutSegment): GarminWor
     durationValue: segment.durationType === "DISTANCE"
       ? convertMilesToMeters(segment.durationValue) // Convert miles to meters
       : convertMinutesToSeconds(segment.durationValue), // Convert minutes to seconds
-    durationValueType: segment.durationType === "DISTANCE"
-      ? GarminValueType.DISTANCE
-      : GarminValueType.TIME,
   };
   
   // Parse targets JSON array
@@ -149,15 +145,6 @@ function buildSegmentStep(stepOrder: number, segment: WorkoutSegment): GarminWor
         step.targetValue = primaryTarget.value;
       }
       
-      // Set value type based on target type
-      if (targetType === "PACE") {
-        step.targetValueType = GarminValueType.PACE;
-      } else if (targetType === "HEART_RATE") {
-        step.targetValueType = GarminValueType.HEART_RATE;
-      } else if (targetType === "SPEED") {
-        step.targetValueType = GarminValueType.DISTANCE; // Speed uses distance/time
-      }
-      
       // Second target (if exists) becomes secondary target
       if (segment.targets.length > 1) {
         const secondaryTarget = segment.targets[1];
@@ -174,12 +161,6 @@ function buildSegmentStep(stepOrder: number, segment: WorkoutSegment): GarminWor
           }
           if (secondaryTarget.value !== undefined && step.secondaryTargetValueLow === undefined) {
             step.secondaryTargetValue = secondaryTarget.value;
-          }
-          
-          if (secondaryTargetType === "PACE") {
-            step.secondaryTargetValueType = GarminValueType.PACE;
-          } else if (secondaryTargetType === "HEART_RATE") {
-            step.secondaryTargetValueType = GarminValueType.HEART_RATE;
           }
         }
       }
