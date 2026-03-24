@@ -285,7 +285,7 @@ export default function AthleteCreateProfilePage() {
           router.push(`/join/runcrew/${joinIntentHandle}/confirm`);
         } else {
           // Normal flow — optional goal step, then home
-          router.push('/set-goal');
+          router.push("/goals");
         }
       }
       

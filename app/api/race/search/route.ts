@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/** POST /api/race/search — legacy body { query } (RaceGoalEditor, runcrew, etc.) */
+/** POST /api/race/search — legacy body { query } (GoalSetter, runcrew, etc.) */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
