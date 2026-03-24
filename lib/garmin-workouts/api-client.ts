@@ -7,6 +7,7 @@
  */
 
 import { GarminWorkout, GarminWorkoutSchedule } from "./types";
+import { GarminOAuth1Config, generateGarminOAuthHeader } from "@/lib/integrations/garmin/auth";
 
 export class GarminApiError extends Error {
   status: number;
@@ -29,6 +30,14 @@ export class GarminApiError extends Error {
   }
 }
 
+export type GarminAuthMode = "bearer" | "oauth1";
+
+export interface GarminClientAuthConfig {
+  mode: GarminAuthMode;
+  bearerToken?: string;
+  oauth1?: GarminOAuth1Config;
+}
+
 /** Full base including `/training-api` — override with GARMIN_TRAINING_API_BASE if Garmin changes host/path */
 function defaultTrainingApiBase(): string {
   return (
@@ -38,12 +47,45 @@ function defaultTrainingApiBase(): string {
 }
 
 export class GarminWorkoutApiClient {
-  private accessToken: string;
+  private authConfig: GarminClientAuthConfig;
   private baseUrl: string;
 
-  constructor(accessToken: string, baseUrl?: string) {
-    this.accessToken = accessToken;
+  constructor(authConfig: GarminClientAuthConfig | string, baseUrl?: string) {
+    this.authConfig =
+      typeof authConfig === "string"
+        ? {
+            mode: "bearer",
+            bearerToken: authConfig,
+          }
+        : authConfig;
     this.baseUrl = (baseUrl ?? defaultTrainingApiBase()).replace(/\/$/, "");
+  }
+
+  private getAuthorizationHeader(method: string, url: string, body?: unknown): string {
+    if (this.authConfig.mode === "oauth1") {
+      if (
+        !this.authConfig.oauth1?.consumerKey ||
+        !this.authConfig.oauth1.consumerSecret ||
+        !this.authConfig.oauth1.token ||
+        !this.authConfig.oauth1.tokenSecret
+      ) {
+        throw new Error("Missing Garmin OAuth1 credentials");
+      }
+      return generateGarminOAuthHeader({
+        method,
+        url,
+        consumerKey: this.authConfig.oauth1.consumerKey,
+        consumerSecret: this.authConfig.oauth1.consumerSecret,
+        token: this.authConfig.oauth1.token,
+        tokenSecret: this.authConfig.oauth1.tokenSecret,
+        body,
+      });
+    }
+
+    if (!this.authConfig.bearerToken) {
+      throw new Error("Missing Garmin bearer token");
+    }
+    return `Bearer ${this.authConfig.bearerToken}`;
   }
 
   private async request<T>(
@@ -54,7 +96,7 @@ export class GarminWorkoutApiClient {
     const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
     const url = `${this.baseUrl}${path}`;
     const headers: HeadersInit = {
-      Authorization: `Bearer ${this.accessToken}`,
+      Authorization: this.getAuthorizationHeader(method, url, body),
       "Content-Type": "application/json",
     };
 

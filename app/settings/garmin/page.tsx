@@ -34,6 +34,77 @@ export default function GarminSettingsPage() {
       .catch(() => router.replace('/welcome'));
   }, [router]);
 
+  const handleConnectTest = async () => {
+    if (!athlete?.id) {
+      alert('Please sign in');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { auth } = await import('@/lib/firebase');
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        alert('Please sign in');
+        setLoading(false);
+        return;
+      }
+      const firebaseToken = await currentUser.getIdToken();
+      const response = await fetch(
+        `/api/auth/garmin-test/authorize?athleteId=${athlete.id}`,
+        {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${firebaseToken}` },
+        }
+      );
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to get test auth URL');
+      }
+      const data = await response.json();
+      if (!data.authUrl) {
+        throw new Error('Invalid response from server');
+      }
+      const popup = window.open(
+        data.authUrl,
+        'garmin-test-oauth',
+        'width=600,height=700,scrollbars=yes,resizable=yes'
+      );
+      if (!popup) {
+        alert('Popup blocked. Please allow popups for this site.');
+        setLoading(false);
+        return;
+      }
+      const checkPopup = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkPopup);
+          setLoading(false);
+          refreshAthlete();
+        }
+      }, 500);
+      const messageHandler = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return;
+        if (event.data.type === 'GARMIN_TEST_OAUTH_SUCCESS') {
+          clearInterval(checkPopup);
+          if (!popup.closed) popup.close();
+          setLoading(false);
+          refreshAthlete();
+          window.removeEventListener('message', messageHandler);
+        } else if (event.data.type === 'GARMIN_TEST_OAUTH_ERROR') {
+          clearInterval(checkPopup);
+          if (!popup.closed) popup.close();
+          setLoading(false);
+          alert('Garmin test connect failed: ' + (event.data.error || 'Unknown error'));
+          window.removeEventListener('message', messageHandler);
+        }
+      };
+      window.addEventListener('message', messageHandler);
+    } catch (e: unknown) {
+      console.error(e);
+      alert(e instanceof Error ? e.message : 'Failed to start Garmin test OAuth');
+      setLoading(false);
+    }
+  };
+
   const handleConnect = async () => {
     if (!athlete?.id) {
       alert('Please sign in to connect Garmin');
@@ -159,7 +230,7 @@ export default function GarminSettingsPage() {
         <div className="bg-white rounded-lg shadow p-6">
           <div className="space-y-4">
             <div>
-              <div className="text-sm text-gray-500">Status</div>
+              <div className="text-sm text-gray-500">Status (production)</div>
               <div className="font-medium">
                 {athlete?.garmin_is_connected ? (
                   <span className="text-green-600">Connected</span>
@@ -167,6 +238,27 @@ export default function GarminSettingsPage() {
                   <span className="text-gray-600">Not Connected</span>
                 )}
               </div>
+            </div>
+
+            <div>
+              <div className="text-sm text-gray-500">Garmin test mode</div>
+              <div className="font-medium text-gray-700">
+                {athlete?.garmin_use_test_tokens && athlete?.garmin_has_test_token ? (
+                  <span className="text-amber-700">Test token linked</span>
+                ) : (
+                  <span className="text-gray-500">Not linked</span>
+                )}
+              </div>
+              {athlete?.garmin_test_linked_email && (
+                <div className="text-xs text-gray-500 mt-1">
+                  Test account label: {athlete.garmin_test_linked_email}
+                </div>
+              )}
+              {athlete?.garmin_test_user_id && (
+                <div className="text-xs text-gray-500 mt-1 font-mono">
+                  Test Garmin user id: {athlete.garmin_test_user_id}
+                </div>
+              )}
             </div>
 
             {athlete?.garmin_is_connected && (
@@ -180,7 +272,7 @@ export default function GarminSettingsPage() {
               </div>
             )}
 
-            <div className="pt-4">
+            <div className="pt-4 space-y-3">
               {athlete?.garmin_is_connected ? (
                 <button
                   onClick={handleDisconnect}
@@ -195,9 +287,21 @@ export default function GarminSettingsPage() {
                   disabled={loading}
                   className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {loading ? 'Connecting...' : 'Connect Garmin'}
+                  {loading ? 'Connecting...' : 'Connect Garmin (production)'}
                 </button>
               )}
+              <button
+                type="button"
+                onClick={handleConnectTest}
+                disabled={loading}
+                className="w-full py-2 px-4 border-2 border-amber-600 text-amber-900 rounded hover:bg-amber-50 disabled:opacity-50 text-sm"
+              >
+                Connect Garmin (test app — does not overwrite production tokens)
+              </button>
+              <p className="text-xs text-gray-500">
+                Test OAuth uses <code className="bg-gray-100 px-1 rounded">GARMIN_TEST_CLIENT_ID</code> and
+                saves only <code className="bg-gray-100 px-1 rounded">garmin_test_*</code> fields.
+              </p>
             </div>
           </div>
         </div>

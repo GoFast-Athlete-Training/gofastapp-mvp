@@ -60,7 +60,7 @@ export async function POST(
     }
 
     // Resolve Garmin context (token + canonical Garmin user identity)
-    let { client, garminUserId, tokenMode } = await getGarminClient(athlete.id);
+    let { client, garminUserId, tokenMode, authMode } = await getGarminClient(athlete.id);
 
     // Assemble Garmin workout from workout + segments
     const garminWorkout = assembleGarminWorkout({
@@ -92,6 +92,7 @@ export async function POST(
       athleteId: athlete.id,
       garminUserId,
       tokenMode,
+      authMode,
       endpoint: "/training-api/workout",
     });
     let garminWorkoutId: number;
@@ -101,6 +102,7 @@ export async function POST(
     } catch (pushError: unknown) {
       const shouldFallbackToProd =
         pushError instanceof GarminApiError &&
+        authMode === "bearer" &&
         tokenMode === "test" &&
         /unable to read oauth header/i.test(pushError.details);
 
@@ -113,12 +115,14 @@ export async function POST(
       client = fallback.client;
       garminUserId = fallback.garminUserId;
       tokenMode = fallback.tokenMode;
+      authMode = fallback.authMode;
 
       console.log("[GarminPush] Retrying workout push", {
         workoutId: workout.id,
         athleteId: athlete.id,
         garminUserId,
         tokenMode,
+        authMode,
         endpoint: "/training-api/workout",
       });
       const retryResult = await client.createWorkout(garminWorkout);

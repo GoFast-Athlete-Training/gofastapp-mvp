@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Send, CheckCircle2, AlertCircle, X } from "lucide-react";
+import { ArrowLeft, Send, CheckCircle2, AlertCircle, X, Plug } from "lucide-react";
 import Link from "next/link";
 import TopNav from "@/components/shared/TopNav";
+import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import api from "@/lib/api";
+import { LocalStorageAPI } from "@/lib/localstorage";
 import {
   formatPaceTargetRangeForDisplay,
   formatStoredPaceAsMinPerMile,
@@ -74,6 +76,7 @@ export default function WorkoutDetailPage() {
   } | null>(null);
   const [showCreatedBanner, setShowCreatedBanner] = useState(false);
   const [garminToast, setGarminToast] = useState<string | null>(null);
+  const [connectingGarminTest, setConnectingGarminTest] = useState(false);
 
   const clearCreatedQuery = useCallback(() => {
     router.replace(`/workouts/${workoutId}`, { scroll: false });
@@ -97,6 +100,23 @@ export default function WorkoutDetailPage() {
   useEffect(() => {
     fetchWorkout();
   }, [workoutId]);
+
+  useEffect(() => {
+    const onMsg = (ev: MessageEvent) => {
+      const t = ev.data?.type;
+      if (t === "GARMIN_TEST_OAUTH_SUCCESS") {
+        setGarminToast("Garmin test account linked. You can send this workout to Garmin.");
+      }
+      if (t === "GARMIN_TEST_OAUTH_ERROR") {
+        setPushStatus({
+          success: false,
+          message: typeof ev.data?.error === "string" ? ev.data.error : "Garmin test connection failed.",
+        });
+      }
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
 
   const fetchWorkout = async () => {
     try {
@@ -161,14 +181,56 @@ export default function WorkoutDetailPage() {
     }
   };
 
+  const handleConnectGarminTest = async () => {
+    const athleteId = LocalStorageAPI.getAthleteId();
+    if (!athleteId) {
+      setPushStatus({
+        success: false,
+        message: "Missing athlete id. Open the app from a signed-in session so your profile loads.",
+      });
+      return;
+    }
+    setConnectingGarminTest(true);
+    setPushStatus(null);
+    try {
+      const { data } = await api.get<{
+        success?: boolean;
+        authUrl?: string;
+        error?: string;
+      }>("auth/garmin-test/authorize", { params: { athleteId } });
+      if (!data.success || !data.authUrl) {
+        setPushStatus({
+          success: false,
+          message: data.error || "Could not start Garmin test OAuth.",
+        });
+        return;
+      }
+      window.open(data.authUrl, "garmin-test-oauth", "width=600,height=700,scrollbars=yes");
+    } catch (e: unknown) {
+      console.error("Garmin test authorize:", e);
+      const err = e as { response?: { data?: { error?: string } } };
+      setPushStatus({
+        success: false,
+        message: err.response?.data?.error || "Could not start Garmin test OAuth.",
+      });
+    } finally {
+      setConnectingGarminTest(false);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex flex-col">
         <TopNav />
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto" />
-          </div>
+        <div className="flex flex-1 overflow-hidden">
+          <AthleteSidebar />
+          <main className="flex-1 overflow-y-auto">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto" />
+              </div>
+            </div>
+          </main>
         </div>
       </div>
     );
@@ -176,19 +238,24 @@ export default function WorkoutDetailPage() {
 
   if (!workout) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex flex-col">
         <TopNav />
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-          <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
-            <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">Workout not found</p>
-            <Link
-              href="/workouts"
-              className="mt-4 inline-block text-orange-600 hover:text-orange-700"
-            >
-              Back to Workouts
-            </Link>
-          </div>
+        <div className="flex flex-1 overflow-hidden">
+          <AthleteSidebar />
+          <main className="flex-1 overflow-y-auto">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+              <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
+                <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">Workout not found</p>
+                <Link
+                  href="/workouts"
+                  className="mt-4 inline-block text-orange-600 hover:text-orange-700"
+                >
+                  Back to Workouts
+                </Link>
+              </div>
+            </div>
+          </main>
         </div>
       </div>
     );
@@ -198,9 +265,11 @@ export default function WorkoutDetailPage() {
     workout.garminWorkoutId != null && workout.garminWorkoutId !== undefined;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
-
+      <div className="flex flex-1 overflow-hidden">
+        <AthleteSidebar />
+        <main className="flex-1 overflow-y-auto relative">
       {/* Post-create success */}
       {showCreatedBanner && (
         <div
@@ -279,7 +348,7 @@ export default function WorkoutDetailPage() {
               </div>
             </div>
 
-            <div className="shrink-0 w-full sm:w-auto">
+            <div className="shrink-0 w-full sm:w-auto flex flex-col gap-2">
               {alreadyOnGarmin ? (
                 <button
                   type="button"
@@ -309,6 +378,24 @@ export default function WorkoutDetailPage() {
                   )}
                 </button>
               )}
+              <button
+                type="button"
+                onClick={handleConnectGarminTest}
+                disabled={connectingGarminTest}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {connectingGarminTest ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600" />
+                    Opening…
+                  </>
+                ) : (
+                  <>
+                    <Plug className="w-4 h-4" />
+                    Connect Garmin (Test)
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
@@ -415,6 +502,8 @@ export default function WorkoutDetailPage() {
             <p className="text-gray-600">No segments defined</p>
           )}
         </div>
+      </div>
+        </main>
       </div>
     </div>
   );

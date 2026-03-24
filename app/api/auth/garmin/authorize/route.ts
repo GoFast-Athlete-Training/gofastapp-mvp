@@ -91,7 +91,7 @@ export async function GET(request: Request) {
     console.log('🔵 Redirect URI in auth URL:', redirectUri);
 
     // 6. Return JSON with authUrl (client opens popup)
-    return NextResponse.json({ authUrl });
+    return NextResponse.json({ success: true, authUrl });
 
   } catch (error: any) {
     console.error('❌ Garmin authorize error:', error);

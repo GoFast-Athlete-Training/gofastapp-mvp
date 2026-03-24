@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Activity, Calendar } from "lucide-react";
 import Link from "next/link";
 import TopNav from "@/components/shared/TopNav";
+import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import api from "@/lib/api";
 
 export default function WorkoutsPage() {
@@ -12,46 +13,50 @@ export default function WorkoutsPage() {
   const [view, setView] = useState<"plan" | "activity">("plan");
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
-      
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Workouts</h1>
-          <p className="text-gray-600">Plan workouts or view your activity history</p>
-        </div>
+      <div className="flex flex-1 overflow-hidden">
+        <AthleteSidebar />
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+            {/* Header */}
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Workouts</h1>
+              <p className="text-gray-600">Plan workouts or view your activity history</p>
+            </div>
 
-        {/* Toggle: Plan or See Activity */}
-        <div className="mb-6 flex gap-4 border-b border-gray-200">
-          <button
-            onClick={() => setView("plan")}
-            className={`px-4 py-2 font-medium transition-colors ${
-              view === "plan"
-                ? "text-orange-600 border-b-2 border-orange-600"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            Plan
-          </button>
-          <button
-            onClick={() => setView("activity")}
-            className={`px-4 py-2 font-medium transition-colors ${
-              view === "activity"
-                ? "text-orange-600 border-b-2 border-orange-600"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            See Activity
-          </button>
-        </div>
+            {/* Toggle: Plan or See Activity */}
+            <div className="mb-6 flex gap-4 border-b border-gray-200">
+              <button
+                onClick={() => setView("plan")}
+                className={`px-4 py-2 font-medium transition-colors ${
+                  view === "plan"
+                    ? "text-orange-600 border-b-2 border-orange-600"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Plan
+              </button>
+              <button
+                onClick={() => setView("activity")}
+                className={`px-4 py-2 font-medium transition-colors ${
+                  view === "activity"
+                    ? "text-orange-600 border-b-2 border-orange-600"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                See Activity
+              </button>
+            </div>
 
-        {/* Content */}
-        {view === "plan" ? (
-          <PlanView />
-        ) : (
-          <ActivityView />
-        )}
+            {/* Content */}
+            {view === "plan" ? (
+              <PlanView />
+            ) : (
+              <ActivityView />
+            )}
+          </div>
+        </main>
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, FileText, Pencil } from "lucide-react";
 import Link from "next/link";
 import TopNav from "@/components/shared/TopNav";
+import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import api from "@/lib/api";
 import {
   parsePaceToSecondsPerMile,
@@ -227,9 +228,12 @@ export default function CreateWorkoutPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+      <div className="flex flex-1 overflow-hidden">
+        <AthleteSidebar />
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         <Link
           href="/workouts"
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
@@ -502,6 +506,8 @@ export default function CreateWorkoutPage() {
             </>
           )}
         </form>
+          </div>
+        </main>
       </div>
     </div>
   );

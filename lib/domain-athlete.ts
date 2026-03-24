@@ -323,6 +323,11 @@ export async function hydrateAthlete(athleteId: string) {
     garmin_is_connected: athlete.garmin_is_connected || false,
     garmin_user_id: athlete.garmin_user_id,
     garmin_connected_at: athlete.garmin_connected_at,
+    // Test Garmin OAuth (no secrets exposed to client)
+    garmin_use_test_tokens: athlete.garmin_use_test_tokens || false,
+    garmin_test_user_id: athlete.garmin_test_user_id ?? undefined,
+    garmin_test_linked_email: athlete.garmin_test_linked_email ?? undefined,
+    garmin_has_test_token: !!(athlete.garmin_test_access_token && athlete.garmin_test_access_token.length > 0),
     
     // Computed fields
     fullName: athlete.firstName && athlete.lastName 

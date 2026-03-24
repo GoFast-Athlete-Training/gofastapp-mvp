@@ -9,6 +9,16 @@ For **sandbox or evaluation** credentials, tokens are stored on the **Athlete** 
 | `garmin_test_access_token` | Bearer token for API calls when test mode is on |
 | `garmin_test_user_id` | Garmin `userId` sent on webhooks — must match for `getAthleteByGarminUserId` |
 | `garmin_use_test_tokens` | When `true`, `getValidAccessToken` returns test token (no refresh) |
+| `garmin_test_linked_email` | Optional label (e.g. test Garmin login email); never touches prod columns |
+
+## Test OAuth (recommended vs portal copy-paste)
+
+Use **Connect Garmin (test app)** on `/settings/garmin` or call:
+
+- `GET /api/auth/garmin-test/authorize?athleteId=<cuid>` → opens Garmin consent with `GARMIN_TEST_CLIENT_ID`
+- Callback: `GET /api/auth/garmin-test/callback` (register this URL on the **test** Garmin app)
+
+Writes **only** `garmin_test_access_token`, `garmin_test_user_id`, `garmin_use_test_tokens`, and optionally `garmin_test_linked_email` from `GARMIN_TEST_LINKED_ACCOUNT_EMAIL`. Does **not** update `garmin_user_id`, `garmin_access_token`, `garmin_refresh_token`, or `garmin_is_connected`.
 
 ## Recommended env names (for scripts / local setup)
 
@@ -18,6 +28,9 @@ For **sandbox or evaluation** credentials, tokens are stored on the **Athlete** 
 | `GARMIN_TRAINING_TEST_USER_ID` | Same script — written to `garmin_test_user_id` |
 | `GARMIN_TRAINING_TEST_ATHLETE_ID` | Optional — target athlete `id` (cuid) |
 | `GARMIN_TRAINING_TEST_ATHLETE_EMAIL` | Optional — substring match on `athlete.email` |
+| `GARMIN_TEST_CLIENT_ID` | Test OAuth app — `garmin-test/authorize` |
+| `GARMIN_TEST_CLIENT_SECRET` | Test OAuth app — token exchange |
+| `GARMIN_TEST_LINKED_ACCOUNT_EMAIL` | Optional — saved to `garmin_test_linked_email` on successful test OAuth |
 
 Example `.env.local` (never commit real tokens):
 
