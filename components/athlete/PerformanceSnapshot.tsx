@@ -82,7 +82,7 @@ export default function PerformanceSnapshot({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-3">
-        <Link href="/settings/race-goal" className="text-sm text-orange-600 font-medium hover:underline">
+        <Link href="/goals" className="text-sm text-orange-600 font-medium hover:underline">
           Edit goal →
         </Link>
       </div>

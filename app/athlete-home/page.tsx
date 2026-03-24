@@ -321,7 +321,7 @@ export default function AthleteHomePage() {
                     </p>
                     {goalDaysLeft != null && <p className="text-gray-500 mt-1">{goalDaysLeft} days to target</p>}
                     <Link
-                      href="/settings/race-goal"
+                      href="/goals"
                       className="text-orange-600 font-medium mt-2 inline-block hover:underline"
                     >
                       Edit goal
@@ -336,7 +336,7 @@ export default function AthleteHomePage() {
                   Train for a goal — pick a race and target time to align workouts and pacing.
                 </p>
                 <Link
-                  href="/settings/race-goal"
+                  href="/goals"
                   className="inline-block mt-4 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
                 >
                   Set goal

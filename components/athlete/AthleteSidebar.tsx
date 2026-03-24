@@ -6,7 +6,7 @@ import { Home, Target, Dumbbell, Users, Trophy, Shirt, MessageCircle, BookOpen }
 
 const navItems: { label: string; href: string; icon: typeof Home }[] = [
   { label: "Home", href: "/athlete-home", icon: Home },
-  { label: "Goals", href: "/settings/race-goal", icon: Target },
+  { label: "Goals", href: "/goals", icon: Target },
   { label: "Training", href: "/workouts", icon: Dumbbell },
   { label: "Training Pod", href: "/my-runcrews", icon: Users },
   { label: "Races", href: "/races", icon: Trophy },

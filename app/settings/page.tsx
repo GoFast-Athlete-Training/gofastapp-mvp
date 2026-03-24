@@ -224,7 +224,7 @@ export default function SettingsPage() {
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Race goal</h2>
             <p className="text-gray-600 mb-4">Set your goal race and target time for personalized workout suggestions.</p>
             <Link
-              href="/settings/race-goal"
+              href="/goals"
               className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
             >
               Set race goal
