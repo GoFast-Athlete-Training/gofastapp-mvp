@@ -4,6 +4,7 @@ import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/firebase";
+import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 
 type PlanDetail = {
   id: string;
@@ -131,12 +132,14 @@ export default function TrainingSetupPlanPage({
 
   if (loading || !plan) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-white gap-4">
-        {error ? <p className="text-red-400">{error}</p> : <p>Loading…</p>}
-        <Link href="/training-setup" className="text-slate-400 text-sm">
-          Back
-        </Link>
-      </div>
+      <AthleteAppShell>
+        <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-4 text-gray-700">
+          {error ? <p className="text-red-600">{error}</p> : <p>Loading…</p>}
+          <Link href="/training-setup" className="text-sm text-orange-600 hover:text-orange-700">
+            Back
+          </Link>
+        </div>
+      </AthleteAppShell>
     );
   }
 
@@ -146,7 +149,9 @@ export default function TrainingSetupPlanPage({
     plan.planWeeks.length > 0;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 max-w-lg mx-auto">
+    <AthleteAppShell>
+      <div className="px-4 py-8 sm:px-6">
+        <div className="mx-auto max-w-lg rounded-2xl border border-gray-200 bg-slate-950 p-6 text-slate-100 shadow-lg">
       <h1 className="text-xl font-semibold mb-1">{plan.name}</h1>
       {plan.race_registry && (
         <p className="text-slate-400 text-sm mb-4">
@@ -226,11 +231,19 @@ export default function TrainingSetupPlanPage({
 
       {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
 
-      <div className="flex gap-4 text-sm text-slate-500">
-        <Link href="/training-setup">New plan</Link>
-        <Link href="/athlete-home">Home</Link>
-        <Link href="/workouts">All workouts</Link>
+      <div className="flex flex-wrap gap-4 text-sm text-slate-500">
+        <Link href="/training-setup" className="hover:text-slate-300">
+          New plan
+        </Link>
+        <Link href="/training" className="hover:text-slate-300">
+          Training hub
+        </Link>
+        <Link href="/workouts" className="hover:text-slate-300">
+          All workouts
+        </Link>
       </div>
-    </div>
+        </div>
+      </div>
+    </AthleteAppShell>
   );
 }

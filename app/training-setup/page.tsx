@@ -6,6 +6,7 @@ import Link from "next/link";
 import { auth } from "@/lib/firebase";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
+import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 
 type RaceRow = {
   id: string;
@@ -130,14 +131,16 @@ export default function TrainingSetupNewPage() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
-        Loading…
-      </div>
+      <AthleteAppShell>
+        <div className="flex min-h-[50vh] items-center justify-center text-gray-600">Loading…</div>
+      </AthleteAppShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 max-w-lg mx-auto">
+    <AthleteAppShell>
+      <div className="px-4 py-8 sm:px-6">
+        <div className="mx-auto max-w-lg rounded-2xl border border-gray-200 bg-slate-950 p-6 text-slate-100 shadow-lg">
       <h1 className="text-2xl font-semibold mb-2">Training plan setup</h1>
       <p className="text-slate-400 text-sm mb-6">
         Pick a race and start date. Baseline pace and mileage update your profile when you
@@ -231,10 +234,12 @@ export default function TrainingSetupNewPage() {
           {creating ? "Creating…" : "Create plan"}
         </button>
 
-        <Link href="/athlete-home" className="block text-center text-slate-500 text-sm">
+        <Link href="/training" className="block text-center text-slate-500 text-sm">
           Cancel
         </Link>
       </div>
-    </div>
+        </div>
+      </div>
+    </AthleteAppShell>
   );
 }

@@ -7,7 +7,7 @@ import { Home, Target, Dumbbell, Users, Trophy, User, MessageCircle, BookOpen } 
 const navItems: { label: string; href: string; icon: typeof Home }[] = [
   { label: "Home", href: "/athlete-home", icon: Home },
   { label: "Goals", href: "/goals", icon: Target },
-  { label: "Training", href: "/workouts", icon: Dumbbell },
+  { label: "Training", href: "/training", icon: Dumbbell },
   { label: "Training Pod", href: "/my-runcrews", icon: Users },
   { label: "Races", href: "/races", icon: Trophy },
   { label: "Profile", href: "/profile", icon: User },
@@ -32,7 +32,12 @@ export default function AthleteSidebar() {
 
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         {navItems.map(({ label, href, icon: Icon }) => {
-          const active = pathname === href || (href !== "/athlete-home" && pathname?.startsWith(href));
+          const active =
+            href === "/training"
+              ? pathname === "/training" ||
+                pathname?.startsWith("/workouts") ||
+                pathname?.startsWith("/training-setup")
+              : pathname === href || (href !== "/athlete-home" && pathname?.startsWith(href));
           return (
             <button
               key={href}
