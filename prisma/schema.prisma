@@ -29,12 +29,6 @@ model Athlete {
   state                   String?
   primarySport            String?
   bio                     String?
-  /// When true, /u/[gofastHandle] is discoverable with public-safe fields only.
-  profilePublic           Boolean                  @default(false)
-  /// Show active training plan summary on public profile (requires profilePublic).
-  showTrainingSummary     Boolean                  @default(false)
-  /// Show upcoming scheduled workouts (title/date/type only) on public profile.
-  showUpcomingWorkouts    Boolean                  @default(false)
   instagram               String?
   garmin_user_id          String?                  @unique
   garmin_access_token      String?

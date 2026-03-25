@@ -15,8 +15,6 @@ type PublicAthlete = {
   city: string | null;
   state: string | null;
   primarySport: string | null;
-  showTrainingSummary: boolean;
-  showUpcomingWorkouts: boolean;
 };
 
 type TrainingSummary = {
@@ -188,7 +186,7 @@ export default function PublicAthletePage() {
           </section>
         )}
 
-        {athlete.showTrainingSummary && trainingSummary && (
+        {trainingSummary && (
           <section className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-slate-900 mb-3">My training</h2>
             <p className="text-slate-800 font-medium">{trainingSummary.planName}</p>
@@ -202,7 +200,7 @@ export default function PublicAthletePage() {
           </section>
         )}
 
-        {athlete.showUpcomingWorkouts && upcomingWorkouts.length > 0 && (
+        {upcomingWorkouts.length > 0 && (
           <section className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-slate-900 mb-3">Workouts I&apos;m doing</h2>
             <ul className="space-y-3">

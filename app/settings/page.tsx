@@ -14,7 +14,6 @@ export default function SettingsPage() {
   const router = useRouter();
   const [athlete, setAthlete] = useState<any>(null);
   const [connectingGarmin, setConnectingGarmin] = useState(false);
-  const [savingPublicProfile, setSavingPublicProfile] = useState(false);
   const [copiedProfileUrl, setCopiedProfileUrl] = useState(false);
 
   const [ambassadorCredits, setAmbassadorCredits] = useState<{
@@ -153,23 +152,6 @@ export default function SettingsPage() {
     }
   };
 
-  const updatePublicProfile = async (patch: {
-    profilePublic?: boolean;
-    showTrainingSummary?: boolean;
-    showUpcomingWorkouts?: boolean;
-  }) => {
-    if (!athlete?.id) return;
-    setSavingPublicProfile(true);
-    try {
-      await api.put(`/athlete/${athlete.id}`, patch);
-      setAthlete((a: any) => (a ? { ...a, ...patch } : a));
-    } catch {
-      alert('Could not save visibility settings. Try again.');
-    } finally {
-      setSavingPublicProfile(false);
-    }
-  };
-
   const copyPublicProfileUrl = async () => {
     const h = athlete?.gofastHandle;
     if (!h || typeof window === 'undefined') return;
@@ -259,101 +241,35 @@ export default function SettingsPage() {
               Public profile
             </h2>
             <p className="text-gray-600 text-sm mb-4">
-              Optional public page at <code className="text-xs bg-gray-100 px-1 rounded">/u/your-handle</code>.
-              Only safe fields are shown; training and workouts are opt-in.
+              Your page at <code className="text-xs bg-gray-100 px-1 rounded">/u/your-handle</code> shows bio,
+              location, training summary, upcoming workouts, and CityRuns you host (safe fields only — no account
+              secrets).
             </p>
             {!athlete?.gofastHandle ? (
-              <p className="text-amber-800 text-sm">Set a GoFast handle in Edit Profile to enable a public URL.</p>
+              <p className="text-amber-800 text-sm">Set a GoFast handle in Edit Profile to get a public URL.</p>
             ) : (
-              <>
-                <div className="flex flex-wrap items-center gap-2 mb-4">
-                  <button
-                    type="button"
-                    onClick={copyPublicProfileUrl}
-                    disabled={!athlete.profilePublic}
-                    className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {copiedProfileUrl ? (
-                      <Check className="h-4 w-4 text-green-600" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                    {copiedProfileUrl ? 'Copied' : 'Copy link'}
-                  </button>
-                  {athlete.profilePublic && (
-                    <Link
-                      href={`/u/${athlete.gofastHandle}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-sky-600 hover:text-sky-800 font-medium"
-                    >
-                      Open public page →
-                    </Link>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={copyPublicProfileUrl}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  {copiedProfileUrl ? (
+                    <Check className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
                   )}
-                </div>
-                <div className="space-y-3 border-t border-gray-100 pt-4">
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="mt-1 rounded border-gray-300"
-                      checked={!!athlete.profilePublic}
-                      disabled={savingPublicProfile}
-                      onChange={(e) =>
-                        updatePublicProfile({
-                          profilePublic: e.target.checked,
-                          ...(e.target.checked
-                            ? {}
-                            : { showTrainingSummary: false, showUpcomingWorkouts: false }),
-                        })
-                      }
-                    />
-                    <span>
-                      <span className="font-medium text-gray-900">Make my profile public</span>
-                      <span className="block text-sm text-gray-600">
-                        Anyone with the link can see your bio, location, and joinable runs you host.
-                      </span>
-                    </span>
-                  </label>
-                  <label
-                    className={`flex items-start gap-3 ${athlete.profilePublic ? 'cursor-pointer' : 'opacity-50'}`}
-                  >
-                    <input
-                      type="checkbox"
-                      className="mt-1 rounded border-gray-300"
-                      checked={!!athlete.showTrainingSummary}
-                      disabled={savingPublicProfile || !athlete.profilePublic}
-                      onChange={(e) =>
-                        updatePublicProfile({ showTrainingSummary: e.target.checked })
-                      }
-                    />
-                    <span>
-                      <span className="font-medium text-gray-900">Show training plan summary</span>
-                      <span className="block text-sm text-gray-600">
-                        Plan name, length, and goal race title only.
-                      </span>
-                    </span>
-                  </label>
-                  <label
-                    className={`flex items-start gap-3 ${athlete.profilePublic ? 'cursor-pointer' : 'opacity-50'}`}
-                  >
-                    <input
-                      type="checkbox"
-                      className="mt-1 rounded border-gray-300"
-                      checked={!!athlete.showUpcomingWorkouts}
-                      disabled={savingPublicProfile || !athlete.profilePublic}
-                      onChange={(e) =>
-                        updatePublicProfile({ showUpcomingWorkouts: e.target.checked })
-                      }
-                    />
-                    <span>
-                      <span className="font-medium text-gray-900">Show upcoming workouts</span>
-                      <span className="block text-sm text-gray-600">
-                        Titles, dates, and workout types (no segment targets).
-                      </span>
-                    </span>
-                  </label>
-                </div>
-              </>
+                  {copiedProfileUrl ? 'Copied' : 'Copy link'}
+                </button>
+                <Link
+                  href={`/u/${athlete.gofastHandle}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-sky-600 hover:text-sky-800 font-medium"
+                >
+                  Open public page →
+                </Link>
+              </div>
             )}
           </div>
 

@@ -14,7 +14,7 @@ function normalizeHandle(raw: string): string {
 
 /**
  * GET /api/athlete/public/[handle]
- * Public, unauthenticated. Safe fields only. 404 if profile not public or handle missing.
+ * Public, unauthenticated. Safe fields only. 404 if no athlete with this gofastHandle.
  */
 export async function GET(
   _request: Request,
@@ -31,7 +31,7 @@ export async function GET(
       where: { gofastHandle: handle },
     });
 
-    if (!athlete || !athlete.profilePublic) {
+    if (!athlete) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -66,58 +66,47 @@ export async function GET(
       raceName: string | null;
     } | null = null;
 
-    if (athlete.showTrainingSummary) {
-      const plan = await prisma.training_plans.findFirst({
-        where: { athleteId: athlete.id },
-        orderBy: { updatedAt: 'desc' },
-        select: {
-          name: true,
-          startDate: true,
-          totalWeeks: true,
-          race_registry: { select: { name: true } },
-        },
-      });
-      if (plan) {
-        trainingSummary = {
-          planName: plan.name,
-          startDate: plan.startDate.toISOString(),
-          totalWeeks: plan.totalWeeks,
-          raceName: plan.race_registry?.name ?? null,
-        };
-      }
+    const plan = await prisma.training_plans.findFirst({
+      where: { athleteId: athlete.id },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        name: true,
+        startDate: true,
+        totalWeeks: true,
+        race_registry: { select: { name: true } },
+      },
+    });
+    if (plan) {
+      trainingSummary = {
+        planName: plan.name,
+        startDate: plan.startDate.toISOString(),
+        totalWeeks: plan.totalWeeks,
+        raceName: plan.race_registry?.name ?? null,
+      };
     }
 
-    let upcomingWorkouts: Array<{
-      id: string;
-      title: string;
-      workoutType: string;
-      date: string | null;
-    }> = [];
-
-    if (athlete.showUpcomingWorkouts) {
-      const startOfToday = new Date(now);
-      startOfToday.setHours(0, 0, 0, 0);
-      const rows = await prisma.workouts.findMany({
-        where: {
-          athleteId: athlete.id,
-          date: { gte: startOfToday },
-        },
-        orderBy: { date: 'asc' },
-        take: 12,
-        select: {
-          id: true,
-          title: true,
-          workoutType: true,
-          date: true,
-        },
-      });
-      upcomingWorkouts = rows.map((w) => ({
-        id: w.id,
-        title: w.title,
-        workoutType: w.workoutType,
-        date: w.date ? w.date.toISOString() : null,
-      }));
-    }
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    const workoutRows = await prisma.workouts.findMany({
+      where: {
+        athleteId: athlete.id,
+        date: { gte: startOfToday },
+      },
+      orderBy: { date: 'asc' },
+      take: 12,
+      select: {
+        id: true,
+        title: true,
+        workoutType: true,
+        date: true,
+      },
+    });
+    const upcomingWorkouts = workoutRows.map((w) => ({
+      id: w.id,
+      title: w.title,
+      workoutType: w.workoutType,
+      date: w.date ? w.date.toISOString() : null,
+    }));
 
     return NextResponse.json({
       success: true,
@@ -130,8 +119,6 @@ export async function GET(
         city: athlete.city,
         state: athlete.state,
         primarySport: athlete.primarySport,
-        showTrainingSummary: athlete.showTrainingSummary,
-        showUpcomingWorkouts: athlete.showUpcomingWorkouts,
       },
       trainingSummary,
       upcomingWorkouts,
