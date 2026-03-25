@@ -1,5 +1,7 @@
 /**
  * One OpenAI call: phases + planWeeks with schedule strings.
+ * Attempts to resolve prompt from gofastapp-mvp's own DB first (training_gen_prompts).
+ * Falls back to hardcoded system prompt if no DB prompt is found.
  */
 
 import type { PlanPhaseOutline, PlanWeekOutline } from "./plan-generate-ai-types";
@@ -10,6 +12,8 @@ import {
   validatePhasesCoverWeeks,
   applyWeekPhasesFromPhases,
 } from "./plan-outline-validate";
+
+import { resolveTrainingPrompt } from "./prompt-resolver";
 
 const SHORT_PLAN_MAX_WEEKS = 8;
 
@@ -72,19 +76,39 @@ export async function generatePlanOutlineWithOpenAI(params: {
     throw new Error("OPENAI_API_KEY is required for plan generation");
   }
 
-  const system =
-    params.totalWeeks <= SHORT_PLAN_MAX_WEEKS
-      ? SYSTEM_SHORT(params.totalWeeks)
-      : SYSTEM_LONG;
+  // Try DB-driven prompt first; fall back to hardcoded if none found
+  const resolved = await resolveTrainingPrompt({
+    totalWeeks: params.totalWeeks,
+    raceName: params.raceName,
+    raceDistanceMiles: params.raceDistanceMiles,
+    raceTypeLabel: params.raceTypeLabel,
+    goalTime: params.goalTime,
+    currentWeeklyMileage: params.currentWeeklyMileage,
+    preferredDaysHuman: params.preferredDaysHuman,
+  });
 
-  const user = [
-    `totalWeeks: ${params.totalWeeks}`,
-    `race: ${params.raceName} (${params.raceTypeLabel}, ${params.raceDistanceMiles} mi)`,
-    `goalTime: ${params.goalTime ?? "not specified"}`,
-    `currentWeeklyMileage: ${params.currentWeeklyMileage ?? "not specified"}`,
-    `athlete preferred training days: ${params.preferredDaysHuman}`,
-    `Generate phases and planWeeks for all ${params.totalWeeks} weeks.`,
-  ].join("\n");
+  let system: string;
+  let user: string;
+
+  if (resolved) {
+    console.log("[plan-generate-ai] Using DB-resolved prompt from training_gen_prompts");
+    system = resolved.systemMessage;
+    user = resolved.userMessage;
+  } else {
+    console.log("[plan-generate-ai] No DB prompt found — falling back to hardcoded prompt");
+    system =
+      params.totalWeeks <= SHORT_PLAN_MAX_WEEKS
+        ? SYSTEM_SHORT(params.totalWeeks)
+        : SYSTEM_LONG;
+    user = [
+      `totalWeeks: ${params.totalWeeks}`,
+      `race: ${params.raceName} (${params.raceTypeLabel}, ${params.raceDistanceMiles} mi)`,
+      `goalTime: ${params.goalTime ?? "not specified"}`,
+      `currentWeeklyMileage: ${params.currentWeeklyMileage ?? "not specified"}`,
+      `athlete preferred training days: ${params.preferredDaysHuman}`,
+      `Generate phases and planWeeks for all ${params.totalWeeks} weeks.`,
+    ].join("\n");
+  }
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",

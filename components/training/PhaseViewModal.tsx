@@ -4,6 +4,44 @@ import { useEffect } from "react";
 import { X } from "lucide-react";
 import type { PhaseRange } from "@/lib/training/plan-phases";
 import { phaseNameForWeek } from "@/lib/training/plan-phases";
+import { parseScheduleString } from "@/lib/training/schedule-parser";
+
+const DAY_LABELS: Record<string, string> = {
+  M: "Mon", Tu: "Tue", W: "Wed", Th: "Thu", F: "Fri", Sa: "Sat", Su: "Sun",
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  E: "Easy", T: "Quality", I: "Quality", L: "Long Run",
+};
+
+function renderSchedule(schedule: string): React.ReactNode {
+  if (!schedule) return <span className="text-gray-400">Rest</span>;
+  try {
+    const tokens = parseScheduleString(schedule);
+    return (
+      <ul className="flex flex-wrap gap-2 mt-1">
+        {tokens.map((t, i) => (
+          <li
+            key={i}
+            className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+              t.typeLetter === "L"
+                ? "bg-orange-100 text-orange-800"
+                : t.typeLetter === "E"
+                ? "bg-gray-100 text-gray-700"
+                : "bg-blue-100 text-blue-800"
+            }`}
+          >
+            <span className="font-semibold">{DAY_LABELS[t.dayAbbr] ?? t.dayAbbr}</span>
+            <span>{t.miles} mi</span>
+            <span className="opacity-70">· {TYPE_LABELS[t.typeLetter] ?? t.typeLetter}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  } catch {
+    return <span className="text-gray-600 text-xs">{schedule}</span>;
+  }
+}
 
 export type PlanWeekRow = {
   weekNumber: number;
@@ -129,9 +167,9 @@ export default function PhaseViewModal({
                         </button>
                       )}
                     </div>
-                    <p className="mt-2 text-gray-700 leading-relaxed break-words">
-                      {w.schedule || "—"}
-                    </p>
+                    <div className="mt-1">
+                      {renderSchedule(w.schedule)}
+                    </div>
                   </li>
                 );
               })}
