@@ -3,9 +3,16 @@
 import { useCallback, useEffect, useMemo, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ChevronLeft, ChevronRight, LayoutList } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
+import PhaseViewModal from "@/components/training/PhaseViewModal";
+import {
+  parsePhasesJson,
+  phaseNameForWeek,
+  type PhaseRange,
+} from "@/lib/training/plan-phases";
 
 type PlanDetail = {
   id: string;
@@ -31,7 +38,6 @@ const DAY_OPTIONS: { value: number; label: string }[] = [
   { value: 7, label: "Sun" },
 ];
 
-/** Default when plan has no preferredDays yet (matches generate API fallback). */
 const DEFAULT_PREFERRED_DAYS = [1, 2, 3, 4, 5, 6];
 
 function parsePlanWeekEntries(
@@ -73,6 +79,7 @@ export default function TrainingSetupPlanPage({
   const [generating, setGenerating] = useState(false);
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [weekNumber, setWeekNumber] = useState(1);
+  const [phaseModalOpen, setPhaseModalOpen] = useState(false);
   const [preferredDaysLocal, setPreferredDaysLocal] = useState<number[]>(
     DEFAULT_PREFERRED_DAYS
   );
@@ -141,10 +148,29 @@ export default function TrainingSetupPlanPage({
     return Array.isArray(plan.planWeeks) && plan.planWeeks.length > 0;
   }, [plan?.planWeeks]);
 
+  const phaseRanges: PhaseRange[] = useMemo(
+    () => (plan ? parsePhasesJson(plan.phases) : []),
+    [plan?.phases]
+  );
+
   const weekEntries = useMemo(
     () => (plan ? parsePlanWeekEntries(plan.planWeeks) : []),
     [plan]
   );
+
+  const currentWeekEntry = useMemo(
+    () => weekEntries.find((w) => w.weekNumber === weekNumber),
+    [weekEntries, weekNumber]
+  );
+
+  const weekPhaseLabel = useMemo(() => {
+    if (!currentWeekEntry) return "";
+    return phaseNameForWeek(
+      phaseRanges,
+      weekNumber,
+      currentWeekEntry.phase
+    );
+  }, [phaseRanges, weekNumber, currentWeekEntry]);
 
   const fetchWeekWorkouts = useCallback(
     async (wn: number) => {
@@ -233,6 +259,15 @@ export default function TrainingSetupPlanPage({
     }
   }
 
+  function goPrevWeek() {
+    setWeekNumber((n) => Math.max(1, n - 1));
+  }
+
+  function goNextWeek() {
+    if (!plan) return;
+    setWeekNumber((n) => Math.min(plan.totalWeeks, n + 1));
+  }
+
   if (loading || !plan) {
     return (
       <AthleteAppShell>
@@ -272,7 +307,7 @@ export default function TrainingSetupPlanPage({
                   Preferred training days
                 </p>
                 <p className="text-xs text-gray-500 mb-3">
-                  The AI uses these when building your weekly schedule (Mon–Sun).
+                  We use these when building each week (Mon–Sun).
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {DAY_OPTIONS.map(({ value, label }) => (
@@ -304,77 +339,96 @@ export default function TrainingSetupPlanPage({
 
           {hasSchedule && (
             <>
-              <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-                Your schedule is ready ({weekEntries.length} weeks). Same compact
-                format as club run schedules.
+              <p className="mb-4 text-sm text-gray-700">
+                Your schedule is ready. Use the preview below to step through weeks
+                and open each workout.
+              </p>
+
+              <div className="mb-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPhaseModalOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                >
+                  <LayoutList className="h-4 w-4" aria-hidden />
+                  View phases &amp; all weeks
+                </button>
               </div>
 
-              <div className="mb-6 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                  All weeks
-                </p>
-                <ul className="space-y-1.5 font-mono text-xs text-gray-800">
-                  {weekEntries.map((w) => (
-                    <li key={w.weekNumber}>
-                      <span className="text-gray-500">W{w.weekNumber}</span>
-                      {w.phase ? (
-                        <span className="text-gray-600"> ({w.phase})</span>
-                      ) : null}
-                      {" — "}
-                      {w.schedule || "—"}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="space-y-3 mb-6">
-                <label className="block text-sm font-medium text-gray-800">
-                  Workouts for week
-                </label>
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="number"
-                    min={1}
-                    max={plan.totalWeeks}
-                    className="w-24 rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                    value={weekNumber}
-                    onChange={(e) =>
-                      setWeekNumber(
-                        Math.min(
-                          plan.totalWeeks,
-                          Math.max(1, Number(e.target.value) || 1)
-                        )
-                      )
-                    }
-                  />
-                  {loadingWeek && (
-                    <span className="text-xs text-gray-500">Loading…</span>
-                  )}
+              <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                      Week preview
+                    </p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      Week {weekNumber} of {plan.totalWeeks}
+                    </p>
+                    {weekPhaseLabel && (
+                      <span className="mt-1 inline-block text-xs font-medium text-orange-800 bg-orange-100 px-2.5 py-0.5 rounded-full">
+                        {weekPhaseLabel}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      onClick={goPrevWeek}
+                      disabled={weekNumber <= 1}
+                      className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-100 disabled:opacity-40"
+                      aria-label="Previous week"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={goNextWeek}
+                      disabled={weekNumber >= plan.totalWeeks}
+                      className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-100 disabled:opacity-40"
+                      aria-label="Next week"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500">
-                  Week 1 loads automatically. Change the number to materialize
-                  another week (creates workouts from the schedule string).
-                </p>
+                {currentWeekEntry?.schedule ? (
+                  <p className="text-sm text-gray-800 leading-relaxed break-words">
+                    {currentWeekEntry.schedule}
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-500">No schedule line for this week.</p>
+                )}
+                {loadingWeek && (
+                  <p className="mt-2 text-xs text-gray-500">Loading workouts…</p>
+                )}
               </div>
             </>
           )}
 
           {weekWorkouts.length > 0 && (
-            <ul className="space-y-2 mb-6">
+            <ul className="space-y-3 mb-6">
               {weekWorkouts.map((w) => (
                 <li key={w.id}>
                   <Link
                     href={`/workouts/${w.id}`}
-                    className="block rounded-lg border border-gray-200 bg-white p-3 hover:border-orange-300 hover:bg-orange-50/30"
+                    className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-orange-300 hover:shadow-md transition"
                   >
-                    <div className="font-medium text-gray-900">{w.title}</div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-base font-semibold text-gray-900 leading-snug">
+                      {w.title}
+                    </div>
+                    <div className="mt-2 text-sm text-gray-600">
                       {w.date
-                        ? new Date(w.date).toLocaleDateString()
-                        : "No date"}{" "}
-                      · {w.workoutType}
+                        ? new Date(w.date).toLocaleDateString(undefined, {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                        : "Date TBD"}
+                      <span className="text-gray-400"> · </span>
+                      {w.workoutType}
                       {w.estimatedDistanceInMeters != null
-                        ? ` · ${(w.estimatedDistanceInMeters / 1609.34).toFixed(1)} mi planned`
+                        ? ` · ${(w.estimatedDistanceInMeters / 1609.34).toFixed(1)} mi`
                         : ""}
                     </div>
                   </Link>
@@ -385,8 +439,8 @@ export default function TrainingSetupPlanPage({
 
           {hasSchedule && !loadingWeek && weekWorkouts.length === 0 && (
             <p className="text-sm text-gray-500 mb-4">
-              No workouts for this week yet. If an error appeared above, check
-              your profile 5K pace (needed to build segments).
+              No workouts for this week yet. If something failed above, set your
+              5K pace on your profile so we can build segments.
             </p>
           )}
 
@@ -405,6 +459,14 @@ export default function TrainingSetupPlanPage({
           </div>
         </div>
       </div>
+
+      <PhaseViewModal
+        open={phaseModalOpen}
+        onClose={() => setPhaseModalOpen(false)}
+        phases={phaseRanges}
+        planWeeks={weekEntries}
+        onJumpToWeek={(wn) => setWeekNumber(wn)}
+      />
     </AthleteAppShell>
   );
 }

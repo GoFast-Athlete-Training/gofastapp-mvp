@@ -47,6 +47,15 @@ function isQualifyingGoal(g: GoalRow): boolean {
   return g.status === "ACTIVE" && goalRaceReady(g) && goalTimeReady(g);
 }
 
+type ActivePlanLite = {
+  id: string;
+  name: string;
+  athleteGoalId: string | null;
+  lifecycleStatus: string;
+  planWeeks: unknown;
+  race_registry: { name: string } | null;
+};
+
 function formatRaceWhen(iso: string): string {
   try {
     const d = new Date(iso);
@@ -101,6 +110,9 @@ export default function TrainingSetupClient() {
   >(null);
   const [baseline5KPace, setBaseline5KPace] = useState("");
   const [baselineWeeklyMileage, setBaselineWeeklyMileage] = useState("");
+  const [activePlans, setActivePlans] = useState<ActivePlanLite[]>([]);
+  const [replaceGoalAcknowledged, setReplaceGoalAcknowledged] = useState(false);
+  const [replaceBlockPlan, setReplaceBlockPlan] = useState<ActivePlanLite | null>(null);
 
   const qualifyingGoals = useMemo(() => goals.filter(isQualifyingGoal), [goals]);
 
@@ -129,12 +141,19 @@ export default function TrainingSetupClient() {
     try {
       const token = await getToken();
       const headers = { Authorization: `Bearer ${token}` };
-      const [gRes, sRes] = await Promise.all([
+      const [gRes, sRes, pRes] = await Promise.all([
         fetch("/api/goals?status=ACTIVE", { headers }),
         fetch("/api/race-signups", { headers }),
+        fetch("/api/training-plan?status=active", { headers }),
       ]);
       const gJson = await gRes.json();
       const sJson = await sRes.json();
+      const pJson = await pRes.json();
+      if (pRes.ok && Array.isArray(pJson.plans)) {
+        setActivePlans(pJson.plans as ActivePlanLite[]);
+      } else {
+        setActivePlans([]);
+      }
       if (!gRes.ok) {
         setOrientationError(gJson.error || "Failed to load goals");
         setGoals([]);
@@ -150,6 +169,7 @@ export default function TrainingSetupClient() {
       setOrientationError(e instanceof Error ? e.message : "Load failed");
       setGoals([]);
       setSignups([]);
+      setActivePlans([]);
     } finally {
       setLoadingOrientation(false);
     }
@@ -210,6 +230,8 @@ export default function TrainingSetupClient() {
     setWizardGoal(g);
     setFormError(null);
     setCreateFeedback(null);
+    setReplaceGoalAcknowledged(false);
+    setReplaceBlockPlan(null);
     const today = new Date();
     setStartDate(today.toISOString().split("T")[0]);
     router.replace(`/training-setup?goalId=${encodeURIComponent(g.id)}`, { scroll: false });
@@ -219,6 +241,8 @@ export default function TrainingSetupClient() {
     setWizardGoal(null);
     setFormError(null);
     setCreateFeedback(null);
+    setReplaceGoalAcknowledged(false);
+    setReplaceBlockPlan(null);
     router.replace("/training-setup", { scroll: false });
   }
 
@@ -228,7 +252,7 @@ export default function TrainingSetupClient() {
     exitWizard();
   }
 
-  async function createPlan() {
+  async function createPlan(opts?: { forceReplace?: boolean }) {
     if (!wizardGoal?.race_registry || !wizardGoal.raceRegistryId) {
       setFormError(null);
       setCreateFeedback("goals");
@@ -238,6 +262,20 @@ export default function TrainingSetupClient() {
       setFormError("Pick a start date for your plan.");
       return;
     }
+
+    const conflicting = activePlans.find(
+      (p) => p.lifecycleStatus === "ACTIVE" && p.athleteGoalId === wizardGoal.id
+    );
+    const mayReplace = replaceGoalAcknowledged || opts?.forceReplace === true;
+    if (conflicting && !mayReplace) {
+      setReplaceBlockPlan(conflicting);
+      setFormError(null);
+      setCreateFeedback(null);
+      return;
+    }
+    setReplaceBlockPlan(null);
+    if (opts?.forceReplace) setReplaceGoalAcknowledged(true);
+
     setCreating(true);
     setFormError(null);
     setCreateFeedback(null);
@@ -272,6 +310,7 @@ export default function TrainingSetupClient() {
         return;
       }
       if (data.plan?.id) {
+        setReplaceGoalAcknowledged(false);
         router.push(`/training-setup/${data.plan.id}`);
       } else {
         setCreateFeedback("generic");
@@ -281,6 +320,14 @@ export default function TrainingSetupClient() {
     } finally {
       setCreating(false);
     }
+  }
+
+  function scheduleReady(p: ActivePlanLite): boolean {
+    return (
+      p.planWeeks != null &&
+      Array.isArray(p.planWeeks) &&
+      (p.planWeeks as unknown[]).length > 0
+    );
   }
 
   if (!ready) {
@@ -347,6 +394,37 @@ export default function TrainingSetupClient() {
 
               {formError && <p className="text-sm text-amber-200">{formError}</p>}
 
+              {replaceBlockPlan && (
+                <div className="rounded-lg border border-amber-700/80 bg-amber-950/40 p-4 text-sm text-amber-50">
+                  <p className="mb-2 font-medium text-amber-100">
+                    You already have an active plan for this goal
+                  </p>
+                  <p className="mb-3 text-amber-100/85">
+                    Open it to keep your schedule, or replace it with a new plan (the current one
+                    will be archived).
+                  </p>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        router.push(`/training-setup/${replaceBlockPlan.id}`)
+                      }
+                      className="inline-flex justify-center rounded bg-amber-500 px-4 py-2 text-center text-sm font-medium text-slate-950 hover:bg-amber-400"
+                    >
+                      Open existing plan
+                    </button>
+                    <button
+                      type="button"
+                      disabled={creating}
+                      onClick={() => void createPlan({ forceReplace: true })}
+                      className="rounded border border-amber-600/80 bg-slate-900/60 px-4 py-2 text-sm font-medium text-amber-100 hover:bg-slate-900 disabled:opacity-50"
+                    >
+                      Replace with new plan
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {createFeedback === "goals" && (
                 <div className="rounded-lg border border-amber-900/60 bg-amber-950/35 p-4 text-sm text-amber-50">
                   <p className="mb-2 font-medium text-amber-100">
@@ -402,7 +480,7 @@ export default function TrainingSetupClient() {
 
               <button
                 type="button"
-                onClick={createPlan}
+                onClick={() => void createPlan()}
                 disabled={creating}
                 className="w-full rounded bg-emerald-600 py-3 font-medium disabled:opacity-50"
               >
@@ -443,6 +521,29 @@ export default function TrainingSetupClient() {
 
           {orientationError && (
             <p className="mb-4 text-sm text-red-400">{orientationError}</p>
+          )}
+
+          {!loadingOrientation && activePlans.length > 0 && (
+            <div className="mb-6 rounded-xl border border-emerald-800/50 bg-emerald-950/25 p-4 text-sm text-emerald-50">
+              <p className="mb-1 font-medium text-emerald-100">Your active plan</p>
+              <p className="mb-1 text-emerald-100/90">{activePlans[0].name}</p>
+              {activePlans[0].race_registry?.name && (
+                <p className="mb-3 text-xs text-emerald-200/80">
+                  {activePlans[0].race_registry.name}
+                  {scheduleReady(activePlans[0]) ? " · Schedule ready" : " · Not generated yet"}
+                </p>
+              )}
+              <Link
+                href={`/training-setup/${activePlans[0].id}`}
+                className="mb-2 inline-flex w-full justify-center rounded-lg bg-emerald-500 px-4 py-2.5 text-center text-sm font-semibold text-slate-950 hover:bg-emerald-400 sm:w-auto"
+              >
+                Continue to plan
+              </Link>
+              <p className="mt-3 text-xs text-emerald-200/70">
+                Use the goals below only if you want a different goal. Creating another plan for the
+                same goal will ask before replacing this one.
+              </p>
+            </div>
           )}
 
           {!loadingOrientation && qualifyingGoals.length > 0 && (

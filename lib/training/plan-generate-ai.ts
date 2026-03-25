@@ -2,19 +2,18 @@
  * One OpenAI call: phases + planWeeks with schedule strings.
  */
 
-export type PlanPhaseOutline = { name: string; startWeek: number; endWeek: number };
-export type PlanWeekOutline = {
-  weekNumber: number;
-  phase: string;
-  schedule: string;
-};
+import type { PlanPhaseOutline, PlanWeekOutline } from "./plan-generate-ai-types";
 
-export type PlanOutlineResult = {
-  phases: PlanPhaseOutline[];
-  planWeeks: PlanWeekOutline[];
-};
+export type { PlanPhaseOutline, PlanWeekOutline, PlanOutlineResult } from "./plan-generate-ai-types";
 
-const SYSTEM = `You are a running coach. Return ONLY valid JSON (no markdown) with this exact shape:
+import {
+  validatePhasesCoverWeeks,
+  applyWeekPhasesFromPhases,
+} from "./plan-outline-validate";
+
+const SHORT_PLAN_MAX_WEEKS = 8;
+
+const SYSTEM_LONG = `You are a running coach. Return ONLY valid JSON (no markdown) with this exact shape:
 {
   "phases": [
     { "name": "base", "startWeek": 1, "endWeek": 6 },
@@ -28,7 +27,7 @@ const SYSTEM = `You are a running coach. Return ONLY valid JSON (no markdown) wi
 }
 
 Rules:
-- phases must be exactly four: base, build, peak, taper in order; startWeek/endWeek must cover 1..totalWeeks with no gaps or overlap.
+- phases: use exactly four segments in order: base, build, peak, taper (lowercase names). startWeek/endWeek must partition 1..totalWeeks with no gaps or overlap.
 - planWeeks must have exactly totalWeeks entries, weekNumber 1..totalWeeks.
 - Each schedule is space-separated tokens: DAY:MILES+TYPE
 - DAY is one of: M, Tu, W, Th, F, Sa, Su
@@ -36,6 +35,28 @@ Rules:
 - TYPE is one letter: E (easy), T (tempo), I (intervals), L (long run)
 - Schedules should match typical marathon (or half) periodization for the given race distance and week count.
 - Prefer 4-6 runs per week in base/build, appropriate long run on weekend (Sa or Su).`;
+
+const SYSTEM_SHORT = (totalWeeks: number) => `You are a running coach. Return ONLY valid JSON (no markdown).
+
+totalWeeks for this athlete is ${totalWeeks} (short runway — e.g. final weeks before race).
+
+Return shape:
+{
+  "phases": [
+    { "name": "Sharpening", "startWeek": 1, "endWeek": 2 },
+    { "name": "Taper", "startWeek": 3, "endWeek": 4 }
+  ],
+  "planWeeks": [
+    { "weekNumber": 1, "phase": "Sharpening", "schedule": "M:5E Tu:5E Th:5E Sa:10L" }
+  ]
+}
+
+Rules:
+- phases: use 1 to 4 segments with DISTINCT, human-readable names (e.g. Maintenance, Sharpening, Race-specific prep, Taper, Race week). Lowercase in JSON is fine; names must NOT all be the same.
+- startWeek/endWeek must partition weeks 1 through ${totalWeeks} exactly once each — no gaps, no overlaps, every week 1..${totalWeeks} appears in exactly one phase.
+- planWeeks: exactly ${totalWeeks} entries, weekNumber 1..${totalWeeks}.
+- Each schedule: space-separated DAY:MILES+TYPE tokens; DAY ∈ M, Tu, W, Th, F, Sa, Su; TYPE ∈ E, T, I, L.
+- Schedules must respect athlete preferred days and stay appropriate for the race distance and remaining weeks.`;
 
 export async function generatePlanOutlineWithOpenAI(params: {
   totalWeeks: number;
@@ -45,11 +66,16 @@ export async function generatePlanOutlineWithOpenAI(params: {
   goalTime?: string | null;
   currentWeeklyMileage?: number | null;
   preferredDaysHuman: string;
-}): Promise<PlanOutlineResult> {
+}): Promise<import("./plan-generate-ai-types").PlanOutlineResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is required for plan generation");
   }
+
+  const system =
+    params.totalWeeks <= SHORT_PLAN_MAX_WEEKS
+      ? SYSTEM_SHORT(params.totalWeeks)
+      : SYSTEM_LONG;
 
   const user = [
     `totalWeeks: ${params.totalWeeks}`,
@@ -69,7 +95,7 @@ export async function generatePlanOutlineWithOpenAI(params: {
     body: JSON.stringify({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: SYSTEM },
+        { role: "system", content: system },
         { role: "user", content: user },
       ],
       temperature: 0.4,
@@ -92,7 +118,10 @@ export async function generatePlanOutlineWithOpenAI(params: {
   return validatePlanOutline(parsed, params.totalWeeks);
 }
 
-function validatePlanOutline(parsed: unknown, totalWeeks: number): PlanOutlineResult {
+function validatePlanOutline(
+  parsed: unknown,
+  totalWeeks: number
+): import("./plan-generate-ai-types").PlanOutlineResult {
   if (!parsed || typeof parsed !== "object") {
     throw new Error("Invalid JSON: not an object");
   }
@@ -106,7 +135,7 @@ function validatePlanOutline(parsed: unknown, totalWeeks: number): PlanOutlineRe
   const phases: PlanPhaseOutline[] = phasesRaw.map((p, i) => {
     if (!p || typeof p !== "object") throw new Error(`Invalid phase at ${i}`);
     const x = p as Record<string, unknown>;
-    const name = String(x.name ?? "");
+    const name = String(x.name ?? "").trim();
     const startWeek = Number(x.startWeek);
     const endWeek = Number(x.endWeek);
     if (!name || !Number.isFinite(startWeek) || !Number.isFinite(endWeek)) {
@@ -115,26 +144,26 @@ function validatePlanOutline(parsed: unknown, totalWeeks: number): PlanOutlineRe
     return { name, startWeek, endWeek };
   });
 
-  const planWeeks: PlanWeekOutline[] = planWeeksRaw.map((w, i) => {
+  const planWeeksDraft: PlanWeekOutline[] = planWeeksRaw.map((w, i) => {
     if (!w || typeof w !== "object") throw new Error(`Invalid planWeek at ${i}`);
     const x = w as Record<string, unknown>;
     const weekNumber = Number(x.weekNumber);
-    const phase = String(x.phase ?? "");
+    const phase = String(x.phase ?? "").trim();
     const schedule = String(x.schedule ?? "").trim();
-    if (!Number.isFinite(weekNumber) || !phase || !schedule) {
+    if (!Number.isFinite(weekNumber) || !schedule) {
       throw new Error(`Invalid planWeek entry at ${i}`);
     }
-    return { weekNumber, phase, schedule };
+    return { weekNumber, phase: phase || "training", schedule };
   });
 
-  if (planWeeks.length !== totalWeeks) {
+  if (planWeeksDraft.length !== totalWeeks) {
     throw new Error(
-      `Expected ${totalWeeks} planWeeks, got ${planWeeks.length}`
+      `Expected ${totalWeeks} planWeeks, got ${planWeeksDraft.length}`
     );
   }
 
   const seen = new Set<number>();
-  for (const w of planWeeks) {
+  for (const w of planWeeksDraft) {
     if (w.weekNumber < 1 || w.weekNumber > totalWeeks) {
       throw new Error(`Invalid weekNumber ${w.weekNumber}`);
     }
@@ -147,7 +176,10 @@ function validatePlanOutline(parsed: unknown, totalWeeks: number): PlanOutlineRe
     throw new Error("Missing some week numbers");
   }
 
-  planWeeks.sort((a, b) => a.weekNumber - b.weekNumber);
+  planWeeksDraft.sort((a, b) => a.weekNumber - b.weekNumber);
 
-  return { phases, planWeeks };
+  const normalizedPhases = validatePhasesCoverWeeks(phases, totalWeeks);
+  const planWeeks = applyWeekPhasesFromPhases(normalizedPhases, planWeeksDraft);
+
+  return { phases: normalizedPhases, planWeeks };
 }

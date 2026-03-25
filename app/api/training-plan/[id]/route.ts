@@ -164,3 +164,24 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest, context: Ctx) {
+  try {
+    const auth = await requireAthleteFromBearer(request);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+    const { id } = await context.params;
+    const result = await prisma.training_plans.deleteMany({
+      where: { id, athleteId: auth.athlete.id },
+    });
+    if (result.count === 0) {
+      return NextResponse.json({ error: "Plan not found" }, { status: 404 });
+    }
+    return NextResponse.json({ success: true });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Failed to delete plan";
+    console.error("DELETE /api/training-plan/[id]", e);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}

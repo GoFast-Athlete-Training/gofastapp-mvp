@@ -231,6 +231,7 @@ export async function GET(request: NextRequest) {
         currentFiveKPace: true,
         createdAt: true,
         updatedAt: true,
+        race_registry: { select: { name: true } },
       },
     });
 
