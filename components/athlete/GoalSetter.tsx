@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Check } from "lucide-react";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import api from "@/lib/api";
 import { deriveGoalPaces } from "@/lib/pace-utils";
@@ -117,6 +117,7 @@ function toDateInputValue(iso: string): string {
   }
 }
 
+/** Race registry dates are calendar days stored as UTC midnight — format in UTC so e.g. 2026-04-20Z is never shown as Apr 19 in US timezones. */
 function formatRaceDateDisplay(iso: string): string {
   try {
     const d = new Date(iso);
@@ -126,6 +127,7 @@ function formatRaceDateDisplay(iso: string): string {
       year: "numeric",
       month: "short",
       day: "numeric",
+      timeZone: "UTC",
     });
   } catch {
     return iso;
@@ -240,13 +242,18 @@ function validateAndAssembleGoalTime(
 }
 
 function daysUntil(iso: string): number | null {
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return null;
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(t);
-  end.setHours(0, 0, 0, 0);
-  return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const raceY = d.getUTCFullYear();
+  const raceM = d.getUTCMonth();
+  const raceD = d.getUTCDate();
+  const now = new Date();
+  const todayY = now.getUTCFullYear();
+  const todayM = now.getUTCMonth();
+  const todayD = now.getUTCDate();
+  const raceUtc = Date.UTC(raceY, raceM, raceD);
+  const todayUtc = Date.UTC(todayY, todayM, todayD);
+  return Math.round((raceUtc - todayUtc) / (1000 * 60 * 60 * 24));
 }
 
 export default function GoalSetter() {
@@ -293,6 +300,7 @@ export default function GoalSetter() {
   const [creatingRace, setCreatingRace] = useState(false);
 
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const goalTimeSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const id = LocalStorageAPI.getAthleteId();
@@ -450,6 +458,15 @@ export default function GoalSetter() {
     }
   }, [selectedRace, goalHours, goalMinutes, goalSeconds]);
 
+  const scrollGoalTimeIntoView = useCallback(() => {
+    window.setTimeout(() => {
+      goalTimeSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 50);
+  }, []);
+
   const handleCreateCustomRace = async () => {
     if (!newRaceName.trim() || !newRaceDate) {
       setError("Race name and date are required");
@@ -491,6 +508,7 @@ export default function GoalSetter() {
         setNewRaceDate("");
         setNewRaceCity("");
         setNewRaceState("");
+        scrollGoalTimeIntoView();
       } else {
         setError(response.data.error || "Failed to create race");
       }
@@ -624,6 +642,16 @@ export default function GoalSetter() {
     }
   };
 
+  const pickRaceForGoal = (race: RaceRegistry) => {
+    setSelectedRace(race);
+    setGoalName((n) => (n.trim() ? n : race.name));
+    setRaceSearchQuery("");
+    setRaceSearchResults([]);
+    setShowCustomRaceForm(false);
+    setShowRaceSearch(false);
+    scrollGoalTimeIntoView();
+  };
+
   const isLongRaceUi =
     selectedRace != null &&
     isLongRaceDistanceKey(normalizeDistanceToValue(selectedRace.raceType));
@@ -652,8 +680,9 @@ export default function GoalSetter() {
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
           Your race goal
         </h1>
-        <p className="text-gray-600 text-sm sm:text-base max-w-xl">
-          Pick your race, then when you want to finish. Goal pace is inferred from that time.
+        <p className="text-gray-600 text-sm sm:text-base max-w-2xl">
+          Pick your race, then when you want to finish. Goal pace is inferred from that time. You can
+          add multiple races under Races; this page sets the single training goal we optimize for.
         </p>
       </header>
 
@@ -747,40 +776,66 @@ export default function GoalSetter() {
 
       {(editing || !goal) && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6 shadow-sm">
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900 mb-1">Your race</h2>
-            <p className="text-xs text-gray-500 mb-3">
-              Search as you type, or add a race that isn&apos;t listed.
-            </p>
-
-            {selectedRace && !showRaceSearch && (
-              <div className="rounded-lg border border-orange-200 bg-orange-50/60 p-4 mb-4">
-                <p className="text-sm font-medium text-gray-900">{selectedRace.name}</p>
-                <p className="text-sm text-gray-600 mt-1">
-                  {selectedRace.distanceMiles} mi · {formatRaceDateDisplay(selectedRace.raceDate)}
-                  {(selectedRace.city || selectedRace.state) && (
-                    <>
-                      {" "}
-                      · {[selectedRace.city, selectedRace.state].filter(Boolean).join(", ")}
-                    </>
-                  )}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowRaceSearch(true);
-                    setRaceSearchQuery("");
-                    setRaceSearchResults([]);
-                  }}
-                  className="mt-3 text-sm font-semibold text-orange-700 hover:text-orange-900 underline-offset-2 hover:underline"
+          {selectedRace && !showRaceSearch && (
+            <div className="rounded-xl border-2 border-orange-400 bg-gradient-to-br from-orange-50 to-white p-4 sm:p-5 shadow-sm">
+              <div className="flex gap-3 sm:gap-4">
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-500 text-white shadow"
+                  aria-hidden
                 >
-                  Change race
-                </button>
+                  <Check className="h-5 w-5" strokeWidth={2.5} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold uppercase tracking-wide text-orange-900">
+                    Race selected for your goal
+                  </p>
+                  <p className="text-base font-semibold text-gray-900 mt-1">{selectedRace.name}</p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {selectedRace.distanceMiles} mi · {formatRaceDateDisplay(selectedRace.raceDate)}
+                    {(selectedRace.city || selectedRace.state) && (
+                      <>
+                        {" "}
+                        · {[selectedRace.city, selectedRace.state].filter(Boolean).join(", ")}
+                      </>
+                    )}
+                  </p>
+                  <p className="text-sm text-gray-800 mt-3 leading-snug">
+                    <span className="font-semibold text-gray-900">Next:</span> scroll to{" "}
+                    <span className="font-semibold text-orange-800">goal finish time</span> below
+                    (optional). Then tap <span className="font-semibold">Save race goal</span>.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowRaceSearch(true);
+                      setRaceSearchQuery("");
+                      setRaceSearchResults([]);
+                    }}
+                    className="mt-3 text-sm font-semibold text-orange-700 hover:text-orange-900 underline-offset-2 hover:underline"
+                  >
+                    Change race
+                  </button>
+                </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {(showRaceSearch || !selectedRace) && (
-              <div className="space-y-4">
+          {(showRaceSearch || !selectedRace) && (
+            <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(280px,20rem)] gap-6 lg:gap-8 items-start">
+              <div className="space-y-4 min-w-0">
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900 mb-1">
+                    <span className="text-orange-600">Step 1.</span> Choose your race
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    <span className="font-medium text-gray-700">Choose a race</span> in the panel on the
+                    right — nothing counts until you click it and see &quot;Race selected&quot; above.
+                    Search the
+                    registry as you type, or add a race that isn&apos;t listed. When search is empty,
+                    your calendar races show on the right.
+                  </p>
+                </div>
+
                 {selectedRace && showRaceSearch && (
                   <button
                     type="button"
@@ -790,93 +845,33 @@ export default function GoalSetter() {
                     Keep current race
                   </button>
                 )}
-                {calendarRaces.length > 0 && (
-                  <div>
-                    <p className="text-xs font-medium text-gray-600 mb-2">
-                      From your race calendar
-                    </p>
-                    <ul className="border border-gray-200 rounded-lg divide-y divide-gray-200 max-h-44 overflow-y-auto">
-                      {calendarRaces.map((race) => (
-                        <li key={race.id}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedRace(race);
-                              setGoalName((n) => (n.trim() ? n : race.name));
-                              setRaceSearchQuery("");
-                              setRaceSearchResults([]);
-                              setShowCustomRaceForm(false);
-                              setShowRaceSearch(false);
-                            }}
-                            className="w-full text-left px-3 py-2.5 hover:bg-orange-50 text-sm text-gray-900"
-                          >
-                            <span className="font-medium">{race.name}</span>
-                            <span className="text-gray-500">
-                              {" "}
-                              — {formatRaceDateDisplay(race.raceDate)}
-                              {(race.city || race.state) && (
-                                <>
-                                  {" "}
-                                  · {[race.city, race.state].filter(Boolean).join(", ")}
-                                </>
-                              )}
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Or search the full registry below.
-                    </p>
+
+                <div>
+                  <label
+                    htmlFor="race-registry-search"
+                    className="block text-xs font-medium text-gray-600 mb-1.5"
+                  >
+                    Search the race registry
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="race-registry-search"
+                      type="text"
+                      value={raceSearchQuery}
+                      onChange={(e) => {
+                        setRaceSearchQuery(e.target.value);
+                        setSearchCompletedEmpty(false);
+                      }}
+                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      autoComplete="off"
+                    />
+                    {searchingRaces && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="h-5 w-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
                   </div>
-                )}
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={raceSearchQuery}
-                    onChange={(e) => {
-                      setRaceSearchQuery(e.target.value);
-                      setSearchCompletedEmpty(false);
-                    }}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                    autoComplete="off"
-                  />
-                  {searchingRaces && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      <div className="h-5 w-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  )}
                 </div>
-                {raceSearchQuery.trim() && raceSearchResults.length > 0 && (
-                  <ul className="border border-gray-200 rounded-lg divide-y divide-gray-200 max-h-48 overflow-y-auto">
-                    {raceSearchResults.map((race) => (
-                      <li key={race.id}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedRace(race);
-                            setGoalName((n) => (n.trim() ? n : race.name));
-                            setRaceSearchQuery("");
-                            setRaceSearchResults([]);
-                            setShowCustomRaceForm(false);
-                            setShowRaceSearch(false);
-                          }}
-                          className="w-full text-left px-3 py-2 hover:bg-orange-50 text-sm"
-                        >
-                          {race.name} — {race.distanceMiles} mi · {race.city ?? ""}{" "}
-                          {race.state ?? ""}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {raceSearchQuery.trim().length >= 2 &&
-                  searchCompletedEmpty &&
-                  !searchingRaces && (
-                    <p className="text-sm text-gray-500">
-                      No matches. Try another search or add your race below.
-                    </p>
-                  )}
 
                 <button
                   type="button"
@@ -961,18 +956,121 @@ export default function GoalSetter() {
                   </div>
                 )}
               </div>
-            )}
-          </div>
+
+              <aside
+                className="rounded-xl border border-gray-200 bg-gray-50/90 flex flex-col min-h-[220px] max-h-[min(70vh,560px)] lg:sticky lg:top-4 overflow-hidden"
+                aria-label="Choose a race"
+              >
+                <div className="px-3 py-2.5 border-b border-gray-200 bg-white shrink-0">
+                  <p className="text-xs font-semibold text-gray-900">Races</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    {raceSearchQuery.trim()
+                      ? "Registry matches — click one to select for your goal"
+                      : calendarRaces.length > 0
+                        ? "On your calendar — click one (only counts after you click)"
+                        : "Results appear here after you search — or add a custom race on the left"}
+                  </p>
+                </div>
+                <div className="overflow-y-auto flex-1 min-h-0 p-2 space-y-2">
+                  {raceSearchQuery.trim() ? (
+                    <>
+                      {searchingRaces && (
+                        <div className="flex justify-center py-10">
+                          <div className="h-8 w-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
+                      {!searchingRaces &&
+                        raceSearchResults.map((race) => (
+                          <button
+                            key={race.id}
+                            type="button"
+                            onClick={() => pickRaceForGoal(race)}
+                            className={`w-full text-left rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+                              selectedRace?.id === race.id
+                                ? "border-orange-400 bg-orange-50/90 ring-1 ring-orange-200"
+                                : "border-gray-200 bg-white hover:bg-orange-50/70 hover:border-orange-200"
+                            }`}
+                          >
+                            <span className="font-medium text-gray-900">{race.name}</span>
+                            <span className="block text-xs text-gray-600 mt-1">
+                              {race.distanceMiles} mi · {formatRaceDateDisplay(race.raceDate)}
+                              {(race.city || race.state) &&
+                                ` · ${[race.city, race.state].filter(Boolean).join(", ")}`}
+                            </span>
+                            <span className="mt-2 block text-[11px] font-semibold text-orange-600">
+                              Select for goal
+                            </span>
+                          </button>
+                        ))}
+                      {!searchingRaces &&
+                        raceSearchQuery.trim().length >= 2 &&
+                        searchCompletedEmpty && (
+                          <p className="text-sm text-gray-500 px-2 py-4">
+                            No matches. Try another search or add your race on the left.
+                          </p>
+                        )}
+                      {!searchingRaces &&
+                        raceSearchQuery.trim().length > 0 &&
+                        raceSearchQuery.trim().length < 2 &&
+                        raceSearchResults.length === 0 &&
+                        !searchCompletedEmpty && (
+                          <p className="text-sm text-gray-500 px-2 py-4">
+                            Type at least 2 characters to search the registry.
+                          </p>
+                        )}
+                    </>
+                  ) : calendarRaces.length > 0 ? (
+                    calendarRaces.map((race) => (
+                      <button
+                        key={race.id}
+                        type="button"
+                        onClick={() => pickRaceForGoal(race)}
+                        className={`w-full text-left rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+                          selectedRace?.id === race.id
+                            ? "border-orange-400 bg-orange-50/90 ring-1 ring-orange-200"
+                            : "border-gray-200 bg-white hover:bg-orange-50/70 hover:border-orange-200"
+                        }`}
+                      >
+                        <span className="font-medium text-gray-900">{race.name}</span>
+                        <span className="block text-xs text-gray-600 mt-1">
+                          {race.distanceMiles} mi · {formatRaceDateDisplay(race.raceDate)}
+                          {(race.city || race.state) &&
+                            ` · ${[race.city, race.state].filter(Boolean).join(", ")}`}
+                        </span>
+                        <span className="mt-2 block text-[11px] font-semibold text-orange-600">
+                          Select for goal
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500 px-2 py-4">
+                      Search by name or city to find a race, or add a custom race on the left. Your
+                      goal isn&apos;t set until you click <span className="font-medium">Select for goal</span>{" "}
+                      on a race.
+                    </p>
+                  )}
+                </div>
+              </aside>
+            </div>
+          )}
 
           {selectedRace && (
-            <div className="border-t border-gray-100 pt-4 space-y-3">
-              <h2 className="text-sm font-semibold text-gray-900">
-                When do you want to finish {selectedRace.name}?
-              </h2>
-              <p className="text-xs text-gray-500">
-                Goal time is optional. Format matches training setup (e.g.{" "}
-                <span className="font-mono">3:05:30</span> for a marathon).
-              </p>
+            <div
+              ref={goalTimeSectionRef}
+              className={`rounded-xl border-2 border-orange-100 bg-orange-50/30 p-4 sm:p-5 space-y-3 scroll-mt-24${showRaceSearch ? " mt-6" : " mt-2"}`}
+            >
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-orange-900 mb-1">
+                  Step 2 · Goal finish time
+                </p>
+                <h2 className="text-base font-semibold text-gray-900">
+                  When do you want to finish {selectedRace.name}?
+                </h2>
+                <p className="text-xs text-gray-600 mt-1">
+                  Goal time is optional. Format matches training setup (e.g.{" "}
+                  <span className="font-mono">3:05:30</span> for a marathon).
+                </p>
+              </div>
 
               {isLongRaceUi ? (
                 <div className="flex items-end gap-2 flex-wrap">
@@ -1213,12 +1311,21 @@ export default function GoalSetter() {
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
+          {!selectedRace && (
+            <p className="text-sm text-amber-950/90 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+              <span className="font-semibold">No race selected yet.</span> Choose one in the list on
+              the right (or search). Then your{" "}
+              <span className="font-semibold">goal finish time</span> fields appear below — optional,
+              but you must select a race before saving.
+            </p>
+          )}
+
           <div className="flex flex-wrap gap-3 pt-2">
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
-              className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+              disabled={saving || !selectedRace}
+              className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? "Saving…" : goal ? "Save changes" : "Save race goal"}
             </button>
