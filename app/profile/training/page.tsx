@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { onAuthStateChanged } from "firebase/auth";
@@ -32,11 +32,25 @@ function birthdayToInput(b: string | Date | null | undefined): string {
   return d.toISOString().split("T")[0];
 }
 
+function parseFiveKPaceToParts(raw: string | null | undefined): {
+  minutes: string;
+  seconds: string;
+} {
+  const t = (raw ?? "").trim().split("/")[0].trim();
+  if (!t) return { minutes: "", seconds: "" };
+  const parts = t.split(":");
+  if (parts.length === 2) {
+    return { minutes: parts[0].trim(), seconds: parts[1].trim() };
+  }
+  return { minutes: "", seconds: "" };
+}
+
 export default function ProfileTrainingPage() {
   const router = useRouter();
   const [athleteId, setAthleteId] = useState<string | null>(null);
   const [base, setBase] = useState<AthleteRow | null>(null);
-  const [fiveKPace, setFiveKPace] = useState("");
+  const [fiveKPaceMinutes, setFiveKPaceMinutes] = useState("");
+  const [fiveKPaceSeconds, setFiveKPaceSeconds] = useState("");
   const [weeklyMileage, setWeeklyMileage] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -59,7 +73,9 @@ export default function ProfileTrainingPage() {
           return;
         }
         setBase(a);
-        setFiveKPace(a.fiveKPace?.trim() ?? "");
+        const paceParts = parseFiveKPaceToParts(a.fiveKPace);
+        setFiveKPaceMinutes(paceParts.minutes);
+        setFiveKPaceSeconds(paceParts.seconds);
         setWeeklyMileage(
           a.weeklyMileage != null && Number.isFinite(Number(a.weeklyMileage))
             ? String(a.weeklyMileage)
@@ -74,6 +90,13 @@ export default function ProfileTrainingPage() {
     });
     return () => unsub();
   }, [router]);
+
+  const assembledFiveKPace = useMemo(() => {
+    if (!fiveKPaceMinutes.trim() || !fiveKPaceSeconds.trim()) return "";
+    const m = fiveKPaceMinutes.padStart(2, "0");
+    const s = fiveKPaceSeconds.padStart(2, "0");
+    return `${m}:${s}`;
+  }, [fiveKPaceMinutes, fiveKPaceSeconds]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -92,6 +115,21 @@ export default function ProfileTrainingPage() {
       setError("Complete required profile fields on Edit all fields first.");
       return;
     }
+    const pm = fiveKPaceMinutes.trim();
+    const ps = fiveKPaceSeconds.trim();
+    if ((pm && !ps) || (!pm && ps)) {
+      setError("Enter both minutes and seconds for 5K pace, or clear both.");
+      return;
+    }
+    if (pm && ps) {
+      const mm = parseInt(pm, 10);
+      const ss = parseInt(ps, 10);
+      if (Number.isNaN(mm) || Number.isNaN(ss) || mm < 0 || mm > 180 || ss < 0 || ss >= 60) {
+        setError("Use valid minutes and seconds (seconds under 60).");
+        return;
+      }
+    }
+
     setSaving(true);
     setError(null);
     setSuccess(false);
@@ -109,7 +147,7 @@ export default function ProfileTrainingPage() {
         bio: base.bio ?? "",
         instagram: base.instagram ?? "",
         photoURL: base.photoURL ?? null,
-        fiveKPace: fiveKPace.trim() || null,
+        fiveKPace: assembledFiveKPace || null,
         weeklyMileage: (() => {
           const t = weeklyMileage.trim();
           if (!t) return null;
@@ -151,18 +189,59 @@ export default function ProfileTrainingPage() {
 
       <form onSubmit={handleSave} className="space-y-5 bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="profile-fivek">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
             Current 5K pace
           </label>
-          <input
-            id="profile-fivek"
-            value={fiveKPace}
-            onChange={(e) => setFiveKPace(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Format: <span className="font-mono">7:30</span> or <span className="font-mono">7:30/mile</span>
-          </p>
+          <div className="flex items-end gap-2 flex-wrap max-w-md">
+            <div className="flex-1 min-w-[4rem]">
+              <label className="block text-xs text-gray-500 mb-1" htmlFor="profile-fivek-min">
+                Minutes
+              </label>
+              <input
+                id="profile-fivek-min"
+                type="number"
+                min={0}
+                max={180}
+                value={fiveKPaceMinutes}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "");
+                  if (val === "" || (parseInt(val, 10) >= 0 && parseInt(val, 10) <= 180)) {
+                    setFiveKPaceMinutes(val);
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              />
+            </div>
+            <span className="text-xl text-gray-400 pb-2">:</span>
+            <div className="flex-1 min-w-[4rem]">
+              <label className="block text-xs text-gray-500 mb-1" htmlFor="profile-fivek-sec">
+                Seconds
+              </label>
+              <input
+                id="profile-fivek-sec"
+                type="number"
+                min={0}
+                max={59}
+                value={fiveKPaceSeconds}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "");
+                  if (val === "" || (parseInt(val, 10) >= 0 && parseInt(val, 10) <= 59)) {
+                    setFiveKPaceSeconds(val);
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              />
+            </div>
+            <span className="text-sm text-gray-600 font-medium pb-2">/mile</span>
+          </div>
+          {assembledFiveKPace ? (
+            <div className="mt-3 rounded-lg border border-orange-100 bg-orange-50/80 px-3 py-2 text-sm text-gray-800">
+              Your 5K pace:{" "}
+              <span className="font-mono font-semibold">{assembledFiveKPace}</span> /mile
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-gray-500">Optional. Use minutes and seconds (e.g. 7 and 30).</p>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="profile-weekly">

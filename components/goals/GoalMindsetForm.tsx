@@ -110,10 +110,10 @@ export default function GoalMindsetForm() {
           Set an active goal first, then you can capture why it matters and what success feels like.
         </p>
         <Link
-          href="/goals/target"
+          href="/goals"
           className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 transition-colors"
         >
-          Go to race & target
+          Go to Goals
         </Link>
       </div>
     );

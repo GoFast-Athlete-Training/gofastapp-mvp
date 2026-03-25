@@ -1,9 +1,5 @@
-import GoalSetter from "@/components/athlete/GoalSetter";
+import { redirect } from "next/navigation";
 
-export default function GoalsTargetPage() {
-  return (
-    <div className="max-w-2xl mx-auto py-2">
-      <GoalSetter />
-    </div>
-  );
+export default function GoalsTargetRedirectPage() {
+  redirect("/goals");
 }

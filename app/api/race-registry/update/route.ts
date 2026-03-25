@@ -18,6 +18,76 @@ export async function OPTIONS() {
 
 type IncomingRace = Record<string, unknown>;
 
+function slugifyTag(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
+}
+
+/** Tags from optional `tags` array and/or comma/semicolon `keywords` string. */
+function tagsFromPayload(racePayload: IncomingRace): string[] {
+  const out: string[] = [];
+  const tagsRaw = racePayload.tags;
+  if (Array.isArray(tagsRaw)) {
+    for (const t of tagsRaw) {
+      const s = slugifyTag(String(t));
+      if (s) out.push(s);
+    }
+  }
+  const keywordsRaw = racePayload.keywords;
+  if (typeof keywordsRaw === "string" && keywordsRaw.trim()) {
+    for (const part of keywordsRaw.split(/[,;]/)) {
+      const s = slugifyTag(part);
+      if (s) out.push(s);
+    }
+  }
+  return [...new Set(out)];
+}
+
+function logoUrlFromPayload(racePayload: IncomingRace): string | null {
+  for (const key of ["raceLogo", "raceDisplayPhoto", "ogImage"] as const) {
+    const v = racePayload[key];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return null;
+}
+
+/** Map company `startTime` (ISO or same-day clock time) onto registry `startTime`. */
+function parseRegistryStartTime(
+  raceDate: Date,
+  raw: unknown
+): Date | null {
+  if (raw == null || raw === "") return null;
+  const s = String(raw).trim();
+  const asIso = new Date(s);
+  if (!Number.isNaN(asIso.getTime()) && (s.includes("T") || /^\d{4}-\d{2}-\d{2}/.test(s))) {
+    return asIso;
+  }
+  const y = raceDate.getUTCFullYear();
+  const m = raceDate.getUTCMonth();
+  const d = raceDate.getUTCDate();
+  const match = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?/i);
+  if (!match) return null;
+  let h = parseInt(match[1], 10);
+  const min = parseInt(match[2], 10);
+  const sec = match[3] ? parseInt(match[3], 10) : 0;
+  const ap = match[4]?.toUpperCase();
+  if (ap === "PM" && h < 12) h += 12;
+  if (ap === "AM" && h === 12) h = 0;
+  if (
+    Number.isNaN(h) ||
+    Number.isNaN(min) ||
+    Number.isNaN(sec) ||
+    min > 59 ||
+    sec > 59
+  ) {
+    return null;
+  }
+  return new Date(Date.UTC(y, m, d, h, min, sec, 0));
+}
+
 /**
  * POST /api/race-registry/update
  * Receives race payload from GoFastCompany (prodpush). Upserts race_registry.
@@ -118,6 +188,13 @@ export async function POST(request: NextRequest) {
 
     const companyRaceId = id;
 
+    const tags = tagsFromPayload(racePayload);
+    const logoUrl = logoUrlFromPayload(racePayload);
+    const startTimeParsed = parseRegistryStartTime(
+      raceDate,
+      racePayload.startTime
+    );
+
     const updateData = {
       name: nameVal,
       slug: slugVal,
@@ -135,6 +212,9 @@ export async function POST(request: NextRequest) {
       charityName: charitySupports,
       officialWebsiteUrl: raceUrl,
       companyRaceId,
+      tags,
+      logoUrl,
+      ...(startTimeParsed ? { startTime: startTimeParsed } : {}),
       updatedAt: new Date(),
     };
 

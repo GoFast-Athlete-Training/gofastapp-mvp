@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
+const BOSTON_QUALIFIER_TAG = 'boston-qualifier';
+
 const raceSearchSelect = {
   id: true,
   name: true,
@@ -14,6 +16,10 @@ const raceSearchSelect = {
   state: true,
   country: true,
   registrationUrl: true,
+  tags: true,
+  startTime: true,
+  logoUrl: true,
+  slug: true,
 } satisfies Prisma.race_registrySelect;
 
 async function searchRaces(where: Prisma.race_registryWhereInput, take: number) {
@@ -25,42 +31,65 @@ async function searchRaces(where: Prisma.race_registryWhereInput, take: number) 
   });
 }
 
-/** GET /api/race/search?q=&upcoming=true — public browse / search */
+function parseDateParam(s: string | null): Date | null {
+  if (!s?.trim()) return null;
+  const d = new Date(s.trim());
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** GET /api/race/search — browse & filter upcoming catalog */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const q = searchParams.get('q');
     const upcoming = searchParams.get('upcoming') === 'true';
+    const city = searchParams.get('city')?.trim() || '';
+    const bostonQualifier = searchParams.get('bostonQualifier') === 'true';
+    const dateFrom = parseDateParam(searchParams.get('dateFrom'));
+    const dateTo = parseDateParam(searchParams.get('dateTo'));
 
-    if (!upcoming && (!q || !q.trim())) {
+    const hasQ = Boolean(q?.trim());
+    const hasCity = Boolean(city);
+    const hasDateFilter = dateFrom != null || dateTo != null;
+
+    if (!upcoming && !hasQ && !hasCity && !bostonQualifier && !hasDateFilter) {
       return NextResponse.json(
-        { success: false, error: 'Provide q= search text or upcoming=true' },
+        {
+          success: false,
+          error:
+            'Provide upcoming=true and/or q=, city=, bostonQualifier=true, dateFrom=/dateTo=',
+        },
         { status: 400 }
       );
     }
 
-    const baseFilter: Prisma.race_registryWhereInput = {
-      isActive: true,
-      isCancelled: false,
-    };
-
-    let where: Prisma.race_registryWhereInput = { ...baseFilter };
+    const now = new Date();
+    let gte: Date | undefined;
+    let lte: Date | undefined;
 
     if (upcoming) {
-      where = {
-        ...where,
-        raceDate: { gte: new Date() },
-      };
+      gte = now;
+    }
+    if (dateFrom != null) {
+      gte = gte ? new Date(Math.max(gte.getTime(), dateFrom.getTime())) : dateFrom;
+    }
+    if (dateTo != null) {
+      lte = dateTo;
     }
 
-    if (q?.trim()) {
-      where = {
-        ...where,
-        name: { contains: q.trim(), mode: 'insensitive' },
-      };
-    }
+    const where: Prisma.race_registryWhereInput = {
+      isActive: true,
+      isCancelled: false,
+      ...(gte != null || lte != null ? { raceDate: { ...(gte ? { gte } : {}), ...(lte ? { lte } : {}) } } : {}),
+      ...(hasQ ? { name: { contains: q!.trim(), mode: 'insensitive' } } : {}),
+      ...(hasCity ? { city: { contains: city, mode: 'insensitive' } } : {}),
+      ...(bostonQualifier ? { tags: { has: BOSTON_QUALIFIER_TAG } } : {}),
+    };
 
-    const take = upcoming && !q?.trim() ? 100 : 20;
+    const take = Math.min(
+      200,
+      upcoming && !hasQ && !hasCity && !bostonQualifier && !hasDateFilter ? 100 : 80
+    );
     const races = await searchRaces(where, take);
 
     return NextResponse.json({
@@ -106,6 +135,8 @@ export async function POST(request: NextRequest) {
 
     const races = await searchRaces(
       {
+        isActive: true,
+        isCancelled: false,
         name: {
           contains: query,
           mode: 'insensitive',

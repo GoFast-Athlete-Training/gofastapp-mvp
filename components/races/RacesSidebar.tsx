@@ -1,29 +1,28 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutList, Flag, Sparkles } from "lucide-react";
+import { Compass, CalendarDays } from "lucide-react";
 
-const items: { label: string; href: string; icon: typeof LayoutList }[] = [
-  { label: "Goal identity", href: "/goals/identity", icon: LayoutList },
-  { label: "Race goal", href: "/goals", icon: Flag },
-  { label: "Mindset", href: "/goals/mindset", icon: Sparkles },
+const items: { label: string; href: string; icon: typeof Compass }[] = [
+  { label: "Browse races", href: "/races", icon: Compass },
+  { label: "My race calendar", href: "/races/calendar", icon: CalendarDays },
 ];
 
-export default function GoalSidebar() {
+export default function RacesSidebar() {
   const router = useRouter();
   const pathname = usePathname();
 
   return (
     <aside className="w-full sm:w-52 shrink-0 border-b sm:border-b-0 sm:border-r border-gray-200 bg-white sm:bg-gray-50/80">
       <div className="p-3 sm:p-4 border-b border-gray-100 sm:border-0">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Goals</p>
-        <p className="text-sm text-gray-600 mt-0.5">Target, pace, motivation</p>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Races</p>
+        <p className="text-sm text-gray-600 mt-0.5">Catalog and your calendar</p>
       </div>
       <nav className="flex flex-row sm:flex-col gap-1 p-2 overflow-x-auto sm:overflow-visible">
         {items.map(({ label, href, icon: Icon }) => {
           const active =
-            href === "/goals"
-              ? pathname === "/goals" || pathname === "/goals/target"
+            href === "/races"
+              ? pathname === "/races"
               : pathname === href || pathname?.startsWith(`${href}/`);
           return (
             <button

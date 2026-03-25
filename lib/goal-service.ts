@@ -81,6 +81,7 @@ export async function getPrimaryGoalForWorkout(athleteId: string) {
 
 export type CreateGoalInput = {
   name?: string | null;
+  description?: string | null;
   distance: string;
   goalTime?: string | null;
   targetByDate: Date;
@@ -117,7 +118,7 @@ export async function createGoal(athleteId: string, input: CreateGoalInput) {
   }
 
   if (!distance) {
-    throw new Error("distance is required (or attach raceRegistryId with raceType)");
+    distance = "";
   }
 
   const { goalRacePace, goalPace5K } = deriveGoalPaces({
@@ -127,6 +128,7 @@ export async function createGoal(athleteId: string, input: CreateGoalInput) {
   });
 
   const nameTrimmed = input.name?.trim() ? input.name!.trim() : null;
+  const description = trimText(input.description);
   const whyGoal = trimText(input.whyGoal);
   const successLooksLike = trimText(input.successLooksLike);
   const completionFeeling = trimText(input.completionFeeling);
@@ -136,6 +138,7 @@ export async function createGoal(athleteId: string, input: CreateGoalInput) {
     data: {
       athleteId,
       name: nameTrimmed,
+      description,
       distance,
       goalTime: input.goalTime?.trim() || null,
       goalRacePace,
@@ -167,6 +170,7 @@ export async function createGoal(athleteId: string, input: CreateGoalInput) {
 
 export type UpdateGoalInput = Partial<{
   name: string | null;
+  description: string | null;
   distance: string;
   goalTime: string | null;
   targetByDate: Date;
@@ -217,6 +221,9 @@ export async function updateGoal(
     data: {
       ...(patch.name !== undefined && {
         name: patch.name?.trim() ? patch.name.trim() : null,
+      }),
+      ...(patch.description !== undefined && {
+        description: trimText(patch.description),
       }),
       ...(patch.distance !== undefined && { distance: patch.distance }),
       ...(patch.goalTime !== undefined && { goalTime: patch.goalTime?.trim() || null }),

@@ -20,6 +20,7 @@
     "db:check-athletes": "tsx scripts/check-athletes.ts",
     "db:verify-schema": "tsx scripts/verify-schema.ts",
     "db:populate-bidirectional-ids": "tsx scripts/populate-bidirectional-run-club-ids.ts",
+    "db:seed-demo-races": "tsx scripts/seed-demo-races.ts",
     "smoke:fivek-pace": "tsx scripts/smoke-fivek-pace.ts"
   },
   "dependencies": {

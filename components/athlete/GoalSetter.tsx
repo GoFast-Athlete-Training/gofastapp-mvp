@@ -277,6 +277,12 @@ export default function GoalSetter() {
   const [searchingRaces, setSearchingRaces] = useState(false);
   const [searchCompletedEmpty, setSearchCompletedEmpty] = useState(false);
   const [selectedRace, setSelectedRace] = useState<RaceRegistry | null>(null);
+  const [calendarRaces, setCalendarRaces] = useState<RaceRegistry[]>([]);
+
+  const signedUpRaceIds = useMemo(
+    () => new Set(calendarRaces.map((r) => r.id)),
+    [calendarRaces]
+  );
 
   const [showCustomRaceForm, setShowCustomRaceForm] = useState(false);
   const [newRaceName, setNewRaceName] = useState("");
@@ -292,6 +298,36 @@ export default function GoalSetter() {
     const id = LocalStorageAPI.getAthleteId();
     if (id) setAthleteId(id);
   }, []);
+
+  useEffect(() => {
+    if (!athleteId) return;
+    api
+      .get<{
+        signups: {
+          race_registry: {
+            id: string;
+            name: string;
+            raceType: string;
+            distanceMiles: number;
+            raceDate: string | Date;
+            city?: string | null;
+            state?: string | null;
+          };
+        }[];
+      }>("/race-signups")
+      .then((res) => {
+        const rows = (res.data?.signups ?? [])
+          .map((s) => s.race_registry)
+          .filter(Boolean)
+          .map((r) => mapApiRaceToRegistry(r));
+        rows.sort(
+          (a, b) =>
+            new Date(a.raceDate).getTime() - new Date(b.raceDate).getTime()
+        );
+        setCalendarRaces(rows);
+      })
+      .catch(() => setCalendarRaces([]));
+  }, [athleteId]);
 
   useEffect(() => {
     if (!athleteId) {
@@ -558,6 +594,21 @@ export default function GoalSetter() {
         }
       }
 
+      if (!signedUpRaceIds.has(selectedRace.id)) {
+        try {
+          await api.post("/race-signups", { raceRegistryId: selectedRace.id });
+          setCalendarRaces((prev) => {
+            if (prev.some((r) => r.id === selectedRace.id)) return prev;
+            return [...prev, selectedRace].sort(
+              (a, b) =>
+                new Date(a.raceDate).getTime() - new Date(b.raceDate).getTime()
+            );
+          });
+        } catch {
+          // Goal is saved; calendar add is best-effort.
+        }
+      }
+
       setShowRaceSearch(false);
       setEditing(false);
       setShowTrainingCta(true);
@@ -738,6 +789,46 @@ export default function GoalSetter() {
                   >
                     Keep current race
                   </button>
+                )}
+                {calendarRaces.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-gray-600 mb-2">
+                      From your race calendar
+                    </p>
+                    <ul className="border border-gray-200 rounded-lg divide-y divide-gray-200 max-h-44 overflow-y-auto">
+                      {calendarRaces.map((race) => (
+                        <li key={race.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedRace(race);
+                              setGoalName((n) => (n.trim() ? n : race.name));
+                              setRaceSearchQuery("");
+                              setRaceSearchResults([]);
+                              setShowCustomRaceForm(false);
+                              setShowRaceSearch(false);
+                            }}
+                            className="w-full text-left px-3 py-2.5 hover:bg-orange-50 text-sm text-gray-900"
+                          >
+                            <span className="font-medium">{race.name}</span>
+                            <span className="text-gray-500">
+                              {" "}
+                              — {formatRaceDateDisplay(race.raceDate)}
+                              {(race.city || race.state) && (
+                                <>
+                                  {" "}
+                                  · {[race.city, race.state].filter(Boolean).join(", ")}
+                                </>
+                              )}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Or search the full registry below.
+                    </p>
+                  </div>
                 )}
                 <div className="relative">
                   <input

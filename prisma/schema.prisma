@@ -271,6 +271,8 @@ model race_registry {
   typicalWeather          String?
   /// When set, matches GoFastCompany races.id (canonical editorial record).
   companyRaceId           String?                   @unique
+  /// External image URL for browse cards (editorial asset or CDN).
+  logoUrl                 String?
   run_crew_specific_races  run_crew_specific_races[]
   run_crews                run_crews[]
   training_plans           training_plans[]
@@ -292,6 +294,7 @@ model AthleteGoal {
   id               String         @id @default(cuid())
   athleteId        String
   name             String?
+  description      String?        @db.Text
   distance         String
   goalTime         String?
   goalRacePace     Int?

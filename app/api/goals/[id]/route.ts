@@ -71,6 +71,7 @@ export async function PUT(
 
     let body: {
       name?: string | null;
+      description?: string | null;
       distance?: string;
       goalTime?: string | null;
       targetByDate?: string;
@@ -89,6 +90,7 @@ export async function PUT(
 
     const patch: Parameters<typeof updateGoal>[2] = {};
     if (body.name !== undefined) patch.name = body.name;
+    if (body.description !== undefined) patch.description = body.description;
     if (body.distance !== undefined) patch.distance = body.distance;
     if (body.goalTime !== undefined) patch.goalTime = body.goalTime;
     if (body.targetByDate !== undefined) {
