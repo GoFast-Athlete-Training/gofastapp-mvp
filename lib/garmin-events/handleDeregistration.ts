@@ -3,8 +3,11 @@
  * Disconnects Garmin when user deregisters
  */
 
-import { getAthleteByGarminUserId } from '../domain-garmin';
-import { disconnectGarmin, disconnectGarminTest } from '../domain-garmin';
+import {
+  disconnectGarmin,
+  disconnectGarminTest,
+  getAthleteByGarminUserId,
+} from '../domain-garmin';
 
 export interface Deregistration {
   userId?: string;
@@ -21,20 +24,21 @@ export async function handleDeregistration(
   try {
     const { userId, reason } = data;
 
-    if (!userId) {
+    if (userId === undefined || userId === null || userId === '') {
       return { success: false, error: 'No userId in deregistration event' };
     }
 
-    const athlete = await getAthleteByGarminUserId(userId);
+    const userIdStr = String(userId).trim();
+    const athlete = await getAthleteByGarminUserId(userIdStr);
     if (!athlete) {
-      console.warn(`⚠️ Athlete not found for Garmin userId: ${userId}`);
+      console.warn(`⚠️ Athlete not found for Garmin userId: ${userIdStr}`);
       return { success: false, error: 'Athlete not found' };
     }
 
-    const matchesProd =
-      !!athlete.garmin_user_id && athlete.garmin_user_id === userId;
-    const matchesTest =
-      !!athlete.garmin_test_user_id && athlete.garmin_test_user_id === userId;
+    const prodId = athlete.garmin_user_id?.trim() || null;
+    const testId = athlete.garmin_test_user_id?.trim() || null;
+    const matchesProd = !!prodId && prodId === userIdStr;
+    const matchesTest = !!testId && testId === userIdStr;
 
     if (matchesProd) {
       await disconnectGarmin(athlete.id);
@@ -45,7 +49,7 @@ export async function handleDeregistration(
 
     if (!matchesProd && !matchesTest) {
       console.warn(
-        `⚠️ USER_DEREGISTER userId ${userId} did not match garmin_user_id or garmin_test_user_id for athlete ${athlete.id}; clearing both connections defensively`
+        `⚠️ USER_DEREGISTER userId ${userIdStr} did not match garmin_user_id or garmin_test_user_id for athlete ${athlete.id}; clearing both connections defensively`
       );
       await disconnectGarmin(athlete.id);
       await disconnectGarminTest(athlete.id);

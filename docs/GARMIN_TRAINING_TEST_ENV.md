@@ -49,7 +49,8 @@ Writes **only** `garmin_test_access_token`, `garmin_test_user_id`, `garmin_use_t
 |----------|---------|
 | `GARMIN_TRAINING_TEST_ACCESS_TOKEN` | `scripts/set-test-garmin-token.ts` — written to `garmin_test_access_token` |
 | `GARMIN_TRAINING_TEST_USER_ID` | Same script — written to `garmin_test_user_id` |
-| `GARMIN_TRAINING_TEST_ATHLETE_ID` | Optional — target athlete `id` (cuid) |
+| (none) | `scripts/clear-garmin-test-connection.ts` — clears `garmin_test_*` and sets `garmin_use_test_tokens=false` |
+| `GARMIN_TRAINING_TEST_ATHLETE_ID` | Optional — target athlete `id` (cuid); used by set/clear scripts |
 | `GARMIN_TRAINING_TEST_ATHLETE_EMAIL` | Optional — substring match on `athlete.email` |
 | `GARMIN_TEST_CLIENT_ID` | Test OAuth app — `garmin-test/authorize` |
 | `GARMIN_TEST_CLIENT_SECRET` | Test OAuth app — token exchange |
@@ -76,6 +77,38 @@ export GARMIN_TRAINING_TEST_ACCESS_TOKEN=...
 export GARMIN_TRAINING_TEST_USER_ID=...
 npx tsx scripts/set-test-garmin-token.ts
 ```
+
+## Clear test connection (switch Garmin account)
+
+To unlink the sandbox/test Garmin user (e.g. `adam@gofastcrushgoals.com`) and connect a different Garmin login via **Connect Garmin (test app)**:
+
+**Script** (same athlete targeting env vars as `set-test-garmin-token.ts`):
+
+```bash
+cd gofastapp-mvp
+export DATABASE_URL='postgresql://...'   # same DB as the app
+GARMIN_TRAINING_TEST_ATHLETE_ID=clxxxxxxxx npx tsx scripts/clear-garmin-test-connection.ts
+# or: GARMIN_TRAINING_TEST_ATHLETE_EMAIL=you@example.com npx tsx scripts/clear-garmin-test-connection.ts
+```
+
+**SQL** (Postgres), equivalent:
+
+```sql
+UPDATE "Athlete"
+SET
+  "garmin_test_access_token" = NULL,
+  "garmin_test_user_id" = NULL,
+  "garmin_use_test_tokens" = false,
+  "garmin_test_linked_email" = NULL
+WHERE id = '<athlete_cuid>';
+```
+
+After clearing, run test OAuth again. Revoking the app in **Garmin Connect** (connected apps) for the **test** OAuth client is still recommended so Garmin’s side matches yours.
+
+## Garmin Developer Portal (test app)
+
+- **Evaluators / sandbox users**: Evaluation apps usually only allow specific Garmin accounts. Add each developer’s Garmin login email in the developer portal for your **test** consumer so they can complete test OAuth with their **personal** account instead of a shared test login.
+- **`USER_DEREGISTER` webhooks**: Register the same webhook URL your app exposes (`POST /api/garmin/webhook`, e.g. `https://pr.gofastcrushgoals.com/api/garmin/webhook`) on the **test** application if you want disconnects in Garmin Connect to clear tokens automatically. The handler updates production tokens when `userId` matches `garmin_user_id`, and clears `garmin_test_*` / `garmin_use_test_tokens` when `userId` matches `garmin_test_user_id`.
 
 ## Webhook resolution
 
