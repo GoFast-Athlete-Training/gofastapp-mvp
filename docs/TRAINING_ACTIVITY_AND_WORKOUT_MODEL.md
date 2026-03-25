@@ -38,7 +38,7 @@ This document defines the canonical terms and IDs for **activity**, **planned ac
 
 ### 2.2 Planned activity / training day
 
-- **Models:** `training_days_executed`, and (for structure) `training_plan_weeks.planningDays` (JSON).
+- **Models:** `training_days_executed`; for **plan structure** on the athlete app, `training_plans.planWeeks` (JSON) holds per-week **schedule strings** (same compact format as club `runSchedule`), which are parsed to create dated `workouts` rows.
 - **Purpose:** “What was planned for this day?” and “Did it get done?”.
 
 **Training Plan Day Structure:**
@@ -66,24 +66,10 @@ A **training plan day** should have:
   - `notes` (string, optional)
 - **date,** **weekIndex,** **dayIndex:** When this planned day sits in the plan.
 
-**training_plan_weeks.planningDays (JSON)**
+**training_plans.planWeeks (JSON) — schedule strings**
 
-- Array of day objects, one per day in the week.
-- Each day object should follow the same structure as `plannedData` above:
-  ```json
-  [
-    {
-      "dayIndex": 0,
-      "title": "Track Tuesday",
-      "description": "Speed work",
-      "workoutId": "workout_123",  // optional reference to workouts table
-      "paceGoals": { "target": "5:30/mile" },
-      "hrGoals": { "zone": "Zone 4-5" },
-      "distanceOverride": 6.0  // override workout's totalMiles if needed
-    },
-    // ... more days
-  ]
-  ```
+- Array of week objects, one per plan week, e.g. `{ "weekNumber": 1, "phase": "Base", "schedule": "M:5E W:6T Th:5E Sa:5E Su:14L" }`.
+- The `schedule` string is parsed (see `lib/training/schedule-parser.ts`) to create `workouts` with `planId` and `workout_segments` for that calendar week.
 
 So:
 
@@ -123,38 +109,30 @@ So:
 
 ### 2.4 Training plan structure
 
-- **Models:** `training_plans`, `training_plan_phases`, `training_plan_weeks`
-- **Purpose:** Plan structure (phases, weeks, goals).
+- **Models:** `training_plans`, `workouts` (plan-scoped), `workout_segments`
+- **Purpose:** Plan metadata, AI outline (phases + weekly schedule strings), and materialized calendar workouts.
 
-**training_plan_weeks**
+**training_plans**
 
-- **`miles`** (Float?) — **Total miles for the week** (target/planned)
-- **`planningDays`** (JSON?) — Array of day objects (see 2.2 above)
-  - Each day can reference a workout (`workoutId`) as a "snap"
-  - The week's **"shape of workouts"** = the pattern/types of workouts across the days
-  - Example shape: "Monday easy, Tuesday intervals, Wednesday easy, Thursday tempo, Friday easy, Saturday long run, Sunday rest"
+- **`phases`** (JSON?) — AI phase ranges, e.g. `[{ name, startWeek, endWeek }]`
+- **`planWeeks`** (JSON?) — AI weekly **schedule strings** per week (see 2.2)
+- **`preferredDays`** — Snapshot of preferred training days (1=Mon … 7=Sun) used when generating schedules
 
-**training_plan_phases**
-
-- **`totalMiles`** (Float?) — Total miles for the phase
-- **`qualityWorkoutsPerWeek`** (Int) — How many hard workouts per week
-- **`runTypesEnabled`** (Json?) — Which workout types are allowed in this phase
-
-**The Plan Hierarchy:**
+**The plan hierarchy (gofastapp-mvp):**
 
 ```
-training_plans (overall plan)
-  └─ training_plan_phases (base, build, peak, taper)
-      └─ training_plan_weeks (week 1, week 2, ...)
-          ├─ miles (total for week)
-          └─ planningDays (array of days)
-              └─ each day: title, description, optional workoutId (snap), pace/HR goals
+training_plans
+  ├─ phases (JSON) — phase ranges
+  ├─ planWeeks (JSON) — weekNumber + phase label + schedule string
+  └─ planned_workouts → workouts (+ workout_segments), created from schedule strings per week
 ```
+
+Relational tables `training_plan_phases` and `training_plan_weeks` were **removed** from this product schema; they duplicated the above and were unused by the app.
 
 **When a day gets executed:**
 
 - A `training_days_executed` row is created (or updated)
-- `plannedData` copies/snapshots the day's plan (from `planningDays` or custom)
+- `plannedData` copies/snapshots the day's plan (or links to a `workouts` row)
 - User can **set workout** (select from library or create new)
 - User can **set pace, miles, HR goals** (override workout defaults if needed)
 - When done, `activityId` links to the recorded `athlete_activities` row
@@ -222,8 +200,8 @@ So:
 
 **Current state vs. desired state:**
 
-- ✅ `workouts` table exists — workout templates/library
-- ✅ `training_plan_weeks.planningDays` (JSON) — plan structure
+- ✅ `workouts` table exists — plan-linked workouts and standalone library
+- ✅ `training_plans.planWeeks` (JSON) — weekly schedule strings (canonical plan outline)
 - ✅ `training_days_executed.plannedData` (JSON) — executed day data
 - ⚠️ `training_days_executed.workoutId` — **NOT YET IN SCHEMA** — should be added as optional FK to `workouts.id`
 - ⚠️ `training_days_executed.activityId` — exists but no FK constraint (should reference `athlete_activities.id`)
@@ -250,26 +228,27 @@ model training_days_executed {
 }
 ```
 
-**planningDays JSON structure (recommended):**
+**planWeeks entry shape (schedule string per week):**
 
 ```typescript
-type PlanningDay = {
-  dayIndex: number;           // 0-6 (Monday-Sunday)
-  title: string;              // "Track Tuesday", "Long Run Sunday"
-  description?: string;       // Optional notes
-  workoutId?: string;        // Optional reference to workouts.id (the "snap")
-  paceGoals?: {               // Optional pace targets
-    target?: string;          // "5:30/mile"
-    min?: string;
-    max?: string;
-  };
-  hrGoals?: {                 // Optional HR targets
-    zone?: string;            // "Zone 4-5"
-    min?: number;
-    max?: number;
-  };
-  distanceOverride?: number;  // Override workout's totalMiles if needed
-  notes?: string;            // Additional notes
+type PlanWeekEntry = {
+  weekNumber: number;
+  phase?: string;            // e.g. "Base", "Build"
+  schedule: string;          // e.g. "M:5E W:6T Th:5E Sa:5E Su:14L" — parsed into workouts
+};
+```
+
+**plannedData JSON (for `training_days_executed`) — still recommended when logging executed days:**
+
+```typescript
+type PlannedDaySnapshot = {
+  title?: string;
+  description?: string;
+  workoutId?: string;
+  paceGoals?: { target?: string; min?: string; max?: string };
+  hrGoals?: { zone?: string; min?: number; max?: number };
+  distanceOverride?: number;
+  notes?: string;
 };
 ```
 
@@ -288,7 +267,7 @@ type PlanningDay = {
    - User sets target pace (e.g. "5:30/mile")
    - User sets target miles (can override workout's `totalMiles`)
    - User sets HR zones (e.g. "Zone 4-5")
-   - These go into `plannedData` (or `planningDays` for the plan structure)
+   - These go into `plannedData` (or are reflected on the materialized `workouts` row for that day)
 
 3. **Push to Garmin** (future: send workout to Garmin Connect)
    - The planned day's structure (from workout snap + customizations) gets formatted for Garmin

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
@@ -155,12 +156,15 @@ export default function TrainingSetupClient() {
   }, []);
 
   useEffect(() => {
-    const u = auth.currentUser;
-    if (!u) {
-      router.replace("/welcome");
-      return;
-    }
-    setReady(true);
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setReady(true);
+      } else {
+        setReady(false);
+        router.replace("/welcome");
+      }
+    });
+    return () => unsub();
   }, [router]);
 
   useEffect(() => {

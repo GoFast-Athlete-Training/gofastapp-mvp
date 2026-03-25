@@ -794,42 +794,6 @@ model training_gen_prompts {
   rule_sets           rule_sets?            @relation(fields: [ruleSetId], references: [id])
 }
 
-model training_plan_phases {
-  id                     String                @id
-  planId                 String
-  name                   String
-  weekCount              Int
-  totalMiles             Float?
-  phaseDescription       String?
-  phaseTotalMilesTarget  Float?
-  longRunProgression     Int[]                 @default([])
-  qualityWorkoutsPerWeek Int                   @default(1)
-  runTypesEnabled        Json?
-  phaseStartDate         DateTime
-  phaseEndDate           DateTime
-  createdAt              DateTime              @default(now())
-  updatedAt              DateTime
-  training_plans         training_plans        @relation(fields: [planId], references: [id], onDelete: Cascade)
-  training_plan_weeks    training_plan_weeks[]
-
-  @@unique([planId, name])
-}
-
-model training_plan_weeks {
-  id                   String               @id
-  planId               String
-  phaseId              String
-  weekNumber           Int
-  miles                Float?
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime
-  planningDays         Json?
-  training_plan_phases training_plan_phases @relation(fields: [phaseId], references: [id], onDelete: Cascade)
-  training_plans       training_plans       @relation(fields: [planId], references: [id], onDelete: Cascade)
-
-  @@unique([planId, weekNumber])
-}
-
 model training_plans {
   id                   String                 @id
   athleteId            String
@@ -850,8 +814,6 @@ model training_plans {
   preferredDays        Int[]                  @default([])
   createdAt            DateTime               @default(now())
   updatedAt            DateTime
-  training_plan_phases training_plan_phases[]
-  training_plan_weeks  training_plan_weeks[]
   planned_workouts     workouts[]
   Athlete              Athlete                @relation(fields: [athleteId], references: [id])
   race_registry        race_registry?         @relation(fields: [raceId], references: [id])
