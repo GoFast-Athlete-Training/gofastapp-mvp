@@ -76,6 +76,10 @@ export async function PUT(
       targetByDate?: string;
       raceRegistryId?: string | null;
       status?: string;
+      whyGoal?: string | null;
+      successLooksLike?: string | null;
+      completionFeeling?: string | null;
+      motivationIcon?: string | null;
     } = {};
     try {
       body = await request.json();
@@ -96,6 +100,10 @@ export async function PUT(
     }
     if (body.raceRegistryId !== undefined) patch.raceRegistryId = body.raceRegistryId;
     if (body.status !== undefined) patch.status = body.status;
+    if (body.whyGoal !== undefined) patch.whyGoal = body.whyGoal;
+    if (body.successLooksLike !== undefined) patch.successLooksLike = body.successLooksLike;
+    if (body.completionFeeling !== undefined) patch.completionFeeling = body.completionFeeling;
+    if (body.motivationIcon !== undefined) patch.motivationIcon = body.motivationIcon;
 
     try {
       const goal = await updateGoal(id, athlete!.id, patch);

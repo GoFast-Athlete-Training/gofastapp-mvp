@@ -106,6 +106,17 @@ export async function PUT(
     let updated;
     try {
       const keys = Object.keys(body || {});
+      const PUBLIC_PROFILE_KEYS = [
+        'profilePublic',
+        'showTrainingSummary',
+        'showUpcomingWorkouts',
+      ] as const;
+      const onlyPublicProfile =
+        keys.length > 0 &&
+        keys.every((k) =>
+          PUBLIC_PROFILE_KEYS.includes(k as (typeof PUBLIC_PROFILE_KEYS)[number])
+        );
+
       if (
         keys.length === 1 &&
         keys[0] === 'garmin_test_linked_email'
@@ -121,6 +132,26 @@ export async function PUT(
             garmin_test_linked_email: normalized,
             updatedAt: new Date(),
           },
+        });
+      } else if (onlyPublicProfile) {
+        const data: {
+          updatedAt: Date;
+          profilePublic?: boolean;
+          showTrainingSummary?: boolean;
+          showUpcomingWorkouts?: boolean;
+        } = { updatedAt: new Date() };
+        if (typeof body.profilePublic === 'boolean') {
+          data.profilePublic = body.profilePublic;
+        }
+        if (typeof body.showTrainingSummary === 'boolean') {
+          data.showTrainingSummary = body.showTrainingSummary;
+        }
+        if (typeof body.showUpcomingWorkouts === 'boolean') {
+          data.showUpcomingWorkouts = body.showUpcomingWorkouts;
+        }
+        updated = await prisma.athlete.update({
+          where: { id },
+          data,
         });
       } else {
         updated = await updateAthlete(id, body);

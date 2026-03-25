@@ -24,6 +24,8 @@ export default function AthleteCreateProfilePage() {
     gofastHandle: '',
     bio: '',
     instagram: '',
+    fiveKPace: '',
+    weeklyMileage: '',
     profilePhoto: null as File | null,
     profilePhotoPreview: null as string | null,
   });
@@ -265,6 +267,13 @@ export default function AthleteCreateProfilePage() {
         bio: formData.bio,
         instagram: formData.instagram,
         photoURL: photoURL,
+        fiveKPace: formData.fiveKPace.trim() || null,
+        weeklyMileage: (() => {
+          const t = formData.weeklyMileage.trim();
+          if (!t) return null;
+          const n = Number(t);
+          return Number.isFinite(n) ? n : null;
+        })(),
       });
       
       console.log('✅ Step 2 - Profile updated:', profileRes.data);
@@ -585,6 +594,34 @@ export default function AthleteCreateProfilePage() {
               <option value="track-field">🏃‍♂️ Track & Field</option>
             </select>
             <p className="text-xs text-gray-400 mt-1">🎯 This helps us match you with the right community!</p>
+          </div>
+
+          <div className="border-t border-gray-200 pt-6 space-y-4">
+            <h3 className="text-sm font-semibold text-gray-900">Training baseline (optional)</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Current 5K pace</label>
+                <input
+                  type="text"
+                  value={formData.fiveKPace}
+                  onChange={(e) => handleInputChange("fiveKPace", e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Weekly mileage</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={formData.weeklyMileage}
+                  onChange={(e) => handleInputChange("weeklyMileage", e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  disabled={loading}
+                />
+              </div>
+            </div>
           </div>
 
           {/* Instagram */}

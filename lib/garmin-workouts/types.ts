@@ -168,8 +168,10 @@ export interface PlannedData {
 export interface Athlete {
   id: string;
   garmin_user_id?: string;
-  current5KPace?: string; // For pace calculations
-  // ... other athlete fields
+  /** Profile baseline pace (M:SS/mi); single source vs legacy alias */
+  fiveKPace?: string | null;
+  /** @deprecated use fiveKPace */
+  current5KPace?: string;
 }
 
 // ============================================================================

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Send, CheckCircle2, AlertCircle, X, Plug } from "lucide-react";
+import { ArrowLeft, Send, CheckCircle2, AlertCircle, X, Plug, Users } from "lucide-react";
 import Link from "next/link";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
@@ -89,6 +89,14 @@ export default function WorkoutDetailPage() {
   const [showCreatedBanner, setShowCreatedBanner] = useState(false);
   const [garminToast, setGarminToast] = useState<string | null>(null);
   const [connectingGarminTest, setConnectingGarminTest] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareMeetup, setShareMeetup] = useState("Meetup details TBD — see run description");
+  const [shareRunDate, setShareRunDate] = useState("");
+  const [shareMeetupCity, setShareMeetupCity] = useState("");
+  const [shareMeetupState, setShareMeetupState] = useState("");
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [shareRunId, setShareRunId] = useState<string | null>(null);
 
   const clearCreatedQuery = useCallback(() => {
     router.replace(`/workouts/${workoutId}`, { scroll: false });
@@ -112,6 +120,30 @@ export default function WorkoutDetailPage() {
   useEffect(() => {
     fetchWorkout();
   }, [workoutId]);
+
+  useEffect(() => {
+    if (!showShareModal || !workout) return;
+    const d = workout.date ? new Date(workout.date) : new Date();
+    setShareRunDate(
+      !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)
+    );
+    setShareError(null);
+    setShareRunId(null);
+    const aid = LocalStorageAPI.getAthleteId();
+    if (!aid) return;
+    (async () => {
+      try {
+        const { data } = await api.get(`/athlete/${aid}`);
+        const a = data?.athlete;
+        if (a) {
+          setShareMeetupCity(a.city || "");
+          setShareMeetupState(a.state || "");
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [showShareModal, workout]);
 
   useEffect(() => {
     const onMsg = (ev: MessageEvent) => {
@@ -190,6 +222,51 @@ export default function WorkoutDetailPage() {
       });
     } finally {
       setPushing(false);
+    }
+  };
+
+  const openShareJoinModal = () => {
+    setShowShareModal(true);
+  };
+
+  const submitShareAsCityRun = async () => {
+    const athleteId = LocalStorageAPI.getAthleteId();
+    if (!athleteId || !workout) {
+      setShareError("Sign in and open this page from the app so your athlete id is available.");
+      return;
+    }
+    if (!shareMeetupCity.trim()) {
+      setShareError("City is required so the run can be listed (same as city runs).");
+      return;
+    }
+    setShareBusy(true);
+    setShareError(null);
+    try {
+      const dateIso = new Date(`${shareRunDate}T12:00:00`).toISOString();
+      const { data } = await api.post("runs/create", {
+        athleteGeneratedId: athleteId,
+        title: workout.title,
+        date: dateIso,
+        meetUpPoint: shareMeetup.trim() || "Meetup TBD",
+        meetUpCity: shareMeetupCity.trim() || undefined,
+        meetUpState: shareMeetupState.trim() || undefined,
+        cityName: shareMeetupCity.trim() || undefined,
+        state: shareMeetupState.trim() || undefined,
+        workoutId: workout.id,
+        workoutDescription: (workout.description || "").slice(0, 2000),
+      });
+      if (data?.success && data?.cityRunId) {
+        setShareRunId(data.cityRunId as string);
+      } else {
+        setShareError(
+          (data as { error?: string })?.error || "Could not create run"
+        );
+      }
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } } };
+      setShareError(err.response?.data?.error || "Could not create run");
+    } finally {
+      setShareBusy(false);
     }
   };
 
@@ -366,6 +443,14 @@ export default function WorkoutDetailPage() {
             </div>
 
             <div className="shrink-0 w-full sm:w-auto flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={openShareJoinModal}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 border border-sky-600 text-sky-700 bg-white hover:bg-sky-50 rounded-lg font-medium transition-colors"
+              >
+                <Users className="w-5 h-5" />
+                Share / Join me
+              </button>
               {alreadyOnGarmin ? (
                 <button
                   type="button"
@@ -447,6 +532,127 @@ export default function WorkoutDetailPage() {
             </div>
           )}
         </div>
+
+        {showShareModal && (
+          <div
+            className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-black/40"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="share-join-title"
+          >
+            <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6">
+              <div className="flex items-start justify-between gap-2 mb-4">
+                <h2 id="share-join-title" className="text-lg font-semibold text-gray-900">
+                  Create a joinable run
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setShowShareModal(false)}
+                  className="p-1 rounded-md text-gray-500 hover:bg-gray-100"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                Creates a CityRun linked to this workout so friends can RSVP on{" "}
+                <span className="font-medium">/gorun</span> like any other run.
+              </p>
+              {shareRunId ? (
+                <div className="space-y-3">
+                  <p className="text-green-800 font-medium text-sm">Run created.</p>
+                  <Link
+                    href={`/gorun/${shareRunId}`}
+                    className="inline-block text-orange-600 hover:text-orange-700 font-semibold text-sm"
+                  >
+                    Open run & RSVP →
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setShowShareModal(false)}
+                    className="block w-full mt-2 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                      Run date
+                    </label>
+                    <input
+                      type="date"
+                      value={shareRunDate}
+                      onChange={(e) => setShareRunDate(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                      Meet-up description
+                    </label>
+                    <textarea
+                      value={shareMeetup}
+                      onChange={(e) => setShareMeetup(e.target.value)}
+                      rows={3}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                        City
+                      </label>
+                      <input
+                        type="text"
+                        value={shareMeetupCity}
+                        onChange={(e) => setShareMeetupCity(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                        State
+                      </label>
+                      <input
+                        type="text"
+                        value={shareMeetupState}
+                        onChange={(e) => setShareMeetupState(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    City/state set the run&apos;s public location slug. Prefilled from your profile when possible.
+                  </p>
+                  {shareError && (
+                    <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                      {shareError}
+                    </p>
+                  )}
+                  <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowShareModal(false)}
+                      className="flex-1 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={submitShareAsCityRun}
+                      disabled={shareBusy}
+                      className="flex-1 py-2 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg disabled:opacity-50"
+                    >
+                      {shareBusy ? "Creating…" : "Create CityRun"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Segments</h2>

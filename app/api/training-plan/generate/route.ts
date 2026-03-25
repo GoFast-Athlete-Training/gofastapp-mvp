@@ -74,17 +74,11 @@ export async function POST(request: NextRequest) {
       preferredDaysHuman: preferredDaysToHuman(preferredDays),
     });
 
-    const current5KPace =
-      plan.current5KPace?.trim() ||
-      athlete.fiveKPace ||
-      null;
-
     const updated = await prisma.training_plans.update({
       where: { id: plan.id },
       data: {
         phases: outline.phases as object,
         planWeeks: outline.planWeeks as object,
-        current5KPace,
         updatedAt: new Date(),
       },
     });

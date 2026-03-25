@@ -651,7 +651,7 @@ Workout = {
    - Set `targetType: "HEART_RATE"`, `targetValueLow` and `targetValueHigh`
    - `targetValueType: "HEART_RATE"`
 
-3. **Derive from `effortType`** + athlete's current paces (from `training_plans.current5KPace`, etc.)
+3. **Derive from `effortType`** + athlete baseline (`Athlete.fiveKPace`; not stored on `training_plans`)
    - FiveKEffort → 5K pace ± 5%
    - TenKEffort → 10K pace ± 5%
    - HalfMarathonEffort → HM pace ± 5%

@@ -75,6 +75,10 @@ export async function POST(request: NextRequest) {
       targetByDate?: string;
       raceRegistryId?: string | null;
       status?: string;
+      whyGoal?: string | null;
+      successLooksLike?: string | null;
+      completionFeeling?: string | null;
+      motivationIcon?: string | null;
     } = {};
     try {
       body = await request.json();
@@ -98,6 +102,10 @@ export async function POST(request: NextRequest) {
         targetByDate,
         raceRegistryId: body.raceRegistryId,
         status: body.status,
+        whyGoal: body.whyGoal,
+        successLooksLike: body.successLooksLike,
+        completionFeeling: body.completionFeeling,
+        motivationIcon: body.motivationIcon,
       });
       return NextResponse.json({ goal });
     } catch (e: unknown) {

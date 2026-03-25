@@ -123,7 +123,8 @@ export function getTargetConfig(
   }
 
   // Priority 3: Derive from effortType + athlete paces (if no goals provided)
-  if (!config.targetType && athlete?.current5KPace) {
+  const baselinePace = athlete?.fiveKPace?.trim() || athlete?.current5KPace?.trim();
+  if (!config.targetType && baselinePace) {
     // Could derive pace from effortType here
     // For now, default to OPEN if nothing provided
   }

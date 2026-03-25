@@ -1,8 +1,23 @@
 import { prisma } from "@/lib/prisma";
+import { MOTIVATION_ICON_SLUGS } from "@/lib/goals-motivation-icons";
 import { distanceMilesToPaceRaceKey } from "@/lib/workout-generator/pace-calculator";
 import { deriveGoalPaces } from "@/lib/pace-utils";
 
 export { deriveGoalPaces } from "@/lib/pace-utils";
+
+const MOTIVATION_ICON_SET = new Set<string>(MOTIVATION_ICON_SLUGS);
+
+export function normalizeMotivationIcon(raw: string | null | undefined): string | null {
+  if (raw == null || raw === "") return null;
+  const s = raw.trim().toLowerCase();
+  return MOTIVATION_ICON_SET.has(s) ? s : null;
+}
+
+function trimText(raw: string | null | undefined): string | null {
+  if (raw == null) return null;
+  const t = raw.trim();
+  return t === "" ? null : t;
+}
 
 export async function getActiveGoals(athleteId: string) {
   return prisma.athleteGoal.findMany({
@@ -71,6 +86,10 @@ export type CreateGoalInput = {
   targetByDate: Date;
   raceRegistryId?: string | null;
   status?: string;
+  whyGoal?: string | null;
+  successLooksLike?: string | null;
+  completionFeeling?: string | null;
+  motivationIcon?: string | null;
 };
 
 export async function createGoal(athleteId: string, input: CreateGoalInput) {
@@ -108,6 +127,10 @@ export async function createGoal(athleteId: string, input: CreateGoalInput) {
   });
 
   const nameTrimmed = input.name?.trim() ? input.name!.trim() : null;
+  const whyGoal = trimText(input.whyGoal);
+  const successLooksLike = trimText(input.successLooksLike);
+  const completionFeeling = trimText(input.completionFeeling);
+  const motivationIcon = normalizeMotivationIcon(input.motivationIcon);
 
   return prisma.athleteGoal.create({
     data: {
@@ -120,6 +143,10 @@ export async function createGoal(athleteId: string, input: CreateGoalInput) {
       targetByDate,
       raceRegistryId: input.raceRegistryId ?? null,
       status: input.status ?? "ACTIVE",
+      whyGoal,
+      successLooksLike,
+      completionFeeling,
+      motivationIcon,
       updatedAt: new Date(),
     },
     include: {
@@ -145,6 +172,10 @@ export type UpdateGoalInput = Partial<{
   targetByDate: Date;
   raceRegistryId: string | null;
   status: string;
+  whyGoal: string | null;
+  successLooksLike: string | null;
+  completionFeeling: string | null;
+  motivationIcon: string | null;
 }>;
 
 export async function updateGoal(
@@ -194,6 +225,16 @@ export async function updateGoal(
         raceRegistryId: patch.raceRegistryId,
       }),
       ...(patch.status !== undefined && { status: patch.status }),
+      ...(patch.whyGoal !== undefined && { whyGoal: trimText(patch.whyGoal) }),
+      ...(patch.successLooksLike !== undefined && {
+        successLooksLike: trimText(patch.successLooksLike),
+      }),
+      ...(patch.completionFeeling !== undefined && {
+        completionFeeling: trimText(patch.completionFeeling),
+      }),
+      ...(patch.motivationIcon !== undefined && {
+        motivationIcon: normalizeMotivationIcon(patch.motivationIcon),
+      }),
       goalRacePace,
       goalPace5K,
       updatedAt: new Date(),

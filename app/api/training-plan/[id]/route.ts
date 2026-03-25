@@ -94,9 +94,6 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         .map((n: unknown) => Number(n))
         .filter((n: number) => n >= 1 && n <= 7);
     }
-    if (typeof body.current5KPace === "string") {
-      data.current5KPace = body.current5KPace.trim() || null;
-    }
     if (body.athleteGoalId != null) {
       const gid = String(body.athleteGoalId);
       const g = await prisma.athleteGoal.findFirst({

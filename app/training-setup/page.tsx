@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/firebase";
+import api from "@/lib/api";
+import { LocalStorageAPI } from "@/lib/localstorage";
 
 type RaceRow = {
   id: string;
@@ -23,6 +25,8 @@ export default function TrainingSetupNewPage() {
   const [startDate, setStartDate] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [baseline5KPace, setBaseline5KPace] = useState("");
+  const [baselineWeeklyMileage, setBaselineWeeklyMileage] = useState("");
 
   useEffect(() => {
     const u = auth.currentUser;
@@ -32,6 +36,27 @@ export default function TrainingSetupNewPage() {
     }
     setReady(true);
   }, [router]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const id = LocalStorageAPI.getAthleteId();
+    if (!id) return;
+    api
+      .get<{ athlete?: { fiveKPace?: string | null; weeklyMileage?: number | null } }>(
+        `/athlete/${id}`
+      )
+      .then((res) => {
+        const a = res.data?.athlete;
+        if (!a) return;
+        setBaseline5KPace(a.fiveKPace?.trim() ?? "");
+        setBaselineWeeklyMileage(
+          a.weeklyMileage != null && Number.isFinite(Number(a.weeklyMileage))
+            ? String(a.weeklyMileage)
+            : ""
+        );
+      })
+      .catch(() => {});
+  }, [ready]);
 
   async function getToken() {
     const u = auth.currentUser;
@@ -82,6 +107,12 @@ export default function TrainingSetupNewPage() {
         body: JSON.stringify({
           raceRegistryId: selectedRaceId,
           startDate: new Date(startDate).toISOString(),
+          fiveKPace: baseline5KPace.trim() || null,
+          currentWeeklyMileage:
+            baselineWeeklyMileage.trim() === ""
+              ? null
+              : Number(baselineWeeklyMileage),
+          syncAthleteBaseline: true,
         }),
       });
       const data = await res.json();
@@ -109,11 +140,37 @@ export default function TrainingSetupNewPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 max-w-lg mx-auto">
       <h1 className="text-2xl font-semibold mb-2">Training plan setup</h1>
       <p className="text-slate-400 text-sm mb-6">
-        Pick a race and when training starts. Preferences from your profile are
-        snapshotted onto the plan.
+        Pick a race and start date. Baseline pace and mileage update your profile when you
+        create the plan (single source of truth for training zones).
       </p>
 
       <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-700 bg-slate-900/50 p-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1">
+              Current 5K pace
+            </label>
+            <input
+              className="w-full rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm"
+              value={baseline5KPace}
+              onChange={(e) => setBaseline5KPace(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1">
+              Weekly mileage
+            </label>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              className="w-full rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm"
+              value={baselineWeeklyMileage}
+              onChange={(e) => setBaselineWeeklyMileage(e.target.value)}
+            />
+          </div>
+        </div>
+
         <div>
           <label className="block text-sm font-medium mb-1">Find race</label>
           <div className="flex gap-2">

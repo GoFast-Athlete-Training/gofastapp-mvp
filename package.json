@@ -19,7 +19,8 @@
     "db:backfill-athletes": "tsx scripts/backfill-athlete-company.ts",
     "db:check-athletes": "tsx scripts/check-athletes.ts",
     "db:verify-schema": "tsx scripts/verify-schema.ts",
-    "db:populate-bidirectional-ids": "tsx scripts/populate-bidirectional-run-club-ids.ts"
+    "db:populate-bidirectional-ids": "tsx scripts/populate-bidirectional-run-club-ids.ts",
+    "smoke:fivek-pace": "tsx scripts/smoke-fivek-pace.ts"
   },
   "dependencies": {
     "@gofast/shared-db": "file:./packages/shared-db",

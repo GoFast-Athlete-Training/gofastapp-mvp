@@ -26,8 +26,11 @@ export async function POST(request: NextRequest) {
       name,
       currentWeeklyMileage,
       preferredDays: bodyPreferredDays,
-      current5KPace: body5k,
+      fiveKPace: bodyFiveK,
+      current5KPace: bodyLegacy5k,
+      syncAthleteBaseline,
     } = body;
+    const body5k = bodyFiveK ?? bodyLegacy5k;
 
     if (!raceRegistryId || !startRaw) {
       return NextResponse.json(
@@ -92,10 +95,20 @@ export async function POST(request: NextRequest) {
           ? prefs.preferredDays
           : [];
 
-    const current5KPace =
-      typeof body5k === "string" && body5k.trim()
-        ? body5k.trim()
-        : athlete.fiveKPace ?? null;
+    const fiveKPaceResolved =
+      typeof body5k === "string" ? body5k.trim() || null : athlete.fiveKPace ?? null;
+
+    let weeklyResolved: number | null = athlete.weeklyMileage ?? null;
+    if (
+      currentWeeklyMileage !== undefined &&
+      currentWeeklyMileage !== null &&
+      currentWeeklyMileage !== ""
+    ) {
+      const n = Number(currentWeeklyMileage);
+      if (Number.isFinite(n)) weeklyResolved = n;
+    } else if (currentWeeklyMileage === "" || currentWeeklyMileage === null) {
+      weeklyResolved = null;
+    }
 
     const planName =
       typeof name === "string" && name.trim()
@@ -112,15 +125,21 @@ export async function POST(request: NextRequest) {
         name: planName,
         startDate,
         totalWeeks,
-        currentWeeklyMileage:
-          currentWeeklyMileage != null
-            ? Number(currentWeeklyMileage)
-            : athlete.weeklyMileage ?? null,
+        currentWeeklyMileage: weeklyResolved,
         preferredDays,
-        current5KPace,
         updatedAt: now,
       },
     });
+
+    if (syncAthleteBaseline === true || syncAthleteBaseline === "true") {
+      await prisma.athlete.update({
+        where: { id: athlete.id },
+        data: {
+          fiveKPace: fiveKPaceResolved,
+          weeklyMileage: weeklyResolved,
+        },
+      });
+    }
 
     return NextResponse.json({ plan });
   } catch (e: unknown) {

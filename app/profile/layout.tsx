@@ -1,6 +1,4 @@
-// SERVER FILE — Route configuration for /profile
-// This route must be dynamic at the server level (auth-gated, personalized profile)
-// The page itself is a client component, but route config lives here
+import ProfileHubShell from '@/components/profile/ProfileHubShell';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +7,5 @@ export default function ProfileLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return <ProfileHubShell>{children}</ProfileHubShell>;
 }
-

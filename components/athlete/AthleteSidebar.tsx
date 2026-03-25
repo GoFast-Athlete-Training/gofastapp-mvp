@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
-import { Home, Target, Dumbbell, Users, Trophy, Shirt, MessageCircle, BookOpen } from "lucide-react";
+import { Home, Target, Dumbbell, Users, Trophy, User, MessageCircle, BookOpen } from "lucide-react";
 
 const navItems: { label: string; href: string; icon: typeof Home }[] = [
   { label: "Home", href: "/athlete-home", icon: Home },
@@ -10,7 +10,7 @@ const navItems: { label: string; href: string; icon: typeof Home }[] = [
   { label: "Training", href: "/workouts", icon: Dumbbell },
   { label: "Training Pod", href: "/my-runcrews", icon: Users },
   { label: "Races", href: "/races", icon: Trophy },
-  { label: "Gear", href: "/athlete-edit-profile", icon: Shirt },
+  { label: "Profile", href: "/profile", icon: User },
   { label: "Ask a Coach", href: "/ask-coach", icon: MessageCircle },
   { label: "Training Journal", href: "/journal", icon: BookOpen },
 ];

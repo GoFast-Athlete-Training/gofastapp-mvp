@@ -29,6 +29,12 @@ model Athlete {
   state                   String?
   primarySport            String?
   bio                     String?
+  /// When true, /u/[gofastHandle] is discoverable with public-safe fields only.
+  profilePublic           Boolean                  @default(false)
+  /// Show active training plan summary on public profile (requires profilePublic).
+  showTrainingSummary     Boolean                  @default(false)
+  /// Show upcoming scheduled workouts (title/date/type only) on public profile.
+  showUpcomingWorkouts    Boolean                  @default(false)
   instagram               String?
   garmin_user_id          String?                  @unique
   garmin_access_token      String?
@@ -299,6 +305,10 @@ model AthleteGoal {
   targetByDate     DateTime
   raceRegistryId   String?
   status           String         @default("ACTIVE")
+  whyGoal          String?        @db.Text
+  successLooksLike String?        @db.Text
+  completionFeeling String?     @db.Text
+  motivationIcon   String?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   Athlete          Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
@@ -830,8 +840,6 @@ model training_plans {
   phases               Json?
   /// AI-generated weekly schedule strings: [{ weekNumber, phase, schedule }]
   planWeeks            Json?
-  /// Baseline 5K pace at plan creation (e.g. "8:30")
-  current5KPace        String?
   /// Snapshot of preferred training days 1=Mon..7=Sun
   preferredDays        Int[]                  @default([])
   createdAt            DateTime               @default(now())

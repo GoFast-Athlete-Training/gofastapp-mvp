@@ -423,6 +423,12 @@ export async function POST(request: NextRequest) {
       // Continue without slug - can be generated later
     }
 
+    const isAthleteJoinMyWorkoutShare =
+      !!resolvedWorkoutId &&
+      !!athleteGeneratedId?.trim() &&
+      !finalRunClubId &&
+      !runCrewId?.trim();
+
     const createData: Record<string, unknown> = {
       id: generateId(),
       gofastCity: finalCitySlug,
@@ -432,7 +438,7 @@ export async function POST(request: NextRequest) {
       staffGeneratedId: staffGeneratedId?.trim() || null,
       athleteGeneratedId: athleteGeneratedId?.trim() || null,
       title: title.trim(),
-      workflowStatus: 'DEVELOP',
+      workflowStatus: isAthleteJoinMyWorkoutShare ? 'APPROVED' : 'DEVELOP',
       dayOfWeek: toCanonicalDayOfWeek(dayOfWeek) ?? (dayOfWeek?.trim() || null) as string | null,
       date: runDateObj,
       startTimeHour: startTimeHour ? parseInt(startTimeHour) : null,

@@ -42,7 +42,14 @@ export default function PerformanceSnapshot({
           <p className="text-xl font-bold text-gray-900 mt-1">
             {current != null ? formatSecPerMile(current) : "—"}
           </p>
-          {!fiveKPace && <p className="text-xs text-gray-500 mt-2">Connect Garmin or set pace in profile.</p>}
+          {!fiveKPace && (
+            <p className="text-xs text-gray-500 mt-2">
+              <a href="/athlete-edit-profile" className="text-orange-600 font-medium hover:underline">
+                Edit profile
+              </a>{" "}
+              to set current 5K pace (training baseline).
+            </p>
+          )}
         </div>
         <div className="rounded-lg bg-orange-50 p-4 border border-orange-100">
           <p className="text-xs font-medium text-orange-800 uppercase tracking-wide">Race goal pace</p>

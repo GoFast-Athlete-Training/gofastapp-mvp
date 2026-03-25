@@ -6,8 +6,7 @@ import type { Prisma, workouts } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   getTrainingPaces,
-  resolveGoalPaceSecondsPerMile,
-  distanceMilesToPaceRaceKey,
+  parsePaceToSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
 import {
   getTemplateSegments,
@@ -62,36 +61,15 @@ function weekNumberFromDate(planStartDate: Date, date: Date): number {
   return Math.floor(diffDays / 7) + 1;
 }
 
-/**
- * Resolve goal pace (sec/mile) for training zones from plan's athlete goal + race.
- */
-function goalPaceSecondsPerMileFromPlan(plan: {
-  athlete_goal: {
-    goalRacePace: number | null;
-    goalTime: string | null;
-    distance: string;
-  } | null;
-  race_registry: { distanceMiles: number; raceType: string } | null;
-}): number {
-  const g = plan.athlete_goal;
-  const race = plan.race_registry;
-  if (g?.goalRacePace != null && g.goalRacePace > 0) {
-    return g.goalRacePace;
+/** Current-fitness anchor for zone offsets: Athlete.fiveKPace (M:SS / mile), not goal race pace. */
+function baselineSecondsPerMileFromAthlete(fiveKPace: string | null | undefined): number {
+  const raw = fiveKPace?.trim();
+  if (!raw) {
+    throw new Error(
+      "Set your current 5K pace on your profile (athlete-edit-profile) so plan workouts can use training zones."
+    );
   }
-  if (g?.goalTime && race) {
-    const distKey = distanceMilesToPaceRaceKey(race.distanceMiles);
-    return resolveGoalPaceSecondsPerMile({
-      raceTime: g.goalTime,
-      raceDistance: distKey,
-    });
-  }
-  if (g?.goalTime && g.distance) {
-    return resolveGoalPaceSecondsPerMile({
-      raceTime: g.goalTime,
-      raceDistance: g.distance.toLowerCase().trim(),
-    });
-  }
-  throw new Error("Cannot derive goal pace: set athlete goal with goalTime or goalRacePace");
+  return parsePaceToSecondsPerMile(raw);
 }
 
 export async function workoutDaysRangeForWeek(params: {
@@ -128,16 +106,7 @@ export async function workoutDaysRangeForWeek(params: {
   const plan = await prisma.training_plans.findFirst({
     where: { id: planId, athleteId },
     include: {
-      athlete_goal: {
-        select: {
-          goalRacePace: true,
-          goalTime: true,
-          distance: true,
-        },
-      },
-      race_registry: {
-        select: { distanceMiles: true, raceType: true },
-      },
+      Athlete: { select: { fiveKPace: true } },
     },
   });
 
@@ -165,8 +134,8 @@ export async function workoutDaysRangeForWeek(params: {
     typeof entry.phase === "string" ? entry.phase : String(entry.phase ?? "");
 
   const tokens = parseScheduleString(schedule);
-  const goalSecPerMile = goalPaceSecondsPerMileFromPlan(plan);
-  const paces = getTrainingPaces(goalSecPerMile);
+  const anchorSecPerMile = baselineSecondsPerMileFromAthlete(plan.Athlete?.fiveKPace);
+  const paces = getTrainingPaces(anchorSecPerMile);
 
   const created: workouts[] = [];
 

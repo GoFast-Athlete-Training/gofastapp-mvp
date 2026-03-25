@@ -28,6 +28,10 @@ type AthleteGoalRow = {
   raceRegistryId: string | null;
   targetByDate: string;
   status: string;
+  whyGoal?: string | null;
+  successLooksLike?: string | null;
+  completionFeeling?: string | null;
+  motivationIcon?: string | null;
   race_registry?: RaceRegistry | null;
 };
 
@@ -116,12 +120,16 @@ function toDateInputValue(iso: string): string {
 
 function goalTimeFieldLabel(
   selectedRace: RaceRegistry | null,
-  distanceValue: string
+  distanceValue: string,
+  hasRaceChoice: "yes" | "no" | null
 ): string {
   if (selectedRace?.raceType?.trim()) {
-    return `Your ${selectedRace.raceType.trim()} goal time`;
+    return `Goal ${selectedRace.raceType.trim()} time`;
   }
-  return `Your ${distanceDisplayLabel(distanceValue)} goal time`;
+  if (hasRaceChoice === "yes") {
+    return "Goal finish time";
+  }
+  return `Goal ${distanceDisplayLabel(distanceValue)} time`;
 }
 
 function daysUntil(iso: string): number | null {
@@ -208,19 +216,19 @@ export default function GoalSetter() {
       .finally(() => setLoading(false));
   }, [athleteId]);
 
-  const livePaces = useMemo(() => {
+  /** goalPace5K is persisted server-side for analysis; we only preview goal race pace here. */
+  const liveGoalRacePace = useMemo(() => {
     if (!goalTime.trim()) return null;
     const distanceKey = selectedRace
       ? normalizeDistanceToValue(selectedRace.raceType)
       : distanceValue;
     try {
-      const { goalRacePace, goalPace5K: g5 } = deriveGoalPaces({
+      const { goalRacePace } = deriveGoalPaces({
         distance: distanceKey,
         goalTime,
         distanceMiles: selectedRace?.distanceMiles ?? null,
       });
-      if (goalRacePace == null || g5 == null) return null;
-      return { goalRacePace, goalPace5K: g5 };
+      return goalRacePace;
     } catch {
       return null;
     }
@@ -424,11 +432,11 @@ export default function GoalSetter() {
   return (
     <div>
       <Link
-        href="/athlete-home"
+        href="/goals"
         className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
       >
         <ArrowLeft className="w-5 h-5" />
-        Back to dashboard
+        Back to goals
       </Link>
 
       <header className="mb-8">
@@ -436,8 +444,7 @@ export default function GoalSetter() {
           Set your goals. Train. PR.
         </h1>
         <p className="text-gray-600 text-sm sm:text-base max-w-xl">
-          Take time to benchmark where you&apos;re at and where you want to be. This can be
-          you vs. you, or go out and compete at a race — both are fair game.
+          Where you want to be on race day — baseline fitness lives in your profile.
         </p>
       </header>
 
@@ -529,9 +536,6 @@ export default function GoalSetter() {
               onChange={(e) => setGoalName(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
             />
-            <p className="mt-1 text-xs text-gray-500">
-              Big-picture intent — e.g. Boston sub-3, first marathon, PR a half.
-            </p>
           </div>
 
           <div>
@@ -570,20 +574,11 @@ export default function GoalSetter() {
                 Not yet
               </button>
             </div>
-            {hasRaceChoice === "no" && (
-              <p className="mt-3 text-sm text-amber-900/90 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                For real training paces, you&apos;ll want a finish line. Pick a distance and target
-                date for now — you can add a race anytime.
-              </p>
-            )}
           </div>
 
           {hasRaceChoice === "yes" && (
             <div className="space-y-4 border-t border-gray-100 pt-4">
               <p className="text-sm font-medium text-gray-800">Pick your race</p>
-              <p className="text-sm text-gray-600">
-                Distance and race day come from the event — then you set your goal time.
-              </p>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -754,16 +749,13 @@ export default function GoalSetter() {
                   onChange={(e) => setTargetDate(e.target.value)}
                   className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 />
-                <p className="mt-1 text-xs text-gray-500">
-                  When do you want to hit this? If you skip it, we default to about 90 days out.
-                </p>
               </div>
             </div>
           )}
 
           <div className="border-t border-gray-100 pt-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {goalTimeFieldLabel(selectedRace, distanceValue)}{" "}
+              {goalTimeFieldLabel(selectedRace, distanceValue, hasRaceChoice)}{" "}
               <span className="text-gray-400 font-normal">(optional)</span>
             </label>
             <input
@@ -772,19 +764,12 @@ export default function GoalSetter() {
               onChange={(e) => setGoalTime(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
             />
-            <p className="mt-1 text-xs text-gray-500">
-              H:MM:SS for marathon/half, or MM:SS for 5K/10K. Skip if you&apos;re focused on finishing
-              strong, not the clock.
-            </p>
-            {livePaces && (
+            <p className="mt-1 text-xs text-gray-500">H:MM:SS or MM:SS per mile.</p>
+            {liveGoalRacePace != null && (
               <div className="mt-3 rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 text-sm text-gray-800">
                 <p>
-                  Goal pace ~{" "}
-                  <span className="font-semibold">{formatSecPerMile(livePaces.goalRacePace)}</span>
-                </p>
-                <p className="text-gray-600 mt-0.5">
-                  Equivalent 5K pace ~{" "}
-                  <span className="font-medium">{formatSecPerMile(livePaces.goalPace5K)}</span>
+                  Goal race pace{" "}
+                  <span className="font-semibold">{formatSecPerMile(liveGoalRacePace)}</span>
                 </p>
               </div>
             )}

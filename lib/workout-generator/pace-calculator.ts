@@ -81,7 +81,10 @@ export type PaceZone =
   | "speed"
   | "recovery";
 
-/** Training pace offsets from goal race pace (seconds per mile). Daniels/McMillan style. */
+/**
+ * Zone offsets from an anchor pace in seconds per mile (often current 5K fitness for plan
+ * workouts; may be goal race pace for other flows). Daniels/McMillan style.
+ */
 const OFFSETS_SEC_PER_MILE: Record<PaceZone, number> = {
   easy: 75,
   longRun: 50,
@@ -92,16 +95,16 @@ const OFFSETS_SEC_PER_MILE: Record<PaceZone, number> = {
   recovery: 75,
 };
 
-/** Get seconds per mile for a zone given goal pace in sec/mile */
+/** Get seconds per mile for a zone given anchor pace in sec/mile */
 export function getPaceSecondsPerMile(
-  goalSecondsPerMile: number,
+  anchorSecondsPerMile: number,
   zone: PaceZone
 ): number {
-  return Math.max(1, goalSecondsPerMile + OFFSETS_SEC_PER_MILE[zone]);
+  return Math.max(1, anchorSecondsPerMile + OFFSETS_SEC_PER_MILE[zone]);
 }
 
 export interface TrainingPaces {
-  /** Goal race pace (sec/mile) */
+  /** Anchor pace used for offsets (sec/mile) — e.g. baseline or goal depending on caller */
   goalSecondsPerMile: number;
   /** Per-zone seconds per mile */
   easy: number;
@@ -113,17 +116,17 @@ export interface TrainingPaces {
   recovery: number;
 }
 
-/** Derive all training paces from goal pace (sec/mile) */
-export function getTrainingPaces(goalSecondsPerMile: number): TrainingPaces {
+/** Derive all training zone paces from anchor sec/mile (baseline fitness or goal — caller defines). */
+export function getTrainingPaces(anchorSecondsPerMile: number): TrainingPaces {
   return {
-    goalSecondsPerMile,
-    easy: getPaceSecondsPerMile(goalSecondsPerMile, "easy"),
-    longRun: getPaceSecondsPerMile(goalSecondsPerMile, "longRun"),
-    marathon: getPaceSecondsPerMile(goalSecondsPerMile, "marathon"),
-    tempo: getPaceSecondsPerMile(goalSecondsPerMile, "tempo"),
-    interval: getPaceSecondsPerMile(goalSecondsPerMile, "interval"),
-    speed: getPaceSecondsPerMile(goalSecondsPerMile, "speed"),
-    recovery: getPaceSecondsPerMile(goalSecondsPerMile, "recovery"),
+    goalSecondsPerMile: anchorSecondsPerMile,
+    easy: getPaceSecondsPerMile(anchorSecondsPerMile, "easy"),
+    longRun: getPaceSecondsPerMile(anchorSecondsPerMile, "longRun"),
+    marathon: getPaceSecondsPerMile(anchorSecondsPerMile, "marathon"),
+    tempo: getPaceSecondsPerMile(anchorSecondsPerMile, "tempo"),
+    interval: getPaceSecondsPerMile(anchorSecondsPerMile, "interval"),
+    speed: getPaceSecondsPerMile(anchorSecondsPerMile, "speed"),
+    recovery: getPaceSecondsPerMile(anchorSecondsPerMile, "recovery"),
   };
 }
 
