@@ -566,7 +566,7 @@ export default function GoalSetter() {
     setError(null);
     try {
       if (!selectedRace) {
-        setError("Pick a race to train for — your goal is your race.");
+        setError("Pick a race to train for.");
         setSaving(false);
         return;
       }
@@ -643,6 +643,7 @@ export default function GoalSetter() {
   };
 
   const pickRaceForGoal = (race: RaceRegistry) => {
+    setError(null);
     setSelectedRace(race);
     setGoalName((n) => (n.trim() ? n : race.name));
     setRaceSearchQuery("");
@@ -681,8 +682,9 @@ export default function GoalSetter() {
           Your race goal
         </h1>
         <p className="text-gray-600 text-sm sm:text-base max-w-2xl">
-          Pick your race, then when you want to finish. Goal pace is inferred from that time. You can
-          add multiple races under Races; this page sets the single training goal we optimize for.
+          Setting a goal starts the journey to getting fast. Pick a race, pick a goal time, then start
+          building toward it. You can add multiple races under Races; this page is the one training goal
+          we&apos;re building around.
         </p>
       </header>
 
@@ -828,11 +830,10 @@ export default function GoalSetter() {
                     <span className="text-orange-600">Step 1.</span> Choose your race
                   </h2>
                   <p className="text-xs text-gray-500">
-                    <span className="font-medium text-gray-700">Choose a race</span> in the panel on the
-                    right — nothing counts until you click it and see &quot;Race selected&quot; above.
-                    Search the
-                    registry as you type, or add a race that isn&apos;t listed. When search is empty,
-                    your calendar races show on the right.
+                    Use the panel on the right to pick a race (search the registry, or browse races on your
+                    calendar when search is empty). When it&apos;s the one you want, click it — you&apos;ll
+                    see <span className="font-medium text-gray-700">Race selected</span> above, then set
+                    your goal time in step 2. You can also add a race that isn&apos;t listed.
                   </p>
                 </div>
 
@@ -965,9 +966,9 @@ export default function GoalSetter() {
                   <p className="text-xs font-semibold text-gray-900">Races</p>
                   <p className="text-[11px] text-gray-500 mt-0.5">
                     {raceSearchQuery.trim()
-                      ? "Registry matches — click one to select for your goal"
+                      ? "Registry matches — choose one for this goal"
                       : calendarRaces.length > 0
-                        ? "On your calendar — click one (only counts after you click)"
+                        ? "On your calendar — choose one for this goal"
                         : "Results appear here after you search — or add a custom race on the left"}
                   </p>
                 </div>
@@ -1044,9 +1045,8 @@ export default function GoalSetter() {
                     ))
                   ) : (
                     <p className="text-sm text-gray-500 px-2 py-4">
-                      Search by name or city to find a race, or add a custom race on the left. Your
-                      goal isn&apos;t set until you click <span className="font-medium">Select for goal</span>{" "}
-                      on a race.
+                      Search by name or city, or add a custom race on the left. Pick a row and use{" "}
+                      <span className="font-medium">Select for goal</span> when you&apos;re ready.
                     </p>
                   )}
                 </div>
@@ -1297,7 +1297,7 @@ export default function GoalSetter() {
                   </p>
                   {liveGoalRacePace != null && (
                     <p className="text-gray-800 mt-1">
-                      Inferred pace:{" "}
+                      Calculated race pace:{" "}
                       <span className="font-semibold">
                         {formatSecPerMile(liveGoalRacePace)}
                       </span>{" "}
