@@ -32,6 +32,19 @@ export async function disconnectGarmin(athleteId: string) {
   });
 }
 
+/** Clear sandbox / test OAuth columns only. Does not touch production Garmin tokens. */
+export async function disconnectGarminTest(athleteId: string) {
+  return prisma.athlete.update({
+    where: { id: athleteId },
+    data: {
+      garmin_test_access_token: null,
+      garmin_test_user_id: null,
+      garmin_use_test_tokens: false,
+      garmin_test_linked_email: null,
+    },
+  });
+}
+
 export async function getGarminConnection(athleteId: string) {
   const athlete = await prisma.athlete.findUnique({
     where: { id: athleteId },

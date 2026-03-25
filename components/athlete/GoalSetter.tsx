@@ -256,7 +256,11 @@ function daysUntil(iso: string): number | null {
   return Math.round((raceUtc - todayUtc) / (1000 * 60 * 60 * 24));
 }
 
-export default function GoalSetter() {
+export default function GoalSetter({
+  initialRaceRegistryId,
+}: {
+  initialRaceRegistryId?: string;
+} = {}) {
   const [athleteId, setAthleteId] = useState<string | null>(null);
   const [goal, setGoal] = useState<AthleteGoalRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -371,13 +375,43 @@ export default function GoalSetter() {
           setGoalMinutes("");
           setGoalSeconds("");
         }
+
+        const rid = initialRaceRegistryId?.trim();
+        if (rid) {
+          let needsPrefill = false;
+          if (!g) needsPrefill = true;
+          else if (!g.raceRegistryId) needsPrefill = true;
+          else if (g.raceRegistryId === rid && !g.race_registry) needsPrefill = true;
+          if (needsPrefill) {
+            api
+              .get<{
+                race: {
+                  id: string;
+                  name: string;
+                  raceType: string;
+                  distanceMiles: number;
+                  raceDate: string | Date;
+                  city?: string | null;
+                  state?: string | null;
+                };
+              }>(`/race-registry/${rid}`)
+              .then((prefillRes) => {
+                const race = prefillRes.data?.race;
+                if (!race) return;
+                setSelectedRace(mapApiRaceToRegistry(race));
+                setShowRaceSearch(false);
+                setEditing(true);
+              })
+              .catch(() => {});
+          }
+        }
       })
       .catch(() => {
         setError("Failed to load your goal");
         setEditing(true);
       })
       .finally(() => setLoading(false));
-  }, [athleteId]);
+  }, [athleteId, initialRaceRegistryId]);
 
   const runRaceSearch = useCallback(async (query: string) => {
     const q = query.trim();

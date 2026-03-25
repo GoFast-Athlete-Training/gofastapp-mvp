@@ -29,6 +29,17 @@ interface WorkoutSegment {
   notes?: string;
 }
 
+interface MatchedActivitySummary {
+  id: string;
+  activityName: string | null;
+  activityType: string | null;
+  startTime: string | null;
+  ingestionStatus: string;
+  distance: number | null;
+  duration: number | null;
+  averageSpeed: number | null;
+}
+
 interface Workout {
   id: string;
   title: string;
@@ -37,6 +48,28 @@ interface Workout {
   date?: string | null;
   garminWorkoutId?: number | null;
   segments: WorkoutSegment[];
+  matchedActivityId?: string | null;
+  actualDistanceMeters?: number | null;
+  actualAvgPaceSecPerMile?: number | null;
+  actualDurationSeconds?: number | null;
+  derivedPerformanceDeltaSeconds?: number | null;
+  derivedPerformanceDirection?: string | null;
+  evaluationEligibleFlag?: boolean;
+  matched_activity?: MatchedActivitySummary | null;
+  training_plans?: {
+    id: string;
+    name: string;
+    totalWeeks: number;
+    currentFiveKPace?: string | null;
+    lifecycleStatus?: string;
+  } | null;
+}
+
+function formatSecPerMile(sec: number | null | undefined): string | null {
+  if (sec == null || !Number.isFinite(sec) || sec <= 0) return null;
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}:${String(s).padStart(2, "0")} /mi`;
 }
 
 function formatWorkoutScheduleLong(iso: string | null | undefined): string | null {
@@ -164,11 +197,10 @@ export default function WorkoutDetailPage() {
 
   const fetchWorkout = async () => {
     try {
-      const response = await api.get("workouts");
-      const { workouts } = response.data;
-      const found = workouts.find((w: Workout) => w.id === workoutId);
-      if (found) {
-        setWorkout(found);
+      const response = await api.get<{ workout: Workout }>(`/training/workout/${workoutId}`);
+      const w = response.data?.workout;
+      if (w) {
+        setWorkout(w);
       } else {
         setPushStatus({
           success: false,
@@ -207,9 +239,7 @@ export default function WorkoutDetailPage() {
           ? `Synced to Garmin. Open Garmin Connect to view it on your device (workout #${garminWorkoutId}).`
           : "Synced to Garmin. Open Garmin Connect on your watch or phone to use this workout."
       );
-      setWorkout((prev) =>
-        prev ? { ...prev, garminWorkoutId: garminWorkoutId ?? prev.garminWorkoutId } : prev
-      );
+      void fetchWorkout();
     } catch (error: unknown) {
       console.error("Error pushing to Garmin:", error);
       const err = error as { response?: { data?: { error?: string; details?: string } } };
@@ -439,6 +469,12 @@ export default function WorkoutDetailPage() {
                     {workout.garminWorkoutId != null ? ` (#${workout.garminWorkoutId})` : ""}
                   </span>
                 )}
+                {workout.matchedActivityId && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-900 rounded-full text-sm font-medium border border-emerald-200">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Logged (matched activity)
+                  </span>
+                )}
               </div>
             </div>
 
@@ -651,6 +687,77 @@ export default function WorkoutDetailPage() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {(workout.matchedActivityId || workout.matched_activity) && (
+          <div className="bg-white rounded-lg border border-emerald-200 p-6 mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-3">Completed run</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              This plan workout was linked to an activity from your watch (Garmin sync). Targets below
+              are compared when pace data is available.
+            </p>
+            {workout.matched_activity && (
+              <div className="text-sm text-gray-700 mb-4 space-y-1">
+                <p>
+                  <span className="font-medium text-gray-900">Activity:</span>{" "}
+                  {workout.matched_activity.activityName || "Run"} ·{" "}
+                  {workout.matched_activity.startTime
+                    ? new Date(workout.matched_activity.startTime).toLocaleString()
+                    : "—"}
+                </p>
+                <p>
+                  <span className="font-medium text-gray-900">Ingest status:</span>{" "}
+                  {workout.matched_activity.ingestionStatus}
+                </p>
+              </div>
+            )}
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              {workout.actualDistanceMeters != null && workout.actualDistanceMeters > 0 && (
+                <div>
+                  <dt className="text-gray-500">Distance</dt>
+                  <dd className="font-medium text-gray-900">
+                    {(workout.actualDistanceMeters / 1609.34).toFixed(2)} mi
+                  </dd>
+                </div>
+              )}
+              {formatSecPerMile(workout.actualAvgPaceSecPerMile) && (
+                <div>
+                  <dt className="text-gray-500">Avg pace</dt>
+                  <dd className="font-medium text-gray-900">
+                    {formatSecPerMile(workout.actualAvgPaceSecPerMile)}
+                  </dd>
+                </div>
+              )}
+              {workout.actualDurationSeconds != null && workout.actualDurationSeconds > 0 && (
+                <div>
+                  <dt className="text-gray-500">Duration</dt>
+                  <dd className="font-medium text-gray-900">
+                    {Math.round(workout.actualDurationSeconds / 60)} min
+                  </dd>
+                </div>
+              )}
+              {workout.derivedPerformanceDeltaSeconds != null && (
+                <div>
+                  <dt className="text-gray-500">Vs main target (pace)</dt>
+                  <dd className="font-medium text-gray-900">
+                    {workout.derivedPerformanceDeltaSeconds > 0
+                      ? `${workout.derivedPerformanceDeltaSeconds}s/mi faster than target`
+                      : workout.derivedPerformanceDeltaSeconds < 0
+                        ? `${Math.abs(workout.derivedPerformanceDeltaSeconds)}s/mi slower than target`
+                        : "On target"}
+                    {workout.derivedPerformanceDirection
+                      ? ` (${workout.derivedPerformanceDirection})`
+                      : ""}
+                  </dd>
+                </div>
+              )}
+            </dl>
+            {workout.training_plans?.currentFiveKPace && (
+              <p className="text-xs text-gray-500 mt-4">
+                Plan baseline 5K (snapshot): {workout.training_plans.currentFiveKPace}
+              </p>
+            )}
           </div>
         )}
 

@@ -4,6 +4,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { syncAthleteFiveKPaceToActivePlan } from "@/lib/training/plan-lifecycle";
 
 function parsePaceToSeconds(pace: string): number {
   const parts = pace.split(":");
@@ -43,6 +44,8 @@ export async function updateFiveKPace(
     where: { id: athleteId },
     data: { fiveKPace: new5kTime },
   });
+
+  await syncAthleteFiveKPaceToActivePlan(athleteId);
 
   return new5kTime;
 }

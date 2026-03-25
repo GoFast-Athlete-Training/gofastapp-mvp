@@ -23,7 +23,25 @@ export async function GET(request: NextRequest, context: Ctx) {
       include: {
         segments: { orderBy: { stepOrder: "asc" } },
         training_plans: {
-          select: { id: true, name: true, totalWeeks: true },
+          select: {
+            id: true,
+            name: true,
+            totalWeeks: true,
+            currentFiveKPace: true,
+            lifecycleStatus: true,
+          },
+        },
+        matched_activity: {
+          select: {
+            id: true,
+            activityName: true,
+            activityType: true,
+            startTime: true,
+            ingestionStatus: true,
+            distance: true,
+            duration: true,
+            averageSpeed: true,
+          },
         },
       },
     });

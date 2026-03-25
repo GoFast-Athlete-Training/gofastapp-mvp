@@ -27,8 +27,8 @@ export default function TrainingHubPage() {
               Set up a training plan
             </h2>
             <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-              Pick a race, baseline, and start date. We&apos;ll generate a structured schedule you can
-              follow week by week.
+              We&apos;ll ask which active goal you&apos;re training for (race + goal time), then set
+              your start date and baseline. After that you get a structured schedule week by week.
             </p>
             <span className="mt-4 inline-block text-sm font-medium text-orange-600">
               Start plan setup →

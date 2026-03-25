@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { getAthleteById, updateAthlete } from '@/lib/domain-athlete';
+import { syncAthleteFiveKPaceToActivePlan } from '@/lib/training/plan-lifecycle';
 
 /** GET /api/athlete/[id]/profile — same row as GET /api/athlete/[id] (auth: own athlete only) */
 export async function GET(
@@ -133,6 +134,10 @@ export async function PUT(
       ...(body.fiveKPace !== undefined && { fiveKPace: body.fiveKPace === "" ? null : body.fiveKPace }),
       ...(body.weeklyMileage !== undefined && { weeklyMileage: body.weeklyMileage == null ? null : Number(body.weeklyMileage) }),
     });
+
+    if (body.fiveKPace !== undefined) {
+      await syncAthleteFiveKPaceToActivePlan(athleteId);
+    }
 
     return NextResponse.json({
       success: true,

@@ -5,10 +5,11 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { totalWeeksFromDates } from "@/lib/training/plan-utils";
+import { TrainingPlanLifecycle } from "@prisma/client";
 
 /**
  * POST /api/training-plan
- * Create a training plan (race required). Snapshots preferredDays from TrainingPreferences.
+ * Create a training plan. Requires an explicit AthleteGoal (race + goal time); no silent goal inference.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -32,9 +33,51 @@ export async function POST(request: NextRequest) {
     } = body;
     const body5k = bodyFiveK ?? bodyLegacy5k;
 
+    if (!bodyGoalId || typeof bodyGoalId !== "string") {
+      return NextResponse.json(
+        { error: "athleteGoalId is required — pick an active goal in training setup" },
+        { status: 400 }
+      );
+    }
+
     if (!raceRegistryId || !startRaw) {
       return NextResponse.json(
         { error: "raceRegistryId and startDate are required" },
+        { status: 400 }
+      );
+    }
+
+    const goal = await prisma.athleteGoal.findFirst({
+      where: {
+        id: bodyGoalId,
+        athleteId: athlete.id,
+      },
+    });
+    if (!goal) {
+      return NextResponse.json({ error: "Goal not found" }, { status: 404 });
+    }
+    if (goal.status !== "ACTIVE") {
+      return NextResponse.json(
+        { error: "Goal must be ACTIVE to create a training plan" },
+        { status: 400 }
+      );
+    }
+    if (!goal.raceRegistryId) {
+      return NextResponse.json(
+        { error: "Goal must have a race before creating a training plan" },
+        { status: 400 }
+      );
+    }
+    const gt = typeof goal.goalTime === "string" ? goal.goalTime.trim() : "";
+    if (!gt) {
+      return NextResponse.json(
+        { error: "Goal must have a goal time set — finish your goal in Goals first" },
+        { status: 400 }
+      );
+    }
+    if (goal.raceRegistryId !== raceRegistryId) {
+      return NextResponse.json(
+        { error: "raceRegistryId must match the selected goal's race" },
         { status: 400 }
       );
     }
@@ -61,28 +104,7 @@ export async function POST(request: NextRequest) {
 
     const totalWeeks = totalWeeksFromDates(startDate, raceDate);
 
-    let athleteGoalId: string | null = bodyGoalId ?? null;
-    if (!athleteGoalId) {
-      const goal = await prisma.athleteGoal.findFirst({
-        where: {
-          athleteId: athlete.id,
-          status: "ACTIVE",
-          raceRegistryId,
-        },
-        orderBy: { targetByDate: "asc" },
-      });
-      athleteGoalId = goal?.id ?? null;
-    } else {
-      const goal = await prisma.athleteGoal.findFirst({
-        where: {
-          id: athleteGoalId,
-          athleteId: athlete.id,
-        },
-      });
-      if (!goal) {
-        return NextResponse.json({ error: "Goal not found" }, { status: 404 });
-      }
-    }
+    const athleteGoalId = goal.id;
 
     const prefs = await prisma.trainingPreferences.findUnique({
       where: { athleteId: athlete.id },
@@ -116,19 +138,33 @@ export async function POST(request: NextRequest) {
         : `Training — ${race.name}`;
 
     const now = new Date();
-    const plan = await prisma.training_plans.create({
-      data: {
-        id: randomUUID(),
-        athleteId: athlete.id,
-        raceId: race.id,
-        athleteGoalId,
-        name: planName,
-        startDate,
-        totalWeeks,
-        currentWeeklyMileage: weeklyResolved,
-        preferredDays,
-        updatedAt: now,
-      },
+    const plan = await prisma.$transaction(async (tx) => {
+      await tx.training_plans.updateMany({
+        where: {
+          athleteId: athlete.id,
+          lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+        },
+        data: {
+          lifecycleStatus: TrainingPlanLifecycle.ARCHIVED,
+          updatedAt: now,
+        },
+      });
+      return tx.training_plans.create({
+        data: {
+          id: randomUUID(),
+          athleteId: athlete.id,
+          raceId: race.id,
+          athleteGoalId,
+          name: planName,
+          startDate,
+          totalWeeks,
+          currentWeeklyMileage: weeklyResolved,
+          currentFiveKPace: fiveKPaceResolved,
+          lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+          preferredDays,
+          updatedAt: now,
+        },
+      });
     });
 
     if (syncAthleteBaseline === true || syncAthleteBaseline === "true") {
@@ -141,7 +177,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ plan });
+    const athleteFiveKPaceAfter =
+      syncAthleteBaseline === true || syncAthleteBaseline === "true"
+        ? fiveKPaceResolved
+        : athlete.fiveKPace ?? null;
+
+    return NextResponse.json({
+      plan,
+      athleteFiveKPace: athleteFiveKPaceAfter,
+    });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Failed to create plan";
     console.error("POST /api/training-plan", e);
@@ -160,8 +204,19 @@ export async function GET(request: NextRequest) {
     }
     const { athlete } = auth;
 
+    const statusParam = request.nextUrl.searchParams.get("status")?.toLowerCase();
+    const lifecycleFilter =
+      statusParam === "active"
+        ? TrainingPlanLifecycle.ACTIVE
+        : statusParam === "archived"
+          ? TrainingPlanLifecycle.ARCHIVED
+          : null;
+
     const plans = await prisma.training_plans.findMany({
-      where: { athleteId: athlete.id },
+      where: {
+        athleteId: athlete.id,
+        ...(lifecycleFilter ? { lifecycleStatus: lifecycleFilter } : {}),
+      },
       orderBy: { updatedAt: "desc" },
       select: {
         id: true,
@@ -172,6 +227,8 @@ export async function GET(request: NextRequest) {
         athleteGoalId: true,
         phases: true,
         planWeeks: true,
+        lifecycleStatus: true,
+        currentFiveKPace: true,
         createdAt: true,
         updatedAt: true,
       },

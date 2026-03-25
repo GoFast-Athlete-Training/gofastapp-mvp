@@ -13,6 +13,12 @@ enum AthleteRole {
   AMBASSADOR    // Ambassador - can manage their RunClub's CityRuns (future)
 }
 
+/// At most one ACTIVE training plan per athlete (enforced in application code).
+enum TrainingPlanLifecycle {
+  ACTIVE
+  ARCHIVED
+}
+
 model Athlete {
   id                      String                   @id
   firebaseId              String                   @unique
@@ -831,6 +837,9 @@ model training_plans {
   athleteGoalId        String?
   name                 String
   currentWeeklyMileage Int?
+  /// Snapshot of current 5K pace (same string format as Athlete.fiveKPace) for plan-scoped hydration/comparison
+  currentFiveKPace     String?
+  lifecycleStatus      TrainingPlanLifecycle  @default(ACTIVE)
   startDate            DateTime
   totalWeeks           Int
   /// AI-generated phase ranges: [{ name, startWeek, endWeek }]
@@ -849,6 +858,7 @@ model training_plans {
   athlete_goal         AthleteGoal?           @relation(fields: [athleteGoalId], references: [id], onDelete: SetNull)
 
   @@index([athleteGoalId])
+  @@index([athleteId, lifecycleStatus])
 }
 
 model training_schemas {

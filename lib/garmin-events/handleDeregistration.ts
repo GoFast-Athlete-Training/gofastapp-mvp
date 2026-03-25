@@ -3,9 +3,8 @@
  * Disconnects Garmin when user deregisters
  */
 
-import { prisma } from '../prisma';
 import { getAthleteByGarminUserId } from '../domain-garmin';
-import { disconnectGarmin } from '../domain-garmin';
+import { disconnectGarmin, disconnectGarminTest } from '../domain-garmin';
 
 export interface Deregistration {
   userId?: string;
@@ -32,10 +31,27 @@ export async function handleDeregistration(
       return { success: false, error: 'Athlete not found' };
     }
 
-    // Disconnect Garmin integration
-    await disconnectGarmin(athlete.id);
+    const matchesProd =
+      !!athlete.garmin_user_id && athlete.garmin_user_id === userId;
+    const matchesTest =
+      !!athlete.garmin_test_user_id && athlete.garmin_test_user_id === userId;
 
-    console.log(`✅ Garmin disconnected for athlete ${athlete.id}${reason ? ` (reason: ${reason})` : ''}`);
+    if (matchesProd) {
+      await disconnectGarmin(athlete.id);
+    }
+    if (matchesTest) {
+      await disconnectGarminTest(athlete.id);
+    }
+
+    if (!matchesProd && !matchesTest) {
+      console.warn(
+        `⚠️ USER_DEREGISTER userId ${userId} did not match garmin_user_id or garmin_test_user_id for athlete ${athlete.id}; clearing both connections defensively`
+      );
+      await disconnectGarmin(athlete.id);
+      await disconnectGarminTest(athlete.id);
+    }
+
+    console.log(`✅ Garmin deregister handled for athlete ${athlete.id}${reason ? ` (reason: ${reason})` : ''}`);
     return { success: true };
 
   } catch (error: any) {

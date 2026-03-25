@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteById, updateAthlete } from '@/lib/domain-athlete';
 import { prisma } from '@/lib/prisma';
+import { syncAthleteFiveKPaceToActivePlan } from '@/lib/training/plan-lifecycle';
 
 export async function GET(
   request: Request,
@@ -124,6 +125,9 @@ export async function PUT(
         });
       } else {
         updated = await updateAthlete(id, body);
+        if (body && typeof body === 'object' && 'fiveKPace' in body) {
+          await syncAthleteFiveKPaceToActivePlan(id);
+        }
       }
     } catch (err) {
       console.error('Prisma error:', err);
