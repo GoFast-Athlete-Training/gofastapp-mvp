@@ -13,6 +13,7 @@ import {
   phaseNameForWeek,
   type PhaseRange,
 } from "@/lib/training/plan-phases";
+import { cataloguePhaseFallbackForWeek } from "@/lib/training/generate-plan";
 
 type PlanDetail = {
   id: string;
@@ -22,6 +23,9 @@ type PlanDetail = {
   phases: unknown;
   planWeeks: unknown;
   preferredDays: number[];
+  weeklyMileageTarget?: number | null;
+  currentWeeklyMileage?: number | null;
+  _count?: { planned_workouts: number };
   race_registry: {
     name: string;
     raceDate: string;
@@ -83,6 +87,8 @@ export default function TrainingSetupPlanPage({
   const [preferredDaysLocal, setPreferredDaysLocal] = useState<number[]>(
     DEFAULT_PREFERRED_DAYS
   );
+  const [peakWeeklyMiles, setPeakWeeklyMiles] = useState("50");
+  const [minWeeklyMiles, setMinWeeklyMiles] = useState("40");
   const [error, setError] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
 
@@ -124,7 +130,19 @@ export default function TrainingSetupPlanPage({
     } else {
       setPreferredDaysLocal([...DEFAULT_PREFERRED_DAYS]);
     }
-  }, [plan?.id, plan?.preferredDays]);
+    const peak =
+      plan.weeklyMileageTarget ?? plan.currentWeeklyMileage ?? null;
+    if (peak != null && Number.isFinite(Number(peak))) {
+      setPeakWeeklyMiles(String(Math.round(Number(peak))));
+    } else {
+      setPeakWeeklyMiles("50");
+    }
+  }, [
+    plan?.id,
+    plan?.preferredDays,
+    plan?.weeklyMileageTarget,
+    plan?.currentWeeklyMileage,
+  ]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -143,11 +161,6 @@ export default function TrainingSetupPlanPage({
     loadPlan();
   }, [authReady, loadPlan]);
 
-  const hasSchedule = useMemo(() => {
-    if (!plan?.planWeeks) return false;
-    return Array.isArray(plan.planWeeks) && plan.planWeeks.length > 0;
-  }, [plan?.planWeeks]);
-
   const phaseRanges: PhaseRange[] = useMemo(
     () => (plan ? parsePhasesJson(plan.phases) : []),
     [plan?.phases]
@@ -158,19 +171,39 @@ export default function TrainingSetupPlanPage({
     [plan]
   );
 
+  const materializedWorkouts = plan?._count?.planned_workouts ?? 0;
+  const hasLegacyPlanWeeks = useMemo(() => {
+    if (!plan?.planWeeks) return false;
+    return Array.isArray(plan.planWeeks) && plan.planWeeks.length > 0;
+  }, [plan?.planWeeks]);
+  const hasSchedule = materializedWorkouts > 0 || hasLegacyPlanWeeks;
+
+  const showPhaseModalButton =
+    phaseRanges.length > 0 || weekEntries.length > 0;
+
   const currentWeekEntry = useMemo(
     () => weekEntries.find((w) => w.weekNumber === weekNumber),
     [weekEntries, weekNumber]
   );
 
   const weekPhaseLabel = useMemo(() => {
-    if (!currentWeekEntry) return "";
-    return phaseNameForWeek(
-      phaseRanges,
-      weekNumber,
-      currentWeekEntry.phase
-    );
-  }, [phaseRanges, weekNumber, currentWeekEntry]);
+    const fromWeek = currentWeekEntry?.phase?.trim();
+    const catalogue =
+      plan?.race_registry != null
+        ? cataloguePhaseFallbackForWeek(
+            plan.startDate,
+            plan.race_registry.raceDate,
+            weekNumber
+          )
+        : "";
+    return phaseNameForWeek(phaseRanges, weekNumber, fromWeek || catalogue);
+  }, [
+    phaseRanges,
+    weekNumber,
+    currentWeekEntry,
+    plan?.race_registry,
+    plan?.startDate,
+  ]);
 
   const fetchWeekWorkouts = useCallback(
     async (wn: number) => {
@@ -224,13 +257,29 @@ export default function TrainingSetupPlanPage({
         setError("Select at least one preferred training day.");
         return;
       }
+      let peak = Math.round(Number(peakWeeklyMiles));
+      let minM = Math.round(Number(minWeeklyMiles));
+      if (!Number.isFinite(peak) || !Number.isFinite(minM)) {
+        setError("Enter valid weekly mileage numbers.");
+        return;
+      }
+      peak = Math.max(25, Math.min(100, peak));
+      minM = Math.max(25, Math.min(100, minM));
+      if (minM > peak) {
+        setError("Minimum weekly miles cannot exceed your peak target.");
+        return;
+      }
+
       const patchRes = await fetch(`/api/training-plan/${planId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ preferredDays: normalized }),
+        body: JSON.stringify({
+          preferredDays: normalized,
+          weeklyMileageTarget: peak,
+        }),
       });
       const patchData = await patchRes.json();
       if (!patchRes.ok) {
@@ -244,7 +293,11 @@ export default function TrainingSetupPlanPage({
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ trainingPlanId: planId }),
+        body: JSON.stringify({
+          trainingPlanId: planId,
+          weeklyMileageTarget: peak,
+          minWeeklyMiles: minM,
+        }),
       });
       const genData = await genRes.json();
       if (!genRes.ok) {
@@ -286,34 +339,83 @@ export default function TrainingSetupPlanPage({
 
   return (
     <AthleteAppShell>
-      <div className="px-4 py-8 sm:px-6 bg-gray-50 min-h-screen">
-        <div className="mx-auto max-w-lg rounded-2xl border border-gray-200 bg-white p-6 text-gray-900 shadow-sm">
-          <h1 className="text-xl font-semibold mb-1">{plan.name}</h1>
+      <div className="min-h-screen bg-gray-50 px-4 py-8 sm:px-6">
+        <div className="mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white p-6 text-gray-900 shadow-sm sm:p-8">
+          <h1 className="mb-1 text-2xl font-semibold tracking-tight">
+            {plan.name}
+          </h1>
           {plan.race_registry && (
-            <p className="text-gray-600 text-sm mb-4">
+            <p className="mb-4 text-sm text-gray-600">
               Race: {plan.race_registry.name} —{" "}
               {new Date(plan.race_registry.raceDate).toLocaleDateString()}
             </p>
           )}
-          <p className="text-gray-600 text-sm mb-4">
+          <p className="mb-4 text-sm text-gray-600">
             {plan.totalWeeks} weeks · Start{" "}
             {new Date(plan.startDate).toLocaleDateString()}
           </p>
 
           {!hasSchedule && (
-            <div className="space-y-4 mb-6">
+            <div className="mb-6 space-y-6">
+              <div className="rounded-xl border border-orange-100 bg-orange-50/80 p-4 text-sm text-gray-800">
+                <p className="font-medium text-gray-900">
+                  We&apos;ll build your plan for you
+                </p>
+                <p className="mt-2 leading-relaxed text-gray-700">
+                  Set your peak week, a minimum weekly floor, and the days you
+                  like to run. We&apos;ll lay out workouts week by week and take
+                  care of the rest—paces, structure, and progression toward race
+                  day.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-800">
+                    Peak weekly miles
+                  </label>
+                  <p className="mb-2 text-xs text-gray-500">
+                    Target at your highest week (25–100).
+                  </p>
+                  <input
+                    type="number"
+                    min={25}
+                    max={100}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    value={peakWeeklyMiles}
+                    onChange={(e) => setPeakWeeklyMiles(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-800">
+                    Minimum weekly floor
+                  </label>
+                  <p className="mb-2 text-xs text-gray-500">
+                    We won&apos;t schedule below this in easier weeks.
+                  </p>
+                  <input
+                    type="number"
+                    min={25}
+                    max={100}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    value={minWeeklyMiles}
+                    onChange={(e) => setMinWeeklyMiles(e.target.value)}
+                  />
+                </div>
+              </div>
+
               <div>
-                <p className="text-sm font-medium text-gray-800 mb-2">
+                <p className="mb-2 text-sm font-medium text-gray-800">
                   Preferred training days
                 </p>
-                <p className="text-xs text-gray-500 mb-3">
-                  We use these when building each week (Mon–Sun).
+                <p className="mb-3 text-xs text-gray-500">
+                  We assign sessions on these days (Mon–Sun).
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {DAY_OPTIONS.map(({ value, label }) => (
                     <label
                       key={value}
-                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50"
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50"
                     >
                       <input
                         type="checkbox"
@@ -326,46 +428,49 @@ export default function TrainingSetupPlanPage({
                   ))}
                 </div>
               </div>
+
               <button
                 type="button"
-                onClick={savePreferredAndGenerate}
+                onClick={() => void savePreferredAndGenerate()}
                 disabled={generating}
-                className="w-full rounded-lg bg-orange-500 text-white py-3 font-medium hover:bg-orange-600 disabled:opacity-50"
+                className="w-full rounded-lg bg-orange-500 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-orange-600 disabled:opacity-50"
               >
-                {generating ? "Generating…" : "Generate my plan"}
+                {generating ? "Building your plan…" : "Build my plan"}
               </button>
             </div>
           )}
 
           {hasSchedule && (
             <>
-              <p className="mb-4 text-sm text-gray-700">
-                Your schedule is ready. Use the preview below to step through weeks
-                and open each workout.
+              <p className="mb-4 text-base text-gray-700">
+                Your schedule is ready. Step through weeks below and open each
+                workout.
               </p>
 
-              <div className="mb-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPhaseModalOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
-                >
-                  <LayoutList className="h-4 w-4" aria-hidden />
-                  View phases &amp; all weeks
-                </button>
-              </div>
+              {showPhaseModalButton && (
+                <div className="mb-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPhaseModalOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                  >
+                    <LayoutList className="h-4 w-4" aria-hidden />
+                    View phases &amp; all weeks
+                  </button>
+                </div>
+              )}
 
-              <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-5">
+                <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                       Week preview
                     </p>
-                    <p className="text-lg font-semibold text-gray-900">
+                    <p className="text-lg font-semibold text-gray-900 sm:text-xl">
                       Week {weekNumber} of {plan.totalWeeks}
                     </p>
                     {weekPhaseLabel && (
-                      <span className="mt-1 inline-block text-xs font-medium text-orange-800 bg-orange-100 px-2.5 py-0.5 rounded-full">
+                      <span className="mt-1 inline-block rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">
                         {weekPhaseLabel}
                       </span>
                     )}
@@ -392,11 +497,19 @@ export default function TrainingSetupPlanPage({
                   </div>
                 </div>
                 {currentWeekEntry?.schedule ? (
-                  <p className="text-sm text-gray-800 leading-relaxed break-words">
+                  <p className="break-words text-sm leading-relaxed text-gray-800">
                     {currentWeekEntry.schedule}
                   </p>
+                ) : materializedWorkouts > 0 ? (
+                  <p className="text-sm leading-relaxed text-gray-600">
+                    This week&apos;s workouts are listed below—open any card for
+                    full detail. (Legacy schedule text isn&apos;t stored for
+                    this plan.)
+                  </p>
                 ) : (
-                  <p className="text-sm text-gray-500">No schedule line for this week.</p>
+                  <p className="text-sm text-gray-500">
+                    No schedule line for this week.
+                  </p>
                 )}
                 {loadingWeek && (
                   <p className="mt-2 text-xs text-gray-500">Loading workouts…</p>

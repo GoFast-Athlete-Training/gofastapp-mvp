@@ -53,6 +53,7 @@ type ActivePlanLite = {
   athleteGoalId: string | null;
   lifecycleStatus: string;
   planWeeks: unknown;
+  _count?: { planned_workouts: number };
   race_registry: { name: string } | null;
 };
 
@@ -323,11 +324,12 @@ export default function TrainingSetupClient() {
   }
 
   function scheduleReady(p: ActivePlanLite): boolean {
-    return (
+    const materialized = p._count?.planned_workouts ?? 0;
+    const legacy =
       p.planWeeks != null &&
       Array.isArray(p.planWeeks) &&
-      (p.planWeeks as unknown[]).length > 0
-    );
+      (p.planWeeks as unknown[]).length > 0;
+    return materialized > 0 || legacy;
   }
 
   if (!ready) {
@@ -342,37 +344,44 @@ export default function TrainingSetupClient() {
     const rr = wizardGoal.race_registry;
     return (
       <AthleteAppShell>
-        <div className="px-4 py-8 sm:px-6">
-          <div className="mx-auto max-w-lg rounded-2xl border border-gray-200 bg-slate-950 p-6 text-slate-100 shadow-lg">
-            <h1 className="mb-2 text-2xl font-semibold">Plan setup</h1>
-            <p className="mb-6 text-sm text-slate-400">
-              Building a plan for your goal:{" "}
-              <span className="text-slate-200">{rr.name}</span> —{" "}
+        <div className="min-h-screen bg-gray-50 px-4 py-8 sm:px-6">
+          <div className="mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white p-6 text-gray-900 shadow-sm sm:p-8">
+            <h1 className="mb-2 text-2xl font-semibold tracking-tight">Plan setup</h1>
+            <div className="mb-5 rounded-xl border border-orange-100 bg-orange-50/80 p-4 text-sm text-gray-800">
+              <p className="font-medium text-gray-900">We&apos;ll build your plan for you</p>
+              <p className="mt-2 leading-relaxed text-gray-700">
+                Next you&apos;ll set peak weekly miles, preferred training days, and we&apos;ll
+                generate every workout. You just need a start date and baseline here.
+              </p>
+            </div>
+            <p className="mb-6 text-sm text-gray-600">
+              Goal:{" "}
+              <span className="font-medium text-gray-900">{rr.name}</span> —{" "}
               {formatRaceWhen(rr.raceDate)} ({rr.raceType}). Baseline fields update your profile
               when you create the plan.
             </p>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-700 bg-slate-900/50 p-3">
+              <div className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-300">
+                  <label className="mb-1 block text-xs font-medium text-gray-700">
                     Current 5K pace
                   </label>
                   <input
-                    className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
                     value={baseline5KPace}
                     onChange={(e) => setBaseline5KPace(e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-300">
+                  <label className="mb-1 block text-xs font-medium text-gray-700">
                     Weekly mileage
                   </label>
                   <input
                     type="number"
                     min={0}
                     step={1}
-                    className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
                     value={baselineWeeklyMileage}
                     onChange={(e) => setBaselineWeeklyMileage(e.target.value)}
                   />
@@ -380,10 +389,12 @@ export default function TrainingSetupClient() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium">Plan start date</label>
+                <label className="mb-1 block text-sm font-medium text-gray-800">
+                  Plan start date
+                </label>
                 <input
                   type="date"
-                  className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
                   value={startDate}
                   onChange={(e) => {
                     setStartDate(e.target.value);
@@ -392,14 +403,14 @@ export default function TrainingSetupClient() {
                 />
               </div>
 
-              {formError && <p className="text-sm text-amber-200">{formError}</p>}
+              {formError && <p className="text-sm text-amber-800">{formError}</p>}
 
               {replaceBlockPlan && (
-                <div className="rounded-lg border border-amber-700/80 bg-amber-950/40 p-4 text-sm text-amber-50">
-                  <p className="mb-2 font-medium text-amber-100">
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                  <p className="mb-2 font-medium text-amber-950">
                     You already have an active plan for this goal
                   </p>
-                  <p className="mb-3 text-amber-100/85">
+                  <p className="mb-3 text-amber-900/90">
                     Open it to keep your schedule, or replace it with a new plan (the current one
                     will be archived).
                   </p>
@@ -409,7 +420,7 @@ export default function TrainingSetupClient() {
                       onClick={() =>
                         router.push(`/training-setup/${replaceBlockPlan.id}`)
                       }
-                      className="inline-flex justify-center rounded bg-amber-500 px-4 py-2 text-center text-sm font-medium text-slate-950 hover:bg-amber-400"
+                      className="inline-flex justify-center rounded-lg bg-amber-500 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-amber-600"
                     >
                       Open existing plan
                     </button>
@@ -417,7 +428,7 @@ export default function TrainingSetupClient() {
                       type="button"
                       disabled={creating}
                       onClick={() => void createPlan({ forceReplace: true })}
-                      className="rounded border border-amber-600/80 bg-slate-900/60 px-4 py-2 text-sm font-medium text-amber-100 hover:bg-slate-900 disabled:opacity-50"
+                      className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                     >
                       Replace with new plan
                     </button>
@@ -426,11 +437,9 @@ export default function TrainingSetupClient() {
               )}
 
               {createFeedback === "goals" && (
-                <div className="rounded-lg border border-amber-900/60 bg-amber-950/35 p-4 text-sm text-amber-50">
-                  <p className="mb-2 font-medium text-amber-100">
-                    Let&apos;s update your goal first
-                  </p>
-                  <p className="mb-3 text-amber-100/85">
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                  <p className="mb-2 font-medium">Let&apos;s update your goal first</p>
+                  <p className="mb-3 text-amber-900/90">
                     We couldn&apos;t start a plan from here—your goal or race may have changed, or
                     something needs to be finished in Goals. Nothing&apos;s wrong with your account;
                     just confirm your race and goal time, then try again.
@@ -438,14 +447,14 @@ export default function TrainingSetupClient() {
                   <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     <Link
                       href="/goals"
-                      className="inline-flex justify-center rounded bg-amber-500 px-4 py-2 text-center text-sm font-medium text-slate-950 hover:bg-amber-400"
+                      className="inline-flex justify-center rounded-lg bg-amber-500 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-amber-600"
                     >
                       Open Goals
                     </Link>
                     <button
                       type="button"
                       onClick={() => void refreshGoalsAndExitWizard()}
-                      className="rounded border border-amber-700/80 bg-slate-900/60 px-4 py-2 text-sm font-medium text-amber-100 hover:bg-slate-900"
+                      className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
                     >
                       Refresh goal list
                     </button>
@@ -454,9 +463,9 @@ export default function TrainingSetupClient() {
               )}
 
               {createFeedback === "dates" && (
-                <div className="rounded-lg border border-sky-900/60 bg-sky-950/35 p-4 text-sm text-sky-50">
-                  <p className="mb-2 font-medium text-sky-100">Check your start date</p>
-                  <p className="text-sky-100/85">
+                <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
+                  <p className="mb-2 font-medium">Check your start date</p>
+                  <p className="text-sky-900/90">
                     Your plan needs to start before race day. Pick an earlier date above, then tap
                     Create plan again.
                   </p>
@@ -464,14 +473,14 @@ export default function TrainingSetupClient() {
               )}
 
               {createFeedback === "generic" && (
-                <div className="rounded-lg border border-slate-600 bg-slate-900/60 p-4 text-sm text-slate-200">
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800">
                   <p className="mb-3">
                     We couldn&apos;t create your plan just now. Please try again in a moment.
                   </p>
                   <button
                     type="button"
                     onClick={() => setCreateFeedback(null)}
-                    className="rounded bg-slate-700 px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-600"
+                    className="rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-300"
                   >
                     Dismiss
                   </button>
@@ -482,7 +491,7 @@ export default function TrainingSetupClient() {
                 type="button"
                 onClick={() => void createPlan()}
                 disabled={creating}
-                className="w-full rounded bg-emerald-600 py-3 font-medium disabled:opacity-50"
+                className="w-full rounded-lg bg-emerald-600 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
               >
                 {creating ? "Creating…" : "Create plan"}
               </button>
@@ -490,12 +499,12 @@ export default function TrainingSetupClient() {
               <button
                 type="button"
                 onClick={exitWizard}
-                className="block w-full text-center text-sm text-slate-500 hover:text-slate-300"
+                className="block w-full text-center text-sm text-gray-500 hover:text-gray-800"
               >
                 Back to goal selection
               </button>
 
-              <Link href="/training" className="block text-center text-sm text-slate-600">
+              <Link href="/training" className="block text-center text-sm text-gray-500 hover:text-orange-600">
                 Cancel
               </Link>
             </div>
@@ -507,39 +516,39 @@ export default function TrainingSetupClient() {
 
   return (
     <AthleteAppShell>
-      <div className="px-4 py-8 sm:px-6">
-        <div className="mx-auto max-w-lg rounded-2xl border border-gray-200 bg-slate-950 p-6 text-slate-100 shadow-lg">
-          <h1 className="mb-2 text-2xl font-semibold">Training plan</h1>
-          <p className="mb-6 text-sm text-slate-400">
-            We start from an active goal with a race and goal time. Pick the goal you are training
-            for, or finish a goal in Goals first.
+      <div className="min-h-screen bg-gray-50 px-4 py-8 sm:px-6">
+        <div className="mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white p-6 text-gray-900 shadow-sm sm:p-8">
+          <h1 className="mb-2 text-2xl font-semibold tracking-tight">Training plan</h1>
+          <p className="mb-6 text-base text-gray-600">
+            We&apos;ll build your plan for you once you pick a goal—peak weekly miles, preferred
+            days, then we generate the workouts. You need an active goal with a race and goal time.
           </p>
 
           {loadingOrientation && (
-            <p className="text-sm text-slate-500">Loading your goals…</p>
+            <p className="text-sm text-gray-500">Loading your goals…</p>
           )}
 
           {orientationError && (
-            <p className="mb-4 text-sm text-red-400">{orientationError}</p>
+            <p className="mb-4 text-sm text-red-600">{orientationError}</p>
           )}
 
           {!loadingOrientation && activePlans.length > 0 && (
-            <div className="mb-6 rounded-xl border border-emerald-800/50 bg-emerald-950/25 p-4 text-sm text-emerald-50">
-              <p className="mb-1 font-medium text-emerald-100">Your active plan</p>
-              <p className="mb-1 text-emerald-100/90">{activePlans[0].name}</p>
+            <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+              <p className="mb-1 font-medium text-emerald-900">Your active plan</p>
+              <p className="mb-1 text-emerald-900/95">{activePlans[0].name}</p>
               {activePlans[0].race_registry?.name && (
-                <p className="mb-3 text-xs text-emerald-200/80">
+                <p className="mb-3 text-xs text-emerald-800/90">
                   {activePlans[0].race_registry.name}
                   {scheduleReady(activePlans[0]) ? " · Schedule ready" : " · Not generated yet"}
                 </p>
               )}
               <Link
                 href={`/training-setup/${activePlans[0].id}`}
-                className="mb-2 inline-flex w-full justify-center rounded-lg bg-emerald-500 px-4 py-2.5 text-center text-sm font-semibold text-slate-950 hover:bg-emerald-400 sm:w-auto"
+                className="mb-2 inline-flex w-full justify-center rounded-lg bg-emerald-600 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 sm:w-auto"
               >
                 Continue to plan
               </Link>
-              <p className="mt-3 text-xs text-emerald-200/70">
+              <p className="mt-3 text-xs text-emerald-800/80">
                 Use the goals below only if you want a different goal. Creating another plan for the
                 same goal will ask before replacing this one.
               </p>
@@ -551,12 +560,12 @@ export default function TrainingSetupClient() {
               {qualifyingGoals.map((g) => (
                 <li
                   key={g.id}
-                  className="rounded-lg border border-slate-700 bg-slate-900/50 p-4"
+                  className="rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm"
                 >
-                  <div className="mb-2 font-medium text-slate-100">
+                  <div className="mb-2 font-medium text-gray-900">
                     {g.race_registry?.name ?? "Race"}
                   </div>
-                  <div className="text-xs text-slate-400">
+                  <div className="text-xs text-gray-600">
                     {g.race_registry
                       ? `${formatRaceWhen(g.race_registry.raceDate)} · Goal time ${g.goalTime}`
                       : g.goalTime}
@@ -564,7 +573,7 @@ export default function TrainingSetupClient() {
                   <button
                     type="button"
                     onClick={() => beginWizardForGoal(g)}
-                    className="mt-3 w-full rounded bg-amber-500 py-2 text-sm font-medium text-slate-950"
+                    className="mt-3 w-full rounded-lg bg-orange-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-orange-600"
                   >
                     Train for this goal
                   </button>
@@ -574,15 +583,15 @@ export default function TrainingSetupClient() {
           )}
 
           {!loadingOrientation && qualifyingGoals.length === 0 && activeNeedsRace && (
-            <div className="mb-6 rounded-lg border border-amber-900/50 bg-amber-950/20 p-4 text-sm text-amber-100">
+            <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
               <p className="mb-2 font-medium">Add a race to your goal</p>
-              <p className="mb-3 text-amber-100/80">
+              <p className="mb-3 text-amber-900/90">
                 Your active goal does not have a race yet. Choose a race in Goals, then set a goal
                 time.
               </p>
               <Link
                 href="/goals"
-                className="inline-block rounded bg-amber-500 px-4 py-2 text-sm font-medium text-slate-950"
+                className="inline-block rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-600"
               >
                 Open Goals
               </Link>
@@ -590,15 +599,15 @@ export default function TrainingSetupClient() {
           )}
 
           {!loadingOrientation && qualifyingGoals.length === 0 && incompleteRaceNeedsTime && (
-            <div className="mb-6 rounded-lg border border-amber-900/50 bg-amber-950/20 p-4 text-sm text-amber-100">
+            <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
               <p className="mb-2 font-medium">Finish your goal time</p>
-              <p className="mb-3 text-amber-100/80">
+              <p className="mb-3 text-amber-900/90">
                 You have a race on your goal, but no goal time yet. Add a time in Goals before
                 building a plan.
               </p>
               <Link
                 href="/goals"
-                className="inline-block rounded bg-amber-500 px-4 py-2 text-sm font-medium text-slate-950"
+                className="inline-block rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-600"
               >
                 Open Goals
               </Link>
@@ -607,8 +616,8 @@ export default function TrainingSetupClient() {
 
           {!loadingOrientation && qualifyingGoals.length === 0 && signups.length > 0 && (
             <div className="mb-6">
-              <h2 className="mb-2 text-sm font-medium text-slate-300">Your race signups</h2>
-              <p className="mb-3 text-xs text-slate-500">
+              <h2 className="mb-2 text-sm font-medium text-gray-800">Your race signups</h2>
+              <p className="mb-3 text-xs text-gray-500">
                 Set a goal (race + goal time) for one of these to unlock plan setup.
               </p>
               <ul className="space-y-2">
@@ -618,17 +627,17 @@ export default function TrainingSetupClient() {
                   return (
                     <li
                       key={s.id}
-                      className="flex flex-col gap-2 rounded-lg border border-slate-700 bg-slate-900/40 p-3 sm:flex-row sm:items-center sm:justify-between"
+                      className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div>
-                        <div className="text-sm font-medium text-slate-200">{r.name}</div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-sm font-medium text-gray-900">{r.name}</div>
+                        <div className="text-xs text-gray-500">
                           {formatRaceWhen(r.raceDate)} · {r.raceType}
                         </div>
                       </div>
                       <Link
                         href={`/goals?raceRegistryId=${encodeURIComponent(s.raceRegistryId)}`}
-                        className="shrink-0 rounded bg-slate-700 px-3 py-2 text-center text-sm font-medium text-slate-100 hover:bg-slate-600"
+                        className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-center text-sm font-medium text-gray-800 hover:bg-gray-50"
                       >
                         Set goal for this race
                       </Link>
@@ -644,26 +653,26 @@ export default function TrainingSetupClient() {
             signups.length === 0 &&
             !incompleteRaceNeedsTime &&
             !activeNeedsRace && (
-              <div className="mb-6 rounded-lg border border-slate-700 bg-slate-900/40 p-4 text-sm text-slate-400">
+              <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
                 <p className="mb-3">
                   No active goal with a race and goal time yet, and no race signups. Add a race in
                   Goals (or sign up for a race), set your goal time, then come back here.
                 </p>
                 <Link
                   href="/goals"
-                  className="inline-block rounded bg-amber-500 px-4 py-2 text-sm font-medium text-slate-950"
+                  className="inline-block rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
                 >
                   Go to Goals
                 </Link>
               </div>
             )}
 
-          <div className="border-t border-slate-800 pt-4 text-center">
-            <Link href="/goals" className="text-sm text-slate-500 hover:text-slate-300">
+          <div className="border-t border-gray-200 pt-4 text-center">
+            <Link href="/goals" className="text-sm text-gray-500 hover:text-orange-600">
               Manage goals
             </Link>
-            <span className="mx-2 text-slate-700">·</span>
-            <Link href="/training" className="text-sm text-slate-500 hover:text-slate-300">
+            <span className="mx-2 text-gray-300">·</span>
+            <Link href="/training" className="text-sm text-gray-500 hover:text-orange-600">
               Back to Training
             </Link>
           </div>

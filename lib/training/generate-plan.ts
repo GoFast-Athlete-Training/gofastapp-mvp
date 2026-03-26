@@ -1,5 +1,6 @@
 /**
- * Deterministic marathon-style plan: nOffset-based volume, quality-day geometry from race day.
+ * Deterministic marathon-style plan: long-run anchor, calendar weeks-to-race for volume
+ * (late joiners get taper-shaped load), easy mileage trimmed first when squeezing the week.
  */
 
 import type { WorkoutType } from "@prisma/client";
@@ -14,6 +15,12 @@ const DAY_NAMES = [
   "Saturday",
   "Sunday",
 ] as const;
+
+const MIN_TEMPO_MI = 3;
+const MIN_INTERVAL_MI = 3;
+const MIN_LONG_MI = 8;
+const MIN_EASY_PER_DAY_MI = 3;
+const MIN_EASY_WEEK_MI = 4;
 
 const ANCHORS: Record<number, number> = {
   0: 0,
@@ -43,13 +50,15 @@ export function longRunMilesForOffset(nOffset: number): number {
 export function weeklyTotalMiles(
   longRun: number,
   nOffset: number,
-  weeklyMileageTarget: number
+  weeklyMileageTarget: number,
+  minWeeklyMiles: number = 40
 ): number {
   let total = longRun * 2.5;
   if (nOffset >= -3) total *= 0.75;
   const rounded = Math.round(total);
-  const cap = Math.max(30, Math.min(80, weeklyMileageTarget));
-  return Math.max(30, Math.min(cap, rounded));
+  const floor = Math.max(25, minWeeklyMiles);
+  const cap = Math.max(floor, Math.min(80, weeklyMileageTarget));
+  return Math.max(floor, Math.min(cap, rounded));
 }
 
 function utcDateOnly(d: Date): Date {
@@ -89,6 +98,130 @@ function qualityDayOurDows(raceOurDow: number): {
   };
 }
 
+export function nOffsetFromWeekAnchor(weekAnchor: Date, raceUtc: Date): number {
+  const dayDiff = Math.floor(
+    (utcDateOnly(raceUtc).getTime() - utcDateOnly(weekAnchor).getTime()) / 86400000
+  );
+  if (dayDiff < 0) return 0;
+  if (dayDiff <= 6) return 0;
+  return -Math.ceil(dayDiff / 7);
+}
+
+
+/** Phase key (e.g. base, build) for a calendar week — matches deterministic generator. */
+export function cataloguePhaseFallbackForWeek(
+  planStartRaw: Date | string,
+  raceRaw: Date | string,
+  weekNumber: number
+): string {
+  const planStart = utcDateOnly(
+    typeof planStartRaw === "string" ? new Date(planStartRaw) : planStartRaw
+  );
+  const raceUtc = utcDateOnly(typeof raceRaw === "string" ? new Date(raceRaw) : raceRaw);
+  const weekAnchor = addDaysUtc(planStart, (weekNumber - 1) * 7);
+  const nOffset = nOffsetFromWeekAnchor(weekAnchor, raceUtc);
+  return phaseForCatalogue(nOffset);
+}
+
+function compressQualityToCap(
+  weeklyCap: number,
+  longMi: number,
+  tempoMi: number,
+  intervalMi: number
+): { longMi: number; tempoMi: number; intervalMi: number } {
+  let L = longMi;
+  let T = tempoMi;
+  let I = intervalMi;
+  let over = L + T + I - weeklyCap;
+  while (over > 0.05) {
+    let progressed = false;
+    if (I > MIN_INTERVAL_MI) {
+      const d = Math.min(I - MIN_INTERVAL_MI, over);
+      I -= d;
+      over -= d;
+      progressed = true;
+    }
+    if (over <= 0) break;
+    if (T > MIN_TEMPO_MI) {
+      const d = Math.min(T - MIN_TEMPO_MI, over);
+      T -= d;
+      over -= d;
+      progressed = true;
+    }
+    if (over <= 0) break;
+    if (L > MIN_LONG_MI) {
+      const d = Math.min(L - MIN_LONG_MI, over);
+      L -= d;
+      over -= d;
+      progressed = true;
+    }
+    if (!progressed) break;
+  }
+  return { longMi: L, tempoMi: T, intervalMi: I };
+}
+
+function fundEasyMiles(
+  weeklyCap: number,
+  longMi: number,
+  tempoMi: number,
+  intervalMi: number,
+  longCapFromWeekly: number
+): { longMi: number; tempoMi: number; intervalMi: number; easyMi: number } {
+  let L = Math.min(longMi, longCapFromWeekly);
+  let T = tempoMi;
+  let I = intervalMi;
+  let easyMi = weeklyCap - L - T - I;
+
+  if (easyMi >= MIN_EASY_WEEK_MI) {
+    return { longMi: L, tempoMi: T, intervalMi: I, easyMi };
+  }
+
+  const need = MIN_EASY_WEEK_MI - easyMi;
+  if (need > 0 && L - MIN_LONG_MI > 0) {
+    const take = Math.min(need, L - MIN_LONG_MI);
+    L -= take;
+    easyMi += take;
+  }
+
+  easyMi = weeklyCap - L - T - I;
+  if (easyMi >= MIN_EASY_WEEK_MI) {
+    return { longMi: L, tempoMi: T, intervalMi: I, easyMi };
+  }
+
+  const need2 = MIN_EASY_WEEK_MI - easyMi;
+  if (need2 > 0) {
+    if (I - MIN_INTERVAL_MI > 0) {
+      const take = Math.min(need2, I - MIN_INTERVAL_MI);
+      I -= take;
+      easyMi += take;
+    }
+    easyMi = weeklyCap - L - T - I;
+  }
+  if (easyMi >= MIN_EASY_WEEK_MI) {
+    return { longMi: L, tempoMi: T, intervalMi: I, easyMi };
+  }
+
+  const need3 = MIN_EASY_WEEK_MI - easyMi;
+  if (need3 > 0 && T - MIN_TEMPO_MI > 0) {
+    const take = Math.min(need3, T - MIN_TEMPO_MI);
+    T -= take;
+    easyMi += take;
+  }
+
+  easyMi = Math.max(0, weeklyCap - L - T - I);
+  const packed = compressQualityToCap(weeklyCap, L, T, I);
+  easyMi = Math.max(
+    0,
+    weeklyCap - packed.longMi - packed.tempoMi - packed.intervalMi
+  );
+  return {
+    longMi: packed.longMi,
+    tempoMi: packed.tempoMi,
+    intervalMi: packed.intervalMi,
+    easyMi,
+  };
+}
+
 export interface GeneratePlanInput {
   planId: string;
   athleteId: string;
@@ -96,6 +229,7 @@ export interface GeneratePlanInput {
   planStartDate: Date;
   raceDate: Date;
   weeklyMileageTarget: number;
+  minWeeklyMiles?: number;
   preferredDays: number[];
   raceName: string;
   raceDistanceMiles: number;
@@ -115,26 +249,96 @@ export interface GeneratedPlanWorkoutRow {
   catalogueWorkoutId: null;
 }
 
-/**
- * One row per scheduled training day (excludes rest days). Race week is the race only.
- */
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function trimEasyAssignmentsToWeeklyTotal(params: {
+  assignment: Map<
+    number,
+    { kind: "tempo" | "interval" | "long" | "easy"; miles: number }
+  >;
+  weeklyCap: number;
+}): void {
+  const { assignment, weeklyCap } = params;
+  const sumAssigned = (): number => {
+    let s = 0;
+    for (const v of assignment.values()) s += v.miles;
+    return Math.round(s * 100) / 100;
+  };
+  let over = sumAssigned() - weeklyCap;
+  if (over <= 0.05) return;
+
+  const easyEntries = [...assignment.entries()].filter(
+    ([, v]) => v.kind === "easy" && v.miles > MIN_EASY_PER_DAY_MI
+  );
+  easyEntries.sort((a, b) => b[1].miles - a[1].miles);
+
+  for (const [dow, v] of easyEntries) {
+    if (over <= 0.05) break;
+    const room = v.miles - MIN_EASY_PER_DAY_MI;
+    if (room <= 0) continue;
+    const shave = Math.min(room, over);
+    assignment.set(dow, { kind: "easy", miles: round2(v.miles - shave) });
+    over -= shave;
+  }
+
+  if (over <= 0.05) return;
+
+  const order: Array<"interval" | "tempo" | "long"> = [
+    "interval",
+    "tempo",
+    "long",
+  ];
+  for (const kind of order) {
+    if (over <= 0.05) break;
+    for (const [dow, v] of [...assignment.entries()]) {
+      if (over <= 0.05) break;
+      if (v.kind !== kind) continue;
+      const minM =
+        kind === "interval"
+          ? MIN_INTERVAL_MI
+          : kind === "tempo"
+            ? MIN_TEMPO_MI
+            : MIN_LONG_MI;
+      const room = v.miles - minM;
+      if (room <= 0) continue;
+      const shave = Math.min(room, over);
+      assignment.set(dow, { kind: v.kind, miles: round2(v.miles - shave) });
+      over -= shave;
+    }
+  }
+}
+
 export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlanWorkoutRow[] {
+  const minWeekly = input.minWeeklyMiles ?? 40;
   const preferred =
     input.preferredDays.length > 0
       ? [...input.preferredDays].sort((a, b) => a - b)
       : [1, 2, 3, 4, 5, 6];
 
   const raceUtc = utcDateOnly(input.raceDate);
+  const planStart = utcDateOnly(input.planStartDate);
   const raceOurDow = ourDowFromUtcDate(raceUtc);
   const q = qualityDayOurDows(raceOurDow);
 
   const out: GeneratedPlanWorkoutRow[] = [];
 
-  for (let weekNumber = 1; weekNumber <= input.totalWeeks; weekNumber++) {
-    const nOffset = weekNumber - input.totalWeeks;
-    const phase = phaseForCatalogue(nOffset);
-    const weekAnchor = addDaysUtc(input.planStartDate, (weekNumber - 1) * 7);
+  if (planStart.getTime() > raceUtc.getTime()) {
+    return out;
+  }
+
+  let weekNumber = 0;
+  for (;;) {
+    weekNumber += 1;
+    if (weekNumber > input.totalWeeks) break;
+
+    const weekAnchor = addDaysUtc(planStart, (weekNumber - 1) * 7);
+    if (weekAnchor.getTime() > raceUtc.getTime()) break;
+
     const weekEnd = addDaysUtc(weekAnchor, 6);
+    const nOffset = nOffsetFromWeekAnchor(weekAnchor, raceUtc);
+    const phase = phaseForCatalogue(nOffset);
 
     const blockedOurDow = new Set<number>();
     const dayBeforeRace = addDaysUtc(raceUtc, -1);
@@ -169,22 +373,33 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
     }
 
     let longMi = longRunMilesForOffset(nOffset);
-    let weeklyMi = weeklyTotalMiles(longMi, nOffset, input.weeklyMileageTarget);
-    longMi = Math.min(longMi, Math.floor(weeklyMi * 0.4 * 10) / 10);
+    let weeklyMi = weeklyTotalMiles(
+      longMi,
+      nOffset,
+      input.weeklyMileageTarget,
+      minWeekly
+    );
+    const longCap = Math.floor(weeklyMi * 0.4 * 10) / 10;
+    longMi = Math.min(longMi, longCap);
 
     let tempoMi = 5;
     let intervalMi = 5;
-    let easyMi = Math.max(0, weeklyMi - longMi - tempoMi - intervalMi);
+    let packed = compressQualityToCap(weeklyMi, longMi, tempoMi, intervalMi);
+    longMi = packed.longMi;
+    tempoMi = packed.tempoMi;
+    intervalMi = packed.intervalMi;
 
-    if (easyMi < 4) {
-      const deficit = 4 - easyMi;
-      const take = Math.min(deficit, tempoMi + intervalMi);
-      const fromT = Math.min(tempoMi, Math.floor(take / 2));
-      tempoMi -= fromT;
-      intervalMi -= take - fromT;
-      easyMi = weeklyMi - longMi - tempoMi - intervalMi;
-    }
-    easyMi = Math.max(0, easyMi);
+    const funded = fundEasyMiles(
+      weeklyMi,
+      longMi,
+      tempoMi,
+      intervalMi,
+      longCap
+    );
+    longMi = funded.longMi;
+    tempoMi = funded.tempoMi;
+    intervalMi = funded.intervalMi;
+    const easyMi = funded.easyMi;
 
     type DayKind = "tempo" | "interval" | "long" | "easy";
     const assignment = new Map<number, { kind: DayKind; miles: number }>();
@@ -193,7 +408,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
       if (miles <= 0) return;
       if (blockedOurDow.has(ourDow)) return;
       if (assignment.has(ourDow)) return;
-      assignment.set(ourDow, { kind, miles });
+      assignment.set(ourDow, { kind, miles: round2(miles) });
     };
 
     tryPlace(q.tempoOurDow, "tempo", tempoMi);
@@ -205,6 +420,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
       tryPlace(longDayTarget, "long", longMi);
     }
 
+    let absorbLongIntoEasy = 0;
     if (skipLongOnLongRunDay && longMi > 0) {
       const candidates = preferred.filter(
         (d) =>
@@ -215,10 +431,9 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
       );
       const fallback = candidates[0];
       if (fallback != null) {
-        assignment.set(fallback, { kind: "long", miles: longMi });
+        assignment.set(fallback, { kind: "long", miles: round2(longMi) });
       } else {
-        easyMi += longMi;
-        longMi = 0;
+        absorbLongIntoEasy = longMi;
       }
     }
 
@@ -233,12 +448,14 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
             (d) => !blockedOurDow.has(d) && !usedForQuality.has(d)
           );
 
-    if (easyMi > 0 && easyDays.length > 0) {
-      const base = Math.floor((easyMi / easyDays.length) * 10) / 10;
+    let easyBudget = easyMi + absorbLongIntoEasy;
+
+    if (easyBudget > 0 && easyDays.length > 0) {
+      const base = Math.floor((easyBudget / easyDays.length) * 10) / 10;
       for (let i = 0; i < easyDays.length; i++) {
         let m =
           i === easyDays.length - 1
-            ? Math.round((easyMi - base * (easyDays.length - 1)) * 10) / 10
+            ? round2(easyBudget - base * (easyDays.length - 1))
             : base;
         if (m < 0.25) continue;
         const d = easyDays[i];
@@ -250,17 +467,19 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
         const a = assignment.get(d);
         return s + (a?.kind === "easy" ? a.miles : 0);
       }, 0);
-      const miss = easyMi - sumEasy;
+      const miss = easyBudget - sumEasy;
       if (Math.abs(miss) > 0.15 && lastEasy != null) {
         const cur = assignment.get(lastEasy);
         if (cur?.kind === "easy") {
           assignment.set(lastEasy, {
             kind: "easy",
-            miles: Math.max(0.25, cur.miles + miss),
+            miles: Math.max(MIN_EASY_PER_DAY_MI, round2(cur.miles + miss)),
           });
         }
       }
     }
+
+    trimEasyAssignmentsToWeeklyTotal({ assignment, weeklyCap: weeklyMi });
 
     for (const [ourDow, { kind, miles }] of assignment) {
       if (miles < 0.25) continue;

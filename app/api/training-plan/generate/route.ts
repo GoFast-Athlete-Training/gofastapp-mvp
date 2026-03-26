@@ -10,7 +10,7 @@ import { Prisma } from "@prisma/client";
 
 /**
  * POST /api/training-plan/generate
- * Body: { trainingPlanId }
+ * Body: { trainingPlanId?, weeklyMileageTarget?, minWeeklyMiles? }
  * Deterministic plan: all workout rows written in one transaction; planWeeks/phases cleared.
  */
 export async function POST(request: NextRequest) {
@@ -62,11 +62,25 @@ export async function POST(request: NextRequest) {
       where: { athleteId: athlete.id },
     });
 
-    const weeklyMileageTarget =
-      plan.weeklyMileageTarget ??
-      prefs?.weeklyMileageTarget ??
-      athlete.weeklyMileage ??
-      45;
+    const rawMin = body.minWeeklyMiles;
+    const minWeeklyMiles =
+      typeof rawMin === "number" && Number.isFinite(rawMin)
+        ? Math.max(25, Math.min(70, Math.round(rawMin)))
+        : 40;
+
+    const rawTarget = body.weeklyMileageTarget;
+    let weeklyMileageTarget =
+      typeof rawTarget === "number" && Number.isFinite(rawTarget)
+        ? Math.round(rawTarget)
+        : plan.weeklyMileageTarget ??
+          prefs?.weeklyMileageTarget ??
+          athlete.weeklyMileage ??
+          45;
+
+    weeklyMileageTarget = Math.max(
+      minWeeklyMiles,
+      Math.min(100, weeklyMileageTarget)
+    );
 
     const preferredDays =
       plan.preferredDays?.length > 0
@@ -83,6 +97,7 @@ export async function POST(request: NextRequest) {
       planStartDate: plan.startDate,
       raceDate: race.raceDate,
       weeklyMileageTarget,
+      minWeeklyMiles,
       preferredDays,
       raceName: race.name,
       raceDistanceMiles: race.distanceMiles,

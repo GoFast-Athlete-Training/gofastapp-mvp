@@ -159,6 +159,10 @@ export async function POST(request: NextRequest) {
           startDate,
           totalWeeks,
           currentWeeklyMileage: weeklyResolved,
+          weeklyMileageTarget:
+            weeklyResolved != null && Number.isFinite(Number(weeklyResolved))
+              ? Math.max(25, Math.min(100, Math.round(Number(weeklyResolved))))
+              : null,
           currentFiveKPace: fiveKPaceResolved,
           lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
           preferredDays,
@@ -232,6 +236,7 @@ export async function GET(request: NextRequest) {
         createdAt: true,
         updatedAt: true,
         race_registry: { select: { name: true } },
+        _count: { select: { planned_workouts: true } },
       },
     });
 

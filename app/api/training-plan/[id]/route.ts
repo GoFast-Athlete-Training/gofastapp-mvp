@@ -36,6 +36,7 @@ export async function GET(request: NextRequest, context: Ctx) {
             distance: true,
           },
         },
+        _count: { select: { planned_workouts: true } },
       },
     });
     if (!plan) {
@@ -122,6 +123,12 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         data.preferredDays = body.preferredDays
           .map((n: unknown) => Number(n))
           .filter((n: number) => n >= 1 && n <= 7);
+      }
+      if (body.weeklyMileageTarget != null) {
+        const n = Number(body.weeklyMileageTarget);
+        if (Number.isFinite(n)) {
+          data.weeklyMileageTarget = Math.max(25, Math.min(100, Math.round(n)));
+        }
       }
       if (body.athleteGoalId != null) {
         const gid = String(body.athleteGoalId);
