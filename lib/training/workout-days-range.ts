@@ -17,6 +17,8 @@ import {
   dateForDayInWeek,
   dayAbbrToOurDow,
 } from "./schedule-parser";
+import { selectNextCatalogueWorkout } from "./select-catalogue-workout";
+import { catalogueEntryToApiSegments } from "./catalogue-to-segments";
 
 function milesToMeters(miles: number): number {
   return miles * 1609.34;
@@ -136,34 +138,57 @@ export async function workoutDaysRangeForWeek(params: {
   const tokens = parseScheduleString(schedule);
   const anchorSecPerMile = baselineSecondsPerMileFromAthlete(plan.Athlete?.fiveKPace);
   const paces = getTrainingPaces(anchorSecPerMile);
+  const phaseNorm = (phase || "base").trim().toLowerCase();
+
+  const cataloguePicks: Awaited<
+    ReturnType<typeof selectNextCatalogueWorkout>
+  >[] = [];
+  for (const token of tokens) {
+    cataloguePicks.push(
+      await selectNextCatalogueWorkout(athleteId, token.workoutType, phaseNorm)
+    );
+  }
 
   const created: workouts[] = [];
 
   await prisma.$transaction(async (tx) => {
-    for (const token of tokens) {
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+      const catalogueEntry = cataloguePicks[i];
       const ourDow = dayAbbrToOurDow(token.dayAbbr);
       const date = dateForDayInWeek(plan.startDate, weekNumber, ourDow);
       const estMeters = milesToMeters(token.miles);
 
+      const title =
+        catalogueEntry != null
+          ? `${catalogueEntry.name} — Week ${weekNumber}`
+          : titleForType(token.workoutType, token.miles, weekNumber);
+
       const w = await tx.workouts.create({
         data: {
-          title: titleForType(token.workoutType, token.miles, weekNumber),
+          title,
           workoutType: token.workoutType,
           athleteId,
           planId,
           date,
           phase: phase || null,
           estimatedDistanceInMeters: estMeters,
+          catalogueWorkoutId: catalogueEntry?.id ?? null,
           updatedAt: new Date(),
         },
       });
 
-      const descriptors = getTemplateSegments(
-        token.workoutType,
-        token.miles,
-        paces
-      );
-      const apiSegs = descriptorsToApiSegments(descriptors, paces);
+      const apiSegs =
+        catalogueEntry != null
+          ? catalogueEntryToApiSegments({
+              entry: catalogueEntry,
+              scheduleMiles: token.miles,
+              anchorSecondsPerMile: anchorSecPerMile,
+            })
+          : descriptorsToApiSegments(
+              getTemplateSegments(token.workoutType, token.miles, paces),
+              paces
+            );
 
       const segmentRows: Prisma.workout_segmentsCreateManyInput[] = apiSegs.map(
         (s) => ({

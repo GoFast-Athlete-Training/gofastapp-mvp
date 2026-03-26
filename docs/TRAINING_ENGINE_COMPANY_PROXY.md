@@ -31,5 +31,8 @@ Company forwards `Authorization` from the logged-in user and adds:
 - `PUT|DELETE /api/training/prompts/[id]/instructions/[instructionId]`
 - `GET|PUT|DELETE /api/rulesets/[id]`
 - `POST /api/rulesets/cluster` (OpenAI clustering; needs `OPENAI_API_KEY` on product)
+- `GET|POST /api/training/catalogue` (workout catalogue CRUD)
+- `PUT|DELETE /api/training/catalogue/[id]`
+- `POST /api/training/catalogue/bulk` (body `{ items: [...] }`, upsert by `name` + `workoutType`)
 
 Plan generation for athletes uses `lib/training/prompt-resolver.ts` (no Company hop).

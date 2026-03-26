@@ -1,6 +1,6 @@
 /**
  * Phase-2 evaluation: use ACTIVITY_DETAIL laps + samples vs workout segments (repeat-expanded).
- * Only refines derivedPerformanceDeltaSeconds when lap count matches expected slots.
+ * Writes per-segment actual pace/distance/duration when lap count matches expanded slots.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -21,8 +21,9 @@ function paceTargetSecPerMileFromTargets(targets: unknown): number | null {
   return Math.round(low * 1.60934);
 }
 
-function expandSegmentSlots(
+function expandSegmentSlotsWithIds(
   segments: {
+    id: string;
     stepOrder: number;
     targets: Prisma.JsonValue;
     title: string;
@@ -30,11 +31,19 @@ function expandSegmentSlots(
   }[]
 ) {
   const sorted = [...segments].sort((a, b) => a.stepOrder - b.stepOrder);
-  const slots: { targets: Prisma.JsonValue; title: string }[] = [];
+  const slots: {
+    segmentId: string;
+    targets: Prisma.JsonValue;
+    title: string;
+  }[] = [];
   for (const seg of sorted) {
     const r = Math.max(1, seg.repeatCount ?? 1);
     for (let k = 0; k < r; k++) {
-      slots.push({ targets: seg.targets, title: seg.title });
+      slots.push({
+        segmentId: seg.id,
+        targets: seg.targets,
+        title: seg.title,
+      });
     }
   }
   return slots;
@@ -57,6 +66,13 @@ function avgSpeedInWindow(
   const sum = inWin.reduce((a, s) => a + (s.speedMetersPerSecond as number), 0);
   return sum / inWin.length;
 }
+
+type Agg = {
+  totalDur: number;
+  totalDistMiles: number;
+  paceWeightedSum: number;
+  paceWeight: number;
+};
 
 /**
  * After detailData is hydrated, refine workout evaluation if laps align with segment slots.
@@ -82,7 +98,7 @@ export async function evaluateLapSegmentsAfterDetail(
     return;
   }
 
-  const slots = expandSegmentSlots(workout.segments);
+  const slots = expandSegmentSlotsWithIds(workout.segments);
   if (laps.length !== slots.length) {
     console.warn(
       `[evaluateLapSegments] lap count ${laps.length} !== expected slots ${slots.length} for activity ${athleteActivityId}`
@@ -100,6 +116,7 @@ export async function evaluateLapSegmentsAfterDetail(
   if (lapStarts.length !== laps.length) return;
 
   const deltas: number[] = [];
+  const bySeg = new Map<string, Agg>();
 
   const lastLapStart = lapStarts[lapStarts.length - 1];
   const lastSampleT =
@@ -109,15 +126,51 @@ export async function evaluateLapSegmentsAfterDetail(
 
   for (let i = 0; i < slots.length; i++) {
     const t0 = lapStarts[i];
-    const t1 =
-      i + 1 < lapStarts.length ? lapStarts[i + 1] : lastSampleT;
+    const t1 = i + 1 < lapStarts.length ? lapStarts[i + 1] : lastSampleT;
+    const dur = Math.max(0, t1 - t0);
     const target = paceTargetSecPerMileFromTargets(slots[i].targets);
-    if (target == null) continue;
 
     const avgMps = avgSpeedInWindow(sortedSamples, t0, t1);
-    if (avgMps == null || avgMps <= 0) continue;
-    const actualSecPerMile = Math.round(1609.34 / avgMps);
-    deltas.push(target - actualSecPerMile);
+    const segmentId = slots[i].segmentId;
+    let agg = bySeg.get(segmentId);
+    if (!agg) {
+      agg = { totalDur: 0, totalDistMiles: 0, paceWeightedSum: 0, paceWeight: 0 };
+      bySeg.set(segmentId, agg);
+    }
+    agg.totalDur += dur;
+    if (avgMps != null && avgMps > 0 && dur > 0) {
+      agg.totalDistMiles += (avgMps * dur) / 1609.34;
+      const actualSecPerMile = Math.round(1609.34 / avgMps);
+      agg.paceWeightedSum += actualSecPerMile * dur;
+      agg.paceWeight += dur;
+    }
+
+    if (target == null || avgMps == null || avgMps <= 0) continue;
+
+    const actualSecPerMileRow = Math.round(1609.34 / avgMps);
+    deltas.push(target - actualSecPerMileRow);
+  }
+
+  for (const [segmentId, agg] of bySeg) {
+    if (agg.totalDur <= 0 && agg.paceWeight <= 0 && agg.totalDistMiles <= 0) {
+      continue;
+    }
+    const data: Prisma.workout_segmentsUpdateInput = { updatedAt: new Date() };
+    if (agg.totalDur > 0) {
+      data.actualDurationSeconds = Math.round(agg.totalDur);
+    }
+    if (agg.totalDistMiles > 0) {
+      data.actualDistanceMiles = Math.round(agg.totalDistMiles * 100) / 100;
+    }
+    if (agg.paceWeight > 0) {
+      data.actualPaceSecPerMile = Math.round(
+        agg.paceWeightedSum / agg.paceWeight
+      );
+    }
+    await prisma.workout_segments.update({
+      where: { id: segmentId },
+      data,
+    });
   }
 
   if (deltas.length === 0) return;

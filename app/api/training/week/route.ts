@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { workoutDaysRangeForWeek } from "@/lib/training/workout-days-range";
+import { phaseForCatalogue } from "@/lib/training/generate-plan";
 
 /**
  * GET /api/training/week?planId=&weekNumber=
@@ -46,18 +46,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const workouts = await workoutDaysRangeForWeek({
-      planId,
-      athleteId: auth.athlete.id,
-      weekNumber,
+    const workouts = await prisma.workouts.findMany({
+      where: {
+        planId,
+        athleteId: auth.athlete.id,
+        weekNumber,
+      },
+      orderBy: { date: "asc" },
     });
 
+    const nOffset = weekNumber - plan.totalWeeks;
     const cards = workouts.map((w) => ({
       id: w.id,
       title: w.title,
       workoutType: w.workoutType,
       date: w.date,
-      phase: w.phase,
+      phase: w.phase ?? phaseForCatalogue(w.nOffset ?? nOffset),
       estimatedDistanceInMeters: w.estimatedDistanceInMeters,
       matchedActivityId: w.matchedActivityId,
       actualDistanceMeters: w.actualDistanceMeters,

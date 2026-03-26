@@ -801,6 +801,8 @@ model training_plans {
   athleteGoalId        String?
   name                 String
   currentWeeklyMileage Int?
+  /// Peak weekly mileage target (miles); falls back to preferences / athlete / default at generation time
+  weeklyMileageTarget  Int?
   /// Snapshot of current 5K pace (same string format as Athlete.fiveKPace) for plan-scoped hydration/comparison
   currentFiveKPace     String?
   lifecycleStatus      TrainingPlanLifecycle  @default(ACTIVE)
@@ -832,6 +834,35 @@ model training_schemas {
   updatedAt   DateTime
 }
 
+/// Coach-curated prescriptions: intervals/tempo/long templates with pace offsets from current 5K.
+model workout_catalogue {
+  id                           String      @id @default(cuid())
+  name                         String
+  workoutType                  WorkoutType
+  /// Phases this entry applies to, e.g. ["base","build"]
+  intendedPhase                String[]
+  progressionIndex             Int
+  reps                         Int?
+  repDistanceMeters            Int?
+  recoveryDistanceMeters       Int?
+  warmupMiles                  Float?
+  cooldownMiles                Float?
+  /// Sec/mile vs athlete current 5K pace (negative = faster than 5K)
+  repPaceOffsetSecPerMile      Int?
+  recoveryPaceOffsetSecPerMile Int?
+  overallPaceOffsetSecPerMile  Int?
+  intendedHeartRateZone        String?
+  intendedHRBpmLow             Int?
+  intendedHRBpmHigh            Int?
+  notes                        String?
+  createdAt                    DateTime    @default(now())
+  updatedAt                    DateTime    @updatedAt
+  workouts                     workouts[]
+
+  @@unique([name, workoutType])
+  @@index([workoutType, progressionIndex])
+}
+
 model workouts {
   id                        String              @id @default(cuid())
   title                     String
@@ -840,12 +871,20 @@ model workouts {
   athleteId                 String
   /// Training plan this workout belongs to (null = standalone)
   planId                    String?
+  /// Selected catalogue prescription when materialized from plan schedule
+  catalogueWorkoutId        String?
   /// Scheduled calendar date for plan workouts
   date                      DateTime?
   /// base | build | peak | taper
   phase                     String?
   /// Garmin field: planned total distance in meters (source of truth before segment expansion)
   estimatedDistanceInMeters Float?
+  /// Weeks before race: first week = -(totalWeeks-1), race week = 0; null for standalone
+  nOffset                   Int?
+  /// 1-based week index within the plan; null for standalone
+  weekNumber                Int?
+  /// Assigned weekday name e.g. "Monday"; null for standalone
+  dayAssigned               String?
   /// Garmin Training API workout id after push-to-garmin (links activity → planned workout)
   garminWorkoutId           Int?
   /// Matched activity after a run (promoted snapshot fields below)
@@ -867,6 +906,7 @@ model workouts {
   updatedAt                 DateTime            @updatedAt
   Athlete                   Athlete             @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   training_plans            training_plans?     @relation(fields: [planId], references: [id], onDelete: SetNull)
+  workout_catalogue         workout_catalogue?  @relation(fields: [catalogueWorkoutId], references: [id], onDelete: SetNull)
   matched_activity          athlete_activities? @relation("WorkoutMatchedActivity", fields: [matchedActivityId], references: [id], onDelete: SetNull)
   segments                  workout_segments[]
   city_runs                 city_runs[]
@@ -875,7 +915,10 @@ model workouts {
   @@index([workoutType])
   @@index([planId])
   @@index([planId, date])
+  @@index([planId, weekNumber])
+  @@index([planId, nOffset])
   @@index([athleteId, garminWorkoutId])
+  @@index([catalogueWorkoutId])
 }
 
 model workout_segments {
@@ -890,6 +933,10 @@ model workout_segments {
   targets          Json?             // Array of target objects: [{ type: "PACE", valueLow: 480, valueHigh: 500 }, { type: "HEART_RATE", valueLow: 160, valueHigh: 180 }]
   // Repeat capability
   repeatCount      Int?              // Repeat this segment N times (for intervals)
+  /// Lap-matched actuals (prescribed targets JSON is never overwritten)
+  actualPaceSecPerMile   Int?
+  actualDistanceMiles    Float?
+  actualDurationSeconds  Int?
   // Metadata
   notes            String?           // User notes for this segment
   createdAt        DateTime          @default(now())

@@ -11,6 +11,8 @@ import { LocalStorageAPI } from "@/lib/localstorage";
 import {
   formatPaceTargetRangeForDisplay,
   formatStoredPaceAsMinPerMile,
+  getTrainingPaces,
+  parsePaceToSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
 
 interface WorkoutSegment {
@@ -27,6 +29,9 @@ interface WorkoutSegment {
   }>;
   repeatCount?: number;
   notes?: string;
+  actualPaceSecPerMile?: number | null;
+  actualDistanceMiles?: number | null;
+  actualDurationSeconds?: number | null;
 }
 
 interface MatchedActivitySummary {
@@ -40,6 +45,26 @@ interface MatchedActivitySummary {
   averageSpeed: number | null;
 }
 
+interface WorkoutCatalogue {
+  id: string;
+  name: string;
+  workoutType: string;
+  intendedPhase: string[];
+  progressionIndex: number;
+  reps: number | null;
+  repDistanceMeters: number | null;
+  recoveryDistanceMeters: number | null;
+  warmupMiles: number | null;
+  cooldownMiles: number | null;
+  repPaceOffsetSecPerMile: number | null;
+  recoveryPaceOffsetSecPerMile: number | null;
+  overallPaceOffsetSecPerMile: number | null;
+  intendedHeartRateZone: string | null;
+  intendedHRBpmLow: number | null;
+  intendedHRBpmHigh: number | null;
+  notes: string | null;
+}
+
 interface Workout {
   id: string;
   title: string;
@@ -47,6 +72,9 @@ interface Workout {
   description?: string;
   date?: string | null;
   garminWorkoutId?: number | null;
+  catalogueWorkoutId?: string | null;
+  workout_catalogue?: WorkoutCatalogue | null;
+  estimatedDistanceInMeters?: number | null;
   segments: WorkoutSegment[];
   matchedActivityId?: string | null;
   actualDistanceMeters?: number | null;
@@ -81,6 +109,165 @@ function formatWorkoutScheduleLong(iso: string | null | undefined): string | nul
     month: "long",
     day: "numeric",
   });
+}
+
+function paceSecFromAnchor(
+  anchor: number,
+  offset: number | null | undefined,
+  zoneSec: number
+): number {
+  if (offset == null) return zoneSec;
+  return Math.max(1, anchor + offset);
+}
+
+function formatPaceMinPerMileFromSec(secPerMile: number): string {
+  const m = Math.floor(secPerMile / 60);
+  const s = Math.round(secPerMile % 60);
+  return `${m}:${String(s).padStart(2, "0")} /mi`;
+}
+
+function CataloguePrescriptionCard({
+  catalogue,
+  fiveKPaceSnapshot,
+  estimatedDistanceInMeters,
+}: {
+  catalogue: WorkoutCatalogue;
+  fiveKPaceSnapshot: string | null | undefined;
+  estimatedDistanceInMeters: number | null | undefined;
+}) {
+  let anchor: number;
+  try {
+    if (!fiveKPaceSnapshot?.trim()) {
+      return (
+        <div className="border border-amber-200 bg-amber-50 rounded-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Coach prescription</h2>
+          <p className="text-sm text-amber-900">
+            Set your current 5K pace on your profile (and ensure your plan has a baseline) to see
+            target paces for this catalogue workout.
+          </p>
+        </div>
+      );
+    }
+    anchor = parsePaceToSecondsPerMile(fiveKPaceSnapshot);
+  } catch {
+    return (
+      <div className="border border-amber-200 bg-amber-50 rounded-lg p-6 mb-6">
+        <p className="text-sm text-amber-900">Could not read plan 5K pace snapshot for targets.</p>
+      </div>
+    );
+  }
+
+  const p = getTrainingPaces(anchor);
+  const totalMi =
+    estimatedDistanceInMeters != null && estimatedDistanceInMeters > 0
+      ? estimatedDistanceInMeters / 1609.34
+      : null;
+
+  const meta = (
+    <div className="text-xs text-gray-500 mt-3 space-y-1">
+      <p>
+        Phases: {catalogue.intendedPhase?.join(", ") || "—"} · Progression #
+        {catalogue.progressionIndex}
+      </p>
+      {catalogue.intendedHeartRateZone && (
+        <p>Heart rate: {catalogue.intendedHeartRateZone}</p>
+      )}
+      {catalogue.notes && <p className="text-gray-600">{catalogue.notes}</p>}
+    </div>
+  );
+
+  if (catalogue.workoutType === "Intervals") {
+    const reps = catalogue.reps ?? 6;
+    const repM = catalogue.repDistanceMeters ?? 800;
+    const recM = catalogue.recoveryDistanceMeters ?? 400;
+    const intSec = paceSecFromAnchor(anchor, catalogue.repPaceOffsetSecPerMile, p.interval);
+    const recSec = paceSecFromAnchor(anchor, catalogue.recoveryPaceOffsetSecPerMile, p.recovery);
+    return (
+      <div className="border border-sky-200 bg-sky-50/60 rounded-lg p-6 mb-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-1">Coach prescription</h2>
+        <p className="text-lg font-medium text-sky-900 mb-4">{catalogue.name}</p>
+        {totalMi != null && (
+          <p className="text-sm text-gray-700 mb-3">Scheduled week volume (approx.): {totalMi.toFixed(1)} mi</p>
+        )}
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm border border-sky-100 rounded-lg overflow-hidden">
+            <thead className="bg-sky-100/80">
+              <tr>
+                <th className="text-left p-2 font-semibold">Part</th>
+                <th className="text-left p-2 font-semibold">Structure</th>
+                <th className="text-left p-2 font-semibold">Target pace</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-t border-sky-100">
+                <td className="p-2">Main set</td>
+                <td className="p-2">
+                  {reps} × {repM}m hard, {recM}m recovery
+                </td>
+                <td className="p-2">
+                  {formatPaceMinPerMileFromSec(intSec)} /{" "}
+                  {formatPaceMinPerMileFromSec(recSec)} recovery
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        {meta}
+      </div>
+    );
+  }
+
+  if (catalogue.workoutType === "Easy") {
+    const easySec = paceSecFromAnchor(anchor, catalogue.overallPaceOffsetSecPerMile, p.easy);
+    return (
+      <div className="border border-slate-200 bg-slate-50 rounded-lg p-6 mb-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-1">Coach prescription</h2>
+        <p className="text-lg font-medium text-gray-900 mb-2">{catalogue.name}</p>
+        {totalMi != null && (
+          <p className="text-base text-gray-800">
+            {totalMi.toFixed(1)} mi easy · ~{formatPaceMinPerMileFromSec(easySec)}
+          </p>
+        )}
+        {totalMi == null && (
+          <p className="text-sm text-gray-600">Easy run — pace ~{formatPaceMinPerMileFromSec(easySec)}</p>
+        )}
+        {meta}
+      </div>
+    );
+  }
+
+  if (catalogue.workoutType === "Tempo") {
+    const tempoSec = paceSecFromAnchor(anchor, catalogue.overallPaceOffsetSecPerMile, p.tempo);
+    const easySec = paceSecFromAnchor(anchor, catalogue.recoveryPaceOffsetSecPerMile, p.easy);
+    return (
+      <div className="border border-indigo-200 bg-indigo-50/50 rounded-lg p-6 mb-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-1">Coach prescription</h2>
+        <p className="text-lg font-medium text-indigo-950 mb-2">{catalogue.name}</p>
+        <ul className="text-sm text-gray-800 list-disc pl-5 space-y-1">
+          <li>Warmup / cooldown: easy ~{formatPaceMinPerMileFromSec(easySec)}</li>
+          <li>Tempo block: ~{formatPaceMinPerMileFromSec(tempoSec)}</li>
+          {totalMi != null && <li>Total scheduled distance ~{totalMi.toFixed(1)} mi</li>}
+        </ul>
+        {meta}
+      </div>
+    );
+  }
+
+  // LongRun
+  const longSec = paceSecFromAnchor(anchor, catalogue.overallPaceOffsetSecPerMile, p.longRun);
+  const mpSec = paceSecFromAnchor(anchor, null, p.marathon);
+  return (
+    <div className="border border-orange-200 bg-orange-50/50 rounded-lg p-6 mb-6">
+      <h2 className="text-xl font-semibold text-gray-900 mb-1">Coach prescription</h2>
+      <p className="text-lg font-medium text-orange-950 mb-2">{catalogue.name}</p>
+      <ul className="text-sm text-gray-800 list-disc pl-5 space-y-1">
+        <li>Long segment: ~{formatPaceMinPerMileFromSec(longSec)}</li>
+        <li>Marathon-pace finish: ~{formatPaceMinPerMileFromSec(mpSec)}</li>
+        {totalMi != null && <li>Total ~{totalMi.toFixed(1)} mi</li>}
+      </ul>
+      {meta}
+    </div>
+  );
 }
 
 function formatTargetLine(target: NonNullable<WorkoutSegment["targets"]>[0]): string {
@@ -761,8 +948,22 @@ export default function WorkoutDetailPage() {
           </div>
         )}
 
+        {workout.workout_catalogue && (
+          <CataloguePrescriptionCard
+            catalogue={workout.workout_catalogue}
+            fiveKPaceSnapshot={workout.training_plans?.currentFiveKPace}
+            estimatedDistanceInMeters={workout.estimatedDistanceInMeters ?? null}
+          />
+        )}
+
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Segments</h2>
+          {workout.workout_catalogue && (
+            <p className="text-sm text-gray-500 mb-4">
+              Step-by-step breakdown (used for Garmin sync). The coach prescription above is the
+              human-readable plan.
+            </p>
+          )}
 
           {workout.segments && workout.segments.length > 0 ? (
             <div className="space-y-4">
@@ -799,7 +1000,7 @@ export default function WorkoutDetailPage() {
                       {segment.targets && segment.targets.length > 0 && (
                         <div>
                           <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-                            Targets
+                            Prescribed
                           </dt>
                           <dd className="space-y-2">
                             {segment.targets.map((target, idx) => (
@@ -815,6 +1016,41 @@ export default function WorkoutDetailPage() {
                                 </span>
                               </div>
                             ))}
+                          </dd>
+                        </div>
+                      )}
+                      {(segment.actualPaceSecPerMile != null ||
+                        segment.actualDistanceMiles != null ||
+                        segment.actualDurationSeconds != null) && (
+                        <div>
+                          <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                            Actual (from matched activity)
+                          </dt>
+                          <dd className="space-y-1 text-base text-gray-900">
+                            {segment.actualPaceSecPerMile != null && (
+                              <p>
+                                <span className="text-gray-600">Pace: </span>
+                                <span className="font-medium">
+                                  {formatSecPerMile(segment.actualPaceSecPerMile)}
+                                </span>
+                              </p>
+                            )}
+                            {segment.actualDistanceMiles != null && (
+                              <p>
+                                <span className="text-gray-600">Distance: </span>
+                                <span className="font-medium">
+                                  {segment.actualDistanceMiles.toFixed(2)} mi
+                                </span>
+                              </p>
+                            )}
+                            {segment.actualDurationSeconds != null && (
+                              <p>
+                                <span className="text-gray-600">Time: </span>
+                                <span className="font-medium">
+                                  {Math.round(segment.actualDurationSeconds / 60)} min
+                                </span>
+                              </p>
+                            )}
                           </dd>
                         </div>
                       )}

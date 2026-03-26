@@ -3,13 +3,15 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { generatePlanOutlineWithOpenAI } from "@/lib/training/plan-generate-ai";
-import { preferredDaysToHuman } from "@/lib/training/plan-utils";
+import { generatePlanWorkoutRows } from "@/lib/training/generate-plan";
+import { selectNextCatalogueWorkout } from "@/lib/training/select-catalogue-workout";
+import { newEntityId } from "@/lib/training/new-entity-id";
+import { Prisma } from "@prisma/client";
 
 /**
  * POST /api/training-plan/generate
  * Body: { trainingPlanId }
- * One AI call → phases + planWeeks on training_plans.
+ * Deterministic plan: all workout rows written in one transaction; planWeeks/phases cleared.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +34,6 @@ export async function POST(request: NextRequest) {
       where: { id: trainingPlanId, athleteId: athlete.id },
       include: {
         race_registry: true,
-        athlete_goal: true,
       },
     });
 
@@ -47,47 +48,94 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (
-      plan.planWeeks != null &&
-      Array.isArray(plan.planWeeks) &&
-      (plan.planWeeks as unknown[]).length > 0
-    ) {
+    const existingPlanWorkouts = await prisma.workouts.count({
+      where: { planId: plan.id, athleteId: athlete.id },
+    });
+    if (existingPlanWorkouts > 0) {
       return NextResponse.json(
-        { error: "Plan already generated" },
+        { error: "Plan already has scheduled workouts; remove them before regenerating." },
         { status: 400 }
       );
     }
 
-    const race = plan.race_registry;
+    const prefs = await prisma.trainingPreferences.findUnique({
+      where: { athleteId: athlete.id },
+    });
+
+    const weeklyMileageTarget =
+      plan.weeklyMileageTarget ??
+      prefs?.weeklyMileageTarget ??
+      athlete.weeklyMileage ??
+      45;
+
     const preferredDays =
       plan.preferredDays?.length > 0
         ? plan.preferredDays
-        : [1, 2, 3, 4, 5, 6];
+        : prefs?.preferredDays?.length
+          ? prefs.preferredDays
+          : [1, 2, 3, 4, 5, 6];
 
-    const outline = await generatePlanOutlineWithOpenAI({
+    const race = plan.race_registry;
+    const drafts = generatePlanWorkoutRows({
+      planId: plan.id,
+      athleteId: athlete.id,
       totalWeeks: plan.totalWeeks,
+      planStartDate: plan.startDate,
+      raceDate: race.raceDate,
+      weeklyMileageTarget,
+      preferredDays,
       raceName: race.name,
       raceDistanceMiles: race.distanceMiles,
-      raceTypeLabel: race.raceType,
-      goalTime: plan.athlete_goal?.goalTime ?? null,
-      currentWeeklyMileage: plan.currentWeeklyMileage ?? athlete.weeklyMileage,
-      preferredDaysHuman: preferredDaysToHuman(preferredDays),
     });
 
-    const updated = await prisma.training_plans.update({
-      where: { id: plan.id },
-      data: {
-        phases: outline.phases as object,
-        planWeeks: outline.planWeeks as object,
+    const rows: Prisma.workoutsCreateManyInput[] = [];
+    for (const d of drafts) {
+      const isRaceDay = d.nOffset === 0;
+      const cat = isRaceDay
+        ? null
+        : await selectNextCatalogueWorkout(
+            athlete.id,
+            d.workoutType,
+            d.phase ?? "base"
+          );
+      const title =
+        cat != null ? `${cat.name} — Week ${d.weekNumber}` : d.title;
+      rows.push({
+        id: newEntityId(),
+        title,
+        workoutType: d.workoutType,
+        athleteId: d.athleteId,
+        planId: d.planId,
+        date: d.date,
+        phase: d.phase,
+        estimatedDistanceInMeters: d.estimatedDistanceInMeters,
+        nOffset: d.nOffset,
+        weekNumber: d.weekNumber,
+        dayAssigned: d.dayAssigned,
+        catalogueWorkoutId: cat?.id ?? null,
         updatedAt: new Date(),
-      },
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (rows.length) {
+        await tx.workouts.createMany({ data: rows });
+      }
+      await tx.training_plans.update({
+        where: { id: plan.id },
+        data: {
+          planWeeks: Prisma.JsonNull,
+          phases: Prisma.JsonNull,
+          weeklyMileageTarget,
+          updatedAt: new Date(),
+        },
+      });
     });
 
     return NextResponse.json({
       success: true,
-      planId: updated.id,
-      phases: outline.phases,
-      planWeeksCount: outline.planWeeks.length,
+      planId: plan.id,
+      workoutCount: rows.length,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Plan generation failed";

@@ -72,10 +72,14 @@ export async function PATCH(request: NextRequest, context: Ctx) {
       return NextResponse.json({ error: "Plan not found" }, { status: 404 });
     }
 
+    const planWorkoutCount = await prisma.workouts.count({
+      where: { planId: existing.id, athleteId: auth.athlete.id },
+    });
     const scheduleLocked =
-      existing.planWeeks != null &&
-      Array.isArray(existing.planWeeks) &&
-      (existing.planWeeks as unknown[]).length > 0;
+      planWorkoutCount > 0 ||
+      (existing.planWeeks != null &&
+        Array.isArray(existing.planWeeks) &&
+        (existing.planWeeks as unknown[]).length > 0);
 
     const body = await request.json();
     const patchKeys = Object.keys(body);
@@ -90,7 +94,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         return NextResponse.json(
           {
             error:
-              "After AI schedule is generated, only lifecycleStatus and currentFiveKPace can be updated",
+              "After the training schedule is generated, only lifecycleStatus and currentFiveKPace can be updated",
           },
           { status: 400 }
         );
