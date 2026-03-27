@@ -96,7 +96,7 @@ export default function TrainingSetupPlanPage({
   const [preferredDaysLocal, setPreferredDaysLocal] = useState<number[]>(
     DEFAULT_PREFERRED_DAYS
   );
-  const [peakWeeklyMiles, setPeakWeeklyMiles] = useState("50");
+  const [weeklyMilesTarget, setWeeklyMilesTarget] = useState("50");
   const [error, setError] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
 
@@ -131,12 +131,12 @@ export default function TrainingSetupPlanPage({
     } else {
       setPreferredDaysLocal([...DEFAULT_PREFERRED_DAYS]);
     }
-    const peak =
+    const fromPlan =
       plan.weeklyMileageTarget ?? plan.currentWeeklyMileage ?? null;
-    if (peak != null && Number.isFinite(Number(peak))) {
-      setPeakWeeklyMiles(String(Math.round(Number(peak))));
+    if (fromPlan != null && Number.isFinite(Number(fromPlan))) {
+      setWeeklyMilesTarget(String(Math.round(Number(fromPlan))));
     } else {
-      setPeakWeeklyMiles("50");
+      setWeeklyMilesTarget("50");
     }
   }, [
     plan?.id,
@@ -167,10 +167,18 @@ export default function TrainingSetupPlanPage({
     [plan?.phases]
   );
 
-  const weekEntries = useMemo(
-    () => (plan ? parsePlanWeekEntries(plan.planWeeks) : []),
-    [plan]
-  );
+  const weekEntries = useMemo(() => {
+    if (!plan) return [];
+    const raw = parsePlanWeekEntries(plan.planWeeks);
+    const race = plan.race_registry;
+    if (!race) return raw;
+    return raw.map((w) => ({
+      ...w,
+      phase:
+        w.phase.trim() ||
+        cataloguePhaseFallbackForWeek(plan.startDate, race.raceDate, w.weekNumber),
+    }));
+  }, [plan]);
 
   const materializedWorkouts = plan?._count?.planned_workouts ?? 0;
   const hasLegacyPlanWeeks = useMemo(() => {
@@ -188,16 +196,16 @@ export default function TrainingSetupPlanPage({
   );
 
   const buildWarnings = useMemo(() => {
-    const peak = Math.round(Number(peakWeeklyMiles));
-    const peakFinite = Number.isFinite(peak);
-    const lowPeak =
-      peakFinite &&
-      peak < ENGINE_MIN_WEEKLY_MI &&
-      peakWeeklyMiles.trim() !== "";
+    const miles = Math.round(Number(weeklyMilesTarget));
+    const milesFinite = Number.isFinite(miles);
+    const belowEngineFloor =
+      milesFinite &&
+      miles < ENGINE_MIN_WEEKLY_MI &&
+      weeklyMilesTarget.trim() !== "";
     const fewDays = preferredCount > 0 && preferredCount < 4;
     const fourDays = preferredCount === 4;
-    return { lowPeak, fewDays, fourDays };
-  }, [peakWeeklyMiles, preferredCount]);
+    return { belowEngineFloor, fewDays, fourDays };
+  }, [weeklyMilesTarget, preferredCount]);
 
   const currentWeekEntry = useMemo(
     () => weekEntries.find((w) => w.weekNumber === weekNumber),
@@ -271,12 +279,12 @@ export default function TrainingSetupPlanPage({
         setError("Select at least one preferred training day.");
         return;
       }
-      let peak = Math.round(Number(peakWeeklyMiles));
-      if (!Number.isFinite(peak)) {
-        setError("Enter a valid peak weekly mileage.");
+      let targetMiles = Math.round(Number(weeklyMilesTarget));
+      if (!Number.isFinite(targetMiles)) {
+        setError("Please enter a number for your weekly miles.");
         return;
       }
-      peak = Math.max(25, Math.min(100, peak));
+      targetMiles = Math.max(25, Math.min(100, targetMiles));
 
       const patchRes = await fetch(`/api/training-plan/${planId}`, {
         method: "PATCH",
@@ -286,7 +294,7 @@ export default function TrainingSetupPlanPage({
         },
         body: JSON.stringify({
           preferredDays: normalized,
-          weeklyMileageTarget: peak,
+          weeklyMileageTarget: targetMiles,
         }),
       });
       const patchData = await patchRes.json();
@@ -303,7 +311,7 @@ export default function TrainingSetupPlanPage({
         },
         body: JSON.stringify({
           trainingPlanId: planId,
-          weeklyMileageTarget: peak,
+          weeklyMileageTarget: targetMiles,
           minWeeklyMiles: ENGINE_MIN_WEEKLY_MI,
         }),
       });
@@ -370,38 +378,39 @@ export default function TrainingSetupPlanPage({
                   We&apos;ll build your plan for you
                 </p>
                 <p className="mt-2 leading-relaxed text-gray-700">
-                  Set your peak week and the days you like to run. We&apos;ll lay
-                  out workouts week by week and take care of the rest—paces,
-                  structure, and progression toward race day.
+                  Tell us roughly how many miles you want in a typical week and
+                  which days you like to run. We use that to size the plan. Each
+                  week won&apos;t match that number exactly—long-run weeks, taper,
+                  and recovery will move weekly volume up and down.
                 </p>
               </div>
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-800">
-                  Peak weekly miles
+                  How many miles do you want to do weekly?
                 </label>
                 <p className="mb-2 text-xs text-gray-500">
-                  Target at your highest week (25–100). We never schedule a week
-                  below {ENGINE_MIN_WEEKLY_MI} mi—if your peak is under that,
-                  you&apos;ll see a heads-up below.
+                  Your ballpark for how much you want to run in a normal week—we
+                  aim the plan at it.
                 </p>
                 <input
                   type="number"
-                  min={25}
-                  max={100}
+                  inputMode="numeric"
+                  step={1}
                   className="w-full max-w-md rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                  value={peakWeeklyMiles}
-                  onChange={(e) => setPeakWeeklyMiles(e.target.value)}
+                  value={weeklyMilesTarget}
+                  onChange={(e) => setWeeklyMilesTarget(e.target.value)}
                 />
-                {buildWarnings.lowPeak && (
+                {buildWarnings.belowEngineFloor && (
                   <p
                     className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950"
                     role="status"
                   >
-                    Plans use at least {ENGINE_MIN_WEEKLY_MI} mi/week on the
-                    calendar—your peak is below that, so volume won&apos;t go
-                    lower than the floor. Consider raising peak toward{" "}
-                    {ENGINE_MIN_WEEKLY_MI}+ if you want headroom.
+                    You entered {Math.round(Number(weeklyMilesTarget))} mi/week.
+                    Our planner won&apos;t schedule a week below{" "}
+                    {ENGINE_MIN_WEEKLY_MI} mi, so some weeks may land a few miles
+                    above what you typed—we still try to stay near your target
+                    when we can.
                   </p>
                 )}
               </div>
@@ -478,7 +487,7 @@ export default function TrainingSetupPlanPage({
                     className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
                   >
                     <LayoutList className="h-4 w-4" aria-hidden />
-                    View phases &amp; all weeks
+                    View plan overview
                   </button>
                 </div>
               )}

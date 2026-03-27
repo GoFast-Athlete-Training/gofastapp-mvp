@@ -801,7 +801,7 @@ model training_plans {
   athleteGoalId        String?
   name                 String
   currentWeeklyMileage Int?
-  /// Peak weekly mileage target (miles); falls back to preferences / athlete / default at generation time
+  /// Athlete weekly mileage target (miles); UI copy treats this as typical week volume, not a separate “peak”; falls back at generation time
   weeklyMileageTarget  Int?
   /// Snapshot of current 5K pace (same string format as Athlete.fiveKPace) for plan-scoped hydration/comparison
   currentFiveKPace     String?
@@ -810,7 +810,7 @@ model training_plans {
   totalWeeks           Int
   /// AI-generated phase ranges: [{ name, startWeek, endWeek }]
   phases               Json?
-  /// AI-generated weekly schedule strings: [{ weekNumber, phase, schedule }]
+  /// Weekly schedule freeze-frame: [{ weekNumber, schedule }]; optional legacy `phase` on entries ignored for new plans
   planWeeks            Json?
   /// Snapshot of preferred training days 1=Mon..7=Sun
   preferredDays        Int[]                  @default([])

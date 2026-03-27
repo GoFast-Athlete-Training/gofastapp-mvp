@@ -350,7 +350,7 @@ export default function TrainingSetupClient() {
             <div className="mb-5 rounded-xl border border-orange-100 bg-orange-50/80 p-4 text-sm text-gray-800">
               <p className="font-medium text-gray-900">We&apos;ll build your plan for you</p>
               <p className="mt-2 leading-relaxed text-gray-700">
-                Next you&apos;ll set peak weekly miles, preferred training days, and we&apos;ll
+                Next you&apos;ll set weekly miles, preferred training days, and we&apos;ll
                 generate every workout. You just need a start date and baseline here.
               </p>
             </div>
@@ -520,7 +520,7 @@ export default function TrainingSetupClient() {
         <div className="mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white p-6 text-gray-900 shadow-sm sm:p-8">
           <h1 className="mb-2 text-2xl font-semibold tracking-tight">Training plan</h1>
           <p className="mb-6 text-base text-gray-600">
-            We&apos;ll build your plan for you once you pick a goal—peak weekly miles, preferred
+            We&apos;ll build your plan for you once you pick a goal—weekly miles, preferred
             days, then we generate the workouts. You need an active goal with a race and goal time.
           </p>
 

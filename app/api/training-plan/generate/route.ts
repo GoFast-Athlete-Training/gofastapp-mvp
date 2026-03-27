@@ -3,7 +3,10 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { generatePlanWorkoutRows } from "@/lib/training/generate-plan";
+import {
+  generatePlanWorkoutRows,
+  planWeeksSnapshotFromGeneratedRows,
+} from "@/lib/training/generate-plan";
 import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
 import { formatPlannedWorkoutTitle } from "@/lib/training/workout-display-title";
 import { selectNextCatalogueWorkout } from "@/lib/training/select-catalogue-workout";
@@ -13,7 +16,7 @@ import { Prisma } from "@prisma/client";
 /**
  * POST /api/training-plan/generate
  * Body: { trainingPlanId?, weeklyMileageTarget?, minWeeklyMiles? }
- * Deterministic plan: all workout rows written in one transaction; planWeeks/phases cleared.
+ * Deterministic plan: all workout rows + planWeeks snapshot in one transaction; phases cleared (legacy).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -128,7 +131,7 @@ export async function POST(request: NextRequest) {
         athleteId: d.athleteId,
         planId: d.planId,
         date: d.date,
-        phase: d.phase,
+        phase: null,
         estimatedDistanceInMeters: d.estimatedDistanceInMeters,
         nOffset: d.nOffset,
         weekNumber: d.weekNumber,
@@ -138,6 +141,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const planWeeksSnapshot = planWeeksSnapshotFromGeneratedRows(drafts, weekCount);
+
     await prisma.$transaction(async (tx) => {
       if (rows.length) {
         await tx.workouts.createMany({ data: rows });
@@ -145,7 +150,7 @@ export async function POST(request: NextRequest) {
       await tx.training_plans.update({
         where: { id: plan.id },
         data: {
-          planWeeks: Prisma.JsonNull,
+          planWeeks: planWeeksSnapshot as unknown as Prisma.InputJsonValue,
           phases: Prisma.JsonNull,
           weeklyMileageTarget,
           totalWeeks: weekCount,

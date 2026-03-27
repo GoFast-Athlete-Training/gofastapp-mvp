@@ -1,7 +1,7 @@
 /**
- * Parse compact schedule strings from planWeeks, e.g. "M:5E W:6T Th:5E Sa:5E Su:14L"
+ * Parse / build compact schedule strings on planWeeks, e.g. "M:5E W:6T Su:14LR"
  * Day abbrev: M, Tu, W, Th, F, Sa, Su
- * Type: E Easy, T Tempo, I Intervals, L LongRun
+ * Type suffix: E Easy, T Tempo, I Intervals, L or LR LongRun (canonical write uses LR)
  */
 
 import type { WorkoutType } from "@prisma/client";
@@ -10,9 +10,85 @@ import { addDaysUtc, mondayUtcOfWeekContaining, utcDateOnly } from "@/lib/traini
 export type ScheduleToken = {
   dayAbbr: string;
   miles: number;
+  /** Single-letter style key for display (L for long run even when token was LR) */
   typeLetter: string;
   workoutType: WorkoutType;
 };
+
+const DAY_NAME_TO_ABBR: Record<string, string> = {
+  Monday: "M",
+  Tuesday: "Tu",
+  Wednesday: "W",
+  Thursday: "Th",
+  Friday: "F",
+  Saturday: "Sa",
+  Sunday: "Su",
+};
+
+const ABBR_TO_DAY_NAME: Record<string, string> = {
+  M: "Monday",
+  Tu: "Tuesday",
+  W: "Wednesday",
+  Th: "Thursday",
+  F: "Friday",
+  Sa: "Saturday",
+  Su: "Sunday",
+};
+
+export function dayNameToAbbr(dayName: string): string {
+  const a = DAY_NAME_TO_ABBR[dayName];
+  if (!a) throw new Error(`Unknown weekday name for schedule: ${dayName}`);
+  return a;
+}
+
+export function dayAbbrToDayName(abbr: string): string {
+  const a = abbr.trim();
+  const n = ABBR_TO_DAY_NAME[a];
+  if (!n) throw new Error(`Unknown day abbreviation: ${abbr}`);
+  return n;
+}
+
+/** Strip trailing zeros for stable tokens (6.5 not 6.50). */
+export function formatMilesForScheduleToken(miles: number): string {
+  const r = Math.round(miles * 100) / 100;
+  if (Number.isInteger(r)) return String(r);
+  return String(r);
+}
+
+export function workoutTypeToScheduleSuffix(wt: WorkoutType): string {
+  switch (wt) {
+    case "Easy":
+      return "E";
+    case "Tempo":
+      return "T";
+    case "Intervals":
+      return "I";
+    case "LongRun":
+      return "LR";
+    default: {
+      const _x: never = wt;
+      return _x;
+    }
+  }
+}
+
+export function suffixToWorkoutType(suffixRaw: string): WorkoutType {
+  const key = suffixRaw.trim().toUpperCase();
+  if (key === "E") return "Easy";
+  if (key === "T") return "Tempo";
+  if (key === "I") return "Intervals";
+  if (key === "L" || key === "LR") return "LongRun";
+  throw new Error(
+    `Unknown workout type suffix "${suffixRaw}" (use E, T, I, L, or LR)`
+  );
+}
+
+function typeLetterFromWorkoutType(wt: WorkoutType): string {
+  if (wt === "LongRun") return "L";
+  if (wt === "Easy") return "E";
+  if (wt === "Tempo") return "T";
+  return "I";
+}
 
 /** Our convention: 1=Monday .. 7=Sunday */
 export function dayAbbrToOurDow(abbr: string): number {
@@ -31,24 +107,8 @@ export function dayAbbrToOurDow(abbr: string): number {
   return n;
 }
 
-function letterToWorkoutType(letter: string): WorkoutType {
-  const u = letter.toUpperCase();
-  switch (u) {
-    case "E":
-      return "Easy";
-    case "T":
-      return "Tempo";
-    case "I":
-      return "Intervals";
-    case "L":
-      return "LongRun";
-    default:
-      throw new Error(`Unknown workout type letter: ${letter} (use E,T,I,L)`);
-  }
-}
-
 /**
- * Split schedule on spaces; each token must be like M:5E or Th:6.5T
+ * Split schedule on spaces; each token is DAY:milesTYPE where TYPE is E,T,I,L,LR,...
  */
 export function parseScheduleString(schedule: string): ScheduleToken[] {
   const trimmed = schedule.trim();
@@ -59,17 +119,18 @@ export function parseScheduleString(schedule: string): ScheduleToken[] {
 
   for (const part of parts) {
     const match = part.match(
-      /^(M|Tu|W|Th|F|Sa|Su):(\d+(?:\.\d+)?)([ETILetil])$/i
+      /^(M|Tu|W|Th|F|Sa|Su):(\d+(?:\.\d+)?)([A-Za-z]+)$/i
     );
     if (!match) {
-      throw new Error(`Invalid schedule token: "${part}" (expected e.g. M:5E)`);
+      throw new Error(`Invalid schedule token: "${part}" (expected e.g. M:5E or Su:14LR)`);
     }
-    const [, dayAbbr, milesStr, typeLetter] = match;
+    const [, dayAbbr, milesStr, typeSuffix] = match;
+    const workoutType = suffixToWorkoutType(typeSuffix);
     tokens.push({
       dayAbbr,
       miles: parseFloat(milesStr),
-      typeLetter: typeLetter.toUpperCase(),
-      workoutType: letterToWorkoutType(typeLetter),
+      typeLetter: typeLetterFromWorkoutType(workoutType),
+      workoutType,
     });
   }
 

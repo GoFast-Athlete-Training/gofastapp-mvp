@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { X } from "lucide-react";
+import type { WorkoutType } from "@prisma/client";
 import type { PhaseRange } from "@/lib/training/plan-phases";
 import { phaseNameForWeek } from "@/lib/training/plan-phases";
 import { parseScheduleString } from "@/lib/training/schedule-parser";
@@ -10,8 +11,11 @@ const DAY_LABELS: Record<string, string> = {
   M: "Mon", Tu: "Tue", W: "Wed", Th: "Thu", F: "Fri", Sa: "Sat", Su: "Sun",
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  E: "Easy", T: "Quality", I: "Quality", L: "Long Run",
+const WORKOUT_TYPE_LABELS: Record<WorkoutType, string> = {
+  Easy: "Easy",
+  Tempo: "Quality",
+  Intervals: "Quality",
+  LongRun: "Long run",
 };
 
 function renderSchedule(schedule: string): React.ReactNode {
@@ -24,16 +28,16 @@ function renderSchedule(schedule: string): React.ReactNode {
           <li
             key={i}
             className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              t.typeLetter === "L"
+              t.workoutType === "LongRun"
                 ? "bg-orange-100 text-orange-800"
-                : t.typeLetter === "E"
+                : t.workoutType === "Easy"
                 ? "bg-gray-100 text-gray-700"
                 : "bg-blue-100 text-blue-800"
             }`}
           >
             <span className="font-semibold">{DAY_LABELS[t.dayAbbr] ?? t.dayAbbr}</span>
             <span>{t.miles} mi</span>
-            <span className="opacity-70">· {TYPE_LABELS[t.typeLetter] ?? t.typeLetter}</span>
+            <span className="opacity-70">· {WORKOUT_TYPE_LABELS[t.workoutType]}</span>
           </li>
         ))}
       </ul>
@@ -101,10 +105,10 @@ export default function PhaseViewModal({
         </div>
 
         <div className="overflow-y-auto px-5 py-4 space-y-6">
-          {phases.length > 0 ? (
+          {phases.length > 0 && (
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500 mb-3">
-                Phases
+                Legacy phases (AI plans)
               </p>
               <ul className="space-y-3">
                 {phases.map((p, i) => (
@@ -129,8 +133,6 @@ export default function PhaseViewModal({
                 ))}
               </ul>
             </div>
-          ) : (
-            <p className="text-sm text-gray-500">No phase breakdown saved for this plan.</p>
           )}
 
           <div>

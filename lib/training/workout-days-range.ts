@@ -16,8 +16,13 @@ import {
   parseScheduleString,
   dateForDayInWeek,
   dayAbbrToOurDow,
+  dayAbbrToDayName,
 } from "./schedule-parser";
 import { addDaysUtc, mondayUtcOfWeekContaining, utcDateOnly } from "./plan-utils";
+import {
+  cataloguePhaseFallbackForWeek,
+  nOffsetFromWeekAnchor,
+} from "./generate-plan";
 import { formatPlannedWorkoutTitle } from "./workout-display-title";
 import { selectNextCatalogueWorkout } from "./select-catalogue-workout";
 import { catalogueEntryToApiSegments } from "./catalogue-to-segments";
@@ -115,6 +120,7 @@ export async function workoutDaysRangeForWeek(params: {
     where: { id: planId, athleteId },
     include: {
       Athlete: { select: { fiveKPace: true } },
+      race_registry: { select: { raceDate: true } },
     },
   });
 
@@ -138,10 +144,17 @@ export async function workoutDaysRangeForWeek(params: {
   }
 
   const schedule = entry.schedule as string;
-  const phase =
-    typeof entry.phase === "string" ? entry.phase : String(entry.phase ?? "");
+  const raceDate = plan.race_registry?.raceDate;
+  const phaseForCat =
+    raceDate != null
+      ? cataloguePhaseFallbackForWeek(plan.startDate, raceDate, weekNumber)
+      : "base";
 
   const tokens = parseScheduleString(schedule);
+  const weekAnchorUtc = utcDateOnly(weekStart);
+  const raceUtc = raceDate ? utcDateOnly(raceDate) : null;
+  const weekNOffset =
+    raceUtc != null ? nOffsetFromWeekAnchor(weekAnchorUtc, raceUtc) : null;
   let anchorSecPerMile: number | null = null;
   let paces: ReturnType<typeof getTrainingPaces> | null = null;
 
@@ -153,7 +166,7 @@ export async function workoutDaysRangeForWeek(params: {
     paces = getTrainingPaces(anchorSecPerMile);
   }
 
-  const phaseNorm = (phase || "base").trim().toLowerCase();
+  const phaseNorm = phaseForCat.trim().toLowerCase();
 
   const cataloguePicks: Awaited<
     ReturnType<typeof selectNextCatalogueWorkout>
@@ -192,9 +205,12 @@ export async function workoutDaysRangeForWeek(params: {
           athleteId,
           planId,
           date,
-          phase: phase || null,
+          phase: null,
           estimatedDistanceInMeters: estMeters,
           catalogueWorkoutId: thin ? null : catalogueEntry?.id ?? null,
+          weekNumber,
+          dayAssigned: dayAbbrToDayName(token.dayAbbr),
+          nOffset: weekNOffset,
           updatedAt: new Date(),
         },
       });

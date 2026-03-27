@@ -4,7 +4,12 @@
  */
 
 import type { WorkoutType } from "@prisma/client";
-import { dateForDayInWeek } from "@/lib/training/schedule-parser";
+import {
+  dateForDayInWeek,
+  dayNameToAbbr,
+  formatMilesForScheduleToken,
+  workoutTypeToScheduleSuffix,
+} from "@/lib/training/schedule-parser";
 import {
   calendarTrainingWeekCount,
   mondayUtcOfWeekContaining,
@@ -62,7 +67,7 @@ export function weeklyTotalMiles(
   if (nOffset >= -3) total *= 0.75;
   const rounded = Math.round(total);
   const floor = Math.max(25, minWeeklyMiles);
-  const cap = Math.max(floor, Math.min(80, weeklyMileageTarget));
+  const cap = Math.max(floor, Math.min(100, weeklyMileageTarget));
   return Math.max(floor, Math.min(cap, rounded));
 }
 
@@ -536,5 +541,41 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
     }
   }
 
+  return out;
+}
+
+export type PlanWeekSlot = { weekNumber: number; schedule: string };
+
+/**
+ * Freeze-frame snapshot aligned to week 1..N (Mon–Sun from plan start math in generator).
+ * Emitted from the same draft rows as bulk insert so strings cannot drift from assigned loads.
+ */
+export function planWeeksSnapshotFromGeneratedRows(
+  rows: GeneratedPlanWorkoutRow[],
+  totalWeeks: number
+): PlanWeekSlot[] {
+  const byWeek = new Map<number, GeneratedPlanWorkoutRow[]>();
+  for (const r of rows) {
+    const list = byWeek.get(r.weekNumber) ?? [];
+    list.push(r);
+    byWeek.set(r.weekNumber, list);
+  }
+  const out: PlanWeekSlot[] = [];
+  for (let w = 1; w <= totalWeeks; w++) {
+    const list = byWeek.get(w) ?? [];
+    list.sort(
+      (a, b) =>
+        DAY_NAMES.indexOf(a.dayAssigned as (typeof DAY_NAMES)[number]) -
+        DAY_NAMES.indexOf(b.dayAssigned as (typeof DAY_NAMES)[number])
+    );
+    const parts = list.map((r) => {
+      const abbr = dayNameToAbbr(r.dayAssigned);
+      const mi = r.estimatedDistanceInMeters / 1609.34;
+      const milesStr = formatMilesForScheduleToken(mi);
+      const suf = workoutTypeToScheduleSuffix(r.workoutType);
+      return `${abbr}:${milesStr}${suf}`;
+    });
+    out.push({ weekNumber: w, schedule: parts.join(" ") });
+  }
   return out;
 }
