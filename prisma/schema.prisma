@@ -902,6 +902,8 @@ model workouts {
   derivedPerformanceDirection     String?
   derivedAgainstTargetPace        Int?
   evaluationEligibleFlag          Boolean             @default(false)
+  /// Lap-based adaptive 5K credit applied once per workout (idempotent on detail re-ingest)
+  adaptiveFiveKCreditAppliedAt    DateTime?
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
   Athlete                   Athlete             @relation(fields: [athleteId], references: [id], onDelete: Cascade)

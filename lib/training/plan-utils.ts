@@ -87,3 +87,25 @@ export function formatCalendarWeekRangeLabel(
   });
   return `${left} – ${right}`;
 }
+
+/**
+ * 1-based training week index for "today" vs plan start (Mon–Sun weeks, UTC).
+ * Clamps to [1, totalWeeks]. Before plan's week 1, returns 1; after last week, returns totalWeeks.
+ */
+export function currentTrainingWeekNumber(
+  planStartRaw: Date | string,
+  totalWeeks: number,
+  now: Date = new Date()
+): number {
+  if (!Number.isFinite(totalWeeks) || totalWeeks < 1) {
+    return 1;
+  }
+  const planStart =
+    typeof planStartRaw === "string" ? new Date(planStartRaw) : planStartRaw;
+  const firstMonday = mondayUtcOfWeekContaining(planStart);
+  const thisMonday = mondayUtcOfWeekContaining(now);
+  const diffMs = thisMonday.getTime() - firstMonday.getTime();
+  const rawWeek = Math.floor(diffMs / (7 * 86400000)) + 1;
+  return Math.min(Math.max(rawWeek, 1), totalWeeks);
+}
+

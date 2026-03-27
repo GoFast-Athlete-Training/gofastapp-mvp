@@ -16,6 +16,10 @@ import {
 import { cataloguePhaseFallbackForWeek } from "@/lib/training/generate-plan";
 import { formatCalendarWeekRangeLabel } from "@/lib/training/plan-utils";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
+import {
+  fetchTrainingPlanDetail,
+  fetchTrainingWeekWorkouts,
+} from "@/lib/training/fetch-plan-week-client";
 
 type PlanDetail = {
   id: string;
@@ -107,18 +111,11 @@ export default function TrainingSetupPlanPage({
     setError(null);
     try {
       const token = await getToken();
-      const res = await fetch(`/api/training-plan/${planId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Failed to load plan");
-        setPlan(null);
-        return;
-      }
-      setPlan(data.plan);
+      const { plan } = await fetchTrainingPlanDetail(planId, token);
+      setPlan(plan as PlanDetail);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
+      setPlan(null);
     } finally {
       setLoading(false);
     }
@@ -237,17 +234,8 @@ export default function TrainingSetupPlanPage({
       setError(null);
       try {
         const token = await getToken();
-        const res = await fetch(
-          `/api/training/week?planId=${encodeURIComponent(planId)}&weekNumber=${wn}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const data = await res.json();
-        if (!res.ok) {
-          setError(data.error || "Failed to load week");
-          setWeekWorkouts([]);
-          return;
-        }
-        setWeekWorkouts(data.workouts || []);
+        const { workouts } = await fetchTrainingWeekWorkouts(planId, wn, token);
+        setWeekWorkouts(workouts);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Week load failed");
         setWeekWorkouts([]);
@@ -624,10 +612,10 @@ export default function TrainingSetupPlanPage({
               New plan
             </Link>
             <Link href="/training" className="hover:text-orange-600">
-              Training hub
+              My Training
             </Link>
             <Link href="/workouts" className="hover:text-orange-600">
-              All workouts
+              Go Train
             </Link>
           </div>
         </div>

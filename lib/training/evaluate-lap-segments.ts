@@ -5,6 +5,15 @@
 
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import {
+  ADAPTIVE_FIVEK_STEP_SEC,
+  applyAdaptiveFiveKCredit,
+} from "@/lib/training/update-five-k-pace";
+
+/** target - actual sec/mi; mean >= this scores performance (aligned with neutral band elsewhere). */
+const ADAPTIVE_FIVEK_MIN_MEAN_DELTA = -5;
+/** Lap-to-lap spread cap for consistency (sec/mi). */
+const ADAPTIVE_FIVEK_MAX_SPREAD = 25;
 
 type Lap = { startTimeInSeconds?: number };
 type Sample = {
@@ -191,4 +200,29 @@ export async function evaluateLapSegmentsAfterDetail(
       evaluationEligibleFlag: true,
     },
   });
+
+  const meanDelta =
+    deltas.reduce((a, b) => a + b, 0) / deltas.length;
+  const spread =
+    Math.max(...deltas) - Math.min(...deltas);
+  const creditEligible =
+    workout.adaptiveFiveKCreditAppliedAt == null &&
+    meanDelta >= ADAPTIVE_FIVEK_MIN_MEAN_DELTA &&
+    spread <= ADAPTIVE_FIVEK_MAX_SPREAD;
+
+  if (creditEligible) {
+    try {
+      await applyAdaptiveFiveKCredit(
+        workout.athleteId,
+        workout.id,
+        ADAPTIVE_FIVEK_STEP_SEC,
+        {
+          meanDeltaSecPerMile: Math.round(meanDelta),
+          spreadSecPerMile: spread,
+        }
+      );
+    } catch (e) {
+      console.warn("applyAdaptiveFiveKCredit:", e);
+    }
+  }
 }

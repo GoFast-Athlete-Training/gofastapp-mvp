@@ -2,12 +2,40 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
-import { Home, Target, Dumbbell, Users, Trophy, User, MessageCircle, BookOpen } from "lucide-react";
+import {
+  Home,
+  Target,
+  Dumbbell,
+  LayoutDashboard,
+  Users,
+  Trophy,
+  User,
+  MessageCircle,
+  BookOpen,
+} from "lucide-react";
 
-const navItems: { label: string; href: string; icon: typeof Home }[] = [
+type NavItem = {
+  label: string;
+  href: string;
+  icon: typeof Home;
+  match?: (pathname: string | null) => boolean;
+};
+
+const navItems: NavItem[] = [
   { label: "Home", href: "/athlete-home", icon: Home },
   { label: "Goals", href: "/goals", icon: Target },
-  { label: "Training", href: "/training", icon: Dumbbell },
+  {
+    label: "My Training",
+    href: "/training",
+    icon: LayoutDashboard,
+    match: (p) => p === "/training" || !!p?.startsWith("/training-setup"),
+  },
+  {
+    label: "Go Train",
+    href: "/workouts",
+    icon: Dumbbell,
+    match: (p) => !!p?.startsWith("/workouts"),
+  },
   { label: "Training Pod", href: "/my-runcrews", icon: Users },
   { label: "Races", href: "/races", icon: Trophy },
   { label: "Profile", href: "/profile", icon: User },
@@ -31,16 +59,15 @@ export default function AthleteSidebar() {
       </div>
 
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-        {navItems.map(({ label, href, icon: Icon }) => {
-          const active =
-            href === "/training"
-              ? pathname === "/training" ||
-                pathname?.startsWith("/workouts") ||
-                pathname?.startsWith("/training-setup")
-              : pathname === href || (href !== "/athlete-home" && pathname?.startsWith(href));
+        {navItems.map((item) => {
+          const { label, href, icon: Icon, match } = item;
+          const active = match
+            ? match(pathname)
+            : pathname === href ||
+              (href !== "/athlete-home" && !!pathname?.startsWith(href));
           return (
             <button
-              key={href}
+              key={`${href}-${label}`}
               type="button"
               onClick={() => router.push(href)}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${

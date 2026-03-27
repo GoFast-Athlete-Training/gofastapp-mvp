@@ -1,10 +1,18 @@
 /**
- * Adjust Athlete.fiveKPace from a workout quality score (0–100).
+ * Adjust Athlete.fiveKPace from a workout quality score (0–100), or fixed lap-based adaptive credit.
  * Ported from trainingmvp/lib/services/analysis.ts — conservative identity update.
  */
 
 import { prisma } from "@/lib/prisma";
 import { syncAthleteFiveKPaceToActivePlan } from "@/lib/training/plan-lifecycle";
+
+/** Seconds/mi improvement per qualifying workout (faster pace = fewer seconds in M:SS). Override via env. */
+export const ADAPTIVE_FIVEK_STEP_SEC =
+  process.env.ADAPTIVE_FIVEK_STEP_SEC != null &&
+  process.env.ADAPTIVE_FIVEK_STEP_SEC !== "" &&
+  Number.isFinite(Number(process.env.ADAPTIVE_FIVEK_STEP_SEC))
+    ? Number(process.env.ADAPTIVE_FIVEK_STEP_SEC)
+    : 5;
 
 function parsePaceToSeconds(pace: string): number {
   const parts = pace.split(":");
@@ -50,7 +58,59 @@ export async function updateFiveKPace(
   return new5kTime;
 }
 
-/** Map pace delta (target - actual sec/mile, positive = beat target) to 0–100 quality for updateFiveKPace */
+/**
+ * Fixed-step adaptive credit: subtract stepSec from stored M:SS pace, max 10% improvement per call.
+ * Idempotent per workout via adaptiveFiveKCreditAppliedAt. Then syncs ACTIVE plan currentFiveKPace.
+ */
+export async function applyAdaptiveFiveKCredit(
+  athleteId: string,
+  workoutId: string,
+  stepSec: number = ADAPTIVE_FIVEK_STEP_SEC,
+  logContext?: { meanDeltaSecPerMile: number; spreadSecPerMile: number }
+): Promise<string | null> {
+  if (stepSec <= 0) return null;
+
+  const updatedPace = await prisma.$transaction(async (tx) => {
+    const workout = await tx.workouts.findUnique({
+      where: { id: workoutId },
+      select: { athleteId: true, adaptiveFiveKCreditAppliedAt: true },
+    });
+    if (!workout || workout.athleteId !== athleteId) return null;
+    if (workout.adaptiveFiveKCreditAppliedAt != null) return null;
+
+    const athlete = await tx.athlete.findUnique({
+      where: { id: athleteId },
+      select: { fiveKPace: true },
+    });
+    if (!athlete) return null;
+
+    const current5k = parsePaceToSeconds(athlete.fiveKPace || "8:00");
+    const new5kSeconds = Math.max(current5k - stepSec, current5k * 0.9);
+    const new5kTime = secondsToPaceString(new5kSeconds);
+
+    await tx.athlete.update({
+      where: { id: athleteId },
+      data: { fiveKPace: new5kTime },
+    });
+    await tx.workouts.update({
+      where: { id: workoutId },
+      data: { adaptiveFiveKCreditAppliedAt: new Date(), updatedAt: new Date() },
+    });
+    return new5kTime;
+  });
+
+  if (updatedPace == null) return null;
+
+  await syncAthleteFiveKPaceToActivePlan(athleteId);
+
+  if (logContext) {
+    console.info(
+      `[applyAdaptiveFiveKCredit] workout=${workoutId} athlete=${athleteId} stepSec=${stepSec} meanDelta=${logContext.meanDeltaSecPerMile} spread=${logContext.spreadSecPerMile} newPace=${updatedPace}`
+    );
+  }
+
+  return updatedPace;
+}
 export function qualityScoreFromPaceDelta(deltaSecPerMile: number | null): number {
   if (deltaSecPerMile == null) return 55;
   const clamped = Math.max(-60, Math.min(60, deltaSecPerMile));

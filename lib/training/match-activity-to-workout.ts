@@ -6,11 +6,6 @@
 
 import { prisma } from "@/lib/prisma";
 import { extractGarminWorkoutIdFromSummary } from "./extract-garmin-workout-id";
-import {
-  qualityScoreFromPaceDelta,
-  updateFiveKPace,
-} from "./update-five-k-pace";
-
 /** m/s → seconds per mile */
 function speedMpsToSecPerMile(mps: number | null | undefined): number | null {
   if (mps == null || mps <= 0) return null;
@@ -183,15 +178,6 @@ export async function tryMatchActivityToTrainingWorkout(
   });
 
   await setIngestion("MATCHED");
-
-  if (evaluationEligible && derivedDelta != null) {
-    try {
-      const q = qualityScoreFromPaceDelta(derivedDelta);
-      await updateFiveKPace(activity.athleteId, q);
-    } catch (e) {
-      console.warn("updateFiveKPace skipped:", e);
-    }
-  }
 
   return { matched: true, workoutId: candidate.id };
 }

@@ -505,7 +505,7 @@ export default function TrainingSetupClient() {
               </button>
 
               <Link href="/training" className="block text-center text-sm text-gray-500 hover:text-orange-600">
-                Cancel
+                Exit to My Training
               </Link>
             </div>
           </div>
@@ -673,7 +673,7 @@ export default function TrainingSetupClient() {
             </Link>
             <span className="mx-2 text-gray-300">·</span>
             <Link href="/training" className="text-sm text-gray-500 hover:text-orange-600">
-              Back to Training
+              Back to My Training
             </Link>
           </div>
         </div>
