@@ -7,6 +7,7 @@ import Link from "next/link";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import api from "@/lib/api";
+import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 
 export default function WorkoutsPage() {
   const router = useRouter();
@@ -124,7 +125,7 @@ function PlanView() {
               onClick={() => router.push(`/workouts/${workout.id}`)}
             >
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <h3 className="text-xl font-semibold text-gray-900">{workout.title}</h3>
+                <h3 className="text-xl font-semibold text-gray-900">{displayWorkoutListTitle({ title: workout.title ?? "", workoutType: workout.workoutType ?? "Easy", estimatedDistanceInMeters: workout.estimatedDistanceInMeters ?? null })}</h3>
                 {workout.matchedActivityId && (
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
                     Logged

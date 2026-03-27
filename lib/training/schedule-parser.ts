@@ -5,6 +5,7 @@
  */
 
 import type { WorkoutType } from "@prisma/client";
+import { addDaysUtc, mondayUtcOfWeekContaining, utcDateOnly } from "@/lib/training/plan-utils";
 
 export type ScheduleToken = {
   dayAbbr: string;
@@ -80,28 +81,14 @@ export function ourDowToJs(our: number): number {
   return our === 7 ? 0 : our;
 }
 
-function utcDateOnly(d: Date): Date {
-  const x = new Date(d);
-  x.setUTCHours(0, 0, 0, 0);
-  return x;
-}
-
-function addDaysUtc(d: Date, days: number): Date {
-  const x = utcDateOnly(d);
-  x.setUTCDate(x.getUTCDate() + days);
-  return x;
-}
-
 /**
- * Week N anchor: planStart + (weekNumber - 1) * 7 days (UTC date).
- * Find the calendar date in [anchor, anchor+6] matching ourDow (1=Mon..7=Sun).
+ * Calendar week = Mon–Sun (UTC). `weekMondayUtc` is that week's Monday 00:00 UTC.
  */
-export function dateForDayInWeek(
-  planStartDate: Date,
-  weekNumber: number,
+export function dateOnOurDowFromWeekMonday(
+  weekMondayUtc: Date,
   ourDow: number
 ): Date {
-  const anchor = addDaysUtc(planStartDate, (weekNumber - 1) * 7);
+  const anchor = utcDateOnly(weekMondayUtc);
   const targetJs = ourDowToJs(ourDow);
   for (let d = 0; d < 7; d++) {
     const candidate = addDaysUtc(anchor, d);
@@ -109,5 +96,18 @@ export function dateForDayInWeek(
       return candidate;
     }
   }
-  throw new Error(`Could not place day ${ourDow} in week ${weekNumber}`);
+  throw new Error(`Could not place day ${ourDow} in calendar week`);
+}
+
+/**
+ * Week N = Nth Mon–Sun block starting at the Monday of the week that contains plan start.
+ */
+export function dateForDayInWeek(
+  planStartDate: Date,
+  weekNumber: number,
+  ourDow: number
+): Date {
+  const firstMonday = mondayUtcOfWeekContaining(planStartDate);
+  const weekMonday = addDaysUtc(firstMonday, (weekNumber - 1) * 7);
+  return dateOnOurDowFromWeekMonday(weekMonday, ourDow);
 }

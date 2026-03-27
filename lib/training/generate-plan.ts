@@ -5,6 +5,11 @@
 
 import type { WorkoutType } from "@prisma/client";
 import { dateForDayInWeek } from "@/lib/training/schedule-parser";
+import {
+  calendarTrainingWeekCount,
+  mondayUtcOfWeekContaining,
+} from "@/lib/training/plan-utils";
+import { formatPlannedWorkoutTitle } from "@/lib/training/workout-display-title";
 
 const DAY_NAMES = [
   "Monday",
@@ -118,7 +123,8 @@ export function cataloguePhaseFallbackForWeek(
     typeof planStartRaw === "string" ? new Date(planStartRaw) : planStartRaw
   );
   const raceUtc = utcDateOnly(typeof raceRaw === "string" ? new Date(raceRaw) : raceRaw);
-  const weekAnchor = addDaysUtc(planStart, (weekNumber - 1) * 7);
+  const firstMonday = mondayUtcOfWeekContaining(planStart);
+  const weekAnchor = addDaysUtc(firstMonday, (weekNumber - 1) * 7);
   const nOffset = nOffsetFromWeekAnchor(weekAnchor, raceUtc);
   return phaseForCatalogue(nOffset);
 }
@@ -328,13 +334,15 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
     return out;
   }
 
+  const firstMonday = mondayUtcOfWeekContaining(planStart);
+  const weekCount = calendarTrainingWeekCount(planStart, raceUtc);
+
   let weekNumber = 0;
   for (;;) {
     weekNumber += 1;
-    if (weekNumber > input.totalWeeks) break;
+    if (weekNumber > weekCount) break;
 
-    const weekAnchor = addDaysUtc(planStart, (weekNumber - 1) * 7);
-    if (weekAnchor.getTime() > raceUtc.getTime()) break;
+    const weekAnchor = addDaysUtc(firstMonday, (weekNumber - 1) * 7);
 
     const weekEnd = addDaysUtc(weekAnchor, 6);
     const nOffset = nOffsetFromWeekAnchor(weekAnchor, raceUtc);
@@ -356,7 +364,10 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
       ) {
         const date = dateForDayInWeek(input.planStartDate, weekNumber, raceOurDow);
         out.push({
-          title: `Race — ${input.raceName}`,
+          title: formatPlannedWorkoutTitle("LongRun", milesToMeters(input.raceDistanceMiles), {
+            isRace: true,
+            raceName: input.raceName,
+          }),
           workoutType: "LongRun",
           athleteId: input.athleteId,
           planId: input.planId,
@@ -404,10 +415,20 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
     type DayKind = "tempo" | "interval" | "long" | "easy";
     const assignment = new Map<number, { kind: DayKind; miles: number }>();
 
+    const dayInPlanWindow = (ourDowArg: number): boolean => {
+      const dt = dateForDayInWeek(input.planStartDate, weekNumber, ourDowArg);
+      if (dt.getTime() < planStart.getTime()) return false;
+      if (nOffset !== 0 && dt.getTime() > raceUtc.getTime()) return false;
+      return true;
+    };
+
     const tryPlace = (ourDow: number, kind: DayKind, miles: number) => {
       if (miles <= 0) return;
       if (blockedOurDow.has(ourDow)) return;
       if (assignment.has(ourDow)) return;
+      const slotDate = dateForDayInWeek(input.planStartDate, weekNumber, ourDow);
+      if (slotDate.getTime() < planStart.getTime()) return;
+      if (nOffset !== 0 && slotDate.getTime() > raceUtc.getTime()) return;
       assignment.set(ourDow, { kind, miles: round2(miles) });
     };
 
@@ -427,7 +448,8 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
           !blockedOurDow.has(d) &&
           !assignment.has(d) &&
           d !== q.tempoOurDow &&
-          d !== q.intervalOurDow
+          d !== q.intervalOurDow &&
+          dayInPlanWindow(d)
       );
       const fallback = candidates[0];
       if (fallback != null) {
@@ -439,13 +461,19 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
 
     const usedForQuality = new Set(assignment.keys());
     const easyCandidates = preferred.filter(
-      (d) => !blockedOurDow.has(d) && !usedForQuality.has(d)
+      (d) =>
+        !blockedOurDow.has(d) &&
+        !usedForQuality.has(d) &&
+        dayInPlanWindow(d)
     );
     const easyDays =
       easyCandidates.length > 0
         ? easyCandidates
         : [1, 2, 3, 4, 5, 6, 7].filter(
-            (d) => !blockedOurDow.has(d) && !usedForQuality.has(d)
+            (d) =>
+              !blockedOurDow.has(d) &&
+              !usedForQuality.has(d) &&
+              dayInPlanWindow(d)
           );
 
     let easyBudget = easyMi + absorbLongIntoEasy;
@@ -492,16 +520,8 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
               ? "LongRun"
               : "Easy";
       const date = dateForDayInWeek(input.planStartDate, weekNumber, ourDow);
-      const label =
-        kind === "long"
-          ? "Long run"
-          : kind === "tempo"
-            ? "Tempo"
-            : kind === "interval"
-              ? "Intervals"
-              : "Easy";
       out.push({
-        title: `${label} — Week ${weekNumber}`,
+        title: formatPlannedWorkoutTitle(workoutType, milesToMeters(miles)),
         workoutType,
         athleteId: input.athleteId,
         planId: input.planId,

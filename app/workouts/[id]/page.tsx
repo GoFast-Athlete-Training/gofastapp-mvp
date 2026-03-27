@@ -14,6 +14,7 @@ import {
   getTrainingPaces,
   parsePaceToSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
+import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 
 interface WorkoutSegment {
   id: string;
@@ -637,7 +638,7 @@ export default function WorkoutDetailPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1">
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 break-words">
-                {workout.title}
+                {displayWorkoutListTitle({ title: workout.title, workoutType: workout.workoutType, estimatedDistanceInMeters: workout.estimatedDistanceInMeters ?? null })}
               </h1>
               {scheduleLabel && (
                 <p className="text-lg text-gray-700 font-medium mb-2">{scheduleLabel}</p>
@@ -948,7 +949,9 @@ export default function WorkoutDetailPage() {
           </div>
         )}
 
-        {workout.workout_catalogue && (
+        {workout.workout_catalogue &&
+          workout.workoutType !== "Intervals" &&
+          workout.workoutType !== "Tempo" && (
           <CataloguePrescriptionCard
             catalogue={workout.workout_catalogue}
             fiveKPaceSnapshot={workout.training_plans?.currentFiveKPace}
@@ -958,7 +961,9 @@ export default function WorkoutDetailPage() {
 
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Segments</h2>
-          {workout.workout_catalogue && (
+          {workout.workout_catalogue &&
+            workout.workoutType !== "Intervals" &&
+            workout.workoutType !== "Tempo" && (
             <p className="text-sm text-gray-500 mb-4">
               Step-by-step breakdown (used for Garmin sync). The coach prescription above is the
               human-readable plan.

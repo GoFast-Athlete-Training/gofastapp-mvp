@@ -14,6 +14,8 @@ import {
   type PhaseRange,
 } from "@/lib/training/plan-phases";
 import { cataloguePhaseFallbackForWeek } from "@/lib/training/generate-plan";
+import { formatCalendarWeekRangeLabel } from "@/lib/training/plan-utils";
+import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 
 type PlanDetail = {
   id: string;
@@ -43,6 +45,9 @@ const DAY_OPTIONS: { value: number; label: string }[] = [
 ];
 
 const DEFAULT_PREFERRED_DAYS = [1, 2, 3, 4, 5, 6];
+
+/** Matches generator default floor; not user-editable. */
+const ENGINE_MIN_WEEKLY_MI = 40;
 
 function parsePlanWeekEntries(
   planWeeks: unknown
@@ -88,7 +93,6 @@ export default function TrainingSetupPlanPage({
     DEFAULT_PREFERRED_DAYS
   );
   const [peakWeeklyMiles, setPeakWeeklyMiles] = useState("50");
-  const [minWeeklyMiles, setMinWeeklyMiles] = useState("40");
   const [error, setError] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
 
@@ -181,6 +185,23 @@ export default function TrainingSetupPlanPage({
   const showPhaseModalButton =
     phaseRanges.length > 0 || weekEntries.length > 0;
 
+  const preferredCount = useMemo(
+    () => preferredDaysLocal.filter((d) => d >= 1 && d <= 7).length,
+    [preferredDaysLocal]
+  );
+
+  const buildWarnings = useMemo(() => {
+    const peak = Math.round(Number(peakWeeklyMiles));
+    const peakFinite = Number.isFinite(peak);
+    const lowPeak =
+      peakFinite &&
+      peak < ENGINE_MIN_WEEKLY_MI &&
+      peakWeeklyMiles.trim() !== "";
+    const fewDays = preferredCount > 0 && preferredCount < 4;
+    const fourDays = preferredCount === 4;
+    return { lowPeak, fewDays, fourDays };
+  }, [peakWeeklyMiles, preferredCount]);
+
   const currentWeekEntry = useMemo(
     () => weekEntries.find((w) => w.weekNumber === weekNumber),
     [weekEntries, weekNumber]
@@ -204,6 +225,11 @@ export default function TrainingSetupPlanPage({
     plan?.race_registry,
     plan?.startDate,
   ]);
+
+  const calendarWeekRangeLabel = useMemo(() => {
+    if (!plan) return "";
+    return formatCalendarWeekRangeLabel(plan.startDate, weekNumber);
+  }, [plan, weekNumber]);
 
   const fetchWeekWorkouts = useCallback(
     async (wn: number) => {
@@ -258,17 +284,11 @@ export default function TrainingSetupPlanPage({
         return;
       }
       let peak = Math.round(Number(peakWeeklyMiles));
-      let minM = Math.round(Number(minWeeklyMiles));
-      if (!Number.isFinite(peak) || !Number.isFinite(minM)) {
-        setError("Enter valid weekly mileage numbers.");
+      if (!Number.isFinite(peak)) {
+        setError("Enter a valid peak weekly mileage.");
         return;
       }
       peak = Math.max(25, Math.min(100, peak));
-      minM = Math.max(25, Math.min(100, minM));
-      if (minM > peak) {
-        setError("Minimum weekly miles cannot exceed your peak target.");
-        return;
-      }
 
       const patchRes = await fetch(`/api/training-plan/${planId}`, {
         method: "PATCH",
@@ -296,7 +316,7 @@ export default function TrainingSetupPlanPage({
         body: JSON.stringify({
           trainingPlanId: planId,
           weeklyMileageTarget: peak,
-          minWeeklyMiles: minM,
+          minWeeklyMiles: ENGINE_MIN_WEEKLY_MI,
         }),
       });
       const genData = await genRes.json();
@@ -362,46 +382,40 @@ export default function TrainingSetupPlanPage({
                   We&apos;ll build your plan for you
                 </p>
                 <p className="mt-2 leading-relaxed text-gray-700">
-                  Set your peak week, a minimum weekly floor, and the days you
-                  like to run. We&apos;ll lay out workouts week by week and take
-                  care of the rest—paces, structure, and progression toward race
-                  day.
+                  Set your peak week and the days you like to run. We&apos;ll lay
+                  out workouts week by week and take care of the rest—paces,
+                  structure, and progression toward race day.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-800">
-                    Peak weekly miles
-                  </label>
-                  <p className="mb-2 text-xs text-gray-500">
-                    Target at your highest week (25–100).
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-800">
+                  Peak weekly miles
+                </label>
+                <p className="mb-2 text-xs text-gray-500">
+                  Target at your highest week (25–100). We never schedule a week
+                  below {ENGINE_MIN_WEEKLY_MI} mi—if your peak is under that,
+                  you&apos;ll see a heads-up below.
+                </p>
+                <input
+                  type="number"
+                  min={25}
+                  max={100}
+                  className="w-full max-w-md rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  value={peakWeeklyMiles}
+                  onChange={(e) => setPeakWeeklyMiles(e.target.value)}
+                />
+                {buildWarnings.lowPeak && (
+                  <p
+                    className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950"
+                    role="status"
+                  >
+                    Plans use at least {ENGINE_MIN_WEEKLY_MI} mi/week on the
+                    calendar—your peak is below that, so volume won&apos;t go
+                    lower than the floor. Consider raising peak toward{" "}
+                    {ENGINE_MIN_WEEKLY_MI}+ if you want headroom.
                   </p>
-                  <input
-                    type="number"
-                    min={25}
-                    max={100}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                    value={peakWeeklyMiles}
-                    onChange={(e) => setPeakWeeklyMiles(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-800">
-                    Minimum weekly floor
-                  </label>
-                  <p className="mb-2 text-xs text-gray-500">
-                    We won&apos;t schedule below this in easier weeks.
-                  </p>
-                  <input
-                    type="number"
-                    min={25}
-                    max={100}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                    value={minWeeklyMiles}
-                    onChange={(e) => setMinWeeklyMiles(e.target.value)}
-                  />
-                </div>
+                )}
               </div>
 
               <div>
@@ -427,6 +441,27 @@ export default function TrainingSetupPlanPage({
                     </label>
                   ))}
                 </div>
+                {buildWarnings.fewDays && (
+                  <p
+                    className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950"
+                    role="status"
+                  >
+                    Fewer than four days makes it harder to spread easy mileage,
+                    quality work, and recovery. Adding another day or two usually
+                    feels better on the legs.
+                  </p>
+                )}
+                {buildWarnings.fourDays && (
+                  <p
+                    className="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm text-sky-950"
+                    role="status"
+                  >
+                    With four sessions a week, your off days are real recovery
+                    days—we&apos;ll treat most runs as quality so something
+                    meaningful happens every time you lace up. Listen to easy
+                    days if we prescribe them.
+                  </p>
+                )}
               </div>
 
               <button
@@ -474,6 +509,11 @@ export default function TrainingSetupPlanPage({
                         {weekPhaseLabel}
                       </span>
                     )}
+                    {calendarWeekRangeLabel && (
+                      <p className="mt-2 text-sm text-gray-500">
+                        Calendar week: {calendarWeekRangeLabel}
+                      </p>
+                    )}
                   </div>
                   <div className="flex shrink-0 gap-1">
                     <button
@@ -500,11 +540,36 @@ export default function TrainingSetupPlanPage({
                   <p className="break-words text-sm leading-relaxed text-gray-800">
                     {currentWeekEntry.schedule}
                   </p>
+                ) : weekWorkouts.length > 0 ? (
+                  <div className="mt-1">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+                      This week
+                    </p>
+                    <ul className="space-y-2">
+                      {weekWorkouts.map((w) => (
+                        <li
+                          key={w.id}
+                          className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm"
+                        >
+                          <span className="font-medium text-gray-900">
+                            {displayWorkoutListTitle(w)}
+                          </span>
+                          <span className="text-gray-500">
+                            {w.date
+                              ? new Date(w.date).toLocaleDateString(undefined, {
+                                  weekday: "short",
+                                  month: "short",
+                                  day: "numeric",
+                                })
+                              : "—"}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ) : materializedWorkouts > 0 ? (
                   <p className="text-sm leading-relaxed text-gray-600">
-                    This week&apos;s workouts are listed below—open any card for
-                    full detail. (Legacy schedule text isn&apos;t stored for
-                    this plan.)
+                    Loading this week&apos;s sessions…
                   </p>
                 ) : (
                   <p className="text-sm text-gray-500">
@@ -527,7 +592,7 @@ export default function TrainingSetupPlanPage({
                     className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-orange-300 hover:shadow-md transition"
                   >
                     <div className="text-base font-semibold text-gray-900 leading-snug">
-                      {w.title}
+                      {displayWorkoutListTitle(w)}
                     </div>
                     <div className="mt-2 text-sm text-gray-600">
                       {w.date
@@ -538,11 +603,6 @@ export default function TrainingSetupPlanPage({
                             year: "numeric",
                           })
                         : "Date TBD"}
-                      <span className="text-gray-400"> · </span>
-                      {w.workoutType}
-                      {w.estimatedDistanceInMeters != null
-                        ? ` · ${(w.estimatedDistanceInMeters / 1609.34).toFixed(1)} mi`
-                        : ""}
                     </div>
                   </Link>
                 </li>

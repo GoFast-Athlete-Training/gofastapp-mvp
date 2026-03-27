@@ -2,7 +2,7 @@
  * Idempotent: load or create plan workouts for [startDate, endDate] UTC inclusive.
  */
 
-import type { Prisma, workouts } from "@prisma/client";
+import type { Prisma, WorkoutType, workouts } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   getTrainingPaces,
@@ -17,8 +17,11 @@ import {
   dateForDayInWeek,
   dayAbbrToOurDow,
 } from "./schedule-parser";
+import { addDaysUtc, mondayUtcOfWeekContaining, utcDateOnly } from "./plan-utils";
+import { formatPlannedWorkoutTitle } from "./workout-display-title";
 import { selectNextCatalogueWorkout } from "./select-catalogue-workout";
 import { catalogueEntryToApiSegments } from "./catalogue-to-segments";
+import { resolvePaceStringForWorkout } from "./algo-workout-segments";
 
 function milesToMeters(miles: number): number {
   return miles * 1609.34;
@@ -32,20 +35,14 @@ function utcDayRange(weekStart: Date, weekEnd: Date): { gte: Date; lte: Date } {
   return { gte, lte };
 }
 
-function titleForType(workoutType: string, miles: number, weekNumber: number): string {
-  return `${workoutType} — Week ${weekNumber} (${miles} mi)`;
-}
-
 export type WeekBounds = { weekStart: Date; weekEnd: Date };
 
 export function weekBoundsFromPlan(
   planStartDate: Date,
   weekNumber: number
 ): WeekBounds {
-  const start = new Date(planStartDate);
-  start.setUTCHours(0, 0, 0, 0);
-  const weekStart = new Date(start);
-  weekStart.setUTCDate(weekStart.getUTCDate() + (weekNumber - 1) * 7);
+  const firstMonday = mondayUtcOfWeekContaining(planStartDate);
+  const weekStart = addDaysUtc(firstMonday, (weekNumber - 1) * 7);
   const weekEnd = new Date(weekStart);
   weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
   weekEnd.setUTCHours(23, 59, 59, 999);
@@ -53,22 +50,31 @@ export function weekBoundsFromPlan(
 }
 
 function weekNumberFromDate(planStartDate: Date, date: Date): number {
-  const s = new Date(planStartDate);
-  s.setUTCHours(0, 0, 0, 0);
-  const d = new Date(date);
-  d.setUTCHours(0, 0, 0, 0);
-  const diffMs = d.getTime() - s.getTime();
-  const diffDays = Math.floor(diffMs / (86400000));
-  if (diffDays < 0) return 1;
+  const firstMon = mondayUtcOfWeekContaining(planStartDate);
+  const d = utcDateOnly(date);
+  if (d.getTime() < firstMon.getTime()) return 1;
+  const diffDays = Math.floor(
+    (d.getTime() - firstMon.getTime()) / 86400000
+  );
   return Math.floor(diffDays / 7) + 1;
 }
 
-/** Current-fitness anchor for zone offsets: Athlete.fiveKPace (M:SS / mile), not goal race pace. */
-function baselineSecondsPerMileFromAthlete(fiveKPace: string | null | undefined): number {
-  const raw = fiveKPace?.trim();
+function isThinPlanWorkoutType(t: WorkoutType): boolean {
+  return t === "Intervals" || t === "Tempo";
+}
+
+/** training_plans.currentFiveKPace first, then athlete profile. */
+function baselineSecondsPerMileFromPlan(plan: {
+  currentFiveKPace: string | null;
+  Athlete: { fiveKPace: string | null } | null;
+}): number {
+  const raw = resolvePaceStringForWorkout(
+    plan.currentFiveKPace,
+    plan.Athlete?.fiveKPace
+  );
   if (!raw) {
     throw new Error(
-      "Set your current 5K pace on your profile (athlete-edit-profile) so plan workouts can use training zones."
+      "Set current 5K pace on your training plan or athlete profile so plan workouts can use training zones."
     );
   }
   return parsePaceToSecondsPerMile(raw);
@@ -136,17 +142,30 @@ export async function workoutDaysRangeForWeek(params: {
     typeof entry.phase === "string" ? entry.phase : String(entry.phase ?? "");
 
   const tokens = parseScheduleString(schedule);
-  const anchorSecPerMile = baselineSecondsPerMileFromAthlete(plan.Athlete?.fiveKPace);
-  const paces = getTrainingPaces(anchorSecPerMile);
+  let anchorSecPerMile: number | null = null;
+  let paces: ReturnType<typeof getTrainingPaces> | null = null;
+
+  const needsPaceForMaterialization =
+    tokens.some((tok) => !isThinPlanWorkoutType(tok.workoutType));
+
+  if (needsPaceForMaterialization) {
+    anchorSecPerMile = baselineSecondsPerMileFromPlan(plan);
+    paces = getTrainingPaces(anchorSecPerMile);
+  }
+
   const phaseNorm = (phase || "base").trim().toLowerCase();
 
   const cataloguePicks: Awaited<
     ReturnType<typeof selectNextCatalogueWorkout>
   >[] = [];
   for (const token of tokens) {
-    cataloguePicks.push(
-      await selectNextCatalogueWorkout(athleteId, token.workoutType, phaseNorm)
-    );
+    if (isThinPlanWorkoutType(token.workoutType)) {
+      cataloguePicks.push(null);
+    } else {
+      cataloguePicks.push(
+        await selectNextCatalogueWorkout(athleteId, token.workoutType, phaseNorm)
+      );
+    }
   }
 
   const created: workouts[] = [];
@@ -159,10 +178,12 @@ export async function workoutDaysRangeForWeek(params: {
       const date = dateForDayInWeek(plan.startDate, weekNumber, ourDow);
       const estMeters = milesToMeters(token.miles);
 
-      const title =
-        catalogueEntry != null
-          ? `${catalogueEntry.name} — Week ${weekNumber}`
-          : titleForType(token.workoutType, token.miles, weekNumber);
+      const title = formatPlannedWorkoutTitle(
+        token.workoutType,
+        milesToMeters(token.miles)
+      );
+
+      const thin = isThinPlanWorkoutType(token.workoutType);
 
       const w = await tx.workouts.create({
         data: {
@@ -173,10 +194,20 @@ export async function workoutDaysRangeForWeek(params: {
           date,
           phase: phase || null,
           estimatedDistanceInMeters: estMeters,
-          catalogueWorkoutId: catalogueEntry?.id ?? null,
+          catalogueWorkoutId: thin ? null : catalogueEntry?.id ?? null,
           updatedAt: new Date(),
         },
       });
+
+      if (thin) {
+        created.push(w);
+        continue;
+      }
+
+      if (!anchorSecPerMile || !paces) {
+        anchorSecPerMile = baselineSecondsPerMileFromPlan(plan);
+        paces = getTrainingPaces(anchorSecPerMile);
+      }
 
       const apiSegs =
         catalogueEntry != null

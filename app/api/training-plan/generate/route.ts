@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { generatePlanWorkoutRows } from "@/lib/training/generate-plan";
+import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
+import { formatPlannedWorkoutTitle } from "@/lib/training/workout-display-title";
 import { selectNextCatalogueWorkout } from "@/lib/training/select-catalogue-workout";
 import { newEntityId } from "@/lib/training/new-entity-id";
 import { Prisma } from "@prisma/client";
@@ -90,10 +92,11 @@ export async function POST(request: NextRequest) {
           : [1, 2, 3, 4, 5, 6];
 
     const race = plan.race_registry;
+    const weekCount = calendarTrainingWeekCount(plan.startDate, race.raceDate);
     const drafts = generatePlanWorkoutRows({
       planId: plan.id,
       athleteId: athlete.id,
-      totalWeeks: plan.totalWeeks,
+      totalWeeks: weekCount,
       planStartDate: plan.startDate,
       raceDate: race.raceDate,
       weeklyMileageTarget,
@@ -113,8 +116,11 @@ export async function POST(request: NextRequest) {
             d.workoutType,
             d.phase ?? "base"
           );
-      const title =
-        cat != null ? `${cat.name} — Week ${d.weekNumber}` : d.title;
+      const title = formatPlannedWorkoutTitle(
+        d.workoutType,
+        d.estimatedDistanceInMeters,
+        isRaceDay ? { isRace: true, raceName: race.name } : undefined
+      );
       rows.push({
         id: newEntityId(),
         title,
@@ -142,6 +148,7 @@ export async function POST(request: NextRequest) {
           planWeeks: Prisma.JsonNull,
           phases: Prisma.JsonNull,
           weeklyMileageTarget,
+          totalWeeks: weekCount,
           updatedAt: new Date(),
         },
       });

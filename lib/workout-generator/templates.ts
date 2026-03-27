@@ -24,9 +24,7 @@ function easy(
   _paces: TrainingPaces
 ): SegmentDescriptor[] {
   return [
-    { title: "Warmup", durationType: "DISTANCE", durationValue: round(totalMiles * 0.1, 2), paceZone: "easy" },
-    { title: "Easy Run", durationType: "DISTANCE", durationValue: round(totalMiles * 0.8, 2), paceZone: "easy" },
-    { title: "Cooldown", durationType: "DISTANCE", durationValue: round(totalMiles * 0.1, 2), paceZone: "easy" },
+    { title: "Easy Run", durationType: "DISTANCE", durationValue: round(totalMiles, 2), paceZone: "easy" },
   ];
 }
 
@@ -45,12 +43,20 @@ function longRun(
   totalMiles: number,
   _paces: TrainingPaces
 ): SegmentDescriptor[] {
-  return [
-    { title: "Warmup", durationType: "DISTANCE", durationValue: round(totalMiles * 0.1, 2), paceZone: "easy" },
-    { title: "Long Run", durationType: "DISTANCE", durationValue: round(totalMiles * 0.75, 2), paceZone: "longRun" },
-    { title: "Marathon Pace", durationType: "DISTANCE", durationValue: round(totalMiles * 0.15, 2), paceZone: "marathon" },
-    { title: "Cooldown", durationType: "DISTANCE", durationValue: round(totalMiles * 0.05, 2), paceZone: "easy" },
+  const main = round(totalMiles * 0.88, 2);
+  const cd = round(totalMiles - main, 2);
+  const segs: SegmentDescriptor[] = [
+    { title: "Long Run", durationType: "DISTANCE", durationValue: main, paceZone: "longRun" },
   ];
+  if (cd > 0.05) {
+    segs.push({
+      title: "Cooldown",
+      durationType: "DISTANCE",
+      durationValue: cd,
+      paceZone: "easy",
+    });
+  }
+  return segs;
 }
 
 function intervals(
