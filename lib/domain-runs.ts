@@ -87,7 +87,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     }
   }
   
-  // Day filter applied client-side from startDate (MVP1: all runs are single events)
+  // Day filter applied client-side from startDate (each city run is a single occurrence)
 
   // Public run hydration: only show upcoming runs (startDate >= start of today UTC)
   const startOfToday = new Date();

@@ -114,7 +114,7 @@ export async function POST(request: Request) {
       runCrewName: m.runCrew?.name || m.run_crews?.name || 'N/A'
     })), null, 2));
 
-    // Return success response matching MVP1 structure
+    // { success, athlete, timestamp } for app bootstrap / shell
     return NextResponse.json({ 
       success: true,
       message: 'Athlete hydrated successfully',

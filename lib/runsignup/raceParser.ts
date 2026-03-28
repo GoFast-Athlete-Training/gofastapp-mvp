@@ -1,7 +1,7 @@
 /**
  * RunSignUp Race Parser - Strict Pass-Through
  * 
- * MVP1 Stability: NO URL INVENTION, NO GUESSING, NO MAGIC
+ * Stability rule: NO URL INVENTION, NO GUESSING, NO MAGIC
  * 
  * CRITICAL RULES:
  * - Only use URLs explicitly provided by RunSignUp
@@ -12,7 +12,7 @@
  * - RunSignUp URL patterns are inconsistent and undocumented
  * - Constructed URLs frequently result in 404s
  * - Only RunSignUp knows the correct URL format for each race
- * - MVP1 requires predictable, stable behavior
+ * - Callers depend on predictable, stable behavior (no silent URL fixes)
  */
 
 export type RaceCategory = 'race' | 'training_program' | 'other';

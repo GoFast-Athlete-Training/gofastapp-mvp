@@ -267,7 +267,7 @@ export async function POST(request: Request) {
       console.log('✅ ATHLETE CREATE: Role set to CLUB_LEADER for athlete:', athlete.id);
     }
 
-    // Format response like MVP1
+    // Return athlete id + firebase mapping for the client bootstrap flow
     const response = NextResponse.json({
       success: true,
       message: 'Athlete found or created',

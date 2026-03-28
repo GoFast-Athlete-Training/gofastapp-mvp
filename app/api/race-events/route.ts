@@ -209,7 +209,7 @@ export async function POST(request: Request) {
     }, {});
     console.log(`📊 Category breakdown:`, categoryCounts);
 
-    // STEP 3: Select for MVP1
+    // STEP 3: Filter to upcoming races only
     // Filter out past events (only show upcoming races)
     // 
     // HOW "TODAY" IS ESTABLISHED:
@@ -221,7 +221,7 @@ export async function POST(request: Request) {
     // TIMEZONE CONSIDERATIONS:
     // - Server timezone may differ from user's timezone
     // - RunSignUp dates are typically in race's local timezone
-    // - For MVP1: server-local comparison is acceptable (shows races from server's "today" forward)
+    // - Server-local "today" is acceptable here (races from API host midnight forward)
     // - Future: Could use athlete's timezone from profile for user-specific filtering
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Start of today in server's timezone

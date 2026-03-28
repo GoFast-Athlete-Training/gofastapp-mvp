@@ -215,14 +215,14 @@ export default function PublicGroupsPage() {
       } else if (activeFilterBox === 'purpose' && filterPurpose.length > 0) {
         filterPurpose.forEach(p => params.append('purpose', p));
       } else if (activeFilterBox === 'race') {
-        // For MVP1, if race filter is active, show all race training groups
+        // With race filter on, list all race-training groups (broad match)
         // If race is selected, filter by it
         if (filterRaceId) {
           params.append('raceId', filterRaceId);
           if (filterRaceState) params.append('raceState', filterRaceState);
           if (filterRaceCity) params.append('raceCity', filterRaceCity);
         } else {
-          // Just show all race training groups (hydration approach for MVP1)
+          // Fallback: show all race training groups from hydrated payload
           params.append('raceTrainingGroups', 'true');
         }
       }

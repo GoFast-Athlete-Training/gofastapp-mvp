@@ -6,7 +6,7 @@ import { adminAuth } from '@/lib/firebaseAdmin';
 
 /**
  * POST /api/runs/manage/[runId]/approve
- * Set workflowStatus to APPROVED (submit-for-approval flow). MVP1: all runs are SINGLE_EVENT.
+ * Set workflowStatus to APPROVED (submit-for-approval flow). City runs are single-occurrence rows.
  */
 export async function POST(
   request: Request,

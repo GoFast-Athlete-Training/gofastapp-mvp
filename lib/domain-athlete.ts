@@ -274,9 +274,9 @@ export async function hydrateAthlete(athleteId: string) {
     }
   }
 
-  // Format athlete data for frontend consumption (matching MVP1 backend structure)
+  // Shape returned to the app shell and client routes (includes RunCrew + Garmin summary fields)
   const hydratedAthlete = {
-    athleteId: athlete.id, // MVP1 uses athleteId as central identifier
+    athleteId: athlete.id, // stable id for client APIs and storage
     id: athlete.id,
     firebaseId: athlete.firebaseId,
     email: athlete.email,

@@ -9,7 +9,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
-// MVP1: Settings deprecated
+// Settings entry lives in TopNav / profile; no header gear here.
 // import { Settings } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -62,23 +62,6 @@ export default function AthleteHeader() {
               </span>
             )}
           </button>
-          {/* MVP1: Settings deprecated - Profile management via profile icon */}
-          {/* Settings Button - COMMENTED OUT FOR MVP1
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log('Settings button clicked');
-              router.push('/settings');
-            }}
-            className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 rounded-lg font-medium hover:bg-gray-100 transition relative z-10 cursor-pointer"
-            type="button"
-            style={{ pointerEvents: 'auto' }}
-          >
-            <Settings className="h-5 w-5" />
-            <span>Settings</span>
-          </button>
-          */}
           <button
             onClick={handleSignOut}
             className="px-4 py-2 text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100 transition"

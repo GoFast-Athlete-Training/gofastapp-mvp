@@ -13,7 +13,6 @@ import api from '@/lib/api';
 export default function SettingsPage() {
   const router = useRouter();
   const [athlete, setAthlete] = useState<any>(null);
-  const [connectingGarmin, setConnectingGarmin] = useState(false);
   const [copiedProfileUrl, setCopiedProfileUrl] = useState(false);
 
   const [ambassadorCredits, setAmbassadorCredits] = useState<{
@@ -23,14 +22,6 @@ export default function SettingsPage() {
     periodStart: string | null;
     amountPerCreditCents: number;
   } | null>(null);
-
-  const refreshAthlete = () => {
-    const id = LocalStorageAPI.getAthleteId();
-    if (!id) return;
-    api.get(`/athlete/${id}`).then((res) => {
-      if (res.data?.athlete) setAthlete(res.data.athlete);
-    });
-  };
 
   useEffect(() => {
     const id = LocalStorageAPI.getAthleteId();
@@ -65,92 +56,6 @@ export default function SettingsPage() {
       })
       .catch(() => setAmbassadorCredits(null));
   }, [athlete?.role]);
-
-  // Direct Garmin OAuth flow (like gofastfrontend-mvp1)
-  const connectGarmin = async () => {
-    if (!athlete?.id) {
-      alert('Please sign in to connect Garmin');
-      return;
-    }
-
-    setConnectingGarmin(true);
-    try {
-      // Get Firebase token
-      const { auth } = await import('@/lib/firebase');
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        alert('Please sign in to connect Garmin');
-        setConnectingGarmin(false);
-        return;
-      }
-      const firebaseToken = await currentUser.getIdToken();
-      
-      // Call authorize endpoint to get auth URL (with popup flag)
-      const response = await fetch(`/api/auth/garmin/authorize?athleteId=${athlete.id}&popup=true`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${firebaseToken}`
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to get auth URL');
-      }
-
-      const data = await response.json();
-      if (!data.success || !data.authUrl) {
-        throw new Error('Invalid response from server');
-      }
-
-      // Open popup window for OAuth
-      const popup = window.open(
-        data.authUrl,
-        'garmin-oauth',
-        'width=600,height=700,scrollbars=yes,resizable=yes'
-      );
-
-      if (!popup) {
-        alert('Popup blocked. Please allow popups for this site.');
-        setConnectingGarmin(false);
-        return;
-      }
-
-      // Listen for popup to close
-      const checkPopup = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(checkPopup);
-          setConnectingGarmin(false);
-          // Refresh athlete data to check connection status
-          refreshAthlete();
-        }
-      }, 500);
-
-      // Listen for postMessage from callback
-      const messageHandler = (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) return;
-        if (event.data.type === 'GARMIN_OAUTH_SUCCESS') {
-          clearInterval(checkPopup);
-          if (!popup.closed) popup.close();
-          setConnectingGarmin(false);
-          refreshAthlete();
-          window.removeEventListener('message', messageHandler);
-        } else if (event.data.type === 'GARMIN_OAUTH_ERROR') {
-          clearInterval(checkPopup);
-          if (!popup.closed) popup.close();
-          setConnectingGarmin(false);
-          alert('Failed to connect Garmin: ' + (event.data.error || 'Unknown error'));
-          window.removeEventListener('message', messageHandler);
-        }
-      };
-      window.addEventListener('message', messageHandler);
-
-    } catch (error: any) {
-      console.error('Error connecting Garmin:', error);
-      alert('Failed to connect Garmin: ' + (error.message || 'Unknown error'));
-      setConnectingGarmin(false);
-    }
-  };
 
   const copyPublicProfileUrl = async () => {
     const h = athlete?.gofastHandle;
@@ -303,51 +208,42 @@ export default function SettingsPage() {
           {/* Integrations */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Integrations</h2>
-            <p className="text-gray-600 mb-4">Connect your fitness apps and devices.</p>
-            
-            {/* Garmin Integration */}
+            <p className="text-gray-600 mb-4">
+              Connect or manage devices on each integration&apos;s page.
+            </p>
+
+            {/* Garmin: status here; connect/disconnect lives on /settings/garmin */}
             <div className="border border-gray-200 rounded-lg p-4 mb-4 hover:border-gray-300 transition">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Image 
-                    src="/Garmin_Connect_app_1024x1024-02.png" 
-                    alt="Garmin Connect" 
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Image
+                    src="/Garmin_Connect_app_1024x1024-02.png"
+                    alt="Garmin Connect"
                     width={40}
                     height={40}
-                    className="rounded"
+                    className="rounded shrink-0"
                   />
-                  <div>
+                  <div className="min-w-0">
                     <h3 className="text-lg font-semibold text-gray-900">Garmin Connect</h3>
                     <p className="text-sm text-gray-600">
                       {athlete?.garmin_connected ? (
-                        <span className="text-green-600">Connected</span>
+                        <span className="text-green-600 font-medium">Connected</span>
                       ) : (
-                        <span className="text-gray-500">Sync activities</span>
+                        <span className="text-gray-500">Not connected</span>
                       )}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  {athlete?.garmin_connected ? (
-                    <>
-                      <span className="text-sm text-green-600 font-medium">Connected</span>
-                      <Link
-                        href="/settings/garmin"
-                        className="px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
-                      >
-                        Manage
-                      </Link>
-                    </>
-                  ) : (
-                    <button
-                      onClick={connectGarmin}
-                      disabled={connectingGarmin}
-                      className="px-4 py-1.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition disabled:opacity-50"
-                    >
-                      {connectingGarmin ? 'Connecting...' : 'Connect'}
-                    </button>
-                  )}
-                </div>
+                <Link
+                  href="/settings/garmin"
+                  className={`shrink-0 px-4 py-1.5 text-sm font-medium rounded-lg transition text-center ${
+                    athlete?.garmin_connected
+                      ? 'text-gray-700 hover:bg-gray-100 border border-gray-200'
+                      : 'text-white bg-orange-500 hover:bg-orange-600'
+                  }`}
+                >
+                  {athlete?.garmin_connected ? 'Manage' : 'Connect'}
+                </Link>
               </div>
             </div>
           </div>

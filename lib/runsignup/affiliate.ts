@@ -1,7 +1,7 @@
 /**
  * RunSignUp Affiliate URL Builder
  * 
- * MVP1: Affiliate tracking for race discovery clicks
+ * Affiliate tracking for race discovery clicks (RunSignUp referral URLs).
  * 
  * WHY AFFILIATE TOKENS ARE PUBLIC:
  * - RunSignUp affiliate tokens are designed to be client-safe

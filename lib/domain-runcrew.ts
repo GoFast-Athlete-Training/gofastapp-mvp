@@ -1219,9 +1219,9 @@ export async function rsvpToRun(data: {
 }
 
 /**
- * Create an event (placeholder - events may be deprecated)
+ * Stub — run crew events are not implemented; kept for call-site compatibility.
  */
-export async function createEvent(data: any) {
-  // Events are deprecated for MVP1, but keeping function signature for API compatibility
-  throw new Error('Events are deprecated for MVP1');
+export async function createEvent(_data: unknown) {
+  // Legacy events API stub — not implemented in this app
+  throw new Error('Run crew events are not supported');
 }

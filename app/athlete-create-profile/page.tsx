@@ -249,7 +249,7 @@ export default function AthleteCreateProfilePage() {
         console.log('✅ Step 1 - Using existing athleteId from localStorage:', athleteId);
       }
       
-      // Step 2: Update athlete with full profile (EXACTLY like MVP1)
+      // Step 2: PATCH athlete with profile fields from the wizard
       console.log('🌐 Step 2: Updating profile via /api/athlete/:id/profile');
       
       const photoURL = firebaseUser.photoURL || formData.profilePhotoPreview;
@@ -302,7 +302,7 @@ export default function AthleteCreateProfilePage() {
       console.error('❌ Profile creation failed:', err);
       setLoading(false);
       
-      // Handle specific error cases (EXACTLY like MVP1)
+      // Map API errors to user-visible messages
       if (err.response?.data?.error) {
         const errorData = err.response.data;
         if (errorData.field === 'gofastHandle') {

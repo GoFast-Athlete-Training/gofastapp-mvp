@@ -9,7 +9,7 @@ import api from '@/lib/api';
 /**
  * Minimal Settings Page - Phase 1
  * 
- * Profile settings only - Garmin/device connections deprecated for MVP1
+ * Profile-focused settings; device integrations live under full Settings.
  */
 export default function MinimalSettingsPage() {
   const router = useRouter();

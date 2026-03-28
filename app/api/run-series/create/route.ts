@@ -49,7 +49,7 @@ export async function OPTIONS() {
  *   seriesEndDate       string  (optional) — ISO date when series ends
  *   staffGeneratedId    string  (optional when createFirstRun=false) — creating staff member (required when creating first run)
  *   firstRunDate        string  (optional) — ISO date for the first city_run stub; only used when createFirstRun=true
- *   createFirstRun      boolean (optional, default true) — if false, only create/update run_series; do not create first city_run (MVP1: series-only, no dual mutation)
+ *   createFirstRun      boolean (optional, default true) — if false, only create/update run_series; skip creating the first city_run
  */
 export async function POST(request: NextRequest) {
   try {
@@ -226,7 +226,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // MVP1: series-only — no dual mutation. When createFirstRun is false, return just the series.
+    // Series-only path: no city_run row when createFirstRun is false.
     if (!createRun) {
       const response = NextResponse.json({
         success: true,

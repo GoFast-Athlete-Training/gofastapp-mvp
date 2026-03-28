@@ -1,5 +1,5 @@
 /**
- * Deterministic Interval + Tempo segment builders (MVP1).
+ * Deterministic Interval + Tempo segment builders for plan generation.
  * Ladder step from prior *completed* workouts of same type (matchedActivityId set).
  */
 

@@ -1,5 +1,5 @@
 /**
- * MVP1 HR zone util: map zone names (e.g. "zone 2", "z2") to simple BPM ranges.
+ * Map zone labels (e.g. "zone 2", "z2") to simple BPM ranges for display and targets.
  * Uses fixed average ranges, not % of max HR.
  */
 

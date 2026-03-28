@@ -67,7 +67,7 @@ export default function RunCrewAdminPage() {
   });
   const [loadingRuns, setLoadingRuns] = useState(false);
 
-  // Message Topics (read-only for MVP1 - fixed defaults, Slack-style with # prefix)
+  // Message topics: fixed defaults only (Slack-style # prefix); no add/remove in UI
   const defaultTopics = ['#general', '#runs', '#training tips', '#myvictories', '#social'];
 
   const paceOptions = [
@@ -110,7 +110,7 @@ export default function RunCrewAdminPage() {
       // Only one active announcement per crew
       setActiveAnnouncement(announcementsList.length > 0 ? announcementsList[0] : null);
       setRuns(crewData.runsBox?.runs || []);
-      // Topics are fixed defaults for MVP1 (no add/remove functionality)
+      // Topics are fixed defaults (no add/remove in this UI)
 
       const currentMembership = crewData.membershipsBox?.memberships?.find(
         (m: any) => m.athleteId === athleteId
@@ -483,7 +483,7 @@ export default function RunCrewAdminPage() {
     }
   };
 
-  // Topic add/remove removed for MVP1 - using fixed defaults
+  // Topic add/remove not exposed here — fixed defaults only
 
   // Loading state
   if (loading) {

@@ -160,10 +160,9 @@ export default function GarminSettingsPage() {
             </span>
           </div>
           <p className="text-sm text-gray-600">
-            For Garmin Developer Program or sandbox testing, point{' '}
-            <code className="bg-gray-100 px-1 rounded text-xs">GARMIN_CLIENT_ID</code> and{' '}
-            <code className="bg-gray-100 px-1 rounded text-xs">GARMIN_CLIENT_SECRET</code> at your
-            eval app in this environment, register the same callback URL, then connect here.
+            {connected
+              ? 'Your Garmin account is linked so we can send workouts to Garmin Connect and keep training data in sync. You can disconnect anytime.'
+              : 'Sign in with Garmin to send workouts to your device and sync training data with GoFast.'}
           </p>
           {typeof athlete?.garmin_user_id === 'string' && athlete.garmin_user_id && (
             <p className="text-xs text-gray-500 font-mono break-all">
