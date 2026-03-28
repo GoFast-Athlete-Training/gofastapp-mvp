@@ -879,6 +879,8 @@ model workouts {
   weekNumber                Int?
   /// Assigned weekday name e.g. "Monday"; null for standalone
   dayAssigned               String?
+  /// Intervals/Tempo: ladder step 0–3 fixed at plan generation (ordinal % 4); aligns with planWeeks token -iN
+  planLadderIndex           Int?
   /// Garmin Training API workout id after push-to-garmin (links activity → planned workout)
   garminWorkoutId           Int?
   /// Matched activity after a run (promoted snapshot fields below)

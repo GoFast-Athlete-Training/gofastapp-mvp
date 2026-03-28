@@ -258,6 +258,8 @@ export interface GeneratedPlanWorkoutRow {
   weekNumber: number;
   dayAssigned: string;
   catalogueWorkoutId: null;
+  /** Intervals/Tempo: set in phase B via assignRotationalIdentifiers */
+  planLadderIndex: number | null;
 }
 
 function round2(n: number): number {
@@ -383,6 +385,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
           weekNumber,
           dayAssigned: DAY_NAMES[raceOurDow - 1],
           catalogueWorkoutId: null,
+          planLadderIndex: null,
         });
       }
       continue;
@@ -537,11 +540,40 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
         weekNumber,
         dayAssigned: DAY_NAMES[ourDow - 1],
         catalogueWorkoutId: null,
+        planLadderIndex: null,
       });
     }
   }
 
   return out;
+}
+
+const LADDER_ROTATION_TYPES = ["Intervals", "Tempo"] as const;
+
+/**
+ * Phase B: freeze ladder step 0–3 from ordinal position in plan (per type), not completion.
+ * Call after generatePlanWorkoutRows.
+ */
+export function assignRotationalIdentifiers(rows: GeneratedPlanWorkoutRow[]): void {
+  const indexed = rows.map((r, idx) => ({ r, idx }));
+  for (const wt of LADDER_ROTATION_TYPES) {
+    const subset = indexed
+      .filter((x) => x.r.workoutType === wt)
+      .sort((a, b) => {
+        const ta = a.r.date.getTime();
+        const tb = b.r.date.getTime();
+        if (ta !== tb) return ta - tb;
+        return a.idx - b.idx;
+      });
+    subset.forEach((x, ord) => {
+      x.r.planLadderIndex = ord % 4;
+    });
+  }
+  for (const r of rows) {
+    if (!LADDER_ROTATION_TYPES.includes(r.workoutType as (typeof LADDER_ROTATION_TYPES)[number])) {
+      r.planLadderIndex = null;
+    }
+  }
 }
 
 export type PlanWeekSlot = { weekNumber: number; schedule: string };
@@ -573,7 +605,14 @@ export function planWeeksSnapshotFromGeneratedRows(
       const mi = r.estimatedDistanceInMeters / 1609.34;
       const milesStr = formatMilesForScheduleToken(mi);
       const suf = workoutTypeToScheduleSuffix(r.workoutType);
-      return `${abbr}:${milesStr}${suf}`;
+      let token = `${abbr}:${milesStr}${suf}`;
+      if (
+        (r.workoutType === "Intervals" || r.workoutType === "Tempo") &&
+        r.planLadderIndex != null
+      ) {
+        token += `-i${r.planLadderIndex}`;
+      }
+      return token;
     });
     out.push({ weekNumber: w, schedule: parts.join(" ") });
   }

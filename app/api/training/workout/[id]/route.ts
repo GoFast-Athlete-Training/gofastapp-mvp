@@ -9,13 +9,67 @@ import {
   buildTempoApiSegments,
   resolvePaceStringForWorkout,
 } from "@/lib/training/algo-workout-segments";
+import { ladderIndexFromScheduleForDay } from "@/lib/training/schedule-parser";
 import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 import { newEntityId } from "@/lib/training/new-entity-id";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, WorkoutType } from "@prisma/client";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 const METERS_PER_MILE = 1609.34;
+
+function scheduleStringForPlanWeek(
+  planWeeks: unknown,
+  weekNumber: number
+): string | null {
+  if (!planWeeks || !Array.isArray(planWeeks)) return null;
+  const entry = planWeeks.find(
+    (w) =>
+      w &&
+      typeof w === "object" &&
+      Number((w as Record<string, unknown>).weekNumber) === weekNumber
+  ) as Record<string, unknown> | undefined;
+  const s = entry?.schedule;
+  return typeof s === "string" ? s : null;
+}
+
+/** Plan-frozen ladder for I/T; omit return → legacy Garmin-completion rotation. */
+function resolvedPlanLadderIndexForWorkout(params: {
+  planLadderIndex: number | null;
+  weekNumber: number | null;
+  dayAssigned: string | null;
+  workoutType: WorkoutType;
+  planWeeks: unknown;
+}): number | undefined {
+  if (
+    params.planLadderIndex != null &&
+    Number.isFinite(params.planLadderIndex)
+  ) {
+    return params.planLadderIndex;
+  }
+  if (
+    params.workoutType !== "Intervals" &&
+    params.workoutType !== "Tempo"
+  ) {
+    return undefined;
+  }
+  if (params.weekNumber == null || !params.dayAssigned?.trim()) {
+    return undefined;
+  }
+  const schedule = scheduleStringForPlanWeek(
+    params.planWeeks,
+    params.weekNumber
+  );
+  if (!schedule) return undefined;
+  const idx = ladderIndexFromScheduleForDay({
+    schedule,
+    dayAssigned: params.dayAssigned,
+    workoutType: params.workoutType,
+  });
+  if (idx === null) return undefined;
+  return idx;
+}
+
 
 /**
  * GET /api/training/workout/[id]
@@ -43,6 +97,7 @@ export async function GET(request: NextRequest, context: Ctx) {
               totalWeeks: true,
               currentFiveKPace: true,
               lifecycleStatus: true,
+              planWeeks: true,
             },
           },
           matched_activity: {
@@ -88,6 +143,14 @@ export async function GET(request: NextRequest, context: Ctx) {
         let apiSegs: Awaited<ReturnType<typeof buildIntervalApiSegments>> | null =
           null;
 
+        const planLadderIndex = resolvedPlanLadderIndexForWorkout({
+          planLadderIndex: workout.planLadderIndex ?? null,
+          weekNumber: workout.weekNumber ?? null,
+          dayAssigned: workout.dayAssigned ?? null,
+          workoutType: workout.workoutType,
+          planWeeks: workout.training_plans?.planWeeks ?? null,
+        });
+
         if (workout.workoutType === "Intervals") {
           apiSegs = await buildIntervalApiSegments({
             athleteId: auth.athlete.id,
@@ -95,6 +158,7 @@ export async function GET(request: NextRequest, context: Ctx) {
             workoutDate: workout.date ?? null,
             scheduleTotalMiles: scheduleMiles,
             anchorSecondsPerMile,
+            planLadderIndex,
           });
         } else if (workout.workoutType === "Tempo") {
           apiSegs = await buildTempoApiSegments({
@@ -103,6 +167,7 @@ export async function GET(request: NextRequest, context: Ctx) {
             workoutDate: workout.date ?? null,
             scheduleTotalMiles: scheduleMiles,
             anchorSecondsPerMile,
+            planLadderIndex,
           });
         } else if (
           workout.workout_catalogue &&

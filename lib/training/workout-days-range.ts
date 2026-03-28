@@ -5,14 +5,6 @@
 import type { Prisma, WorkoutType, workouts } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
-  getTrainingPaces,
-  parsePaceToSecondsPerMile,
-} from "@/lib/workout-generator/pace-calculator";
-import {
-  getTemplateSegments,
-  descriptorsToApiSegments,
-} from "@/lib/workout-generator/templates";
-import {
   parseScheduleString,
   dateForDayInWeek,
   dayAbbrToOurDow,
@@ -25,8 +17,8 @@ import {
 } from "./generate-plan";
 import { formatPlannedWorkoutTitle } from "./workout-display-title";
 import { selectNextCatalogueWorkout } from "./select-catalogue-workout";
-import { catalogueEntryToApiSegments } from "./catalogue-to-segments";
-import { resolvePaceStringForWorkout } from "./algo-workout-segments";
+import { buildPlanWorkoutApiSegments } from "./workout-segment-generator";
+import { titleFromLadderIndex } from "./algo-workout-segments";
 
 function milesToMeters(miles: number): number {
   return miles * 1609.34;
@@ -64,27 +56,6 @@ function weekNumberFromDate(planStartDate: Date, date: Date): number {
   return Math.floor(diffDays / 7) + 1;
 }
 
-function isThinPlanWorkoutType(t: WorkoutType): boolean {
-  return t === "Intervals" || t === "Tempo";
-}
-
-/** training_plans.currentFiveKPace first, then athlete profile. */
-function baselineSecondsPerMileFromPlan(plan: {
-  currentFiveKPace: string | null;
-  Athlete: { fiveKPace: string | null } | null;
-}): number {
-  const raw = resolvePaceStringForWorkout(
-    plan.currentFiveKPace,
-    plan.Athlete?.fiveKPace
-  );
-  if (!raw) {
-    throw new Error(
-      "Set current 5K pace on your training plan or athlete profile so plan workouts can use training zones."
-    );
-  }
-  return parsePaceToSecondsPerMile(raw);
-}
-
 export async function workoutDaysRangeForWeek(params: {
   planId: string;
   athleteId: string;
@@ -119,7 +90,6 @@ export async function workoutDaysRangeForWeek(params: {
   const plan = await prisma.training_plans.findFirst({
     where: { id: planId, athleteId },
     include: {
-      Athlete: { select: { fiveKPace: true } },
       race_registry: { select: { raceDate: true } },
     },
   });
@@ -155,15 +125,18 @@ export async function workoutDaysRangeForWeek(params: {
   const raceUtc = raceDate ? utcDateOnly(raceDate) : null;
   const weekNOffset =
     raceUtc != null ? nOffsetFromWeekAnchor(weekAnchorUtc, raceUtc) : null;
-  let anchorSecPerMile: number | null = null;
-  let paces: ReturnType<typeof getTrainingPaces> | null = null;
 
-  const needsPaceForMaterialization =
-    tokens.some((tok) => !isThinPlanWorkoutType(tok.workoutType));
+  const needsPaceForMaterialization = tokens.some(
+    (tok) => tok.workoutType === "Easy" || tok.workoutType === "LongRun"
+  );
 
-  if (needsPaceForMaterialization) {
-    anchorSecPerMile = baselineSecondsPerMileFromPlan(plan);
-    paces = getTrainingPaces(anchorSecPerMile);
+  if (
+    needsPaceForMaterialization &&
+    !plan.currentFiveKPace?.trim()
+  ) {
+    throw new Error(
+      "training_plans.currentFiveKPace is missing; set athlete 5K pace and sync to the plan (generate plan or update profile)."
+    );
   }
 
   const phaseNorm = phaseForCat.trim().toLowerCase();
@@ -172,7 +145,9 @@ export async function workoutDaysRangeForWeek(params: {
     ReturnType<typeof selectNextCatalogueWorkout>
   >[] = [];
   for (const token of tokens) {
-    if (isThinPlanWorkoutType(token.workoutType)) {
+    const skipCat =
+      token.workoutType === "Intervals" || token.workoutType === "Tempo";
+    if (skipCat) {
       cataloguePicks.push(null);
     } else {
       cataloguePicks.push(
@@ -191,12 +166,20 @@ export async function workoutDaysRangeForWeek(params: {
       const date = dateForDayInWeek(plan.startDate, weekNumber, ourDow);
       const estMeters = milesToMeters(token.miles);
 
-      const title = formatPlannedWorkoutTitle(
-        token.workoutType,
-        milesToMeters(token.miles)
-      );
-
-      const thin = isThinPlanWorkoutType(token.workoutType);
+      const planLadderIndex =
+        token.workoutType === "Intervals" || token.workoutType === "Tempo"
+          ? (token.ladderIndex ?? null)
+          : null;
+      const title =
+        token.workoutType === "Intervals" || token.workoutType === "Tempo"
+          ? titleFromLadderIndex(
+              token.workoutType,
+              token.ladderIndex ?? 0
+            )!
+          : formatPlannedWorkoutTitle(
+              token.workoutType,
+              milesToMeters(token.miles)
+            );
 
       const w = await tx.workouts.create({
         data: {
@@ -207,35 +190,24 @@ export async function workoutDaysRangeForWeek(params: {
           date,
           phase: null,
           estimatedDistanceInMeters: estMeters,
-          catalogueWorkoutId: thin ? null : catalogueEntry?.id ?? null,
+          catalogueWorkoutId:
+            token.workoutType === "Intervals" || token.workoutType === "Tempo"
+              ? null
+              : catalogueEntry?.id ?? null,
           weekNumber,
           dayAssigned: dayAbbrToDayName(token.dayAbbr),
           nOffset: weekNOffset,
+          planLadderIndex,
           updatedAt: new Date(),
         },
       });
 
-      if (thin) {
-        created.push(w);
-        continue;
-      }
-
-      if (!anchorSecPerMile || !paces) {
-        anchorSecPerMile = baselineSecondsPerMileFromPlan(plan);
-        paces = getTrainingPaces(anchorSecPerMile);
-      }
-
-      const apiSegs =
-        catalogueEntry != null
-          ? catalogueEntryToApiSegments({
-              entry: catalogueEntry,
-              scheduleMiles: token.miles,
-              anchorSecondsPerMile: anchorSecPerMile,
-            })
-          : descriptorsToApiSegments(
-              getTemplateSegments(token.workoutType, token.miles, paces),
-              paces
-            );
+      const apiSegs = buildPlanWorkoutApiSegments({
+        workoutType: token.workoutType,
+        miles: token.miles,
+        currentFiveKPace: plan.currentFiveKPace,
+        catalogueEntry,
+      });
 
       const segmentRows: Prisma.workout_segmentsCreateManyInput[] = apiSegs.map(
         (s) => ({

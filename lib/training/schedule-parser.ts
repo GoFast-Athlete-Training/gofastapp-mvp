@@ -2,6 +2,7 @@
  * Parse / build compact schedule strings on planWeeks, e.g. "M:5E W:6T Su:14LR"
  * Day abbrev: M, Tu, W, Th, F, Sa, Su
  * Type suffix: E Easy, T Tempo, I Intervals, L or LR LongRun (canonical write uses LR)
+ * Optional ladder marker for I/T: "-i0" .. "-i3" (plan-frozen step), e.g. "W:5I-i2"
  */
 
 import type { WorkoutType } from "@prisma/client";
@@ -13,6 +14,8 @@ export type ScheduleToken = {
   /** Single-letter style key for display (L for long run even when token was LR) */
   typeLetter: string;
   workoutType: WorkoutType;
+  /** Present for Intervals/Tempo when token includes -iN; legacy strings omit → treat as 0 */
+  ladderIndex?: number;
 };
 
 const DAY_NAME_TO_ABBR: Record<string, string> = {
@@ -108,7 +111,7 @@ export function dayAbbrToOurDow(abbr: string): number {
 }
 
 /**
- * Split schedule on spaces; each token is DAY:milesTYPE where TYPE is E,T,I,L,LR,...
+ * Split schedule on spaces; each token is DAY:milesTYPE[-iN] where TYPE is E,T,I,L,LR,...
  */
 export function parseScheduleString(schedule: string): ScheduleToken[] {
   const trimmed = schedule.trim();
@@ -119,22 +122,46 @@ export function parseScheduleString(schedule: string): ScheduleToken[] {
 
   for (const part of parts) {
     const match = part.match(
-      /^(M|Tu|W|Th|F|Sa|Su):(\d+(?:\.\d+)?)([A-Za-z]+)$/i
+      /^(M|Tu|W|Th|F|Sa|Su):(\d+(?:\.\d+)?)([A-Za-z]+)(?:-i(\d+))?$/i
     );
     if (!match) {
-      throw new Error(`Invalid schedule token: "${part}" (expected e.g. M:5E or Su:14LR)`);
+      throw new Error(`Invalid schedule token: "${part}" (expected e.g. M:5E or W:5I-i0)`);
     }
-    const [, dayAbbr, milesStr, typeSuffix] = match;
+    const [, dayAbbr, milesStr, typeSuffix, ladderStr] = match;
     const workoutType = suffixToWorkoutType(typeSuffix);
+    const ladderIndex =
+      ladderStr != null && ladderStr !== ""
+        ? Math.min(3, Math.max(0, parseInt(ladderStr, 10)))
+        : undefined;
     tokens.push({
       dayAbbr,
       miles: parseFloat(milesStr),
       typeLetter: typeLetterFromWorkoutType(workoutType),
       workoutType,
+      ...(ladderIndex !== undefined ? { ladderIndex } : {}),
     });
   }
 
   return tokens;
+}
+
+/** Resolve plan-frozen ladder index from a week's schedule string for legacy rows missing planLadderIndex. */
+export function ladderIndexFromScheduleForDay(params: {
+  schedule: string;
+  dayAssigned: string;
+  workoutType: WorkoutType;
+}): number | null {
+  try {
+    const abbr = dayNameToAbbr(params.dayAssigned);
+    const toks = parseScheduleString(params.schedule);
+    const hit = toks.find(
+      (t) => t.dayAbbr === abbr && t.workoutType === params.workoutType
+    );
+    if (!hit) return null;
+    return hit.ladderIndex ?? 0;
+  } catch {
+    return null;
+  }
 }
 
 /** JS getDay(): 0=Sun..6=Sat → our 1=Mon..7=Sun */

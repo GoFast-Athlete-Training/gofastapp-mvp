@@ -4,10 +4,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { phaseForCatalogue } from "@/lib/training/generate-plan";
+import { workoutDaysRangeForWeek } from "@/lib/training/plan-workout-materialization";
 
 /**
  * GET /api/training/week?planId=&weekNumber=
- * Returns plan workouts for that week (no segments).
+ * Returns plan workouts for that week. If none exist but planWeeks has the week, materializes lazily (writes DB).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const workouts = await prisma.workouts.findMany({
+    let workouts = await prisma.workouts.findMany({
       where: {
         planId,
         athleteId: auth.athlete.id,
@@ -54,6 +55,14 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { date: "asc" },
     });
+
+    if (workouts.length === 0) {
+      workouts = await workoutDaysRangeForWeek({
+        planId,
+        athleteId: auth.athlete.id,
+        weekNumber,
+      });
+    }
 
     const nOffset = weekNumber - plan.totalWeeks;
     const cards = workouts.map((w) => ({

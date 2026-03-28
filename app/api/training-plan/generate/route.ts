@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import {
+  assignRotationalIdentifiers,
   generatePlanWorkoutRows,
   planWeeksSnapshotFromGeneratedRows,
 } from "@/lib/training/generate-plan";
@@ -11,6 +12,9 @@ import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
 import { formatPlannedWorkoutTitle } from "@/lib/training/workout-display-title";
 import { selectNextCatalogueWorkout } from "@/lib/training/select-catalogue-workout";
 import { newEntityId } from "@/lib/training/new-entity-id";
+import { buildPlanWorkoutApiSegments } from "@/lib/training/workout-segment-generator";
+import { titleFromLadderIndex } from "@/lib/training/algo-workout-segments";
+import type { workout_catalogue } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 
 /**
@@ -108,22 +112,62 @@ export async function POST(request: NextRequest) {
       raceName: race.name,
       raceDistanceMiles: race.distanceMiles,
     });
+    assignRotationalIdentifiers(drafts);
+
+    const syncedFiveKPace =
+      athlete.fiveKPace?.trim() ||
+      plan.currentFiveKPace?.trim() ||
+      null;
+    const needsFiveKAnchor = drafts.some(
+      (d) => d.workoutType === "Easy" || d.workoutType === "LongRun"
+    );
+    if (needsFiveKAnchor && !syncedFiveKPace) {
+      return NextResponse.json(
+        {
+          error:
+            "Set 5K pace on your athlete profile before generating a plan (syncs to the plan for workout zones).",
+        },
+        { status: 400 }
+      );
+    }
 
     const rows: Prisma.workoutsCreateManyInput[] = [];
+    const catalogueByRow: (workout_catalogue | null)[] = [];
     for (const d of drafts) {
       const isRaceDay = d.nOffset === 0;
-      const cat = isRaceDay
+      const skipCat =
+        isRaceDay ||
+        d.workoutType === "Intervals" ||
+        d.workoutType === "Tempo";
+      const cat = skipCat
         ? null
         : await selectNextCatalogueWorkout(
             athlete.id,
             d.workoutType,
             d.phase ?? "base"
           );
-      const title = formatPlannedWorkoutTitle(
-        d.workoutType,
-        d.estimatedDistanceInMeters,
-        isRaceDay ? { isRace: true, raceName: race.name } : undefined
-      );
+      catalogueByRow.push(cat);
+      let title: string;
+      if (isRaceDay) {
+        title = formatPlannedWorkoutTitle(
+          d.workoutType,
+          d.estimatedDistanceInMeters,
+          { isRace: true, raceName: race.name }
+        );
+      } else if (
+        d.workoutType === "Intervals" ||
+        d.workoutType === "Tempo"
+      ) {
+        title = titleFromLadderIndex(
+          d.workoutType,
+          d.planLadderIndex ?? 0
+        )!;
+      } else {
+        title = formatPlannedWorkoutTitle(
+          d.workoutType,
+          d.estimatedDistanceInMeters
+        );
+      }
       rows.push({
         id: newEntityId(),
         title,
@@ -137,6 +181,7 @@ export async function POST(request: NextRequest) {
         weekNumber: d.weekNumber,
         dayAssigned: d.dayAssigned,
         catalogueWorkoutId: cat?.id ?? null,
+        planLadderIndex: d.planLadderIndex,
         updatedAt: new Date(),
       });
     }
@@ -154,9 +199,38 @@ export async function POST(request: NextRequest) {
           phases: Prisma.JsonNull,
           weeklyMileageTarget,
           totalWeeks: weekCount,
+          ...(syncedFiveKPace != null
+            ? { currentFiveKPace: syncedFiveKPace }
+            : {}),
           updatedAt: new Date(),
         },
       });
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const d = drafts[i];
+        const cat = catalogueByRow[i];
+        const miles = d.estimatedDistanceInMeters / 1609.34;
+        const apiSegs = buildPlanWorkoutApiSegments({
+          workoutType: d.workoutType,
+          miles,
+          currentFiveKPace: syncedFiveKPace,
+          catalogueEntry: cat,
+        });
+        if (!apiSegs.length) continue;
+        await tx.workout_segments.createMany({
+          data: apiSegs.map((s) => ({
+            workoutId: row.id as string,
+            stepOrder: s.stepOrder,
+            title: s.title,
+            durationType: s.durationType,
+            durationValue: s.durationValue,
+            targets: s.targets as object | undefined,
+            repeatCount: s.repeatCount ?? undefined,
+            updatedAt: new Date(),
+          })),
+        });
+      }
     });
 
     return NextResponse.json({
