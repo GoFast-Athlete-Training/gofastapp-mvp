@@ -1,45 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAthleteByFirebaseId } from "@/lib/domain-athlete";
-import { adminAuth } from "@/lib/firebaseAdmin";
+import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { assembleGarminWorkout } from "@/lib/garmin-workouts/garmin-training-service";
-import { GarminApiError } from "@/lib/garmin-workouts/api-client";
-import {
-  GarminConnectionError,
-  getGarminClient,
-  getGarminClientForMode,
-} from "@/lib/garmin-workouts/get-garmin-client";
+import { GarminApiError, GarminTrainingApi } from "@/lib/garmin-workouts/garmin-training-api";
+import { GarminNotConnectedError, requireGarminToken } from "@/lib/domain-garmin";
 
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/workouts/[id]/push-to-garmin
- * Push a workout to Garmin Connect
+ * Push a workout to Garmin Connect (production bearer token only).
  */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Authenticate
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    const athlete = await getAthleteByFirebaseId(decodedToken.uid);
-    if (!athlete) {
-      return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
+    const auth = await requireAthleteFromBearer(request);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const { id } = await params;
 
-    // Get workout with segments
     const workout = await prisma.workouts.findFirst({
       where: {
         id,
-        athleteId: athlete.id,
+        athleteId: auth.athlete.id,
       },
       include: {
         segments: {
@@ -59,10 +46,8 @@ export async function POST(
       );
     }
 
-    // Resolve Garmin context (token + canonical Garmin user identity)
-    let { client, garminUserId, tokenMode, authMode } = await getGarminClient(athlete.id);
+    const token = await requireGarminToken(auth.athlete.id);
 
-    // Assemble Garmin workout from workout + segments
     const garminWorkout = assembleGarminWorkout({
       id: workout.id,
       title: workout.title,
@@ -86,48 +71,9 @@ export async function POST(
       })),
     });
 
-    // Push to Garmin with Garmin token auth (never internal athlete/workout ids as Garmin identity)
-    console.log("[GarminPush] Sending workout", {
-      workoutId: workout.id,
-      athleteId: athlete.id,
-      garminUserId,
-      tokenMode,
-      authMode,
-      endpoint: "/training-api/workout",
-    });
-    let garminWorkoutId: number;
-    try {
-      const result = await client.createWorkout(garminWorkout);
-      garminWorkoutId = result.workoutId;
-    } catch (pushError: unknown) {
-      const shouldFallbackToProd =
-        pushError instanceof GarminApiError &&
-        authMode === "bearer" &&
-        tokenMode === "test" &&
-        /unable to read oauth header/i.test(pushError.details);
-
-      if (!shouldFallbackToProd) {
-        throw pushError;
-      }
-
-      console.warn("[GarminPush] Test token rejected by Garmin; retrying with production token");
-      const fallback = await getGarminClientForMode(athlete.id, { preferTest: false });
-      client = fallback.client;
-      garminUserId = fallback.garminUserId;
-      tokenMode = fallback.tokenMode;
-      authMode = fallback.authMode;
-
-      console.log("[GarminPush] Retrying workout push", {
-        workoutId: workout.id,
-        athleteId: athlete.id,
-        garminUserId,
-        tokenMode,
-        authMode,
-        endpoint: "/training-api/workout",
-      });
-      const retryResult = await client.createWorkout(garminWorkout);
-      garminWorkoutId = retryResult.workoutId;
-    }
+    const client = new GarminTrainingApi(token, auth.athlete.id);
+    const result = await client.createWorkout(garminWorkout);
+    const garminWorkoutId = result.workoutId;
 
     await prisma.workouts.update({
       where: { id: workout.id },
@@ -140,20 +86,14 @@ export async function POST(
       garminWorkoutId,
     });
   } catch (error: unknown) {
-    if (error instanceof GarminConnectionError) {
+    if (error instanceof GarminNotConnectedError) {
       return NextResponse.json(
-        { error: error.message, status: error.status, details: error.details ?? null },
-        { status: error.status }
+        { error: error.message, status: 400 },
+        { status: 400 }
       );
     }
 
     if (error instanceof GarminApiError) {
-      console.error("[GarminPush] Garmin API error", {
-        status: error.status,
-        details: error.details,
-        url: error.url,
-        body: error.rawBody,
-      });
       return NextResponse.json(
         {
           error: "Failed to push workout to Garmin",

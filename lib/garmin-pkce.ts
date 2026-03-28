@@ -47,33 +47,6 @@ export function buildGarminAuthUrl(codeChallenge: string, athleteId: string, red
   return `https://connect.garmin.com/oauthConfirm?${params.toString()}`;
 }
 
-/** Same scopes as production; uses test app client id from env. */
-export function buildGarminTestAuthUrl(codeChallenge: string, athleteId: string, redirectUri: string) {
-  const clientId = process.env.GARMIN_TEST_CLIENT_ID;
-  if (!clientId) {
-    throw new Error("GARMIN_TEST_CLIENT_ID is not configured");
-  }
-
-  const scopes = [
-    "CONNECT_READ",
-    "CONNECT_WRITE",
-    "PARTNER_READ",
-    "PARTNER_WRITE",
-  ].join(" ");
-
-  const params = new URLSearchParams({
-    client_id: clientId,
-    response_type: "code",
-    code_challenge: codeChallenge,
-    code_challenge_method: "S256",
-    state: athleteId,
-    scope: scopes,
-    redirect_uri: redirectUri,
-  });
-
-  return `https://connect.garmin.com/oauthConfirm?${params.toString()}`;
-}
-
 /**
  * Exchange authorization code for access tokens
  */
@@ -135,59 +108,6 @@ export async function exchangeCodeForTokens(code: string, codeVerifier: string, 
     return {
       success: false,
       error: error.message
-    };
-  }
-}
-
-/**
- * Exchange auth code using test OAuth app credentials (does not touch prod tokens).
- */
-export async function exchangeTestCodeForTokens(code: string, codeVerifier: string, redirectUri: string) {
-  const clientId = process.env.GARMIN_TEST_CLIENT_ID;
-  const clientSecret = process.env.GARMIN_TEST_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    throw new Error("Garmin test OAuth credentials not configured (GARMIN_TEST_CLIENT_ID / GARMIN_TEST_CLIENT_SECRET)");
-  }
-
-  const tokenUrl = "https://diauth.garmin.com/di-oauth2-service/oauth/token";
-
-  try {
-    console.log(`🔍 [TOKEN_EXCHANGE_TEST] Redirect URI: ${redirectUri}`);
-
-    const response = await fetch(tokenUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        client_id: clientId,
-        client_secret: clientSecret,
-        code,
-        code_verifier: codeVerifier,
-        redirect_uri: redirectUri,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ [TOKEN_EXCHANGE_TEST] Failed:", response.status, errorText);
-      throw new Error(`Token exchange failed: ${response.status} - ${errorText}`);
-    }
-
-    const tokenData = await response.json();
-    console.log("✅ [TOKEN_EXCHANGE_TEST] Tokens received from Garmin");
-
-    return {
-      success: true as const,
-      tokens: tokenData,
-    };
-  } catch (error: any) {
-    console.error("❌ [TOKEN_EXCHANGE_TEST] Error:", error);
-    return {
-      success: false as const,
-      error: error.message,
     };
   }
 }

@@ -44,7 +44,7 @@ export default function ActivitiesPage() {
         ]);
         const row = profRes.data?.athlete;
         const garminFromStorage = typeof window !== 'undefined' && localStorage.getItem('garminConnected') === 'true';
-        setGarminConnected(!!row?.garmin_is_connected || garminFromStorage);
+        setGarminConnected(!!row?.garmin_connected || garminFromStorage);
         const list = actRes.data?.activities ?? [];
         setActivities(Array.isArray(list) ? list : []);
       } catch {

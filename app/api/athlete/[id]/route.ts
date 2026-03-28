@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteById, updateAthlete } from '@/lib/domain-athlete';
-import { prisma } from '@/lib/prisma';
 import { syncAthleteFiveKPaceToActivePlan } from '@/lib/training/plan-lifecycle';
 
 export async function GET(
@@ -45,18 +44,20 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Never send OAuth / test bearer tokens to the client
+    // Never send OAuth bearer tokens to the client
     const raw = athlete as Record<string, unknown>;
     const {
       garmin_access_token: _ga,
       garmin_refresh_token: _gr,
-      garmin_test_access_token: _gt,
+      garmin_is_connected: _gic,
       ...athleteSafe
     } = raw;
 
     const athleteForClient = {
       ...athleteSafe,
-      garmin_has_test_token: !!(athlete.garmin_test_access_token && athlete.garmin_test_access_token.length > 0),
+      garmin_connected: !!(
+        athlete.garmin_access_token && athlete.garmin_access_token.length > 0
+      ),
     };
 
     return NextResponse.json({ success: true, athlete: athleteForClient });
@@ -106,28 +107,9 @@ export async function PUT(
 
     let updated;
     try {
-      const keys = Object.keys(body || {});
-      if (
-        keys.length === 1 &&
-        keys[0] === 'garmin_test_linked_email'
-      ) {
-        const v = body.garmin_test_linked_email;
-        const normalized =
-          v === null || v === undefined || v === ''
-            ? null
-            : String(v).trim().slice(0, 320);
-        updated = await prisma.athlete.update({
-          where: { id },
-          data: {
-            garmin_test_linked_email: normalized,
-            updatedAt: new Date(),
-          },
-        });
-      } else {
-        updated = await updateAthlete(id, body);
-        if (body && typeof body === 'object' && 'fiveKPace' in body) {
-          await syncAthleteFiveKPaceToActivePlan(id);
-        }
+      updated = await updateAthlete(id, body);
+      if (body && typeof body === 'object' && 'fiveKPace' in body) {
+        await syncAthleteFiveKPaceToActivePlan(id);
       }
     } catch (err) {
       console.error('Prisma error:', err);
@@ -138,7 +120,7 @@ export async function PUT(
     const {
       garmin_access_token: _ga,
       garmin_refresh_token: _gr,
-      garmin_test_access_token: _gt,
+      garmin_is_connected: _gic,
       ...athleteSafe
     } = raw;
 
@@ -146,9 +128,8 @@ export async function PUT(
       success: true,
       athlete: {
         ...athleteSafe,
-        garmin_has_test_token: !!(
-          updated.garmin_test_access_token &&
-          updated.garmin_test_access_token.length > 0
+        garmin_connected: !!(
+          updated.garmin_access_token && updated.garmin_access_token.length > 0
         ),
       },
     });

@@ -1,6 +1,5 @@
 'use client';
 
-
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -9,8 +8,8 @@ import { LocalStorageAPI } from '@/lib/localstorage';
 
 export default function GarminSettingsPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [athlete, setAthlete] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  const [athlete, setAthlete] = useState<Record<string, unknown> | null>(null);
 
   const refreshAthlete = () => {
     const id = LocalStorageAPI.getAthleteId();
@@ -34,114 +33,25 @@ export default function GarminSettingsPage() {
       .catch(() => router.replace('/welcome'));
   }, [router]);
 
-  const handleConnectTest = async () => {
-    if (!athlete?.id) {
-      alert('Please sign in');
-      return;
-    }
-    setLoading(true);
-    try {
-      const { auth } = await import('@/lib/firebase');
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        alert('Please sign in');
-        setLoading(false);
-        return;
-      }
-      const firebaseToken = await currentUser.getIdToken();
-      const response = await fetch(
-        `/api/auth/garmin-test/authorize?athleteId=${athlete.id}`,
-        {
-          method: 'GET',
-          headers: { Authorization: `Bearer ${firebaseToken}` },
-        }
-      );
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to get test auth URL');
-      }
-      const data = await response.json();
-      if (!data.authUrl) {
-        throw new Error('Invalid response from server');
-      }
-      const popup = window.open(
-        data.authUrl,
-        'garmin-test-oauth',
-        'width=600,height=700,scrollbars=yes,resizable=yes'
-      );
-      if (!popup) {
-        alert('Popup blocked. Please allow popups for this site.');
-        setLoading(false);
-        return;
-      }
-      const checkPopup = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(checkPopup);
-          setLoading(false);
-          refreshAthlete();
-        }
-      }, 500);
-      const messageHandler = (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) return;
-        if (event.data.type === 'GARMIN_TEST_OAUTH_SUCCESS') {
-          clearInterval(checkPopup);
-          if (!popup.closed) popup.close();
-          setLoading(false);
-          refreshAthlete();
-          window.removeEventListener('message', messageHandler);
-        } else if (event.data.type === 'GARMIN_TEST_OAUTH_ERROR') {
-          clearInterval(checkPopup);
-          if (!popup.closed) popup.close();
-          setLoading(false);
-          alert('Garmin test connect failed: ' + (event.data.error || 'Unknown error'));
-          window.removeEventListener('message', messageHandler);
-        }
-      };
-      window.addEventListener('message', messageHandler);
-    } catch (e: unknown) {
-      console.error(e);
-      alert(e instanceof Error ? e.message : 'Failed to start Garmin test OAuth');
-      setLoading(false);
-    }
-  };
-
   const handleConnect = async () => {
     if (!athlete?.id) {
       alert('Please sign in to connect Garmin');
       return;
     }
 
-    setLoading(true);
+    setBusy(true);
     try {
-      // Get Firebase token
-      const { auth } = await import('@/lib/firebase');
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        alert('Please sign in to connect Garmin');
-        setLoading(false);
-        return;
-      }
-      const firebaseToken = await currentUser.getIdToken();
-      
-      // Call authorize endpoint to get auth URL (with popup flag)
-      const response = await fetch(`/api/auth/garmin/authorize?athleteId=${athlete.id}&popup=true`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${firebaseToken}`
-        }
+      const { data } = await api.get<{
+        success?: boolean;
+        authUrl?: string;
+        error?: string;
+      }>('/auth/garmin/authorize', {
+        params: { athleteId: String(athlete.id), popup: 'true' },
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to get auth URL');
-      }
-
-      const data = await response.json();
       if (!data.success || !data.authUrl) {
-        throw new Error('Invalid response from server');
+        throw new Error(data.error || 'Invalid response from server');
       }
 
-      // Open popup window
       const popup = window.open(
         data.authUrl,
         'garmin-oauth',
@@ -150,163 +60,145 @@ export default function GarminSettingsPage() {
 
       if (!popup) {
         alert('Popup blocked. Please allow popups for this site.');
-        setLoading(false);
         return;
       }
 
-      // Listen for popup to close or send message
       const checkPopup = setInterval(() => {
         if (popup.closed) {
           clearInterval(checkPopup);
-          setLoading(false);
-          // Refresh athlete data to check connection status
+          setBusy(false);
           refreshAthlete();
         }
       }, 500);
 
-      // Listen for postMessage from callback
       const messageHandler = (event: MessageEvent) => {
         if (event.origin !== window.location.origin) return;
         if (event.data.type === 'GARMIN_OAUTH_SUCCESS') {
           clearInterval(checkPopup);
           if (!popup.closed) popup.close();
-          setLoading(false);
+          setBusy(false);
           refreshAthlete();
           window.removeEventListener('message', messageHandler);
         } else if (event.data.type === 'GARMIN_OAUTH_ERROR') {
           clearInterval(checkPopup);
           if (!popup.closed) popup.close();
-          setLoading(false);
+          setBusy(false);
           alert('Failed to connect Garmin: ' + (event.data.error || 'Unknown error'));
           window.removeEventListener('message', messageHandler);
         }
       };
       window.addEventListener('message', messageHandler);
-
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error connecting Garmin:', error);
-      alert('Failed to connect Garmin: ' + (error.message || 'Unknown error'));
-      setLoading(false);
+      alert(
+        'Failed to connect Garmin: ' +
+          (error instanceof Error ? error.message : 'Unknown error')
+      );
+      setBusy(false);
     }
   };
 
   const handleDisconnect = async () => {
-    if (!confirm('Are you sure you want to disconnect Garmin?')) {
+    if (
+      !confirm(
+        'Disconnect your Garmin account from GoFast? Workouts and sync will stop using this connection.'
+      )
+    ) {
       return;
     }
 
-    setLoading(true);
+    setBusy(true);
     try {
-      // TODO: Implement disconnect endpoint
-      alert('Disconnect functionality coming soon');
-    } catch (error) {
+      await api.post('/auth/garmin/disconnect');
+      refreshAthlete();
+    } catch (error: unknown) {
       console.error('Error disconnecting:', error);
+      const msg =
+        error && typeof error === 'object' && 'response' in error
+          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+          : undefined;
+      alert(msg || (error instanceof Error ? error.message : 'Disconnect failed'));
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
+  const connected = !!athlete?.garmin_connected;
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-2xl mx-auto space-y-8">
         <button
           onClick={() => router.push('/settings')}
-          className="mb-4 text-blue-600 hover:text-blue-700"
+          className="mb-2 text-blue-600 hover:text-blue-700"
         >
           ← Back to Settings
         </button>
-        
-        <div className="flex items-center gap-4 mb-8">
-          <Image 
-            src="/Garmin_Connect_app_1024x1024-02.png" 
-            alt="Garmin Connect" 
+
+        <div className="flex items-center gap-4">
+          <Image
+            src="/Garmin_Connect_app_1024x1024-02.png"
+            alt="Garmin Connect"
             width={48}
             height={48}
             className="rounded-lg"
           />
           <h1 className="text-3xl font-bold text-gray-900">Garmin Connect</h1>
         </div>
-        
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="space-y-4">
-            <div>
-              <div className="text-sm text-gray-500">Status (production)</div>
-              <div className="font-medium">
-                {athlete?.garmin_is_connected ? (
-                  <span className="text-green-600">Connected</span>
-                ) : (
-                  <span className="text-gray-600">Not Connected</span>
-                )}
-              </div>
-            </div>
 
-            <div>
-              <div className="text-sm text-gray-500">Garmin test mode</div>
-              <div className="font-medium text-gray-700">
-                {athlete?.garmin_use_test_tokens && athlete?.garmin_has_test_token ? (
-                  <span className="text-amber-700">Test token linked</span>
-                ) : (
-                  <span className="text-gray-500">Not linked</span>
-                )}
-              </div>
-              {athlete?.garmin_test_linked_email && (
-                <div className="text-xs text-gray-500 mt-1">
-                  Test account label: {athlete.garmin_test_linked_email}
-                </div>
-              )}
-              {athlete?.garmin_test_user_id && (
-                <div className="text-xs text-gray-500 mt-1 font-mono">
-                  Test Garmin user id: {athlete.garmin_test_user_id}
-                </div>
-              )}
-            </div>
-
-            {athlete?.garmin_is_connected && (
-              <div>
-                <div className="text-sm text-gray-500">Connected At</div>
-                <div className="font-medium">
-                  {athlete.garmin_connected_at
-                    ? new Date(athlete.garmin_connected_at).toLocaleDateString()
-                    : 'Unknown'}
-                </div>
-              </div>
-            )}
-
-            <div className="pt-4 space-y-3">
-              {athlete?.garmin_is_connected ? (
-                <button
-                  onClick={handleDisconnect}
-                  disabled={loading}
-                  className="w-full py-2 px-4 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                >
-                  {loading ? 'Disconnecting...' : 'Disconnect Garmin'}
-                </button>
-              ) : (
-                <button
-                  onClick={handleConnect}
-                  disabled={loading}
-                  className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {loading ? 'Connecting...' : 'Connect Garmin (production)'}
-                </button>
-              )}
+        <section className="bg-white rounded-lg shadow border border-gray-200 p-6 space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold text-gray-900">Connection</h2>
+            <span
+              className={
+                connected
+                  ? 'text-xs font-medium rounded-full px-2 py-0.5 bg-green-100 text-green-800'
+                  : 'text-xs font-medium rounded-full px-2 py-0.5 bg-gray-100 text-gray-600'
+              }
+            >
+              {connected ? 'Connected' : 'Not connected'}
+            </span>
+          </div>
+          <p className="text-sm text-gray-600">
+            For Garmin Developer Program or sandbox testing, point{' '}
+            <code className="bg-gray-100 px-1 rounded text-xs">GARMIN_CLIENT_ID</code> and{' '}
+            <code className="bg-gray-100 px-1 rounded text-xs">GARMIN_CLIENT_SECRET</code> at your
+            eval app in this environment, register the same callback URL, then connect here.
+          </p>
+          {typeof athlete?.garmin_user_id === 'string' && athlete.garmin_user_id && (
+            <p className="text-xs text-gray-500 font-mono break-all">
+              Garmin user id: {athlete.garmin_user_id}
+            </p>
+          )}
+          {connected && athlete?.garmin_connected_at != null ? (
+            <p className="text-sm text-gray-500">
+              Connected since{' '}
+              {new Date(String(athlete.garmin_connected_at)).toLocaleDateString()}
+            </p>
+          ) : null}
+          <div className="pt-2">
+            {connected ? (
               <button
                 type="button"
-                onClick={handleConnectTest}
-                disabled={loading}
-                className="w-full py-2 px-4 border-2 border-amber-600 text-amber-900 rounded hover:bg-amber-50 disabled:opacity-50 text-sm"
+                onClick={handleDisconnect}
+                disabled={busy}
+                className="w-full py-2.5 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 text-sm font-medium"
               >
-                Connect Garmin (test app — does not overwrite production tokens)
+                {busy ? 'Working…' : 'Disconnect Garmin'}
               </button>
-              <p className="text-xs text-gray-500">
-                Test OAuth uses <code className="bg-gray-100 px-1 rounded">GARMIN_TEST_CLIENT_ID</code> and
-                saves only <code className="bg-gray-100 px-1 rounded">garmin_test_*</code> fields.
-              </p>
-            </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleConnect}
+                disabled={busy}
+                className="w-full py-2.5 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+              >
+                {busy ? 'Connecting…' : 'Connect Garmin'}
+              </button>
+            )}
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
 }
-

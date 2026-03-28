@@ -3,7 +3,8 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
-import { getValidAccessToken } from '@/lib/garmin-refresh-token';
+import { refreshGarminToken } from '@/lib/garmin-refresh-token';
+import { GarminNotConnectedError, requireGarminToken } from '@/lib/domain-garmin';
 import { prisma } from '@/lib/prisma';
 import { activityExists } from '@/lib/garmin-events/dedupe';
 import { normalizeActivityFields } from '@/lib/garmin-events/normalizeActivityFields';
@@ -17,13 +18,11 @@ function generateId(): string {
 
 /**
  * POST /api/garmin/sync
- * 
+ *
  * Manual sync endpoint for pulling recent activities from Garmin.
- * Useful for debugging and user-facing "Sync Now" buttons.
  */
 export async function POST(request: Request) {
   try {
-    // 1. Authenticate user
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -36,48 +35,58 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // 2. Get athlete
     const athlete = await getAthleteByFirebaseId(decodedToken.uid);
     if (!athlete) {
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
 
-    if (!athlete.garmin_is_connected || !athlete.garmin_user_id) {
+    const hasProd =
+      !!(athlete.garmin_access_token?.trim()) && !!(athlete.garmin_user_id?.trim());
+    if (!hasProd) {
       return NextResponse.json(
         { error: 'Garmin not connected' },
         { status: 400 }
       );
     }
 
-    // 3. Get valid access token (refresh if needed)
-    const accessToken = await getValidAccessToken(athlete.id);
-    if (!accessToken) {
-      return NextResponse.json(
-        { error: 'Failed to get valid access token' },
-        { status: 500 }
-      );
+    let accessToken: string;
+    try {
+      accessToken = await requireGarminToken(athlete.id);
+    } catch (e) {
+      if (e instanceof GarminNotConnectedError) {
+        return NextResponse.json({ error: 'Garmin not connected' }, { status: 400 });
+      }
+      throw e;
     }
 
-    // 4. Fetch activities from Garmin API
-    // Garmin Wellness API endpoint for activities
     const activitiesUrl = 'https://apis.garmin.com/wellness-api/rest/activities';
-    
-    // Get activities from last 30 days (more historical data)
+
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 30);
     const startDateStr = startDate.toISOString().split('T')[0];
-    console.log(`🔍 [SYNC] Fetching activities from ${startDateStr} (last 30 days)`);
 
-    const response = await fetch(
-      `${activitiesUrl}?startDate=${startDateStr}`,
-      {
+    const fetchActivities = (token: string) =>
+      fetch(`${activitiesUrl}?startDate=${startDateStr}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+    let response = await fetchActivities(accessToken);
+
+    if (response.status === 401) {
+      const refreshed = await refreshGarminToken(athlete.id);
+      if (!refreshed.success || !refreshed.accessToken) {
+        return NextResponse.json(
+          { error: 'Garmin session expired; reconnect Garmin' },
+          { status: 401 }
+        );
       }
-    );
+      accessToken = refreshed.accessToken;
+      response = await fetchActivities(accessToken);
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -89,7 +98,7 @@ export async function POST(request: Request) {
     }
 
     const activities = await response.json();
-    
+
     if (!Array.isArray(activities)) {
       return NextResponse.json(
         { error: 'Invalid response format from Garmin' },
@@ -97,7 +106,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // 5. Process and save activities to athlete_activities
     let saved = 0;
     let skipped = 0;
     let errors = 0;
@@ -149,7 +157,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // 6. Update last sync time
     await prisma.athlete.update({
       where: { id: athlete.id },
       data: {
@@ -176,4 +183,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

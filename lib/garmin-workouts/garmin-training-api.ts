@@ -1,13 +1,12 @@
 /**
- * Garmin Workout API Client
- * Handles API calls to Garmin Connect Training API
- *
+ * Garmin Training API — HTTP client for workout CRUD / schedule.
  * Base path must include `/training-api` (not root `/workout`).
  * @see https://developer.garmin.com/gc-developer-program/training-api/
  */
 
 import { GarminWorkout, GarminWorkoutSchedule } from "./types";
 import { GarminOAuth1Config, generateGarminOAuthHeader } from "@/lib/integrations/garmin/auth";
+import { refreshGarminToken } from "@/lib/garmin-refresh-token";
 
 export class GarminApiError extends Error {
   status: number;
@@ -38,7 +37,6 @@ export interface GarminClientAuthConfig {
   oauth1?: GarminOAuth1Config;
 }
 
-/** Full base including `/training-api` — override with GARMIN_TRAINING_API_BASE if Garmin changes host/path */
 function defaultTrainingApiBase(): string {
   return (
     process.env.GARMIN_TRAINING_API_BASE?.replace(/\/$/, "") ||
@@ -46,18 +44,30 @@ function defaultTrainingApiBase(): string {
   );
 }
 
-export class GarminWorkoutApiClient {
+function normalizeAuth(
+  authConfig: GarminClientAuthConfig | string
+): GarminClientAuthConfig {
+  if (typeof authConfig === "string") {
+    return { mode: "bearer", bearerToken: authConfig };
+  }
+  return authConfig;
+}
+
+/**
+ * Training API client. For bearer auth with athleteId, createWorkout retries once on 401 after refreshGarminToken.
+ */
+export class GarminTrainingApi {
   private authConfig: GarminClientAuthConfig;
   private baseUrl: string;
+  private athleteIdForRefresh: string | null;
 
-  constructor(authConfig: GarminClientAuthConfig | string, baseUrl?: string) {
-    this.authConfig =
-      typeof authConfig === "string"
-        ? {
-            mode: "bearer",
-            bearerToken: authConfig,
-          }
-        : authConfig;
+  constructor(
+    authConfig: GarminClientAuthConfig | string,
+    athleteIdForRefresh?: string | null,
+    baseUrl?: string
+  ) {
+    this.authConfig = normalizeAuth(authConfig);
+    this.athleteIdForRefresh = athleteIdForRefresh ?? null;
     this.baseUrl = (baseUrl ?? defaultTrainingApiBase()).replace(/\/$/, "");
   }
 
@@ -115,11 +125,17 @@ export class GarminWorkoutApiClient {
       const raw = await response.text();
       let details = response.statusText;
       try {
-        const parsed = JSON.parse(raw) as { message?: string; error?: string; errors?: unknown };
+        const parsed = JSON.parse(raw) as {
+          message?: string;
+          error?: string;
+          errors?: unknown;
+        };
         details =
           parsed.message ||
           parsed.error ||
-          (typeof parsed.errors === "string" ? parsed.errors : JSON.stringify(parsed.errors)) ||
+          (typeof parsed.errors === "string"
+            ? parsed.errors
+            : JSON.stringify(parsed.errors)) ||
           raw.slice(0, 500);
       } catch {
         if (raw) details = raw.slice(0, 500);
@@ -135,45 +151,52 @@ export class GarminWorkoutApiClient {
     return response.json() as Promise<T>;
   }
 
-  /**
-   * Create a workout
-   * POST /workout
-   */
   async createWorkout(workout: GarminWorkout): Promise<{ workoutId: number }> {
-    return this.request<{ workoutId: number }>("POST", "/workout", workout);
+    return this.createWorkoutWithRetry(workout, false);
   }
 
-  /**
-   * Get workout details
-   * GET /workout/{workoutId}
-   */
+  private async createWorkoutWithRetry(
+    workout: GarminWorkout,
+    isRetry: boolean
+  ): Promise<{ workoutId: number }> {
+    try {
+      return await this.request<{ workoutId: number }>("POST", "/workout", workout);
+    } catch (e) {
+      if (
+        !isRetry &&
+        e instanceof GarminApiError &&
+        e.status === 401 &&
+        this.athleteIdForRefresh &&
+        this.authConfig.mode === "bearer"
+      ) {
+        const refreshed = await refreshGarminToken(this.athleteIdForRefresh);
+        if (refreshed.success && refreshed.accessToken) {
+          this.authConfig = {
+            ...this.authConfig,
+            bearerToken: refreshed.accessToken,
+          };
+          return this.createWorkoutWithRetry(workout, true);
+        }
+      }
+      throw e;
+    }
+  }
+
   async getWorkout(workoutId: number): Promise<GarminWorkout> {
     return this.request<GarminWorkout>("GET", `/workout/${workoutId}`);
   }
 
-  /**
-   * Update a workout
-   * PUT /workout/{workoutId}
-   */
   async updateWorkout(workoutId: number, workout: GarminWorkout): Promise<void> {
     return this.request<void>("PUT", `/workout/${workoutId}`, workout);
   }
 
-  /**
-   * Delete a workout
-   * DELETE /workout/{workoutId}
-   */
   async deleteWorkout(workoutId: number): Promise<void> {
     return this.request<void>("DELETE", `/workout/${workoutId}`);
   }
 
-  /**
-   * Schedule a workout for a specific date
-   * POST /schedule
-   */
   async scheduleWorkout(
     workoutId: number,
-    date: string // YYYY-MM-DD
+    date: string
   ): Promise<{ scheduleId: number }> {
     const schedule: GarminWorkoutSchedule = {
       workoutId,
@@ -182,18 +205,10 @@ export class GarminWorkoutApiClient {
     return this.request<{ scheduleId: number }>("POST", "/schedule", schedule);
   }
 
-  /**
-   * Get schedule details
-   * GET /schedule/{scheduleId}
-   */
   async getSchedule(scheduleId: number): Promise<GarminWorkoutSchedule> {
     return this.request<GarminWorkoutSchedule>("GET", `/schedule/${scheduleId}`);
   }
 
-  /**
-   * Delete a schedule
-   * DELETE /schedule/{scheduleId}
-   */
   async deleteSchedule(scheduleId: number): Promise<void> {
     return this.request<void>("DELETE", `/schedule/${scheduleId}`);
   }

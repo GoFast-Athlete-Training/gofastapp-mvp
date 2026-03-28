@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Send, CheckCircle2, AlertCircle, X, Plug, Users } from "lucide-react";
+import { ArrowLeft, Send, CheckCircle2, AlertCircle, X, Users } from "lucide-react";
 import Link from "next/link";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
@@ -309,7 +309,6 @@ export default function WorkoutDetailPage() {
   } | null>(null);
   const [showCreatedBanner, setShowCreatedBanner] = useState(false);
   const [garminToast, setGarminToast] = useState<string | null>(null);
-  const [connectingGarminTest, setConnectingGarminTest] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareMeetup, setShareMeetup] = useState("Meetup details TBD — see run description");
   const [shareRunDate, setShareRunDate] = useState("");
@@ -365,23 +364,6 @@ export default function WorkoutDetailPage() {
       }
     })();
   }, [showShareModal, workout]);
-
-  useEffect(() => {
-    const onMsg = (ev: MessageEvent) => {
-      const t = ev.data?.type;
-      if (t === "GARMIN_TEST_OAUTH_SUCCESS") {
-        setGarminToast("Garmin test account linked. You can send this workout to Garmin.");
-      }
-      if (t === "GARMIN_TEST_OAUTH_ERROR") {
-        setPushStatus({
-          success: false,
-          message: typeof ev.data?.error === "string" ? ev.data.error : "Garmin test connection failed.",
-        });
-      }
-    };
-    window.addEventListener("message", onMsg);
-    return () => window.removeEventListener("message", onMsg);
-  }, []);
 
   const fetchWorkout = async () => {
     try {
@@ -485,43 +467,6 @@ export default function WorkoutDetailPage() {
       setShareError(err.response?.data?.error || "Could not create run");
     } finally {
       setShareBusy(false);
-    }
-  };
-
-  const handleConnectGarminTest = async () => {
-    const athleteId = LocalStorageAPI.getAthleteId();
-    if (!athleteId) {
-      setPushStatus({
-        success: false,
-        message: "Missing athlete id. Open the app from a signed-in session so your profile loads.",
-      });
-      return;
-    }
-    setConnectingGarminTest(true);
-    setPushStatus(null);
-    try {
-      const { data } = await api.get<{
-        success?: boolean;
-        authUrl?: string;
-        error?: string;
-      }>("auth/garmin-test/authorize", { params: { athleteId } });
-      if (!data.success || !data.authUrl) {
-        setPushStatus({
-          success: false,
-          message: data.error || "Could not start Garmin test OAuth.",
-        });
-        return;
-      }
-      window.open(data.authUrl, "garmin-test-oauth", "width=600,height=700,scrollbars=yes");
-    } catch (e: unknown) {
-      console.error("Garmin test authorize:", e);
-      const err = e as { response?: { data?: { error?: string } } };
-      setPushStatus({
-        success: false,
-        message: err.response?.data?.error || "Could not start Garmin test OAuth.",
-      });
-    } finally {
-      setConnectingGarminTest(false);
     }
   };
 
@@ -704,24 +649,12 @@ export default function WorkoutDetailPage() {
                   )}
                 </button>
               )}
-              <button
-                type="button"
-                onClick={handleConnectGarminTest}
-                disabled={connectingGarminTest}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              <Link
+                href="/settings/garmin"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 rounded-lg font-medium text-sm transition-colors text-center"
               >
-                {connectingGarminTest ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600" />
-                    Opening…
-                  </>
-                ) : (
-                  <>
-                    <Plug className="w-4 h-4" />
-                    Connect Garmin (Test)
-                  </>
-                )}
-              </button>
+                Garmin settings
+              </Link>
             </div>
           </div>
 

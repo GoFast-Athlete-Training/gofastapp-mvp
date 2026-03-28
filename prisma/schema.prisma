@@ -49,12 +49,6 @@ model Athlete {
   garmin_user_profile      Json?
   garmin_user_sleep        Json?
   garmin_user_preferences  Json?
-  // Test tokens (for evaluation/testing - won't overwrite production tokens)
-  garmin_test_access_token String?
-  garmin_test_user_id      String?
-  /// Garmin test OAuth account email (e.g. adam@gofastcrushgoals.com); ops only — never overwrites prod Garmin columns
-  garmin_test_linked_email String?
-  garmin_use_test_tokens   Boolean                  @default(false)
   strava_id               Int?                     @unique
   strava_access_token     String?
   strava_refresh_token    String?

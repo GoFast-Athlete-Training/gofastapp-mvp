@@ -74,7 +74,7 @@ export async function GET(request: Request) {
         instagram: true,
         createdAt: true,
         updatedAt: true,
-        garmin_is_connected: true,
+        garmin_access_token: true,
         garmin_user_id: true,
         garmin_connected_at: true,
         garmin_last_sync_at: true,
@@ -110,12 +110,15 @@ export async function GET(request: Request) {
         ? Math.floor((Date.now() - new Date(athlete.createdAt).getTime()) / (1000 * 60 * 60 * 24))
         : 0,
       garmin: {
-        connected: athlete.garmin_is_connected || false,
+        connected: !!(athlete.garmin_access_token && athlete.garmin_access_token.length > 0),
         userId: athlete.garmin_user_id || undefined,
         connectedAt: athlete.garmin_connected_at || undefined,
         lastSyncAt: athlete.garmin_last_sync_at || undefined,
         hasTokens: !!(athlete.garmin_user_id),
-        tokenStatus: athlete.garmin_is_connected ? 'active' : 'disconnected',
+        tokenStatus:
+          athlete.garmin_access_token && athlete.garmin_access_token.length > 0
+            ? 'active'
+            : 'disconnected',
       },
     }));
 

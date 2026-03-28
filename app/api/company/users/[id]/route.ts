@@ -98,12 +98,15 @@ export async function GET(
         : undefined,
       profileComplete: !!(athlete.firstName && athlete.lastName),
       garmin: {
-        connected: athlete.garmin_is_connected || false,
+        connected: !!(athlete.garmin_access_token && athlete.garmin_access_token.length > 0),
         userId: athlete.garmin_user_id || undefined,
         connectedAt: athlete.garmin_connected_at || undefined,
         lastSyncAt: athlete.garmin_last_sync_at || undefined,
         hasTokens: !!(athlete.garmin_user_id),
-        tokenStatus: athlete.garmin_is_connected ? 'active' : 'disconnected',
+        tokenStatus:
+          athlete.garmin_access_token && athlete.garmin_access_token.length > 0
+            ? 'active'
+            : 'disconnected',
       },
     };
 

@@ -319,7 +319,7 @@ export default function SettingsPage() {
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">Garmin Connect</h3>
                     <p className="text-sm text-gray-600">
-                      {athlete?.garmin_is_connected ? (
+                      {athlete?.garmin_connected ? (
                         <span className="text-green-600">Connected</span>
                       ) : (
                         <span className="text-gray-500">Sync activities</span>
@@ -328,7 +328,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  {athlete?.garmin_is_connected ? (
+                  {athlete?.garmin_connected ? (
                     <>
                       <span className="text-sm text-green-600 font-medium">Connected</span>
                       <Link

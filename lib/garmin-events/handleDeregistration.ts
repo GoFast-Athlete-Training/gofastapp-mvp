@@ -1,11 +1,10 @@
 /**
  * Handle USER_DEREGISTER webhook events
- * Disconnects Garmin when user deregisters
+ * Garmin-initiated: user revoked access in Garmin Connect — local wipe only (no outbound DELETE).
  */
 
 import {
-  disconnectGarmin,
-  disconnectGarminTest,
+  clearGarminProductionAfterPlatformRevoke,
   getAthleteByGarminUserId,
 } from '../domain-garmin';
 
@@ -35,25 +34,7 @@ export async function handleDeregistration(
       return { success: false, error: 'Athlete not found' };
     }
 
-    const prodId = athlete.garmin_user_id?.trim() || null;
-    const testId = athlete.garmin_test_user_id?.trim() || null;
-    const matchesProd = !!prodId && prodId === userIdStr;
-    const matchesTest = !!testId && testId === userIdStr;
-
-    if (matchesProd) {
-      await disconnectGarmin(athlete.id);
-    }
-    if (matchesTest) {
-      await disconnectGarminTest(athlete.id);
-    }
-
-    if (!matchesProd && !matchesTest) {
-      console.warn(
-        `⚠️ USER_DEREGISTER userId ${userIdStr} did not match garmin_user_id or garmin_test_user_id for athlete ${athlete.id}; clearing both connections defensively`
-      );
-      await disconnectGarmin(athlete.id);
-      await disconnectGarminTest(athlete.id);
-    }
+    await clearGarminProductionAfterPlatformRevoke(athlete.id);
 
     console.log(`✅ Garmin deregister handled for athlete ${athlete.id}${reason ? ` (reason: ${reason})` : ''}`);
     return { success: true };
@@ -63,4 +44,3 @@ export async function handleDeregistration(
     return { success: false, error: error.message };
   }
 }
-

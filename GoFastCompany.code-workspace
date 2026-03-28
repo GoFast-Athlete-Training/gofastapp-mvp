@@ -23,6 +23,9 @@
 		},
 		{
 			"path": "../GoFastLanding"
+		},
+		{
+			"path": "../gofastbackendv2-fall2025"
 		}
 	],
 	"settings": {}

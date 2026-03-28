@@ -125,9 +125,7 @@ export default function AthleteHomePage() {
 
     const garminFromStorage =
       typeof window !== 'undefined' && localStorage.getItem('garminConnected') === 'true';
-    // Tokens stripped from API; infer test mode from flag only (tokens exist server-side).
-    const testGarminReady = !!row.garmin_use_test_tokens;
-    setGarminConnected(!!row.garmin_is_connected || testGarminReady || garminFromStorage);
+    setGarminConnected(!!row.garmin_connected || garminFromStorage);
 
     setLoading(false);
   }, [router]);
