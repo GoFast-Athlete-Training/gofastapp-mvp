@@ -1,6 +1,5 @@
 export const dynamic = 'force-dynamic';
 
-import { NextResponse } from 'next/server';
 import { handleActivitySummary } from '@/lib/garmin-events/handleActivitySummary';
 import { handleActivityDetail } from '@/lib/garmin-events/handleActivityDetail';
 import { handleActivityFile } from '@/lib/garmin-events/handleActivityFile';
@@ -9,232 +8,423 @@ import { handleDeregistration } from '@/lib/garmin-events/handleDeregistration';
 
 const DEBUG = process.env.GARMIN_DEBUG === 'true';
 
+type GarminWebhookCategory =
+  | 'ACTIVITY'
+  | 'WORKOUT'
+  | 'PERMISSION'
+  | 'DEREGISTRATION'
+  | 'UNKNOWN';
+
 /**
- * POST /api/garmin/webhook
- *
- * Unified webhook endpoint for all Garmin events.
- * Responds with 200 OK immediately (<3 seconds), then processes asynchronously.
- *
- * To see if Garmin is sending: check server logs for "Garmin webhook POST received".
- * Set GARMIN_DEBUG=true for full payload logging.
+ * Classifies a normalized webhook body. Never throws.
+ * (Not exported: Next.js route modules may only export HTTP method handlers.)
+ */
+function detectGarminEvent(body: Record<string, unknown>): GarminWebhookCategory {
+  try {
+    const activities = body.activities;
+    const hasActivitiesArray = Array.isArray(activities) && activities.length > 0;
+    const firstActivity = hasActivitiesArray ? (activities as unknown[])[0] : null;
+    const isPing =
+      firstActivity !== null &&
+      typeof firstActivity === 'object' &&
+      firstActivity !== null &&
+      'callbackURL' in firstActivity &&
+      Boolean((firstActivity as { callbackURL?: unknown }).callbackURL);
+
+    if (hasActivitiesArray && isPing) return 'ACTIVITY';
+    if (hasActivitiesArray) return 'ACTIVITY';
+
+    const details = body.activityDetails;
+    const files = body.activityFiles;
+    if (Array.isArray(details) && details.length > 0) return 'ACTIVITY';
+    if (Array.isArray(files) && files.length > 0) return 'ACTIVITY';
+
+    if (body.activityId != null && body.activityId !== '') return 'ACTIVITY';
+    if (body.workoutId != null && body.workoutId !== '') return 'WORKOUT';
+
+    const et = body.eventType;
+    if (typeof et === 'string') {
+      const u = et.toUpperCase();
+      if (
+        u === 'USER_PERMISSION_CHANGED' ||
+        u === 'CONSUMER_PERMISSIONS' ||
+        u.includes('PERMISSION')
+      ) {
+        return 'PERMISSION';
+      }
+      if (u === 'USER_DEREGISTER' || u.includes('DEREGISTER')) {
+        return 'DEREGISTRATION';
+      }
+      if (
+        [
+          'ACTIVITY_SUMMARY',
+          'ACTIVITY_DETAIL',
+          'ACTIVITY_FILE',
+          'MANUALLY_UPDATED',
+          'MOVEIQ',
+        ].includes(u)
+      ) {
+        return 'ACTIVITY';
+      }
+    }
+
+    if (body.reason === 'USER_DEREGISTER' || body.action === 'deregister') {
+      return 'DEREGISTRATION';
+    }
+    if (body.permissions != null || body.scopes != null) return 'PERMISSION';
+
+    return 'UNKNOWN';
+  } catch {
+    return 'UNKNOWN';
+  }
+}
+
+function parseJsonSafe(rawText: string): unknown {
+  try {
+    const t = rawText?.trim() ?? '';
+    if (!t) return {};
+    return JSON.parse(t);
+  } catch {
+    return {};
+  }
+}
+
+function normalizeParsedToObject(parsed: unknown): Record<string, unknown> {
+  try {
+    if (parsed === null || typeof parsed !== 'object') return {};
+    if (Array.isArray(parsed)) return {};
+    return parsed as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+function safeRun(label: string, fn: () => unknown): void {
+  void (async () => {
+    try {
+      await fn();
+    } catch (err: unknown) {
+      console.error(`[GARMIN WEBHOOK] ${label}:`, err);
+    }
+  })();
+}
+
+function readRawBody(request: Request): Promise<string> {
+  return request.text().catch(() => '');
+}
+
+/**
+ * POST /api/garmin/webhook — partner verification safe (always 200 OK).
  */
 export async function POST(request: Request) {
-  const startTime = Date.now();
-
-  // Log immediately so we can see in Vercel/server logs whether Garmin is hitting this endpoint at all
   console.log('📩 Garmin webhook POST received', {
     timestamp: new Date().toISOString(),
     contentType: request.headers.get('content-type') ?? 'none',
   });
 
-  // 1. Acknowledge Garmin immediately (required for webhook compliance)
-  const acknowledgeResponse = NextResponse.json({ success: true }, { status: 200 });
-
-  // 2. Process webhook data asynchronously (don't await)
-  processWebhookData(request).catch((error) => {
-    console.error('❌ Error processing Garmin webhook:', error);
-  });
-
-  const responseTime = Date.now() - startTime;
-  if (DEBUG) {
-    console.log(`⚡ Webhook acknowledged in ${responseTime}ms`);
-  }
-
-  return acknowledgeResponse;
+  const rawText = await readRawBody(request);
+  void processWebhookSafely(rawText);
+  return new Response('OK', { status: 200 });
 }
 
 /**
- * Process webhook data asynchronously.
- * Supports both PING (callbackURL to fetch) and PUSH (inline activity data).
+ * PUT /api/garmin/webhook — same as POST (Garmin may use PUT).
  */
-async function processWebhookData(request: Request) {
+export async function PUT(request: Request) {
+  console.log('📩 Garmin webhook PUT received', {
+    timestamp: new Date().toISOString(),
+    contentType: request.headers.get('content-type') ?? 'none',
+  });
+
+  const rawText = await readRawBody(request);
+  void processWebhookSafely(rawText);
+  return new Response('OK', { status: 200 });
+}
+
+/**
+ * Background processing: must not affect HTTP; errors logged only.
+ */
+async function processWebhookSafely(rawText: string): Promise<void> {
   try {
-    const body = await request.json();
-    const keys = Object.keys(body);
+    console.log('[GARMIN RAW]', rawText.slice(0, 500));
+
+    const parsed = parseJsonSafe(rawText);
+    const body = normalizeParsedToObject(parsed);
+
     const activities = body.activities;
     const hasActivitiesArray = Array.isArray(activities) && activities.length > 0;
-    const firstActivity = hasActivitiesArray ? activities[0] : null;
-    const isPing = firstActivity && 'callbackURL' in firstActivity && firstActivity.callbackURL;
+    const firstActivity = hasActivitiesArray ? (activities as unknown[])[0] : null;
+    const isPing =
+      firstActivity !== null &&
+      typeof firstActivity === 'object' &&
+      firstActivity !== null &&
+      'callbackURL' in firstActivity &&
+      Boolean((firstActivity as { callbackURL?: unknown }).callbackURL);
 
-    // Always log enough to see if we got activities and whether it's PING vs PUSH (for debugging empty DB)
-    const topLevelUserId = body.userId ?? null;
-    const firstActivityUserId = firstActivity && typeof firstActivity === 'object' && 'userId' in firstActivity ? (firstActivity as any).userId : null;
+    const topLevelUserId =
+      body.userId !== undefined && body.userId !== null ? String(body.userId) : null;
+    const firstActivityUserId =
+      firstActivity &&
+      typeof firstActivity === 'object' &&
+      firstActivity !== null &&
+      'userId' in firstActivity
+        ? String((firstActivity as { userId?: unknown }).userId ?? '')
+        : null;
+    const userIdLog = topLevelUserId ?? firstActivityUserId ?? '(none)';
+
+    let keys: string[] = [];
+    try {
+      keys = Object.keys(body);
+    } catch {
+      keys = [];
+    }
+
     console.log('📩 Garmin webhook payload', {
       keys,
-      activitiesCount: hasActivitiesArray ? activities.length : 0,
+      activitiesCount: hasActivitiesArray ? (activities as unknown[]).length : 0,
       mode: isPing ? 'PING (callbackURL)' : hasActivitiesArray ? 'PUSH (inline)' : 'none',
-      userId: topLevelUserId ?? firstActivityUserId ?? '(none)',
+      userId: userIdLog,
       hasBodyUserId: topLevelUserId != null,
       hasFirstActivityUserId: firstActivityUserId != null,
       timestamp: new Date().toISOString(),
     });
 
     if (DEBUG) {
-      console.log('📩 Garmin webhook body:', JSON.stringify(body, null, 2));
+      try {
+        console.log('📩 Garmin webhook body:', JSON.stringify(body, null, 2));
+      } catch {
+        /* ignore */
+      }
     }
 
-    // Garmin PING: activities contain callbackURL; we must fetch each URL to get the actual data
     if (hasActivitiesArray && isPing) {
-      await handlePingActivities(activities, body.userId);
+      safeRun('handlePingActivities', async () => {
+        await handlePingActivities(activities as any, body.userId as string | undefined);
+      });
       return;
     }
 
-    // Detect event type and route to appropriate handler (PUSH or other)
-    const eventType = detectEventType(body);
-    
-    if (DEBUG) {
-      console.log(`🔍 Detected event type: ${eventType}`);
-    }
+    const category = detectGarminEvent(body);
+    console.log('[GARMIN DETECT]', { category, userId: userIdLog });
 
-    switch (eventType) {
-      case 'ACTIVITY_SUMMARY': {
-        const result = await handleActivitySummary(
-          body.activities || [],
-          body.userId
-        );
-        console.log('📩 Garmin ACTIVITY_SUMMARY result', { ...result, userId: body.userId ?? '(none)' });
-        break;
-      }
-
-      case 'ACTIVITY_DETAIL':
-        await handleActivityDetail(
-          body.activityDetails || [],
-          body.userId
-        );
-        break;
-
-      case 'ACTIVITY_FILE':
-        await handleActivityFile(
-          body.activityFiles || [],
-          body.userId
-        );
-        break;
-
-      case 'USER_PERMISSION_CHANGED':
+    if (category === 'PERMISSION') {
+      safeRun('handlePermissionChange', async () => {
         await handlePermissionChange({
-          userId: body.userId,
-          permissions: body.permissions,
-          scopes: body.scopes,
-          ...body
-        });
-        break;
+          userId: body.userId as string | undefined,
+          permissions: body.permissions as Parameters<typeof handlePermissionChange>[0]['permissions'],
+          scopes: body.scopes as Parameters<typeof handlePermissionChange>[0]['scopes'],
+          ...body,
+        } as Parameters<typeof handlePermissionChange>[0]);
+      });
+      return;
+    }
 
-      case 'USER_DEREGISTER':
+    if (category === 'DEREGISTRATION') {
+      safeRun('handleDeregistration', async () => {
         await handleDeregistration({
-          userId: body.userId,
-          reason: body.reason,
-          ...body
-        });
-        break;
+          userId: body.userId as string | undefined,
+          reason: body.reason as string | undefined,
+          ...body,
+        } as Parameters<typeof handleDeregistration>[0]);
+      });
+      return;
+    }
 
-      case 'MOVEIQ':
-        // MoveIQ events - handle if needed
-        if (DEBUG) {
+    void dispatchLegacyEventType(body);
+  } catch (error: unknown) {
+    console.error('❌ [GARMIN WEBHOOK] processWebhookSafely:', error);
+  }
+}
+
+/**
+ * Legacy eventType routing for ACTIVITY / WORKOUT / UNKNOWN.
+ */
+async function dispatchLegacyEventType(body: Record<string, unknown>): Promise<void> {
+  const eventType = detectEventTypeSafe(body);
+
+  if (DEBUG) {
+    console.log(`🔍 Detected legacy event type: ${eventType}`);
+  }
+
+  switch (eventType) {
+    case 'ACTIVITY_SUMMARY':
+      safeRun('handleActivitySummary', async () => {
+        const acts = Array.isArray(body.activities) ? body.activities : [];
+        const result = await handleActivitySummary(acts as any, body.userId as string | undefined);
+        console.log('📩 Garmin ACTIVITY_SUMMARY result', {
+          ...result,
+          userId: body.userId ?? '(none)',
+        });
+      });
+      break;
+
+    case 'ACTIVITY_DETAIL':
+      safeRun('handleActivityDetail', async () => {
+        await handleActivityDetail(
+          (Array.isArray(body.activityDetails) ? body.activityDetails : []) as any,
+          body.userId as string | undefined
+        );
+      });
+      break;
+
+    case 'ACTIVITY_FILE':
+      safeRun('handleActivityFile', async () => {
+        await handleActivityFile(
+          (Array.isArray(body.activityFiles) ? body.activityFiles : []) as any,
+          body.userId as string | undefined
+        );
+      });
+      break;
+
+    case 'USER_PERMISSION_CHANGED':
+      safeRun('handlePermissionChange(legacy)', async () => {
+        await handlePermissionChange({
+          userId: body.userId as string | undefined,
+          permissions: body.permissions as Parameters<typeof handlePermissionChange>[0]['permissions'],
+          scopes: body.scopes as Parameters<typeof handlePermissionChange>[0]['scopes'],
+          ...body,
+        } as Parameters<typeof handlePermissionChange>[0]);
+      });
+      break;
+
+    case 'USER_DEREGISTER':
+      safeRun('handleDeregistration(legacy)', async () => {
+        await handleDeregistration({
+          userId: body.userId as string | undefined,
+          reason: body.reason as string | undefined,
+          ...body,
+        } as Parameters<typeof handleDeregistration>[0]);
+      });
+      break;
+
+    case 'MOVEIQ':
+      if (DEBUG) {
+        try {
           console.log('📊 MoveIQ event received:', body);
+        } catch {
+          /* ignore */
         }
-        // TODO: Implement MoveIQ handler if needed
-        break;
+      }
+      break;
 
-      case 'MANUALLY_UPDATED':
-        // Manually updated activities
-        if (body.activities && Array.isArray(body.activities)) {
-          await handleActivitySummary(body.activities, body.userId);
-        }
-        break;
-
-      default:
-        console.warn('❓ Unknown webhook event type:', eventType, {
-          keys: Object.keys(body)
+    case 'MANUALLY_UPDATED':
+      if (
+        Array.isArray(body.activities) &&
+        body.activities.length > 0
+      ) {
+        safeRun('handleActivitySummary(MANUALLY_UPDATED)', async () => {
+          await handleActivitySummary(body.activities as any, body.userId as string | undefined);
         });
-    }
+      }
+      break;
 
-  } catch (error: any) {
-    console.error('❌ Webhook processing error:', error);
-    // Don't throw - we've already acknowledged the webhook
+    default:
+      try {
+        console.warn('❓ Unknown webhook event type:', eventType, {
+          keys: Object.keys(body),
+        });
+      } catch {
+        /* ignore */
+      }
   }
 }
 
 /**
- * Detect event type from webhook payload
+ * Legacy string event type with string guard and safe structural inference.
  */
-function detectEventType(body: any): string {
-  // Check for explicit eventType field
-  if (body.eventType) {
-    const eventType = body.eventType.toUpperCase();
-    if (['ACTIVITY_SUMMARY', 'ACTIVITY_DETAIL', 'ACTIVITY_FILE', 
-         'USER_PERMISSION_CHANGED', 'USER_DEREGISTER', 'MOVEIQ', 
-         'MANUALLY_UPDATED'].includes(eventType)) {
-      return eventType;
+function detectEventTypeSafe(body: Record<string, unknown>): string {
+  try {
+    const et = body.eventType;
+    if (typeof et === 'string') {
+      const eventType = et.toUpperCase();
+      if (eventType === 'CONSUMER_PERMISSIONS') {
+        return 'USER_PERMISSION_CHANGED';
+      }
+      if (
+        [
+          'ACTIVITY_SUMMARY',
+          'ACTIVITY_DETAIL',
+          'ACTIVITY_FILE',
+          'USER_PERMISSION_CHANGED',
+          'USER_DEREGISTER',
+          'MOVEIQ',
+          'MANUALLY_UPDATED',
+        ].includes(eventType)
+      ) {
+        return eventType;
+      }
     }
-  }
 
-  // Infer from payload structure
-  if (body.activities && Array.isArray(body.activities)) {
-    return 'ACTIVITY_SUMMARY';
-  }
-  
-  if (body.activityDetails && Array.isArray(body.activityDetails)) {
-    return 'ACTIVITY_DETAIL';
-  }
-  
-  if (body.activityFiles && Array.isArray(body.activityFiles)) {
-    return 'ACTIVITY_FILE';
-  }
+    const acts = body.activities;
+    if (Array.isArray(acts) && acts.length > 0) {
+      return 'ACTIVITY_SUMMARY';
+    }
 
-  // Check for permission change indicators
-  if (body.permissions || body.scopes) {
-    return 'USER_PERMISSION_CHANGED';
-  }
+    const details = body.activityDetails;
+    if (Array.isArray(details) && details.length > 0) {
+      return 'ACTIVITY_DETAIL';
+    }
 
-  // Check for deregistration indicators
-  if (body.reason === 'USER_DEREGISTER' || body.action === 'deregister') {
-    return 'USER_DEREGISTER';
-  }
+    const files = body.activityFiles;
+    if (Array.isArray(files) && files.length > 0) {
+      return 'ACTIVITY_FILE';
+    }
 
-  // Default to unknown
-  return 'UNKNOWN';
+    if (body.permissions != null || body.scopes != null) {
+      return 'USER_PERMISSION_CHANGED';
+    }
+
+    if (body.reason === 'USER_DEREGISTER' || body.action === 'deregister') {
+      return 'USER_DEREGISTER';
+    }
+
+    return 'UNKNOWN';
+  } catch {
+    return 'UNKNOWN';
+  }
 }
 
-/**
- * Handle Garmin PING: fetch activity data from each callbackURL, then save.
- * Garmin sends { activities: [{ userId, callbackURL }] } and we must GET the URL to get the actual activity/activities.
- */
 async function handlePingActivities(
   activities: Array<{ userId?: string; callbackURL?: string }>,
   userId?: string
 ): Promise<void> {
-  const garminUserId = userId ?? activities[0]?.userId;
-  if (!garminUserId) {
-    console.warn('⚠️ Garmin PING: no userId in payload or activities');
-    return;
-  }
-
-  const allFetched: any[] = [];
-  for (const item of activities) {
-    const url = item?.callbackURL;
-    if (!url) continue;
-    try {
-      const res = await fetch(url, { method: 'GET' });
-      if (!res.ok) {
-        console.warn(`⚠️ Garmin PING fetch failed: ${res.status} ${url.slice(0, 80)}...`);
-        continue;
-      }
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        allFetched.push(...data);
-      } else if (data && typeof data === 'object') {
-        allFetched.push(data);
-      }
-    } catch (err: any) {
-      console.error('❌ Garmin PING fetch error:', err?.message, url?.slice(0, 80));
+  try {
+    const garminUserId = userId ?? activities[0]?.userId;
+    if (!garminUserId) {
+      console.warn('⚠️ Garmin PING: no userId in payload or activities');
+      return;
     }
-  }
 
-  if (allFetched.length === 0) {
-    console.log('📩 Garmin PING: no activity data returned from callbackURLs');
-    return;
-  }
+    const allFetched: unknown[] = [];
+    for (const item of activities) {
+      const url = item?.callbackURL;
+      if (!url) continue;
+      try {
+        const res = await fetch(url, { method: 'GET' });
+        if (!res.ok) {
+          console.warn(`⚠️ Garmin PING fetch failed: ${res.status} ${url.slice(0, 80)}...`);
+          continue;
+        }
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          allFetched.push(...data);
+        } else if (data && typeof data === 'object') {
+          allFetched.push(data);
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('❌ Garmin PING fetch error:', msg, url?.slice(0, 80));
+      }
+    }
 
-  const result = await handleActivitySummary(allFetched, garminUserId);
-  console.log('📩 Garmin PING processed', { fetched: allFetched.length, ...result });
+    if (allFetched.length === 0) {
+      console.log('📩 Garmin PING: no activity data returned from callbackURLs');
+      return;
+    }
+
+    const result = await handleActivitySummary(allFetched as any, garminUserId);
+    console.log('📩 Garmin PING processed', { fetched: allFetched.length, ...result });
+  } catch (err: unknown) {
+    console.error('❌ Garmin PING handler error:', err);
+  }
 }
