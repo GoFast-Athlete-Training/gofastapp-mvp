@@ -4,6 +4,32 @@ import { prisma } from './prisma';
 const GARMIN_REGISTRATION_URL =
   'https://apis.garmin.com/wellness-api/rest/user/registration';
 
+/**
+ * Register the user's Garmin account for wellness push (pair to DELETE on disconnect).
+ * Does not throw; log and return status for observability.
+ */
+export async function registerGarminUser(
+  accessToken: string
+): Promise<{ status: number; ok: boolean }> {
+  try {
+    const res = await fetch(GARMIN_REGISTRATION_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    const body = await res.text().catch(() => '');
+    console.log(
+      `[GARMIN REGISTER] POST registration status=${res.status} body=${body.slice(0, 200)}`
+    );
+    return { status: res.status, ok: res.ok || res.status === 409 };
+  } catch (err: unknown) {
+    console.error('[GARMIN REGISTER] POST registration failed:', err);
+    return { status: 0, ok: false };
+  }
+}
+
 /** Thrown when prod Garmin access token is missing (derived “not connected”). */
 export class GarminNotConnectedError extends Error {
   constructor(message = 'Garmin not connected') {
@@ -56,20 +82,33 @@ async function wipeGarminProductionFields(athleteId: string) {
 export async function updateGarminConnection(
   athleteId: string,
   data: {
-    garmin_user_id: string;
+    garmin_user_id?: string | null;
     garmin_access_token: string;
     garmin_refresh_token: string;
     garmin_expires_in: number;
     garmin_scope?: string;
+    garmin_permissions?: Record<string, unknown>;
   }
 ) {
+  const payload: Prisma.AthleteUpdateInput = {
+    garmin_access_token: data.garmin_access_token,
+    garmin_refresh_token: data.garmin_refresh_token,
+    garmin_expires_in: data.garmin_expires_in,
+    garmin_is_connected: true,
+    garmin_connected_at: new Date(),
+  };
+  if (data.garmin_scope !== undefined) {
+    payload.garmin_scope = data.garmin_scope;
+  }
+  if (data.garmin_user_id !== undefined) {
+    payload.garmin_user_id = data.garmin_user_id;
+  }
+  if (data.garmin_permissions !== undefined) {
+    payload.garmin_permissions = data.garmin_permissions as Prisma.InputJsonValue;
+  }
   return prisma.athlete.update({
     where: { id: athleteId },
-    data: {
-      ...data,
-      garmin_is_connected: true,
-      garmin_connected_at: new Date(),
-    },
+    data: payload,
   });
 }
 

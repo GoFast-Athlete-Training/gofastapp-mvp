@@ -3,7 +3,11 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { exchangeCodeForTokens } from '@/lib/garmin-pkce';
-import { updateGarminConnection, fetchAndSaveGarminUserInfo } from '@/lib/domain-garmin';
+import {
+  updateGarminConnection,
+  fetchAndSaveGarminUserInfo,
+  registerGarminUser,
+} from '@/lib/domain-garmin';
 
 /**
  * GET /api/auth/garmin/callback?code=XXX&state=athleteId
@@ -119,9 +123,10 @@ export async function GET(request: Request) {
     console.log(`🔍 [CALLBACK] Fetching Garmin user ID for athleteId: ${athleteId}`);
     const userInfoResult = await fetchAndSaveGarminUserInfo(athleteId, tokens.access_token);
 
-    let garminUserId = userInfoResult.garminUserId || 'pending';
-    if (userInfoResult.success) {
-      console.log(`✅ [CALLBACK] Garmin user ID fetched and saved: ${garminUserId}`);
+    if (userInfoResult.success && userInfoResult.garminUserId) {
+      console.log(
+        `✅ [CALLBACK] Garmin user ID fetched and saved: ${userInfoResult.garminUserId}`
+      );
     } else {
       console.warn(`⚠️ [CALLBACK] Could not fetch Garmin user info: ${userInfoResult.error}`);
     }
@@ -130,13 +135,32 @@ export async function GET(request: Request) {
     console.log(`🔍 [CALLBACK] Saving tokens to database for athleteId: ${athleteId}`);
     try {
       await updateGarminConnection(athleteId, {
-        garmin_user_id: garminUserId,
+        ...(userInfoResult.garminUserId
+          ? { garmin_user_id: userInfoResult.garminUserId }
+          : {}),
         garmin_access_token: tokens.access_token,
         garmin_refresh_token: tokens.refresh_token,
         garmin_expires_in: tokens.expires_in || 3600,
-        garmin_scope: tokens.scope
+        garmin_scope: tokens.scope,
+        garmin_permissions: {
+          read: (tokens.scope || '').includes('READ'),
+          write: (tokens.scope || '').includes('WRITE'),
+          scope: tokens.scope,
+          grantedAt: new Date().toISOString(),
+        },
       });
       console.log(`✅ [CALLBACK] Garmin tokens saved successfully for athleteId: ${athleteId}`);
+
+      const regResult = await registerGarminUser(tokens.access_token);
+      if (!regResult.ok) {
+        console.warn(
+          `⚠️ [CALLBACK] Garmin registration failed status=${regResult.status} — webhooks may not fire`
+        );
+      } else {
+        console.log(
+          `✅ [CALLBACK] Garmin wellness registration complete status=${regResult.status}`
+        );
+      }
     } catch (dbError: any) {
       console.error(`❌ [CALLBACK] Database save failed:`, dbError);
       console.error(`❌ [CALLBACK] Error details:`, dbError.message, dbError.stack);

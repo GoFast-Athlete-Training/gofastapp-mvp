@@ -5,7 +5,11 @@
  */
 
 import { generatePKCE, buildGarminAuthUrl, exchangeCodeForTokens, fetchGarminUserInfo } from './garmin-pkce';
-import { updateGarminConnection, fetchAndSaveGarminUserInfo } from './domain-garmin';
+import {
+  updateGarminConnection,
+  fetchAndSaveGarminUserInfo,
+  registerGarminUser,
+} from './domain-garmin';
 
 export interface GarminOAuthResult {
   success: boolean;
@@ -42,21 +46,38 @@ export async function completeGarminOAuth(
       tokens.access_token
     );
 
-    const garminUserId = userInfoResult.garminUserId || 'pending';
+    const garminUserId = userInfoResult.garminUserId;
 
     // 3. Save tokens to database
     await updateGarminConnection(athleteId, {
-      garmin_user_id: garminUserId,
+      ...(garminUserId ? { garmin_user_id: garminUserId } : {}),
       garmin_access_token: tokens.access_token,
       garmin_refresh_token: tokens.refresh_token,
       garmin_expires_in: tokens.expires_in || 3600,
-      garmin_scope: tokens.scope
+      garmin_scope: tokens.scope,
+      garmin_permissions: {
+        read: (tokens.scope || '').includes('READ'),
+        write: (tokens.scope || '').includes('WRITE'),
+        scope: tokens.scope,
+        grantedAt: new Date().toISOString(),
+      },
     });
+
+    const regResult = await registerGarminUser(tokens.access_token);
+    if (!regResult.ok) {
+      console.warn(
+        `⚠️ [completeGarminOAuth] Garmin registration failed status=${regResult.status} — webhooks may not fire`
+      );
+    } else {
+      console.log(
+        `✅ [completeGarminOAuth] Garmin wellness registration complete status=${regResult.status}`
+      );
+    }
 
     return {
       success: true,
       athleteId,
-      garminUserId: garminUserId !== 'pending' ? garminUserId : undefined
+      garminUserId: garminUserId || undefined,
     };
 
   } catch (error: any) {
