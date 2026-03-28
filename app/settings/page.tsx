@@ -13,6 +13,8 @@ import api from '@/lib/api';
 export default function SettingsPage() {
   const router = useRouter();
   const [athlete, setAthlete] = useState<any>(null);
+  /** Avoid flashing wrong Garmin / profile-derived UI before /athlete/:id returns. */
+  const [athleteReady, setAthleteReady] = useState(false);
   const [copiedProfileUrl, setCopiedProfileUrl] = useState(false);
 
   const [ambassadorCredits, setAmbassadorCredits] = useState<{
@@ -32,7 +34,12 @@ export default function SettingsPage() {
     api
       .get(`/athlete/${id}`)
       .then((res) => {
-        if (res.data?.athlete) setAthlete(res.data.athlete);
+        if (res.data?.athlete) {
+          setAthlete(res.data.athlete);
+          setAthleteReady(true);
+        } else {
+          router.replace('/welcome');
+        }
       })
       .catch(() => router.replace('/welcome'));
   }, [router]);
@@ -79,6 +86,15 @@ export default function SettingsPage() {
           <p className="text-gray-600 mt-2">Manage your account settings and integrations</p>
         </div>
 
+        {!athleteReady ? (
+          <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+            <div
+              className="h-10 w-10 animate-spin rounded-full border-2 border-gray-200 border-t-orange-500 mb-4"
+              aria-hidden
+            />
+            <p className="text-sm">Loading settings…</p>
+          </div>
+        ) : (
         <div className="space-y-6">
           {/* Ambassador: My payment credits (like My Work for data-entry) */}
           {athlete?.role === 'AMBASSADOR' && (
@@ -248,6 +264,7 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+        )}
       </main>
     </div>
   );

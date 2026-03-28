@@ -10,6 +10,8 @@ export default function GarminSettingsPage() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [athlete, setAthlete] = useState<Record<string, unknown> | null>(null);
+  /** Avoid flashing "Not connected" + Connect before /athlete/:id returns. */
+  const [athleteReady, setAthleteReady] = useState(false);
 
   const refreshAthlete = () => {
     const id = LocalStorageAPI.getAthleteId();
@@ -28,7 +30,12 @@ export default function GarminSettingsPage() {
     api
       .get(`/athlete/${id}`)
       .then((res) => {
-        if (res.data?.athlete) setAthlete(res.data.athlete);
+        if (res.data?.athlete) {
+          setAthlete(res.data.athlete);
+          setAthleteReady(true);
+        } else {
+          router.replace('/welcome');
+        }
       })
       .catch(() => router.replace('/welcome'));
   }, [router]);
@@ -125,10 +132,34 @@ export default function GarminSettingsPage() {
 
   const connected = !!athlete?.garmin_connected;
 
+  if (!athleteReady) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-2xl mx-auto space-y-8">
+          <button
+            type="button"
+            onClick={() => router.push('/settings')}
+            className="mb-2 text-blue-600 hover:text-blue-700"
+          >
+            ← Back to Settings
+          </button>
+          <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+            <div
+              className="h-10 w-10 animate-spin rounded-full border-2 border-gray-200 border-t-blue-600 mb-4"
+              aria-hidden
+            />
+            <p className="text-sm">Loading connection…</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-2xl mx-auto space-y-8">
         <button
+          type="button"
           onClick={() => router.push('/settings')}
           className="mb-2 text-blue-600 hover:text-blue-700"
         >
