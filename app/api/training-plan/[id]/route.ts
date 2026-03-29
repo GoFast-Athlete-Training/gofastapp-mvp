@@ -9,6 +9,7 @@ import { archiveOtherActivePlans } from "@/lib/training/plan-lifecycle";
 
 type Ctx = { params: Promise<{ id: string }> };
 
+/** `id` = persisted `training_plans.id` (see lib/training/persisted-training-plan.ts). */
 export async function GET(request: NextRequest, context: Ctx) {
   try {
     const auth = await requireAthleteFromBearer(request);

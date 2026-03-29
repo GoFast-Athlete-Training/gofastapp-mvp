@@ -14,11 +14,13 @@ import { newEntityId } from "@/lib/training/new-entity-id";
 import { buildPlanWorkoutApiSegments } from "@/lib/training/workout-segment-generator";
 import { titleFromLadderIndex } from "@/lib/training/algo-workout-segments";
 import { Prisma } from "@prisma/client";
+import { persistedPlanIdFromRequestBody } from "@/lib/training/persisted-training-plan";
 
 /**
  * POST /api/training-plan/generate
- * Body: { trainingPlanId?, weeklyMileageTarget?, minWeeklyMiles? }
- * Deterministic plan: all workout rows + planWeeks snapshot in one transaction; phases cleared (legacy).
+ * Body: { trainingPlanId | persist, weeklyMileageTarget?, minWeeklyMiles? }
+ * `trainingPlanId` and `persist` are the same: persisted `training_plans.id` (see persisted-training-plan.ts).
+ * Initial materialization only (no workouts yet). Writes planWeeks + currentFiveKPace + workouts to DB.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -29,10 +31,12 @@ export async function POST(request: NextRequest) {
     const { athlete } = auth;
 
     const body = await request.json();
-    const trainingPlanId = body.trainingPlanId as string | undefined;
+    const trainingPlanId = persistedPlanIdFromRequestBody(
+      body as Record<string, unknown>
+    );
     if (!trainingPlanId) {
       return NextResponse.json(
-        { error: "trainingPlanId is required" },
+        { error: "trainingPlanId or persist is required (persisted training_plans.id)" },
         { status: 400 }
       );
     }
