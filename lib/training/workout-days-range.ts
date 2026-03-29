@@ -2,7 +2,7 @@
  * Idempotent: load or create plan workouts for [startDate, endDate] UTC inclusive.
  */
 
-import type { Prisma, WorkoutType, workouts } from "@prisma/client";
+import type { Prisma, workouts } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   parseScheduleString,
@@ -11,12 +11,8 @@ import {
   dayAbbrToDayName,
 } from "./schedule-parser";
 import { addDaysUtc, mondayUtcOfWeekContaining, utcDateOnly } from "./plan-utils";
-import {
-  cataloguePhaseFallbackForWeek,
-  nOffsetFromWeekAnchor,
-} from "./generate-plan";
+import { nOffsetFromWeekAnchor } from "./generate-plan";
 import { formatPlannedWorkoutTitle } from "./workout-display-title";
-import { selectNextCatalogueWorkout } from "./select-catalogue-workout";
 import { buildPlanWorkoutApiSegments } from "./workout-segment-generator";
 import { titleFromLadderIndex } from "./algo-workout-segments";
 
@@ -115,10 +111,6 @@ export async function workoutDaysRangeForWeek(params: {
 
   const schedule = entry.schedule as string;
   const raceDate = plan.race_registry?.raceDate;
-  const phaseForCat =
-    raceDate != null
-      ? cataloguePhaseFallbackForWeek(plan.startDate, raceDate, weekNumber)
-      : "base";
 
   const tokens = parseScheduleString(schedule);
   const weekAnchorUtc = utcDateOnly(weekStart);
@@ -139,29 +131,11 @@ export async function workoutDaysRangeForWeek(params: {
     );
   }
 
-  const phaseNorm = phaseForCat.trim().toLowerCase();
-
-  const cataloguePicks: Awaited<
-    ReturnType<typeof selectNextCatalogueWorkout>
-  >[] = [];
-  for (const token of tokens) {
-    const skipCat =
-      token.workoutType === "Intervals" || token.workoutType === "Tempo";
-    if (skipCat) {
-      cataloguePicks.push(null);
-    } else {
-      cataloguePicks.push(
-        await selectNextCatalogueWorkout(athleteId, token.workoutType, phaseNorm)
-      );
-    }
-  }
-
   const created: workouts[] = [];
 
   await prisma.$transaction(async (tx) => {
     for (let i = 0; i < tokens.length; i++) {
       const token = tokens[i];
-      const catalogueEntry = cataloguePicks[i];
       const ourDow = dayAbbrToOurDow(token.dayAbbr);
       const date = dateForDayInWeek(plan.startDate, weekNumber, ourDow);
       const estMeters = milesToMeters(token.miles);
@@ -190,10 +164,7 @@ export async function workoutDaysRangeForWeek(params: {
           date,
           phase: null,
           estimatedDistanceInMeters: estMeters,
-          catalogueWorkoutId:
-            token.workoutType === "Intervals" || token.workoutType === "Tempo"
-              ? null
-              : catalogueEntry?.id ?? null,
+          catalogueWorkoutId: null,
           weekNumber,
           dayAssigned: dayAbbrToDayName(token.dayAbbr),
           nOffset: weekNOffset,
@@ -206,7 +177,7 @@ export async function workoutDaysRangeForWeek(params: {
         workoutType: token.workoutType,
         miles: token.miles,
         currentFiveKPace: plan.currentFiveKPace,
-        catalogueEntry,
+        catalogueEntry: null,
       });
 
       const segmentRows: Prisma.workout_segmentsCreateManyInput[] = apiSegs.map(

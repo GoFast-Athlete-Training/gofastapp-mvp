@@ -3,12 +3,13 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { catalogueEntryToApiSegments } from "@/lib/training/catalogue-to-segments";
 import {
   buildIntervalApiSegments,
   buildTempoApiSegments,
   resolvePaceStringForWorkout,
 } from "@/lib/training/algo-workout-segments";
+import { buildPlanWorkoutApiSegments } from "@/lib/training/workout-segment-generator";
+import type { ApiSegment } from "@/lib/workout-generator/templates";
 import { ladderIndexFromScheduleForDay } from "@/lib/training/schedule-parser";
 import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 import { newEntityId } from "@/lib/training/new-entity-id";
@@ -73,8 +74,8 @@ function resolvedPlanLadderIndexForWorkout(params: {
 
 /**
  * GET /api/training/workout/[id]
- * Workout + segments. Intervals/Tempo: deterministic segments on first load.
- * Catalogue-linked workouts: lazy segments when missing (Easy/LongRun legacy path).
+ * Workout + segments. Lazy create when empty: I/T via algo; Easy/LongRun via
+ * templates + plan pace (plan path). Legacy rows may still link a catalogue entry.
  */
 export async function GET(request: NextRequest, context: Ctx) {
   try {
@@ -140,8 +141,7 @@ export async function GET(request: NextRequest, context: Ctx) {
           (workout.estimatedDistanceInMeters ?? 0) / METERS_PER_MILE
         );
 
-        let apiSegs: Awaited<ReturnType<typeof buildIntervalApiSegments>> | null =
-          null;
+        let apiSegs: ApiSegment[] | null = null;
 
         const planLadderIndex = resolvedPlanLadderIndexForWorkout({
           planLadderIndex: workout.planLadderIndex ?? null,
@@ -170,13 +170,17 @@ export async function GET(request: NextRequest, context: Ctx) {
             planLadderIndex,
           });
         } else if (
-          workout.workout_catalogue &&
-          workout.catalogueWorkoutId
+          workout.workoutType === "Easy" ||
+          workout.workoutType === "LongRun"
         ) {
-          apiSegs = catalogueEntryToApiSegments({
-            entry: workout.workout_catalogue,
-            scheduleMiles,
-            anchorSecondsPerMile,
+          apiSegs = buildPlanWorkoutApiSegments({
+            workoutType: workout.workoutType,
+            miles: scheduleMiles,
+            currentFiveKPace: paceStr,
+            catalogueEntry:
+              workout.catalogueWorkoutId && workout.workout_catalogue
+                ? workout.workout_catalogue
+                : null,
           });
         }
 

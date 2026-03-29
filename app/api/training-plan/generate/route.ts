@@ -10,11 +10,9 @@ import {
 } from "@/lib/training/generate-plan";
 import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
 import { formatPlannedWorkoutTitle } from "@/lib/training/workout-display-title";
-import { selectNextCatalogueWorkout } from "@/lib/training/select-catalogue-workout";
 import { newEntityId } from "@/lib/training/new-entity-id";
 import { buildPlanWorkoutApiSegments } from "@/lib/training/workout-segment-generator";
 import { titleFromLadderIndex } from "@/lib/training/algo-workout-segments";
-import type { workout_catalogue } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 
 /**
@@ -132,21 +130,8 @@ export async function POST(request: NextRequest) {
     }
 
     const rows: Prisma.workoutsCreateManyInput[] = [];
-    const catalogueByRow: (workout_catalogue | null)[] = [];
     for (const d of drafts) {
       const isRaceDay = d.nOffset === 0;
-      const skipCat =
-        isRaceDay ||
-        d.workoutType === "Intervals" ||
-        d.workoutType === "Tempo";
-      const cat = skipCat
-        ? null
-        : await selectNextCatalogueWorkout(
-            athlete.id,
-            d.workoutType,
-            d.phase ?? "base"
-          );
-      catalogueByRow.push(cat);
       let title: string;
       if (isRaceDay) {
         title = formatPlannedWorkoutTitle(
@@ -180,7 +165,7 @@ export async function POST(request: NextRequest) {
         nOffset: d.nOffset,
         weekNumber: d.weekNumber,
         dayAssigned: d.dayAssigned,
-        catalogueWorkoutId: cat?.id ?? null,
+        catalogueWorkoutId: null,
         planLadderIndex: d.planLadderIndex,
         updatedAt: new Date(),
       });
@@ -209,13 +194,12 @@ export async function POST(request: NextRequest) {
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const d = drafts[i];
-        const cat = catalogueByRow[i];
         const miles = d.estimatedDistanceInMeters / 1609.34;
         const apiSegs = buildPlanWorkoutApiSegments({
           workoutType: d.workoutType,
           miles,
           currentFiveKPace: syncedFiveKPace,
-          catalogueEntry: cat,
+          catalogueEntry: null,
         });
         if (!apiSegs.length) continue;
         await tx.workout_segments.createMany({
