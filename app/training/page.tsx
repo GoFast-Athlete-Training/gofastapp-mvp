@@ -14,8 +14,9 @@ import {
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import {
   fetchTrainingPlanDetail,
-  fetchTrainingWeekWorkouts,
-  type TrainingPlanWeekWorkout,
+  fetchPlanWeekSchedule,
+  resolveWorkoutForPlanDay,
+  type PlanDayCard,
 } from "@/lib/training/fetch-plan-week-client";
 
 type PlanDetailHub = {
@@ -30,10 +31,7 @@ type PlanDetailHub = {
 };
 
 function hasSchedule(p: PlanDetailHub): boolean {
-  const materialized = p._count?.planned_workouts ?? 0;
-  const legacy =
-    Array.isArray(p.planWeeks) && (p.planWeeks as unknown[]).length > 0;
-  return materialized > 0 || legacy;
+  return Array.isArray(p.planWeeks) && (p.planWeeks as unknown[]).length > 0;
 }
 
 export default function TrainingHubPage() {
@@ -43,7 +41,8 @@ export default function TrainingHubPage() {
   const [planDetail, setPlanDetail] = useState<PlanDetailHub | null>(null);
   const [athleteFiveKPace, setAthleteFiveKPace] = useState<string | null>(null);
   const [weekNumber, setWeekNumber] = useState(1);
-  const [weekWorkouts, setWeekWorkouts] = useState<TrainingPlanWeekWorkout[]>([]);
+  const [weekDays, setWeekDays] = useState<PlanDayCard[]>([]);
+  const [openingDayKey, setOpeningDayKey] = useState<string | null>(null);
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [hubError, setHubError] = useState<string | null>(null);
@@ -63,7 +62,7 @@ export default function TrainingHubPage() {
     setLoading(true);
     setHubError(null);
     setPlanDetail(null);
-    setWeekWorkouts([]);
+    setWeekDays([]);
     try {
       const u = auth.currentUser;
       if (!u) return;
@@ -88,11 +87,11 @@ export default function TrainingHubPage() {
         setWeekNumber(wn);
         setLoadingWeek(true);
         try {
-          const { workouts } = await fetchTrainingWeekWorkouts(planId, wn, token);
-          setWeekWorkouts(workouts);
+          const { days } = await fetchPlanWeekSchedule(planId, wn, token);
+          setWeekDays(days);
         } catch (e) {
           setHubError(e instanceof Error ? e.message : "Could not load this week");
-          setWeekWorkouts([]);
+          setWeekDays([]);
         } finally {
           setLoadingWeek(false);
         }
@@ -103,6 +102,23 @@ export default function TrainingHubPage() {
       setLoading(false);
     }
   }, []);
+
+  async function openPlanDay(planIdForDay: string, day: PlanDayCard) {
+    const u = auth.currentUser;
+    if (!u) return;
+    try {
+      setOpeningDayKey(day.dateKey);
+      const token = await u.getIdToken();
+      const id =
+        day.workoutId ??
+        (await resolveWorkoutForPlanDay(planIdForDay, day.dateKey, token));
+      router.push(`/workouts/${id}`);
+    } catch (e) {
+      setHubError(e instanceof Error ? e.message : "Could not open workout");
+    } finally {
+      setOpeningDayKey(null);
+    }
+  }
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -272,16 +288,21 @@ export default function TrainingHubPage() {
               {loadingWeek && (
                 <p className="text-sm text-gray-500">Loading workouts…</p>
               )}
-              {!loadingWeek && weekWorkouts.length === 0 && (
+              {!loadingWeek && weekDays.length === 0 && (
                 <p className="text-sm text-gray-600">No sessions this week in the schedule.</p>
               )}
-              {!loadingWeek && weekWorkouts.length > 0 && (
+              {!loadingWeek && weekDays.length > 0 && (
                 <ul className="space-y-2">
-                  {weekWorkouts.map((w) => (
-                    <li key={w.id}>
-                      <Link
-                        href={`/workouts/${w.id}`}
-                        className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-lg border border-gray-100 px-3 py-2.5 text-sm hover:border-orange-200 hover:bg-orange-50/40 transition"
+                  {weekDays.map((w) => (
+                    <li key={w.dateKey}>
+                      <button
+                        type="button"
+                        disabled={openingDayKey === w.dateKey}
+                        onClick={() => {
+                          if (!planDetail) return;
+                          void openPlanDay(planDetail.id, w);
+                        }}
+                        className="flex w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-lg border border-gray-100 px-3 py-2.5 text-sm text-left hover:border-orange-200 hover:bg-orange-50/40 transition disabled:opacity-50"
                       >
                         <span className="font-medium text-gray-900">
                           {displayWorkoutListTitle(w)}
@@ -298,7 +319,7 @@ export default function TrainingHubPage() {
                             <span className="ml-2 text-emerald-700 font-medium">Done</span>
                           ) : null}
                         </span>
-                      </Link>
+                      </button>
                     </li>
                   ))}
                 </ul>

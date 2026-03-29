@@ -9,7 +9,7 @@ import { archiveOtherActivePlans } from "@/lib/training/plan-lifecycle";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-/** `id` = `training_plans.id` (see `lib/training/persisted-training-plan.ts` for generate vs hydrate). */
+/** `id` = `training_plans.id` (see `lib/training/persisted-training-plan.ts` for generate vs week/workout flows). */
 export async function GET(request: NextRequest, context: Ctx) {
   try {
     const auth = await requireAthleteFromBearer(request);

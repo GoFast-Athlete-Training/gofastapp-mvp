@@ -1,15 +1,15 @@
 /**
- * Browser fetch helpers for plan detail + week workouts.
- * Shared by My Training hub and training-setup calendar.
+ * Browser fetch helpers for plan detail + week schedule (from `planWeeks`, not workouts-first).
  */
 
-export type TrainingPlanWeekWorkout = {
-  id: string;
+export type PlanDayCard = {
+  workoutId: string | null;
+  dateKey: string;
+  date: string;
   title: string;
   workoutType: string;
-  date: string | null;
-  phase?: string | null;
-  estimatedDistanceInMeters: number | null;
+  phase: string;
+  estimatedDistanceInMeters: number;
   matchedActivityId: string | null;
   actualDistanceMeters: number | null;
   actualAvgPaceSecPerMile: number | null;
@@ -35,18 +35,42 @@ export async function fetchTrainingPlanDetail(
   return { plan: data.plan, athleteFiveKPace: data.athleteFiveKPace ?? null };
 }
 
-export async function fetchTrainingWeekWorkouts(
+/**
+ * Week preview: `planWeeks` schedule + optional materialized workout ids.
+ */
+export async function fetchPlanWeekSchedule(
   planId: string,
   weekNumber: number,
   bearerToken: string
-): Promise<{ workouts: TrainingPlanWeekWorkout[] }> {
+): Promise<{ days: PlanDayCard[] }> {
   const res = await fetch(
-    `/api/training/week?planId=${encodeURIComponent(planId)}&weekNumber=${weekNumber}`,
+    `/api/training/plan/week?planId=${encodeURIComponent(planId)}&weekNumber=${weekNumber}`,
     { headers: { Authorization: `Bearer ${bearerToken}` } }
   );
-  const data = (await res.json()) as { error?: string; workouts?: TrainingPlanWeekWorkout[] };
+  const data = (await res.json()) as { error?: string; days?: PlanDayCard[] };
   if (!res.ok) {
     throw new Error(typeof data.error === "string" ? data.error : "Failed to load week");
   }
-  return { workouts: Array.isArray(data.workouts) ? data.workouts : [] };
+  return { days: Array.isArray(data.days) ? data.days : [] };
+}
+
+/**
+ * Resolve `workouts.id` for a calendar day (creates row + segments if needed).
+ */
+export async function resolveWorkoutForPlanDay(
+  planId: string,
+  dateKeyOrIso: string,
+  bearerToken: string
+): Promise<string> {
+  const res = await fetch(
+    `/api/training/workout/day?planId=${encodeURIComponent(planId)}&date=${encodeURIComponent(dateKeyOrIso)}`,
+    { headers: { Authorization: `Bearer ${bearerToken}` } }
+  );
+  const data = (await res.json()) as { error?: string; workoutId?: string };
+  if (!res.ok || typeof data.workoutId !== "string") {
+    throw new Error(
+      typeof data.error === "string" ? data.error : "Could not open workout"
+    );
+  }
+  return data.workoutId;
 }

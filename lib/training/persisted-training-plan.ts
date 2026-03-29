@@ -1,10 +1,14 @@
 /**
- * Conceptual split: **generate** vs **hydrate** (no extra API fields — naming is for engineers only).
+ * Conceptual split: **generate** vs **read/hydrate** (no extra API fields — naming is for engineers only).
  *
- * - **Generate** — `POST /api/training-plan/generate` with `trainingPlanId` = `training_plans.id`, scoped
- *   by bearer `athleteId`. One-shot materialization writes `planWeeks`, `currentFiveKPace`, `workouts`.
- * - **Hydrate** — `GET /api/training/week?planId=…`, `GET /api/training-plan/[id]`, and lazy week
- *   materialization read that row from Prisma (`planWeeks`, pace, etc.). They do **not** re-run generate.
+ * - **Generate** — `POST /api/training/plan/generate` (or `/api/training-plan/generate`) with
+ *   `trainingPlanId` = `training_plans.id`, scoped by bearer `athleteId`. Writes **`planWeeks` + plan
+ *   scalars only** (not `workouts` rows).
+ * - **Week preview** — `GET /api/training/plan/week?planId=&weekNumber=` reads `planWeeks` and merges
+ *   any materialized `workouts` for that week.
+ * - **Open a day** — `GET /api/training/workout/day?planId=&date=` find-or-creates the `workouts` row
+ *   from `planWeeks`. Detail + lazy segments: `GET /api/training/workout/[id]`.
+ * - **Plan row** — `GET /api/training-plan/[id]`.
  *
  * All access: `where: { id: trainingPlanId | planId, athleteId }` from auth.
  */

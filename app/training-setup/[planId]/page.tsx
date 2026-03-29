@@ -18,7 +18,9 @@ import { formatCalendarWeekRangeLabel } from "@/lib/training/plan-utils";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import {
   fetchTrainingPlanDetail,
-  fetchTrainingWeekWorkouts,
+  fetchPlanWeekSchedule,
+  resolveWorkoutForPlanDay,
+  type PlanDayCard,
 } from "@/lib/training/fetch-plan-week-client";
 
 type PlanDetail = {
@@ -79,15 +81,8 @@ export default function TrainingSetupPlanPage({
   const { planId } = use(params);
   const router = useRouter();
   const [plan, setPlan] = useState<PlanDetail | null>(null);
-  const [weekWorkouts, setWeekWorkouts] = useState<
-    Array<{
-      id: string;
-      title: string;
-      workoutType: string;
-      date: string | null;
-      estimatedDistanceInMeters: number | null;
-    }>
-  >([]);
+  const [weekDays, setWeekDays] = useState<PlanDayCard[]>([]);
+  const [openingDayKey, setOpeningDayKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [loadingWeek, setLoadingWeek] = useState(false);
@@ -180,12 +175,11 @@ export default function TrainingSetupPlanPage({
     }));
   }, [plan]);
 
-  const materializedWorkouts = plan?._count?.planned_workouts ?? 0;
   const hasLegacyPlanWeeks = useMemo(() => {
     if (!plan?.planWeeks) return false;
     return Array.isArray(plan.planWeeks) && plan.planWeeks.length > 0;
   }, [plan?.planWeeks]);
-  const hasSchedule = materializedWorkouts > 0 || hasLegacyPlanWeeks;
+  const hasSchedule = hasLegacyPlanWeeks;
 
   const showPhaseModalButton =
     phaseRanges.length > 0 || weekEntries.length > 0;
@@ -242,11 +236,11 @@ export default function TrainingSetupPlanPage({
       setError(null);
       try {
         const token = await getToken();
-        const { workouts } = await fetchTrainingWeekWorkouts(planId, wn, token);
-        setWeekWorkouts(workouts);
+        const { days } = await fetchPlanWeekSchedule(planId, wn, token);
+        setWeekDays(days);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Week load failed");
-        setWeekWorkouts([]);
+        setWeekDays([]);
       } finally {
         setLoadingWeek(false);
       }
@@ -335,6 +329,23 @@ export default function TrainingSetupPlanPage({
   function goNextWeek() {
     if (!plan) return;
     setWeekNumber((n) => Math.min(plan.totalWeeks, n + 1));
+  }
+
+  async function openPlanDay(day: PlanDayCard) {
+    const u = auth.currentUser;
+    if (!u || !plan) return;
+    try {
+      setOpeningDayKey(day.dateKey);
+      const token = await u.getIdToken();
+      const id =
+        day.workoutId ??
+        (await resolveWorkoutForPlanDay(plan.id, day.dateKey, token));
+      router.push(`/workouts/${id}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not open workout");
+    } finally {
+      setOpeningDayKey(null);
+    }
   }
 
   if (loading || !plan) {
@@ -537,15 +548,15 @@ export default function TrainingSetupPlanPage({
                   <p className="break-words text-sm leading-relaxed text-gray-800">
                     {currentWeekEntry.schedule}
                   </p>
-                ) : weekWorkouts.length > 0 ? (
+                ) : weekDays.length > 0 ? (
                   <div className="mt-1">
                     <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
                       This week
                     </p>
                     <ul className="space-y-2">
-                      {weekWorkouts.map((w) => (
+                      {weekDays.map((w) => (
                         <li
-                          key={w.id}
+                          key={w.dateKey}
                           className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm"
                         >
                           <span className="font-medium text-gray-900">
@@ -564,7 +575,7 @@ export default function TrainingSetupPlanPage({
                       ))}
                     </ul>
                   </div>
-                ) : materializedWorkouts > 0 ? (
+                ) : loadingWeek ? (
                   <p className="text-sm leading-relaxed text-gray-600">
                     Loading this week&apos;s sessions…
                   </p>
@@ -580,13 +591,15 @@ export default function TrainingSetupPlanPage({
             </>
           )}
 
-          {weekWorkouts.length > 0 && (
+          {weekDays.length > 0 && (
             <ul className="space-y-3 mb-6">
-              {weekWorkouts.map((w) => (
-                <li key={w.id}>
-                  <Link
-                    href={`/workouts/${w.id}`}
-                    className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-orange-300 hover:shadow-md transition"
+              {weekDays.map((w) => (
+                <li key={w.dateKey}>
+                  <button
+                    type="button"
+                    disabled={openingDayKey === w.dateKey}
+                    onClick={() => void openPlanDay(w)}
+                    className="block w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm hover:border-orange-300 hover:shadow-md transition disabled:opacity-50"
                   >
                     <div className="text-base font-semibold text-gray-900 leading-snug">
                       {displayWorkoutListTitle(w)}
@@ -601,13 +614,13 @@ export default function TrainingSetupPlanPage({
                           })
                         : "Date TBD"}
                     </div>
-                  </Link>
+                  </button>
                 </li>
               ))}
             </ul>
           )}
 
-          {hasSchedule && !loadingWeek && weekWorkouts.length === 0 && (
+          {hasSchedule && !loadingWeek && weekDays.length === 0 && (
             <p className="text-sm text-gray-500 mb-4">
               No workouts for this week yet. If something failed above, set your
               5K pace on your profile so we can build segments.

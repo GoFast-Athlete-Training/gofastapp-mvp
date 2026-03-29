@@ -6,8 +6,8 @@ import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { buildPlanWeekCards } from "@/lib/training/plan-week-cards";
 
 /**
- * GET /api/training/week?planId=&weekNumber=
- * @deprecated Prefer GET /api/training/plan/week (identical response).
+ * GET /api/training/plan/week?planId=&weekNumber=
+ * Week preview from `planWeeks`, merged with materialized `workouts` when present.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ weekNumber, days });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Failed to load week";
-    console.error("GET /api/training/week", e);
+    console.error("GET /api/training/plan/week", e);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -324,12 +324,11 @@ export default function TrainingSetupClient() {
   }
 
   function scheduleReady(p: ActivePlanLite): boolean {
-    const materialized = p._count?.planned_workouts ?? 0;
-    const legacy =
+    return (
       p.planWeeks != null &&
       Array.isArray(p.planWeeks) &&
-      (p.planWeeks as unknown[]).length > 0;
-    return materialized > 0 || legacy;
+      (p.planWeeks as unknown[]).length > 0
+    );
   }
 
   if (!ready) {
