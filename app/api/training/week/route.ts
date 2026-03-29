@@ -8,8 +8,8 @@ import { workoutDaysRangeForWeek } from "@/lib/training/plan-workout-materializa
 
 /**
  * GET /api/training/week?planId=&weekNumber=
- * `planId` = persisted `training_plans.id` (same as generate body `trainingPlanId` / `persist`), scoped by bearer athlete.
- * Reads materialized `planWeeks` from DB — not generate. If no workouts for that calendar week yet, hydrates from the week's schedule string.
+ * **Hydrate:** `planId` = `training_plans.id` (same id as generate body `trainingPlanId`), scoped by bearer athlete.
+ * Loads saved `planWeeks` from DB (no generate). If that week has no workouts yet, materializes from that week's schedule string.
  */
 export async function GET(request: NextRequest) {
   try {

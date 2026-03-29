@@ -1,26 +1,13 @@
 /**
- * Persisted training plan = one `training_plans` row (`training_plans.id`, cuid), always scoped by `athleteId`.
+ * Conceptual split: **generate** vs **hydrate** (no extra API fields — naming is for engineers only).
  *
- * Flow:
- * 1. **Create shell** — `POST /api/training-plan` returns the plan `id`. `planWeeks` is empty until generate.
- * 2. **Materialize once** — `POST /api/training-plan/generate` with `trainingPlanId` or `persist` writes
- *    `planWeeks`, syncs `currentFiveKPace`, creates `workouts` (+ segments per generator).
- * 3. **Hydrate** — `GET /api/training/week?planId=<id>` and lazy week materialization read **persisted**
- *    `planWeeks` + `currentFiveKPace` from Prisma. No re-run of generate; the DB row is source of truth.
+ * - **Generate** — `POST /api/training-plan/generate` with `trainingPlanId` = `training_plans.id`, scoped
+ *   by bearer `athleteId`. One-shot materialization writes `planWeeks`, `currentFiveKPace`, `workouts`.
+ * - **Hydrate** — `GET /api/training/week?planId=…`, `GET /api/training-plan/[id]`, and lazy week
+ *   materialization read that row from Prisma (`planWeeks`, pace, etc.). They do **not** re-run generate.
  *
- * Client: keep this id in local state; send it as `planId` / `trainingPlanId` / `persist` plus bearer auth
- * so the server resolves `where: { id, athleteId }`.
+ * All access: `where: { id: trainingPlanId | planId, athleteId }` from auth.
  */
 
-export type PersistedTrainingPlanId = string;
-
-/** Accept `trainingPlanId` (primary) or `persist` (alias) from JSON body. */
-export function persistedPlanIdFromRequestBody(
-  body: Record<string, unknown>
-): PersistedTrainingPlanId | undefined {
-  const a = body.trainingPlanId;
-  const b = body.persist;
-  if (typeof a === "string" && a.trim()) return a.trim();
-  if (typeof b === "string" && b.trim()) return b.trim();
-  return undefined;
-}
+/** Primary key of `training_plans` (cuid string). */
+export type TrainingPlanRowId = string;

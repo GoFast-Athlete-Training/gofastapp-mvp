@@ -14,13 +14,14 @@ import { newEntityId } from "@/lib/training/new-entity-id";
 import { buildPlanWorkoutApiSegments } from "@/lib/training/workout-segment-generator";
 import { titleFromLadderIndex } from "@/lib/training/algo-workout-segments";
 import { Prisma } from "@prisma/client";
-import { persistedPlanIdFromRequestBody } from "@/lib/training/persisted-training-plan";
 
 /**
  * POST /api/training-plan/generate
- * Body: { trainingPlanId | persist, weeklyMileageTarget?, minWeeklyMiles? }
- * `trainingPlanId` and `persist` are the same: persisted `training_plans.id` (see persisted-training-plan.ts).
- * Initial materialization only (no workouts yet). Writes planWeeks + currentFiveKPace + workouts to DB.
+ * Body: { trainingPlanId, weeklyMileageTarget?, minWeeklyMiles? }
+ *
+ * **Generate (one shot):** initial fill only when the plan has zero workouts. Writes `planWeeks`,
+ * syncs `currentFiveKPace`, creates workouts (+ segments). See `lib/training/persisted-training-plan.ts`
+ * for how **hydrate** (later reads) uses the same `training_plans.id` + athlete from DB only.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -31,12 +32,11 @@ export async function POST(request: NextRequest) {
     const { athlete } = auth;
 
     const body = await request.json();
-    const trainingPlanId = persistedPlanIdFromRequestBody(
-      body as Record<string, unknown>
-    );
+    const trainingPlanId =
+      typeof body.trainingPlanId === "string" ? body.trainingPlanId.trim() : "";
     if (!trainingPlanId) {
       return NextResponse.json(
-        { error: "trainingPlanId or persist is required (persisted training_plans.id)" },
+        { error: "trainingPlanId is required (training_plans.id)" },
         { status: 400 }
       );
     }

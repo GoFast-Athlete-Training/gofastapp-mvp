@@ -1,10 +1,10 @@
 /**
- * Plan workout materialization: read persisted `planWeeks` + `training_plans.currentFiveKPace`,
- * project to workouts + segments (see workout-segment-generator).
- * Source of truth after generate is the DB row keyed by persisted plan id + athleteId.
+ * **Hydrate** path: read saved `planWeeks` + `training_plans.currentFiveKPace` from the DB,
+ * materialize missing week workouts + segments (see workout-segment-generator).
+ * After the one-shot generate, `training_plans.id` + `athleteId` scope that source row — no regenerate.
  */
 
-export type { PersistedTrainingPlanId } from "./persisted-training-plan";
+export type { TrainingPlanRowId } from "./persisted-training-plan";
 export {
   workoutDaysRangeForWeek,
   weekBoundsFromPlan,
