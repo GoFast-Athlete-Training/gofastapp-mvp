@@ -54,8 +54,6 @@ const DAY_OPTIONS: { value: number; label: string }[] = [
   { value: 7, label: "Sun" },
 ];
 
-const DEFAULT_PREFERRED_DAYS = [1, 2, 3, 4, 5, 6];
-
 const LONG_RUN_DAY_OPTIONS: { value: number; label: string }[] = [
   { value: 6, label: "Saturday" },
   { value: 7, label: "Sunday" },
@@ -97,9 +95,7 @@ export default function TrainingSetupPlanPage({
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [weekNumber, setWeekNumber] = useState(1);
   const [phaseModalOpen, setPhaseModalOpen] = useState(false);
-  const [preferredDaysLocal, setPreferredDaysLocal] = useState<number[]>(
-    DEFAULT_PREFERRED_DAYS
-  );
+  const [preferredDaysLocal, setPreferredDaysLocal] = useState<number[]>([]);
   const [weeklyMilesTarget, setWeeklyMilesTarget] = useState("50");
   const [preferredLongRunDowLocal, setPreferredLongRunDowLocal] = useState(6);
   const [error, setError] = useState<string | null>(null);
@@ -134,7 +130,7 @@ export default function TrainingSetupPlanPage({
         [...pd].filter((n) => n >= 1 && n <= 7).sort((a, b) => a - b)
       );
     } else {
-      setPreferredDaysLocal([...DEFAULT_PREFERRED_DAYS]);
+      setPreferredDaysLocal([]);
     }
     const fromPlan =
       plan.weeklyMileageTarget ?? plan.currentWeeklyMileage ?? null;
@@ -273,8 +269,7 @@ export default function TrainingSetupPlanPage({
   function togglePreferredDay(d: number) {
     setPreferredDaysLocal((prev) => {
       if (prev.includes(d)) {
-        const next = prev.filter((x) => x !== d);
-        return next.length > 0 ? next : prev;
+        return prev.filter((x) => x !== d);
       }
       return [...prev, d].sort((a, b) => a - b);
     });
@@ -449,7 +444,8 @@ export default function TrainingSetupPlanPage({
                   Preferred training days
                 </p>
                 <p className="mb-3 text-xs text-gray-500">
-                  We assign sessions on these days (Mon–Sun).
+                  Choose the days you want to train. We assign sessions on these
+                  days (Mon–Sun).
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {DAY_OPTIONS.map(({ value, label }) => (

@@ -26,7 +26,8 @@ function parseOptionalWorkoutDate(input: unknown): Date | undefined {
 
 /**
  * GET /api/workouts
- * List workouts for the authenticated athlete
+ * List workouts for the authenticated athlete.
+ * Optional: `?limit=20&offset=0` for pagination (max limit 100). When omitted, returns all (legacy).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -42,22 +43,128 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
     }
 
-    // Fetch workouts with segments
-    const workouts = await prisma.workouts.findMany({
-      where: { athleteId: athlete.id },
-      include: {
-        segments: {
-          orderBy: { stepOrder: "asc" },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const { searchParams } = new URL(request.url);
+    const limitRaw = searchParams.get("limit");
+    const offsetRaw = searchParams.get("offset");
+    const usePaging =
+      limitRaw != null ||
+      offsetRaw != null ||
+      searchParams.get("paged") === "1";
+
+    let take: number | undefined;
+    let skip = 0;
+    if (usePaging) {
+      const limit = Math.min(
+        Math.max(parseInt(limitRaw ?? "20", 10) || 20, 1),
+        100
+      );
+      take = limit;
+      skip = Math.max(parseInt(offsetRaw ?? "0", 10) || 0, 0);
+    }
+
+    const where = { athleteId: athlete.id };
+
+    const [workouts, total] = await Promise.all([
+      usePaging
+        ? prisma.workouts.findMany({
+            where,
+            select: {
+              id: true,
+              title: true,
+              workoutType: true,
+              description: true,
+              date: true,
+              matchedActivityId: true,
+              estimatedDistanceInMeters: true,
+              planId: true,
+              _count: { select: { segments: true } },
+            },
+            orderBy: { createdAt: "desc" },
+            take: take!,
+            skip,
+          })
+        : prisma.workouts.findMany({
+            where,
+            include: {
+              segments: {
+                orderBy: { stepOrder: "asc" },
+              },
+            },
+            orderBy: { createdAt: "desc" },
+          }),
+      usePaging
+        ? prisma.workouts.count({ where })
+        : Promise.resolve(0),
+    ]);
+
+    if (usePaging) {
+      return NextResponse.json({
+        workouts,
+        total,
+        offset: skip,
+        hasMore: skip + workouts.length < total,
+      });
+    }
 
     return NextResponse.json({ workouts });
   } catch (error: any) {
     console.error("Error fetching workouts:", error);
     return NextResponse.json(
       { error: "Failed to fetch workouts" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/workouts
+ * Body: `{ "ids": string[] }` — delete many workouts owned by the athlete.
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
+    const athlete = await getAthleteByFirebaseId(decodedToken.uid);
+    if (!athlete) {
+      return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
+    }
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+    const ids =
+      body &&
+      typeof body === "object" &&
+      "ids" in body &&
+      Array.isArray((body as { ids: unknown }).ids)
+        ? (body as { ids: unknown[] }).ids.filter(
+            (id): id is string => typeof id === "string" && id.length > 0
+          )
+        : [];
+
+    if (ids.length === 0) {
+      return NextResponse.json(
+        { error: "Provide a non-empty ids array" },
+        { status: 400 }
+      );
+    }
+
+    const result = await prisma.workouts.deleteMany({
+      where: { athleteId: athlete.id, id: { in: ids } },
+    });
+
+    return NextResponse.json({ deleted: result.count });
+  } catch (error: unknown) {
+    console.error("DELETE /api/workouts", error);
+    return NextResponse.json(
+      { error: "Failed to delete workouts" },
       { status: 500 }
     );
   }

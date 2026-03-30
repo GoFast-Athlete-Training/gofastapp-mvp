@@ -108,16 +108,18 @@ export function formatCalendarWeekRangeLabel(
   const weekMon = addDaysUtc(firstMonday, weekNumber - 1);
   const weekSun = addDaysUtc(weekMon, 6);
   const opt: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-  const left = weekMon.toLocaleDateString(undefined, {
-    ...opt,
-    ...(weekMon.getUTCFullYear() !== weekSun.getUTCFullYear()
-      ? { year: "numeric" }
-      : {}),
+  /** Local display without TZ drift from UTC-midnight Date (see formatPlanDateDisplay). */
+  function fmtUtcDay(d: Date, extra: Intl.DateTimeFormatOptions): string {
+    const ymd = ymdFromDate(d);
+    const anchor = new Date(`${ymd}T12:00:00`);
+    return anchor.toLocaleDateString(undefined, { ...opt, ...extra });
+  }
+  const yMon = weekMon.getUTCFullYear();
+  const ySun = weekSun.getUTCFullYear();
+  const left = fmtUtcDay(weekMon, {
+    ...(yMon !== ySun ? { year: "numeric" } : {}),
   });
-  const right = weekSun.toLocaleDateString(undefined, {
-    ...opt,
-    year: "numeric",
-  });
+  const right = fmtUtcDay(weekSun, { year: "numeric" });
   return `${left} – ${right}`;
 }
 
