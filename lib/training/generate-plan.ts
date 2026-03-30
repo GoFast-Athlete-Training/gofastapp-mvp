@@ -1,12 +1,16 @@
 /**
  * Marathon-style week builder. Pipeline per calendar week (Mon-Sun, UTC):
  *
- * 1. Race / taper - `nOffset` from race sets phase, long-run anchor miles, weekly cap slack
- *    (race-only week skips normal quality).
- * 2. Weekly envelope - `weeklyMileageTarget` + taper: `longMi` (LR peak load that week),
- *    tempo/interval floors, then `fundEasyMiles` so LR+quality+easy fit under `weeklyMi`.
- * 3. Placement order - long run on Sat/Sun (picker + preferred), then tempo (Tue), intervals
- *    (Thu), then easy only on remaining preferred days (never off-days).
+ * 1. Race day - anchor end of plan; race week (`nOffset === 0`) is race-only; day-before-race
+ *    is hard-blocked for any workout.
+ * 2. Taper - `nOffsetFromWeekAnchor` sets phase and taper-shaped long-run miles + weekly cap
+ *    (`longRunMilesForOffset`, `weeklyTotalMiles`, skip LR at `nOffset === -1`).
+ * 3. Long run as weekly load - the LR mileage for that week (e.g. 22 mi) is chosen first under
+ *    the athlete's desired weekly miles (`weeklyMileageTarget`, `longCap`, `compressQualityToCap`,
+ *    `fundEasyMiles`). That LR is a large slice of `weeklyMi`; tempo, interval, and easy split
+ *    what remains.
+ * 4. Placement - place LR on picker Sat/Sun (preferred-only), then tempo (Tue) and intervals
+ *    (Thu) on preferred days with nearest fallback, then easy only on leftover preferred days.
  *
  * Partial week 1: skip tempo/interval; LR only if preferred Sat/Sun fall in-window; easy on prefs.
  */
@@ -426,6 +430,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
       continue;
     }
 
+    /* LR miles + weekly envelope: long-run distance drives the week's total budget. */
     let longMi = longRunMilesForOffset(nOffset);
     let weeklyMi = weeklyTotalMiles(
       longMi,
@@ -542,6 +547,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
         dayInPlanWindow(d) &&
         !blockedDates.has(slotYmd(d))
     );
+    /* Easy only on preferred days (no Mon-Sun fallback). */
     const easyDays = easyCandidates;
 
     let easyBudget = easyMi + absorbLongIntoEasy + extraEasyFromSkippedQuality;
