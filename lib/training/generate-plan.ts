@@ -1,6 +1,14 @@
 /**
- * Deterministic marathon-style plan: long-run anchor, calendar weeks-to-race for volume
- * (late joiners get taper-shaped load), easy mileage trimmed first when squeezing the week.
+ * Marathon-style week builder. Pipeline per calendar week (Mon-Sun, UTC):
+ *
+ * 1. Race / taper - `nOffset` from race sets phase, long-run anchor miles, weekly cap slack
+ *    (race-only week skips normal quality).
+ * 2. Weekly envelope - `weeklyMileageTarget` + taper: `longMi` (LR peak load that week),
+ *    tempo/interval floors, then `fundEasyMiles` so LR+quality+easy fit under `weeklyMi`.
+ * 3. Placement order - long run on Sat/Sun (picker + preferred), then tempo (Tue), intervals
+ *    (Thu), then easy only on remaining preferred days (never off-days).
+ *
+ * Partial week 1: skip tempo/interval; LR only if preferred Sat/Sun fall in-window; easy on prefs.
  */
 
 import type { WorkoutType } from "@prisma/client";
@@ -116,6 +124,7 @@ function orderQualityCandidates(
   const seen = new Set<number>();
   const out: number[] = [];
   if (isLongRun) {
+    /* LR only ever lands on Sat/Sun if those are preferred — never Mon–Fri fallback. */
     const other = idealOurDow === 6 ? 7 : 6;
     for (const d of [idealOurDow, other]) {
       if (preferredSorted.includes(d) && !seen.has(d)) {
@@ -123,13 +132,7 @@ function orderQualityCandidates(
         seen.add(d);
       }
     }
-    const rest = preferredSorted
-      .filter((d) => !seen.has(d))
-      .sort(
-        (a, b) =>
-          circularDistOurDow(a, idealOurDow) - circularDistOurDow(b, idealOurDow)
-      );
-    return out.concat(rest);
+    return out;
   }
   if (preferredSorted.includes(idealOurDow)) {
     out.push(idealOurDow);
@@ -450,6 +453,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
     longMi = funded.longMi;
     tempoMi = funded.tempoMi;
     intervalMi = funded.intervalMi;
+    /* Easy pool after LR + tempo + interval are budgeted against weeklyMi. */
     const easyMi = funded.easyMi;
 
     type DayKind = "tempo" | "interval" | "long" | "easy";
@@ -497,13 +501,6 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
     let extraEasyFromSkippedQuality = 0;
     if (partialWeek1) {
       extraEasyFromSkippedQuality += tempoMi + intervalMi;
-    } else {
-      if (!tryPlaceQuality(TEMPO_IDEAL_OUR_DOW, "tempo", tempoMi, false)) {
-        extraEasyFromSkippedQuality += tempoMi;
-      }
-      if (!tryPlaceQuality(INTERVAL_IDEAL_OUR_DOW, "interval", intervalMi, false)) {
-        extraEasyFromSkippedQuality += intervalMi;
-      }
     }
 
     const skipLongOnLongRunDay = nOffset === -1;
@@ -529,6 +526,15 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
       }
     }
 
+    if (!partialWeek1) {
+      if (!tryPlaceQuality(TEMPO_IDEAL_OUR_DOW, "tempo", tempoMi, false)) {
+        extraEasyFromSkippedQuality += tempoMi;
+      }
+      if (!tryPlaceQuality(INTERVAL_IDEAL_OUR_DOW, "interval", intervalMi, false)) {
+        extraEasyFromSkippedQuality += intervalMi;
+      }
+    }
+
     const usedForQuality = new Set(assignment.keys());
     const easyCandidates = preferred.filter(
       (d) =>
@@ -536,15 +542,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
         dayInPlanWindow(d) &&
         !blockedDates.has(slotYmd(d))
     );
-    const easyDays =
-      easyCandidates.length > 0
-        ? easyCandidates
-        : [1, 2, 3, 4, 5, 6, 7].filter(
-            (d) =>
-              !usedForQuality.has(d) &&
-              dayInPlanWindow(d) &&
-              !blockedDates.has(slotYmd(d))
-          );
+    const easyDays = easyCandidates;
 
     let easyBudget = easyMi + absorbLongIntoEasy + extraEasyFromSkippedQuality;
 

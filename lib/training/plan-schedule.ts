@@ -97,7 +97,7 @@ export function planScheduleDaysForWeek(params: {
   const entry = scheduleEntryForWeek(planWeeks, weekNumber);
   if (!entry) return [];
 
-  const { weekStart } = weekBoundsFromPlan(planStartDate, weekNumber);
+  const { weekStart, weekEnd } = weekBoundsFromPlan(planStartDate, weekNumber);
   const weekAnchorUtc = utcDateOnly(weekStart);
   const raceUtc = raceDate ? utcDateOnly(raceDate) : null;
   const weekNOffset =
@@ -157,8 +157,13 @@ export function planScheduleDaysForWeek(params: {
     });
   }
 
-  out.sort((a, b) => a.date.getTime() - b.date.getTime());
-  return out;
+  const startKey = dateKeyUtc(weekStart);
+  const endKey = dateKeyUtc(utcDateOnly(weekEnd));
+  const clipped = out.filter(
+    (d) => d.dateKey >= startKey && d.dateKey <= endKey
+  );
+  clipped.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+  return clipped;
 }
 
 /**
