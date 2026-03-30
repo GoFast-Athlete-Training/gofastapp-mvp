@@ -83,7 +83,7 @@ export async function buildPlanWeekCards(params: {
     return {
       workoutId: row?.id ?? null,
       dateKey: s.dateKey,
-      date: s.date.toISOString(),
+      date: s.dateKey,
       title: row?.title ?? s.title,
       workoutType: row?.workoutType ?? s.workoutType,
       phase: s.phase,

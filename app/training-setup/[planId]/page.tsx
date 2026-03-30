@@ -14,7 +14,10 @@ import {
   type PhaseRange,
 } from "@/lib/training/plan-phases";
 import { cataloguePhaseFallbackForWeek } from "@/lib/training/generate-plan";
-import { formatCalendarWeekRangeLabel } from "@/lib/training/plan-utils";
+import {
+  formatCalendarWeekRangeLabel,
+  formatPlanDateDisplay,
+} from "@/lib/training/plan-utils";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import {
   fetchTrainingPlanDetail,
@@ -31,6 +34,7 @@ type PlanDetail = {
   phases: unknown;
   planWeeks: unknown;
   preferredDays: number[];
+  preferredLongRunDow?: number | null;
   weeklyMileageTarget?: number | null;
   currentWeeklyMileage?: number | null;
   _count?: { planned_workouts: number };
@@ -51,6 +55,11 @@ const DAY_OPTIONS: { value: number; label: string }[] = [
 ];
 
 const DEFAULT_PREFERRED_DAYS = [1, 2, 3, 4, 5, 6];
+
+const LONG_RUN_DAY_OPTIONS: { value: number; label: string }[] = [
+  { value: 6, label: "Saturday" },
+  { value: 7, label: "Sunday" },
+];
 
 /** Matches generator default floor; not user-editable. */
 const ENGINE_MIN_WEEKLY_MI = 40;
@@ -92,6 +101,7 @@ export default function TrainingSetupPlanPage({
     DEFAULT_PREFERRED_DAYS
   );
   const [weeklyMilesTarget, setWeeklyMilesTarget] = useState("50");
+  const [preferredLongRunDowLocal, setPreferredLongRunDowLocal] = useState(6);
   const [error, setError] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
 
@@ -133,9 +143,16 @@ export default function TrainingSetupPlanPage({
     } else {
       setWeeklyMilesTarget("50");
     }
+    const pld = plan.preferredLongRunDow;
+    if (pld === 6 || pld === 7) {
+      setPreferredLongRunDowLocal(pld);
+    } else {
+      setPreferredLongRunDowLocal(6);
+    }
   }, [
     plan?.id,
     plan?.preferredDays,
+    plan?.preferredLongRunDow,
     plan?.weeklyMileageTarget,
     plan?.currentWeeklyMileage,
   ]);
@@ -289,6 +306,7 @@ export default function TrainingSetupPlanPage({
         body: JSON.stringify({
           preferredDays: normalized,
           weeklyMileageTarget: targetMiles,
+          preferredLongRunDow: preferredLongRunDowLocal,
         }),
       });
       const patchData = await patchRes.json();
@@ -374,12 +392,12 @@ export default function TrainingSetupPlanPage({
           {plan.race_registry && (
             <p className="mb-4 text-sm text-gray-600">
               Race: {plan.race_registry.name} —{" "}
-              {new Date(plan.race_registry.raceDate).toLocaleDateString()}
+              {formatPlanDateDisplay(plan.race_registry.raceDate)}
             </p>
           )}
           <p className="mb-4 text-sm text-gray-600">
             {plan.totalWeeks} weeks · Start{" "}
-            {new Date(plan.startDate).toLocaleDateString()}
+            {formatPlanDateDisplay(plan.startDate)}
           </p>
 
           {!hasSchedule && (
@@ -472,6 +490,33 @@ export default function TrainingSetupPlanPage({
                 )}
               </div>
 
+              <div>
+                <p className="mb-2 text-sm font-medium text-gray-800">
+                  Long run day
+                </p>
+                <p className="mb-3 text-xs text-gray-500">
+                  Tempo is Tuesday, intervals Thursday; pick Saturday or Sunday for
+                  your long run.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  {LONG_RUN_DAY_OPTIONS.map(({ value, label }) => (
+                    <label
+                      key={value}
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50"
+                    >
+                      <input
+                        type="radio"
+                        name="preferredLongRunDow"
+                        className="border-gray-300 text-orange-600 focus:ring-orange-500"
+                        checked={preferredLongRunDowLocal === value}
+                        onChange={() => setPreferredLongRunDowLocal(value)}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               <button
                 type="button"
                 onClick={() => void savePreferredAndGenerate()}
@@ -544,11 +589,7 @@ export default function TrainingSetupPlanPage({
                     </button>
                   </div>
                 </div>
-                {currentWeekEntry?.schedule ? (
-                  <p className="break-words text-sm leading-relaxed text-gray-800">
-                    {currentWeekEntry.schedule}
-                  </p>
-                ) : weekDays.length > 0 ? (
+                {weekDays.length > 0 ? (
                   <div className="mt-1">
                     <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
                       This week
@@ -564,7 +605,7 @@ export default function TrainingSetupPlanPage({
                           </span>
                           <span className="text-gray-500">
                             {w.date
-                              ? new Date(w.date).toLocaleDateString(undefined, {
+                              ? formatPlanDateDisplay(w.date, {
                                   weekday: "short",
                                   month: "short",
                                   day: "numeric",
@@ -581,7 +622,7 @@ export default function TrainingSetupPlanPage({
                   </p>
                 ) : (
                   <p className="text-sm text-gray-500">
-                    No schedule line for this week.
+                    No sessions scheduled for this week.
                   </p>
                 )}
                 {loadingWeek && (
@@ -606,7 +647,7 @@ export default function TrainingSetupPlanPage({
                     </div>
                     <div className="mt-2 text-sm text-gray-600">
                       {w.date
-                        ? new Date(w.date).toLocaleDateString(undefined, {
+                        ? formatPlanDateDisplay(w.date, {
                             weekday: "short",
                             month: "short",
                             day: "numeric",

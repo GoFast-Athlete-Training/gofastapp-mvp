@@ -10,6 +10,7 @@ import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import {
   currentTrainingWeekNumber,
   formatCalendarWeekRangeLabel,
+  formatPlanDateDisplay,
 } from "@/lib/training/plan-utils";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import {
@@ -309,7 +310,7 @@ export default function TrainingHubPage() {
                         </span>
                         <span className="text-gray-500 text-right">
                           {w.date
-                            ? new Date(w.date).toLocaleDateString(undefined, {
+                            ? formatPlanDateDisplay(w.date, {
                                 weekday: "short",
                                 month: "short",
                                 day: "numeric",

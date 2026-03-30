@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { totalWeeksFromDates } from "@/lib/training/plan-utils";
+import { totalWeeksFromDates, ymdFromDate } from "@/lib/training/plan-utils";
 import { TrainingPlanLifecycle } from "@prisma/client";
 import { archiveOtherActivePlans } from "@/lib/training/plan-lifecycle";
 
@@ -49,8 +49,19 @@ export async function GET(request: NextRequest, context: Ctx) {
       select: { fiveKPace: true },
     });
 
+    const serialized = {
+      ...plan,
+      startDate: ymdFromDate(plan.startDate),
+      race_registry: plan.race_registry
+        ? {
+            ...plan.race_registry,
+            raceDate: ymdFromDate(plan.race_registry.raceDate),
+          }
+        : null,
+    };
+
     return NextResponse.json({
-      plan,
+      plan: serialized,
       athleteFiveKPace: athleteRow?.fiveKPace ?? null,
     });
   } catch (e: unknown) {
@@ -125,6 +136,17 @@ export async function PATCH(request: NextRequest, context: Ctx) {
           .map((n: unknown) => Number(n))
           .filter((n: number) => n >= 1 && n <= 7);
       }
+      if ("preferredLongRunDow" in body) {
+        const v = body.preferredLongRunDow;
+        if (v === null || v === undefined || v === "") {
+          data.preferredLongRunDow = null;
+        } else {
+          const n = Number(v);
+          if (n === 6 || n === 7) {
+            data.preferredLongRunDow = n;
+          }
+        }
+      }
       if (body.weeklyMileageTarget != null) {
         const n = Number(body.weeklyMileageTarget);
         if (Number.isFinite(n)) {
@@ -156,9 +178,29 @@ export async function PATCH(request: NextRequest, context: Ctx) {
       data.lifecycleStatus = TrainingPlanLifecycle.ARCHIVED;
     }
 
-    const plan = await prisma.training_plans.update({
+    const planRow = await prisma.training_plans.update({
       where: { id },
       data: data as object,
+      include: {
+        race_registry: {
+          select: {
+            id: true,
+            name: true,
+            raceDate: true,
+            distanceMiles: true,
+            raceType: true,
+          },
+        },
+        athlete_goal: {
+          select: {
+            id: true,
+            goalTime: true,
+            goalRacePace: true,
+            distance: true,
+          },
+        },
+        _count: { select: { planned_workouts: true } },
+      },
     });
 
     const athleteRow = await prisma.athlete.findUnique({
@@ -166,8 +208,19 @@ export async function PATCH(request: NextRequest, context: Ctx) {
       select: { fiveKPace: true },
     });
 
+    const serialized = {
+      ...planRow,
+      startDate: ymdFromDate(planRow.startDate),
+      race_registry: planRow.race_registry
+        ? {
+            ...planRow.race_registry,
+            raceDate: ymdFromDate(planRow.race_registry.raceDate),
+          }
+        : null,
+    };
+
     return NextResponse.json({
-      plan,
+      plan: serialized,
       athleteFiveKPace: athleteRow?.fiveKPace ?? null,
     });
   } catch (e: unknown) {

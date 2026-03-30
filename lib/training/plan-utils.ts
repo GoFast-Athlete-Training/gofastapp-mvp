@@ -46,6 +46,39 @@ export function totalWeeksFromDates(planStartDate: Date, raceDate: Date): number
   return calendarTrainingWeekCount(planStartDate, raceDate);
 }
 
+/** Calendar date string from a UTC date-only `Date` (DB / generator). */
+export function ymdFromDate(d: Date): string {
+  const x = utcDateOnly(d);
+  const y = x.getUTCFullYear();
+  const m = String(x.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(x.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Display a plan date string without shifting the calendar day (avoids UTC midnight / local tz bugs).
+ * `ymd` is `YYYY-MM-DD` or any value parseable after appending local noon.
+ */
+export function formatPlanDateDisplay(
+  ymdOrIso: string,
+  options: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }
+): string {
+  const raw = ymdOrIso.trim();
+  const base =
+    raw.length >= 10 && raw[4] === "-" && raw[7] === "-"
+      ? raw.slice(0, 10)
+      : raw;
+  const d = new Date(`${base}T12:00:00`);
+  if (Number.isNaN(d.getTime())) {
+    return raw;
+  }
+  return d.toLocaleDateString(undefined, options);
+}
+
 /** preferredDays: 1=Monday .. 7=Sunday */
 const DAY_NAMES = [
   "Sunday",

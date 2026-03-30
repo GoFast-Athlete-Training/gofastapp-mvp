@@ -25,6 +25,7 @@ export async function executePlanGenerate(params: {
     id: string;
     startDate: Date;
     preferredDays: number[];
+    preferredLongRunDow: number | null;
     currentFiveKPace: string | null;
     weeklyMileageTarget: number | null;
     race_registry: RaceForGenerate;
@@ -63,6 +64,7 @@ export async function executePlanGenerate(params: {
     preferredDays,
     raceName: race.name,
     raceDistanceMiles: race.distanceMiles,
+    preferredLongRunDow: plan.preferredLongRunDow,
   });
   assignRotationalIdentifiers(drafts);
 

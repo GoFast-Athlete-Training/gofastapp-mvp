@@ -13,6 +13,7 @@ import {
 import {
   calendarTrainingWeekCount,
   mondayUtcOfWeekContaining,
+  ymdFromDate,
 } from "@/lib/training/plan-utils";
 import { formatPlannedWorkoutTitle } from "@/lib/training/workout-display-title";
 
@@ -92,20 +93,55 @@ function milesToMeters(miles: number): number {
   return miles * 1609.34;
 }
 
-function qualityDayOurDows(raceOurDow: number): {
-  longRunOurDow: number;
-  intervalOurDow: number;
-  tempoOurDow: number;
-} {
-  const raceIndex = raceOurDow - 1;
-  const longRunDayIndex = (raceIndex - 1 + 7) % 7;
-  const intervalDayIndex = (longRunDayIndex - 3 + 7) % 7;
-  const tempoDayIndex = (intervalDayIndex + 2) % 7;
-  return {
-    longRunOurDow: longRunDayIndex + 1,
-    intervalOurDow: intervalDayIndex + 1,
-    tempoOurDow: tempoDayIndex + 1,
-  };
+/** Fixed quality pattern: Tue tempo, Thu intervals; LR is Sat/Sun via preferredLongRunDow. */
+const TEMPO_IDEAL_OUR_DOW = 2;
+const INTERVAL_IDEAL_OUR_DOW = 4;
+const DEFAULT_LONG_RUN_OUR_DOW = 6;
+
+function circularDistOurDow(a: number, b: number): number {
+  const d = Math.abs(a - b);
+  return Math.min(d, 7 - d);
+}
+
+function normalizeLongRunOurDow(pref: number | null | undefined): number {
+  if (pref === 6 || pref === 7) return pref;
+  return DEFAULT_LONG_RUN_OUR_DOW;
+}
+
+function orderQualityCandidates(
+  idealOurDow: number,
+  isLongRun: boolean,
+  preferredSorted: number[]
+): number[] {
+  const seen = new Set<number>();
+  const out: number[] = [];
+  if (isLongRun) {
+    const other = idealOurDow === 6 ? 7 : 6;
+    for (const d of [idealOurDow, other]) {
+      if (preferredSorted.includes(d) && !seen.has(d)) {
+        out.push(d);
+        seen.add(d);
+      }
+    }
+    const rest = preferredSorted
+      .filter((d) => !seen.has(d))
+      .sort(
+        (a, b) =>
+          circularDistOurDow(a, idealOurDow) - circularDistOurDow(b, idealOurDow)
+      );
+    return out.concat(rest);
+  }
+  if (preferredSorted.includes(idealOurDow)) {
+    out.push(idealOurDow);
+    seen.add(idealOurDow);
+  }
+  const rest = preferredSorted
+    .filter((d) => !seen.has(d))
+    .sort(
+      (a, b) =>
+        circularDistOurDow(a, idealOurDow) - circularDistOurDow(b, idealOurDow)
+    );
+  return out.concat(rest);
 }
 
 export function nOffsetFromWeekAnchor(weekAnchor: Date, raceUtc: Date): number {
@@ -244,6 +280,8 @@ export interface GeneratePlanInput {
   preferredDays: number[];
   raceName: string;
   raceDistanceMiles: number;
+  /** Preferred long-run day: 6=Sat, 7=Sun (default 6). */
+  preferredLongRunDow?: number | null;
 }
 
 export interface GeneratedPlanWorkoutRow {
@@ -333,7 +371,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
   const raceUtc = utcDateOnly(input.raceDate);
   const planStart = utcDateOnly(input.planStartDate);
   const raceOurDow = ourDowFromUtcDate(raceUtc);
-  const q = qualityDayOurDows(raceOurDow);
+  const longRunIdeal = normalizeLongRunOurDow(input.preferredLongRunDow);
 
   const out: GeneratedPlanWorkoutRow[] = [];
 
@@ -355,14 +393,8 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
     const nOffset = nOffsetFromWeekAnchor(weekAnchor, raceUtc);
     const phase = phaseForCatalogue(nOffset);
 
-    const blockedOurDow = new Set<number>();
-    const dayBeforeRace = addDaysUtc(raceUtc, -1);
-    if (
-      dayBeforeRace.getTime() >= weekAnchor.getTime() &&
-      dayBeforeRace.getTime() <= weekEnd.getTime()
-    ) {
-      blockedOurDow.add(ourDowFromUtcDate(dayBeforeRace));
-    }
+    const blockedDates = new Set<string>();
+    blockedDates.add(ymdFromDate(addDaysUtc(raceUtc, -1)));
 
     if (nOffset === 0) {
       if (
@@ -430,39 +462,69 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
       return true;
     };
 
-    const tryPlace = (ourDow: number, kind: DayKind, miles: number) => {
-      if (miles <= 0) return;
-      if (blockedOurDow.has(ourDow)) return;
-      if (assignment.has(ourDow)) return;
+    const slotYmd = (ourDow: number): string =>
+      ymdFromDate(dateForDayInWeek(input.planStartDate, weekNumber, ourDow));
+
+    const tryPlace = (ourDow: number, kind: DayKind, miles: number): boolean => {
+      if (miles <= 0) return false;
+      if (assignment.has(ourDow)) return false;
       const slotDate = dateForDayInWeek(input.planStartDate, weekNumber, ourDow);
-      if (slotDate.getTime() < planStart.getTime()) return;
-      if (nOffset !== 0 && slotDate.getTime() > raceUtc.getTime()) return;
+      if (slotDate.getTime() < planStart.getTime()) return false;
+      if (nOffset !== 0 && slotDate.getTime() > raceUtc.getTime()) return false;
+      if (blockedDates.has(ymdFromDate(slotDate))) return false;
       assignment.set(ourDow, { kind, miles: round2(miles) });
+      return true;
     };
 
-    tryPlace(q.tempoOurDow, "tempo", tempoMi);
-    tryPlace(q.intervalOurDow, "interval", intervalMi);
+    const tryPlaceQuality = (
+      idealOurDow: number,
+      kind: DayKind,
+      miles: number,
+      isLongRun: boolean
+    ): boolean => {
+      for (const dow of orderQualityCandidates(idealOurDow, isLongRun, preferred)) {
+        if (tryPlace(dow, kind, miles)) return true;
+      }
+      return false;
+    };
 
-    const skipLongOnLongRunDay = nOffset === -1;
-    const longDayTarget = skipLongOnLongRunDay ? null : q.longRunOurDow;
-    if (longDayTarget != null && longMi > 0) {
-      tryPlace(longDayTarget, "long", longMi);
+    const preferredInWeek1 =
+      weekNumber === 1
+        ? preferred.filter((d) => dayInPlanWindow(d)).length
+        : 999;
+    const partialWeek1 = weekNumber === 1 && preferredInWeek1 < 4;
+
+    let extraEasyFromSkippedQuality = 0;
+    if (partialWeek1) {
+      extraEasyFromSkippedQuality += tempoMi + intervalMi;
+    } else {
+      if (!tryPlaceQuality(TEMPO_IDEAL_OUR_DOW, "tempo", tempoMi, false)) {
+        extraEasyFromSkippedQuality += tempoMi;
+      }
+      if (!tryPlaceQuality(INTERVAL_IDEAL_OUR_DOW, "interval", intervalMi, false)) {
+        extraEasyFromSkippedQuality += intervalMi;
+      }
     }
 
+    const skipLongOnLongRunDay = nOffset === -1;
     let absorbLongIntoEasy = 0;
-    if (skipLongOnLongRunDay && longMi > 0) {
-      const candidates = preferred.filter(
-        (d) =>
-          !blockedOurDow.has(d) &&
-          !assignment.has(d) &&
-          d !== q.tempoOurDow &&
-          d !== q.intervalOurDow &&
-          dayInPlanWindow(d)
-      );
-      const fallback = candidates[0];
-      if (fallback != null) {
-        assignment.set(fallback, { kind: "long", miles: round2(longMi) });
-      } else {
+    if (skipLongOnLongRunDay) {
+      absorbLongIntoEasy = longMi;
+    } else if (longMi > 0) {
+      if (partialWeek1) {
+        const other = longRunIdeal === 6 ? 7 : 6;
+        const lrDay =
+          preferred.includes(longRunIdeal) && dayInPlanWindow(longRunIdeal)
+            ? longRunIdeal
+            : preferred.includes(other) && dayInPlanWindow(other)
+              ? other
+              : null;
+        if (lrDay != null && tryPlace(lrDay, "long", longMi)) {
+          /* ok */
+        } else {
+          absorbLongIntoEasy = longMi;
+        }
+      } else if (!tryPlaceQuality(longRunIdeal, "long", longMi, true)) {
         absorbLongIntoEasy = longMi;
       }
     }
@@ -470,21 +532,21 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
     const usedForQuality = new Set(assignment.keys());
     const easyCandidates = preferred.filter(
       (d) =>
-        !blockedOurDow.has(d) &&
         !usedForQuality.has(d) &&
-        dayInPlanWindow(d)
+        dayInPlanWindow(d) &&
+        !blockedDates.has(slotYmd(d))
     );
     const easyDays =
       easyCandidates.length > 0
         ? easyCandidates
         : [1, 2, 3, 4, 5, 6, 7].filter(
             (d) =>
-              !blockedOurDow.has(d) &&
               !usedForQuality.has(d) &&
-              dayInPlanWindow(d)
+              dayInPlanWindow(d) &&
+              !blockedDates.has(slotYmd(d))
           );
 
-    let easyBudget = easyMi + absorbLongIntoEasy;
+    let easyBudget = easyMi + absorbLongIntoEasy + extraEasyFromSkippedQuality;
 
     if (easyBudget > 0 && easyDays.length > 0) {
       const base = Math.floor((easyBudget / easyDays.length) * 10) / 10;

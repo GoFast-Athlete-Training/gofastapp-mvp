@@ -808,6 +808,8 @@ model training_plans {
   planWeeks            Json?
   /// Snapshot of preferred training days 1=Mon..7=Sun
   preferredDays        Int[]                  @default([])
+  /// Preferred long-run day: 6=Saturday, 7=Sunday (default 6)
+  preferredLongRunDow  Int?
   createdAt            DateTime               @default(now())
   updatedAt            DateTime
   planned_workouts     workouts[]
