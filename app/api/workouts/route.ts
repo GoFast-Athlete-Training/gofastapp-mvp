@@ -28,6 +28,7 @@ function parseOptionalWorkoutDate(input: unknown): Date | undefined {
  * GET /api/workouts
  * List workouts for the authenticated athlete.
  * Optional: `?limit=20&offset=0` for pagination (max limit 100). When omitted, returns all (legacy).
+ * Optional: `?standalone=1` — only workouts with no training plan (`planId` null).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -62,7 +63,11 @@ export async function GET(request: NextRequest) {
       skip = Math.max(parseInt(offsetRaw ?? "0", 10) || 0, 0);
     }
 
-    const where = { athleteId: athlete.id };
+    const standaloneOnly = searchParams.get("standalone") === "1";
+    const where = {
+      athleteId: athlete.id,
+      ...(standaloneOnly ? { planId: null } : {}),
+    };
 
     const [workouts, total] = await Promise.all([
       usePaging

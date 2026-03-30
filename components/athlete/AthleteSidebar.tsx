@@ -12,6 +12,7 @@ import {
   User,
   MessageCircle,
   BookOpen,
+  Zap,
 } from "lucide-react";
 
 type NavItem = {
@@ -34,7 +35,14 @@ const navItems: NavItem[] = [
     label: "Go Train",
     href: "/workouts",
     icon: Dumbbell,
-    match: (p) => !!p?.startsWith("/workouts"),
+    match: (p) => p === "/workouts",
+  },
+  {
+    label: "Build a Run",
+    href: "/build-a-run",
+    icon: Zap,
+    match: (p) =>
+      !!p?.startsWith("/build-a-run") || p === "/workouts/create",
   },
   { label: "Training Pod", href: "/my-runcrews", icon: Users },
   { label: "Races", href: "/races", icon: Trophy },
