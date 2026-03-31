@@ -20,6 +20,7 @@ import {
   resolveWorkoutForPlanDay,
   type PlanDayCard,
 } from "@/lib/training/fetch-plan-week-client";
+import { workoutDetailPathWithGoTrainContext } from "@/lib/training/workout-nav-query";
 
 type PlanDetailHub = {
   id: string;
@@ -389,7 +390,15 @@ export default function TrainingHubPage() {
           onClose={() => setPlanPreview(null)}
           onDoThisWorkout={(id) => {
             setPlanPreview(null);
-            router.push(`/workouts/${id}`);
+            router.push(
+              workoutDetailPathWithGoTrainContext(id, {
+                back: "training",
+                planId: planDetail.id,
+                weekNumber,
+                totalWeeks: planDetail.totalWeeks,
+                dateKey: planPreview.planDay.dateKey,
+              })
+            );
           }}
           onGoToPrevDay={() => void shiftPlanPreview(-1)}
           onGoToNextDay={() => void shiftPlanPreview(1)}

@@ -91,7 +91,8 @@ function parseRegistryStartTime(
 /**
  * POST /api/race-registry/update
  * Receives race payload from GoFastCompany (prodpush). Upserts race_registry.
- * Company races.id === race_registry.id; companyRaceId mirrors races.id.
+ * Prefer companyRaceId (GoFastCompany races.id). Optional registryId / prodRaceId
+ * is race_registry.id when the row already exists in the athlete app.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -105,14 +106,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const id =
-      racePayload.id != null ? String(racePayload.id).trim() : "";
-    if (!id) {
+    const companyRaceId =
+      racePayload.companyRaceId != null &&
+      String(racePayload.companyRaceId).trim()
+        ? String(racePayload.companyRaceId).trim()
+        : racePayload.id != null && String(racePayload.id).trim()
+          ? String(racePayload.id).trim()
+          : "";
+
+    if (!companyRaceId) {
       return NextResponse.json(
-        { success: false, error: "race.id is required" },
+        {
+          success: false,
+          error: "companyRaceId or race.id is required",
+        },
         { status: 400, headers: corsHeaders }
       );
     }
+
+    const registryIdRaw = racePayload.registryId ?? racePayload.prodRaceId;
+    const registryId =
+      registryIdRaw != null && String(registryIdRaw).trim()
+        ? String(registryIdRaw).trim()
+        : null;
 
     const raceDateRaw = racePayload.raceDate;
     if (raceDateRaw == null || raceDateRaw === "") {
@@ -186,8 +202,6 @@ export async function POST(request: NextRequest) {
         ? String(racePayload.raceUrl).trim() || null
         : null;
 
-    const companyRaceId = id;
-
     const tags = tagsFromPayload(racePayload);
     const logoUrl = logoUrlFromPayload(racePayload);
     const startTimeParsed = parseRegistryStartTime(
@@ -218,64 +232,87 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     };
 
-    const slugFinal = slugVal || id;
+    const slugFinal = slugVal || companyRaceId;
+
+    const selectRace = {
+      id: true,
+      name: true,
+      slug: true,
+      raceDate: true,
+      companyRaceId: true,
+    } as const;
+
+    let target:
+      | Awaited<ReturnType<typeof prisma.race_registry.findUnique>>
+      | null = null;
+
+    if (registryId) {
+      target = await prisma.race_registry.findUnique({
+        where: { id: registryId },
+      });
+    }
+    if (!target) {
+      target = await prisma.race_registry.findFirst({
+        where: { companyRaceId },
+      });
+    }
+    if (!target) {
+      target = await prisma.race_registry.findUnique({
+        where: { id: companyRaceId },
+      });
+    }
+    if (!target && slugVal) {
+      const bySlug = await prisma.race_registry.findUnique({
+        where: { slug: slugVal },
+      });
+      if (
+        bySlug &&
+        (!bySlug.companyRaceId ||
+          bySlug.companyRaceId === companyRaceId ||
+          (registryId && bySlug.id === registryId))
+      ) {
+        target = bySlug;
+      }
+    }
 
     let row;
 
-    const existingById = await prisma.race_registry.findUnique({
-      where: { id },
-    });
-    const existingBySlug = slugVal
-      ? await prisma.race_registry.findUnique({
-          where: { slug: slugVal },
-        })
-      : null;
-
-    if (existingBySlug && existingBySlug.id !== id) {
+    if (target) {
       row = await prisma.race_registry.update({
-        where: { id: existingBySlug.id },
+        where: { id: target.id },
         data: {
           ...updateData,
-          slug: slugVal ?? existingBySlug.slug,
+          slug: slugVal ?? target.slug ?? slugFinal,
         },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          raceDate: true,
-          companyRaceId: true,
-        },
-      });
-    } else if (existingById) {
-      row = await prisma.race_registry.update({
-        where: { id },
-        data: updateData,
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          raceDate: true,
-          companyRaceId: true,
-        },
+        select: selectRace,
       });
     } else {
-      row = await prisma.race_registry.create({
-        data: {
-          id,
-          country: "USA",
-          isActive: true,
-          isCancelled: false,
-          ...updateData,
-          slug: slugVal ?? slugFinal,
-        },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          raceDate: true,
-          companyRaceId: true,
-        },
+      const newId = registryId ?? companyRaceId;
+      const collision = await prisma.race_registry.findUnique({
+        where: { id: newId },
       });
+      if (collision) {
+        row = await prisma.race_registry.update({
+          where: { id: newId },
+          data: {
+            ...updateData,
+            slug: slugVal ?? collision.slug ?? slugFinal,
+          },
+          select: selectRace,
+        });
+      } else {
+        row = await prisma.race_registry.create({
+          data: {
+            id: newId,
+            country: "USA",
+            isActive: true,
+            isCancelled: false,
+            ...updateData,
+            slug: slugVal ?? slugFinal,
+          },
+          select: selectRace,
+        });
+      }
     }
 
     const response = NextResponse.json({ success: true, race: row });

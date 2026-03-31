@@ -19,6 +19,7 @@ import {
   resolveWorkoutForPlanDay,
   type PlanDayCard,
 } from "@/lib/training/fetch-plan-week-client";
+import { workoutDetailPathWithGoTrainContext } from "@/lib/training/workout-nav-query";
 
 type PlanListEntry = { id: string };
 
@@ -75,6 +76,8 @@ function TodaysPlanWorkout() {
     null
   );
   const [planId, setPlanId] = useState<string | null>(null);
+  const [currentWeekNumber, setCurrentWeekNumber] = useState<number | null>(null);
+  const [totalWeeks, setTotalWeeks] = useState<number | null>(null);
   const [opening, setOpening] = useState(false);
 
   const todayKey = useMemo(() => ymdFromDate(new Date()), []);
@@ -85,6 +88,8 @@ function TodaysPlanWorkout() {
     setTodayCard(null);
     setHasActiveSchedule(null);
     setPlanId(null);
+    setCurrentWeekNumber(null);
+    setTotalWeeks(null);
     try {
       const u = auth.currentUser;
       if (!u) return;
@@ -109,6 +114,11 @@ function TodaysPlanWorkout() {
         startDate: string;
         totalWeeks: number;
       };
+      setTotalWeeks(
+        typeof p.totalWeeks === "number" && Number.isFinite(p.totalWeeks)
+          ? p.totalWeeks
+          : null
+      );
       const scheduled =
         Array.isArray(p.planWeeks) && (p.planWeeks as unknown[]).length > 0;
       if (!scheduled) {
@@ -117,6 +127,7 @@ function TodaysPlanWorkout() {
       }
       setHasActiveSchedule(true);
       const wn = currentTrainingWeekNumber(p.startDate, p.totalWeeks);
+      setCurrentWeekNumber(wn);
       const { days } = await fetchPlanWeekSchedule(id, wn, token);
       const hit = days.find((d) => d.dateKey === todayKey) ?? null;
       setTodayCard(hit);
@@ -151,7 +162,15 @@ function TodaysPlanWorkout() {
       const wid =
         todayCard.workoutId ??
         (await resolveWorkoutForPlanDay(planId, todayCard.dateKey, token));
-      router.push(`/workouts/${wid}`);
+      router.push(
+        workoutDetailPathWithGoTrainContext(wid, {
+          back: "workouts",
+          planId,
+          weekNumber: currentWeekNumber ?? undefined,
+          totalWeeks: totalWeeks ?? undefined,
+          dateKey: todayCard.dateKey,
+        })
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not open workout");
     } finally {

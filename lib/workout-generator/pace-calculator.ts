@@ -179,6 +179,21 @@ export function formatPaceTargetRangeForDisplay(valueLow: number, valueHigh: num
   return `${lo}–${hi} /mi`;
 }
 
+/** Single stored pace band value → "m:ss /mi" (same encoding as {@link formatPaceTargetRangeForDisplay}). */
+export function formatPaceTargetSingleForDisplay(storedBandValue: number): string {
+  return `${formatStoredPaceAsMinPerMile(storedBandValue)} /mi`;
+}
+
+/** UI label for segment target rows (sentence case). */
+export function workoutTargetTypeLabel(apiType: string): string {
+  const t = (apiType || "").toUpperCase();
+  if (t === "PACE") return "Pace";
+  if (t === "HEART_RATE" || t === "HEARTRATE") return "Heart rate";
+  if (t === "CADENCE") return "Cadence";
+  if (t === "POWER") return "Power";
+  return apiType ? apiType.charAt(0).toUpperCase() + apiType.slice(1).toLowerCase() : "Target";
+}
+
 /** Resolve goal pace: either from explicit pace string or from race time + distance */
 export function resolveGoalPaceSecondsPerMile(options: {
   goalPace?: string;

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { auth } from "@/lib/firebase";
-import { formatPlanDateDisplay } from "@/lib/training/plan-utils";
+import { formatPlanDateDisplay, ymdFromDate } from "@/lib/training/plan-utils";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import { fetchTrainingWorkoutDetail, type PlanDayCard } from "@/lib/training/fetch-plan-week-client";
 
@@ -158,6 +158,8 @@ export default function PlanPreviewDayModal({
       })
     : "—";
 
+  const isToday = planDay.dateKey === ymdFromDate(new Date());
+
   const scheduleMi = metersToMiDisplay(planDay.estimatedDistanceInMeters);
   const title =
     workout?.title?.trim() || displayWorkoutListTitle(planDay);
@@ -176,9 +178,15 @@ export default function PlanPreviewDayModal({
       <div className="w-full max-w-lg max-h-[90vh] overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-xl flex flex-col">
         <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Planned in your schedule
-            </p>
+            {isToday ? (
+              <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">
+                Here&apos;s your work for today
+              </p>
+            ) : (
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Planned in your schedule
+              </p>
+            )}
             {planName?.trim() ? (
               <p className="mt-0.5 text-xs text-gray-600 truncate">{planName}</p>
             ) : null}
@@ -286,7 +294,7 @@ export default function PlanPreviewDayModal({
             disabled={loading || !!error}
             className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
           >
-            Do this workout
+            {isToday ? "Let&apos;s go — open workout" : "Do this workout"}
           </button>
           <button
             type="button"
