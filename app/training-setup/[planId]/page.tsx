@@ -8,6 +8,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import PhaseViewModal from "@/components/training/PhaseViewModal";
+import PlanPreviewDayModal from "@/components/training/PlanPreviewDayModal";
 import {
   parsePhasesJson,
   phaseNameForWeek,
@@ -100,6 +101,10 @@ export default function TrainingSetupPlanPage({
   const [preferredLongRunDowLocal, setPreferredLongRunDowLocal] = useState(6);
   const [error, setError] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [planPreview, setPlanPreview] = useState<{
+    workoutId: string;
+    planDay: PlanDayCard;
+  } | null>(null);
 
   async function getToken() {
     const u = auth.currentUser;
@@ -266,6 +271,10 @@ export default function TrainingSetupPlanPage({
     void fetchWeekWorkouts(weekNumber);
   }, [authReady, plan, hasSchedule, weekNumber, fetchWeekWorkouts]);
 
+  useEffect(() => {
+    setPlanPreview(null);
+  }, [weekNumber]);
+
   function togglePreferredDay(d: number) {
     setPreferredDaysLocal((prev) => {
       if (prev.includes(d)) {
@@ -350,12 +359,32 @@ export default function TrainingSetupPlanPage({
     try {
       setOpeningDayKey(day.dateKey);
       const token = await u.getIdToken();
-      const id =
+      const workoutId =
         day.workoutId ??
         (await resolveWorkoutForPlanDay(plan.id, day.dateKey, token));
-      router.push(`/workouts/${id}`);
+      setPlanPreview({ workoutId, planDay: day });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not open workout");
+    } finally {
+      setOpeningDayKey(null);
+    }
+  }
+
+  async function shiftPlanPreview(delta: -1 | 1) {
+    if (!plan || !planPreview) return;
+    const idx = weekDays.findIndex((d) => d.dateKey === planPreview.planDay.dateKey);
+    const nextIdx = idx + delta;
+    if (nextIdx < 0 || nextIdx >= weekDays.length) return;
+    const day = weekDays[nextIdx]!;
+    setOpeningDayKey(day.dateKey);
+    try {
+      const token = await getToken();
+      const workoutId =
+        day.workoutId ??
+        (await resolveWorkoutForPlanDay(plan.id, day.dateKey, token));
+      setPlanPreview({ workoutId, planDay: day });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load day");
     } finally {
       setOpeningDayKey(null);
     }
@@ -687,6 +716,31 @@ export default function TrainingSetupPlanPage({
         planWeeks={weekEntries}
         onJumpToWeek={(wn) => setWeekNumber(wn)}
       />
+
+      {plan && planPreview && (
+        <PlanPreviewDayModal
+          open
+          workoutId={planPreview.workoutId}
+          planDay={planPreview.planDay}
+          weekNumber={weekNumber}
+          totalWeeks={plan.totalWeeks}
+          planName={plan.name}
+          onClose={() => setPlanPreview(null)}
+          onDoThisWorkout={(id) => {
+            setPlanPreview(null);
+            router.push(`/workouts/${id}`);
+          }}
+          onGoToPrevDay={() => void shiftPlanPreview(-1)}
+          onGoToNextDay={() => void shiftPlanPreview(1)}
+          prevDisabled={
+            weekDays.findIndex((d) => d.dateKey === planPreview.planDay.dateKey) <= 0
+          }
+          nextDisabled={
+            weekDays.findIndex((d) => d.dateKey === planPreview.planDay.dateKey) >=
+            weekDays.length - 1
+          }
+        />
+      )}
     </AthleteAppShell>
   );
 }

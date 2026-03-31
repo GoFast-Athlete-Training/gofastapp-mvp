@@ -74,3 +74,18 @@ export async function resolveWorkoutForPlanDay(
   }
   return data.workoutId;
 }
+
+/** Full workout + segments (lazy segment creation may run on server for I/T). */
+export async function fetchTrainingWorkoutDetail(
+  workoutId: string,
+  bearerToken: string
+): Promise<{ workout: unknown }> {
+  const res = await fetch(`/api/training/workout/${encodeURIComponent(workoutId)}`, {
+    headers: { Authorization: `Bearer ${bearerToken}` },
+  });
+  const data = (await res.json()) as { error?: string; workout?: unknown };
+  if (!res.ok || data.workout == null) {
+    throw new Error(typeof data.error === "string" ? data.error : "Failed to load workout");
+  }
+  return { workout: data.workout };
+}

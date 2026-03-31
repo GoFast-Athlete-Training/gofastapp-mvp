@@ -7,6 +7,7 @@ import { Trash2 } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
+import PlanPreviewDayModal from "@/components/training/PlanPreviewDayModal";
 import {
   currentTrainingWeekNumber,
   formatCalendarWeekRangeLabel,
@@ -47,6 +48,10 @@ export default function TrainingHubPage() {
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [hubError, setHubError] = useState<string | null>(null);
+  const [planPreview, setPlanPreview] = useState<{
+    workoutId: string;
+    planDay: PlanDayCard;
+  } | null>(null);
 
   const paceDisplay = useMemo(() => {
     if (!planDetail) return null;
@@ -110,12 +115,34 @@ export default function TrainingHubPage() {
     try {
       setOpeningDayKey(day.dateKey);
       const token = await u.getIdToken();
-      const id =
+      const workoutId =
         day.workoutId ??
         (await resolveWorkoutForPlanDay(planIdForDay, day.dateKey, token));
-      router.push(`/workouts/${id}`);
+      setPlanPreview({ workoutId, planDay: day });
     } catch (e) {
       setHubError(e instanceof Error ? e.message : "Could not open workout");
+    } finally {
+      setOpeningDayKey(null);
+    }
+  }
+
+  async function shiftPlanPreview(delta: -1 | 1) {
+    if (!planDetail || !planPreview) return;
+    const idx = weekDays.findIndex((d) => d.dateKey === planPreview.planDay.dateKey);
+    const nextIdx = idx + delta;
+    if (nextIdx < 0 || nextIdx >= weekDays.length) return;
+    const day = weekDays[nextIdx]!;
+    setOpeningDayKey(day.dateKey);
+    try {
+      const u = auth.currentUser;
+      if (!u) return;
+      const token = await u.getIdToken();
+      const workoutId =
+        day.workoutId ??
+        (await resolveWorkoutForPlanDay(planDetail.id, day.dateKey, token));
+      setPlanPreview({ workoutId, planDay: day });
+    } catch (e) {
+      setHubError(e instanceof Error ? e.message : "Could not load day");
     } finally {
       setOpeningDayKey(null);
     }
@@ -350,6 +377,31 @@ export default function TrainingHubPage() {
           </ul>
         </div>
       </div>
+
+      {planDetail && planPreview && (
+        <PlanPreviewDayModal
+          open
+          workoutId={planPreview.workoutId}
+          planDay={planPreview.planDay}
+          weekNumber={weekNumber}
+          totalWeeks={planDetail.totalWeeks}
+          planName={planDetail.name}
+          onClose={() => setPlanPreview(null)}
+          onDoThisWorkout={(id) => {
+            setPlanPreview(null);
+            router.push(`/workouts/${id}`);
+          }}
+          onGoToPrevDay={() => void shiftPlanPreview(-1)}
+          onGoToNextDay={() => void shiftPlanPreview(1)}
+          prevDisabled={
+            weekDays.findIndex((d) => d.dateKey === planPreview.planDay.dateKey) <= 0
+          }
+          nextDisabled={
+            weekDays.findIndex((d) => d.dateKey === planPreview.planDay.dateKey) >=
+            weekDays.length - 1
+          }
+        />
+      )}
     </AthleteAppShell>
   );
 }
