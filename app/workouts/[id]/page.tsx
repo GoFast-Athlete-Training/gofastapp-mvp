@@ -2,7 +2,21 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import { ArrowLeft, Send, CheckCircle2, AlertCircle, X, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  Send,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  Users,
+  Pencil,
+  Save,
+  Copy,
+  Plus,
+  Trash2,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
 import Link from "next/link";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
@@ -325,6 +339,80 @@ function CataloguePrescriptionCard({
   );
 }
 
+type EditableSegment = {
+  clientKey: string;
+  title: string;
+  durationType: "DISTANCE" | "TIME";
+  durationValue: string;
+  repeatCount: string;
+  paceLowSec: string;
+  paceHighSec: string;
+  notes: string;
+};
+
+function newClientKey(): string {
+  if (typeof globalThis !== "undefined" && globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+  return `k_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function segmentToEditable(s: WorkoutSegment): EditableSegment {
+  const pace = s.targets?.find((t) => (t.type || "").toUpperCase() === "PACE");
+  return {
+    clientKey: s.id?.trim() ? s.id : newClientKey(),
+    title: s.title,
+    durationType: s.durationType === "TIME" ? "TIME" : "DISTANCE",
+    durationValue: String(s.durationValue),
+    repeatCount:
+      s.repeatCount != null && Number(s.repeatCount) > 1 ? String(s.repeatCount) : "",
+    paceLowSec:
+      pace?.valueLow != null && Number.isFinite(Number(pace.valueLow))
+        ? String(Math.round(Number(pace.valueLow)))
+        : "",
+    paceHighSec:
+      pace?.valueHigh != null && Number.isFinite(Number(pace.valueHigh))
+        ? String(Math.round(Number(pace.valueHigh)))
+        : "",
+    notes: s.notes ?? "",
+  };
+}
+
+function editableSegmentsToApiPayload(segments: EditableSegment[]) {
+  return segments.map((s, i) => {
+    const durationValue = parseFloat(s.durationValue);
+    if (!Number.isFinite(durationValue) || durationValue < 0) {
+      throw new Error(`Segment ${i + 1}: invalid duration`);
+    }
+    const title = s.title.trim();
+    if (!title) {
+      throw new Error(`Segment ${i + 1}: title is required`);
+    }
+    let repeatCount: number | null = null;
+    if (s.repeatCount.trim()) {
+      const r = parseInt(s.repeatCount, 10);
+      if (Number.isFinite(r) && r > 1) repeatCount = r;
+    }
+    const low = s.paceLowSec.trim() ? Number(s.paceLowSec) : NaN;
+    const high = s.paceHighSec.trim() ? Number(s.paceHighSec) : NaN;
+    let targets: unknown = null;
+    if (Number.isFinite(low) && Number.isFinite(high)) {
+      targets = [{ type: "PACE", valueLow: low, valueHigh: high }];
+    } else if (Number.isFinite(low)) {
+      targets = [{ type: "PACE", value: low }];
+    }
+    return {
+      stepOrder: i + 1,
+      title,
+      durationType: s.durationType,
+      durationValue,
+      repeatCount,
+      notes: s.notes.trim() || null,
+      targets,
+    };
+  });
+}
+
 function formatTargetLine(target: NonNullable<WorkoutSegment["targets"]>[0]): string {
   const type = (target.type || "").toUpperCase();
   if (type === "PACE") {
@@ -366,6 +454,21 @@ export default function WorkoutDetailPage() {
   const [garminToast, setGarminToast] = useState<string | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [savingEdits, setSavingEdits] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editDateYmd, setEditDateYmd] = useState("");
+  const [editDistanceMi, setEditDistanceMi] = useState("");
+  const [editSegments, setEditSegments] = useState<EditableSegment[]>([]);
+  const [repeatModalOpen, setRepeatModalOpen] = useState(false);
+  const [repeatFirstDate, setRepeatFirstDate] = useState("");
+  const [repeatOccurrences, setRepeatOccurrences] = useState(2);
+  const [repeatIntervalDays, setRepeatIntervalDays] = useState(7);
+  const [repeatSubmitting, setRepeatSubmitting] = useState(false);
+  const [repeatError, setRepeatError] = useState<string | null>(null);
+
   const goTrainCtx = useMemo(
     () => parseGoTrainNavContext(searchParams),
     [searchParams]
@@ -398,6 +501,200 @@ export default function WorkoutDetailPage() {
   useEffect(() => {
     fetchWorkout();
   }, [workoutId]);
+
+  const startEdit = useCallback(() => {
+    if (!workout) return;
+    setEditError(null);
+    setEditTitle(workout.title);
+    setEditDescription(workout.description ?? "");
+    setEditDateYmd(workoutCalendarYmd(workout.date) ?? "");
+    setEditDistanceMi(
+      workout.estimatedDistanceInMeters != null &&
+        workout.estimatedDistanceInMeters > 0
+        ? (workout.estimatedDistanceInMeters / 1609.34).toFixed(2)
+        : ""
+    );
+    const sorted = [...(workout.segments ?? [])].sort((a, b) => a.stepOrder - b.stepOrder);
+    setEditSegments(sorted.map((s) => segmentToEditable(s)));
+    setIsEditing(true);
+  }, [workout]);
+
+  const cancelEdit = useCallback(() => {
+    setIsEditing(false);
+    setEditError(null);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const wantEdit = searchParams.get("edit") === "1";
+    if (!wantEdit || !workout) return;
+    startEdit();
+    const q = new URLSearchParams(searchParams.toString());
+    q.delete("edit");
+    const qs = q.toString();
+    router.replace(qs ? `/workouts/${workoutId}?${qs}` : `/workouts/${workoutId}`, {
+      scroll: false,
+    });
+  }, [workout, workoutId, searchParams, router, startEdit]);
+
+  const saveEdits = async () => {
+    if (!workout) return;
+    const title = editTitle.trim();
+    if (!title) {
+      setEditError("Title is required");
+      return;
+    }
+    let payload: ReturnType<typeof editableSegmentsToApiPayload>;
+    try {
+      if (editSegments.length === 0) {
+        setEditError("Add at least one segment");
+        return;
+      }
+      payload = editableSegmentsToApiPayload(editSegments);
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : "Invalid segments");
+      return;
+    }
+
+    setSavingEdits(true);
+    setEditError(null);
+
+    let estimatedDistanceInMeters: number | null;
+    const mi = parseFloat(editDistanceMi);
+    if (editDistanceMi.trim() === "") {
+      estimatedDistanceInMeters = null;
+    } else if (Number.isFinite(mi) && mi >= 0) {
+      estimatedDistanceInMeters = mi * 1609.34;
+    } else {
+      setSavingEdits(false);
+      setEditError("Total distance must be a valid number (miles) or empty");
+      return;
+    }
+
+    try {
+      const patchBody: Record<string, unknown> = {
+        title,
+        description: editDescription.trim() || null,
+        date: editDateYmd.trim() ? editDateYmd.trim() : null,
+        estimatedDistanceInMeters,
+      };
+
+      const patchRes = await api.patch(`/workouts/${workoutId}`, patchBody);
+      const warn = (patchRes.data as { dateChangeWarning?: string })?.dateChangeWarning;
+      if (warn) {
+        setGarminToast(warn);
+      }
+
+      await api.put(`/workouts/${workoutId}/segments`, payload);
+
+      setIsEditing(false);
+      await fetchWorkout();
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { error?: string } } };
+      setEditError(ax.response?.data?.error || "Failed to save changes");
+    } finally {
+      setSavingEdits(false);
+    }
+  };
+
+  const addEditSegment = () => {
+    setEditSegments((prev) => [
+      ...prev,
+      {
+        clientKey: newClientKey(),
+        title: "Segment",
+        durationType: "DISTANCE",
+        durationValue: "1",
+        repeatCount: "",
+        paceLowSec: "",
+        paceHighSec: "",
+        notes: "",
+      },
+    ]);
+  };
+
+  const removeEditSegment = (key: string) => {
+    setEditSegments((prev) => prev.filter((s) => s.clientKey !== key));
+  };
+
+  const moveEditSegment = (key: string, dir: -1 | 1) => {
+    setEditSegments((prev) => {
+      const i = prev.findIndex((s) => s.clientKey === key);
+      if (i < 0) return prev;
+      const j = i + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      const t = next[i]!;
+      next[i] = next[j]!;
+      next[j] = t;
+      return next;
+    });
+  };
+
+  const openRepeatModal = () => {
+    if (!workout) return;
+    setRepeatError(null);
+    setRepeatFirstDate(workoutCalendarYmd(workout.date) ?? ymdFromDate(new Date()));
+    setRepeatOccurrences(2);
+    setRepeatIntervalDays(7);
+    setRepeatModalOpen(true);
+  };
+
+  const repeatPreviewDates = useMemo(() => {
+    const ymd = repeatFirstDate.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return [];
+    const base = new Date(Date.UTC(
+      parseInt(ymd.slice(0, 4), 10),
+      parseInt(ymd.slice(5, 7), 10) - 1,
+      parseInt(ymd.slice(8, 10), 10),
+      12,
+      0,
+      0
+    ));
+    if (Number.isNaN(base.getTime())) return [];
+    const n = Math.min(13, Math.max(1, repeatOccurrences));
+    const iv = Math.min(365, Math.max(1, repeatIntervalDays));
+    const out: string[] = [];
+    for (let i = 0; i < n; i++) {
+      const d = new Date(base.getTime());
+      d.setUTCDate(d.getUTCDate() + i * iv);
+      out.push(d.toISOString().slice(0, 10));
+    }
+    return out;
+  }, [repeatFirstDate, repeatOccurrences, repeatIntervalDays]);
+
+  const submitRepeat = async () => {
+    if (!workout) return;
+    const ymd = repeatFirstDate.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
+      setRepeatError("Pick a valid start date");
+      return;
+    }
+    const n = Math.min(13, Math.max(1, repeatOccurrences));
+    const repeatCount = n - 1;
+    const iv = Math.min(365, Math.max(1, repeatIntervalDays));
+    setRepeatSubmitting(true);
+    setRepeatError(null);
+    try {
+      const res = await api.post(`/workouts/${workoutId}/duplicate`, {
+        date: ymd,
+        repeatCount,
+        repeatIntervalDays: iv,
+      });
+      const ids = (res.data as { workoutIds?: string[] })?.workoutIds ?? [];
+      setRepeatModalOpen(false);
+      setGarminToast(
+        ids.length > 1
+          ? `Created ${ids.length} workouts. Open Go Train to see them.`
+          : "Workout copy created."
+      );
+    } catch (e) {
+      const ax = e as { response?: { data?: { error?: string } } };
+      setRepeatError(ax.response?.data?.error || "Could not create copies");
+    } finally {
+      setRepeatSubmitting(false);
+    }
+  };
 
   const fetchWorkout = async () => {
     try {
@@ -653,6 +950,56 @@ export default function WorkoutDetailPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
                 Workout detail
               </p>
+              {!isLogged && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {!isEditing ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={startEdit}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50"
+                      >
+                        <Pencil className="w-4 h-4 shrink-0" />
+                        Edit workout
+                      </button>
+                      <button
+                        type="button"
+                        onClick={openRepeatModal}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50"
+                      >
+                        <Copy className="w-4 h-4 shrink-0" />
+                        Repeat / copy
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void saveEdits()}
+                        disabled={savingEdits}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 disabled:opacity-50"
+                      >
+                        <Save className="w-4 h-4 shrink-0" />
+                        {savingEdits ? "Saving…" : "Save changes"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelEdit}
+                        disabled={savingEdits}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+              {editError && (
+                <p className="text-sm text-red-600 mb-2" role="alert">
+                  {editError}
+                </p>
+              )}
+              {!isEditing ? (
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 break-words">
                 {displayWorkoutListTitle({
                   title: workout.title,
@@ -660,6 +1007,58 @@ export default function WorkoutDetailPage() {
                   estimatedDistanceInMeters: workout.estimatedDistanceInMeters ?? null,
                 })}
               </h1>
+              ) : (
+                <div className="space-y-3 mb-2">
+                  <label className="block">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Title
+                    </span>
+                    <input
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-lg font-semibold text-gray-900"
+                    />
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="block">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Scheduled date
+                      </span>
+                      <input
+                        type="date"
+                        value={editDateYmd}
+                        onChange={(e) => setEditDateYmd(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Total distance (mi, optional)
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={editDistanceMi}
+                        onChange={(e) => setEditDistanceMi(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        placeholder="e.g. 6.5"
+                      />
+                    </label>
+                  </div>
+                  <label className="block">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Description
+                    </span>
+                    <textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      rows={3}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800"
+                    />
+                  </label>
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 {isLogged ? (
                   <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-900 rounded-full text-sm font-medium border border-emerald-200">
@@ -690,7 +1089,7 @@ export default function WorkoutDetailPage() {
                   </span>
                 )}
               </div>
-              {scheduleLabel && (
+              {scheduleLabel && !isEditing && (
                 <p className="text-lg text-gray-800 font-medium mb-1">
                   {isLogged || dayRel === "today"
                     ? scheduleLabel
@@ -701,7 +1100,7 @@ export default function WorkoutDetailPage() {
                         : scheduleLabel}
                 </p>
               )}
-              {estMi && (
+              {estMi && !isEditing && (
                 <p className="text-sm text-gray-600 mb-2">About {estMi} total (planned)</p>
               )}
               <p className="text-sm text-gray-600 mb-1">
@@ -711,7 +1110,7 @@ export default function WorkoutDetailPage() {
               {weekOnPlan && (
                 <p className="text-sm text-gray-500 mb-3">{weekOnPlan} on your plan</p>
               )}
-              {workout.description && (
+              {workout.description && !isEditing && (
                 <p className="text-gray-600 text-sm border-t border-gray-100 pt-3 break-words">
                   {workout.description}
                 </p>
@@ -947,16 +1346,213 @@ export default function WorkoutDetailPage() {
 
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Segments</h2>
-          {workout.workout_catalogue &&
+          {!isEditing &&
+            workout.workout_catalogue &&
             workout.workoutType !== "Intervals" &&
             workout.workoutType !== "Tempo" && (
-            <p className="text-sm text-gray-500 mb-4">
-              Step-by-step breakdown (used for Garmin sync). The coach prescription above is the
-              human-readable plan.
-            </p>
-          )}
+              <p className="text-sm text-gray-500 mb-4">
+                Step-by-step breakdown (used for Garmin sync). The coach prescription above is the
+                human-readable plan.
+              </p>
+            )}
 
-          {workout.segments && workout.segments.length > 0 ? (
+          {isEditing ? (
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={addEditSegment}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-orange-300 bg-orange-50/50 text-sm font-medium text-orange-900 hover:bg-orange-50"
+              >
+                <Plus className="w-4 h-4 shrink-0" />
+                Add segment
+              </button>
+              {editSegments.map((segment, segIdx) => (
+                <div
+                  key={segment.clientKey}
+                  className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-3"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium text-gray-500">#{segIdx + 1}</span>
+                    <div className="flex gap-1 ml-auto">
+                      <button
+                        type="button"
+                        aria-label="Move up"
+                        onClick={() => moveEditSegment(segment.clientKey, -1)}
+                        disabled={segIdx === 0}
+                        className="p-2 rounded border border-gray-200 bg-white disabled:opacity-40"
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Move down"
+                        onClick={() => moveEditSegment(segment.clientKey, 1)}
+                        disabled={segIdx === editSegments.length - 1}
+                        className="p-2 rounded border border-gray-200 bg-white disabled:opacity-40"
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Remove segment"
+                        onClick={() => removeEditSegment(segment.clientKey)}
+                        className="p-2 rounded border border-red-200 bg-white text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <label className="block">
+                    <span className="text-xs font-semibold uppercase text-gray-500">Title</span>
+                    <input
+                      type="text"
+                      value={segment.title}
+                      onChange={(e) =>
+                        setEditSegments((prev) =>
+                          prev.map((s) =>
+                            s.clientKey === segment.clientKey
+                              ? { ...s, title: e.target.value }
+                              : s
+                          )
+                        )
+                      }
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <label className="block">
+                      <span className="text-xs font-semibold uppercase text-gray-500">Type</span>
+                      <select
+                        value={segment.durationType}
+                        onChange={(e) =>
+                          setEditSegments((prev) =>
+                            prev.map((s) =>
+                              s.clientKey === segment.clientKey
+                                ? {
+                                    ...s,
+                                    durationType:
+                                      e.target.value === "TIME" ? "TIME" : "DISTANCE",
+                                  }
+                                : s
+                            )
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      >
+                        <option value="DISTANCE">Distance</option>
+                        <option value="TIME">Time</option>
+                      </select>
+                    </label>
+                    <label className="block sm:col-span-2">
+                      <span className="text-xs font-semibold uppercase text-gray-500">
+                        {segment.durationType === "DISTANCE" ? "Miles" : "Minutes"}
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={segment.durationValue}
+                        onChange={(e) =>
+                          setEditSegments((prev) =>
+                            prev.map((s) =>
+                              s.clientKey === segment.clientKey
+                                ? { ...s, durationValue: e.target.value }
+                                : s
+                            )
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      />
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <label className="block">
+                      <span className="text-xs font-semibold uppercase text-gray-500">
+                        Repeat block (×)
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="optional"
+                        value={segment.repeatCount}
+                        onChange={(e) =>
+                          setEditSegments((prev) =>
+                            prev.map((s) =>
+                              s.clientKey === segment.clientKey
+                                ? { ...s, repeatCount: e.target.value }
+                                : s
+                            )
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-semibold uppercase text-gray-500">
+                        Pace low (sec/mi)
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="optional"
+                        value={segment.paceLowSec}
+                        onChange={(e) =>
+                          setEditSegments((prev) =>
+                            prev.map((s) =>
+                              s.clientKey === segment.clientKey
+                                ? { ...s, paceLowSec: e.target.value }
+                                : s
+                            )
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-semibold uppercase text-gray-500">
+                        Pace high (sec/mi)
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="optional"
+                        value={segment.paceHighSec}
+                        onChange={(e) =>
+                          setEditSegments((prev) =>
+                            prev.map((s) =>
+                              s.clientKey === segment.clientKey
+                                ? { ...s, paceHighSec: e.target.value }
+                                : s
+                            )
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      />
+                    </label>
+                  </div>
+                  <label className="block">
+                    <span className="text-xs font-semibold uppercase text-gray-500">Notes</span>
+                    <input
+                      type="text"
+                      value={segment.notes}
+                      onChange={(e) =>
+                        setEditSegments((prev) =>
+                          prev.map((s) =>
+                            s.clientKey === segment.clientKey
+                              ? { ...s, notes: e.target.value }
+                              : s
+                          )
+                        )
+                      }
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </label>
+                </div>
+              ))}
+              {editSegments.length === 0 && (
+                <p className="text-sm text-gray-600">Add at least one segment to save.</p>
+              )}
+            </div>
+          ) : workout.segments && workout.segments.length > 0 ? (
             <div className="space-y-4">
               {sortedSegments.map((segment, segIdx) => {
                 const structBadge = segmentStructureBadge(
@@ -1073,6 +1669,104 @@ export default function WorkoutDetailPage() {
             <p className="text-gray-600">No segments defined</p>
           )}
         </div>
+
+        {repeatModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4 bg-black/40"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="repeat-workout-title"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) setRepeatModalOpen(false);
+            }}
+          >
+            <div className="w-full max-w-md rounded-2xl bg-white shadow-xl p-6 space-y-4">
+              <h2 id="repeat-workout-title" className="text-lg font-semibold text-gray-900">
+                Repeat / copy workout
+              </h2>
+              <p className="text-sm text-gray-600">
+                Create standalone copies with the same structure. They won&apos;t be tied to your
+                plan calendar.
+              </p>
+              <label className="block">
+                <span className="text-xs font-semibold uppercase text-gray-500">First date</span>
+                <input
+                  type="date"
+                  value={repeatFirstDate}
+                  onChange={(e) => setRepeatFirstDate(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold uppercase text-gray-500">
+                  Total occurrences (1–13)
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={13}
+                  value={repeatOccurrences}
+                  onChange={(e) =>
+                    setRepeatOccurrences(
+                      Math.min(13, Math.max(1, parseInt(e.target.value, 10) || 1))
+                    )
+                  }
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold uppercase text-gray-500">
+                  Days between copies
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={repeatIntervalDays}
+                  onChange={(e) =>
+                    setRepeatIntervalDays(
+                      Math.min(365, Math.max(1, parseInt(e.target.value, 10) || 7))
+                    )
+                  }
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </label>
+              {repeatPreviewDates.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold uppercase text-gray-500 mb-1">Preview</p>
+                  <ul className="text-sm text-gray-800 list-disc pl-5 space-y-0.5">
+                    {repeatPreviewDates.map((d) => (
+                      <li key={d}>{d}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {repeatError && (
+                <p className="text-sm text-red-600" role="alert">
+                  {repeatError}
+                </p>
+              )}
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRepeatModalOpen(false)}
+                  disabled={repeatSubmitting}
+                  className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void submitRepeat()}
+                  disabled={repeatSubmitting}
+                  className="flex-1 rounded-xl bg-orange-600 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+                >
+                  {repeatSubmitting ? "Creating…" : "Create copies"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
         </main>
       </div>

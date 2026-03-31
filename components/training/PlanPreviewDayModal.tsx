@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { formatPlanDateDisplay, ymdFromDate } from "@/lib/training/plan-utils";
@@ -261,6 +262,13 @@ export default function PlanPreviewDayModal({
             Browsing your plan: use the buttons below when you&apos;re ready to set up this run on
             your watch or log it — that opens the full workout screen.
           </p>
+          <Link
+            href={`/workouts/${workoutId}?edit=1`}
+            className="inline-flex text-sm font-semibold text-orange-700 hover:text-orange-900 underline-offset-2 hover:underline"
+            onClick={() => onClose()}
+          >
+            Customize this workout
+          </Link>
         </div>
 
         <div className="border-t border-gray-100 px-5 py-4 space-y-3 bg-gray-50/60">
