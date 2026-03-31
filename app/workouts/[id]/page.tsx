@@ -15,7 +15,7 @@ import {
   parsePaceToSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
-import { formatPlanDateDisplay } from "@/lib/training/plan-utils";
+import { formatPlanDateDisplay, ymdFromDate } from "@/lib/training/plan-utils";
 
 interface WorkoutSegment {
   id: string;
@@ -86,6 +86,8 @@ interface Workout {
   derivedPerformanceDirection?: string | null;
   evaluationEligibleFlag?: boolean;
   matched_activity?: MatchedActivitySummary | null;
+  planId?: string | null;
+  weekNumber?: number | null;
   training_plans?: {
     id: string;
     name: string;
@@ -122,6 +124,32 @@ function formatWorkoutScheduleLong(iso: string | null | undefined): string | nul
     month: "long",
     day: "numeric",
   });
+}
+
+function workoutCalendarYmd(iso: string | null | undefined): string | null {
+  if (iso == null || iso === "") return null;
+  const raw = iso.trim();
+  if (raw.length >= 10 && raw[4] === "-" && raw[7] === "-") return raw.slice(0, 10);
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+function dayRelativeToToday(workoutDate: string | null | undefined): "today" | "past" | "future" | "none" {
+  const ymd = workoutCalendarYmd(workoutDate);
+  if (!ymd) return "none";
+  const today = ymdFromDate(new Date());
+  if (ymd === today) return "today";
+  if (ymd < today) return "past";
+  return "future";
+}
+
+function estimatedMiDisplay(meters: number | null | undefined): string | null {
+  if (meters == null || !Number.isFinite(meters) || meters <= 0) return null;
+  const mi = meters / 1609.34;
+  if (mi >= 10) return `${Math.round(mi)} mi`;
+  if (mi >= 1) return `${mi.toFixed(1)} mi`;
+  return `${Math.round(mi * 5280)} ft`;
 }
 
 function paceSecFromAnchor(
@@ -413,7 +441,7 @@ export default function WorkoutDetailPage() {
 
       setPushStatus({
         success: true,
-        message: "Workout sent to Garmin successfully.",
+        message: "Workout is set up on Garmin.",
         garminWorkoutId,
       });
       setGarminToast(
@@ -515,7 +543,7 @@ export default function WorkoutDetailPage() {
                   href="/workouts"
                   className="mt-4 inline-block text-orange-600 hover:text-orange-700"
                 >
-                  Back to Workouts
+                  Back to Go Train
                 </Link>
               </div>
             </div>
@@ -529,6 +557,16 @@ export default function WorkoutDetailPage() {
     workout.garminWorkoutId != null && workout.garminWorkoutId !== undefined;
 
   const scheduleLabel = formatWorkoutScheduleLong(workout.date);
+  const isLogged = Boolean(workout.matchedActivityId ?? workout.matched_activity);
+  const dayRel = dayRelativeToToday(workout.date);
+  const estMi = estimatedMiDisplay(workout.estimatedDistanceInMeters);
+  const planName = workout.training_plans?.name?.trim();
+  const weekOnPlan =
+    workout.weekNumber != null &&
+    Number.isFinite(workout.weekNumber) &&
+    workout.training_plans?.totalWeeks != null
+      ? `Week ${workout.weekNumber} of ${workout.training_plans.totalWeeks}`
+      : null;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -546,7 +584,7 @@ export default function WorkoutDetailPage() {
           <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm sm:text-base font-medium">
               <CheckCircle2 className="w-5 h-5 shrink-0" />
-              Workout saved. You can send it to Garmin when you&apos;re ready.
+              Workout saved. You can set it up on Garmin when you&apos;re ready.
             </div>
             <button
               type="button"
@@ -588,22 +626,41 @@ export default function WorkoutDetailPage() {
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
-          Back to Workouts
+          Back to Go Train
         </Link>
 
         <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                Workout detail
+              </p>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 break-words">
-                {displayWorkoutListTitle({ title: workout.title, workoutType: workout.workoutType, estimatedDistanceInMeters: workout.estimatedDistanceInMeters ?? null })}
+                {displayWorkoutListTitle({
+                  title: workout.title,
+                  workoutType: workout.workoutType,
+                  estimatedDistanceInMeters: workout.estimatedDistanceInMeters ?? null,
+                })}
               </h1>
-              {scheduleLabel && (
-                <p className="text-lg text-gray-700 font-medium mb-2">{scheduleLabel}</p>
-              )}
-              {workout.description && (
-                <p className="text-gray-600 mb-4 break-words">{workout.description}</p>
-              )}
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                {isLogged ? (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-900 rounded-full text-sm font-medium border border-emerald-200">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Completed
+                  </span>
+                ) : dayRel === "today" ? (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-orange-50 text-orange-900 rounded-full text-sm font-medium border border-orange-200">
+                    Today&apos;s workout
+                  </span>
+                ) : dayRel === "future" ? (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-sky-50 text-sky-900 rounded-full text-sm font-medium border border-sky-200">
+                    Planned
+                  </span>
+                ) : dayRel === "past" ? (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium border border-gray-200">
+                    Past session
+                  </span>
+                ) : null}
                 <span className="inline-block px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
                   {workout.workoutType}
                 </span>
@@ -614,59 +671,101 @@ export default function WorkoutDetailPage() {
                     {workout.garminWorkoutId != null ? ` (#${workout.garminWorkoutId})` : ""}
                   </span>
                 )}
-                {workout.matchedActivityId && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-900 rounded-full text-sm font-medium border border-emerald-200">
-                    <CheckCircle2 className="w-4 h-4" />
-                    Logged (matched activity)
-                  </span>
-                )}
               </div>
+              {scheduleLabel && (
+                <p className="text-lg text-gray-800 font-medium mb-1">
+                  {isLogged || dayRel === "today"
+                    ? scheduleLabel
+                    : dayRel === "future"
+                      ? `Planned for ${scheduleLabel}`
+                      : dayRel === "past"
+                        ? `Scheduled for ${scheduleLabel}`
+                        : scheduleLabel}
+                </p>
+              )}
+              {estMi && (
+                <p className="text-sm text-gray-600 mb-2">About {estMi} total (planned)</p>
+              )}
+              <p className="text-sm text-gray-600 mb-1">
+                <span className="font-medium text-gray-700">From:</span>{" "}
+                {planName || "Standalone run"}
+              </p>
+              {weekOnPlan && (
+                <p className="text-sm text-gray-500 mb-3">{weekOnPlan} on your plan</p>
+              )}
+              {workout.description && (
+                <p className="text-gray-600 text-sm border-t border-gray-100 pt-3 break-words">
+                  {workout.description}
+                </p>
+              )}
             </div>
 
-            <div className="shrink-0 w-full sm:w-auto flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={openShareJoinModal}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 border border-sky-600 text-sky-700 bg-white hover:bg-sky-50 rounded-lg font-medium transition-colors"
-              >
-                <Users className="w-5 h-5" />
-                Share / Join me
-              </button>
-              {alreadyOnGarmin ? (
+            <div className="shrink-0 w-full sm:w-auto sm:min-w-[220px] flex flex-col gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                  Run setup
+                </p>
+                {!isLogged ? (
+                  <>
+                    {alreadyOnGarmin ? (
+                      <button
+                        type="button"
+                        disabled
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-600 rounded-lg font-medium cursor-not-allowed border border-gray-200"
+                      >
+                        <CheckCircle2 className="w-5 h-5 text-green-600" />
+                        On Garmin already
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handlePushToGarmin}
+                        disabled={pushing}
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {pushing ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                            Sending…
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-5 h-5" />
+                            Set up on Garmin
+                          </>
+                        )}
+                      </button>
+                    )}
+                    <Link
+                      href="/settings/garmin"
+                      className="mt-2 block text-center text-sm font-medium text-gray-600 hover:text-orange-700"
+                    >
+                      Garmin and device settings
+                    </Link>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    This session is logged. Garmin setup isn&apos;t needed here—see the summary
+                    below.
+                  </p>
+                )}
+              </div>
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                  Social
+                </p>
                 <button
                   type="button"
-                  disabled
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-medium cursor-not-allowed border border-gray-200"
+                  onClick={openShareJoinModal}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 border border-sky-600 text-sky-700 bg-white hover:bg-sky-50 rounded-lg font-medium transition-colors"
                 >
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  Sent to Garmin
+                  <Users className="w-5 h-5" />
+                  Invite others to this run
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handlePushToGarmin}
-                  disabled={pushing}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {pushing ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                      Sending…
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-5 h-5" />
-                      Send to Garmin
-                    </>
-                  )}
-                </button>
-              )}
-              <Link
-                href="/settings/garmin"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 rounded-lg font-medium text-sm transition-colors text-center"
-              >
-                Garmin settings
-              </Link>
+                <p className="mt-1.5 text-xs text-gray-500">
+                  Creates a joinable city run from this workout so people can RSVP.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -702,6 +801,13 @@ export default function WorkoutDetailPage() {
           )}
         </div>
 
+        <div className="bg-white rounded-lg border border-dashed border-gray-200 p-6 mb-6">
+          <h2 className="text-sm font-semibold text-gray-900">Notes for this run</h2>
+          <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+            Space for things to think about, encouragement, or coach notes—coming soon.
+          </p>
+        </div>
+
         {showShareModal && (
           <div
             className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-black/40"
@@ -712,7 +818,7 @@ export default function WorkoutDetailPage() {
             <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6">
               <div className="flex items-start justify-between gap-2 mb-4">
                 <h2 id="share-join-title" className="text-lg font-semibold text-gray-900">
-                  Create a joinable run
+                  Invite others to this run
                 </h2>
                 <button
                   type="button"
@@ -724,8 +830,8 @@ export default function WorkoutDetailPage() {
                 </button>
               </div>
               <p className="text-sm text-gray-600 mb-4">
-                Creates a CityRun linked to this workout so friends can RSVP on{" "}
-                <span className="font-medium">/gorun</span> like any other run.
+                Share a joinable city run linked to this workout so friends can RSVP on{" "}
+                <span className="font-medium">/gorun</span>.
               </p>
               {shareRunId ? (
                 <div className="space-y-3">

@@ -35,7 +35,9 @@ const navItems: NavItem[] = [
     label: "Go Train",
     href: "/workouts",
     icon: Dumbbell,
-    match: (p) => p === "/workouts",
+    match: (p) =>
+      p === "/workouts" ||
+      (!!p?.startsWith("/workouts/") && p !== "/workouts/create"),
   },
   {
     label: "Build a Run",

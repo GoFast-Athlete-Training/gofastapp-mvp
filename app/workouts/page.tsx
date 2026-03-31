@@ -32,8 +32,21 @@ export default function WorkoutsPage() {
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Go Train</h1>
-              <p className="text-gray-600">
-                What&apos;s on your plan for today. Need a one-off session? Use{" "}
+              <p className="text-gray-600 leading-relaxed">
+                This is your hub for executing workouts. Open a session to see structure, set it up
+                on your watch, or invite others to join. Each workout opens as a{" "}
+                <span className="font-medium text-gray-800">workout detail</span> page with segments
+                and actions.
+              </p>
+              <p className="text-gray-600 mt-3">
+                Today&apos;s plan is below. Your full calendar lives under{" "}
+                <Link
+                  href="/training"
+                  className="font-medium text-orange-600 hover:text-orange-700"
+                >
+                  My Training
+                </Link>
+                . Need a one-off? Use{" "}
                 <Link
                   href="/build-a-run"
                   className="font-medium text-orange-600 hover:text-orange-700"
