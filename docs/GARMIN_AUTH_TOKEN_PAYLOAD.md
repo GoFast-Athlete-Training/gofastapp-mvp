@@ -54,7 +54,7 @@ On HTTP **401**, callers may invoke `refreshGarminToken(athleteId)` once and ret
 
 ## 5) Training API auth mode support
 
-Workout push supports:
+Workout push (`POST /api/workouts/[id]/push-to-garmin`) uses [`createGarminTrainingApiForAthlete`](../lib/garmin-workouts/garmin-training-api.ts) which reads:
 
 - `GARMIN_TRAINING_AUTH_MODE=bearer` (default): `Authorization: Bearer <garmin_access_token>`.
 - `GARMIN_TRAINING_AUTH_MODE=oauth1`: `Authorization: OAuth ...` (HMAC-SHA1). Requires:
@@ -63,7 +63,17 @@ Workout push supports:
   - `GARMIN_TRAINING_OAUTH_TOKEN_SECRET`  
   Uses `garmin_access_token` as `oauth_token`.
 
-## 6) Data model gap analysis
+On **401**, only **bearer** mode retries once after `refreshGarminToken(athleteId)`.
+
+## 6) Observability (412 / debugging)
+
+- Every non-OK Training API response is logged as one JSON line: `[GARMIN_TRAINING_API]` with `method`, `status`, `url`, `details`, and full `rawBody` (copy/paste for Garmin support).
+- On push failures, `[GARMIN_PUSH]` logs `status`, `details`, `rawBody`, `url`, and `tokenSummary` from [`summarizeGarminTokenForLogs`](../lib/garmin-access-token-claims.ts) (`client_id`, `scope`, `exp`, and whether `client_id` matches `GARMIN_CLIENT_ID`).
+- Set `GARMIN_DEBUG=true` so the push API JSON error response also includes `rawBody` and `tokenSummary` (omit in production unless debugging).
+
+Minimal workout smoke (auth vs payload): `npm run smoke:garmin-minimal -- <athleteId>` — uses [`minimalSmokeGarminWorkout`](../lib/garmin-workouts/minimal-smoke-workout.ts).
+
+## 7) Data model gap analysis
 
 For strict per-athlete OAuth1 support, we currently **do not store**:
 

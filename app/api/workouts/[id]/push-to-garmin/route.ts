@@ -2,19 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { assembleGarminWorkout } from "@/lib/garmin-workouts/garmin-training-service";
-import { GarminApiError, GarminTrainingApi } from "@/lib/garmin-workouts/garmin-training-api";
+import {
+  GarminApiError,
+  createGarminTrainingApiForAthlete,
+} from "@/lib/garmin-workouts/garmin-training-api";
 import { GarminNotConnectedError, requireGarminToken } from "@/lib/domain-garmin";
+import { summarizeGarminTokenForLogs } from "@/lib/garmin-access-token-claims";
 
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/workouts/[id]/push-to-garmin
- * Push a workout to Garmin Connect (production bearer token only).
+ * Push a workout to Garmin Connect (bearer or oauth1 via GARMIN_TRAINING_AUTH_MODE).
  */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let garminAccessTokenForLogs: string | undefined;
   try {
     const auth = await requireAthleteFromBearer(request);
     if ("error" in auth) {
@@ -47,6 +52,7 @@ export async function POST(
     }
 
     const token = await requireGarminToken(auth.athlete.id);
+    garminAccessTokenForLogs = token;
 
     const garminWorkout = assembleGarminWorkout({
       id: workout.id,
@@ -71,7 +77,7 @@ export async function POST(
       })),
     });
 
-    const client = new GarminTrainingApi(token, auth.athlete.id);
+    const client = createGarminTrainingApiForAthlete(auth.athlete.id, token);
     const result = await client.createWorkout(garminWorkout);
     const garminWorkoutId = result.workoutId;
 
@@ -94,11 +100,23 @@ export async function POST(
     }
 
     if (error instanceof GarminApiError) {
+      const logLine = {
+        status: error.status,
+        details: error.details,
+        rawBody: error.rawBody ?? null,
+        url: error.url,
+        tokenSummary: summarizeGarminTokenForLogs(garminAccessTokenForLogs),
+      };
+      console.error("[GARMIN_PUSH]", JSON.stringify(logLine));
+
+      const debug = process.env.GARMIN_DEBUG === "true";
       return NextResponse.json(
         {
           error: "Failed to push workout to Garmin",
           status: error.status,
           details: error.details,
+          ...(debug && error.rawBody !== undefined ? { rawBody: error.rawBody } : {}),
+          ...(debug ? { tokenSummary: summarizeGarminTokenForLogs(garminAccessTokenForLogs) } : {}),
         },
         { status: error.status }
       );

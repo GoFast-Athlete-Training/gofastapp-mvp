@@ -53,6 +53,47 @@ function normalizeAuth(
   return authConfig;
 }
 
+function trainingAuthModeFromEnv(): "bearer" | "oauth1" {
+  const m = (process.env.GARMIN_TRAINING_AUTH_MODE || "bearer").toLowerCase().trim();
+  if (m === "oauth1" || m === "oauth_1") return "oauth1";
+  return "bearer";
+}
+
+/**
+ * Build a Training API client for workout push using env `GARMIN_TRAINING_AUTH_MODE`.
+ * - bearer (default): OAuth2 access token in Authorization header; 401 → refresh + retry.
+ * - oauth1: HMAC-SHA1 header; uses `garmin_access_token` as oauth_token and global token secret env.
+ */
+export function createGarminTrainingApiForAthlete(
+  athleteId: string,
+  garminAccessToken: string
+): GarminTrainingApi {
+  const mode = trainingAuthModeFromEnv();
+  if (mode === "oauth1") {
+    const consumerKey = process.env.GARMIN_TRAINING_OAUTH_CONSUMER_KEY?.trim();
+    const consumerSecret = process.env.GARMIN_TRAINING_OAUTH_CONSUMER_SECRET?.trim();
+    const tokenSecret = process.env.GARMIN_TRAINING_OAUTH_TOKEN_SECRET?.trim();
+    if (!consumerKey || !consumerSecret || !tokenSecret) {
+      throw new Error(
+        "GARMIN_TRAINING_AUTH_MODE=oauth1 requires GARMIN_TRAINING_OAUTH_CONSUMER_KEY, GARMIN_TRAINING_OAUTH_CONSUMER_SECRET, and GARMIN_TRAINING_OAUTH_TOKEN_SECRET"
+      );
+    }
+    return new GarminTrainingApi(
+      {
+        mode: "oauth1",
+        oauth1: {
+          consumerKey,
+          consumerSecret,
+          token: garminAccessToken,
+          tokenSecret,
+        },
+      },
+      athleteId
+    );
+  }
+  return new GarminTrainingApi(garminAccessToken, athleteId);
+}
+
 /**
  * Training API client. For bearer auth with athleteId, createWorkout retries once on 401 after refreshGarminToken.
  */
@@ -140,6 +181,16 @@ export class GarminTrainingApi {
       } catch {
         if (raw) details = raw.slice(0, 500);
       }
+
+      const logPayload = {
+        method,
+        status: response.status,
+        url,
+        details: details || "Unknown error",
+        rawBody: raw ?? "",
+      };
+      console.error("[GARMIN_TRAINING_API]", JSON.stringify(logPayload));
+
       throw new GarminApiError({
         status: response.status,
         url,
