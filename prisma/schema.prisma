@@ -79,6 +79,11 @@ model Athlete {
   workouts                workouts[]
   athlete_goals           AthleteGoal[]
   athlete_race_signups    athlete_race_signups[]
+  race_memberships        race_memberships[]
+  race_messages           race_messages[]
+  race_announcements      race_announcements[]
+  race_events_organized   race_events[]            @relation("RaceEventOrganizer")
+  race_event_rsvps        race_event_rsvps[]
   training_preferences    TrainingPreferences?
   run_journal_entries     run_journal_entries[]
 }
@@ -279,6 +284,11 @@ model race_registry {
   race_trainer_groups      race_trainer_groups[]
   athlete_goals            AthleteGoal[]
   athlete_race_signups     athlete_race_signups[]
+  race_memberships         race_memberships[]
+  race_messages            race_messages[]
+  race_announcements       race_announcements[]
+  race_events              race_events[]
+  city_runs_tagged         city_runs[]               @relation("CityRunRaceRegistry")
 
   @@index([charitySupported])
   @@index([city, state])
@@ -338,6 +348,97 @@ model athlete_race_signups {
   @@index([athleteId])
   @@index([raceRegistryId])
   @@map("athlete_race_signups")
+}
+
+/// Join a race registry → access race chatter and container features (mirrors run_crew_memberships).
+model race_memberships {
+  id        String         @id @default(cuid())
+  raceId    String
+  athleteId String
+  role      RaceMemberRole @default(MEMBER)
+  joinedAt  DateTime       @default(now())
+
+  race_registry race_registry @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  Athlete       Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([raceId, athleteId])
+  @@index([raceId])
+  @@index([athleteId])
+  @@map("race_memberships")
+}
+
+/// Race-scoped chatter (mirrors run_crew_messages).
+model race_messages {
+  id        String   @id @default(cuid())
+  raceId    String
+  athleteId String
+  content   String
+  topic     String   @default("general")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  race_registry race_registry @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  Athlete       Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@index([raceId])
+  @@index([athleteId])
+  @@map("race_messages")
+}
+
+model race_announcements {
+  id         String    @id @default(cuid())
+  raceId     String
+  authorId   String
+  title      String
+  content    String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  race_registry race_registry @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  Athlete       Athlete       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([raceId])
+  @@map("race_announcements")
+}
+
+/// Race-day / training meetups tied to a race (mirrors run_crew_events).
+model race_events {
+  id                String   @id @default(cuid())
+  raceId            String
+  organizerId       String
+  title             String
+  date              DateTime
+  time              String
+  venue             String
+  address           String?
+  description       String?
+  additionalDetails String?
+  cost              Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  race_registry     race_registry      @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  organizer         Athlete            @relation("RaceEventOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
+  race_event_rsvps  race_event_rsvps[]
+
+  @@index([raceId])
+  @@index([date])
+  @@map("race_events")
+}
+
+model race_event_rsvps {
+  id        String   @id @default(cuid())
+  eventId   String
+  athleteId String
+  status    String
+  createdAt DateTime @default(now())
+
+  race_events race_events @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  Athlete     Athlete     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, athleteId])
+  @@map("race_event_rsvps")
 }
 
 /// Free-form training journal entries (Runner OS).
@@ -633,6 +734,8 @@ model city_runs {
   endCity             String?
   endState            String?
   runSeriesId         String?              // null = standalone; set = series occurrence (FK to run_series)
+  /// Optional: tag this run to a race registry (training for X marathon, etc.).
+  raceRegistryId      String?
   locationId          String?              // FK to run_locations (auto-seeded or manually linked)
   routeId             String?              // Optional saved route (reference path + media)
   workoutId           String?              // Optional structured workout for join-my-workout
@@ -643,6 +746,7 @@ model city_runs {
   run_crews           run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
   runClub             run_clubs?           @relation(fields: [runClubId], references: [id], onDelete: SetNull)
   runSeries           run_series?          @relation(fields: [runSeriesId], references: [id], onDelete: SetNull)
+  race_registry       race_registry?       @relation("CityRunRaceRegistry", fields: [raceRegistryId], references: [id], onDelete: SetNull)
   location            run_locations?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
   route               routes?              @relation(fields: [routeId], references: [id], onDelete: SetNull)
   workout             workouts?            @relation(fields: [workoutId], references: [id], onDelete: SetNull)
@@ -657,6 +761,7 @@ model city_runs {
   @@index([runCrewId])
   @@index([staffGeneratedId])
   @@index([runSeriesId])
+  @@index([raceRegistryId])
   @@index([locationId])
   @@index([routeId])
   @@index([workoutId])
@@ -902,6 +1007,8 @@ model workouts {
   evaluationEligibleFlag          Boolean             @default(false)
   /// Lap-based adaptive 5K credit applied once per workout (idempotent on detail re-ingest)
   adaptiveFiveKCreditAppliedAt    DateTime?
+  /// Public share path slug for /mytrainingruns/[slug] (e.g. acole842719); set when athlete creates a join link
+  slug                      String?             @unique
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
   Athlete                   Athlete             @relation(fields: [athleteId], references: [id], onDelete: Cascade)
@@ -972,6 +1079,12 @@ enum RunCrewRole {
   member
   admin
   manager
+}
+
+/// Role on race container (mirrors run crew admin/member semantics).
+enum RaceMemberRole {
+  MEMBER
+  ADMIN
 }
 
 enum State {
