@@ -55,6 +55,14 @@ export function ymdFromDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Local wall-clock calendar day (browser = user TZ). Use for "today" matching `dateKey` strings. */
+export function localYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 /**
  * Display a plan date string without shifting the calendar day (avoids UTC midnight / local tz bugs).
  * `ymd` is `YYYY-MM-DD` or any value parseable after appending local noon.

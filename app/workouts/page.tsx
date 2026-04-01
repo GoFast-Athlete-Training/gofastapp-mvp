@@ -11,7 +11,7 @@ import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import {
   currentTrainingWeekNumber,
   formatPlanDateDisplay,
-  ymdFromDate,
+  localYmd,
 } from "@/lib/training/plan-utils";
 import {
   fetchPlanWeekSchedule,
@@ -80,7 +80,7 @@ function TodaysPlanWorkout() {
   const [totalWeeks, setTotalWeeks] = useState<number | null>(null);
   const [opening, setOpening] = useState(false);
 
-  const todayKey = useMemo(() => ymdFromDate(new Date()), []);
+  const todayKey = useMemo(() => localYmd(new Date()), []);
 
   const load = useCallback(async () => {
     setLoading(true);

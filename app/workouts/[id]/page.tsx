@@ -42,7 +42,7 @@ import {
   structuredSegmentTotals,
 } from "@/lib/training/segment-summary";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
-import { formatPlanDateDisplay, ymdFromDate } from "@/lib/training/plan-utils";
+import { formatPlanDateDisplay, localYmd } from "@/lib/training/plan-utils";
 
 interface WorkoutSegment {
   id: string;
@@ -165,7 +165,7 @@ function workoutCalendarYmd(iso: string | null | undefined): string | null {
 function dayRelativeToToday(workoutDate: string | null | undefined): "today" | "past" | "future" | "none" {
   const ymd = workoutCalendarYmd(workoutDate);
   if (!ymd) return "none";
-  const today = ymdFromDate(new Date());
+  const today = localYmd(new Date());
   if (ymd === today) return "today";
   if (ymd < today) return "past";
   return "future";
@@ -652,7 +652,7 @@ export default function WorkoutDetailPage() {
   const openRepeatModal = () => {
     if (!workout) return;
     setRepeatError(null);
-    setRepeatFirstDate(workoutCalendarYmd(workout.date) ?? ymdFromDate(new Date()));
+    setRepeatFirstDate(workoutCalendarYmd(workout.date) ?? localYmd(new Date()));
     setRepeatOccurrences(2);
     setRepeatIntervalDays(7);
     setRepeatModalOpen(true);
@@ -857,7 +857,7 @@ export default function WorkoutDetailPage() {
 
   const planDateKeyFromNav = goTrainCtx?.dateKey ?? null;
   const isContextToday =
-    planDateKeyFromNav != null && planDateKeyFromNav === ymdFromDate(new Date());
+    planDateKeyFromNav != null && planDateKeyFromNav === localYmd(new Date());
   const navWeekLine =
     goTrainCtx?.weekNumber != null &&
     goTrainCtx?.totalWeeks != null &&

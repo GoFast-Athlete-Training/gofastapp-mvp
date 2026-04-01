@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { auth } from "@/lib/firebase";
-import { formatPlanDateDisplay, ymdFromDate } from "@/lib/training/plan-utils";
+import { formatPlanDateDisplay, localYmd } from "@/lib/training/plan-utils";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import { fetchTrainingWorkoutDetail, type PlanDayCard } from "@/lib/training/fetch-plan-week-client";
 
@@ -159,7 +159,7 @@ export default function PlanPreviewDayModal({
       })
     : "—";
 
-  const isToday = planDay.dateKey === ymdFromDate(new Date());
+  const isToday = planDay.dateKey === localYmd(new Date());
 
   const scheduleMi = metersToMiDisplay(planDay.estimatedDistanceInMeters);
   const title =
