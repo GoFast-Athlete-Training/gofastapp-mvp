@@ -22,6 +22,7 @@ import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import api from "@/lib/api";
 import InviteCityRunFromWorkoutModal from "@/components/cityruns/InviteCityRunFromWorkoutModal";
+import { LocalStorageAPI } from "@/lib/localstorage";
 import {
   formatPaceTargetRangeForDisplay,
   formatPaceTargetSingleForDisplay,
@@ -457,10 +458,8 @@ export default function WorkoutDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [savingEdits, setSavingEdits] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [editDateYmd, setEditDateYmd] = useState("");
   const [editDistanceMi, setEditDistanceMi] = useState("");
+  const [garminConnected, setGarminConnected] = useState<boolean | null>(null);
   const [editSegments, setEditSegments] = useState<EditableSegment[]>([]);
   const [repeatModalOpen, setRepeatModalOpen] = useState(false);
   const [repeatFirstDate, setRepeatFirstDate] = useState("");
@@ -502,12 +501,31 @@ export default function WorkoutDetailPage() {
     fetchWorkout();
   }, [workoutId]);
 
+  useEffect(() => {
+    const athleteId = LocalStorageAPI.getAthleteId();
+    if (!athleteId) {
+      setGarminConnected(false);
+      return;
+    }
+    let cancelled = false;
+    api
+      .get<{ athlete?: { garmin_connected?: boolean } }>(`/athlete/${athleteId}`)
+      .then((res) => {
+        if (cancelled) return;
+        const c = res.data?.athlete?.garmin_connected;
+        setGarminConnected(typeof c === "boolean" ? c : false);
+      })
+      .catch(() => {
+        if (!cancelled) setGarminConnected(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workoutId]);
+
   const startEdit = useCallback(() => {
     if (!workout) return;
     setEditError(null);
-    setEditTitle(workout.title);
-    setEditDescription(workout.description ?? "");
-    setEditDateYmd(workoutCalendarYmd(workout.date) ?? "");
     setEditDistanceMi(
       workout.estimatedDistanceInMeters != null &&
         workout.estimatedDistanceInMeters > 0
@@ -517,6 +535,11 @@ export default function WorkoutDetailPage() {
     const sorted = [...(workout.segments ?? [])].sort((a, b) => a.stepOrder - b.stepOrder);
     setEditSegments(sorted.map((s) => segmentToEditable(s)));
     setIsEditing(true);
+    requestAnimationFrame(() => {
+      document
+        .getElementById("workout-segments")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }, [workout]);
 
   const cancelEdit = useCallback(() => {
@@ -539,11 +562,6 @@ export default function WorkoutDetailPage() {
 
   const saveEdits = async () => {
     if (!workout) return;
-    const title = editTitle.trim();
-    if (!title) {
-      setEditError("Title is required");
-      return;
-    }
     let payload: ReturnType<typeof editableSegmentsToApiPayload>;
     try {
       if (editSegments.length === 0) {
@@ -573,9 +591,9 @@ export default function WorkoutDetailPage() {
 
     try {
       const patchBody: Record<string, unknown> = {
-        title,
-        description: editDescription.trim() || null,
-        date: editDateYmd.trim() ? editDateYmd.trim() : null,
+        title: workout.title,
+        description: workout.description?.trim() || null,
+        date: workoutCalendarYmd(workout.date) ?? null,
         estimatedDistanceInMeters,
       };
 
@@ -732,7 +750,7 @@ export default function WorkoutDetailPage() {
 
       setPushStatus({
         success: true,
-        message: "Workout is set up on Garmin.",
+        message: "Workout pushed to Garmin.",
         garminWorkoutId,
       });
       setGarminToast(
@@ -872,7 +890,7 @@ export default function WorkoutDetailPage() {
           <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm sm:text-base font-medium">
               <CheckCircle2 className="w-5 h-5 shrink-0" />
-              Workout saved. You can set it up on Garmin when you&apos;re ready.
+              Workout saved. Connect Garmin in Settings, then use Push to Garmin on this page.
             </div>
             <button
               type="button"
@@ -936,70 +954,19 @@ export default function WorkoutDetailPage() {
               Let&apos;s go do this!
             </p>
             <a
-              href="#run-setup"
+              href="#workout-segments"
               className="mt-4 inline-flex text-sm font-semibold text-orange-700 hover:text-orange-900 underline-offset-2 hover:underline"
             >
-              Jump to watch setup
+              Jump to workout steps
             </a>
           </div>
         )}
 
         <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 flex-1">
+          <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
                 Workout detail
               </p>
-              {!isLogged && (
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {!isEditing ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={startEdit}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50"
-                      >
-                        <Pencil className="w-4 h-4 shrink-0" />
-                        Edit workout
-                      </button>
-                      <button
-                        type="button"
-                        onClick={openRepeatModal}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50"
-                      >
-                        <Copy className="w-4 h-4 shrink-0" />
-                        Repeat / copy
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => void saveEdits()}
-                        disabled={savingEdits}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 disabled:opacity-50"
-                      >
-                        <Save className="w-4 h-4 shrink-0" />
-                        {savingEdits ? "Saving…" : "Save changes"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={cancelEdit}
-                        disabled={savingEdits}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-              {editError && (
-                <p className="text-sm text-red-600 mb-2" role="alert">
-                  {editError}
-                </p>
-              )}
-              {!isEditing ? (
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 break-words">
                 {displayWorkoutListTitle({
                   title: workout.title,
@@ -1007,58 +974,6 @@ export default function WorkoutDetailPage() {
                   estimatedDistanceInMeters: workout.estimatedDistanceInMeters ?? null,
                 })}
               </h1>
-              ) : (
-                <div className="space-y-3 mb-2">
-                  <label className="block">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      Title
-                    </span>
-                    <input
-                      type="text"
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-lg font-semibold text-gray-900"
-                    />
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <label className="block">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        Scheduled date
-                      </span>
-                      <input
-                        type="date"
-                        value={editDateYmd}
-                        onChange={(e) => setEditDateYmd(e.target.value)}
-                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        Total distance (mi, optional)
-                      </span>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={editDistanceMi}
-                        onChange={(e) => setEditDistanceMi(e.target.value)}
-                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                        placeholder="e.g. 6.5"
-                      />
-                    </label>
-                  </div>
-                  <label className="block">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      Description
-                    </span>
-                    <textarea
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      rows={3}
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800"
-                    />
-                  </label>
-                </div>
-              )}
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 {isLogged ? (
                   <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-900 rounded-full text-sm font-medium border border-emerald-200">
@@ -1081,15 +996,8 @@ export default function WorkoutDetailPage() {
                 <span className="inline-block px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
                   {workout.workoutType}
                 </span>
-                {alreadyOnGarmin && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-50 text-green-800 rounded-full text-sm font-medium border border-green-200">
-                    <CheckCircle2 className="w-4 h-4" />
-                    On Garmin
-                    {workout.garminWorkoutId != null ? ` (#${workout.garminWorkoutId})` : ""}
-                  </span>
-                )}
               </div>
-              {scheduleLabel && !isEditing && (
+              {scheduleLabel && (
                 <p className="text-lg text-gray-800 font-medium mb-1">
                   {isLogged || dayRel === "today"
                     ? scheduleLabel
@@ -1100,7 +1008,7 @@ export default function WorkoutDetailPage() {
                         : scheduleLabel}
                 </p>
               )}
-              {estMi && !isEditing && (
+              {estMi && (
                 <p className="text-sm text-gray-600 mb-2">About {estMi} total (planned)</p>
               )}
               <p className="text-sm text-gray-600 mb-1">
@@ -1110,84 +1018,79 @@ export default function WorkoutDetailPage() {
               {weekOnPlan && (
                 <p className="text-sm text-gray-500 mb-3">{weekOnPlan} on your plan</p>
               )}
-              {workout.description && !isEditing && (
+              {workout.description && (
                 <p className="text-gray-600 text-sm border-t border-gray-100 pt-3 break-words">
                   {workout.description}
                 </p>
               )}
-            </div>
+          </div>
+        </div>
 
-            <div
-              id="run-setup"
-              className="scroll-mt-24 shrink-0 w-full sm:w-auto sm:min-w-[220px] flex flex-col gap-4"
-            >
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-                  Run setup
-                </p>
-                {!isLogged ? (
-                  <>
-                    {alreadyOnGarmin ? (
-                      <button
-                        type="button"
-                        disabled
-                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-600 rounded-lg font-medium cursor-not-allowed border border-gray-200"
-                      >
-                        <CheckCircle2 className="w-5 h-5 text-green-600" />
-                        On Garmin already
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handlePushToGarmin}
-                        disabled={pushing}
-                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {pushing ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                            Sending…
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-5 h-5" />
-                            Set up on Garmin
-                          </>
-                        )}
-                      </button>
-                    )}
-                    <Link
-                      href="/settings/garmin"
-                      className="mt-2 block text-center text-sm font-medium text-gray-600 hover:text-orange-700"
-                    >
-                      Garmin and device settings
-                    </Link>
-                  </>
-                ) : (
-                  <p className="text-sm text-gray-600 leading-relaxed">
-                    This session is logged. Garmin setup isn&apos;t needed here—see the summary
-                    below.
-                  </p>
-                )}
-              </div>
-              <div className="border-t border-gray-100 pt-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-                  Social
-                </p>
+        {!isLogged && (
+          <div
+            id="workout-garmin"
+            className="rounded-lg border border-gray-200 bg-gray-50/90 px-4 py-3 mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between scroll-mt-24"
+          >
+            <div className="text-sm text-gray-700 min-w-0">
+              {garminConnected === null ? (
+                <span className="text-gray-500">Checking Garmin connection…</span>
+              ) : !garminConnected ? (
+                <>
+                  <span className="font-medium text-gray-900">Garmin not connected.</span>{" "}
+                  Connect in Settings to push this workout to your watch.
+                </>
+              ) : alreadyOnGarmin ? (
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                  <span>
+                    On Garmin
+                    {workout.garminWorkoutId != null ? ` (workout #${workout.garminWorkoutId})` : ""}
+                  </span>
+                </span>
+              ) : (
+                <span>Garmin is connected—you can push this workout to your watch.</span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0 justify-start sm:justify-end">
+              {garminConnected === true && !alreadyOnGarmin && (
                 <button
                   type="button"
-                  onClick={() => setShowInviteModal(true)}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 border border-sky-600 text-sky-700 bg-white hover:bg-sky-50 rounded-lg font-medium transition-colors"
+                  onClick={handlePushToGarmin}
+                  disabled={pushing}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50"
                 >
-                  <Users className="w-5 h-5" />
-                  Invite others to this workout
+                  {pushing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-700" />
+                      Sending…
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      Push to Garmin
+                    </>
+                  )}
                 </button>
-                <p className="mt-1.5 text-xs text-gray-500">
-                  Creates a CityRun linked to this workout with a shareable link and RSVP on /gorun.
-                </p>
-              </div>
+              )}
+              {!garminConnected && garminConnected !== null && (
+                <Link
+                  href="/settings/garmin"
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700"
+                >
+                  Connect Garmin
+                </Link>
+              )}
+              {garminConnected && (
+                <Link
+                  href="/settings/garmin"
+                  className="text-sm font-medium text-gray-600 hover:text-orange-700 underline-offset-2 hover:underline"
+                >
+                  Garmin settings
+                </Link>
+              )}
             </div>
           </div>
+        )}
 
           {pushStatus && (
             <div
@@ -1219,145 +1122,65 @@ export default function WorkoutDetailPage() {
               </div>
             </div>
           )}
-        </div>
 
-        <div className="bg-white rounded-lg border border-dashed border-gray-200 p-6 mb-6">
-          <h2 className="text-sm font-semibold text-gray-900">Notes for this run</h2>
-          <p className="text-sm text-gray-500 mt-2 leading-relaxed">
-            Space for things to think about, encouragement, or coach notes—coming soon.
-          </p>
-        </div>
-
-        <InviteCityRunFromWorkoutModal
-          open={showInviteModal}
-          onClose={() => setShowInviteModal(false)}
-          workout={workout}
-        />
-
-        {(workout.matchedActivityId || workout.matched_activity) && (
-          <div className="bg-white rounded-lg border border-emerald-200 p-6 mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">Completed run</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              This plan workout was linked to an activity from your watch (Garmin sync). Targets below
-              are compared when pace data is available.
-            </p>
-            {workout.matched_activity && (
-              <div className="text-sm text-gray-700 mb-4 space-y-1">
-                <p>
-                  <span className="font-medium text-gray-900">Activity:</span>{" "}
-                  {workout.matched_activity.activityName || "Run"} ·{" "}
-                  {workout.matched_activity.startTime
-                    ? new Date(workout.matched_activity.startTime).toLocaleString()
-                    : "—"}
-                </p>
-                <p>
-                  <span className="font-medium text-gray-900">Ingest status:</span>{" "}
-                  {workout.matched_activity.ingestionStatus}
-                </p>
+        <div
+          id="workout-segments"
+          className="bg-white rounded-lg border border-gray-200 p-6 mb-6 scroll-mt-24"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
+            <h2 className="text-xl font-semibold text-gray-900">Segments & miles</h2>
+            {isEditing && (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void saveEdits()}
+                  disabled={savingEdits}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4 shrink-0" />
+                  {savingEdits ? "Saving…" : "Save changes"}
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  disabled={savingEdits}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
               </div>
             )}
-            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              {workout.actualDistanceMeters != null && workout.actualDistanceMeters > 0 && (
-                <div>
-                  <dt className="text-gray-500">Distance</dt>
-                  <dd className="font-medium text-gray-900">
-                    {(workout.actualDistanceMeters / 1609.34).toFixed(2)} mi
-                  </dd>
-                </div>
-              )}
-              {formatSecPerMile(workout.actualAvgPaceSecPerMile) && (
-                <div>
-                  <dt className="text-gray-500">Avg pace</dt>
-                  <dd className="font-medium text-gray-900">
-                    {formatSecPerMile(workout.actualAvgPaceSecPerMile)}
-                  </dd>
-                </div>
-              )}
-              {workout.actualDurationSeconds != null && workout.actualDurationSeconds > 0 && (
-                <div>
-                  <dt className="text-gray-500">Duration</dt>
-                  <dd className="font-medium text-gray-900">
-                    {Math.round(workout.actualDurationSeconds / 60)} min
-                  </dd>
-                </div>
-              )}
-              {workout.derivedPerformanceDeltaSeconds != null && (
-                <div>
-                  <dt className="text-gray-500">Vs main target (pace)</dt>
-                  <dd className="font-medium text-gray-900">
-                    {workout.derivedPerformanceDeltaSeconds > 0
-                      ? `${workout.derivedPerformanceDeltaSeconds}s/mi faster than target`
-                      : workout.derivedPerformanceDeltaSeconds < 0
-                        ? `${Math.abs(workout.derivedPerformanceDeltaSeconds)}s/mi slower than target`
-                        : "On target"}
-                    {workout.derivedPerformanceDirection
-                      ? ` (${workout.derivedPerformanceDirection})`
-                      : ""}
-                  </dd>
-                </div>
-              )}
-            </dl>
-            {workout.training_plans?.currentFiveKPace && (
-              <p className="text-xs text-gray-500 mt-4">
-                Plan baseline 5K (snapshot): {workout.training_plans.currentFiveKPace}
-              </p>
-            )}
           </div>
-        )}
-
-        {workout.workout_catalogue &&
-          workout.workoutType !== "Intervals" &&
-          workout.workoutType !== "Tempo" && (
-          <CataloguePrescriptionCard
-            catalogue={workout.workout_catalogue}
-            fiveKPaceSnapshot={workout.training_plans?.currentFiveKPace}
-            estimatedDistanceInMeters={workout.estimatedDistanceInMeters ?? null}
-          />
-        )}
-
-        {(planDayMi != null || structuredMiLine !== "") && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Volume</h2>
-            <ul className="text-sm text-gray-800 space-y-2 list-none p-0 m-0">
-              {planDayMi != null && (
-                <li>
-                  <span className="font-medium text-gray-900">Day total (plan): </span>
-                  ~{planDayMi.toFixed(1)} mi
-                </li>
-              )}
-              {structuredMiLine.length > 0 && (
-                <li>
-                  <span className="font-medium text-gray-900">Structured steps (watch): </span>
-                  {structuredMiLine}
-                </li>
-              )}
-            </ul>
-            {showVolumeGapNote && (
-              <p className="text-sm text-gray-600 mt-4 border-t border-gray-100 pt-4 leading-relaxed">
-                The steps below are the main pieces for your watch. If your plan lists more mileage
-                than these steps add up to, cover the difference with{" "}
-                <span className="font-medium text-gray-800">easy running</span> before and/or
-                after—common on quality days (e.g. short 5K-effort segment plus cool-down, with extra
-                easy miles to hit the day total).
-              </p>
-            )}
-          </div>
-        )}
-
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Segments</h2>
+          {editError && (
+            <p className="text-sm text-red-600 mb-3" role="alert">
+              {editError}
+            </p>
+          )}
           {!isEditing &&
             workout.workout_catalogue &&
             workout.workoutType !== "Intervals" &&
             workout.workoutType !== "Tempo" && (
               <p className="text-sm text-gray-500 mb-4">
-                Step-by-step breakdown (used for Garmin sync). The coach prescription above is the
-                human-readable plan.
+                Step-by-step structure for your watch and Garmin. A fuller coach prescription may
+                appear further down the page.
               </p>
             )}
 
           {isEditing ? (
             <div className="space-y-4">
+              <label className="block max-w-xs">
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Day total (planned miles, optional)
+                </span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={editDistanceMi}
+                  onChange={(e) => setEditDistanceMi(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="e.g. 6.5"
+                />
+              </label>
               <button
                 type="button"
                 onClick={addEditSegment}
@@ -1551,6 +1374,25 @@ export default function WorkoutDetailPage() {
               {editSegments.length === 0 && (
                 <p className="text-sm text-gray-600">Add at least one segment to save.</p>
               )}
+              <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => void saveEdits()}
+                  disabled={savingEdits}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4 shrink-0" />
+                  {savingEdits ? "Saving…" : "Save changes"}
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  disabled={savingEdits}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           ) : workout.segments && workout.segments.length > 0 ? (
             <div className="space-y-4">
@@ -1668,6 +1510,156 @@ export default function WorkoutDetailPage() {
           ) : (
             <p className="text-gray-600">No segments defined</p>
           )}
+          {!isLogged && !isEditing && (
+            <div className="border-t border-gray-200 mt-6 pt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={startEdit}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50"
+              >
+                <Pencil className="w-4 h-4 shrink-0" />
+                Edit workout
+              </button>
+              <button
+                type="button"
+                onClick={openRepeatModal}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50"
+              >
+                <Copy className="w-4 h-4 shrink-0" />
+                Repeat / copy
+              </button>
+            </div>
+          )}
+        </div>
+        <InviteCityRunFromWorkoutModal
+          open={showInviteModal}
+          onClose={() => setShowInviteModal(false)}
+          workout={workout}
+        />
+
+        {(workout.matchedActivityId || workout.matched_activity) && (
+          <div className="bg-white rounded-lg border border-emerald-200 p-6 mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-3">Completed run</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              This plan workout was linked to an activity from your watch (Garmin sync). Targets below
+              are compared when pace data is available.
+            </p>
+            {workout.matched_activity && (
+              <div className="text-sm text-gray-700 mb-4 space-y-1">
+                <p>
+                  <span className="font-medium text-gray-900">Activity:</span>{" "}
+                  {workout.matched_activity.activityName || "Run"} ·{" "}
+                  {workout.matched_activity.startTime
+                    ? new Date(workout.matched_activity.startTime).toLocaleString()
+                    : "—"}
+                </p>
+                <p>
+                  <span className="font-medium text-gray-900">Ingest status:</span>{" "}
+                  {workout.matched_activity.ingestionStatus}
+                </p>
+              </div>
+            )}
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              {workout.actualDistanceMeters != null && workout.actualDistanceMeters > 0 && (
+                <div>
+                  <dt className="text-gray-500">Distance</dt>
+                  <dd className="font-medium text-gray-900">
+                    {(workout.actualDistanceMeters / 1609.34).toFixed(2)} mi
+                  </dd>
+                </div>
+              )}
+              {formatSecPerMile(workout.actualAvgPaceSecPerMile) && (
+                <div>
+                  <dt className="text-gray-500">Avg pace</dt>
+                  <dd className="font-medium text-gray-900">
+                    {formatSecPerMile(workout.actualAvgPaceSecPerMile)}
+                  </dd>
+                </div>
+              )}
+              {workout.actualDurationSeconds != null && workout.actualDurationSeconds > 0 && (
+                <div>
+                  <dt className="text-gray-500">Duration</dt>
+                  <dd className="font-medium text-gray-900">
+                    {Math.round(workout.actualDurationSeconds / 60)} min
+                  </dd>
+                </div>
+              )}
+              {workout.derivedPerformanceDeltaSeconds != null && (
+                <div>
+                  <dt className="text-gray-500">Vs main target (pace)</dt>
+                  <dd className="font-medium text-gray-900">
+                    {workout.derivedPerformanceDeltaSeconds > 0
+                      ? `${workout.derivedPerformanceDeltaSeconds}s/mi faster than target`
+                      : workout.derivedPerformanceDeltaSeconds < 0
+                        ? `${Math.abs(workout.derivedPerformanceDeltaSeconds)}s/mi slower than target`
+                        : "On target"}
+                    {workout.derivedPerformanceDirection
+                      ? ` (${workout.derivedPerformanceDirection})`
+                      : ""}
+                  </dd>
+                </div>
+              )}
+            </dl>
+            {workout.training_plans?.currentFiveKPace && (
+              <p className="text-xs text-gray-500 mt-4">
+                Plan baseline 5K (snapshot): {workout.training_plans.currentFiveKPace}
+              </p>
+            )}
+          </div>
+        )}
+
+        {workout.workout_catalogue &&
+          workout.workoutType !== "Intervals" &&
+          workout.workoutType !== "Tempo" && (
+          <CataloguePrescriptionCard
+            catalogue={workout.workout_catalogue}
+            fiveKPaceSnapshot={workout.training_plans?.currentFiveKPace}
+            estimatedDistanceInMeters={workout.estimatedDistanceInMeters ?? null}
+          />
+        )}
+
+        {(planDayMi != null || structuredMiLine !== "") && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">Volume</h2>
+            <ul className="text-sm text-gray-800 space-y-2 list-none p-0 m-0">
+              {planDayMi != null && (
+                <li>
+                  <span className="font-medium text-gray-900">Day total (plan): </span>
+                  ~{planDayMi.toFixed(1)} mi
+                </li>
+              )}
+              {structuredMiLine.length > 0 && (
+                <li>
+                  <span className="font-medium text-gray-900">Structured steps (watch): </span>
+                  {structuredMiLine}
+                </li>
+              )}
+            </ul>
+            {showVolumeGapNote && (
+              <p className="text-sm text-gray-600 mt-4 border-t border-gray-100 pt-4 leading-relaxed">
+                The structured steps above are what sync to your watch. If your plan lists more mileage
+                than those steps add up to, cover the difference with{" "}
+                <span className="font-medium text-gray-800">easy running</span> before and/or
+                after—common on quality days (e.g. short 5K-effort segment plus cool-down, with extra
+                easy miles to hit the day total).
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Social</p>
+          <button
+            type="button"
+            onClick={() => setShowInviteModal(true)}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 border border-sky-600 text-sky-700 bg-white hover:bg-sky-50 rounded-lg font-medium transition-colors"
+          >
+            <Users className="w-5 h-5" />
+            Invite others to this workout
+          </button>
+          <p className="mt-1.5 text-xs text-gray-500">
+            Creates a CityRun linked to this workout with a shareable link and RSVP on /gorun.
+          </p>
         </div>
 
         {repeatModalOpen && (
