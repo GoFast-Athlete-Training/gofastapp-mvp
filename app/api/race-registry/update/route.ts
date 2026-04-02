@@ -169,18 +169,6 @@ export async function POST(request: NextRequest) {
       racePayload.state != null
         ? String(racePayload.state).trim() || null
         : null;
-    const street =
-      racePayload.streetAddress != null
-        ? String(racePayload.streetAddress).trim()
-        : "";
-    const addr =
-      racePayload.address != null ? String(racePayload.address).trim() : "";
-    const address = street || addr || null;
-
-    const venueName =
-      racePayload.venueName != null
-        ? String(racePayload.venueName).trim() || null
-        : null;
     const description =
       racePayload.description != null
         ? String(racePayload.description).trim() || null
@@ -189,20 +177,9 @@ export async function POST(request: NextRequest) {
       racePayload.registrationUrl != null
         ? String(racePayload.registrationUrl).trim() || null
         : null;
-    const courseMapUrl =
-      racePayload.courseMapUrl != null
-        ? String(racePayload.courseMapUrl).trim() || null
-        : null;
-    const charitySupports =
-      racePayload.charitySupports != null
-        ? String(racePayload.charitySupports).trim() || null
-        : null;
-    const raceUrl =
-      racePayload.raceUrl != null
-        ? String(racePayload.raceUrl).trim() || null
-        : null;
 
-    const tags = tagsFromPayload(racePayload);
+    /** Slim sync: course, charity, venue, keywords, external URLs stay on company only. */
+    const tagList = tagsFromPayload(racePayload);
     const logoUrl = logoUrlFromPayload(racePayload);
     const startTimeParsed = parseRegistryStartTime(
       raceDate,
@@ -218,15 +195,10 @@ export async function POST(request: NextRequest) {
       isVirtual,
       city: locationCity,
       state,
-      address,
-      startLocation: venueName,
       description,
       registrationUrl,
-      courseMapUrl,
-      charityName: charitySupports,
-      officialWebsiteUrl: raceUrl,
       companyRaceId,
-      tags,
+      ...(tagList.length > 0 ? { tags: tagList } : {}),
       logoUrl,
       ...(startTimeParsed ? { startTime: startTimeParsed } : {}),
       updatedAt: new Date(),

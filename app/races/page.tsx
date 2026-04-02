@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/firebase";
@@ -48,6 +48,7 @@ export default function RacesBrowsePage() {
   const [dateTo, setDateTo] = useState("");
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [submittingRaceId, setSubmittingRaceId] = useState<string | null>(null);
+  const addIntentHandled = useRef(false);
 
   const signedRaceIds = useMemo(
     () => new Set(signups.map((s) => s.raceRegistryId)),
@@ -100,14 +101,7 @@ export default function RacesBrowsePage() {
     loadCatalog();
   }, [loadCatalog]);
 
-  useEffect(() => {
-    const unsub = auth.onAuthStateChanged((user) => {
-      if (!user) router.replace("/signup");
-    });
-    return () => unsub();
-  }, [router]);
-
-  async function onAddToCalendar(raceId: string) {
+  const onAddToCalendar = useCallback(async (raceId: string) => {
     setSubmittingRaceId(raceId);
     try {
       const { data } = await api.post<{ signup: Signup }>("/race-signups", {
@@ -124,7 +118,35 @@ export default function RacesBrowsePage() {
     } finally {
       setSubmittingRaceId(null);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(
+      typeof window !== "undefined" ? window.location.search : ""
+    );
+    const addId = params.get("add")?.trim() ?? null;
+
+    const unsub = auth.onAuthStateChanged((user) => {
+      if (!user) {
+        if (addId) {
+          router.replace(
+            `/signup?redirect=${encodeURIComponent(`/races?add=${addId}`)}`
+          );
+        } else {
+          router.replace("/signup");
+        }
+        return;
+      }
+      if (addId && !addIntentHandled.current) {
+        addIntentHandled.current = true;
+        void (async () => {
+          await onAddToCalendar(addId);
+          router.replace("/races");
+        })();
+      }
+    });
+    return () => unsub();
+  }, [router, onAddToCalendar]);
 
   return (
     <div>
