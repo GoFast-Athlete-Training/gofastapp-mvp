@@ -1,8 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { adminAuth } from '@/lib/firebaseAdmin';
-import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
+import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
 import { prisma } from '@/lib/prisma';
 
 /**
@@ -20,22 +19,11 @@ export async function GET(request: Request) {
       Math.max(1, limitRaw ? parseInt(limitRaw, 10) || 200 : 200)
     );
 
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireAthleteFromBearer(request);
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-
-    let decodedToken;
-    try {
-      decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    } catch {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    const athlete = await getAthleteByFirebaseId(decodedToken.uid);
-    if (!athlete) {
-      return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
-    }
+    const { athlete } = auth;
 
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);

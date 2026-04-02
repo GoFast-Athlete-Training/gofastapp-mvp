@@ -2,7 +2,6 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
-import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
 import { getRuns } from '@/lib/domain-runs';
 
 /**
@@ -36,13 +35,6 @@ export async function GET(request: Request) {
     } catch {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
-
-    // For GoFastCompany staff, athlete check is optional
-    // Staff users from GoFastCompany don't need to be athletes
-    const athlete = await getAthleteByFirebaseId(decodedToken.uid).catch(() => null);
-    
-    // If not an athlete, allow access anyway (likely GoFastCompany staff)
-    // This enables GoFastCompany dashboard to view CityRuns
 
     // Parse query params
     const { searchParams } = new URL(request.url);

@@ -1,8 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth } from "@/lib/firebaseAdmin";
-import { getAthleteByFirebaseId } from "@/lib/domain-athlete";
+import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { prisma } from "@/lib/prisma";
 
 /** GET /api/race-registry/[id] — one registry row for authenticated athlete (prefill Goals / setup). */
@@ -11,14 +10,9 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const decoded = await adminAuth.verifyIdToken(authHeader.substring(7));
-    const athlete = await getAthleteByFirebaseId(decoded.uid);
-    if (!athlete) {
-      return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
+    const auth = await requireAthleteFromBearer(request);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const { id } = await context.params;

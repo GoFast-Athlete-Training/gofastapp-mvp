@@ -1,8 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { adminAuth } from '@/lib/firebaseAdmin';
-import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
+import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
 import { hydrateCrew } from '@/lib/domain-runcrew';
 
 // POST /api/runcrew/[id]/transfer-ownership - Transfer ownership to another member
@@ -26,31 +25,11 @@ export async function POST(
       return NextResponse.json({ error: 'Missing newOwnerMembershipId' }, { status: 400 });
     }
 
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireAthleteFromBearer(request);
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-
-    let decodedToken;
-    try {
-      decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    } catch {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    const firebaseId = decodedToken.uid;
-
-    let athlete;
-    try {
-      athlete = await getAthleteByFirebaseId(firebaseId);
-    } catch (err) {
-      console.error('Prisma error:', err);
-      return NextResponse.json({ error: 'DB error' }, { status: 500 });
-    }
-
-    if (!athlete) {
-      return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
-    }
+    const { athlete } = auth;
 
     // Verify user is admin
     let crew;

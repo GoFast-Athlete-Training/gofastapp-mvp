@@ -1,8 +1,7 @@
 export const dynamic = 'force-dynamic';
 
-import { NextResponse } from 'next/server';
-import { adminAuth } from '@/lib/firebaseAdmin';
-import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
 import { refreshGarminToken } from '@/lib/garmin-refresh-token';
 import { GarminNotConnectedError, requireGarminToken } from '@/lib/domain-garmin';
 import { prisma } from '@/lib/prisma';
@@ -21,24 +20,13 @@ function generateId(): string {
  *
  * Manual sync endpoint for pulling recent activities from Garmin.
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireAthleteFromBearer(request);
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-
-    let decodedToken;
-    try {
-      decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    } catch {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    const athlete = await getAthleteByFirebaseId(decodedToken.uid);
-    if (!athlete) {
-      return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
-    }
+    const { athlete } = auth;
 
     const hasProd =
       !!(athlete.garmin_access_token?.trim()) && !!(athlete.garmin_user_id?.trim());

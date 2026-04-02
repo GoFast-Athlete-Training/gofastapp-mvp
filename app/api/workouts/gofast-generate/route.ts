@@ -1,8 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { getAthleteByFirebaseId } from "@/lib/domain-athlete";
-import { adminAuth } from "@/lib/firebaseAdmin";
+import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import {
   parsePaceToSecondsPerMile,
   getTrainingPaces,
@@ -53,16 +52,11 @@ export interface GoFastGenerateNeedsPace {
  */
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireAthleteFromBearer(request);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-
-    const decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    const athlete = await getAthleteByFirebaseId(decodedToken.uid);
-    if (!athlete) {
-      return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
-    }
+    const { athlete } = auth;
 
     const body = (await request.json()) as { workoutType?: string };
     const workoutType = body.workoutType ?? "Easy";

@@ -1,8 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { adminAuth } from '@/lib/firebaseAdmin';
-import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
+import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
 import { prisma } from '@/lib/prisma';
 
 function generateId() {
@@ -25,17 +24,11 @@ export async function GET(
       return NextResponse.json({ error: 'Missing run id' }, { status: 400 });
     }
 
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireAthleteFromBearer(request);
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-
-    let decodedToken;
-    try {
-      decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    } catch {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
+    const { athlete } = auth;
 
     const { searchParams } = new URL(request.url);
     const topic = searchParams.get('topic') || undefined;
@@ -43,12 +36,6 @@ export async function GET(
     const run = await prisma.city_runs.findUnique({ where: { id: runId }, select: { id: true } });
     if (!run) {
       return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
-    }
-
-    // RSVP = membership. Must be RSVP'd "going" to access participant features.
-    const athlete = await getAthleteByFirebaseId(decodedToken.uid);
-    if (!athlete) {
-      return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
     const membership = await prisma.city_run_rsvps.findUnique({
       where: { runId_athleteId: { runId, athleteId: athlete.id } },
@@ -93,22 +80,11 @@ export async function POST(
       body = await request.json();
     } catch {}
 
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireAthleteFromBearer(request);
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-
-    let decodedToken;
-    try {
-      decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    } catch {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    const athlete = await getAthleteByFirebaseId(decodedToken.uid);
-    if (!athlete) {
-      return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
-    }
+    const { athlete } = auth;
 
     const run = await prisma.city_runs.findUnique({ where: { id: runId }, select: { id: true } });
     if (!run) {

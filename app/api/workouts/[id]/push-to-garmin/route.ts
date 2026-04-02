@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * POST /api/workouts/[id]/push-to-garmin
- * Push a workout to Garmin Connect (bearer or oauth1 via GARMIN_TRAINING_AUTH_MODE).
+ * Auth: Firebase Bearer + x-athlete-id (see lib/api.ts). Pushes to Garmin Training API with the athlete's stored OAuth2 token.
  */
 export async function POST(
   request: NextRequest,

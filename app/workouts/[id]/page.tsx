@@ -11,7 +11,7 @@ import {
   Users,
   Pencil,
   Save,
-  Copy,
+  CalendarPlus,
   Plus,
   Trash2,
   ChevronUp,
@@ -703,8 +703,8 @@ export default function WorkoutDetailPage() {
       setRepeatModalOpen(false);
       setGarminToast(
         ids.length > 1
-          ? `Created ${ids.length} workouts. Open Go Train to see them.`
-          : "Workout copy created."
+          ? `Created ${ids.length} scheduled workouts. Open Go Train to see them.`
+          : "Scheduled copy on your calendar."
       );
     } catch (e) {
       const ax = e as { response?: { data?: { error?: string } } };
@@ -1525,8 +1525,8 @@ export default function WorkoutDetailPage() {
                 onClick={openRepeatModal}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50"
               >
-                <Copy className="w-4 h-4 shrink-0" />
-                Repeat / copy
+                <CalendarPlus className="w-4 h-4 shrink-0" aria-hidden />
+                Schedule copies
               </button>
             </div>
           )}
@@ -1686,18 +1686,23 @@ export default function WorkoutDetailPage() {
             className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4 bg-black/40"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="repeat-workout-title"
+            aria-labelledby="schedule-copies-title"
             onMouseDown={(e) => {
               if (e.target === e.currentTarget) setRepeatModalOpen(false);
             }}
           >
             <div className="w-full max-w-md rounded-2xl bg-white shadow-xl p-6 space-y-4">
-              <h2 id="repeat-workout-title" className="text-lg font-semibold text-gray-900">
-                Repeat / copy workout
+              <h2 id="schedule-copies-title" className="text-lg font-semibold text-gray-900">
+                Schedule copies on calendar
               </h2>
               <p className="text-sm text-gray-600">
-                Create standalone copies with the same structure. They won&apos;t be tied to your
-                plan calendar.
+                Create extra standalone workouts on the dates you pick—same structure as this
+                session, not linked to your training plan calendar.
+              </p>
+              <p className="text-sm text-gray-600">
+                To change interval reps (for example 4×800 to 5×800), use{" "}
+                <span className="font-medium text-gray-800">Edit workout</span> above. That
+                builder-style flow is where you adjust repeats per segment.
               </p>
               <label className="block">
                 <span className="text-xs font-semibold uppercase text-gray-500">First date</span>
@@ -1727,7 +1732,7 @@ export default function WorkoutDetailPage() {
               </label>
               <label className="block">
                 <span className="text-xs font-semibold uppercase text-gray-500">
-                  Days between copies
+                  Days between dates
                 </span>
                 <input
                   type="number"

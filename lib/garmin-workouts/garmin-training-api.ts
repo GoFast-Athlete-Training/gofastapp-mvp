@@ -1,12 +1,14 @@
 /**
  * Garmin Training API — HTTP client for workout CRUD / schedule.
  * Base path must include `/training-api` (not root `/workout`).
+ * Uses OAuth2 bearer tokens from connect flow (GARMIN_CLIENT_ID / GARMIN_CLIENT_SECRET for refresh only).
  * @see https://developer.garmin.com/gc-developer-program/training-api/
  */
 
 import { GarminWorkout, GarminWorkoutSchedule } from "./types";
-import { GarminOAuth1Config, generateGarminOAuthHeader } from "@/lib/integrations/garmin/auth";
 import { refreshGarminToken } from "@/lib/garmin-refresh-token";
+
+const GARMIN_TRAINING_API_BASE = "https://apis.garmin.com/training-api";
 
 export class GarminApiError extends Error {
   status: number;
@@ -29,114 +31,29 @@ export class GarminApiError extends Error {
   }
 }
 
-export type GarminAuthMode = "bearer" | "oauth1";
-
-export interface GarminClientAuthConfig {
-  mode: GarminAuthMode;
-  bearerToken?: string;
-  oauth1?: GarminOAuth1Config;
-}
-
-function defaultTrainingApiBase(): string {
-  return (
-    process.env.GARMIN_TRAINING_API_BASE?.replace(/\/$/, "") ||
-    "https://apis.garmin.com/training-api"
-  );
-}
-
-function normalizeAuth(
-  authConfig: GarminClientAuthConfig | string
-): GarminClientAuthConfig {
-  if (typeof authConfig === "string") {
-    return { mode: "bearer", bearerToken: authConfig };
-  }
-  return authConfig;
-}
-
-function trainingAuthModeFromEnv(): "bearer" | "oauth1" {
-  const m = (process.env.GARMIN_TRAINING_AUTH_MODE || "bearer").toLowerCase().trim();
-  if (m === "oauth1" || m === "oauth_1") return "oauth1";
-  return "bearer";
-}
-
-/**
- * Build a Training API client for workout push using env `GARMIN_TRAINING_AUTH_MODE`.
- * - bearer (default): OAuth2 access token in Authorization header; 401 → refresh + retry.
- * - oauth1: HMAC-SHA1 header; uses `garmin_access_token` as oauth_token and global token secret env.
- */
 export function createGarminTrainingApiForAthlete(
   athleteId: string,
   garminAccessToken: string
 ): GarminTrainingApi {
-  const mode = trainingAuthModeFromEnv();
-  if (mode === "oauth1") {
-    const consumerKey = process.env.GARMIN_TRAINING_OAUTH_CONSUMER_KEY?.trim();
-    const consumerSecret = process.env.GARMIN_TRAINING_OAUTH_CONSUMER_SECRET?.trim();
-    const tokenSecret = process.env.GARMIN_TRAINING_OAUTH_TOKEN_SECRET?.trim();
-    if (!consumerKey || !consumerSecret || !tokenSecret) {
-      throw new Error(
-        "GARMIN_TRAINING_AUTH_MODE=oauth1 requires GARMIN_TRAINING_OAUTH_CONSUMER_KEY, GARMIN_TRAINING_OAUTH_CONSUMER_SECRET, and GARMIN_TRAINING_OAUTH_TOKEN_SECRET"
-      );
-    }
-    return new GarminTrainingApi(
-      {
-        mode: "oauth1",
-        oauth1: {
-          consumerKey,
-          consumerSecret,
-          token: garminAccessToken,
-          tokenSecret,
-        },
-      },
-      athleteId
-    );
-  }
   return new GarminTrainingApi(garminAccessToken, athleteId);
 }
 
 /**
- * Training API client. For bearer auth with athleteId, createWorkout retries once on 401 after refreshGarminToken.
+ * Training API client. createWorkout retries once on 401 after refreshGarminToken.
  */
 export class GarminTrainingApi {
-  private authConfig: GarminClientAuthConfig;
-  private baseUrl: string;
-  private athleteIdForRefresh: string | null;
+  private bearerToken: string;
+  private readonly baseUrl: string;
+  private readonly athleteIdForRefresh: string | null;
 
   constructor(
-    authConfig: GarminClientAuthConfig | string,
+    bearerToken: string,
     athleteIdForRefresh?: string | null,
-    baseUrl?: string
+    baseUrl: string = GARMIN_TRAINING_API_BASE
   ) {
-    this.authConfig = normalizeAuth(authConfig);
+    this.bearerToken = bearerToken;
     this.athleteIdForRefresh = athleteIdForRefresh ?? null;
-    this.baseUrl = (baseUrl ?? defaultTrainingApiBase()).replace(/\/$/, "");
-  }
-
-  private getAuthorizationHeader(method: string, url: string, body?: unknown): string {
-    if (this.authConfig.mode === "oauth1") {
-      if (
-        !this.authConfig.oauth1?.consumerKey ||
-        !this.authConfig.oauth1.consumerSecret ||
-        !this.authConfig.oauth1.token ||
-        !this.authConfig.oauth1.tokenSecret
-      ) {
-        throw new Error("Missing Garmin OAuth1 credentials");
-      }
-      return generateGarminOAuthHeader({
-        method,
-        url,
-        consumerKey: this.authConfig.oauth1.consumerKey,
-        consumerSecret: this.authConfig.oauth1.consumerSecret,
-        token: this.authConfig.oauth1.token,
-        tokenSecret: this.authConfig.oauth1.tokenSecret,
-        body,
-      });
-    }
-
-    if (!this.authConfig.bearerToken) {
-      throw new Error("Missing Garmin bearer token");
-    }
-    return `Bearer ${this.authConfig.bearerToken}`;
+    this.baseUrl = baseUrl.replace(/\/$/, "");
   }
 
   private async request<T>(
@@ -147,7 +64,7 @@ export class GarminTrainingApi {
     const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
     const url = `${this.baseUrl}${path}`;
     const headers: HeadersInit = {
-      Authorization: this.getAuthorizationHeader(method, url, body),
+      Authorization: `Bearer ${this.bearerToken}`,
       "Content-Type": "application/json",
     };
 
@@ -217,15 +134,11 @@ export class GarminTrainingApi {
         !isRetry &&
         e instanceof GarminApiError &&
         e.status === 401 &&
-        this.athleteIdForRefresh &&
-        this.authConfig.mode === "bearer"
+        this.athleteIdForRefresh
       ) {
         const refreshed = await refreshGarminToken(this.athleteIdForRefresh);
         if (refreshed.success && refreshed.accessToken) {
-          this.authConfig = {
-            ...this.authConfig,
-            bearerToken: refreshed.accessToken,
-          };
+          this.bearerToken = refreshed.accessToken;
           return this.createWorkoutWithRetry(workout, true);
         }
       }

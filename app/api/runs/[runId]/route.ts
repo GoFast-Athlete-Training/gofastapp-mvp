@@ -2,7 +2,8 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
-import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
+import { getAthleteById } from '@/lib/domain-athlete';
+import { ATHLETE_ID_HEADER } from '@/lib/gofast-request-headers';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { normalizeWebsiteUrl, normalizeStravaUrl, normalizeInstagramUrl } from '@/lib/runclub-urls';
@@ -101,12 +102,16 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // For GoFastCompany staff, athlete check is optional
-    // Staff users from GoFastCompany don't need to be athletes
-    const athlete = await getAthleteByFirebaseId(decodedToken.uid).catch(() => null);
-    
-    // If not an athlete, allow access anyway (likely GoFastCompany staff)
-    // This enables GoFastCompany dashboard to view run details
+    // Optional session athlete (mobile); staff/dashboard may omit x-athlete-id.
+    let athlete: NonNullable<Awaited<ReturnType<typeof getAthleteById>>> | null = null;
+    const sessionAthleteId = request.headers.get(ATHLETE_ID_HEADER)?.trim();
+    if (sessionAthleteId) {
+      const byId = await getAthleteById(sessionAthleteId);
+      if (!byId || byId.firebaseId !== decodedToken.uid) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      athlete = byId;
+    }
 
     const { runId } = await params;
     console.log('[GET /api/runs/[runId]] Runtime info', {
@@ -730,13 +735,6 @@ export async function DELETE(
     } catch {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
-
-    // For GoFastCompany staff, athlete check is optional
-    // Staff users from GoFastCompany don't need to be athletes
-    const athlete = await getAthleteByFirebaseId(decodedToken.uid).catch(() => null);
-    
-    // If not an athlete, allow access anyway (likely GoFastCompany staff)
-    // This enables GoFastCompany dashboard to delete runs
 
     const { runId } = await params;
 

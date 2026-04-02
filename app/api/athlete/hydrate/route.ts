@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { adminAuth } from '@/lib/firebaseAdmin';
-import { getAthleteByFirebaseId, hydrateAthlete } from '@/lib/domain-athlete';
+import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
+import { hydrateAthlete } from '@/lib/domain-athlete';
 
 export async function POST(request: Request) {
   const timestamp = new Date().toISOString();
@@ -10,73 +10,18 @@ export async function POST(request: Request) {
   let firebaseId: string | null = null;
 
   try {
-    // Parse body safely
-    let body: any = {};
-    try {
-      body = await request.json();
-    } catch {}
-
-    // Get Firebase UID from header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      console.error(`❌ HYDRATE [${timestamp}]: Missing or invalid auth header`);
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Unauthorized' 
-      }, { status: 401 });
+    const authR = await requireAthleteFromBearer(request);
+    if ('error' in authR) {
+      const st = authR.status;
+      console.error(`❌ HYDRATE [${timestamp}]: Auth failed: ${authR.error} (${st})`);
+      return NextResponse.json(
+        { success: false, error: authR.error },
+        { status: st === 400 ? 400 : st }
+      );
     }
-
-    // Verify token
-    let decodedToken;
-    try {
-      decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-      firebaseId = decodedToken.uid;
-      console.log(`✅ HYDRATE [${timestamp}]: Token verified for UID: ${firebaseId}`);
-    } catch (err: any) {
-      console.error(`❌ HYDRATE [${timestamp}]: Token verification failed:`, err?.message);
-      console.error(`❌ HYDRATE [${timestamp}]: Error code:`, err?.code);
-      console.error(`❌ HYDRATE [${timestamp}]: Error name:`, err?.name);
-      
-      // Check if it's a Firebase Admin initialization error
-      if (err?.message?.includes('Firebase Admin env vars missing') || err?.message?.includes('Firebase Admin')) {
-        console.error(`❌ HYDRATE [${timestamp}]: Firebase Admin initialization failed`);
-        return NextResponse.json({ 
-          success: false, 
-          error: 'Firebase Admin initialization failed',
-          details: err?.message || 'Check Firebase environment variables'
-        }, { status: 500 });
-      }
-      
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Invalid token',
-        details: err?.message
-      }, { status: 401 });
-    }
-
-    // Find athlete
-    let athlete;
-    try {
-      athlete = await getAthleteByFirebaseId(firebaseId);
-    } catch (err: any) {
-      console.error(`❌ HYDRATE [${timestamp}]: Prisma error finding athlete:`, err?.message);
-      console.error(`❌ HYDRATE [${timestamp}]: UID: ${firebaseId}`);
-      console.error(`❌ HYDRATE [${timestamp}]: Method: ${method}`);
-      console.error(`❌ HYDRATE [${timestamp}]: Stack:`, err?.stack);
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Database error' 
-      }, { status: 500 });
-    }
-
-    // Athlete not found - return 404 with success: false
-    if (!athlete) {
-      console.log(`⚠️ HYDRATE [${timestamp}]: Athlete not found for UID: ${firebaseId}`);
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Athlete not found' 
-      }, { status: 404 });
-    }
+    const athlete = authR.athlete;
+    firebaseId = athlete.firebaseId;
+    console.log(`✅ HYDRATE [${timestamp}]: Session verified athleteId=${athlete.id} firebaseUid=${firebaseId}`);
 
     // Hydrate athlete
     let hydrated;

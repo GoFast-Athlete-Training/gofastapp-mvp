@@ -1,6 +1,5 @@
-import { NextResponse } from 'next/server';
-import { adminAuth } from '@/lib/firebaseAdmin';
-import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
 import { parseRace } from '@/lib/runsignup/raceParser';
 
 export const dynamic = 'force-dynamic';
@@ -15,46 +14,30 @@ export const fetchCache = 'force-no-store'; // Disable fetch caching
  * Verifies athleteId matches Firebase token for authorization.
  * Uses athlete's state to filter races.
  * 
- * Request body: { athleteId: string }
+ * Request body: optional `{ athleteId: string }` (must match x-athlete-id if sent).
  * 
  * Returns normalized list of upcoming events (limit 5 for MVP).
  */
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     // ============================================================
     // STAGE 0: GET ATHLETE LOCATION (for filtering)
     // ============================================================
     let filterState = 'VA'; // Default to Virginia
-    
-    // 1. Parse request body to get athleteId
+
+    const authR = await requireAthleteFromBearer(request);
+    if ('error' in authR) {
+      return NextResponse.json({ error: authR.error }, { status: authR.status });
+    }
+    const athlete = authR.athlete;
+
     let body: any = {};
     try {
       body = await request.json();
     } catch {}
-    
+
     const { athleteId } = body;
-    
-    // 2. Verify Firebase token (for authentication)
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    let decodedToken;
-    try {
-      decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    } catch {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    // 3. Get athlete and verify athleteId matches Firebase token
-    const athlete = await getAthleteByFirebaseId(decodedToken.uid);
-    if (!athlete) {
-      return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
-    }
-
-    // If athleteId provided, verify it matches
     if (athleteId && athlete.id !== athleteId) {
       return NextResponse.json({ error: 'Athlete ID mismatch' }, { status: 403 });
     }

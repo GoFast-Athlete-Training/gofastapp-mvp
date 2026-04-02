@@ -17,15 +17,6 @@
 		},
 		{
 			"path": "../../Ignite/IgniteBd-Next-combine"
-		},
-		{
-			"path": "../../Ignite/bdlangingpage"
-		},
-		{
-			"path": "../GoFastLanding"
-		},
-		{
-			"path": "../gofastbackendv2-fall2025"
 		}
 	],
 	"settings": {}

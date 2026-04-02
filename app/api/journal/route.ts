@@ -1,30 +1,21 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth } from "@/lib/firebaseAdmin";
-import { getAthleteByFirebaseId } from "@/lib/domain-athlete";
+import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { prisma } from "@/lib/prisma";
 
-async function athleteFromAuth(authHeader: string | null) {
-  if (!authHeader?.startsWith("Bearer ")) {
-    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+async function athleteFromRequest(request: NextRequest) {
+  const auth = await requireAthleteFromBearer(request);
+  if ("error" in auth) {
+    return { error: NextResponse.json({ error: auth.error }, { status: auth.status }) };
   }
-  try {
-    const decoded = await adminAuth.verifyIdToken(authHeader.substring(7));
-    const athlete = await getAthleteByFirebaseId(decoded.uid);
-    if (!athlete) {
-      return { error: NextResponse.json({ error: "Athlete not found" }, { status: 404 }) };
-    }
-    return { athlete };
-  } catch {
-    return { error: NextResponse.json({ error: "Invalid token" }, { status: 401 }) };
-  }
+  return { athlete: auth.athlete };
 }
 
 /** GET /api/journal — list journal entries for authenticated athlete (newest first) */
 export async function GET(request: NextRequest) {
   try {
-    const { athlete, error } = await athleteFromAuth(request.headers.get("authorization"));
+    const { athlete, error } = await athleteFromRequest(request);
     if (error) return error;
 
     const entries = await prisma.run_journal_entries.findMany({
@@ -46,7 +37,7 @@ export async function GET(request: NextRequest) {
 /** POST /api/journal — create entry { text, date? ISO string } */
 export async function POST(request: NextRequest) {
   try {
-    const { athlete, error } = await athleteFromAuth(request.headers.get("authorization"));
+    const { athlete, error } = await athleteFromRequest(request);
     if (error) return error;
 
     const body = await request.json().catch(() => ({}));

@@ -1,30 +1,18 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth } from "@/lib/firebaseAdmin";
-import { getAthleteByFirebaseId } from "@/lib/domain-athlete";
+import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { prisma } from "@/lib/prisma";
 import { askReikiCoach } from "@/lib/coach/reiki-coach";
 
 /** POST /api/ask-coach — { message: string } */
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireAthleteFromBearer(request);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-
-    let decoded;
-    try {
-      decoded = await adminAuth.verifyIdToken(authHeader.substring(7));
-    } catch {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    const athlete = await getAthleteByFirebaseId(decoded.uid);
-    if (!athlete) {
-      return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
-    }
+    const { athlete } = auth;
 
     const body = await request.json().catch(() => ({}));
     const message = typeof body.message === "string" ? body.message.trim() : "";

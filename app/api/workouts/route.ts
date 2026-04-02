@@ -1,30 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAthleteByFirebaseId } from "@/lib/domain-athlete";
-import { adminAuth } from "@/lib/firebaseAdmin";
+import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { parseOptionalWorkoutDate } from "@/lib/training/workout-date-parse";
 
 export const dynamic = "force-dynamic";
+
+/** YYYY-MM-DD → [start, end) in UTC for that calendar day */
+function utcDayRangeFromYmd(dateStr: string): { gte: Date; lt: Date } | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (y < 1970 || y > 2100 || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  return {
+    gte: new Date(Date.UTC(y, mo - 1, d, 0, 0, 0)),
+    lt: new Date(Date.UTC(y, mo - 1, d + 1, 0, 0, 0)),
+  };
+}
 
 /**
  * GET /api/workouts
  * List workouts for the authenticated athlete.
  * Optional: `?limit=20&offset=0` for pagination (max limit 100). When omitted, returns all (legacy).
  * Optional: `?standalone=1` — only workouts with no training plan (`planId` null).
+ * Optional: `?date=YYYY-MM-DD` — only workouts whose scheduled `date` falls on that calendar day (UTC).
  */
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireAthleteFromBearer(request);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-
-    const decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    const athlete = await getAthleteByFirebaseId(decodedToken.uid);
-    if (!athlete) {
-      return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
-    }
+    const { athlete } = auth;
 
     const { searchParams } = new URL(request.url);
     const limitRaw = searchParams.get("limit");
@@ -46,9 +54,14 @@ export async function GET(request: NextRequest) {
     }
 
     const standaloneOnly = searchParams.get("standalone") === "1";
+    const dateParam = searchParams.get("date");
+    const dateRange =
+      dateParam && dateParam.trim() ? utcDayRangeFromYmd(dateParam) : null;
+
     const where = {
       athleteId: athlete.id,
       ...(standaloneOnly ? { planId: null } : {}),
+      ...(dateRange ? { date: { gte: dateRange.gte, lt: dateRange.lt } } : {}),
     };
 
     const [workouts, total] = await Promise.all([
@@ -109,16 +122,11 @@ export async function GET(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireAthleteFromBearer(request);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-
-    const decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    const athlete = await getAthleteByFirebaseId(decodedToken.uid);
-    if (!athlete) {
-      return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
-    }
+    const { athlete } = auth;
 
     let body: unknown;
     try {
@@ -163,17 +171,11 @@ export async function DELETE(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireAthleteFromBearer(request);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-
-    const decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    const athlete = await getAthleteByFirebaseId(decodedToken.uid);
-    if (!athlete) {
-      return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
-    }
+    const { athlete } = auth;
 
     const body = await request.json();
     const {
