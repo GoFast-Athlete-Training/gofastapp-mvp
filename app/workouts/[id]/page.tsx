@@ -16,6 +16,7 @@ import {
   Trash2,
   ChevronUp,
   ChevronDown,
+  ListOrdered,
 } from "lucide-react";
 import Link from "next/link";
 import TopNav from "@/components/shared/TopNav";
@@ -537,7 +538,7 @@ export default function WorkoutDetailPage() {
     setIsEditing(true);
     requestAnimationFrame(() => {
       document
-        .getElementById("workout-segments")
+        .getElementById("segment-sequencer")
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }, [workout]);
@@ -954,10 +955,10 @@ export default function WorkoutDetailPage() {
               Let&apos;s go do this!
             </p>
             <a
-              href="#workout-segments"
+              href="#segment-sequencer"
               className="mt-4 inline-flex text-sm font-semibold text-orange-700 hover:text-orange-900 underline-offset-2 hover:underline"
             >
-              Jump to workout steps
+              Jump to segment sequencer
             </a>
           </div>
         )}
@@ -1124,11 +1125,11 @@ export default function WorkoutDetailPage() {
           )}
 
         <div
-          id="workout-segments"
+          id="segment-sequencer"
           className="bg-white rounded-lg border border-gray-200 p-6 mb-6 scroll-mt-24"
         >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
-            <h2 className="text-xl font-semibold text-gray-900">Segments & miles</h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-2">
+            <h2 className="text-xl font-semibold text-gray-900">Segment sequencer</h2>
             {isEditing && (
               <div className="flex flex-wrap gap-2">
                 <button
@@ -1151,6 +1152,17 @@ export default function WorkoutDetailPage() {
               </div>
             )}
           </div>
+          {isEditing && (
+            <p className="text-sm text-gray-600 mb-3">
+              Add blocks, set repeat counts (e.g. 4×800 → 5×800), and reorder—then save.
+            </p>
+          )}
+          {!isEditing && (
+            <p className="text-sm text-gray-600 mb-3">
+              Open the sequencer below to add steps, change repeats, or reorder what syncs to your
+              watch.
+            </p>
+          )}
           {editError && (
             <p className="text-sm text-red-600 mb-3" role="alert">
               {editError}
