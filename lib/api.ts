@@ -3,6 +3,8 @@
 import axios from 'axios';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { LocalStorageAPI } from './localstorage';
+import { ATHLETE_ID_HEADER } from './gofast-request-headers';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || '/api',
@@ -35,7 +37,12 @@ function waitForAuthUser(timeoutMs = 5000): Promise<import('firebase/auth').User
 
 // ── Request interceptor ────────────────────────────────────────────────────────
 api.interceptors.request.use(async (config) => {
-  // If a caller already set Authorization (e.g. explicit token pass), respect it
+  const aid = LocalStorageAPI.getAthleteId();
+  if (aid && config.headers[ATHLETE_ID_HEADER] == null) {
+    config.headers[ATHLETE_ID_HEADER] = aid;
+  }
+
+  // If a caller already set Authorization (e.g. explicit token pass), still return after athlete header
   if (config.headers['Authorization']) {
     return config;
   }
@@ -75,6 +82,10 @@ api.interceptors.response.use(
           const token = await user.getIdToken(true);
           config[RETRY_KEY] = true;
           config.headers['Authorization'] = `Bearer ${token}`;
+          const retryAid = LocalStorageAPI.getAthleteId();
+          if (retryAid) {
+            config.headers[ATHLETE_ID_HEADER] = retryAid;
+          }
           return api.request(config);
         } catch (refreshErr) {
           console.warn('API: Token refresh failed on 401 retry', refreshErr);

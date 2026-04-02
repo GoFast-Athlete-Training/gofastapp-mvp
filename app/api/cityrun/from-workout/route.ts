@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { adminAuth } from "@/lib/firebaseAdmin";
-import { getAthleteByFirebaseId } from "@/lib/domain-athlete";
+import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import {
   generateUniqueCityRunSlug,
   generateCityRunUrlPath,
   generateCityRunUrl,
 } from "@/lib/slug-utils";
+import { assignUniqueWorkoutShareSlug } from "@/lib/workout-public-slug";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +116,11 @@ type FromWorkoutBody = {
   endStreetAddress?: string | null;
   endCity?: string | null;
   endState?: string | null;
+  meetUpPlaceId?: string | null;
+  meetUpLat?: number | string | null;
+  meetUpLng?: number | string | null;
+  /** Group pace label e.g. "7:00-7:30" — stored on city_runs.pace */
+  pace?: string | null;
 };
 
 /**
@@ -124,16 +129,11 @@ type FromWorkoutBody = {
  */
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireAthleteFromBearer(request);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-
-    const decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    const athlete = await getAthleteByFirebaseId(decodedToken.uid);
-    if (!athlete) {
-      return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
-    }
+    const { athlete } = auth;
 
     const body = (await request.json()) as FromWorkoutBody;
     const {
@@ -156,6 +156,10 @@ export async function POST(request: NextRequest) {
       endStreetAddress,
       endCity,
       endState,
+      meetUpPlaceId,
+      meetUpLat,
+      meetUpLng,
+      pace: paceBody,
     } = body;
 
     if (!workoutId?.trim()) {
@@ -261,6 +265,19 @@ export async function POST(request: NextRequest) {
     };
     const parseMinute = parseHour;
 
+    const latNum =
+      meetUpLat != null && meetUpLat !== ""
+        ? Number(meetUpLat)
+        : null;
+    const lngNum =
+      meetUpLng != null && meetUpLng !== ""
+        ? Number(meetUpLng)
+        : null;
+    const meetUpLatFinal =
+      latNum != null && Number.isFinite(latNum) ? latNum : null;
+    const meetUpLngFinal =
+      lngNum != null && Number.isFinite(lngNum) ? lngNum : null;
+
     const createData: Record<string, unknown> = {
       id: generateId(),
       gofastCity: finalCitySlug,
@@ -285,15 +302,15 @@ export async function POST(request: NextRequest) {
       routeNeighborhood: null,
       runType: null,
       workoutDescription: workoutDescriptionHydrated,
-      meetUpPlaceId: null,
-      meetUpLat: null,
-      meetUpLng: null,
+      meetUpPlaceId: meetUpPlaceId?.trim() || null,
+      meetUpLat: meetUpLatFinal,
+      meetUpLng: meetUpLngFinal,
       endPoint: endPoint?.trim() || null,
       endStreetAddress: endStreetAddress?.trim() || null,
       endCity: endCity?.trim() || null,
       endState: endState?.trim() || null,
       totalMiles: totalMilesFromWorkout,
-      pace: null,
+      pace: paceBody?.trim() || null,
       stravaMapUrl: null,
       description: null,
       postRunActivity: null,
@@ -371,11 +388,34 @@ export async function POST(request: NextRequest) {
             return `${base.replace(/\/$/, "")}/gorun/${run.id}`;
           })();
 
+    const baseApp =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.NEXT_PUBLIC_CONTENT_PUBLIC_BASE_DOMAIN ||
+      "https://gofastapp.com";
+    const baseNorm = baseApp.replace(/\/$/, "");
+
+    const workoutRow = await prisma.workouts.findUnique({
+      where: { id: workout.id },
+      select: { slug: true },
+    });
+    let workoutSlug = workoutRow?.slug ?? null;
+    if (!workoutSlug?.trim()) {
+      workoutSlug = await assignUniqueWorkoutShareSlug({
+        workoutId: workout.id,
+        gofastHandle: athlete.gofastHandle,
+      });
+    }
+    const workoutPath = `/mytrainingruns/${workoutSlug}`;
+    const workoutShareUrl = `${baseNorm}${workoutPath}`;
+
     return NextResponse.json({
       cityRunId: run.id,
       slug: run.slug,
       path,
       shareUrl,
+      workoutSlug,
+      workoutPath,
+      workoutShareUrl,
     });
   } catch (error: unknown) {
     const err = error as { message?: string };

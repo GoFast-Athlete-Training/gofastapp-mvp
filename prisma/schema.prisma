@@ -215,6 +215,10 @@ model prompt_instructions {
   @@index([promptId, order])
 }
 
+// TODO(race-prep): Athlete-facing course preview / training-plan tie-in may need a
+// race_registry_courses junction or companyRaceId reference to structured course data.
+// Company remains canonical for course geometry; do not duplicate until feature is scoped.
+
 model race_registry {
   id                      String                    @id
   name                    String

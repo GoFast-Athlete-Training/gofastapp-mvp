@@ -113,6 +113,11 @@ export async function GET(request: NextRequest, context: Ctx) {
               averageSpeed: true,
             },
           },
+          city_runs: {
+            select: { id: true, date: true, createdAt: true },
+            orderBy: { createdAt: "desc" },
+            take: 3,
+          },
         },
       });
 

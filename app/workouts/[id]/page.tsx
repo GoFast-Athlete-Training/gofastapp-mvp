@@ -21,7 +21,6 @@ import Link from "next/link";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import api from "@/lib/api";
-import InviteCityRunFromWorkoutModal from "@/components/cityruns/InviteCityRunFromWorkoutModal";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import {
   formatPaceTargetRangeForDisplay,
@@ -122,6 +121,8 @@ interface Workout {
     currentFiveKPace?: string | null;
     lifecycleStatus?: string;
   } | null;
+  slug?: string | null;
+  city_runs?: Array<{ id: string; date: string; createdAt?: string }>;
 }
 
 function formatSecPerMile(sec: number | null | undefined): string | null {
@@ -453,7 +454,6 @@ export default function WorkoutDetailPage() {
   } | null>(null);
   const [showCreatedBanner, setShowCreatedBanner] = useState(false);
   const [garminToast, setGarminToast] = useState<string | null>(null);
-  const [showInviteModal, setShowInviteModal] = useState(false);
 
   const [isEditing, setIsEditing] = useState(false);
   const [savingEdits, setSavingEdits] = useState(false);
@@ -1531,12 +1531,6 @@ export default function WorkoutDetailPage() {
             </div>
           )}
         </div>
-        <InviteCityRunFromWorkoutModal
-          open={showInviteModal}
-          onClose={() => setShowInviteModal(false)}
-          workout={workout}
-        />
-
         {(workout.matchedActivityId || workout.matched_activity) && (
           <div className="bg-white rounded-lg border border-emerald-200 p-6 mb-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-3">Completed run</h2>
@@ -1649,16 +1643,41 @@ export default function WorkoutDetailPage() {
 
         <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Social</p>
-          <button
-            type="button"
-            onClick={() => setShowInviteModal(true)}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 border border-sky-600 text-sky-700 bg-white hover:bg-sky-50 rounded-lg font-medium transition-colors"
-          >
-            <Users className="w-5 h-5" />
-            Invite others to this workout
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
+            {workout.city_runs && workout.city_runs.length > 0 ? (
+              <Link
+                href={`/gorun/${workout.city_runs[0].id}`}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 border border-emerald-600 text-emerald-700 bg-white hover:bg-emerald-50 rounded-lg font-medium transition-colors"
+              >
+                <Users className="w-5 h-5" />
+                Manage Your Run
+              </Link>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => router.push(`/workouts/${workout.id}/let-others-join`)}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 border border-sky-600 text-sky-700 bg-white hover:bg-sky-50 rounded-lg font-medium transition-colors"
+            >
+              <Users className="w-5 h-5" />
+              {workout.city_runs && workout.city_runs.length > 0
+                ? "Add Another Meetup"
+                : "Let Others Join this Workout"}
+            </button>
+          </div>
+          {workout.slug ? (
+            <p className="mt-2 text-xs text-gray-600">
+              Training share page:{" "}
+              <Link
+                href={`/mytrainingruns/${workout.slug}`}
+                className="text-sky-700 font-medium underline"
+              >
+                /mytrainingruns/{workout.slug}
+              </Link>
+            </p>
+          ) : null}
           <p className="mt-1.5 text-xs text-gray-500">
-            Creates a CityRun linked to this workout with a shareable link and RSVP on /gorun.
+            Set a meetup spot and time; friends get a CityRun link to RSVP and a page that shows your
+            workout structure.
           </p>
         </div>
 
