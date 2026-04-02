@@ -9,9 +9,7 @@ import {
   AlertCircle,
   X,
   Users,
-  Pencil,
   Save,
-  CalendarPlus,
   Plus,
   Trash2,
   ChevronUp,
@@ -416,6 +414,51 @@ function editableSegmentsToApiPayload(segments: EditableSegment[]) {
   });
 }
 
+/** "m:ss" per mile → seconds per mile */
+function parsePaceMinSecPerMileInput(s: string): number | null {
+  const t = s.trim();
+  const m = /^(\d+):(\d{1,2})$/.exec(t);
+  if (!m) return null;
+  const min = Number(m[1]);
+  const sec = Number(m[2]);
+  if (!Number.isFinite(min) || !Number.isFinite(sec) || sec >= 60) return null;
+  return min * 60 + sec;
+}
+
+function paceInputValueFromSecPerMile(sec: number | null | undefined): string {
+  if (sec == null || !Number.isFinite(sec) || sec <= 0) return "";
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function getPaceSecsFromSegment(seg: WorkoutSegment): {
+  low: number | null;
+  high: number | null;
+} {
+  const pace = seg.targets?.find((t) => (t.type || "").toUpperCase() === "PACE");
+  if (!pace) return { low: null, high: null };
+  if (pace.valueLow != null && Number.isFinite(Number(pace.valueLow))) {
+    const low = Number(pace.valueLow);
+    const high =
+      pace.valueHigh != null && Number.isFinite(Number(pace.valueHigh))
+        ? Number(pace.valueHigh)
+        : null;
+    return { low, high };
+  }
+  if (pace.value != null && Number.isFinite(Number(pace.value))) {
+    const v = Number(pace.value);
+    return { low: v, high: null };
+  }
+  return { low: null, high: null };
+}
+
+type SegmentQuickOverride = {
+  repeatCount?: number;
+  paceLowSec?: number;
+  paceHighSec?: number;
+};
+
 function formatTargetLine(target: NonNullable<WorkoutSegment["targets"]>[0]): string {
   const type = (target.type || "").toUpperCase();
   if (type === "PACE") {
@@ -462,12 +505,17 @@ export default function WorkoutDetailPage() {
   const [editDistanceMi, setEditDistanceMi] = useState("");
   const [garminConnected, setGarminConnected] = useState<boolean | null>(null);
   const [editSegments, setEditSegments] = useState<EditableSegment[]>([]);
-  const [repeatModalOpen, setRepeatModalOpen] = useState(false);
-  const [repeatFirstDate, setRepeatFirstDate] = useState("");
-  const [repeatOccurrences, setRepeatOccurrences] = useState(2);
-  const [repeatIntervalDays, setRepeatIntervalDays] = useState(7);
-  const [repeatSubmitting, setRepeatSubmitting] = useState(false);
-  const [repeatError, setRepeatError] = useState<string | null>(null);
+  const [quickOrderIds, setQuickOrderIds] = useState<string[]>([]);
+  const [segmentOverrides, setSegmentOverrides] = useState<
+    Record<string, SegmentQuickOverride>
+  >({});
+  const [savingQuick, setSavingQuick] = useState(false);
+  const [quickEditError, setQuickEditError] = useState<string | null>(null);
+
+  const sortedSegments = useMemo(() => {
+    if (!workout?.segments?.length) return [];
+    return [...workout.segments].sort((a, b) => a.stepOrder - b.stepOrder);
+  }, [workout?.segments]);
 
   const goTrainCtx = useMemo(
     () => parseGoTrainNavContext(searchParams),
@@ -501,6 +549,13 @@ export default function WorkoutDetailPage() {
   useEffect(() => {
     fetchWorkout();
   }, [workoutId]);
+
+  useEffect(() => {
+    if (!workout?.id) return;
+    setQuickOrderIds([]);
+    setSegmentOverrides({});
+    setQuickEditError(null);
+  }, [workout?.id]);
 
   useEffect(() => {
     const athleteId = LocalStorageAPI.getAthleteId();
@@ -650,70 +705,120 @@ export default function WorkoutDetailPage() {
     });
   };
 
-  const openRepeatModal = () => {
-    if (!workout) return;
-    setRepeatError(null);
-    setRepeatFirstDate(workoutCalendarYmd(workout.date) ?? localYmd(new Date()));
-    setRepeatOccurrences(2);
-    setRepeatIntervalDays(7);
-    setRepeatModalOpen(true);
-  };
+  const getQuickOrderedSegments = useCallback((): WorkoutSegment[] => {
+    const base = sortedSegments;
+    if (base.length === 0) return [];
+    const ids = quickOrderIds.length > 0 ? quickOrderIds : base.map((s) => s.id);
+    const map = new Map(base.map((s) => [s.id, s]));
+    return ids.map((id) => map.get(id)).filter((s): s is WorkoutSegment => s != null);
+  }, [sortedSegments, quickOrderIds]);
 
-  const repeatPreviewDates = useMemo(() => {
-    const ymd = repeatFirstDate.trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return [];
-    const base = new Date(Date.UTC(
-      parseInt(ymd.slice(0, 4), 10),
-      parseInt(ymd.slice(5, 7), 10) - 1,
-      parseInt(ymd.slice(8, 10), 10),
-      12,
-      0,
-      0
-    ));
-    if (Number.isNaN(base.getTime())) return [];
-    const n = Math.min(13, Math.max(1, repeatOccurrences));
-    const iv = Math.min(365, Math.max(1, repeatIntervalDays));
-    const out: string[] = [];
-    for (let i = 0; i < n; i++) {
-      const d = new Date(base.getTime());
-      d.setUTCDate(d.getUTCDate() + i * iv);
-      out.push(d.toISOString().slice(0, 10));
-    }
-    return out;
-  }, [repeatFirstDate, repeatOccurrences, repeatIntervalDays]);
+  const defaultSegmentOrderIds = useMemo(
+    () => sortedSegments.map((s) => s.id),
+    [sortedSegments]
+  );
 
-  const submitRepeat = async () => {
-    if (!workout) return;
-    const ymd = repeatFirstDate.trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
-      setRepeatError("Pick a valid start date");
-      return;
-    }
-    const n = Math.min(13, Math.max(1, repeatOccurrences));
-    const repeatCount = n - 1;
-    const iv = Math.min(365, Math.max(1, repeatIntervalDays));
-    setRepeatSubmitting(true);
-    setRepeatError(null);
-    try {
-      const res = await api.post(`/workouts/${workoutId}/duplicate`, {
-        date: ymd,
-        repeatCount,
-        repeatIntervalDays: iv,
+  const quickOrderDirty = useMemo(() => {
+    if (quickOrderIds.length === 0) return false;
+    if (quickOrderIds.length !== defaultSegmentOrderIds.length) return true;
+    return quickOrderIds.some((id, i) => id !== defaultSegmentOrderIds[i]);
+  }, [quickOrderIds, defaultSegmentOrderIds]);
+
+  const quickOverridesDirty = Object.keys(segmentOverrides).length > 0;
+  const quickEditDirty = quickOrderDirty || quickOverridesDirty;
+
+  const swapQuickSegment = useCallback(
+    (displayIndex: number, dir: -1 | 1) => {
+      const base = sortedSegments.map((s) => s.id);
+      const ids = quickOrderIds.length > 0 ? [...quickOrderIds] : [...base];
+      const j = displayIndex + dir;
+      if (j < 0 || j >= ids.length) return;
+      const a = ids[displayIndex]!;
+      const b = ids[j]!;
+      ids[displayIndex] = b;
+      ids[j] = a;
+      setQuickOrderIds(ids);
+    },
+    [sortedSegments, quickOrderIds]
+  );
+
+  const adjustQuickRepeat = useCallback(
+    (segmentId: string, delta: number) => {
+      setSegmentOverrides((prev) => {
+        const seg = sortedSegments.find((s) => s.id === segmentId);
+        if (!seg) return prev;
+        const prevOv = prev[segmentId];
+        const current = prevOv?.repeatCount ?? seg.repeatCount ?? 1;
+        const next = Math.min(20, Math.max(1, current + delta));
+        return { ...prev, [segmentId]: { ...prevOv, repeatCount: next } };
       });
-      const ids = (res.data as { workoutIds?: string[] })?.workoutIds ?? [];
-      setRepeatModalOpen(false);
-      setGarminToast(
-        ids.length > 1
-          ? `Created ${ids.length} scheduled workouts. Open Go Train to see them.`
-          : "Scheduled copy on your calendar."
-      );
-    } catch (e) {
-      const ax = e as { response?: { data?: { error?: string } } };
-      setRepeatError(ax.response?.data?.error || "Could not create copies");
+    },
+    [sortedSegments]
+  );
+
+  const updateQuickPaceField = useCallback(
+    (segmentId: string, field: "low" | "high", raw: string) => {
+      const parsed = parsePaceMinSecPerMileInput(raw);
+      setSegmentOverrides((prev) => {
+        const o = { ...prev[segmentId] };
+        if (parsed == null) {
+          if (field === "low") delete o.paceLowSec;
+          else delete o.paceHighSec;
+        } else if (field === "low") {
+          o.paceLowSec = parsed;
+        } else {
+          o.paceHighSec = parsed;
+        }
+        const hasAny =
+          o.repeatCount != null || o.paceLowSec != null || o.paceHighSec != null;
+        if (!hasAny) {
+          const { [segmentId]: _, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, [segmentId]: o };
+      });
+    },
+    []
+  );
+
+  const saveQuickSegments = useCallback(async () => {
+    if (!workout) return;
+    setSavingQuick(true);
+    setQuickEditError(null);
+    try {
+      const ordered = getQuickOrderedSegments();
+      if (ordered.length === 0) {
+        setQuickEditError("No segments to save");
+        return;
+      }
+      const editable: EditableSegment[] = ordered.map((seg) => {
+        const o = segmentOverrides[seg.id];
+        const base = segmentToEditable(seg);
+        let repeatCount = base.repeatCount;
+        if (o?.repeatCount != null) {
+          repeatCount = o.repeatCount > 1 ? String(o.repeatCount) : "";
+        }
+        let paceLowSec = base.paceLowSec;
+        let paceHighSec = base.paceHighSec;
+        if (o?.paceLowSec != null) paceLowSec = String(Math.round(o.paceLowSec));
+        if (o?.paceHighSec != null) paceHighSec = String(Math.round(o.paceHighSec));
+        return { ...base, repeatCount, paceLowSec, paceHighSec };
+      });
+      const payload = editableSegmentsToApiPayload(editable);
+      await api.put(`/workouts/${workoutId}/segments`, payload);
+      setQuickOrderIds([]);
+      setSegmentOverrides({});
+      const response = await api.get<{ workout: Workout }>(`/training/workout/${workoutId}`);
+      const w = response.data?.workout;
+      if (w) setWorkout(w);
+      setGarminToast("Workout steps saved.");
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { error?: string } } };
+      setQuickEditError(ax.response?.data?.error || "Could not save segments");
     } finally {
-      setRepeatSubmitting(false);
+      setSavingQuick(false);
     }
-  };
+  }, [workout, getQuickOrderedSegments, segmentOverrides, workoutId]);
 
   const fetchWorkout = async () => {
     try {
@@ -836,9 +941,6 @@ export default function WorkoutDetailPage() {
   const backHref = goTrainCtx ? backHrefFromGoTrainContext(goTrainCtx) : "/workouts";
   const backLabel = goTrainCtx ? backLabelFromGoTrainContext(goTrainCtx) : "Back to Go Train";
 
-  const sortedSegments = [...(workout.segments ?? [])].sort(
-    (a, b) => a.stepOrder - b.stepOrder
-  );
   const structuredTotals = structuredSegmentTotals(sortedSegments);
   const structuredParts = [
     formatStructuredMilesTotal(structuredTotals.miles),
@@ -1157,12 +1259,6 @@ export default function WorkoutDetailPage() {
               Add blocks, set repeat counts (e.g. 4×800 → 5×800), and reorder—then save.
             </p>
           )}
-          {!isEditing && (
-            <p className="text-sm text-gray-600 mb-3">
-              Open the sequencer below to add steps, change repeats, or reorder what syncs to your
-              watch.
-            </p>
-          )}
           {editError && (
             <p className="text-sm text-red-600 mb-3" role="alert">
               {editError}
@@ -1173,8 +1269,10 @@ export default function WorkoutDetailPage() {
             workout.workoutType !== "Intervals" &&
             workout.workoutType !== "Tempo" && (
               <p className="text-sm text-gray-500 mb-4">
-                Step-by-step structure for your watch and Garmin. A fuller coach prescription may
-                appear further down the page.
+                Step-by-step structure for your watch and Garmin—use{" "}
+                <span className="font-medium text-gray-700">Segment sequencer</span> below to add
+                steps or change repeats. A fuller coach prescription may appear further down the
+                page.
               </p>
             )}
 
@@ -1408,35 +1506,96 @@ export default function WorkoutDetailPage() {
             </div>
           ) : workout.segments && workout.segments.length > 0 ? (
             <div className="space-y-4">
-              {sortedSegments.map((segment, segIdx) => {
+              {(isLogged ? sortedSegments : getQuickOrderedSegments()).map((segment, segIdx) => {
+                const displayList = isLogged ? sortedSegments : getQuickOrderedSegments();
                 const structBadge = segmentStructureBadge(
                   segment.title,
                   segIdx,
-                  sortedSegments.length
+                  displayList.length
                 );
+                const o = segmentOverrides[segment.id];
+                const effRepeat = o?.repeatCount ?? segment.repeatCount ?? 1;
+                const showRepeatStepper = !isLogged && effRepeat >= 2;
+                const { low: baseLow, high: baseHigh } = getPaceSecsFromSegment(segment);
+                const effLow = o?.paceLowSec ?? baseLow;
+                const effHigh = o?.paceHighSec ?? baseHigh;
+                const hasPaceTarget = baseLow != null || baseHigh != null;
                 return (
                   <div
                     key={segment.id}
                     className="border border-gray-200 rounded-lg p-4 sm:p-5 bg-gray-50"
                   >
                     <div className="mb-4">
-                      <h3 className="font-semibold text-gray-900 text-lg flex flex-wrap items-center gap-2">
-                        <span>
-                          {segment.stepOrder}. {segment.title}
-                        </span>
-                        {structBadge ? (
-                          <span className="inline-flex items-center rounded-full bg-white border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-700">
-                            {structBadge}
+                      <div className="flex flex-wrap items-start gap-2">
+                        {!isLogged && (
+                          <div className="flex gap-1 shrink-0 pt-1">
+                            <button
+                              type="button"
+                              aria-label="Move segment up"
+                              onClick={() => swapQuickSegment(segIdx, -1)}
+                              disabled={segIdx === 0}
+                              className="p-2 rounded border border-gray-200 bg-white disabled:opacity-40 hover:bg-gray-50"
+                            >
+                              <ChevronUp className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label="Move segment down"
+                              onClick={() => swapQuickSegment(segIdx, 1)}
+                              disabled={segIdx === displayList.length - 1}
+                              className="p-2 rounded border border-gray-200 bg-white disabled:opacity-40 hover:bg-gray-50"
+                            >
+                              <ChevronDown className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                        <h3 className="font-semibold text-gray-900 text-lg flex flex-wrap items-center gap-2 min-w-0">
+                          <span>
+                            {segIdx + 1}. {segment.title}
                           </span>
-                        ) : null}
-                      </h3>
-                      {segment.repeatCount != null && segment.repeatCount > 1 && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          <span className="font-medium text-gray-800">Repeats: </span>
-                          {segment.repeatCount}× this block (do the step this many times before
-                          moving on)
-                        </p>
+                          {structBadge ? (
+                            <span className="inline-flex items-center rounded-full bg-white border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+                              {structBadge}
+                            </span>
+                          ) : null}
+                        </h3>
+                      </div>
+                      {showRepeatStepper && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                          <span className="font-medium text-gray-800">Repeats</span>
+                          <button
+                            type="button"
+                            onClick={() => adjustQuickRepeat(segment.id, -1)}
+                            disabled={effRepeat <= 1}
+                            className="h-8 w-8 rounded-lg border border-gray-300 bg-white font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-40"
+                          >
+                            −
+                          </button>
+                          <span className="min-w-[2rem] text-center font-semibold text-gray-900">
+                            {effRepeat}×
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => adjustQuickRepeat(segment.id, 1)}
+                            disabled={effRepeat >= 20}
+                            className="h-8 w-8 rounded-lg border border-gray-300 bg-white font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-40"
+                          >
+                            +
+                          </button>
+                          <span className="text-gray-500 text-xs">
+                            this block before the next step
+                          </span>
+                        </div>
                       )}
+                      {isLogged &&
+                        segment.repeatCount != null &&
+                        segment.repeatCount > 1 && (
+                          <p className="text-sm text-gray-600 mt-1">
+                            <span className="font-medium text-gray-800">Repeats: </span>
+                            {segment.repeatCount}× this block (do the step this many times
+                            before moving on)
+                          </p>
+                        )}
                     </div>
 
                     <dl className="space-y-4">
@@ -1457,19 +1616,75 @@ export default function WorkoutDetailPage() {
                             Prescribed
                           </dt>
                           <dd className="space-y-2">
-                            {segment.targets.map((target, idx) => (
-                              <div
-                                key={idx}
-                                className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3 text-base"
-                              >
-                                <span className="text-gray-600 shrink-0 sm:min-w-[7rem]">
-                                  {workoutTargetTypeLabel(target.type || "Target")}
-                                </span>
-                                <span className="text-gray-900 font-medium break-words">
-                                  {formatTargetLine(target)}
-                                </span>
-                              </div>
-                            ))}
+                            {segment.targets.map((target, idx) => {
+                              const t = (target.type || "").toUpperCase();
+                              if (!isLogged && t === "PACE" && hasPaceTarget) {
+                                return (
+                                  <div key={idx} className="space-y-2">
+                                    <span className="text-gray-600 text-sm block">
+                                      {workoutTargetTypeLabel(target.type || "Target")}
+                                    </span>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
+                                      <label className="block text-sm">
+                                        <span className="text-xs font-medium text-gray-500 block mb-1">
+                                          Pace low (min:ss /mi)
+                                        </span>
+                                        <input
+                                          type="text"
+                                          inputMode="numeric"
+                                          value={paceInputValueFromSecPerMile(effLow ?? undefined)}
+                                          onChange={(e) =>
+                                            updateQuickPaceField(
+                                              segment.id,
+                                              "low",
+                                              e.target.value
+                                            )
+                                          }
+                                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                                          placeholder="e.g. 7:30"
+                                        />
+                                      </label>
+                                      <label className="block text-sm">
+                                        <span className="text-xs font-medium text-gray-500 block mb-1">
+                                          Pace high (min:ss /mi)
+                                        </span>
+                                        <input
+                                          type="text"
+                                          inputMode="numeric"
+                                          value={paceInputValueFromSecPerMile(
+                                            effHigh ?? undefined
+                                          )}
+                                          onChange={(e) =>
+                                            updateQuickPaceField(
+                                              segment.id,
+                                              "high",
+                                              e.target.value
+                                            )
+                                          }
+                                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                                          placeholder={
+                                            baseHigh != null ? "e.g. 8:00" : "optional"
+                                          }
+                                        />
+                                      </label>
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div
+                                  key={idx}
+                                  className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3 text-base"
+                                >
+                                  <span className="text-gray-600 shrink-0 sm:min-w-[7rem]">
+                                    {workoutTargetTypeLabel(target.type || "Target")}
+                                  </span>
+                                  <span className="text-gray-900 font-medium break-words">
+                                    {formatTargetLine(target)}
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </dd>
                         </div>
                       )}
@@ -1518,6 +1733,36 @@ export default function WorkoutDetailPage() {
                   </div>
                 );
               })}
+              {!isLogged && quickEditDirty && (
+                <div className="mt-2 flex flex-col sm:flex-row flex-wrap gap-2 border-t border-gray-200 pt-4">
+                  {quickEditError && (
+                    <p className="text-sm text-red-600 w-full" role="alert">
+                      {quickEditError}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    disabled={savingQuick}
+                    onClick={() => void saveQuickSegments()}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 disabled:opacity-50"
+                  >
+                    <Save className="w-4 h-4 shrink-0" />
+                    {savingQuick ? "Saving…" : "Save changes"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingQuick}
+                    onClick={() => {
+                      setQuickOrderIds([]);
+                      setSegmentOverrides({});
+                      setQuickEditError(null);
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Reset
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-gray-600">No segments defined</p>
@@ -1529,16 +1774,8 @@ export default function WorkoutDetailPage() {
                 onClick={startEdit}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50"
               >
-                <Pencil className="w-4 h-4 shrink-0" />
-                Edit workout
-              </button>
-              <button
-                type="button"
-                onClick={openRepeatModal}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50"
-              >
-                <CalendarPlus className="w-4 h-4 shrink-0" aria-hidden />
-                Schedule copies
+                <ListOrdered className="w-4 h-4 shrink-0" aria-hidden />
+                Segment sequencer
               </button>
             </div>
           )}
@@ -1693,108 +1930,6 @@ export default function WorkoutDetailPage() {
           </p>
         </div>
 
-        {repeatModalOpen && (
-          <div
-            className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4 bg-black/40"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="schedule-copies-title"
-            onMouseDown={(e) => {
-              if (e.target === e.currentTarget) setRepeatModalOpen(false);
-            }}
-          >
-            <div className="w-full max-w-md rounded-2xl bg-white shadow-xl p-6 space-y-4">
-              <h2 id="schedule-copies-title" className="text-lg font-semibold text-gray-900">
-                Schedule copies on calendar
-              </h2>
-              <p className="text-sm text-gray-600">
-                Create extra standalone workouts on the dates you pick—same structure as this
-                session, not linked to your training plan calendar.
-              </p>
-              <p className="text-sm text-gray-600">
-                To change interval reps (for example 4×800 to 5×800), use{" "}
-                <span className="font-medium text-gray-800">Edit workout</span> above. That
-                builder-style flow is where you adjust repeats per segment.
-              </p>
-              <label className="block">
-                <span className="text-xs font-semibold uppercase text-gray-500">First date</span>
-                <input
-                  type="date"
-                  value={repeatFirstDate}
-                  onChange={(e) => setRepeatFirstDate(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold uppercase text-gray-500">
-                  Total occurrences (1–13)
-                </span>
-                <input
-                  type="number"
-                  min={1}
-                  max={13}
-                  value={repeatOccurrences}
-                  onChange={(e) =>
-                    setRepeatOccurrences(
-                      Math.min(13, Math.max(1, parseInt(e.target.value, 10) || 1))
-                    )
-                  }
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold uppercase text-gray-500">
-                  Days between dates
-                </span>
-                <input
-                  type="number"
-                  min={1}
-                  max={365}
-                  value={repeatIntervalDays}
-                  onChange={(e) =>
-                    setRepeatIntervalDays(
-                      Math.min(365, Math.max(1, parseInt(e.target.value, 10) || 7))
-                    )
-                  }
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                />
-              </label>
-              {repeatPreviewDates.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold uppercase text-gray-500 mb-1">Preview</p>
-                  <ul className="text-sm text-gray-800 list-disc pl-5 space-y-0.5">
-                    {repeatPreviewDates.map((d) => (
-                      <li key={d}>{d}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {repeatError && (
-                <p className="text-sm text-red-600" role="alert">
-                  {repeatError}
-                </p>
-              )}
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setRepeatModalOpen(false)}
-                  disabled={repeatSubmitting}
-                  className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void submitRepeat()}
-                  disabled={repeatSubmitting}
-                  className="flex-1 rounded-xl bg-orange-600 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
-                >
-                  {repeatSubmitting ? "Creating…" : "Create copies"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
         </main>
       </div>

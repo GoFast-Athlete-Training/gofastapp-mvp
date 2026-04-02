@@ -1,5 +1,11 @@
 export const dynamic = "force-dynamic";
 
+/**
+ * Standalone workout copies on calendar dates (legacy).
+ * App UI removed until a plan-aware scheduler / “same workout on date X” flow ships.
+ * Kept server-side for future use or integrations.
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
