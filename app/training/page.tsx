@@ -8,7 +8,6 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
-import PlanPreviewDayModal from "@/components/training/PlanPreviewDayModal";
 import {
   currentTrainingWeekNumber,
   formatCalendarWeekRangeLabel,
@@ -18,10 +17,8 @@ import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import {
   fetchTrainingPlanDetail,
   fetchPlanWeekSchedule,
-  resolveWorkoutForPlanDay,
   type PlanDayCard,
 } from "@/lib/training/fetch-plan-week-client";
-import { workoutDetailPathWithGoTrainContext } from "@/lib/training/workout-nav-query";
 
 type PlanDetailHub = {
   id: string;
@@ -46,14 +43,9 @@ export default function TrainingHubPage() {
   const [athleteFiveKPace, setAthleteFiveKPace] = useState<string | null>(null);
   const [weekNumber, setWeekNumber] = useState(1);
   const [weekDays, setWeekDays] = useState<PlanDayCard[]>([]);
-  const [openingDayKey, setOpeningDayKey] = useState<string | null>(null);
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [hubError, setHubError] = useState<string | null>(null);
-  const [planPreview, setPlanPreview] = useState<{
-    workoutId: string;
-    planDay: PlanDayCard;
-  } | null>(null);
 
   const paceDisplay = useMemo(() => {
     if (!planDetail) return null;
@@ -111,43 +103,8 @@ export default function TrainingHubPage() {
     }
   }, []);
 
-  async function openPlanDay(planIdForDay: string, day: PlanDayCard) {
-    const u = auth.currentUser;
-    if (!u) return;
-    try {
-      setOpeningDayKey(day.dateKey);
-      const token = await u.getIdToken();
-      const workoutId =
-        day.workoutId ??
-        (await resolveWorkoutForPlanDay(planIdForDay, day.dateKey, token));
-      setPlanPreview({ workoutId, planDay: day });
-    } catch (e) {
-      setHubError(e instanceof Error ? e.message : "Could not open workout");
-    } finally {
-      setOpeningDayKey(null);
-    }
-  }
-
-  async function shiftPlanPreview(delta: -1 | 1) {
-    if (!planDetail || !planPreview) return;
-    const idx = weekDays.findIndex((d) => d.dateKey === planPreview.planDay.dateKey);
-    const nextIdx = idx + delta;
-    if (nextIdx < 0 || nextIdx >= weekDays.length) return;
-    const day = weekDays[nextIdx]!;
-    setOpeningDayKey(day.dateKey);
-    try {
-      const u = auth.currentUser;
-      if (!u) return;
-      const token = await u.getIdToken();
-      const workoutId =
-        day.workoutId ??
-        (await resolveWorkoutForPlanDay(planDetail.id, day.dateKey, token));
-      setPlanPreview({ workoutId, planDay: day });
-    } catch (e) {
-      setHubError(e instanceof Error ? e.message : "Could not load day");
-    } finally {
-      setOpeningDayKey(null);
-    }
+  function openPlanDay(day: PlanDayCard) {
+    router.push(`/training/day/${day.dateKey}`);
   }
 
   useEffect(() => {
@@ -327,12 +284,8 @@ export default function TrainingHubPage() {
                     <li key={w.dateKey}>
                       <button
                         type="button"
-                        disabled={openingDayKey === w.dateKey}
-                        onClick={() => {
-                          if (!planDetail) return;
-                          void openPlanDay(planDetail.id, w);
-                        }}
-                        className="flex w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-lg border border-gray-100 px-3 py-2.5 text-sm text-left hover:border-orange-200 hover:bg-orange-50/40 transition disabled:opacity-50"
+                        onClick={() => openPlanDay(w)}
+                        className="flex w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-lg border border-gray-100 px-3 py-2.5 text-sm text-left hover:border-orange-200 hover:bg-orange-50/40 transition"
                       >
                         <span className="font-medium text-gray-900">
                           {displayWorkoutListTitle(w)}
@@ -379,39 +332,6 @@ export default function TrainingHubPage() {
           </ul>
         </div>
       </div>
-
-      {planDetail && planPreview && (
-        <PlanPreviewDayModal
-          open
-          workoutId={planPreview.workoutId}
-          planDay={planPreview.planDay}
-          weekNumber={weekNumber}
-          totalWeeks={planDetail.totalWeeks}
-          planName={planDetail.name}
-          onClose={() => setPlanPreview(null)}
-          onDoThisWorkout={(id) => {
-            setPlanPreview(null);
-            router.push(
-              workoutDetailPathWithGoTrainContext(id, {
-                back: "training",
-                planId: planDetail.id,
-                weekNumber,
-                totalWeeks: planDetail.totalWeeks,
-                dateKey: planPreview.planDay.dateKey,
-              })
-            );
-          }}
-          onGoToPrevDay={() => void shiftPlanPreview(-1)}
-          onGoToNextDay={() => void shiftPlanPreview(1)}
-          prevDisabled={
-            weekDays.findIndex((d) => d.dateKey === planPreview.planDay.dateKey) <= 0
-          }
-          nextDisabled={
-            weekDays.findIndex((d) => d.dateKey === planPreview.planDay.dateKey) >=
-            weekDays.length - 1
-          }
-        />
-      )}
     </AthleteAppShell>
   );
 }

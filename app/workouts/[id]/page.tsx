@@ -31,6 +31,9 @@ import {
 import {
   backHrefFromGoTrainContext,
   backLabelFromGoTrainContext,
+  backLabelFromPath,
+  parseBackHrefParam,
+  parseDateKeyFromTrainingDayPreviewPath,
   parseGoTrainNavContext,
 } from "@/lib/training/workout-nav-query";
 import {
@@ -517,6 +520,10 @@ export default function WorkoutDetailPage() {
     return [...workout.segments].sort((a, b) => a.stepOrder - b.stepOrder);
   }, [workout?.segments]);
 
+  const simpleBackHref = useMemo(
+    () => parseBackHrefParam(searchParams),
+    [searchParams]
+  );
   const goTrainCtx = useMemo(
     () => parseGoTrainNavContext(searchParams),
     [searchParams]
@@ -938,8 +945,16 @@ export default function WorkoutDetailPage() {
       ? `Week ${workout.weekNumber} of ${workout.training_plans.totalWeeks}`
       : null;
 
-  const backHref = goTrainCtx ? backHrefFromGoTrainContext(goTrainCtx) : "/workouts";
-  const backLabel = goTrainCtx ? backLabelFromGoTrainContext(goTrainCtx) : "Back to Go Train";
+  const backHref = simpleBackHref
+    ? simpleBackHref
+    : goTrainCtx
+      ? backHrefFromGoTrainContext(goTrainCtx)
+      : "/workouts";
+  const backLabel = simpleBackHref
+    ? backLabelFromPath(simpleBackHref)
+    : goTrainCtx
+      ? backLabelFromGoTrainContext(goTrainCtx)
+      : "Back to Go Train";
 
   const structuredTotals = structuredSegmentTotals(sortedSegments);
   const structuredParts = [
@@ -958,7 +973,9 @@ export default function WorkoutDetailPage() {
     structuredTotals.miles > 0 &&
     planDayMi - structuredTotals.miles >= 0.35;
 
-  const planDateKeyFromNav = goTrainCtx?.dateKey ?? null;
+  const planDateKeyFromNav =
+    goTrainCtx?.dateKey ??
+    (simpleBackHref ? parseDateKeyFromTrainingDayPreviewPath(simpleBackHref) : null);
   const isContextToday =
     planDateKeyFromNav != null && planDateKeyFromNav === localYmd(new Date());
   const navWeekLine =
@@ -1038,7 +1055,9 @@ export default function WorkoutDetailPage() {
           {backLabel}
         </Link>
 
-        {goTrainCtx && (
+        {(goTrainCtx ||
+          (simpleBackHref &&
+            simpleBackHref.split("?")[0]?.startsWith("/training/day/"))) && (
           <div className="rounded-2xl border-2 border-orange-200 bg-gradient-to-b from-orange-50/90 to-white p-6 mb-6 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-orange-800">
               Go Train

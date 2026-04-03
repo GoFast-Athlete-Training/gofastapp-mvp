@@ -8,7 +8,6 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import PhaseViewModal from "@/components/training/PhaseViewModal";
-import PlanPreviewDayModal from "@/components/training/PlanPreviewDayModal";
 import {
   parsePhasesJson,
   phaseNameForWeek,
@@ -23,10 +22,8 @@ import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import {
   fetchTrainingPlanDetail,
   fetchPlanWeekSchedule,
-  resolveWorkoutForPlanDay,
   type PlanDayCard,
 } from "@/lib/training/fetch-plan-week-client";
-import { workoutDetailPathWithGoTrainContext } from "@/lib/training/workout-nav-query";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 
 type PlanDetail = {
@@ -92,7 +89,6 @@ export default function TrainingSetupPlanPage({
   const router = useRouter();
   const [plan, setPlan] = useState<PlanDetail | null>(null);
   const [weekDays, setWeekDays] = useState<PlanDayCard[]>([]);
-  const [openingDayKey, setOpeningDayKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [loadingWeek, setLoadingWeek] = useState(false);
@@ -103,11 +99,6 @@ export default function TrainingSetupPlanPage({
   const [preferredLongRunDowLocal, setPreferredLongRunDowLocal] = useState(6);
   const [error, setError] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
-  const [planPreview, setPlanPreview] = useState<{
-    workoutId: string;
-    planDay: PlanDayCard;
-  } | null>(null);
-
   async function getToken() {
     const u = auth.currentUser;
     if (!u) throw new Error("Sign in required");
@@ -273,10 +264,6 @@ export default function TrainingSetupPlanPage({
     void fetchWeekWorkouts(weekNumber);
   }, [authReady, plan, hasSchedule, weekNumber, fetchWeekWorkouts]);
 
-  useEffect(() => {
-    setPlanPreview(null);
-  }, [weekNumber]);
-
   function togglePreferredDay(d: number) {
     setPreferredDaysLocal((prev) => {
       if (prev.includes(d)) {
@@ -355,41 +342,11 @@ export default function TrainingSetupPlanPage({
     setWeekNumber((n) => Math.min(plan.totalWeeks, n + 1));
   }
 
-  async function openPlanDay(day: PlanDayCard) {
-    const u = auth.currentUser;
-    if (!u || !plan) return;
-    try {
-      setOpeningDayKey(day.dateKey);
-      const token = await u.getIdToken();
-      const workoutId =
-        day.workoutId ??
-        (await resolveWorkoutForPlanDay(plan.id, day.dateKey, token));
-      setPlanPreview({ workoutId, planDay: day });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not open workout");
-    } finally {
-      setOpeningDayKey(null);
-    }
-  }
-
-  async function shiftPlanPreview(delta: -1 | 1) {
-    if (!plan || !planPreview) return;
-    const idx = weekDays.findIndex((d) => d.dateKey === planPreview.planDay.dateKey);
-    const nextIdx = idx + delta;
-    if (nextIdx < 0 || nextIdx >= weekDays.length) return;
-    const day = weekDays[nextIdx]!;
-    setOpeningDayKey(day.dateKey);
-    try {
-      const token = await getToken();
-      const workoutId =
-        day.workoutId ??
-        (await resolveWorkoutForPlanDay(plan.id, day.dateKey, token));
-      setPlanPreview({ workoutId, planDay: day });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load day");
-    } finally {
-      setOpeningDayKey(null);
-    }
+  function openPlanDay(day: PlanDayCard) {
+    if (!plan) return;
+    router.push(
+      `/training/day/${day.dateKey}?planId=${encodeURIComponent(plan.id)}&source=setup`
+    );
   }
 
   if (loading || !plan) {
@@ -665,9 +622,8 @@ export default function TrainingSetupPlanPage({
                 <li key={w.dateKey}>
                   <button
                     type="button"
-                    disabled={openingDayKey === w.dateKey}
-                    onClick={() => void openPlanDay(w)}
-                    className="block w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm hover:border-orange-300 hover:shadow-md transition disabled:opacity-50"
+                    onClick={() => openPlanDay(w)}
+                    className="block w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm hover:border-orange-300 hover:shadow-md transition"
                   >
                     <div className="text-base font-semibold text-gray-900 leading-snug">
                       {displayWorkoutListTitle(w)}
@@ -719,38 +675,6 @@ export default function TrainingSetupPlanPage({
         onJumpToWeek={(wn) => setWeekNumber(wn)}
       />
 
-      {plan && planPreview && (
-        <PlanPreviewDayModal
-          open
-          workoutId={planPreview.workoutId}
-          planDay={planPreview.planDay}
-          weekNumber={weekNumber}
-          totalWeeks={plan.totalWeeks}
-          planName={plan.name}
-          onClose={() => setPlanPreview(null)}
-          onDoThisWorkout={(id) => {
-            setPlanPreview(null);
-            router.push(
-              workoutDetailPathWithGoTrainContext(id, {
-                back: "setup",
-                planId: plan?.id,
-                weekNumber,
-                totalWeeks: plan?.totalWeeks,
-                dateKey: planPreview.planDay.dateKey,
-              })
-            );
-          }}
-          onGoToPrevDay={() => void shiftPlanPreview(-1)}
-          onGoToNextDay={() => void shiftPlanPreview(1)}
-          prevDisabled={
-            weekDays.findIndex((d) => d.dateKey === planPreview.planDay.dateKey) <= 0
-          }
-          nextDisabled={
-            weekDays.findIndex((d) => d.dateKey === planPreview.planDay.dateKey) >=
-            weekDays.length - 1
-          }
-        />
-      )}
     </AthleteAppShell>
   );
 }

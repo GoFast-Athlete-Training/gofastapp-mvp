@@ -48,6 +48,55 @@ export function workoutDetailPathWithGoTrainContext(
   return qs ? `/workouts/${workoutId}?${qs}` : `/workouts/${workoutId}`;
 }
 
+const BACK_QUERY_KEY = "back";
+
+/** Internal path only — avoids open redirects. */
+export function isSafeInternalBackPath(path: string): boolean {
+  const t = path.trim();
+  if (!t.startsWith("/") || t.startsWith("//")) return false;
+  if (t.includes("://")) return false;
+  return true;
+}
+
+export function workoutDetailPathWithBackHref(
+  workoutId: string,
+  backPath: string
+): string {
+  const trimmed = backPath.trim();
+  if (!isSafeInternalBackPath(trimmed)) {
+    return `/workouts/${workoutId}`;
+  }
+  const q = new URLSearchParams();
+  q.set(BACK_QUERY_KEY, trimmed);
+  return `/workouts/${workoutId}?${q.toString()}`;
+}
+
+/** Read `?back=/internal/path` from workout detail URL. */
+export function parseBackHrefParam(params: URLSearchParams): string | null {
+  const raw = params.get(BACK_QUERY_KEY)?.trim();
+  if (!raw || !isSafeInternalBackPath(raw)) return null;
+  return raw;
+}
+
+export function backLabelFromPath(path: string): string {
+  const p = path.split("?")[0] ?? path;
+  if (p.startsWith("/training/day/")) return "Back to plan preview";
+  if (p === "/training") return "Back to My Training";
+  if (p.startsWith("/training-setup/")) return "Back to plan setup";
+  if (p === "/workouts") return "Back to Go Train";
+  return "Back";
+}
+
+/** Extract YYYY-MM-DD from `/training/day/[dateKey]` when present in back URL. */
+export function parseDateKeyFromTrainingDayPreviewPath(path: string): string | null {
+  const base = path.split("?")[0] ?? path;
+  const m = base.match(/\/training\/day\/([^/?#]+)$/);
+  if (!m?.[1]) return null;
+  const raw = decodeURIComponent(m[1]).trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  return raw;
+}
+
 /** Parse `/workouts/[id]?from=go-train&back=…` from URLSearchParams or null. */
 export function parseGoTrainNavContext(
   params: URLSearchParams

@@ -152,3 +152,23 @@ export function currentTrainingWeekNumber(
   return Math.min(Math.max(rawWeek, 1), totalWeeks);
 }
 
+/**
+ * 1-based training week index for a calendar day (`YYYY-MM-DD`) vs plan start (Mon–Sun weeks, UTC).
+ * Clamps to [1, totalWeeks].
+ */
+export function trainingWeekNumberForDateKey(
+  planStartRaw: Date | string,
+  totalWeeks: number,
+  dateKey: string
+): number {
+  const raw = dateKey.trim().slice(0, 10);
+  if (raw.length !== 10 || raw[4] !== "-" || raw[7] !== "-") {
+    return 1;
+  }
+  const anchor = new Date(`${raw}T12:00:00Z`);
+  if (Number.isNaN(anchor.getTime())) {
+    return 1;
+  }
+  return currentTrainingWeekNumber(planStartRaw, totalWeeks, anchor);
+}
+
