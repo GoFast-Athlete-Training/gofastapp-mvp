@@ -994,6 +994,24 @@ export default function WorkoutDetailPage() {
         })
       : null;
 
+  const simpleBackPathOnly = simpleBackHref?.split("?")[0] ?? null;
+  const executionFraming = Boolean(
+    goTrainCtx ||
+      (simpleBackHref &&
+        (simpleBackPathOnly === "/workouts" ||
+          simpleBackPathOnly?.startsWith("/training/day/")))
+  );
+  const detailEyebrow =
+    goTrainCtx || simpleBackPathOnly === "/workouts"
+      ? "Go Train"
+      : simpleBackPathOnly?.startsWith("/training/day/")
+        ? "Workout"
+        : "Workout detail";
+
+  const weekLineDisplay = navWeekLine ?? weekOnPlan;
+  const dateLineDisplay = navDateLine ?? scheduleLabel;
+  const weekAndDateLine = [weekLineDisplay, dateLineDisplay].filter(Boolean).join(" · ");
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
@@ -1055,39 +1073,14 @@ export default function WorkoutDetailPage() {
           {backLabel}
         </Link>
 
-        {(goTrainCtx ||
-          (simpleBackHref &&
-            simpleBackHref.split("?")[0]?.startsWith("/training/day/"))) && (
-          <div className="rounded-2xl border-2 border-orange-200 bg-gradient-to-b from-orange-50/90 to-white p-6 mb-6 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-orange-800">
-              Go Train
-            </p>
-            <h2 className="mt-1 text-xl sm:text-2xl font-bold text-gray-900">
-              {isContextToday
-                ? "Here’s your work for today"
-                : "Your planned workout"}
-            </h2>
-            <p className="mt-2 text-sm text-gray-700">
-              {[navWeekLine || weekOnPlan, navDateLine || scheduleLabel]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-            <p className="mt-3 text-sm font-semibold text-orange-900">
-              Let&apos;s go do this!
-            </p>
-            <a
-              href="#segment-sequencer"
-              className="mt-4 inline-flex text-sm font-semibold text-orange-700 hover:text-orange-900 underline-offset-2 hover:underline"
-            >
-              Jump to segment sequencer
-            </a>
-          </div>
-        )}
-
         <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
           <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                Workout detail
+              <p
+                className={`text-xs font-semibold uppercase tracking-wide mb-1 ${
+                  executionFraming ? "text-orange-800" : "text-gray-500"
+                }`}
+              >
+                {detailEyebrow}
               </p>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 break-words">
                 {displayWorkoutListTitle({
@@ -1119,27 +1112,28 @@ export default function WorkoutDetailPage() {
                   {workout.workoutType}
                 </span>
               </div>
-              {scheduleLabel && (
-                <p className="text-lg text-gray-800 font-medium mb-1">
-                  {isLogged || dayRel === "today"
-                    ? scheduleLabel
-                    : dayRel === "future"
-                      ? `Planned for ${scheduleLabel}`
-                      : dayRel === "past"
-                        ? `Scheduled for ${scheduleLabel}`
-                        : scheduleLabel}
-                </p>
-              )}
-              {estMi && (
+              {weekAndDateLine ? (
+                <p className="text-base text-gray-800 font-medium mb-2">{weekAndDateLine}</p>
+              ) : null}
+              {executionFraming ? (
+                <>
+                  <p className="text-sm font-semibold text-orange-900 mb-1">
+                    {isContextToday ? "Here&apos;s your work for today." : "Let&apos;s go do this!"}
+                  </p>
+                  <a
+                    href="#segment-sequencer"
+                    className="inline-flex text-sm font-semibold text-orange-700 hover:text-orange-900 underline-offset-2 hover:underline mb-3"
+                  >
+                    Jump to segment sequencer
+                  </a>
+                </>
+              ) : null}
+              {estMi && !executionFraming ? (
                 <p className="text-sm text-gray-600 mb-2">About {estMi} total (planned)</p>
-              )}
-              <p className="text-sm text-gray-600 mb-1">
-                <span className="font-medium text-gray-700">From:</span>{" "}
-                {planName || "Standalone run"}
+              ) : null}
+              <p className="text-sm text-gray-600 mb-3">
+                {planName ? planName : "Standalone run"}
               </p>
-              {weekOnPlan && (
-                <p className="text-sm text-gray-500 mb-3">{weekOnPlan} on your plan</p>
-              )}
               {workout.description && (
                 <p className="text-gray-600 text-sm border-t border-gray-100 pt-3 break-words">
                   {workout.description}

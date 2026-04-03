@@ -21,7 +21,7 @@ import {
   resolveWorkoutForPlanDay,
   type PlanDayCard,
 } from "@/lib/training/fetch-plan-week-client";
-import { workoutDetailPathWithGoTrainContext } from "@/lib/training/workout-nav-query";
+import { workoutDetailPathWithBackHref } from "@/lib/training/workout-nav-query";
 import {
   metersToMiDisplay,
   pickWorkoutPayload,
@@ -266,15 +266,7 @@ function GoTrainToday() {
         data.todayCard.workoutId ??
         (await resolveWorkoutForPlanDay(data.planId, data.todayCard.dateKey, token));
       setOpeningId(wid);
-      router.push(
-        workoutDetailPathWithGoTrainContext(wid, {
-          back: "workouts",
-          planId: data.planId,
-          weekNumber: data.currentWeekNumber ?? undefined,
-          totalWeeks: data.totalWeeks ?? undefined,
-          dateKey: data.todayCard.dateKey,
-        })
-      );
+      router.push(workoutDetailPathWithBackHref(wid, "/workouts"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not open workout");
     } finally {
@@ -287,13 +279,7 @@ function GoTrainToday() {
       setOpeningId(workoutId);
       setError(null);
       try {
-        router.push(
-          workoutDetailPathWithGoTrainContext(workoutId, {
-            back: "workouts",
-            planId: null,
-            dateKey: todayKey,
-          })
-        );
+        router.push(workoutDetailPathWithBackHref(workoutId, "/workouts"));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not open workout");
       } finally {
@@ -450,14 +436,6 @@ function WorkoutPreviewPanel({
     ? metersToMiDisplay(todayCard.estimatedDistanceInMeters)
     : metersToMiDisplay(workout?.estimatedDistanceInMeters);
 
-  const phaseLabel =
-    variant === "plan" && todayCard ? (
-      <>
-        {" · "}
-        <span className="font-medium text-gray-600">{todayCard.phase}</span> phase
-      </>
-    ) : null;
-
   const logged =
     variant === "plan" && todayCard?.matchedActivityId ? (
       <span className="ml-2 font-medium text-emerald-700">Logged</span>
@@ -470,23 +448,14 @@ function WorkoutPreviewPanel({
         <p className="mt-0.5 text-xs text-gray-600 truncate">{planName}</p>
       ) : null}
       <h3 className="mt-2 text-lg font-semibold text-gray-900 leading-snug">{title}</h3>
-      {variant === "plan" &&
-        weekNumber != null &&
-        totalWeeks != null &&
-        todayCard?.date && (
-          <p className="mt-1 text-sm text-gray-600">
-            Week {weekNumber} of {totalWeeks} ·{" "}
-            {formatPlanDateDisplay(todayCard.date, {
-              weekday: "long",
-              month: "short",
-              day: "numeric",
-            })}
-          </p>
-        )}
+      {variant === "plan" && weekNumber != null && totalWeeks != null && (
+        <p className="mt-1 text-sm text-gray-600">
+          Week {weekNumber} of {totalWeeks}
+        </p>
+      )}
       <p className="mt-1 text-xs text-gray-500">
         {typeLabel}
         {scheduleMi ? ` · ~${scheduleMi} planned` : null}
-        {phaseLabel}
         {logged}
       </p>
       {workout?.description?.trim() ? (
