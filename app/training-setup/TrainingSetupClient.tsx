@@ -7,6 +7,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
+import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 
 type RaceRegistryLite = {
@@ -141,7 +142,7 @@ export default function TrainingSetupClient() {
     setOrientationError(null);
     try {
       const token = await getToken();
-      const headers = { Authorization: `Bearer ${token}` };
+      const headers = athleteBearerFetchHeaders(token);
       const [gRes, sRes, pRes] = await Promise.all([
         fetch("/api/goals?status=ACTIVE", { headers }),
         fetch("/api/race-signups", { headers }),
@@ -286,7 +287,7 @@ export default function TrainingSetupClient() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...athleteBearerFetchHeaders(token),
         },
         body: JSON.stringify({
           athleteGoalId: wizardGoal.id,

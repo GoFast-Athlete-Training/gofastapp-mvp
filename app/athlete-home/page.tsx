@@ -54,7 +54,7 @@ export default function AthleteHomePage() {
   const [athlete, setAthlete] = useState<any>(null);
   const [weeklyActivities, setWeeklyActivities] = useState<any[]>([]);
   const [weeklyTotals, setWeeklyTotals] = useState<any>(null);
-  const [workoutsList, setWorkoutsList] = useState<any[]>([]);
+  const [upcomingSessions, setUpcomingSessions] = useState<any[]>([]);
   const [garminConnected, setGarminConnected] = useState(false);
   const [connectingGarmin, setConnectingGarmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -96,10 +96,10 @@ export default function AthleteHomePage() {
 
     // ── Secondary data fetches (can fail softly) ───────────────────────────
     // Failures here show empty states in UI. Welcome is never involved.
-    const [actRes, goalsRes, workoutsRes] = await Promise.allSettled([
+    const [actRes, goalsRes, upcomingRes] = await Promise.allSettled([
       api.get('/activities?limit=50'),
       api.get('/goals?status=ACTIVE'),
-      api.get('/workouts'),
+      api.get('/training/upcoming'),
     ]);
 
     if (actRes.status === 'fulfilled') {
@@ -117,10 +117,10 @@ export default function AthleteHomePage() {
       console.warn('athlete-home: goals fetch failed', goalsRes.reason);
     }
 
-    if (workoutsRes.status === 'fulfilled') {
-      setWorkoutsList(workoutsRes.value.data?.workouts ?? []);
+    if (upcomingRes.status === 'fulfilled') {
+      setUpcomingSessions(upcomingRes.value.data?.sessions ?? []);
     } else {
-      console.warn('athlete-home: workouts fetch failed', workoutsRes.reason);
+      console.warn('athlete-home: upcoming training fetch failed', upcomingRes.reason);
     }
 
     const garminFromStorage =
@@ -142,25 +142,6 @@ export default function AthleteHomePage() {
     });
     return () => unsub();
   }, [router]);
-
-  const upcomingWorkouts = useMemo(() => {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    const withDate = workoutsList.filter((w) => w.date != null);
-    const upcoming = withDate
-      .filter((w) => {
-        const d = new Date(w.date);
-        return !Number.isNaN(d.getTime()) && d >= start;
-      })
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .slice(0, 5);
-    if (upcoming.length >= 3) return upcoming;
-    const rest = withDate
-      .filter((w) => new Date(w.date) < start && !w.matchedActivityId)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 2);
-    return [...upcoming, ...rest].slice(0, 5);
-  }, [workoutsList]);
 
   const latestActivity = useMemo(() => {
     if (!weeklyActivities?.length) return null;
@@ -290,7 +271,7 @@ export default function AthleteHomePage() {
               <p className="text-gray-600">Here&apos;s your training overview</p>
             </div>
 
-            <UpcomingRuns workouts={upcomingWorkouts} />
+            <UpcomingRuns upcoming={upcomingSessions} />
 
             <PerformanceSnapshot
               fiveKPace={athlete.fiveKPace}

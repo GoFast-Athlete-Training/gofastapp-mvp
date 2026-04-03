@@ -27,6 +27,7 @@ import {
   type PlanDayCard,
 } from "@/lib/training/fetch-plan-week-client";
 import { workoutDetailPathWithGoTrainContext } from "@/lib/training/workout-nav-query";
+import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 
 type PlanDetail = {
   id: string;
@@ -306,7 +307,7 @@ export default function TrainingSetupPlanPage({
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...athleteBearerFetchHeaders(token),
         },
         body: JSON.stringify({
           preferredDays: normalized,
@@ -324,7 +325,7 @@ export default function TrainingSetupPlanPage({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...athleteBearerFetchHeaders(token),
         },
         body: JSON.stringify({
           trainingPlanId: planId,

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import PlanPreviewDayModal from "@/components/training/PlanPreviewDayModal";
 import {
@@ -75,7 +76,7 @@ export default function TrainingHubPage() {
       if (!u) return;
       const token = await u.getIdToken();
       const listRes = await fetch("/api/training-plan?status=active", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: athleteBearerFetchHeaders(token),
       });
       const listData = await listRes.json();
       if (!listRes.ok || !Array.isArray(listData.plans) || listData.plans.length === 0) {
@@ -182,7 +183,7 @@ export default function TrainingHubPage() {
       const token = await u.getIdToken();
       const res = await fetch(`/api/training-plan/${planDetail.id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: athleteBearerFetchHeaders(token),
       });
       if (res.ok) {
         await loadHub();

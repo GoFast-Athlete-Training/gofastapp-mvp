@@ -2,6 +2,8 @@
  * Browser fetch helpers for plan detail + week schedule (from `planWeeks`, not workouts-first).
  */
 
+import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
+
 export type PlanDayCard = {
   workoutId: string | null;
   dateKey: string;
@@ -22,7 +24,7 @@ export async function fetchTrainingPlanDetail(
   bearerToken: string
 ): Promise<{ plan: unknown; athleteFiveKPace: string | null }> {
   const res = await fetch(`/api/training-plan/${planId}`, {
-    headers: { Authorization: `Bearer ${bearerToken}` },
+    headers: athleteBearerFetchHeaders(bearerToken),
   });
   const data = (await res.json()) as {
     error?: string;
@@ -45,7 +47,7 @@ export async function fetchPlanWeekSchedule(
 ): Promise<{ days: PlanDayCard[] }> {
   const res = await fetch(
     `/api/training/plan/week?planId=${encodeURIComponent(planId)}&weekNumber=${weekNumber}`,
-    { headers: { Authorization: `Bearer ${bearerToken}` } }
+    { headers: athleteBearerFetchHeaders(bearerToken) }
   );
   const data = (await res.json()) as { error?: string; days?: PlanDayCard[] };
   if (!res.ok) {
@@ -64,7 +66,7 @@ export async function resolveWorkoutForPlanDay(
 ): Promise<string> {
   const res = await fetch(
     `/api/training/workout/day?planId=${encodeURIComponent(planId)}&date=${encodeURIComponent(dateKeyOrIso)}`,
-    { headers: { Authorization: `Bearer ${bearerToken}` } }
+    { headers: athleteBearerFetchHeaders(bearerToken) }
   );
   const data = (await res.json()) as { error?: string; workoutId?: string };
   if (!res.ok || typeof data.workoutId !== "string") {
@@ -81,7 +83,7 @@ export async function fetchTrainingWorkoutDetail(
   bearerToken: string
 ): Promise<{ workout: unknown }> {
   const res = await fetch(`/api/training/workout/${encodeURIComponent(workoutId)}`, {
-    headers: { Authorization: `Bearer ${bearerToken}` },
+    headers: athleteBearerFetchHeaders(bearerToken),
   });
   const data = (await res.json()) as { error?: string; workout?: unknown };
   if (!res.ok || data.workout == null) {

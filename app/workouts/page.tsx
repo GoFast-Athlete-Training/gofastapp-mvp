@@ -6,6 +6,7 @@ import Link from "next/link";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import { auth } from "@/lib/firebase";
+import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import { onAuthStateChanged } from "firebase/auth";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import {
@@ -119,10 +120,10 @@ function GoTrainToday() {
       const [standaloneRes, listRes] = await Promise.all([
         fetch(
           `/api/workouts?standalone=1&date=${encodeURIComponent(todayKey)}&paged=1&limit=20`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: athleteBearerFetchHeaders(token) }
         ),
         fetch("/api/training-plan?status=active", {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: athleteBearerFetchHeaders(token),
         }),
       ]);
 
