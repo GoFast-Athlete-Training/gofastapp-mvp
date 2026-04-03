@@ -26,6 +26,8 @@ import {
   formatPaceTargetSingleForDisplay,
   getTrainingPaces,
   parsePaceToSecondsPerMile,
+  secondsPerMileToSecondsPerKm,
+  storedPaceSecondsKmToSecondsPerMile,
   workoutTargetTypeLabel,
 } from "@/lib/workout-generator/pace-calculator";
 import { readWorkoutDayNav } from "@/lib/training/workout-day-nav";
@@ -373,11 +375,15 @@ function segmentToEditable(s: WorkoutSegment): EditableSegment {
       s.repeatCount != null && Number(s.repeatCount) > 1 ? String(s.repeatCount) : "",
     paceLowSec:
       pace?.valueLow != null && Number.isFinite(Number(pace.valueLow))
-        ? String(Math.round(Number(pace.valueLow)))
+        ? String(
+            Math.round(storedPaceSecondsKmToSecondsPerMile(Number(pace.valueLow)))
+          )
         : "",
     paceHighSec:
       pace?.valueHigh != null && Number.isFinite(Number(pace.valueHigh))
-        ? String(Math.round(Number(pace.valueHigh)))
+        ? String(
+            Math.round(storedPaceSecondsKmToSecondsPerMile(Number(pace.valueHigh)))
+          )
         : "",
     notes: s.notes ?? "",
   };
@@ -398,8 +404,12 @@ function editableSegmentsToApiPayload(segments: EditableSegment[]) {
       const r = parseInt(s.repeatCount, 10);
       if (Number.isFinite(r) && r > 1) repeatCount = r;
     }
-    const low = s.paceLowSec.trim() ? Number(s.paceLowSec) : NaN;
-    const high = s.paceHighSec.trim() ? Number(s.paceHighSec) : NaN;
+    const lowSecMi = s.paceLowSec.trim() ? Number(s.paceLowSec) : NaN;
+    const highSecMi = s.paceHighSec.trim() ? Number(s.paceHighSec) : NaN;
+    const low = Number.isFinite(lowSecMi) ? secondsPerMileToSecondsPerKm(lowSecMi) : NaN;
+    const high = Number.isFinite(highSecMi)
+      ? secondsPerMileToSecondsPerKm(highSecMi)
+      : NaN;
     let targets: unknown = null;
     if (Number.isFinite(low) && Number.isFinite(high)) {
       targets = [{ type: "PACE", valueLow: low, valueHigh: high }];
@@ -443,15 +453,21 @@ function getPaceSecsFromSegment(seg: WorkoutSegment): {
   const pace = seg.targets?.find((t) => (t.type || "").toUpperCase() === "PACE");
   if (!pace) return { low: null, high: null };
   if (pace.valueLow != null && Number.isFinite(Number(pace.valueLow))) {
-    const low = Number(pace.valueLow);
+    const low = Math.round(
+      storedPaceSecondsKmToSecondsPerMile(Number(pace.valueLow))
+    );
     const high =
       pace.valueHigh != null && Number.isFinite(Number(pace.valueHigh))
-        ? Number(pace.valueHigh)
+        ? Math.round(
+            storedPaceSecondsKmToSecondsPerMile(Number(pace.valueHigh))
+          )
         : null;
     return { low, high };
   }
   if (pace.value != null && Number.isFinite(Number(pace.value))) {
-    const v = Number(pace.value);
+    const v = Math.round(
+      storedPaceSecondsKmToSecondsPerMile(Number(pace.value))
+    );
     return { low: v, high: null };
   }
   return { low: null, high: null };

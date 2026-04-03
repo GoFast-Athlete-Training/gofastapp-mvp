@@ -10,6 +10,13 @@ export function secondsPerMileToSecondsPerKm(secPerMile: number): number {
   return Math.round(secPerMile * 1.60934);
 }
 
+/**
+ * Segment/API PACE targets use sec/km; workout edit inputs use sec/mi (total seconds per mile).
+ */
+export function storedPaceSecondsKmToSecondsPerMile(storedSecKm: number): number {
+  return storedSecKm * MILES_PER_KM;
+}
+
 /** Parse "7:30" or "7:30/mile" to total seconds per mile */
 export function parsePaceToSecondsPerMile(paceString: string): number {
   const match = paceString.trim().match(/(\d+):(\d+)/);
