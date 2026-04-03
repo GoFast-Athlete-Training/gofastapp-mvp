@@ -64,6 +64,25 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
+    const primaryGoal = await prisma.athleteGoal.findFirst({
+      where: { athleteId: workout.athleteId, status: "ACTIVE" },
+      orderBy: { targetByDate: "asc" },
+      include: {
+        race_registry: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            raceDate: true,
+            city: true,
+            state: true,
+            distanceMiles: true,
+            raceType: true,
+          },
+        },
+      },
+    });
+
     const now = new Date();
     const upcoming = workout.city_runs.find((r) => r.date >= now) ?? workout.city_runs[0] ?? null;
 
@@ -96,6 +115,28 @@ export async function GET(
             state: workout.Athlete.state,
             primarySport: workout.Athlete.primarySport,
             bio: workout.Athlete.bio,
+          }
+        : null,
+      goal: primaryGoal
+        ? {
+            id: primaryGoal.id,
+            name: primaryGoal.name,
+            distance: primaryGoal.distance,
+            goalTime: primaryGoal.goalTime,
+            targetByDate: primaryGoal.targetByDate.toISOString(),
+            raceRegistryId: primaryGoal.raceRegistryId,
+          }
+        : null,
+      goalRace: primaryGoal?.race_registry
+        ? {
+            id: primaryGoal.race_registry.id,
+            name: primaryGoal.race_registry.name,
+            slug: primaryGoal.race_registry.slug,
+            raceDate: primaryGoal.race_registry.raceDate.toISOString(),
+            city: primaryGoal.race_registry.city,
+            state: primaryGoal.race_registry.state,
+            distanceMiles: primaryGoal.race_registry.distanceMiles,
+            raceType: primaryGoal.race_registry.raceType,
           }
         : null,
       cityRun: upcoming
