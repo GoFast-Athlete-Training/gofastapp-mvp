@@ -4,13 +4,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 
-function pushRaceToCompanyUpstream(race: {
-  id: string;
-  name: string;
-  raceDate: Date;
-  city: string | null;
-  state: string | null;
-}) {
+function pushRaceToCompanyUpstream(
+  race: {
+    id: string;
+    name: string;
+    raceDate: Date;
+    city: string | null;
+    state: string | null;
+    registrationUrl: string | null;
+    raceType: string;
+    distanceMiles: number;
+  },
+  authHeader: string | null
+) {
   const raw =
     process.env.NEXT_PUBLIC_COMPANY_APP_URL ||
     process.env.GOFAST_COMPANY_API_URL ||
@@ -18,12 +24,11 @@ function pushRaceToCompanyUpstream(race: {
   const base = raw.replace(/\/$/, '');
   if (!base) return;
 
-  const secret = process.env.RACE_UPSTREAM_SECRET?.trim();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  if (secret) {
-    headers.Authorization = `Bearer ${secret}`;
+  if (authHeader) {
+    headers.Authorization = authHeader;
   }
 
   const body = JSON.stringify({
@@ -32,9 +37,12 @@ function pushRaceToCompanyUpstream(race: {
     raceDate: race.raceDate.toISOString(),
     cityName: race.city,
     state: race.state,
+    registrationUrl: race.registrationUrl,
+    raceType: race.raceType,
+    distanceMiles: race.distanceMiles,
   });
 
-  void fetch(`${base}/api/race/receive-upstream`, {
+  void fetch(`${base}/api/race-registrations/create`, {
     method: 'POST',
     headers,
     body,
@@ -116,13 +124,19 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    pushRaceToCompanyUpstream({
-      id: race.id,
-      name: race.name,
-      raceDate: race.raceDate,
-      city: race.city,
-      state: race.state,
-    });
+    pushRaceToCompanyUpstream(
+      {
+        id: race.id,
+        name: race.name,
+        raceDate: race.raceDate,
+        city: race.city,
+        state: race.state,
+        registrationUrl: race.registrationUrl ?? null,
+        raceType: race.raceType,
+        distanceMiles: race.distanceMiles,
+      },
+      authHeader
+    );
 
     return NextResponse.json({
       success: true,
