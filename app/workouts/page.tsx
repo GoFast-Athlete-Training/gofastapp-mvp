@@ -21,7 +21,7 @@ import {
   resolveWorkoutForPlanDay,
   type PlanDayCard,
 } from "@/lib/training/fetch-plan-week-client";
-import { workoutDetailPathWithBackHref } from "@/lib/training/workout-nav-query";
+import { stashWorkoutDayNav } from "@/lib/training/workout-day-nav";
 import {
   metersToMiDisplay,
   pickWorkoutPayload,
@@ -266,7 +266,8 @@ function GoTrainToday() {
         data.todayCard.workoutId ??
         (await resolveWorkoutForPlanDay(data.planId, data.todayCard.dateKey, token));
       setOpeningId(wid);
-      router.push(workoutDetailPathWithBackHref(wid, "/workouts"));
+      stashWorkoutDayNav(wid, { source: "go-train" });
+      router.push(`/workouts/${wid}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not open workout");
     } finally {
@@ -279,7 +280,8 @@ function GoTrainToday() {
       setOpeningId(workoutId);
       setError(null);
       try {
-        router.push(workoutDetailPathWithBackHref(workoutId, "/workouts"));
+        stashWorkoutDayNav(workoutId, { source: "go-train" });
+        router.push(`/workouts/${workoutId}`);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not open workout");
       } finally {

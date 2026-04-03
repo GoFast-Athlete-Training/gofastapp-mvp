@@ -28,6 +28,7 @@ import {
   parsePaceToSecondsPerMile,
   workoutTargetTypeLabel,
 } from "@/lib/workout-generator/pace-calculator";
+import { readWorkoutDayNav } from "@/lib/training/workout-day-nav";
 import {
   backHrefFromGoTrainContext,
   backLabelFromGoTrainContext,
@@ -529,6 +530,11 @@ export default function WorkoutDetailPage() {
     [searchParams]
   );
 
+  const navFromStash = useMemo(
+    () => readWorkoutDayNav(workoutId),
+    [workoutId]
+  );
+
   const clearCreatedQuery = useCallback(() => {
     const q = new URLSearchParams(searchParams.toString());
     q.delete("created");
@@ -945,16 +951,22 @@ export default function WorkoutDetailPage() {
       ? `Week ${workout.weekNumber} of ${workout.training_plans.totalWeeks}`
       : null;
 
-  const backHref = simpleBackHref
-    ? simpleBackHref
-    : goTrainCtx
-      ? backHrefFromGoTrainContext(goTrainCtx)
-      : "/workouts";
+  const planPreviewBackFromStash =
+    navFromStash?.source === "plan-preview" ? navFromStash.backPath : null;
+  const fromGoTrainStash = navFromStash?.source === "go-train";
+
+  const backHref =
+    simpleBackHref ??
+    planPreviewBackFromStash ??
+    (goTrainCtx ? backHrefFromGoTrainContext(goTrainCtx) : null) ??
+    "/workouts";
   const backLabel = simpleBackHref
     ? backLabelFromPath(simpleBackHref)
-    : goTrainCtx
-      ? backLabelFromGoTrainContext(goTrainCtx)
-      : "Back to Go Train";
+    : planPreviewBackFromStash
+      ? backLabelFromPath(planPreviewBackFromStash)
+      : goTrainCtx
+        ? backLabelFromGoTrainContext(goTrainCtx)
+        : "Back to Go Train";
 
   const structuredTotals = structuredSegmentTotals(sortedSegments);
   const structuredParts = [
@@ -975,7 +987,10 @@ export default function WorkoutDetailPage() {
 
   const planDateKeyFromNav =
     goTrainCtx?.dateKey ??
-    (simpleBackHref ? parseDateKeyFromTrainingDayPreviewPath(simpleBackHref) : null);
+    (simpleBackHref ? parseDateKeyFromTrainingDayPreviewPath(simpleBackHref) : null) ??
+    (planPreviewBackFromStash
+      ? parseDateKeyFromTrainingDayPreviewPath(planPreviewBackFromStash)
+      : null);
   const isContextToday =
     planDateKeyFromNav != null && planDateKeyFromNav === localYmd(new Date());
   const navWeekLine =
@@ -995,16 +1010,20 @@ export default function WorkoutDetailPage() {
       : null;
 
   const simpleBackPathOnly = simpleBackHref?.split("?")[0] ?? null;
+  const planPreviewPathOnly = planPreviewBackFromStash?.split("?")[0] ?? "";
   const executionFraming = Boolean(
     goTrainCtx ||
+      fromGoTrainStash ||
       (simpleBackHref &&
         (simpleBackPathOnly === "/workouts" ||
-          simpleBackPathOnly?.startsWith("/training/day/")))
+          simpleBackPathOnly?.startsWith("/training/day/"))) ||
+      planPreviewPathOnly.startsWith("/training/day/")
   );
   const detailEyebrow =
-    goTrainCtx || simpleBackPathOnly === "/workouts"
+    goTrainCtx || fromGoTrainStash || simpleBackPathOnly === "/workouts"
       ? "Go Train"
-      : simpleBackPathOnly?.startsWith("/training/day/")
+      : simpleBackPathOnly?.startsWith("/training/day/") ||
+          planPreviewPathOnly.startsWith("/training/day/")
         ? "Workout"
         : "Workout detail";
 

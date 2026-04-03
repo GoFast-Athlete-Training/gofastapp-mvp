@@ -28,9 +28,7 @@ import {
   pickWorkoutPayload,
   type PreviewWorkout,
 } from "@/lib/training/workout-preview-payload";
-import {
-  workoutDetailPathWithBackHref,
-} from "@/lib/training/workout-nav-query";
+import { stashWorkoutDayNav } from "@/lib/training/workout-day-nav";
 
 type PlanDetail = {
   id: string;
@@ -228,7 +226,8 @@ export default function TrainingPlanDayPreviewPage() {
         workoutId ??
         planDay.workoutId ??
         (await resolveWorkoutForPlanDay(planDetail.id, dateKey, token));
-      router.push(workoutDetailPathWithBackHref(wid, previewBackPath));
+      stashWorkoutDayNav(wid, { source: "plan-preview", backPath: previewBackPath });
+      router.push(`/workouts/${wid}`);
     } catch (e) {
       setWorkoutError(e instanceof Error ? e.message : "Could not open workout");
     } finally {
@@ -236,10 +235,11 @@ export default function TrainingPlanDayPreviewPage() {
     }
   }
 
-  const customizeHref =
-    workoutId != null
-      ? `/workouts/${workoutId}?edit=1&back=${encodeURIComponent(previewBackPath)}`
-      : null;
+  const customizeHref = workoutId != null ? `/workouts/${workoutId}?edit=1` : null;
+
+  function stashPreviewNavForWorkout(wid: string) {
+    stashWorkoutDayNav(wid, { source: "plan-preview", backPath: previewBackPath });
+  }
 
   return (
     <AthleteAppShell>
@@ -349,9 +349,10 @@ export default function TrainingPlanDayPreviewPage() {
                 When you&apos;re ready to set up this run on your watch or log it, open the full
                 workout screen.
               </p>
-              {customizeHref && (
+              {customizeHref && workoutId && (
                 <Link
                   href={customizeHref}
+                  onClick={() => stashPreviewNavForWorkout(workoutId)}
                   className="inline-flex text-sm font-semibold text-orange-700 hover:text-orange-900 underline-offset-2 hover:underline"
                 >
                   Customize this workout
