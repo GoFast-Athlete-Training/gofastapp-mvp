@@ -28,38 +28,47 @@
  * @param raceUrl - Valid RunSignUp URL from race data (may be empty)
  * @returns Final URL with affiliate tracking, or empty string if input invalid
  */
-export function buildRunSignUpAffiliateUrl(raceUrl: string): string {
+export function buildRunSignUpAffiliateUrl(
+  raceUrl: string,
+  options?: { applyAffiliate?: boolean }
+): string {
   // If raceUrl is empty or invalid → return empty string
   if (!raceUrl || typeof raceUrl !== 'string' || raceUrl.trim() === '') {
     return '';
   }
 
-  // Must be a RunSignUp URL (safety check)
-  if (!raceUrl.includes('runsignup.com')) {
-    return '';
+  const trimmed = raceUrl.trim();
+
+  // External registration sites: open as-is (no RunSignup tracking)
+  if (!trimmed.includes('runsignup.com')) {
+    return trimmed;
+  }
+
+  if (options?.applyAffiliate === false) {
+    return trimmed;
   }
 
   // Get affiliate token from public env var (safe for client)
   // NOTE: In Next.js, NEXT_PUBLIC_ vars are embedded at build time
   // If you change .env.local, you need to restart the dev server
   const affiliateToken = process.env.NEXT_PUBLIC_RUNSIGNUP_AFFILIATE_TOKEN;
-  
+
   console.log('🔍 Affiliate URL Builder Debug:', {
     hasToken: !!affiliateToken,
     tokenLength: affiliateToken?.length || 0,
     tokenPreview: affiliateToken ? `${affiliateToken.substring(0, 4)}...` : 'missing',
-    inputUrl: raceUrl,
+    inputUrl: trimmed,
   });
-  
+
   if (!affiliateToken) {
     console.warn('⚠️ RunSignUp affiliate token not configured - check NEXT_PUBLIC_RUNSIGNUP_AFFILIATE_TOKEN in .env.local');
     // Still return the URL without affiliate tracking
-    return raceUrl;
+    return trimmed;
   }
 
   try {
     // Parse existing URL to preserve all existing params
-    const url = new URL(raceUrl);
+    const url = new URL(trimmed);
 
     // Append affiliate token (RunSignUp uses 'aff' parameter)
     url.searchParams.set('aff', affiliateToken);
@@ -71,7 +80,7 @@ export function buildRunSignUpAffiliateUrl(raceUrl: string): string {
 
     const finalUrl = url.toString();
     console.log('✅ Built affiliate URL:', {
-      original: raceUrl,
+      original: trimmed,
       final: finalUrl,
       hasAffParam: finalUrl.includes('aff='),
     });
@@ -79,7 +88,7 @@ export function buildRunSignUpAffiliateUrl(raceUrl: string): string {
     return finalUrl;
   } catch (error) {
     // Invalid URL format - return empty string
-    console.error('❌ Invalid RunSignUp URL format:', raceUrl);
+    console.error('❌ Invalid RunSignUp URL format:', trimmed);
     return '';
   }
 }

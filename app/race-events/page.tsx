@@ -19,6 +19,8 @@ interface Event {
   location: string;
   url: string;
   category?: 'race' | 'training_program' | 'other';
+  /** When false, open RunSignup URL without adding aff/UTM (registry opt-out). */
+  useRunSignupAffiliate?: boolean;
 }
 
 /**
@@ -166,9 +168,10 @@ export default function RaceEventsPage() {
       originalUrl: event.url,
     });
 
-    // Build affiliate URL with tracking
-    const affiliateUrl = buildRunSignUpAffiliateUrl(event.url);
-    
+    const affiliateUrl = buildRunSignUpAffiliateUrl(event.url, {
+      applyAffiliate: event.useRunSignupAffiliate !== false,
+    });
+
     if (!affiliateUrl) {
       console.warn('⚠️ Could not build affiliate URL for:', event.name);
       return;

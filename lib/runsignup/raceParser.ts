@@ -25,6 +25,8 @@ export interface ParsedRace {
   location: string;
   url: string; // May be empty - client will handle disabled state
   category: RaceCategory; // Classification for selection logic
+  /** False when company registry marks registration as external-only (not yet wired from API). */
+  useRunSignupAffiliate: boolean;
 }
 
 /**
@@ -170,14 +172,17 @@ export function parseRace(race: any): ParsedRace {
     location = parts.join(', ') || location;
   }
 
+  const url = extractUrl(race);
   return {
     id: String(race.race_id || race.id || ''),
     name: race.name || 'Untitled Event',
     startDate: startDate,
     endDate: endDate,
     location: location,
-    url: extractUrl(race), // Strict pass-through - may be empty
+    url,
     category: classifyRace(race), // Classification for selection logic
+    useRunSignupAffiliate:
+      url.length > 0 && url.toLowerCase().includes('runsignup.com'),
   };
 }
 
