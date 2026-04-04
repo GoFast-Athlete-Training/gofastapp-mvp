@@ -1566,7 +1566,8 @@ export default function WorkoutDetailPage() {
           </div>
           {isEditing && (
             <p className="text-sm text-gray-600 mb-3">
-              Add blocks, set repeat counts (e.g. 4×800 → 5×800), and reorder—then save.
+              Add blocks, set repeat counts (e.g. 4×800 → 5×800), and reorder—then save. Recovery
+              between reps: add a separate segment (distance or time), for example an easy jog.
             </p>
           )}
           {editError && (
@@ -1712,20 +1713,55 @@ export default function WorkoutDetailPage() {
                       <span className="text-xs font-semibold uppercase text-gray-500">
                         Repeat block (×)
                       </span>
+                      <p className="mt-1 text-xs text-gray-600">
+                        Number of times to repeat <strong>this</strong> step (intervals). Leave blank
+                        for a single step.
+                      </p>
                       <input
-                        type="text"
+                        type="number"
                         inputMode="numeric"
-                        placeholder="optional"
+                        min={2}
+                        max={20}
+                        step={1}
+                        placeholder="e.g. 4"
                         value={segment.repeatCount}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (raw === "") {
+                            setEditSegments((prev) =>
+                              prev.map((s) =>
+                                s.clientKey === segment.clientKey
+                                  ? { ...s, repeatCount: "" }
+                                  : s
+                              )
+                            );
+                            return;
+                          }
+                          const n = parseInt(raw, 10);
+                          if (!Number.isFinite(n)) return;
+                          const clamped = Math.min(20, Math.max(0, n));
                           setEditSegments((prev) =>
                             prev.map((s) =>
                               s.clientKey === segment.clientKey
-                                ? { ...s, repeatCount: e.target.value }
+                                ? { ...s, repeatCount: String(clamped) }
                                 : s
                             )
-                          )
-                        }
+                          );
+                        }}
+                        onBlur={() => {
+                          setEditSegments((prev) =>
+                            prev.map((s) => {
+                              if (s.clientKey !== segment.clientKey) return s;
+                              const t = s.repeatCount.trim();
+                              if (!t) return { ...s, repeatCount: "" };
+                              const n = parseInt(t, 10);
+                              if (!Number.isFinite(n) || n <= 1) {
+                                return { ...s, repeatCount: "" };
+                              }
+                              return { ...s, repeatCount: String(Math.min(20, n)) };
+                            })
+                          );
+                        }}
                         className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                       />
                     </label>
