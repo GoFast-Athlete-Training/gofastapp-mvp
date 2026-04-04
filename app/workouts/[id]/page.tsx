@@ -375,13 +375,13 @@ function segmentToEditable(s: WorkoutSegment): EditableSegment {
       s.repeatCount != null && Number(s.repeatCount) > 1 ? String(s.repeatCount) : "",
     paceLowSec:
       pace?.valueLow != null && Number.isFinite(Number(pace.valueLow))
-        ? String(
+        ? paceInputValueFromSecPerMile(
             Math.round(storedPaceSecondsKmToSecondsPerMile(Number(pace.valueLow)))
           )
         : "",
     paceHighSec:
       pace?.valueHigh != null && Number.isFinite(Number(pace.valueHigh))
-        ? String(
+        ? paceInputValueFromSecPerMile(
             Math.round(storedPaceSecondsKmToSecondsPerMile(Number(pace.valueHigh)))
           )
         : "",
@@ -404,8 +404,14 @@ function editableSegmentsToApiPayload(segments: EditableSegment[]) {
       const r = parseInt(s.repeatCount, 10);
       if (Number.isFinite(r) && r > 1) repeatCount = r;
     }
-    const lowSecMi = s.paceLowSec.trim() ? Number(s.paceLowSec) : NaN;
-    const highSecMi = s.paceHighSec.trim() ? Number(s.paceHighSec) : NaN;
+    const lowSecMi = s.paceLowSec.trim()
+      ? (parsePaceMinSecPerMileInput(s.paceLowSec) ??
+        (Number.isFinite(Number(s.paceLowSec)) ? Number(s.paceLowSec) : NaN))
+      : NaN;
+    const highSecMi = s.paceHighSec.trim()
+      ? (parsePaceMinSecPerMileInput(s.paceHighSec) ??
+        (Number.isFinite(Number(s.paceHighSec)) ? Number(s.paceHighSec) : NaN))
+      : NaN;
     const low = Number.isFinite(lowSecMi) ? secondsPerMileToSecondsPerKm(lowSecMi) : NaN;
     const high = Number.isFinite(highSecMi)
       ? secondsPerMileToSecondsPerKm(highSecMi)
@@ -524,6 +530,7 @@ export default function WorkoutDetailPage() {
   const [editError, setEditError] = useState<string | null>(null);
   const [editDistanceMi, setEditDistanceMi] = useState("");
   const [garminConnected, setGarminConnected] = useState<boolean | null>(null);
+  const [connectingGarmin, setConnectingGarmin] = useState(false);
   const [editSegments, setEditSegments] = useState<EditableSegment[]>([]);
   const [quickOrderIds, setQuickOrderIds] = useState<string[]>([]);
   const [segmentOverrides, setSegmentOverrides] = useState<
@@ -829,8 +836,10 @@ export default function WorkoutDetailPage() {
         }
         let paceLowSec = base.paceLowSec;
         let paceHighSec = base.paceHighSec;
-        if (o?.paceLowSec != null) paceLowSec = String(Math.round(o.paceLowSec));
-        if (o?.paceHighSec != null) paceHighSec = String(Math.round(o.paceHighSec));
+        if (o?.paceLowSec != null)
+          paceLowSec = paceInputValueFromSecPerMile(Math.round(o.paceLowSec));
+        if (o?.paceHighSec != null)
+          paceHighSec = paceInputValueFromSecPerMile(Math.round(o.paceHighSec));
         return { ...base, repeatCount, paceLowSec, paceHighSec };
       });
       const payload = editableSegmentsToApiPayload(editable);
@@ -906,6 +915,80 @@ export default function WorkoutDetailPage() {
       });
     } finally {
       setPushing(false);
+    }
+  };
+
+  const handleConnectGarmin = async () => {
+    const athleteId = LocalStorageAPI.getAthleteId();
+    if (!athleteId) {
+      alert("Please sign in to connect Garmin");
+      return;
+    }
+    setConnectingGarmin(true);
+    try {
+      const authRes = await api.get("/auth/garmin/authorize", {
+        params: { athleteId: String(athleteId), popup: "true" },
+      });
+      const data = authRes.data as {
+        success?: boolean;
+        authUrl?: string;
+        error?: string;
+      };
+      if (!data.success || !data.authUrl) {
+        throw new Error(data.error || "Invalid response from server");
+      }
+      const popup = window.open(
+        data.authUrl,
+        "garmin-oauth",
+        "width=600,height=700,scrollbars=yes,resizable=yes"
+      );
+      if (!popup) {
+        alert("Popup blocked. Please allow popups for this site.");
+        setConnectingGarmin(false);
+        return;
+      }
+      const checkPopup = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkPopup);
+          setConnectingGarmin(false);
+          const id = LocalStorageAPI.getAthleteId();
+          if (id) {
+            void api
+              .get<{ athlete?: { garmin_connected?: boolean } }>(`/athlete/${id}`)
+              .then((res) => {
+                const c = res.data?.athlete?.garmin_connected;
+                setGarminConnected(typeof c === "boolean" ? c : false);
+              })
+              .catch(() => setGarminConnected(false));
+          }
+        }
+      }, 500);
+      const messageHandler = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return;
+        if (event.data.type === "GARMIN_OAUTH_SUCCESS") {
+          clearInterval(checkPopup);
+          if (!popup.closed) popup.close();
+          setConnectingGarmin(false);
+          setGarminConnected(true);
+          localStorage.setItem("garminConnected", "true");
+          setGarminToast("Garmin connected. You can push this workout below.");
+          window.removeEventListener("message", messageHandler);
+        } else if (event.data.type === "GARMIN_OAUTH_ERROR") {
+          clearInterval(checkPopup);
+          if (!popup.closed) popup.close();
+          setConnectingGarmin(false);
+          alert("Failed to connect Garmin: " + (event.data.error || "Unknown error"));
+          window.removeEventListener("message", messageHandler);
+        }
+      };
+      window.addEventListener("message", messageHandler);
+    } catch (error: unknown) {
+      console.error("Error connecting Garmin:", error);
+      alert(
+        "Failed to connect Garmin: " +
+          (error instanceof Error ? error.message : "Unknown error")
+      );
+      setConnectingGarmin(false);
     }
   };
 
@@ -1063,7 +1146,7 @@ export default function WorkoutDetailPage() {
           <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm sm:text-base font-medium">
               <CheckCircle2 className="w-5 h-5 shrink-0" />
-              Workout saved. Connect Garmin in Settings, then use Push to Garmin on this page.
+              Workout saved. Connect Garmin on this page, then use Push to Garmin.
             </div>
             <button
               type="button"
@@ -1188,7 +1271,7 @@ export default function WorkoutDetailPage() {
               ) : !garminConnected ? (
                 <>
                   <span className="font-medium text-gray-900">Garmin not connected.</span>{" "}
-                  Connect in Settings to push this workout to your watch.
+                  Connect below to push this workout to your watch.
                 </>
               ) : alreadyOnGarmin ? (
                 <span className="inline-flex flex-wrap items-center gap-2">
@@ -1224,12 +1307,14 @@ export default function WorkoutDetailPage() {
                 </button>
               )}
               {!garminConnected && garminConnected !== null && (
-                <Link
-                  href="/settings/garmin"
-                  className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700"
+                <button
+                  type="button"
+                  onClick={handleConnectGarmin}
+                  disabled={connectingGarmin}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 disabled:opacity-50"
                 >
-                  Connect Garmin
-                </Link>
+                  {connectingGarmin ? "Connecting…" : "Connect Garmin"}
+                </button>
               )}
               {garminConnected && (
                 <Link
@@ -1469,12 +1554,12 @@ export default function WorkoutDetailPage() {
                     </label>
                     <label className="block">
                       <span className="text-xs font-semibold uppercase text-gray-500">
-                        Pace low (sec/mi)
+                        Pace low (min:ss /mi)
                       </span>
                       <input
                         type="text"
                         inputMode="numeric"
-                        placeholder="optional"
+                        placeholder="e.g. 7:30"
                         value={segment.paceLowSec}
                         onChange={(e) =>
                           setEditSegments((prev) =>
@@ -1490,12 +1575,12 @@ export default function WorkoutDetailPage() {
                     </label>
                     <label className="block">
                       <span className="text-xs font-semibold uppercase text-gray-500">
-                        Pace high (sec/mi)
+                        Pace high (min:ss /mi)
                       </span>
                       <input
                         type="text"
                         inputMode="numeric"
-                        placeholder="optional"
+                        placeholder="e.g. 7:45"
                         value={segment.paceHighSec}
                         onChange={(e) =>
                           setEditSegments((prev) =>
