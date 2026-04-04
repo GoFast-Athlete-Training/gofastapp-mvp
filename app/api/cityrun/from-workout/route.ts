@@ -55,7 +55,6 @@ function isMissingCityRunsColumn(error: unknown) {
 }
 
 const UNSUPPORTED_CITY_RUN_FIELDS = [
-  "postRunActivity",
   "stravaUrl",
   "stravaText",
   "webUrl",
@@ -98,6 +97,8 @@ function buildWorkoutDescriptionHydration(workout: {
 
 type FromWorkoutBody = {
   workoutId?: string;
+  /** Public listing title (defaults to workout title server-side) */
+  title?: string | null;
   gofastCity?: string;
   cityName?: string;
   state?: string;
@@ -111,7 +112,9 @@ type FromWorkoutBody = {
   startTimeMinute?: number | string | null;
   startTimePeriod?: string | null;
   timezone?: string | null;
+  /** Public CityRun description (listing copy) */
   description?: string | null;
+  postRunActivity?: string | null;
   endPoint?: string | null;
   endStreetAddress?: string | null;
   endCity?: string | null;
@@ -119,8 +122,10 @@ type FromWorkoutBody = {
   meetUpPlaceId?: string | null;
   meetUpLat?: number | string | null;
   meetUpLng?: number | string | null;
-  /** Group pace label e.g. "7:00-7:30" — stored on city_runs.pace */
-  pace?: string | null;
+  totalMiles?: number | string | null;
+  stravaMapUrl?: string | null;
+  mapImageUrl?: string | null;
+  routePhotos?: string[] | null;
 };
 
 /**
@@ -138,6 +143,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as FromWorkoutBody;
     const {
       workoutId,
+      title: titleBody,
       gofastCity,
       cityName,
       state,
@@ -151,7 +157,8 @@ export async function POST(request: NextRequest) {
       startTimeMinute,
       startTimePeriod,
       timezone,
-      description: descriptionOverride,
+      description: listingDescription,
+      postRunActivity: postRunActivityBody,
       endPoint,
       endStreetAddress,
       endCity,
@@ -159,7 +166,10 @@ export async function POST(request: NextRequest) {
       meetUpPlaceId,
       meetUpLat,
       meetUpLng,
-      pace: paceBody,
+      totalMiles: totalMilesBody,
+      stravaMapUrl: stravaMapUrlBody,
+      mapImageUrl: mapImageUrlBody,
+      routePhotos: routePhotosBody,
     } = body;
 
     if (!workoutId?.trim()) {
@@ -170,6 +180,15 @@ export async function POST(request: NextRequest) {
     }
     if (!meetUpPoint?.trim()) {
       return NextResponse.json({ error: "meetUpPoint is required" }, { status: 400 });
+    }
+    if (!meetUpStreetAddress?.trim() || !meetUpCity?.trim() || !meetUpState?.trim()) {
+      return NextResponse.json(
+        {
+          error:
+            "Street address, city, and state are required. Pick a Google Places result or fill address fields.",
+        },
+        { status: 400 }
+      );
     }
 
     const workout = await prisma.workouts.findFirst({
@@ -241,22 +260,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const finalTitle =
+      titleBody?.trim() || workout.title.trim();
+
     let runSlug: string | null = null;
     try {
-      runSlug = await generateUniqueCityRunSlug(workout.title, { date: runDateObj });
+      runSlug = await generateUniqueCityRunSlug(finalTitle, { date: runDateObj });
     } catch (e) {
       console.warn("[cityrun/from-workout] slug generation failed:", e);
     }
 
-    const workoutDescriptionHydrated =
-      descriptionOverride?.trim() ||
-      buildWorkoutDescriptionHydration(workout);
+    const workoutDescriptionHydrated = buildWorkoutDescriptionHydration(workout);
 
     const totalMilesFromWorkout =
       workout.estimatedDistanceInMeters != null &&
       workout.estimatedDistanceInMeters > 0
         ? workout.estimatedDistanceInMeters / 1609.34
         : null;
+
+    const parsedTotalMiles = (() => {
+      if (totalMilesBody == null || totalMilesBody === "") return totalMilesFromWorkout;
+      const n = typeof totalMilesBody === "string" ? parseFloat(totalMilesBody) : totalMilesBody;
+      return Number.isFinite(n) && n > 0 ? n : totalMilesFromWorkout;
+    })();
+
+    const routePhotosFiltered =
+      Array.isArray(routePhotosBody) && routePhotosBody.length > 0
+        ? routePhotosBody.map((u) => String(u).trim()).filter(Boolean).slice(0, 8)
+        : [];
 
     const parseHour = (v: number | string | null | undefined) => {
       if (v == null || v === "") return null;
@@ -286,7 +317,7 @@ export async function POST(request: NextRequest) {
       runClubId: null,
       staffGeneratedId: null,
       athleteGeneratedId: athlete.id,
-      title: workout.title.trim(),
+      title: finalTitle,
       workflowStatus: "APPROVED",
       dayOfWeek: null,
       date: runDateObj,
@@ -309,13 +340,16 @@ export async function POST(request: NextRequest) {
       endStreetAddress: endStreetAddress?.trim() || null,
       endCity: endCity?.trim() || null,
       endState: endState?.trim() || null,
-      totalMiles: totalMilesFromWorkout,
-      pace: paceBody?.trim() || null,
-      stravaMapUrl: null,
-      description: null,
-      postRunActivity: null,
-      routePhotos: Prisma.JsonNull,
-      mapImageUrl: null,
+      totalMiles: parsedTotalMiles,
+      pace: null,
+      stravaMapUrl: stravaMapUrlBody?.trim() || null,
+      description: listingDescription?.trim() || null,
+      postRunActivity: postRunActivityBody?.trim() || null,
+      routePhotos:
+        routePhotosFiltered.length > 0
+          ? routePhotosFiltered
+          : Prisma.JsonNull,
+      mapImageUrl: mapImageUrlBody?.trim() || null,
       staffNotes: null,
       stravaUrl: null,
       stravaText: null,
