@@ -93,8 +93,8 @@ export type PaceZone =
  * workouts; may be goal race pace for other flows). Daniels/McMillan style.
  */
 const OFFSETS_SEC_PER_MILE: Record<PaceZone, number> = {
-  easy: 75,
-  longRun: 50,
+  easy: 90,
+  longRun: 75,
   marathon: 0,
   tempo: 15,
   interval: -10,

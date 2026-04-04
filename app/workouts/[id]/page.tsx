@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -352,7 +352,11 @@ type EditableSegment = {
   durationType: "DISTANCE" | "TIME";
   durationValue: string;
   repeatCount: string;
+  /** Pace low: minutes per mile (integer string). */
+  paceLowMin: string;
+  /** Pace low: seconds 0–59. */
   paceLowSec: string;
+  paceHighMin: string;
   paceHighSec: string;
   notes: string;
 };
@@ -364,8 +368,43 @@ function newClientKey(): string {
   return `k_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function secPerMileToSplitStrings(totalSec: number): { min: string; sec: string } {
+  const rounded = Math.max(0, Math.round(totalSec));
+  return {
+    min: String(Math.floor(rounded / 60)),
+    sec: String(rounded % 60),
+  };
+}
+
 function segmentToEditable(s: WorkoutSegment): EditableSegment {
   const pace = s.targets?.find((t) => (t.type || "").toUpperCase() === "PACE");
+  let paceLowMin = "";
+  let paceLowSec = "";
+  let paceHighMin = "";
+  let paceHighSec = "";
+  if (pace?.valueLow != null && Number.isFinite(Number(pace.valueLow))) {
+    const lowTotal = Math.round(
+      storedPaceSecondsKmToSecondsPerMile(Number(pace.valueLow))
+    );
+    const lo = secPerMileToSplitStrings(lowTotal);
+    paceLowMin = lo.min;
+    paceLowSec = lo.sec;
+  } else if (pace?.value != null && Number.isFinite(Number(pace.value))) {
+    const lowTotal = Math.round(
+      storedPaceSecondsKmToSecondsPerMile(Number(pace.value))
+    );
+    const lo = secPerMileToSplitStrings(lowTotal);
+    paceLowMin = lo.min;
+    paceLowSec = lo.sec;
+  }
+  if (pace?.valueHigh != null && Number.isFinite(Number(pace.valueHigh))) {
+    const highTotal = Math.round(
+      storedPaceSecondsKmToSecondsPerMile(Number(pace.valueHigh))
+    );
+    const hi = secPerMileToSplitStrings(highTotal);
+    paceHighMin = hi.min;
+    paceHighSec = hi.sec;
+  }
   return {
     clientKey: s.id?.trim() ? s.id : newClientKey(),
     title: s.title,
@@ -373,20 +412,34 @@ function segmentToEditable(s: WorkoutSegment): EditableSegment {
     durationValue: String(s.durationValue),
     repeatCount:
       s.repeatCount != null && Number(s.repeatCount) > 1 ? String(s.repeatCount) : "",
-    paceLowSec:
-      pace?.valueLow != null && Number.isFinite(Number(pace.valueLow))
-        ? paceInputValueFromSecPerMile(
-            Math.round(storedPaceSecondsKmToSecondsPerMile(Number(pace.valueLow)))
-          )
-        : "",
-    paceHighSec:
-      pace?.valueHigh != null && Number.isFinite(Number(pace.valueHigh))
-        ? paceInputValueFromSecPerMile(
-            Math.round(storedPaceSecondsKmToSecondsPerMile(Number(pace.valueHigh)))
-          )
-        : "",
+    paceLowMin,
+    paceLowSec,
+    paceHighMin,
+    paceHighSec,
     notes: s.notes ?? "",
   };
+}
+
+/** Combine min + sec inputs to total seconds per mile; empty fields → NaN. */
+function parseSplitPaceToSecPerMile(
+  minStr: string,
+  secStr: string,
+  segmentLabel: string,
+  boundLabel: string
+): number {
+  const minT = minStr.trim();
+  const secT = secStr.trim();
+  if (!minT && !secT) return NaN;
+  const m = minT === "" ? 0 : parseInt(minT, 10);
+  const s = secT === "" ? 0 : parseInt(secT, 10);
+  if (!Number.isFinite(m) || !Number.isFinite(s) || m < 0 || s < 0 || s > 59) {
+    throw new Error(
+      `${segmentLabel}: invalid pace ${boundLabel} — use minutes ≥ 0 and seconds 0–59`
+    );
+  }
+  const total = m * 60 + s;
+  if (total <= 0) return NaN;
+  return total;
 }
 
 function editableSegmentsToApiPayload(segments: EditableSegment[]) {
@@ -404,14 +457,18 @@ function editableSegmentsToApiPayload(segments: EditableSegment[]) {
       const r = parseInt(s.repeatCount, 10);
       if (Number.isFinite(r) && r > 1) repeatCount = r;
     }
-    const lowSecMi = s.paceLowSec.trim()
-      ? (parsePaceMinSecPerMileInput(s.paceLowSec) ??
-        (Number.isFinite(Number(s.paceLowSec)) ? Number(s.paceLowSec) : NaN))
-      : NaN;
-    const highSecMi = s.paceHighSec.trim()
-      ? (parsePaceMinSecPerMileInput(s.paceHighSec) ??
-        (Number.isFinite(Number(s.paceHighSec)) ? Number(s.paceHighSec) : NaN))
-      : NaN;
+    const lowSecMi = parseSplitPaceToSecPerMile(
+      s.paceLowMin,
+      s.paceLowSec,
+      `Segment ${i + 1}`,
+      "low"
+    );
+    const highSecMi = parseSplitPaceToSecPerMile(
+      s.paceHighMin,
+      s.paceHighSec,
+      `Segment ${i + 1}`,
+      "high"
+    );
     const low = Number.isFinite(lowSecMi) ? secondsPerMileToSecondsPerKm(lowSecMi) : NaN;
     const high = Number.isFinite(highSecMi)
       ? secondsPerMileToSecondsPerKm(highSecMi)
@@ -432,24 +489,6 @@ function editableSegmentsToApiPayload(segments: EditableSegment[]) {
       targets,
     };
   });
-}
-
-/** "m:ss" per mile → seconds per mile */
-function parsePaceMinSecPerMileInput(s: string): number | null {
-  const t = s.trim();
-  const m = /^(\d+):(\d{1,2})$/.exec(t);
-  if (!m) return null;
-  const min = Number(m[1]);
-  const sec = Number(m[2]);
-  if (!Number.isFinite(min) || !Number.isFinite(sec) || sec >= 60) return null;
-  return min * 60 + sec;
-}
-
-function paceInputValueFromSecPerMile(sec: number | null | undefined): string {
-  if (sec == null || !Number.isFinite(sec) || sec <= 0) return "";
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 function getPaceSecsFromSegment(seg: WorkoutSegment): {
@@ -481,9 +520,120 @@ function getPaceSecsFromSegment(seg: WorkoutSegment): {
 
 type SegmentQuickOverride = {
   repeatCount?: number;
-  paceLowSec?: number;
-  paceHighSec?: number;
+  /** Set when user edits quick pace; undefined means use segment value for that part. */
+  quickPaceLowMin?: string;
+  quickPaceLowSec?: string;
+  quickPaceHighMin?: string;
+  quickPaceHighSec?: string;
 };
+
+function quickPaceDisplayStrings(
+  seg: WorkoutSegment,
+  o?: SegmentQuickOverride
+): {
+  lowMin: string;
+  lowSec: string;
+  highMin: string;
+  highSec: string;
+} {
+  const { low: baseLow, high: baseHigh } = getPaceSecsFromSegment(seg);
+  return {
+    lowMin:
+      o?.quickPaceLowMin !== undefined
+        ? o.quickPaceLowMin
+        : baseLow != null
+          ? String(Math.floor(baseLow / 60))
+          : "",
+    lowSec:
+      o?.quickPaceLowSec !== undefined
+        ? o.quickPaceLowSec
+        : baseLow != null
+          ? String(Math.round(baseLow % 60))
+          : "",
+    highMin:
+      o?.quickPaceHighMin !== undefined
+        ? o.quickPaceHighMin
+        : baseHigh != null
+          ? String(Math.floor(baseHigh / 60))
+          : "",
+    highSec:
+      o?.quickPaceHighSec !== undefined
+        ? o.quickPaceHighSec
+        : baseHigh != null
+          ? String(Math.round(baseHigh % 60))
+          : "",
+  };
+}
+
+function PaceMiSplitEditor({
+  minValue,
+  secValue,
+  onMinChange,
+  onSecChange,
+  disabled,
+}: {
+  minValue: string;
+  secValue: string;
+  onMinChange: (v: string) => void;
+  onSecChange: (v: string) => void;
+  disabled?: boolean;
+}) {
+  const secRef = useRef<HTMLInputElement>(null);
+  return (
+    <div className="flex items-end gap-1 flex-wrap">
+      <div className="w-[4.25rem]">
+        <span className="block text-xs font-medium text-gray-500 mb-1">Min</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm text-center"
+          value={minValue}
+          disabled={disabled}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "" || /^\d+$/.test(v)) onMinChange(v);
+          }}
+          onKeyDown={(e) => {
+            if (
+              (e.key === "Tab" || e.key === "Enter") &&
+              !e.shiftKey &&
+              secRef.current
+            ) {
+              e.preventDefault();
+              secRef.current.focus();
+            }
+          }}
+        />
+      </div>
+      <span className="text-gray-400 pb-2 select-none">:</span>
+      <div className="w-[4.25rem]">
+        <span className="block text-xs font-medium text-gray-500 mb-1">Sec</span>
+        <input
+          ref={secRef}
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={59}
+          className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm text-center"
+          value={secValue}
+          disabled={disabled}
+          onChange={(e) => {
+            const v = e.target.value.replace(/\D/g, "");
+            if (v === "") {
+              onSecChange("");
+              return;
+            }
+            const n = parseInt(v, 10);
+            if (!Number.isFinite(n)) return;
+            onSecChange(String(Math.min(59, n)));
+          }}
+        />
+      </div>
+      <span className="text-xs text-gray-500 pb-2 select-none">/mi</span>
+    </div>
+  );
+}
 
 function formatTargetLine(target: NonNullable<WorkoutSegment["targets"]>[0]): string {
   const type = (target.type || "").toUpperCase();
@@ -716,7 +866,9 @@ export default function WorkoutDetailPage() {
         durationType: "DISTANCE",
         durationValue: "1",
         repeatCount: "",
+        paceLowMin: "",
         paceLowSec: "",
+        paceHighMin: "",
         paceHighSec: "",
         notes: "",
       },
@@ -792,21 +944,44 @@ export default function WorkoutDetailPage() {
     [sortedSegments]
   );
 
-  const updateQuickPaceField = useCallback(
-    (segmentId: string, field: "low" | "high", raw: string) => {
-      const parsed = parsePaceMinSecPerMileInput(raw);
+  const updateQuickPaceSplit = useCallback(
+    (
+      segmentId: string,
+      bound: "low" | "high",
+      part: "min" | "sec",
+      raw: string
+    ) => {
       setSegmentOverrides((prev) => {
-        const o = { ...prev[segmentId] };
-        if (parsed == null) {
-          if (field === "low") delete o.paceLowSec;
-          else delete o.paceHighSec;
-        } else if (field === "low") {
-          o.paceLowSec = parsed;
+        const seg = sortedSegments.find((s) => s.id === segmentId);
+        if (!seg) return prev;
+        const o: SegmentQuickOverride = { ...prev[segmentId] };
+
+        if (bound === "low") {
+          if (part === "min") {
+            const v = raw.replace(/\D/g, "");
+            if (v === "") delete o.quickPaceLowMin;
+            else o.quickPaceLowMin = v;
+          } else {
+            const v = raw.replace(/\D/g, "");
+            if (v === "") delete o.quickPaceLowSec;
+            else o.quickPaceLowSec = String(Math.min(59, parseInt(v, 10) || 0));
+          }
+        } else if (part === "min") {
+          const v = raw.replace(/\D/g, "");
+          if (v === "") delete o.quickPaceHighMin;
+          else o.quickPaceHighMin = v;
         } else {
-          o.paceHighSec = parsed;
+          const v = raw.replace(/\D/g, "");
+          if (v === "") delete o.quickPaceHighSec;
+          else o.quickPaceHighSec = String(Math.min(59, parseInt(v, 10) || 0));
         }
-        const hasAny =
-          o.repeatCount != null || o.paceLowSec != null || o.paceHighSec != null;
+
+        const hasPace =
+          o.quickPaceLowMin !== undefined ||
+          o.quickPaceLowSec !== undefined ||
+          o.quickPaceHighMin !== undefined ||
+          o.quickPaceHighSec !== undefined;
+        const hasAny = o.repeatCount != null || hasPace;
         if (!hasAny) {
           const { [segmentId]: _, ...rest } = prev;
           return rest;
@@ -814,7 +989,7 @@ export default function WorkoutDetailPage() {
         return { ...prev, [segmentId]: o };
       });
     },
-    []
+    [sortedSegments]
   );
 
   const saveQuickSegments = useCallback(async () => {
@@ -834,13 +1009,15 @@ export default function WorkoutDetailPage() {
         if (o?.repeatCount != null) {
           repeatCount = o.repeatCount > 1 ? String(o.repeatCount) : "";
         }
-        let paceLowSec = base.paceLowSec;
-        let paceHighSec = base.paceHighSec;
-        if (o?.paceLowSec != null)
-          paceLowSec = paceInputValueFromSecPerMile(Math.round(o.paceLowSec));
-        if (o?.paceHighSec != null)
-          paceHighSec = paceInputValueFromSecPerMile(Math.round(o.paceHighSec));
-        return { ...base, repeatCount, paceLowSec, paceHighSec };
+        const q = quickPaceDisplayStrings(seg, o);
+        return {
+          ...base,
+          repeatCount,
+          paceLowMin: q.lowMin,
+          paceLowSec: q.lowSec,
+          paceHighMin: q.highMin,
+          paceHighSec: q.highSec,
+        };
       });
       const payload = editableSegmentsToApiPayload(editable);
       await api.put(`/workouts/${workoutId}/segments`, payload);
@@ -1530,8 +1707,8 @@ export default function WorkoutDetailPage() {
                       />
                     </label>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <label className="block">
+                  <div className="space-y-4">
+                    <label className="block max-w-xs">
                       <span className="text-xs font-semibold uppercase text-gray-500">
                         Repeat block (×)
                       </span>
@@ -1552,48 +1729,62 @@ export default function WorkoutDetailPage() {
                         className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                       />
                     </label>
-                    <label className="block">
-                      <span className="text-xs font-semibold uppercase text-gray-500">
-                        Pace low (min:ss /mi)
-                      </span>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="e.g. 7:30"
-                        value={segment.paceLowSec}
-                        onChange={(e) =>
-                          setEditSegments((prev) =>
-                            prev.map((s) =>
-                              s.clientKey === segment.clientKey
-                                ? { ...s, paceLowSec: e.target.value }
-                                : s
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-xs font-semibold uppercase text-gray-500 block mb-1">
+                          Pace low
+                        </span>
+                        <PaceMiSplitEditor
+                          minValue={segment.paceLowMin}
+                          secValue={segment.paceLowSec}
+                          onMinChange={(v) =>
+                            setEditSegments((prev) =>
+                              prev.map((s) =>
+                                s.clientKey === segment.clientKey
+                                  ? { ...s, paceLowMin: v }
+                                  : s
+                              )
                             )
-                          )
-                        }
-                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="text-xs font-semibold uppercase text-gray-500">
-                        Pace high (min:ss /mi)
-                      </span>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="e.g. 7:45"
-                        value={segment.paceHighSec}
-                        onChange={(e) =>
-                          setEditSegments((prev) =>
-                            prev.map((s) =>
-                              s.clientKey === segment.clientKey
-                                ? { ...s, paceHighSec: e.target.value }
-                                : s
+                          }
+                          onSecChange={(v) =>
+                            setEditSegments((prev) =>
+                              prev.map((s) =>
+                                s.clientKey === segment.clientKey
+                                  ? { ...s, paceLowSec: v }
+                                  : s
+                              )
                             )
-                          )
-                        }
-                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                      />
-                    </label>
+                          }
+                        />
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold uppercase text-gray-500 block mb-1">
+                          Pace high
+                        </span>
+                        <PaceMiSplitEditor
+                          minValue={segment.paceHighMin}
+                          secValue={segment.paceHighSec}
+                          onMinChange={(v) =>
+                            setEditSegments((prev) =>
+                              prev.map((s) =>
+                                s.clientKey === segment.clientKey
+                                  ? { ...s, paceHighMin: v }
+                                  : s
+                              )
+                            )
+                          }
+                          onSecChange={(v) =>
+                            setEditSegments((prev) =>
+                              prev.map((s) =>
+                                s.clientKey === segment.clientKey
+                                  ? { ...s, paceHighSec: v }
+                                  : s
+                              )
+                            )
+                          }
+                        />
+                      </div>
+                    </div>
                   </div>
                   <label className="block">
                     <span className="text-xs font-semibold uppercase text-gray-500">Notes</span>
@@ -1650,8 +1841,7 @@ export default function WorkoutDetailPage() {
                 const effRepeat = o?.repeatCount ?? segment.repeatCount ?? 1;
                 const showRepeatStepper = !isLogged && effRepeat >= 2;
                 const { low: baseLow, high: baseHigh } = getPaceSecsFromSegment(segment);
-                const effLow = o?.paceLowSec ?? baseLow;
-                const effHigh = o?.paceHighSec ?? baseHigh;
+                const qStr = quickPaceDisplayStrings(segment, o);
                 const hasPaceTarget = baseLow != null || baseHigh != null;
                 return (
                   <div
@@ -1757,49 +1947,37 @@ export default function WorkoutDetailPage() {
                                     <span className="text-gray-600 text-sm block">
                                       {workoutTargetTypeLabel(target.type || "Target")}
                                     </span>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
-                                      <label className="block text-sm">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
+                                      <div>
                                         <span className="text-xs font-medium text-gray-500 block mb-1">
-                                          Pace low (min:ss /mi)
+                                          Pace low
                                         </span>
-                                        <input
-                                          type="text"
-                                          inputMode="numeric"
-                                          value={paceInputValueFromSecPerMile(effLow ?? undefined)}
-                                          onChange={(e) =>
-                                            updateQuickPaceField(
-                                              segment.id,
-                                              "low",
-                                              e.target.value
-                                            )
+                                        <PaceMiSplitEditor
+                                          minValue={qStr.lowMin}
+                                          secValue={qStr.lowSec}
+                                          onMinChange={(v) =>
+                                            updateQuickPaceSplit(segment.id, "low", "min", v)
                                           }
-                                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                                          placeholder="e.g. 7:30"
-                                        />
-                                      </label>
-                                      <label className="block text-sm">
-                                        <span className="text-xs font-medium text-gray-500 block mb-1">
-                                          Pace high (min:ss /mi)
-                                        </span>
-                                        <input
-                                          type="text"
-                                          inputMode="numeric"
-                                          value={paceInputValueFromSecPerMile(
-                                            effHigh ?? undefined
-                                          )}
-                                          onChange={(e) =>
-                                            updateQuickPaceField(
-                                              segment.id,
-                                              "high",
-                                              e.target.value
-                                            )
-                                          }
-                                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                                          placeholder={
-                                            baseHigh != null ? "e.g. 8:00" : "optional"
+                                          onSecChange={(v) =>
+                                            updateQuickPaceSplit(segment.id, "low", "sec", v)
                                           }
                                         />
-                                      </label>
+                                      </div>
+                                      <div>
+                                        <span className="text-xs font-medium text-gray-500 block mb-1">
+                                          Pace high
+                                        </span>
+                                        <PaceMiSplitEditor
+                                          minValue={qStr.highMin}
+                                          secValue={qStr.highSec}
+                                          onMinChange={(v) =>
+                                            updateQuickPaceSplit(segment.id, "high", "min", v)
+                                          }
+                                          onSecChange={(v) =>
+                                            updateQuickPaceSplit(segment.id, "high", "sec", v)
+                                          }
+                                        />
+                                      </div>
                                     </div>
                                   </div>
                                 );
