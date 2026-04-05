@@ -29,7 +29,7 @@ model Athlete {
   gofastHandle            String?                  @unique
   photoURL                String?
   /// GoFast Page hero — finish line / action shot (public). URL string.
-  runPhotoURL             String?
+  myBestRunPhotoURL       String?
   phoneNumber             String?
   birthday                DateTime?
   gender                  String?

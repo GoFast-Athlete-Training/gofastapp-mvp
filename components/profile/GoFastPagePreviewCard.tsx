@@ -14,19 +14,19 @@ import {
 } from "lucide-react";
 import { getGoFastAppPublicUrl } from "@/lib/gofast-app-public-url";
 
-export type PublicRunPhotoAthlete = {
+export type GoFastPageAthlete = {
   gofastHandle: string | null;
   firstName: string | null;
   lastName: string | null;
   photoURL: string | null;
-  runPhotoURL?: string | null;
+  myBestRunPhotoURL?: string | null;
   bio: string | null;
   city: string | null;
   state: string | null;
   primarySport: string | null;
 };
 
-export type PublicRunPhotoRace = {
+export type GoFastPageRace = {
   id: string;
   name: string;
   slug: string | null;
@@ -37,7 +37,7 @@ export type PublicRunPhotoRace = {
   raceType: string;
 };
 
-export type PublicRunPhotoLastRun = {
+export type GoFastPageLastRun = {
   activityName: string | null;
   startTime: string | null;
   distanceMiles: number | null;
@@ -45,9 +45,9 @@ export type PublicRunPhotoLastRun = {
   activityType: string | null;
 };
 
-export type PublicRunPhotoPayload = {
+export type GoFastPagePayload = {
   success: boolean;
-  athlete: PublicRunPhotoAthlete | null;
+  athlete: GoFastPageAthlete | null;
   trainingSummary: {
     planName: string;
     startDate: string;
@@ -63,8 +63,8 @@ export type PublicRunPhotoPayload = {
     raceName: string | null;
     raceSlug: string | null;
   } | null;
-  lastRun?: PublicRunPhotoLastRun | null;
-  signedUpRaces: PublicRunPhotoRace[];
+  lastRun?: GoFastPageLastRun | null;
+  signedUpRaces: GoFastPageRace[];
   upcomingWorkouts: {
     id: string;
     title: string;
@@ -120,7 +120,7 @@ function formatDuration(sec: number | null): string {
 export default function GoFastPagePreviewCard({
   data,
 }: {
-  data: PublicRunPhotoPayload;
+  data: GoFastPagePayload;
 }) {
   const appBase = getGoFastAppPublicUrl();
   const { athlete } = data;
@@ -151,7 +151,7 @@ export default function GoFastPagePreviewCard({
 
   const signupUrl = `${appBase.replace(/\/$/, "")}/signup`;
   const heroSrc =
-    athlete.runPhotoURL?.trim() || athlete.photoURL?.trim() || null;
+    athlete.myBestRunPhotoURL?.trim() || athlete.photoURL?.trim() || null;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-20">

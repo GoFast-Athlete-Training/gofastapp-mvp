@@ -222,7 +222,7 @@ export async function GET(
         firstName: athlete.firstName,
         lastName: athlete.lastName,
         photoURL: athlete.photoURL,
-        runPhotoURL: athlete.runPhotoURL,
+        myBestRunPhotoURL: athlete.myBestRunPhotoURL,
         bio: athlete.bio,
         city: athlete.city,
         state: athlete.state,

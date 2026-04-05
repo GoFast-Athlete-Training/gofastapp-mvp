@@ -131,8 +131,11 @@ export async function PUT(
       bio: body.bio || null,
       instagram: body.instagram || null,
       photoURL: body.photoURL || null,
-      ...(Object.prototype.hasOwnProperty.call(body, 'runPhotoURL') && {
-        runPhotoURL: body.runPhotoURL == null || body.runPhotoURL === '' ? null : String(body.runPhotoURL),
+      ...(Object.prototype.hasOwnProperty.call(body, 'myBestRunPhotoURL') && {
+        myBestRunPhotoURL:
+          body.myBestRunPhotoURL == null || body.myBestRunPhotoURL === ''
+            ? null
+            : String(body.myBestRunPhotoURL),
       }),
       ...(body.fiveKPace !== undefined && { fiveKPace: body.fiveKPace === "" ? null : body.fiveKPace }),
       ...(body.weeklyMileage !== undefined && { weeklyMileage: body.weeklyMileage == null ? null : Number(body.weeklyMileage) }),

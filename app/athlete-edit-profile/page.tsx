@@ -12,7 +12,7 @@ import AthleteAppShell from '@/components/athlete/AthleteAppShell';
 export default function AthleteEditProfilePage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const runPhotoInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -29,8 +29,8 @@ export default function AthleteEditProfilePage() {
     weeklyMileage: '',
     profilePhoto: null as File | null,
     profilePhotoPreview: null as string | null,
-    runPhoto: null as File | null,
-    runPhotoPreview: null as string | null,
+    bannerFile: null as File | null,
+    bannerPreview: null as string | null,
   });
   const [athleteId, setAthleteId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -71,8 +71,8 @@ export default function AthleteEditProfilePage() {
               : "",
           profilePhoto: null,
           profilePhotoPreview: stored.photoURL || auth.currentUser?.photoURL || null,
-          runPhoto: null,
-          runPhotoPreview: stored.runPhotoURL || null,
+          bannerFile: null,
+          bannerPreview: stored.myBestRunPhotoURL || null,
         });
       })
       .catch(() => {
@@ -116,7 +116,7 @@ export default function AthleteEditProfilePage() {
     fileInputRef.current?.click();
   };
 
-  const handleRunPhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBannerUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
@@ -130,14 +130,14 @@ export default function AthleteEditProfilePage() {
       const previewUrl = URL.createObjectURL(file);
       setFormData((prev) => ({
         ...prev,
-        runPhoto: file,
-        runPhotoPreview: previewUrl,
+        bannerFile: file,
+        bannerPreview: previewUrl,
       }));
     }
   };
 
-  const handleRunPhotoClick = () => {
-    runPhotoInputRef.current?.click();
+  const handleBannerClick = () => {
+    bannerInputRef.current?.click();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -173,7 +173,7 @@ export default function AthleteEditProfilePage() {
       console.log('🌐 Updating profile via /api/athlete/:id/profile');
       
       const photoURL = formData.profilePhotoPreview || firebaseUser.photoURL || null;
-      const runPhotoURL = formData.runPhotoPreview || null;
+      const bannerURL = formData.bannerPreview || null;
       
       const profileRes = await api.put(`/athlete/${athleteId}/profile`, {
         firstName: formData.firstName,
@@ -188,7 +188,7 @@ export default function AthleteEditProfilePage() {
         bio: formData.bio,
         instagram: formData.instagram,
         photoURL: photoURL,
-        runPhotoURL: runPhotoURL,
+        myBestRunPhotoURL: bannerURL,
         fiveKPace: formData.fiveKPace.trim() || null,
         weeklyMileage: (() => {
           const t = formData.weeklyMileage.trim();
@@ -310,13 +310,13 @@ export default function AthleteEditProfilePage() {
             <div
               role="button"
               tabIndex={0}
-              onClick={handleRunPhotoClick}
-              onKeyDown={(e) => e.key === 'Enter' && handleRunPhotoClick()}
+              onClick={handleBannerClick}
+              onKeyDown={(e) => e.key === 'Enter' && handleBannerClick()}
               className="w-full aspect-[21/9] max-h-36 bg-gray-200 rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-300 transition-colors overflow-hidden"
             >
-              {formData.runPhotoPreview ? (
+              {formData.bannerPreview ? (
                 <img
-                  src={formData.runPhotoPreview}
+                  src={formData.bannerPreview}
                   alt=""
                   className="w-full h-full object-cover"
                 />
@@ -326,16 +326,16 @@ export default function AthleteEditProfilePage() {
             </div>
             <button
               type="button"
-              onClick={handleRunPhotoClick}
+              onClick={handleBannerClick}
               className="mt-2 text-orange-600 text-sm font-medium hover:text-orange-700"
             >
-              {formData.runPhotoPreview ? 'Change banner' : 'Add banner'}
+              {formData.bannerPreview ? 'Change banner' : 'Add banner'}
             </button>
             <input
-              ref={runPhotoInputRef}
+              ref={bannerInputRef}
               type="file"
               accept="image/*"
-              onChange={handleRunPhotoUpload}
+              onChange={handleBannerUpload}
               className="hidden"
             />
           </div>

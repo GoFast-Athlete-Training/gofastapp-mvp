@@ -5,7 +5,7 @@ import { User, Gauge, MapPin, Users, Pencil, Sparkles } from "lucide-react";
 
 const items: { label: string; href: string; icon: typeof User }[] = [
   { label: "Overview", href: "/profile", icon: User },
-  { label: "GoFast Page preview", href: "/profile/runphoto-preview", icon: Sparkles },
+  { label: "GoFast Page preview", href: "/profile/gofast-page", icon: Sparkles },
   { label: "Training & pace", href: "/profile/training", icon: Gauge },
   { label: "Findability", href: "/profile/discoverability", icon: MapPin },
   { label: "Community", href: "/profile/community", icon: Users },

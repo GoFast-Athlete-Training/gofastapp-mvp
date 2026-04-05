@@ -6,7 +6,7 @@ import Link from "next/link";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import GoFastPagePreviewCard, {
-  type PublicRunPhotoPayload,
+  type GoFastPagePayload,
 } from "@/components/profile/GoFastPagePreviewCard";
 
 const RUNNER_BASE =
@@ -15,7 +15,7 @@ const RUNNER_BASE =
 
 export default function GoFastPagePreviewRoute() {
   const router = useRouter();
-  const [payload, setPayload] = useState<PublicRunPhotoPayload | null>(null);
+  const [payload, setPayload] = useState<GoFastPagePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -39,7 +39,7 @@ export default function GoFastPagePreviewRoute() {
           return;
         }
         const pubRes = await fetch(`/api/athlete/public/${encodeURIComponent(handle)}`);
-        const data = (await pubRes.json()) as PublicRunPhotoPayload & { error?: string };
+        const data = (await pubRes.json()) as GoFastPagePayload & { error?: string };
         if (!pubRes.ok || !data.success || !data.athlete) {
           if (!cancelled) {
             setError(data.error || "Could not load your public page data.");

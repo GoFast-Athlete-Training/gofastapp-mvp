@@ -145,7 +145,7 @@ export default function ProfilePage() {
           </button>
           <button
             type="button"
-            onClick={() => router.push('/profile/runphoto-preview')}
+            onClick={() => router.push('/profile/gofast-page')}
             className="border-2 border-gray-200 text-gray-800 px-6 py-2.5 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
           >
             GoFast Page preview
