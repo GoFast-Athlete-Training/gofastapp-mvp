@@ -12,6 +12,7 @@ import AthleteAppShell from '@/components/athlete/AthleteAppShell';
 export default function AthleteEditProfilePage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const runPhotoInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -28,6 +29,8 @@ export default function AthleteEditProfilePage() {
     weeklyMileage: '',
     profilePhoto: null as File | null,
     profilePhotoPreview: null as string | null,
+    runPhoto: null as File | null,
+    runPhotoPreview: null as string | null,
   });
   const [athleteId, setAthleteId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -68,6 +71,8 @@ export default function AthleteEditProfilePage() {
               : "",
           profilePhoto: null,
           profilePhotoPreview: stored.photoURL || auth.currentUser?.photoURL || null,
+          runPhoto: null,
+          runPhotoPreview: stored.runPhotoURL || null,
         });
       })
       .catch(() => {
@@ -111,6 +116,30 @@ export default function AthleteEditProfilePage() {
     fileInputRef.current?.click();
   };
 
+  const handleRunPhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Please select a valid image file');
+        return;
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        alert('Image size must be less than 8MB');
+        return;
+      }
+      const previewUrl = URL.createObjectURL(file);
+      setFormData((prev) => ({
+        ...prev,
+        runPhoto: file,
+        runPhotoPreview: previewUrl,
+      }));
+    }
+  };
+
+  const handleRunPhotoClick = () => {
+    runPhotoInputRef.current?.click();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -144,6 +173,7 @@ export default function AthleteEditProfilePage() {
       console.log('🌐 Updating profile via /api/athlete/:id/profile');
       
       const photoURL = formData.profilePhotoPreview || firebaseUser.photoURL || null;
+      const runPhotoURL = formData.runPhotoPreview || null;
       
       const profileRes = await api.put(`/athlete/${athleteId}/profile`, {
         firstName: formData.firstName,
@@ -158,6 +188,7 @@ export default function AthleteEditProfilePage() {
         bio: formData.bio,
         instagram: formData.instagram,
         photoURL: photoURL,
+        runPhotoURL: runPhotoURL,
         fiveKPace: formData.fiveKPace.trim() || null,
         weeklyMileage: (() => {
           const t = formData.weeklyMileage.trim();
@@ -211,6 +242,13 @@ export default function AthleteEditProfilePage() {
   return (
     <AthleteAppShell>
       <div className="max-w-2xl w-full mx-auto px-4 sm:px-6 py-8">
+        <button
+          type="button"
+          onClick={() => router.push('/profile')}
+          className="mb-4 text-sm font-medium text-orange-600 hover:text-orange-700"
+        >
+          ← Back to profile
+        </button>
         <div className="bg-white rounded-2xl shadow-lg p-8">
         {/* Header */}
         <div className="text-center mb-8">
@@ -260,6 +298,44 @@ export default function AthleteEditProfilePage() {
               type="file"
               accept="image/*"
               onChange={handleImageUpload}
+              className="hidden"
+            />
+          </div>
+
+          <div className="rounded-xl border border-orange-100 bg-orange-50/50 p-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">GoFast Page — banner photo</h3>
+            <p className="text-xs text-gray-600 mb-3">
+              Finish line, mid-race, or trail shot. This is the big photo on your public GoFast Page (separate from your profile circle).
+            </p>
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={handleRunPhotoClick}
+              onKeyDown={(e) => e.key === 'Enter' && handleRunPhotoClick()}
+              className="w-full aspect-[21/9] max-h-36 bg-gray-200 rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-300 transition-colors overflow-hidden"
+            >
+              {formData.runPhotoPreview ? (
+                <img
+                  src={formData.runPhotoPreview}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-gray-500 text-sm">Tap to add banner</span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handleRunPhotoClick}
+              className="mt-2 text-orange-600 text-sm font-medium hover:text-orange-700"
+            >
+              {formData.runPhotoPreview ? 'Change banner' : 'Add banner'}
+            </button>
+            <input
+              ref={runPhotoInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleRunPhotoUpload}
               className="hidden"
             />
           </div>

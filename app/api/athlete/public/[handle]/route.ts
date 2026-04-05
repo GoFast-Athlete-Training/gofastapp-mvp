@@ -156,6 +156,42 @@ export async function GET(
       }
     }
 
+    const lastActivity = await prisma.athlete_activities.findFirst({
+      where: {
+        athleteId: athlete.id,
+        ingestionStatus: 'MATCHED',
+      },
+      orderBy: { startTime: 'desc' },
+      select: {
+        activityName: true,
+        startTime: true,
+        distance: true,
+        duration: true,
+        activityType: true,
+      },
+    });
+
+    let lastRun: {
+      activityName: string | null;
+      startTime: string | null;
+      distanceMiles: number | null;
+      durationSeconds: number | null;
+      activityType: string | null;
+    } | null = null;
+    if (lastActivity?.startTime) {
+      const miles =
+        lastActivity.distance != null && lastActivity.distance > 0
+          ? lastActivity.distance / 1609.34
+          : null;
+      lastRun = {
+        activityName: lastActivity.activityName,
+        startTime: lastActivity.startTime.toISOString(),
+        distanceMiles: miles,
+        durationSeconds: lastActivity.duration ?? null,
+        activityType: lastActivity.activityType,
+      };
+    }
+
     const startOfToday = new Date(now);
     startOfToday.setHours(0, 0, 0, 0);
     const workoutRows = await prisma.workouts.findMany({
@@ -186,6 +222,7 @@ export async function GET(
         firstName: athlete.firstName,
         lastName: athlete.lastName,
         photoURL: athlete.photoURL,
+        runPhotoURL: athlete.runPhotoURL,
         bio: athlete.bio,
         city: athlete.city,
         state: athlete.state,
@@ -193,6 +230,7 @@ export async function GET(
       },
       trainingSummary,
       primaryChasingGoal,
+      lastRun,
       signedUpRaces,
       upcomingWorkouts,
       upcomingRuns: upcomingRuns.map((r) => ({
