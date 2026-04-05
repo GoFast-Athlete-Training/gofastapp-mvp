@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Image from 'next/image';
 import Link from 'next/link';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
@@ -375,22 +374,42 @@ function AthleteEditProfileInner() {
 
   const liveGoFastUrl = formData.gofastHandle ? `${RUNNER_BASE}/${formData.gofastHandle}` : null;
 
-  const tabBtn = (id: ProfileTab, label: string) => (
+  const sectionMeta: Record<ProfileTab, { title: string; subtitle: string }> = {
+    you: {
+      title: 'You',
+      subtitle:
+        'Profile photo, name, GoFast handle, birthday, gender, phone, and city. Save when you’re done with this section.',
+    },
+    'gofast-page': {
+      title: 'GoFast Page',
+      subtitle:
+        'Public hero banner, bio, sport, Instagram, and optional GoFast Container. These fields shape how the world sees you.',
+    },
+    training: {
+      title: 'Training',
+      subtitle: '5K pace and weekly mileage help tune workouts and pacing in the app.',
+    },
+  };
+
+  const sectionNavItem = (id: ProfileTab, label: string, hint: string) => (
     <button
       key={id}
       type="button"
       onClick={() => setTab(id)}
-      className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${
-        activeTab === id ? 'bg-orange-500 text-white shadow' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+      className={`w-full rounded-r-lg border-l-[3px] px-3 py-3 text-left transition-colors ${
+        activeTab === id
+          ? 'border-orange-500 bg-white text-gray-900 shadow-sm'
+          : 'border-transparent text-gray-600 hover:bg-white/60 hover:text-gray-900'
       }`}
     >
-      {label}
+      <span className={`block text-sm ${activeTab === id ? 'font-semibold' : 'font-medium'}`}>{label}</span>
+      <span className="mt-0.5 block text-xs text-gray-500 leading-snug">{hint}</span>
     </button>
   );
 
   return (
     <AthleteAppShell>
-      <div className="max-w-2xl w-full mx-auto px-4 sm:px-6 py-8">
+      <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <button
           type="button"
           onClick={() => router.push('/profile')}
@@ -398,37 +417,39 @@ function AthleteEditProfileInner() {
         >
           ← Back to profile
         </button>
-        <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
-          <div className="text-center mb-6">
-            <Image
-              src="/logo.jpg"
-              alt="GoFast"
-              width={56}
-              height={56}
-              className="w-14 h-14 rounded-full mx-auto mb-3"
-            />
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Edit profile</h1>
-            <p className="text-gray-600 text-sm mt-1">Save each section with the button at the bottom of the tab.</p>
-          </div>
 
-          <div className="flex gap-2 mb-6">
-            {tabBtn('you', 'You')}
-            {tabBtn('gofast-page', 'GoFast Page')}
-            {tabBtn('training', 'Training')}
-          </div>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-              <p className="text-red-800 text-sm whitespace-pre-line">{error}</p>
+        <div className="flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg md:min-h-[580px] md:flex-row">
+          <aside className="shrink-0 border-b border-gray-200 bg-gradient-to-b from-gray-50 to-gray-50/90 md:w-64 md:border-b-0 md:border-r md:border-gray-200 md:bg-gray-50">
+            <div className="sticky top-0 p-3 sm:p-4">
+              <p className="mb-2 hidden px-1 text-xs font-bold uppercase tracking-wider text-gray-400 md:block">
+                Sections
+              </p>
+              <nav className="flex flex-col gap-0.5" aria-label="Profile sections">
+                {sectionNavItem('you', 'You', 'Photo, name & account')}
+                {sectionNavItem('gofast-page', 'GoFast Page', 'Public page & banner')}
+                {sectionNavItem('training', 'Training', 'Pace & mileage')}
+              </nav>
             </div>
-          )}
-          {success && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-              <p className="text-green-800 text-sm">{success}</p>
-            </div>
-          )}
+          </aside>
 
-          {activeTab === 'you' && (
+          <div className="min-w-0 flex-1 p-5 sm:p-8">
+            <header className="mb-6 border-b border-gray-100 pb-4">
+              <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{sectionMeta[activeTab].title}</h1>
+              <p className="mt-1.5 text-sm leading-relaxed text-gray-500">{sectionMeta[activeTab].subtitle}</p>
+            </header>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                <p className="text-red-800 text-sm whitespace-pre-line">{error}</p>
+              </div>
+            )}
+            {success && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <p className="text-green-800 text-sm">{success}</p>
+              </div>
+            )}
+
+            {activeTab === 'you' && (
             <div className="space-y-5">
               <div className="text-center">
                 <div
@@ -777,9 +798,6 @@ function AthleteEditProfileInner() {
 
           {activeTab === 'training' && (
             <div className="space-y-5">
-              <p className="text-sm text-gray-600">
-                These help tune workouts and pacing. You can refine them anytime.
-              </p>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Current 5K pace</label>
                 <input
@@ -823,6 +841,7 @@ function AthleteEditProfileInner() {
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
     </AthleteAppShell>
