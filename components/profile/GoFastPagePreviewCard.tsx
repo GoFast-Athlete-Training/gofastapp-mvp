@@ -83,6 +83,22 @@ export type GoFastPagePayload = {
     startTimePeriod: string | null;
     gorunPath: string;
   }[];
+  isGoFastContainer?: boolean;
+  hostAthleteId?: string;
+  containerMemberCount?: number;
+  containerRecentMembers?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    photoURL: string | null;
+    gofastHandle: string | null;
+  }[];
+  containerMessagesPreview?: {
+    id: string;
+    body: string;
+    createdAt: string;
+    authorDisplay: string;
+  }[];
 };
 
 function formatWhen(iso: string): string {
@@ -222,7 +238,7 @@ export default function GoFastPagePreviewCard({
               href={signupUrl}
               className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-amber-500/25 hover:bg-amber-400 transition-colors"
             >
-              Train with GoFast
+              {data.isGoFastContainer ? "Join & train with GoFast" : "Train with GoFast"}
               <ChevronRight className="w-4 h-4" />
             </a>
           </div>
@@ -230,6 +246,72 @@ export default function GoFastPagePreviewCard({
       </section>
 
       <div className="max-w-3xl mx-auto px-5 space-y-10 -mt-2 relative z-20">
+        {data.isGoFastContainer && athlete.gofastHandle ? (
+          <section className="rounded-2xl border border-violet-500/35 bg-zinc-900/85 p-5 shadow-lg shadow-violet-950/20">
+            <h2 className="text-lg font-semibold text-white mb-1">Community</h2>
+            <p className="text-sm text-zinc-400 mb-4">
+              Join {displayName}&apos;s GoFast Container — upcoming runs below, chatter in the app.
+            </p>
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <a
+                href={`${appBase.replace(/\/$/, "")}/container/${encodeURIComponent(athlete.gofastHandle)}`}
+                className="inline-flex items-center gap-2 rounded-full bg-violet-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-400 transition-colors"
+              >
+                Join community
+                <ChevronRight className="w-4 h-4" />
+              </a>
+              <span className="text-sm text-zinc-400">
+                {data.containerMemberCount ?? 0} member
+                {(data.containerMemberCount ?? 0) !== 1 ? "s" : ""}
+              </span>
+            </div>
+            {(data.containerRecentMembers?.length ?? 0) > 0 ? (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {data.containerRecentMembers!.slice(0, 8).map((m) => (
+                  <span
+                    key={m.id}
+                    className="inline-flex items-center gap-1 rounded-full border border-zinc-700 bg-zinc-950/50 px-2 py-1 text-xs text-zinc-300"
+                  >
+                    {m.photoURL ? (
+                      <img src={m.photoURL} alt="" className="h-5 w-5 rounded-full object-cover" />
+                    ) : null}
+                    {[m.firstName, m.lastName].filter(Boolean).join(" ") || m.gofastHandle || "Member"}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            {(data.containerMessagesPreview?.length ?? 0) > 0 ? (
+              <div className="border-t border-zinc-800 pt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">
+                  Recent chatter
+                </p>
+                <ul className="space-y-2">
+                  {data.containerMessagesPreview!.map((msg) => (
+                    <li key={msg.id} className="text-sm text-zinc-300">
+                      <span className="text-amber-400/90 font-medium">{msg.authorDisplay}</span>
+                      <span className="text-zinc-600"> · </span>
+                      <span className="text-zinc-400">{msg.body}</span>
+                    </li>
+                  ))}
+                </ul>
+                <a
+                  href={`${appBase.replace(/\/$/, "")}/container/${encodeURIComponent(athlete.gofastHandle)}`}
+                  className="mt-3 inline-block text-xs font-semibold text-amber-400 hover:text-amber-300"
+                >
+                  Open full feed in the app →
+                </a>
+              </div>
+            ) : (
+              <a
+                href={`${appBase.replace(/\/$/, "")}/container/${encodeURIComponent(athlete.gofastHandle)}`}
+                className="inline-block text-xs font-semibold text-amber-400 hover:text-amber-300"
+              >
+                Say hi in the app →
+              </a>
+            )}
+          </section>
+        ) : null}
+
         {data.upcomingRuns.length > 0 ? (
           <section>
             <h2 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">

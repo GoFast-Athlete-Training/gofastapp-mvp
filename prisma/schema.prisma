@@ -38,6 +38,8 @@ model Athlete {
   primarySport            String?
   bio                     String?
   instagram               String?
+  /// Opt-in: GoFast Page acts as a lightweight community (membership + chatter).
+  isGoFastContainer       Boolean                  @default(false)
   garmin_user_id          String?                  @unique
   garmin_access_token      String?
   garmin_refresh_token     String?
@@ -88,6 +90,37 @@ model Athlete {
   race_event_rsvps        race_event_rsvps[]
   training_preferences    TrainingPreferences?
   run_journal_entries     run_journal_entries[]
+  hosted_container_memberships  gofast_container_memberships[] @relation("ContainerHost")
+  member_container_memberships   gofast_container_memberships[] @relation("ContainerMember")
+  container_messages_as_host     gofast_container_messages[]    @relation("ContainerMessages")
+  container_messages_as_author   gofast_container_messages[]    @relation("ContainerMessageAuthor")
+}
+
+model gofast_container_memberships {
+  id                 String   @id @default(cuid())
+  containerAthleteId String
+  memberAthleteId    String
+  role               String   @default("member")
+  joinedAt           DateTime @default(now())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  containerAthlete   Athlete  @relation("ContainerHost", fields: [containerAthleteId], references: [id], onDelete: Cascade)
+  memberAthlete      Athlete  @relation("ContainerMember", fields: [memberAthleteId], references: [id], onDelete: Cascade)
+
+  @@unique([containerAthleteId, memberAthleteId])
+  @@index([containerAthleteId])
+}
+
+model gofast_container_messages {
+  id                 String   @id @default(cuid())
+  containerAthleteId String
+  authorAthleteId    String
+  body               String
+  createdAt          DateTime @default(now())
+  containerAthlete   Athlete  @relation("ContainerMessages", fields: [containerAthleteId], references: [id], onDelete: Cascade)
+  authorAthlete      Athlete  @relation("ContainerMessageAuthor", fields: [authorAthleteId], references: [id], onDelete: Cascade)
+
+  @@index([containerAthleteId, createdAt])
 }
 
 model ambassador_credits {

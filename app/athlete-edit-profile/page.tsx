@@ -55,6 +55,9 @@ function AthleteEditProfileInner() {
   const [success, setSuccess] = useState('');
   const [handleStatus, setHandleStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [handleError, setHandleError] = useState('');
+  const [isGoFastContainer, setIsGoFastContainer] = useState(false);
+  const [containerMemberCount, setContainerMemberCount] = useState(0);
+  const [containerToggleLoading, setContainerToggleLoading] = useState(false);
 
   useEffect(() => {
     setActiveTab(tabFromParam(searchParams.get('tab')));
@@ -102,6 +105,7 @@ function AthleteEditProfileInner() {
           bannerFile: null,
           bannerPreview: stored.myBestRunPhotoURL || null,
         });
+        setIsGoFastContainer(!!stored.isGoFastContainer);
       })
       .catch(() => {
         setError('Error loading profile. Please try again.');
@@ -109,6 +113,39 @@ function AthleteEditProfileInner() {
       })
       .finally(() => setIsLoading(false));
   }, [router]);
+
+  useEffect(() => {
+    if (!athleteId || !isGoFastContainer) return;
+    api
+      .get(`/athlete/${athleteId}/container/members`)
+      .then((r) => setContainerMemberCount(r.data?.count ?? 0))
+      .catch(() => {});
+  }, [athleteId, isGoFastContainer]);
+
+  const handleContainerToggle = async () => {
+    if (!athleteId || containerToggleLoading) return;
+    setContainerToggleLoading(true);
+    setError('');
+    try {
+      const res = await api.post(`/athlete/${athleteId}/container/toggle`, {
+        value: !isGoFastContainer,
+      });
+      const next = !!res.data?.isGoFastContainer;
+      setIsGoFastContainer(next);
+      if (next) {
+        const m = await api.get(`/athlete/${athleteId}/container/members`);
+        setContainerMemberCount(m.data?.count ?? 0);
+      } else {
+        setContainerMemberCount(0);
+      }
+      setSuccess(next ? 'GoFast Container is on.' : 'GoFast Container is off.');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string; error?: string } } };
+      setError(e.response?.data?.message || e.response?.data?.error || 'Could not update container setting.');
+    } finally {
+      setContainerToggleLoading(false);
+    }
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({
@@ -661,6 +698,41 @@ function AthleteEditProfileInner() {
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                   disabled={loading}
                 />
+              </div>
+
+              <div className="rounded-xl border border-violet-200/80 bg-violet-50/50 p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isGoFastContainer}
+                    disabled={containerToggleLoading || !athleteId || loading}
+                    onChange={() => void handleContainerToggle()}
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                  />
+                  <span>
+                    <span className="font-semibold text-gray-900">GoFast Container</span>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Optional: turn your public page into a small community — your upcoming runs appear automatically,
+                      and members can chat in one feed. You moderate as the host.
+                    </p>
+                  </span>
+                </label>
+                {isGoFastContainer ? (
+                  <div className="mt-3 pl-7 text-sm text-gray-700">
+                    <p>
+                      {containerMemberCount} member{containerMemberCount !== 1 ? 's' : ''}
+                      {containerToggleLoading ? '…' : ''}
+                    </p>
+                    {formData.gofastHandle ? (
+                      <Link
+                        href={`/container/${encodeURIComponent(formData.gofastHandle)}`}
+                        className="inline-block mt-2 font-semibold text-orange-600 hover:text-orange-700"
+                      >
+                        Open container hub →
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex flex-wrap gap-2">

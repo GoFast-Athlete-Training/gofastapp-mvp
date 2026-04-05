@@ -215,8 +215,82 @@ export async function GET(
       date: w.date ? w.date.toISOString() : null,
     }));
 
+    let containerMemberCount = 0;
+    let containerRecentMembers: {
+      id: string;
+      firstName: string | null;
+      lastName: string | null;
+      photoURL: string | null;
+      gofastHandle: string | null;
+    }[] = [];
+    let containerMessagesPreview: {
+      id: string;
+      body: string;
+      createdAt: string;
+      authorDisplay: string;
+    }[] = [];
+
+    if (athlete.isGoFastContainer) {
+      containerMemberCount = await prisma.gofast_container_memberships.count({
+        where: { containerAthleteId: athlete.id },
+      });
+
+      const memberRows = await prisma.gofast_container_memberships.findMany({
+        where: { containerAthleteId: athlete.id },
+        orderBy: { joinedAt: 'desc' },
+        take: 8,
+        include: {
+          memberAthlete: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              photoURL: true,
+              gofastHandle: true,
+            },
+          },
+        },
+      });
+      containerRecentMembers = memberRows.map((r) => ({
+        id: r.memberAthlete.id,
+        firstName: r.memberAthlete.firstName,
+        lastName: r.memberAthlete.lastName,
+        photoURL: r.memberAthlete.photoURL,
+        gofastHandle: r.memberAthlete.gofastHandle,
+      }));
+
+      const msgRows = await prisma.gofast_container_messages.findMany({
+        where: { containerAthleteId: athlete.id },
+        orderBy: { createdAt: 'desc' },
+        take: 3,
+        include: {
+          authorAthlete: {
+            select: { firstName: true, lastName: true, gofastHandle: true },
+          },
+        },
+      });
+      containerMessagesPreview = msgRows.map((m) => {
+        const authorDisplay =
+          [m.authorAthlete.firstName, m.authorAthlete.lastName].filter(Boolean).join(' ') ||
+          (m.authorAthlete.gofastHandle ? `@${m.authorAthlete.gofastHandle}` : 'Member');
+        const raw = m.body;
+        const snippet = raw.length > 160 ? `${raw.slice(0, 157)}...` : raw;
+        return {
+          id: m.id,
+          body: snippet,
+          createdAt: m.createdAt.toISOString(),
+          authorDisplay,
+        };
+      });
+    }
+
     return NextResponse.json({
       success: true,
+      isGoFastContainer: athlete.isGoFastContainer,
+      ...(athlete.isGoFastContainer ? { hostAthleteId: athlete.id } : {}),
+      containerMemberCount,
+      containerRecentMembers,
+      containerMessagesPreview,
       athlete: {
         gofastHandle: athlete.gofastHandle,
         firstName: athlete.firstName,
