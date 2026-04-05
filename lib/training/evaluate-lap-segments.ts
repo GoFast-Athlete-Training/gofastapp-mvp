@@ -9,6 +9,10 @@ import {
   ADAPTIVE_FIVEK_STEP_SEC,
   applyAdaptiveFiveKCredit,
 } from "@/lib/training/update-five-k-pace";
+import {
+  normalizePaceTargetEncodingVersion,
+  storedPaceSecondsKmToSecondsPerMile,
+} from "@/lib/workout-generator/pace-calculator";
 
 /** target - actual sec/mi; mean >= this scores performance (aligned with neutral band elsewhere). */
 const ADAPTIVE_FIVEK_MIN_MEAN_DELTA = -5;
@@ -21,13 +25,17 @@ type Sample = {
   speedMetersPerSecond?: number;
 };
 
-function paceTargetSecPerMileFromTargets(targets: unknown): number | null {
+function paceTargetSecPerMileFromTargets(
+  targets: unknown,
+  paceTargetEncodingVersion: number
+): number | null {
   if (!Array.isArray(targets) || targets.length === 0) return null;
   const t = targets[0] as { type?: string; valueLow?: number; value?: number };
   if (!t?.type || String(t.type).toUpperCase() !== "PACE") return null;
   const low = t.valueLow ?? t.value;
   if (low == null || typeof low !== "number" || low <= 0) return null;
-  return Math.round(low * 1.60934);
+  const enc = normalizePaceTargetEncodingVersion(paceTargetEncodingVersion);
+  return Math.round(storedPaceSecondsKmToSecondsPerMile(low, enc));
 }
 
 function expandSegmentSlotsWithIds(
@@ -37,6 +45,7 @@ function expandSegmentSlotsWithIds(
     targets: Prisma.JsonValue;
     title: string;
     repeatCount?: number | null;
+    paceTargetEncodingVersion: number;
   }[]
 ) {
   const sorted = [...segments].sort((a, b) => a.stepOrder - b.stepOrder);
@@ -44,6 +53,7 @@ function expandSegmentSlotsWithIds(
     segmentId: string;
     targets: Prisma.JsonValue;
     title: string;
+    paceTargetEncodingVersion: number;
   }[] = [];
   for (const seg of sorted) {
     const r = Math.max(1, seg.repeatCount ?? 1);
@@ -52,6 +62,7 @@ function expandSegmentSlotsWithIds(
         segmentId: seg.id,
         targets: seg.targets,
         title: seg.title,
+        paceTargetEncodingVersion: seg.paceTargetEncodingVersion,
       });
     }
   }
@@ -137,7 +148,10 @@ export async function evaluateLapSegmentsAfterDetail(
     const t0 = lapStarts[i];
     const t1 = i + 1 < lapStarts.length ? lapStarts[i + 1] : lastSampleT;
     const dur = Math.max(0, t1 - t0);
-    const target = paceTargetSecPerMileFromTargets(slots[i].targets);
+    const target = paceTargetSecPerMileFromTargets(
+      slots[i].targets,
+      slots[i].paceTargetEncodingVersion
+    );
 
     const avgMps = avgSpeedInWindow(sortedSamples, t0, t1);
     const segmentId = slots[i].segmentId;

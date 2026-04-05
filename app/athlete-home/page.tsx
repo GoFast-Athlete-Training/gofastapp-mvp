@@ -12,9 +12,18 @@ import Link from 'next/link';
 import {
   formatPaceTargetRangeForDisplay,
   formatPaceTargetSingleForDisplay,
+  normalizePaceTargetEncodingVersion,
 } from '@/lib/workout-generator/pace-calculator';
 
-function homeSessionPaceLabel(segments: { stepOrder: number; targets: unknown }[] | undefined): string | null {
+function homeSessionPaceLabel(
+  segments:
+    | {
+        stepOrder: number;
+        targets: unknown;
+        paceTargetEncodingVersion?: number;
+      }[]
+    | undefined
+): string | null {
   if (!segments?.length) return null;
   const sorted = [...segments].sort((a, b) => a.stepOrder - b.stepOrder);
   for (const seg of sorted) {
@@ -26,11 +35,12 @@ function homeSessionPaceLabel(segments: { stepOrder: number; targets: unknown }[
     if (String(t.type || '').toUpperCase() !== 'PACE') continue;
     const low = t.valueLow ?? t.value;
     const high = t.valueHigh;
+    const enc = normalizePaceTargetEncodingVersion(seg.paceTargetEncodingVersion);
     if (low != null && typeof low === 'number' && high != null && typeof high === 'number') {
-      return formatPaceTargetRangeForDisplay(low, high);
+      return formatPaceTargetRangeForDisplay(low, high, enc);
     }
     if (low != null && typeof low === 'number') {
-      return formatPaceTargetSingleForDisplay(low);
+      return formatPaceTargetSingleForDisplay(low, enc);
     }
   }
   return null;

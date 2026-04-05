@@ -200,6 +200,7 @@ export async function GET(request: NextRequest, context: Ctx) {
               durationValue: s.durationValue,
               targets: s.targets as object | undefined,
               repeatCount: s.repeatCount ?? undefined,
+              paceTargetEncodingVersion: 2,
               updatedAt: new Date(),
             }));
           await prisma.workout_segments.createMany({ data: segmentRows });

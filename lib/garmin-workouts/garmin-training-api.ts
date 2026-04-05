@@ -39,7 +39,7 @@ export function createGarminTrainingApiForAthlete(
 }
 
 /**
- * Training API client. createWorkout retries once on 401 after refreshGarminToken.
+ * Training API client. Mutating calls (create/update/schedule/delete) retry once on 401 after refreshGarminToken.
  */
 export class GarminTrainingApi {
   private bearerToken: string;
@@ -78,9 +78,9 @@ export class GarminTrainingApi {
     }
 
     const response = await fetch(url, options);
+    const raw = await response.text();
 
     if (!response.ok) {
-      const raw = await response.text();
       let details = response.statusText;
       try {
         const parsed = JSON.parse(raw) as {
@@ -116,19 +116,19 @@ export class GarminTrainingApi {
       });
     }
 
-    return response.json() as Promise<T>;
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      return undefined as T;
+    }
+    return JSON.parse(trimmed) as T;
   }
 
-  async createWorkout(workout: GarminWorkout): Promise<{ workoutId: number }> {
-    return this.createWorkoutWithRetry(workout, false);
-  }
-
-  private async createWorkoutWithRetry(
-    workout: GarminWorkout,
-    isRetry: boolean
-  ): Promise<{ workoutId: number }> {
+  /**
+   * Retry once on 401 after refreshGarminToken (same pattern for mutating calls).
+   */
+  private async with401Retry<T>(fn: () => Promise<T>, isRetry = false): Promise<T> {
     try {
-      return await this.request<{ workoutId: number }>("POST", "/workout", workout);
+      return await fn();
     } catch (e) {
       if (
         !isRetry &&
@@ -139,11 +139,17 @@ export class GarminTrainingApi {
         const refreshed = await refreshGarminToken(this.athleteIdForRefresh);
         if (refreshed.success && refreshed.accessToken) {
           this.bearerToken = refreshed.accessToken;
-          return this.createWorkoutWithRetry(workout, true);
+          return this.with401Retry(fn, true);
         }
       }
       throw e;
     }
+  }
+
+  async createWorkout(workout: GarminWorkout): Promise<{ workoutId: number }> {
+    return this.with401Retry(() =>
+      this.request<{ workoutId: number }>("POST", "/workout", workout)
+    );
   }
 
   async getWorkout(workoutId: number): Promise<GarminWorkout> {
@@ -151,11 +157,15 @@ export class GarminTrainingApi {
   }
 
   async updateWorkout(workoutId: number, workout: GarminWorkout): Promise<void> {
-    return this.request<void>("PUT", `/workout/${workoutId}`, workout);
+    return this.with401Retry(() =>
+      this.request<void>("PUT", `/workout/${workoutId}`, workout)
+    );
   }
 
   async deleteWorkout(workoutId: number): Promise<void> {
-    return this.request<void>("DELETE", `/workout/${workoutId}`);
+    return this.with401Retry(() =>
+      this.request<void>("DELETE", `/workout/${workoutId}`)
+    );
   }
 
   async scheduleWorkout(
@@ -166,7 +176,9 @@ export class GarminTrainingApi {
       workoutId,
       date,
     };
-    return this.request<{ scheduleId: number }>("POST", "/schedule", schedule);
+    return this.with401Retry(() =>
+      this.request<{ scheduleId: number }>("POST", "/schedule", schedule)
+    );
   }
 
   async getSchedule(scheduleId: number): Promise<GarminWorkoutSchedule> {
@@ -174,6 +186,8 @@ export class GarminTrainingApi {
   }
 
   async deleteSchedule(scheduleId: number): Promise<void> {
-    return this.request<void>("DELETE", `/schedule/${scheduleId}`);
+    return this.with401Retry(() =>
+      this.request<void>("DELETE", `/schedule/${scheduleId}`)
+    );
   }
 }

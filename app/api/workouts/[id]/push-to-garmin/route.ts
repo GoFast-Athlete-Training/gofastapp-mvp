@@ -11,9 +11,14 @@ import { summarizeGarminTokenForLogs } from "@/lib/garmin-access-token-claims";
 
 export const dynamic = "force-dynamic";
 
+function scheduleDateFromWorkoutDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
 /**
  * POST /api/workouts/[id]/push-to-garmin
  * Auth: Firebase Bearer + x-athlete-id (see lib/api.ts). Pushes to Garmin Training API with the athlete's stored OAuth2 token.
+ * Creates or updates the workout, then schedules it on the workout's date so it appears on Garmin Connect / the watch calendar.
  */
 export async function POST(
   request: NextRequest,
@@ -51,6 +56,16 @@ export async function POST(
       );
     }
 
+    if (!workout.date) {
+      return NextResponse.json(
+        {
+          error:
+            "Workout must have a scheduled date to add to your Garmin calendar. Set a date on the workout first.",
+        },
+        { status: 400 }
+      );
+    }
+
     const token = await requireGarminToken(auth.athlete.id);
     garminAccessTokenForLogs = token;
 
@@ -74,22 +89,45 @@ export async function POST(
         }> | undefined,
         repeatCount: seg.repeatCount || undefined,
         notes: seg.notes || undefined,
+        paceTargetEncodingVersion: seg.paceTargetEncodingVersion,
       })),
     });
 
     const client = createGarminTrainingApiForAthlete(auth.athlete.id, token);
-    const result = await client.createWorkout(garminWorkout);
-    const garminWorkoutId = result.workoutId;
+
+    let garminWorkoutId = workout.garminWorkoutId;
+    if (garminWorkoutId != null) {
+      await client.updateWorkout(garminWorkoutId, garminWorkout);
+    } else {
+      const result = await client.createWorkout(garminWorkout);
+      garminWorkoutId = result.workoutId;
+    }
+
+    if (workout.garminScheduleId != null) {
+      try {
+        await client.deleteSchedule(workout.garminScheduleId);
+      } catch (e) {
+        if (!(e instanceof GarminApiError && e.status === 404)) {
+          throw e;
+        }
+      }
+    }
+
+    const scheduledDate = scheduleDateFromWorkoutDate(workout.date);
+    const scheduleResult = await client.scheduleWorkout(garminWorkoutId, scheduledDate);
+    const garminScheduleId = scheduleResult.scheduleId;
 
     await prisma.workouts.update({
       where: { id: workout.id },
-      data: { garminWorkoutId },
+      data: { garminWorkoutId, garminScheduleId },
     });
 
     return NextResponse.json({
       success: true,
-      workout: { ...workout, garminWorkoutId },
+      workout: { ...workout, garminWorkoutId, garminScheduleId },
       garminWorkoutId,
+      garminScheduleId,
+      scheduledDate,
     });
   } catch (error: unknown) {
     if (error instanceof GarminNotConnectedError) {

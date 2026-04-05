@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   formatPaceTargetRangeForDisplay,
   formatPaceTargetSingleForDisplay,
+  normalizePaceTargetEncodingVersion,
 } from "@/lib/workout-generator/pace-calculator";
 
 export type UpcomingWorkoutRow = {
@@ -13,7 +14,11 @@ export type UpcomingWorkoutRow = {
   date: string | null;
   matchedActivityId: string | null;
   derivedPerformanceDirection?: string | null;
-  segments?: { stepOrder: number; targets: unknown }[];
+  segments?: {
+    stepOrder: number;
+    targets: unknown;
+    paceTargetEncodingVersion?: number;
+  }[];
   /** Present when a DB row exists (open day in My Training). */
   workoutId?: string | null;
   /** From planWeeks before lazy materialization. */
@@ -33,11 +38,12 @@ function mainPaceTargetLabel(segments: UpcomingWorkoutRow["segments"]): string |
     if (String(t.type || "").toUpperCase() !== "PACE") continue;
     const low = t.valueLow ?? t.value;
     const high = t.valueHigh;
+    const enc = normalizePaceTargetEncodingVersion(seg.paceTargetEncodingVersion);
     if (low != null && typeof low === "number" && high != null && typeof high === "number") {
-      return formatPaceTargetRangeForDisplay(low, high);
+      return formatPaceTargetRangeForDisplay(low, high, enc);
     }
     if (low != null && typeof low === "number") {
-      return formatPaceTargetSingleForDisplay(low);
+      return formatPaceTargetSingleForDisplay(low, enc);
     }
   }
   return null;

@@ -25,6 +25,7 @@ import {
   formatPaceTargetRangeForDisplay,
   formatPaceTargetSingleForDisplay,
   getTrainingPaces,
+  normalizePaceTargetEncodingVersion,
   parsePaceToSecondsPerMile,
   secondsPerMileToSecondsPerKm,
   storedPaceSecondsKmToSecondsPerMile,
@@ -45,7 +46,10 @@ import {
   segmentStructureBadge,
   structuredSegmentTotals,
 } from "@/lib/training/segment-summary";
-import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
+import {
+  displayWorkoutListTitle,
+  formatPlannedWorkoutTitle,
+} from "@/lib/training/workout-display-title";
 import { formatPlanDateDisplay, localYmd } from "@/lib/training/plan-utils";
 
 interface WorkoutSegment {
@@ -62,6 +66,7 @@ interface WorkoutSegment {
   }>;
   repeatCount?: number;
   notes?: string;
+  paceTargetEncodingVersion?: number;
   actualPaceSecPerMile?: number | null;
   actualDistanceMiles?: number | null;
   actualDurationSeconds?: number | null;
@@ -105,6 +110,7 @@ interface Workout {
   description?: string;
   date?: string | null;
   garminWorkoutId?: number | null;
+  garminScheduleId?: number | null;
   catalogueWorkoutId?: string | null;
   workout_catalogue?: WorkoutCatalogue | null;
   estimatedDistanceInMeters?: number | null;
@@ -361,6 +367,10 @@ type EditableSegment = {
   notes: string;
 };
 
+function segmentPaceEncoding(seg: WorkoutSegment) {
+  return normalizePaceTargetEncodingVersion(seg.paceTargetEncodingVersion);
+}
+
 function newClientKey(): string {
   if (typeof globalThis !== "undefined" && globalThis.crypto?.randomUUID) {
     return globalThis.crypto.randomUUID();
@@ -377,6 +387,7 @@ function secPerMileToSplitStrings(totalSec: number): { min: string; sec: string 
 }
 
 function segmentToEditable(s: WorkoutSegment): EditableSegment {
+  const enc = segmentPaceEncoding(s);
   const pace = s.targets?.find((t) => (t.type || "").toUpperCase() === "PACE");
   let paceLowMin = "";
   let paceLowSec = "";
@@ -384,14 +395,14 @@ function segmentToEditable(s: WorkoutSegment): EditableSegment {
   let paceHighSec = "";
   if (pace?.valueLow != null && Number.isFinite(Number(pace.valueLow))) {
     const lowTotal = Math.round(
-      storedPaceSecondsKmToSecondsPerMile(Number(pace.valueLow))
+      storedPaceSecondsKmToSecondsPerMile(Number(pace.valueLow), enc)
     );
     const lo = secPerMileToSplitStrings(lowTotal);
     paceLowMin = lo.min;
     paceLowSec = lo.sec;
   } else if (pace?.value != null && Number.isFinite(Number(pace.value))) {
     const lowTotal = Math.round(
-      storedPaceSecondsKmToSecondsPerMile(Number(pace.value))
+      storedPaceSecondsKmToSecondsPerMile(Number(pace.value), enc)
     );
     const lo = secPerMileToSplitStrings(lowTotal);
     paceLowMin = lo.min;
@@ -399,7 +410,7 @@ function segmentToEditable(s: WorkoutSegment): EditableSegment {
   }
   if (pace?.valueHigh != null && Number.isFinite(Number(pace.valueHigh))) {
     const highTotal = Math.round(
-      storedPaceSecondsKmToSecondsPerMile(Number(pace.valueHigh))
+      storedPaceSecondsKmToSecondsPerMile(Number(pace.valueHigh), enc)
     );
     const hi = secPerMileToSplitStrings(highTotal);
     paceHighMin = hi.min;
@@ -495,23 +506,24 @@ function getPaceSecsFromSegment(seg: WorkoutSegment): {
   low: number | null;
   high: number | null;
 } {
+  const enc = segmentPaceEncoding(seg);
   const pace = seg.targets?.find((t) => (t.type || "").toUpperCase() === "PACE");
   if (!pace) return { low: null, high: null };
   if (pace.valueLow != null && Number.isFinite(Number(pace.valueLow))) {
     const low = Math.round(
-      storedPaceSecondsKmToSecondsPerMile(Number(pace.valueLow))
+      storedPaceSecondsKmToSecondsPerMile(Number(pace.valueLow), enc)
     );
     const high =
       pace.valueHigh != null && Number.isFinite(Number(pace.valueHigh))
         ? Math.round(
-            storedPaceSecondsKmToSecondsPerMile(Number(pace.valueHigh))
+            storedPaceSecondsKmToSecondsPerMile(Number(pace.valueHigh), enc)
           )
         : null;
     return { low, high };
   }
   if (pace.value != null && Number.isFinite(Number(pace.value))) {
     const v = Math.round(
-      storedPaceSecondsKmToSecondsPerMile(Number(pace.value))
+      storedPaceSecondsKmToSecondsPerMile(Number(pace.value), enc)
     );
     return { low: v, high: null };
   }
@@ -565,6 +577,9 @@ function quickPaceDisplayStrings(
   };
 }
 
+/** Stepper cap for minutes/mile; typing can still enter higher via keyboard. */
+const PACE_MIN_STEPPER_MAX = 99;
+
 function PaceMiSplitEditor({
   minValue,
   secValue,
@@ -578,23 +593,63 @@ function PaceMiSplitEditor({
   onSecChange: (v: string) => void;
   disabled?: boolean;
 }) {
+  const minRef = useRef<HTMLInputElement>(null);
   const secRef = useRef<HTMLInputElement>(null);
-  return (
-    <div className="flex items-end gap-1 flex-wrap">
-      <div className="w-[4.25rem]">
-        <span className="block text-xs font-medium text-gray-500 mb-1">Min</span>
-        <input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm text-center"
-          value={minValue}
+
+  const bumpMin = (delta: number) => {
+    const cur = minValue.trim() === "" ? 0 : parseInt(minValue, 10);
+    const n = Number.isFinite(cur) ? cur : 0;
+    const next = Math.max(0, Math.min(PACE_MIN_STEPPER_MAX, n + delta));
+    onMinChange(String(next));
+  };
+
+  const bumpSec = (delta: number) => {
+    let cur = secValue.trim() === "" ? 0 : parseInt(secValue, 10);
+    if (!Number.isFinite(cur)) cur = 0;
+    let next = cur + delta;
+    while (next < 0) next += 60;
+    while (next > 59) next -= 60;
+    onSecChange(String(next));
+  };
+
+  const stepperCol = (label: string, value: string, which: "min" | "sec") => (
+    <div className="w-20 sm:w-24 shrink-0">
+      <span className="block text-xs text-gray-500 mb-1">{label}</span>
+      <div className="rounded-lg border border-gray-300 overflow-hidden bg-white shadow-sm">
+        <button
+          type="button"
           disabled={disabled}
+          aria-label={`Increase ${label.toLowerCase()}`}
+          onClick={() => (which === "min" ? bumpMin(1) : bumpSec(1))}
+          className="w-full flex justify-center py-1 bg-gray-50 hover:bg-gray-100 border-b border-gray-200 disabled:opacity-40 disabled:pointer-events-none"
+        >
+          <ChevronUp className="w-4 h-4 text-gray-700" strokeWidth={2.25} />
+        </button>
+        <input
+          ref={which === "min" ? minRef : secRef}
+          type="text"
+          inputMode="numeric"
+          disabled={disabled}
+          autoComplete="off"
+          className="w-full border-0 px-2 py-2 text-sm text-center tabular-nums text-gray-900 focus:ring-2 focus:ring-inset focus:ring-orange-500 focus:z-10 relative"
+          value={value}
           onChange={(e) => {
-            const v = e.target.value;
-            if (v === "" || /^\d+$/.test(v)) onMinChange(v);
+            if (which === "min") {
+              const v = e.target.value;
+              if (v === "" || /^\d+$/.test(v)) onMinChange(v);
+            } else {
+              const v = e.target.value.replace(/\D/g, "");
+              if (v === "") {
+                onSecChange("");
+                return;
+              }
+              const n = parseInt(v, 10);
+              if (!Number.isFinite(n)) return;
+              onSecChange(String(Math.min(59, n)));
+            }
           }}
           onKeyDown={(e) => {
+            if (which !== "min") return;
             if (
               (e.key === "Tab" || e.key === "Enter") &&
               !e.shiftKey &&
@@ -605,44 +660,46 @@ function PaceMiSplitEditor({
             }
           }}
         />
-      </div>
-      <span className="text-gray-400 pb-2 select-none">:</span>
-      <div className="w-[4.25rem]">
-        <span className="block text-xs font-medium text-gray-500 mb-1">Sec</span>
-        <input
-          ref={secRef}
-          type="number"
-          inputMode="numeric"
-          min={0}
-          max={59}
-          className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm text-center"
-          value={secValue}
+        <button
+          type="button"
           disabled={disabled}
-          onChange={(e) => {
-            const v = e.target.value.replace(/\D/g, "");
-            if (v === "") {
-              onSecChange("");
-              return;
-            }
-            const n = parseInt(v, 10);
-            if (!Number.isFinite(n)) return;
-            onSecChange(String(Math.min(59, n)));
-          }}
-        />
+          aria-label={`Decrease ${label.toLowerCase()}`}
+          onClick={() => (which === "min" ? bumpMin(-1) : bumpSec(-1))}
+          className="w-full flex justify-center py-1 bg-gray-50 hover:bg-gray-100 border-t border-gray-200 disabled:opacity-40 disabled:pointer-events-none"
+        >
+          <ChevronDown className="w-4 h-4 text-gray-700" strokeWidth={2.25} />
+        </button>
       </div>
+    </div>
+  );
+
+  return (
+    <div className="flex items-end gap-2 flex-wrap">
+      {stepperCol("Minutes", minValue, "min")}
+      <span className="text-xl text-gray-400 pb-2 select-none" aria-hidden>
+        :
+      </span>
+      {stepperCol("Seconds", secValue, "sec")}
       <span className="text-xs text-gray-500 pb-2 select-none">/mi</span>
     </div>
   );
 }
 
-function formatTargetLine(target: NonNullable<WorkoutSegment["targets"]>[0]): string {
+function formatTargetLine(
+  target: NonNullable<WorkoutSegment["targets"]>[0],
+  encodingVersion: ReturnType<typeof segmentPaceEncoding>
+): string {
   const type = (target.type || "").toUpperCase();
   if (type === "PACE") {
     if (target.valueLow !== undefined && target.valueHigh !== undefined) {
-      return formatPaceTargetRangeForDisplay(target.valueLow, target.valueHigh);
+      return formatPaceTargetRangeForDisplay(
+        target.valueLow,
+        target.valueHigh,
+        encodingVersion
+      );
     }
     if (target.value !== undefined && Number.isFinite(Number(target.value))) {
-      return formatPaceTargetSingleForDisplay(Number(target.value));
+      return formatPaceTargetSingleForDisplay(Number(target.value), encodingVersion);
     }
   }
   if (type === "HEART_RATE") {
@@ -671,6 +728,8 @@ export default function WorkoutDetailPage() {
     success: boolean;
     message: string;
     garminWorkoutId?: number;
+    garminScheduleId?: number;
+    scheduledDate?: string;
   } | null>(null);
   const [showCreatedBanner, setShowCreatedBanner] = useState(false);
   const [garminToast, setGarminToast] = useState<string | null>(null);
@@ -832,8 +891,15 @@ export default function WorkoutDetailPage() {
     }
 
     try {
+      let titleForPatch = workout.title;
+      if (editDistanceMi.trim() !== "" && Number.isFinite(mi) && mi >= 0) {
+        titleForPatch = formatPlannedWorkoutTitle(
+          workout.workoutType,
+          estimatedDistanceInMeters
+        );
+      }
       const patchBody: Record<string, unknown> = {
-        title: workout.title,
+        title: titleForPatch,
         description: workout.description?.trim() || null,
         date: workoutCalendarYmd(workout.date) ?? null,
         estimatedDistanceInMeters,
@@ -1067,17 +1133,39 @@ export default function WorkoutDetailPage() {
 
     try {
       const response = await api.post(`workouts/${workoutId}/push-to-garmin`);
-      const { garminWorkoutId } = response.data as { garminWorkoutId?: number };
+      const {
+        garminWorkoutId,
+        garminScheduleId,
+        scheduledDate,
+      } = response.data as {
+        garminWorkoutId?: number;
+        garminScheduleId?: number;
+        scheduledDate?: string;
+      };
+
+      const dateLabel =
+        scheduledDate != null && scheduledDate.length >= 10
+          ? new Date(`${scheduledDate.slice(0, 10)}T12:00:00`).toLocaleDateString(
+              undefined,
+              { weekday: "short", month: "short", day: "numeric", year: "numeric" }
+            )
+          : null;
 
       setPushStatus({
         success: true,
-        message: "Workout pushed to Garmin.",
+        message: dateLabel
+          ? `Pushed to Garmin and scheduled for ${dateLabel}. Sync your watch.`
+          : "Pushed to Garmin and added to your calendar. Sync your watch.",
         garminWorkoutId,
+        garminScheduleId,
+        scheduledDate,
       });
       setGarminToast(
-        garminWorkoutId
-          ? `Synced to Garmin. Open Garmin Connect to view it on your device (workout #${garminWorkoutId}).`
-          : "Synced to Garmin. Open Garmin Connect on your watch or phone to use this workout."
+        dateLabel && garminWorkoutId != null
+          ? `Scheduled for ${dateLabel} — sync your watch for today’s planned run (workout #${garminWorkoutId}).`
+          : garminWorkoutId != null
+            ? `Synced to Garmin (workout #${garminWorkoutId}). Sync your watch.`
+            : "Synced to Garmin. Sync your watch to load it on your device."
       );
       void fetchWorkout();
     } catch (error: unknown) {
@@ -1530,6 +1618,9 @@ export default function WorkoutDetailPage() {
                 {pushStatus.garminWorkoutId != null && pushStatus.success && (
                   <p className="text-sm text-green-700 mt-1">
                     Garmin workout id: {pushStatus.garminWorkoutId}
+                    {pushStatus.garminScheduleId != null
+                      ? ` · schedule id: ${pushStatus.garminScheduleId}`
+                      : ""}
                   </p>
                 )}
               </div>
@@ -2027,7 +2118,10 @@ export default function WorkoutDetailPage() {
                                     {workoutTargetTypeLabel(target.type || "Target")}
                                   </span>
                                   <span className="text-gray-900 font-medium break-words">
-                                    {formatTargetLine(target)}
+                                    {formatTargetLine(
+                                      target,
+                                      segmentPaceEncoding(segment)
+                                    )}
                                   </span>
                                 </div>
                               );

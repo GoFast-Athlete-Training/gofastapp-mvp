@@ -3,18 +3,54 @@
  * All internal math in seconds per mile; export helpers for seconds per km (for Garmin/API targets).
  */
 
-const MILES_PER_KM = 1 / 1.60934;
+/** 1 mi ≈ 1.60934 km (Garmin pace targets use seconds per kilometer). */
+export const KM_PER_MILE = 1.60934;
 
-/** Seconds per mile → seconds per km */
+/**
+ * Legacy mistake: values were stored as round(sec/mile × KM_PER_MILE) and mislabeled as sec/km.
+ * True sec/km = legacyStored / this factor.
+ */
+export const LEGACY_PACE_TARGET_STORAGE_FACTOR = KM_PER_MILE * KM_PER_MILE;
+
+/** 1 = legacy inflated storage; 2 = true seconds per kilometer (Garmin/API). */
+export type PaceTargetEncodingVersion = 1 | 2;
+
+export function normalizePaceTargetEncodingVersion(
+  v: unknown
+): PaceTargetEncodingVersion {
+  return v === 2 ? 2 : 1;
+}
+
+/** Seconds per mile → seconds per km (pace is time/distance; shorter km → fewer seconds). */
 export function secondsPerMileToSecondsPerKm(secPerMile: number): number {
-  return Math.round(secPerMile * 1.60934);
+  return Math.round(secPerMile / KM_PER_MILE);
 }
 
 /**
- * Segment/API PACE targets use sec/km; workout edit inputs use sec/mi (total seconds per mile).
+ * Convert stored PACE band numbers to seconds per mile for UI and evaluation.
+ * @param encodingVersion v1 legacy blob uses inflated values; v2 is true sec/km.
  */
-export function storedPaceSecondsKmToSecondsPerMile(storedSecKm: number): number {
-  return storedSecKm * MILES_PER_KM;
+export function storedPaceSecondsKmToSecondsPerMile(
+  stored: number,
+  encodingVersion: PaceTargetEncodingVersion = 2
+): number {
+  if (encodingVersion === 1) {
+    return stored / KM_PER_MILE;
+  }
+  return stored * KM_PER_MILE;
+}
+
+/**
+ * Stored segment value → Garmin Training API pace target (seconds per kilometer).
+ */
+export function paceTargetStoredToGarminSecPerKm(
+  stored: number,
+  encodingVersion: PaceTargetEncodingVersion
+): number {
+  if (encodingVersion === 1) {
+    return Math.round(stored / LEGACY_PACE_TARGET_STORAGE_FACTOR);
+  }
+  return Math.round(stored);
 }
 
 /** Parse "7:30" or "7:30/mile" to total seconds per mile */
@@ -166,8 +202,11 @@ export function paceTargetFromSecondsPerMile(
  * Segment `valueLow` / `valueHigh` use the same encoding as the API/Garmin layer
  * (seconds per km via {@link secondsPerMileToSecondsPerKm}).
  */
-export function formatStoredPaceAsMinPerMile(storedSecKm: number): string {
-  const secPerMile = storedSecKm / 1.60934;
+export function formatStoredPaceAsMinPerMile(
+  stored: number,
+  encodingVersion: PaceTargetEncodingVersion = 2
+): string {
+  const secPerMile = storedPaceSecondsKmToSecondsPerMile(stored, encodingVersion);
   let totalSec = Math.round(secPerMile);
   let minutes = Math.floor(totalSec / 60);
   let seconds = totalSec % 60;
@@ -179,16 +218,23 @@ export function formatStoredPaceAsMinPerMile(storedSecKm: number): string {
 }
 
 /** Human-readable pace range e.g. "8:15–8:45 /mi" */
-export function formatPaceTargetRangeForDisplay(valueLow: number, valueHigh: number): string {
-  const lo = formatStoredPaceAsMinPerMile(valueLow);
-  const hi = formatStoredPaceAsMinPerMile(valueHigh);
+export function formatPaceTargetRangeForDisplay(
+  valueLow: number,
+  valueHigh: number,
+  encodingVersion: PaceTargetEncodingVersion = 2
+): string {
+  const lo = formatStoredPaceAsMinPerMile(valueLow, encodingVersion);
+  const hi = formatStoredPaceAsMinPerMile(valueHigh, encodingVersion);
   if (lo === hi) return `${lo} /mi`;
   return `${lo}–${hi} /mi`;
 }
 
 /** Single stored pace band value → "m:ss /mi" (same encoding as {@link formatPaceTargetRangeForDisplay}). */
-export function formatPaceTargetSingleForDisplay(storedBandValue: number): string {
-  return `${formatStoredPaceAsMinPerMile(storedBandValue)} /mi`;
+export function formatPaceTargetSingleForDisplay(
+  storedBandValue: number,
+  encodingVersion: PaceTargetEncodingVersion = 2
+): string {
+  return `${formatStoredPaceAsMinPerMile(storedBandValue, encodingVersion)} /mi`;
 }
 
 /** UI label for segment target rows (sentence case). */

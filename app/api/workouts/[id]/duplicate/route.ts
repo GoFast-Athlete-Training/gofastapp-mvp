@@ -111,6 +111,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
             dayAssigned: null,
             planLadderIndex: null,
             garminWorkoutId: null,
+            garminScheduleId: null,
             matchedActivityId: null,
             actualDistanceMeters: null,
             actualAvgPaceSecPerMile: null,
@@ -139,6 +140,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
                           : (seg.targets as Prisma.InputJsonValue),
                       repeatCount: seg.repeatCount,
                       notes: seg.notes,
+                      paceTargetEncodingVersion: seg.paceTargetEncodingVersion,
                     })),
                   }
                 : undefined,

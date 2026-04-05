@@ -14,10 +14,13 @@ import {
   GarminTargetType,
   GarminSport,
   GarminRepeatType,
-  convertPaceToSecondsPerKm,
   convertMilesToMeters,
   convertMinutesToSeconds,
 } from "./types";
+import {
+  normalizePaceTargetEncodingVersion,
+  paceTargetStoredToGarminSecPerKm,
+} from "../workout-generator/pace-calculator";
 
 export interface WorkoutSegment {
   id: string;
@@ -34,6 +37,7 @@ export interface WorkoutSegment {
   }>;
   repeatCount?: number;
   notes?: string;
+  paceTargetEncodingVersion?: number;
 }
 
 export interface Workout {
@@ -112,6 +116,7 @@ function buildStepsFromSegments(segments: WorkoutSegment[]): GarminWorkoutStep[]
  * Handles conversion: minutes → seconds, miles → meters, targets JSON → Garmin format
  */
 function buildSegmentStep(stepOrder: number, segment: WorkoutSegment): GarminWorkoutStep {
+  const paceEnc = normalizePaceTargetEncodingVersion(segment.paceTargetEncodingVersion);
   const step: GarminWorkoutStep = {
     stepOrder,
     type: "WorkoutStep",
@@ -134,15 +139,32 @@ function buildSegmentStep(stepOrder: number, segment: WorkoutSegment): GarminWor
     if (GarminTargetType[targetType]) {
       step.targetType = GarminTargetType[targetType];
       
-      // Handle numeric values (targets JSON should have numeric values)
-      if (primaryTarget.valueLow !== undefined) {
-        step.targetValueLow = primaryTarget.valueLow;
-      }
-      if (primaryTarget.valueHigh !== undefined) {
-        step.targetValueHigh = primaryTarget.valueHigh;
-      }
-      if (primaryTarget.value !== undefined && step.targetValueLow === undefined) {
-        step.targetValue = primaryTarget.value;
+      const mapPace = (n: number | undefined): number | undefined => {
+        if (n === undefined) return undefined;
+        return paceTargetStoredToGarminSecPerKm(n, paceEnc);
+      };
+
+      // PACE values must be true sec/km on the wire; stored blobs may be v1 legacy
+      if (GarminTargetType[targetType] === GarminTargetType.PACE) {
+        if (primaryTarget.valueLow !== undefined) {
+          step.targetValueLow = mapPace(primaryTarget.valueLow);
+        }
+        if (primaryTarget.valueHigh !== undefined) {
+          step.targetValueHigh = mapPace(primaryTarget.valueHigh);
+        }
+        if (primaryTarget.value !== undefined && step.targetValueLow === undefined) {
+          step.targetValue = mapPace(primaryTarget.value);
+        }
+      } else {
+        if (primaryTarget.valueLow !== undefined) {
+          step.targetValueLow = primaryTarget.valueLow;
+        }
+        if (primaryTarget.valueHigh !== undefined) {
+          step.targetValueHigh = primaryTarget.valueHigh;
+        }
+        if (primaryTarget.value !== undefined && step.targetValueLow === undefined) {
+          step.targetValue = primaryTarget.value;
+        }
       }
       
       // Second target (if exists) becomes secondary target
@@ -153,14 +175,32 @@ function buildSegmentStep(stepOrder: number, segment: WorkoutSegment): GarminWor
         if (GarminTargetType[secondaryTargetType]) {
           step.secondaryTargetType = GarminTargetType[secondaryTargetType];
           
-          if (secondaryTarget.valueLow !== undefined) {
-            step.secondaryTargetValueLow = secondaryTarget.valueLow;
-          }
-          if (secondaryTarget.valueHigh !== undefined) {
-            step.secondaryTargetValueHigh = secondaryTarget.valueHigh;
-          }
-          if (secondaryTarget.value !== undefined && step.secondaryTargetValueLow === undefined) {
-            step.secondaryTargetValue = secondaryTarget.value;
+          if (GarminTargetType[secondaryTargetType] === GarminTargetType.PACE) {
+            if (secondaryTarget.valueLow !== undefined) {
+              step.secondaryTargetValueLow = mapPace(secondaryTarget.valueLow);
+            }
+            if (secondaryTarget.valueHigh !== undefined) {
+              step.secondaryTargetValueHigh = mapPace(secondaryTarget.valueHigh);
+            }
+            if (
+              secondaryTarget.value !== undefined &&
+              step.secondaryTargetValueLow === undefined
+            ) {
+              step.secondaryTargetValue = mapPace(secondaryTarget.value);
+            }
+          } else {
+            if (secondaryTarget.valueLow !== undefined) {
+              step.secondaryTargetValueLow = secondaryTarget.valueLow;
+            }
+            if (secondaryTarget.valueHigh !== undefined) {
+              step.secondaryTargetValueHigh = secondaryTarget.valueHigh;
+            }
+            if (
+              secondaryTarget.value !== undefined &&
+              step.secondaryTargetValueLow === undefined
+            ) {
+              step.secondaryTargetValue = secondaryTarget.value;
+            }
           }
         }
       }

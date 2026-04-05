@@ -132,6 +132,7 @@ export async function findOrCreateWorkoutForPlanDay(params: {
           durationValue: s.durationValue,
           targets: s.targets as object | undefined,
           repeatCount: s.repeatCount ?? undefined,
+          paceTargetEncodingVersion: 2,
           updatedAt: new Date(),
         })
       );

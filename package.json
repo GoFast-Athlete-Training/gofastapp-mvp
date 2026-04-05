@@ -22,7 +22,8 @@
     "db:populate-bidirectional-ids": "tsx scripts/populate-bidirectional-run-club-ids.ts",
     "db:seed-demo-races": "tsx scripts/seed-demo-races.ts",
     "smoke:fivek-pace": "tsx scripts/smoke-fivek-pace.ts",
-    "smoke:garmin-minimal": "tsx scripts/garmin-minimal-workout-smoke.ts"
+    "smoke:garmin-minimal": "tsx scripts/garmin-minimal-workout-smoke.ts",
+    "db:migrate-pace-targets": "tsx scripts/migrate-legacy-pace-targets.ts"
   },
   "dependencies": {
     "@gofast/shared-db": "file:./packages/shared-db",

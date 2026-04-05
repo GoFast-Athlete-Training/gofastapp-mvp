@@ -6,6 +6,10 @@
 
 import { prisma } from "@/lib/prisma";
 import { extractGarminWorkoutIdFromSummary } from "./extract-garmin-workout-id";
+import {
+  normalizePaceTargetEncodingVersion,
+  storedPaceSecondsKmToSecondsPerMile,
+} from "@/lib/workout-generator/pace-calculator";
 /** m/s → seconds per mile */
 function speedMpsToSecPerMile(mps: number | null | undefined): number | null {
   if (mps == null || mps <= 0) return null;
@@ -39,29 +43,37 @@ function isRunningActivityType(activityType: string | null | undefined): boolean
 
 type SegmentTarget = { type?: string; valueLow?: number; valueHigh?: number; value?: number };
 
-function paceTargetSecPerMileFromSegment(targets: unknown): number | null {
+function paceTargetSecPerMileFromSegment(
+  targets: unknown,
+  paceTargetEncodingVersion: number
+): number | null {
   if (!Array.isArray(targets) || targets.length === 0) return null;
   const t = targets[0] as SegmentTarget;
   if (!t?.type || String(t.type).toUpperCase() !== "PACE") return null;
   const low = t.valueLow ?? t.value;
   if (low == null || typeof low !== "number" || low <= 0) return null;
-  // Stored as sec/km (Garmin) → sec/mile
-  return Math.round(low * 1.60934);
+  const enc = normalizePaceTargetEncodingVersion(paceTargetEncodingVersion);
+  return Math.round(storedPaceSecondsKmToSecondsPerMile(low, enc));
 }
 
 function pickMainPaceTargetSecPerMile(
-  segments: { title: string; targets: unknown; stepOrder: number }[]
+  segments: {
+    title: string;
+    targets: unknown;
+    stepOrder: number;
+    paceTargetEncodingVersion: number;
+  }[]
 ): { targetSecPerMile: number | null } {
   const sorted = [...segments].sort((a, b) => a.stepOrder - b.stepOrder);
   for (const seg of sorted) {
     const title = (seg.title || "").toLowerCase();
     if (title.includes("warmup") || title.includes("warm-up")) continue;
     if (title.includes("cooldown") || title.includes("cool-down")) continue;
-    const p = paceTargetSecPerMileFromSegment(seg.targets);
+    const p = paceTargetSecPerMileFromSegment(seg.targets, seg.paceTargetEncodingVersion);
     if (p != null) return { targetSecPerMile: p };
   }
   for (const seg of sorted) {
-    const p = paceTargetSecPerMileFromSegment(seg.targets);
+    const p = paceTargetSecPerMileFromSegment(seg.targets, seg.paceTargetEncodingVersion);
     if (p != null) return { targetSecPerMile: p };
   }
   return { targetSecPerMile: null };

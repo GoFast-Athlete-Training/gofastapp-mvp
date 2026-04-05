@@ -35,9 +35,9 @@ type ApiSegment = {
   repeatCount?: number;
 };
 
-/** Sec/km (stored API value) to "M:SS" per mile — shared with workout detail */
+/** Sec/km (stored API value, encoding v2) to "M:SS" per mile — shared with workout detail */
 function secPerKmToPaceDisplay(value: number): string {
-  return formatStoredPaceAsMinPerMile(value);
+  return formatStoredPaceAsMinPerMile(value, 2);
 }
 
 /** Map AI-derived segments into fixed warmup / mainWork / cooldown slots */

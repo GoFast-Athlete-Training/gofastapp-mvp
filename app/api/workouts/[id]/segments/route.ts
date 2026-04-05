@@ -126,6 +126,7 @@ export async function PUT(request: NextRequest, ctx: Ctx) {
               : (seg.targets as Prisma.InputJsonValue),
           repeatCount: seg.repeatCount,
           notes: seg.notes,
+          paceTargetEncodingVersion: 2,
         })),
       });
     });

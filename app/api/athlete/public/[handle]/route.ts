@@ -27,8 +27,8 @@ export async function GET(
       return NextResponse.json({ error: 'Handle required' }, { status: 400 });
     }
 
-    const athlete = await prisma.athlete.findUnique({
-      where: { gofastHandle: handle },
+    const athlete = await prisma.athlete.findFirst({
+      where: { gofastHandle: { equals: handle, mode: 'insensitive' } },
     });
 
     if (!athlete) {
@@ -36,6 +36,44 @@ export async function GET(
     }
 
     const now = new Date();
+
+    const raceSignupRows = await prisma.athlete_race_signups.findMany({
+      where: { athleteId: athlete.id },
+      include: {
+        race_registry: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            raceDate: true,
+            city: true,
+            state: true,
+            distanceMiles: true,
+            raceType: true,
+            isActive: true,
+            isCancelled: true,
+          },
+        },
+      },
+      orderBy: { race_registry: { raceDate: 'asc' } },
+      take: 24,
+    });
+
+    const signedUpRaces = raceSignupRows
+      .filter((row) => row.race_registry?.isActive && !row.race_registry.isCancelled)
+      .map((row) => {
+        const r = row.race_registry;
+        return {
+          id: r.id,
+          name: r.name,
+          slug: r.slug,
+          raceDate: r.raceDate.toISOString(),
+          city: r.city,
+          state: r.state,
+          distanceMiles: r.distanceMiles,
+          raceType: r.raceType,
+        };
+      });
 
     const upcomingRuns = await prisma.city_runs.findMany({
       where: {
@@ -85,6 +123,39 @@ export async function GET(
       };
     }
 
+    let primaryChasingGoal: {
+      id: string;
+      name: string | null;
+      distance: string;
+      goalTime: string | null;
+      targetByDate: string;
+      raceName: string | null;
+      raceSlug: string | null;
+    } | null = null;
+
+    if (!trainingSummary) {
+      const chasing = await prisma.athleteGoal.findFirst({
+        where: { athleteId: athlete.id, status: 'ACTIVE' },
+        orderBy: { targetByDate: 'asc' },
+        include: {
+          race_registry: {
+            select: { name: true, slug: true },
+          },
+        },
+      });
+      if (chasing) {
+        primaryChasingGoal = {
+          id: chasing.id,
+          name: chasing.name,
+          distance: chasing.distance,
+          goalTime: chasing.goalTime,
+          targetByDate: chasing.targetByDate.toISOString(),
+          raceName: chasing.race_registry?.name ?? null,
+          raceSlug: chasing.race_registry?.slug ?? null,
+        };
+      }
+    }
+
     const startOfToday = new Date(now);
     startOfToday.setHours(0, 0, 0, 0);
     const workoutRows = await prisma.workouts.findMany({
@@ -121,6 +192,8 @@ export async function GET(
         primarySport: athlete.primarySport,
       },
       trainingSummary,
+      primaryChasingGoal,
+      signedUpRaces,
       upcomingWorkouts,
       upcomingRuns: upcomingRuns.map((r) => ({
         id: r.id,

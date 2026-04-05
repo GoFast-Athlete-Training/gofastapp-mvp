@@ -994,6 +994,8 @@ model workouts {
   planLadderIndex           Int?
   /// Garmin Training API workout id after push-to-garmin (links activity → planned workout)
   garminWorkoutId           Int?
+  /// Garmin Training API schedule id (calendar placement for this workout)
+  garminScheduleId          Int?
   /// Matched activity after a run (promoted snapshot fields below)
   matchedActivityId         String?             @unique
   actualDistanceMeters      Float?
@@ -1042,6 +1044,8 @@ model workout_segments {
   durationValue    Float             // Miles (if DISTANCE) or minutes (if TIME)
   // Targets (generic - matches Garmin structure)
   targets          Json?             // Array of target objects: [{ type: "PACE", valueLow: 480, valueHigh: 500 }, { type: "HEART_RATE", valueLow: 160, valueHigh: 180 }]
+  /// 1 = legacy PACE values (inflated); 2 = true sec/km per Garmin — see lib/workout-generator/pace-calculator.ts
+  paceTargetEncodingVersion Int         @default(2)
   // Repeat capability
   repeatCount      Int?              // Repeat this segment N times (for intervals)
   /// Lap-matched actuals (prescribed targets JSON is never overwritten)
