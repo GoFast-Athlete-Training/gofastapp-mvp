@@ -187,7 +187,7 @@ export default function ProfilePage() {
             </button>
             <button
               type="button"
-              onClick={() => router.push('/athlete-edit-profile?tab=gofast-page')}
+              onClick={() => router.push('/athlete-edit-profile?tab=about-you')}
               className="border border-orange-200 text-orange-800 px-4 py-2 rounded-lg font-semibold text-sm hover:bg-orange-50"
             >
               Build GoFast Page

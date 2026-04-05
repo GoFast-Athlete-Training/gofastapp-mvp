@@ -11,12 +11,21 @@ import AthleteAppShell from '@/components/athlete/AthleteAppShell';
 const RUNNER_BASE =
   process.env.NEXT_PUBLIC_RUNNER_PHOTO_URL?.replace(/\/$/, '') || 'https://runner.gofastcrushgoals.com';
 
-const TAB_IDS = ['you', 'gofast-page', 'training'] as const;
+const TAB_IDS = ['profile-info', 'about-you', 'goal-perf'] as const;
 type ProfileTab = (typeof TAB_IDS)[number];
 
+/** Old ?tab= slugs from bookmarks / shared links */
+const LEGACY_TAB_MAP: Record<string, ProfileTab> = {
+  you: 'profile-info',
+  'gofast-page': 'about-you',
+  training: 'goal-perf',
+};
+
 function tabFromParam(raw: string | null): ProfileTab {
-  if (raw && TAB_IDS.includes(raw as ProfileTab)) return raw as ProfileTab;
-  return 'you';
+  if (!raw) return 'profile-info';
+  if (LEGACY_TAB_MAP[raw]) return LEGACY_TAB_MAP[raw];
+  if (TAB_IDS.includes(raw as ProfileTab)) return raw as ProfileTab;
+  return 'profile-info';
 }
 
 function AthleteEditProfileInner() {
@@ -61,6 +70,13 @@ function AthleteEditProfileInner() {
   useEffect(() => {
     setActiveTab(tabFromParam(searchParams.get('tab')));
   }, [searchParams]);
+
+  useEffect(() => {
+    const raw = searchParams.get('tab');
+    if (raw && LEGACY_TAB_MAP[raw]) {
+      router.replace(`/athlete-edit-profile?tab=${LEGACY_TAB_MAP[raw]}`, { scroll: false });
+    }
+  }, [searchParams, router]);
 
   const setTab = (t: ProfileTab) => {
     setActiveTab(t);
@@ -254,7 +270,7 @@ function AthleteEditProfileInner() {
     setSuccess('');
   };
 
-  const saveYouTab = async () => {
+  const saveProfileInfoTab = async () => {
     if (
       !formData.firstName ||
       !formData.lastName ||
@@ -296,7 +312,7 @@ function AthleteEditProfileInner() {
         state: formData.state,
         photoURL,
       });
-      setSuccess('You — saved.');
+      setSuccess('Profile Info — saved.');
     } catch (err: unknown) {
       const e = err as { response?: { data?: { field?: string; message?: string; error?: string } } };
       if (e.response?.data?.field === 'gofastHandle') {
@@ -309,7 +325,7 @@ function AthleteEditProfileInner() {
     }
   };
 
-  const saveGoFastTab = async () => {
+  const saveAboutYouTab = async () => {
     if (!athleteId) {
       setError('Athlete ID not found.');
       return;
@@ -321,10 +337,9 @@ function AthleteEditProfileInner() {
       await api.put(`/athlete/${athleteId}/profile`, {
         myBestRunPhotoURL: bannerURL,
         bio: formData.bio || null,
-        primarySport: formData.primarySport.trim() || null,
         instagram: formData.instagram.trim() || null,
       });
-      setSuccess('GoFast Page — saved.');
+      setSuccess('About You — saved.');
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string; error?: string } } };
       setError(e.response?.data?.message || e.response?.data?.error || 'Save failed.');
@@ -333,7 +348,7 @@ function AthleteEditProfileInner() {
     }
   };
 
-  const saveTrainingTab = async () => {
+  const saveGoalPerfTab = async () => {
     if (!athleteId) {
       setError('Athlete ID not found.');
       return;
@@ -342,6 +357,7 @@ function AthleteEditProfileInner() {
     setLoading(true);
     try {
       await api.put(`/athlete/${athleteId}/profile`, {
+        primarySport: formData.primarySport.trim() || null,
         fiveKPace: formData.fiveKPace.trim() || null,
         weeklyMileage: (() => {
           const t = formData.weeklyMileage.trim();
@@ -350,7 +366,7 @@ function AthleteEditProfileInner() {
           return Number.isFinite(n) ? n : null;
         })(),
       });
-      setSuccess('Training — saved.');
+      setSuccess('Goal & Performance — saved.');
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string; error?: string } } };
       setError(e.response?.data?.message || e.response?.data?.error || 'Save failed.');
@@ -375,19 +391,20 @@ function AthleteEditProfileInner() {
   const liveGoFastUrl = formData.gofastHandle ? `${RUNNER_BASE}/${formData.gofastHandle}` : null;
 
   const sectionMeta: Record<ProfileTab, { title: string; subtitle: string }> = {
-    you: {
-      title: 'You',
+    'profile-info': {
+      title: 'Profile Info',
       subtitle:
         'Profile photo, name, GoFast handle, birthday, gender, phone, and city. Save when you’re done with this section.',
     },
-    'gofast-page': {
-      title: 'GoFast Page',
+    'about-you': {
+      title: 'About You',
       subtitle:
-        'Public hero banner, bio, sport, Instagram, and optional GoFast Container. These fields shape how the world sees you.',
+        'Public hero banner, bio, Instagram, and optional GoFast Container. These fields shape how the world sees you.',
     },
-    training: {
-      title: 'Training',
-      subtitle: '5K pace and weekly mileage help tune workouts and pacing in the app.',
+    'goal-perf': {
+      title: 'Goal & Performance',
+      subtitle:
+        'Primary sport, 5K pace, and weekly mileage help tune workouts and pacing in the app.',
     },
   };
 
@@ -410,13 +427,25 @@ function AthleteEditProfileInner() {
   return (
     <AthleteAppShell>
       <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <button
-          type="button"
-          onClick={() => router.push('/profile')}
-          className="mb-4 text-sm font-medium text-orange-600 hover:text-orange-700"
-        >
-          ← Back to profile
-        </button>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => router.push('/profile')}
+            className="text-sm font-medium text-orange-600 hover:text-orange-700"
+          >
+            ← Back to profile
+          </button>
+          {liveGoFastUrl ? (
+            <a
+              href={liveGoFastUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium text-orange-600 hover:text-orange-700"
+            >
+              See your GoFast Page →
+            </a>
+          ) : null}
+        </div>
 
         <div className="flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg md:min-h-[580px] md:flex-row">
           <aside className="shrink-0 border-b border-gray-200 bg-gradient-to-b from-gray-50 to-gray-50/90 md:w-64 md:border-b-0 md:border-r md:border-gray-200 md:bg-gray-50">
@@ -425,9 +454,9 @@ function AthleteEditProfileInner() {
                 Sections
               </p>
               <nav className="flex flex-col gap-0.5" aria-label="Profile sections">
-                {sectionNavItem('you', 'You', 'Photo, name & account')}
-                {sectionNavItem('gofast-page', 'GoFast Page', 'Public page & banner')}
-                {sectionNavItem('training', 'Training', 'Pace & mileage')}
+                {sectionNavItem('profile-info', 'Profile Info', 'Photo, name & account')}
+                {sectionNavItem('about-you', 'About You', 'Public page & banner')}
+                {sectionNavItem('goal-perf', 'Goal & Performance', 'Sport, pace & mileage')}
               </nav>
             </div>
           </aside>
@@ -449,7 +478,7 @@ function AthleteEditProfileInner() {
               </div>
             )}
 
-            {activeTab === 'you' && (
+            {activeTab === 'profile-info' && (
             <div className="space-y-5">
               <div className="text-center">
                 <div
@@ -631,17 +660,17 @@ function AthleteEditProfileInner() {
                 </button>
                 <button
                   type="button"
-                  onClick={saveYouTab}
+                  onClick={saveProfileInfoTab}
                   disabled={loading || handleStatus === 'taken'}
                   className="flex-1 bg-orange-500 text-white py-3 rounded-lg font-semibold hover:bg-orange-600 disabled:opacity-50"
                 >
-                  {loading ? 'Saving…' : 'Save You'}
+                  {loading ? 'Saving…' : 'Save profile info'}
                 </button>
               </div>
             </div>
           )}
 
-          {activeTab === 'gofast-page' && (
+          {activeTab === 'about-you' && (
             <div className="space-y-5">
               <div className="rounded-xl border border-orange-100 bg-orange-50/50 p-4">
                 <h3 className="text-sm font-semibold text-gray-900 mb-1">Banner photo</h3>
@@ -686,28 +715,6 @@ function AthleteEditProfileInner() {
                   disabled={loading}
                 />
                 <p className="text-xs text-gray-500 mt-1">{formData.bio.length}/250</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Primary sport <span className="text-gray-400 font-normal">(optional)</span>
-                </label>
-                <select
-                  value={formData.primarySport}
-                  onChange={(e) => handleInputChange('primarySport', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
-                  disabled={loading}
-                >
-                  <option value="">Select…</option>
-                  <option value="running">Running</option>
-                  <option value="cycling">Cycling</option>
-                  <option value="swimming">Swimming</option>
-                  <option value="triathlon">Triathlon</option>
-                  <option value="ultra-racing">Ultra racing</option>
-                  <option value="hiking">Hiking</option>
-                  <option value="trail-running">Trail running</option>
-                  <option value="track-field">Track & field</option>
-                </select>
               </div>
 
               <div>
@@ -786,18 +793,39 @@ function AthleteEditProfileInner() {
                 </button>
                 <button
                   type="button"
-                  onClick={saveGoFastTab}
+                  onClick={saveAboutYouTab}
                   disabled={loading}
                   className="flex-1 bg-orange-500 text-white py-3 rounded-lg font-semibold hover:bg-orange-600 disabled:opacity-50"
                 >
-                  {loading ? 'Saving…' : 'Save GoFast Page'}
+                  {loading ? 'Saving…' : 'Save about you'}
                 </button>
               </div>
             </div>
           )}
 
-          {activeTab === 'training' && (
+          {activeTab === 'goal-perf' && (
             <div className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Primary sport <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <select
+                  value={formData.primarySport}
+                  onChange={(e) => handleInputChange('primarySport', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  disabled={loading}
+                >
+                  <option value="">Select…</option>
+                  <option value="running">Running</option>
+                  <option value="cycling">Cycling</option>
+                  <option value="swimming">Swimming</option>
+                  <option value="triathlon">Triathlon</option>
+                  <option value="ultra-racing">Ultra racing</option>
+                  <option value="hiking">Hiking</option>
+                  <option value="trail-running">Trail running</option>
+                  <option value="track-field">Track & field</option>
+                </select>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Current 5K pace</label>
                 <input
@@ -832,11 +860,11 @@ function AthleteEditProfileInner() {
                 </button>
                 <button
                   type="button"
-                  onClick={saveTrainingTab}
+                  onClick={saveGoalPerfTab}
                   disabled={loading}
                   className="flex-1 bg-orange-500 text-white py-3 rounded-lg font-semibold hover:bg-orange-600 disabled:opacity-50"
                 >
-                  {loading ? 'Saving…' : 'Save training'}
+                  {loading ? 'Saving…' : 'Save goal & performance'}
                 </button>
               </div>
             </div>

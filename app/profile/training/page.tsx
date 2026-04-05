@@ -235,7 +235,7 @@ export default function ProfileTrainingPage() {
             {saving ? "Saving…" : "Save"}
           </button>
           <Link
-            href="/athlete-edit-profile"
+            href="/athlete-edit-profile?tab=goal-perf"
             className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
           >
             Edit full profile
