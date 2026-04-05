@@ -1,18 +1,34 @@
 'use client';
 
-
-import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
+import Link from 'next/link';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import AthleteAppShell from '@/components/athlete/AthleteAppShell';
 
-export default function AthleteEditProfilePage() {
+const RUNNER_BASE =
+  process.env.NEXT_PUBLIC_RUNNER_PHOTO_URL?.replace(/\/$/, '') || 'https://runner.gofastcrushgoals.com';
+
+const TAB_IDS = ['you', 'gofast-page', 'training'] as const;
+type ProfileTab = (typeof TAB_IDS)[number];
+
+function tabFromParam(raw: string | null): ProfileTab {
+  if (raw && TAB_IDS.includes(raw as ProfileTab)) return raw as ProfileTab;
+  return 'you';
+}
+
+function AthleteEditProfileInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
+  const handleCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [activeTab, setActiveTab] = useState<ProfileTab>(() => tabFromParam(searchParams.get('tab')));
+
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -36,6 +52,18 @@ export default function AthleteEditProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [handleStatus, setHandleStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const [handleError, setHandleError] = useState('');
+
+  useEffect(() => {
+    setActiveTab(tabFromParam(searchParams.get('tab')));
+  }, [searchParams]);
+
+  const setTab = (t: ProfileTab) => {
+    setActiveTab(t);
+    router.replace(`/athlete-edit-profile?tab=${t}`, { scroll: false });
+  };
 
   useEffect(() => {
     const storedAthleteId = LocalStorageAPI.getAthleteId();
@@ -64,11 +92,11 @@ export default function AthleteEditProfilePage() {
           gofastHandle: stored.gofastHandle || '',
           bio: stored.bio || '',
           instagram: stored.instagram || '',
-          fiveKPace: stored.fiveKPace?.trim() || "",
+          fiveKPace: stored.fiveKPace?.trim() || '',
           weeklyMileage:
             stored.weeklyMileage != null && Number.isFinite(Number(stored.weeklyMileage))
               ? String(stored.weeklyMileage)
-              : "",
+              : '',
           profilePhoto: null,
           profilePhotoPreview: stored.photoURL || auth.currentUser?.photoURL || null,
           bannerFile: null,
@@ -83,11 +111,63 @@ export default function AthleteEditProfilePage() {
   }, [router]);
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [field]: value,
     }));
   };
+
+  const checkHandleAvailability = useCallback(async (handle: string) => {
+    const normalized = handle.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (!normalized || normalized.length < 2) {
+      setHandleStatus('idle');
+      setHandleError('');
+      return;
+    }
+    setHandleStatus('checking');
+    setHandleError('');
+    try {
+      const response = await api.get(`/athlete/check-handle?handle=${normalized}`);
+      if (response.data.success) {
+        if (response.data.available) {
+          setHandleStatus('available');
+          setHandleError('');
+        } else {
+          setHandleStatus('taken');
+          setHandleError(`"@${normalized}" is already taken.`);
+        }
+      }
+    } catch {
+      setHandleStatus('idle');
+    }
+  }, []);
+
+  const handleHandleChange = (value: string) => {
+    const normalized = value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    setFormData((prev) => ({ ...prev, gofastHandle: normalized }));
+    if (handleCheckTimeoutRef.current) clearTimeout(handleCheckTimeoutRef.current);
+    if (!normalized) {
+      setHandleStatus('idle');
+      setHandleError('');
+      return;
+    }
+    handleCheckTimeoutRef.current = setTimeout(() => checkHandleAvailability(normalized), 500);
+  };
+
+  const handleHandleBlur = () => {
+    const handle = formData.gofastHandle.trim().toLowerCase();
+    if (handleCheckTimeoutRef.current) {
+      clearTimeout(handleCheckTimeoutRef.current);
+      handleCheckTimeoutRef.current = null;
+    }
+    if (handle && handleStatus === 'idle') checkHandleAvailability(handle);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (handleCheckTimeoutRef.current) clearTimeout(handleCheckTimeoutRef.current);
+    };
+  }, []);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -96,15 +176,12 @@ export default function AthleteEditProfilePage() {
         alert('Please select a valid image file');
         return;
       }
-      
       if (file.size > 5 * 1024 * 1024) {
         alert('Image size must be less than 5MB');
         return;
       }
-
       const previewUrl = URL.createObjectURL(file);
-      
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         profilePhoto: file,
         profilePhotoPreview: previewUrl,
@@ -112,9 +189,7 @@ export default function AthleteEditProfilePage() {
     }
   };
 
-  const handleImageClick = () => {
-    fileInputRef.current?.click();
-  };
+  const handleImageClick = () => fileInputRef.current?.click();
 
   const handleBannerUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -136,59 +211,101 @@ export default function AthleteEditProfilePage() {
     }
   };
 
-  const handleBannerClick = () => {
-    bannerInputRef.current?.click();
+  const handleBannerClick = () => bannerInputRef.current?.click();
+
+  const beginSave = () => {
+    setError('');
+    setSuccess('');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    console.log('🚀 SUBMIT: Updating profile...');
-    console.log('📝 Form data:', formData);
-    
-    // Validate required fields
-    if (!formData.firstName || !formData.lastName || !formData.gofastHandle || !formData.birthday || !formData.gender || !formData.city || !formData.state || !formData.primarySport) {
-      setError('Please fill in all required fields');
+  const saveYouTab = async () => {
+    if (
+      !formData.firstName ||
+      !formData.lastName ||
+      !formData.gofastHandle ||
+      !formData.birthday ||
+      !formData.gender ||
+      !formData.city ||
+      !formData.state
+    ) {
+      setError('Fill in all required fields on this tab.');
       return;
     }
-
+    if (handleStatus === 'taken') {
+      setError('Choose a different handle.');
+      return;
+    }
     if (!athleteId) {
-      setError('Athlete ID not found. Please refresh and try again.');
+      setError('Athlete ID not found.');
+      return;
+    }
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) {
+      setError('Sign in to save.');
       return;
     }
 
+    beginSave();
+    setLoading(true);
     try {
-      setLoading(true);
-      setError('');
-
-      const firebaseUser = auth.currentUser;
-      
-      if (!firebaseUser) {
-        setError('No user logged in. Please sign in first.');
-        console.warn('// REDIRECT DISABLED: /signup');
-        return;
-      }
-
-      // Update profile - overwrites existing data
-      console.log('🌐 Updating profile via /api/athlete/:id/profile');
-      
       const photoURL = formData.profilePhotoPreview || firebaseUser.photoURL || null;
-      const bannerURL = formData.bannerPreview || null;
-      
-      const profileRes = await api.put(`/athlete/${athleteId}/profile`, {
+      await api.put(`/athlete/${athleteId}/profile`, {
         firstName: formData.firstName,
         lastName: formData.lastName,
-        phoneNumber: formData.phoneNumber,
+        phoneNumber: formData.phoneNumber || null,
         gofastHandle: formData.gofastHandle.trim().toLowerCase(),
         birthday: formData.birthday,
         gender: formData.gender,
         city: formData.city,
         state: formData.state,
-        primarySport: formData.primarySport,
-        bio: formData.bio,
-        instagram: formData.instagram,
-        photoURL: photoURL,
+        photoURL,
+      });
+      setSuccess('You — saved.');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { field?: string; message?: string; error?: string } } };
+      if (e.response?.data?.field === 'gofastHandle') {
+        setError(`Handle @"${formData.gofastHandle}" is taken.`);
+      } else {
+        setError(e.response?.data?.message || e.response?.data?.error || 'Save failed.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveGoFastTab = async () => {
+    if (!athleteId) {
+      setError('Athlete ID not found.');
+      return;
+    }
+    beginSave();
+    setLoading(true);
+    try {
+      const bannerURL = formData.bannerPreview || null;
+      await api.put(`/athlete/${athleteId}/profile`, {
         myBestRunPhotoURL: bannerURL,
+        bio: formData.bio || null,
+        primarySport: formData.primarySport.trim() || null,
+        instagram: formData.instagram.trim() || null,
+      });
+      setSuccess('GoFast Page — saved.');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string; error?: string } } };
+      setError(e.response?.data?.message || e.response?.data?.error || 'Save failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveTrainingTab = async () => {
+    if (!athleteId) {
+      setError('Athlete ID not found.');
+      return;
+    }
+    beginSave();
+    setLoading(true);
+    try {
+      await api.put(`/athlete/${athleteId}/profile`, {
         fiveKPace: formData.fiveKPace.trim() || null,
         weeklyMileage: (() => {
           const t = formData.weeklyMileage.trim();
@@ -197,32 +314,12 @@ export default function AthleteEditProfilePage() {
           return Number.isFinite(n) ? n : null;
         })(),
       });
-      
-      console.log('✅ Profile updated:', profileRes.data);
-
-      // Navigate back to profile page
-      console.log('🏠 Navigating back to profile...');
-      router.push('/profile');
-      
-    } catch (err: any) {
-      console.error('❌ Profile update failed:', err);
+      setSuccess('Training — saved.');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string; error?: string } } };
+      setError(e.response?.data?.message || e.response?.data?.error || 'Save failed.');
+    } finally {
       setLoading(false);
-      
-      // Handle specific error cases
-      if (err.response?.data?.error) {
-        const errorData = err.response.data;
-        if (errorData.field === 'gofastHandle') {
-          setError(`❌ Handle taken!\n\n"@${formData.gofastHandle}" is already taken. Please choose a different handle.`);
-        } else {
-          setError(`❌ Profile update failed:\n\n${errorData.message || errorData.error}`);
-        }
-      } else if (err.response?.status === 403) {
-        setError('❌ Forbidden!\n\nYou can only update your own profile. Please sign in with the correct account.');
-      } else if (err.response?.status === 404) {
-        setError('❌ Profile not found!\n\nYour athlete record was not found. Please try signing in again.');
-      } else {
-        setError(`❌ Profile update failed:\n\n${err.message || 'Unknown error occurred'}`);
-      }
     }
   };
 
@@ -239,6 +336,21 @@ export default function AthleteEditProfilePage() {
     );
   }
 
+  const liveGoFastUrl = formData.gofastHandle ? `${RUNNER_BASE}/${formData.gofastHandle}` : null;
+
+  const tabBtn = (id: ProfileTab, label: string) => (
+    <button
+      key={id}
+      type="button"
+      onClick={() => setTab(id)}
+      className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${
+        activeTab === id ? 'bg-orange-500 text-white shadow' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+      }`}
+    >
+      {label}
+    </button>
+  );
+
   return (
     <AthleteAppShell>
       <div className="max-w-2xl w-full mx-auto px-4 sm:px-6 py-8">
@@ -249,353 +361,414 @@ export default function AthleteEditProfilePage() {
         >
           ← Back to profile
         </button>
-        <div className="bg-white rounded-2xl shadow-lg p-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <Image
-            src="/logo.jpg"
-            alt="GoFast"
-            width={64}
-            height={64}
-            className="w-16 h-16 rounded-full mx-auto mb-4"
-          />
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Edit Your Profile</h1>
-          <p className="text-gray-600 mb-4">Update your information to keep your profile current and help others find you.</p>
-        </div>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-800 text-sm whitespace-pre-line">{error}</p>
+        <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+          <div className="text-center mb-6">
+            <Image
+              src="/logo.jpg"
+              alt="GoFast"
+              width={56}
+              height={56}
+              className="w-14 h-14 rounded-full mx-auto mb-3"
+            />
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Edit profile</h1>
+            <p className="text-gray-600 text-sm mt-1">Save each section with the button at the bottom of the tab.</p>
           </div>
-        )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Profile Photo */}
-          <div className="text-center">
-            <div 
-              className="w-24 h-24 bg-gray-200 rounded-full mx-auto mb-2 flex items-center justify-center cursor-pointer hover:bg-gray-300 transition-colors overflow-hidden"
-              onClick={handleImageClick}
-            >
-              {formData.profilePhotoPreview ? (
-                <img 
-                  src={formData.profilePhotoPreview} 
-                  alt="Profile preview" 
-                  className="w-24 h-24 rounded-full object-cover"
+          <div className="flex gap-2 mb-6">
+            {tabBtn('you', 'You')}
+            {tabBtn('gofast-page', 'GoFast Page')}
+            {tabBtn('training', 'Training')}
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+              <p className="text-red-800 text-sm whitespace-pre-line">{error}</p>
+            </div>
+          )}
+          {success && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+              <p className="text-green-800 text-sm">{success}</p>
+            </div>
+          )}
+
+          {activeTab === 'you' && (
+            <div className="space-y-5">
+              <div className="text-center">
+                <div
+                  className="w-24 h-24 bg-gray-200 rounded-full mx-auto mb-2 flex items-center justify-center cursor-pointer hover:bg-gray-300 transition-colors overflow-hidden"
+                  onClick={handleImageClick}
+                >
+                  {formData.profilePhotoPreview ? (
+                    <img
+                      src={formData.profilePhotoPreview}
+                      alt=""
+                      className="w-24 h-24 rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-4xl">📷</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleImageClick}
+                  className="text-orange-600 text-sm font-medium hover:text-orange-700"
+                >
+                  {formData.profilePhotoPreview ? 'Change photo' : 'Add photo'}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
                 />
-              ) : (
-                <span className="text-4xl">📷</span>
-              )}
-            </div>
-            <div className="flex items-center justify-center text-orange-500 text-sm cursor-pointer hover:text-orange-600" onClick={handleImageClick}>
-              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-              </svg>
-              {formData.profilePhotoPreview ? 'Change Photo' : 'Add Photo'}
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="hidden"
-            />
-          </div>
-
-          <div className="rounded-xl border border-orange-100 bg-orange-50/50 p-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-1">GoFast Page — banner photo</h3>
-            <p className="text-xs text-gray-600 mb-3">
-              Finish line, mid-race, or trail shot. This is the big photo on your public GoFast Page (separate from your profile circle).
-            </p>
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={handleBannerClick}
-              onKeyDown={(e) => e.key === 'Enter' && handleBannerClick()}
-              className="w-full aspect-[21/9] max-h-36 bg-gray-200 rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-300 transition-colors overflow-hidden"
-            >
-              {formData.bannerPreview ? (
-                <img
-                  src={formData.bannerPreview}
-                  alt=""
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span className="text-gray-500 text-sm">Tap to add banner</span>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={handleBannerClick}
-              className="mt-2 text-orange-600 text-sm font-medium hover:text-orange-700"
-            >
-              {formData.bannerPreview ? 'Change banner' : 'Add banner'}
-            </button>
-            <input
-              ref={bannerInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleBannerUpload}
-              className="hidden"
-            />
-          </div>
-
-          {/* First Name and Last Name */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                First Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.firstName}
-                onChange={(e) => handleInputChange('firstName', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                required
-                disabled={loading}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Last Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.lastName}
-                onChange={(e) => handleInputChange('lastName', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                required
-                disabled={loading}
-              />
-            </div>
-          </div>
-
-          {/* Phone Number */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Phone Number
-            </label>
-            <input
-              type="tel"
-              value={formData.phoneNumber}
-              onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              disabled={loading}
-            />
-          </div>
-
-          {/* Short Bio */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Short Bio
-            </label>
-            <textarea
-              value={formData.bio}
-              onChange={(e) => handleInputChange('bio', e.target.value)}
-              maxLength={250}
-              rows={3}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              disabled={loading}
-            />
-            <p className="text-sm text-gray-500 mt-1">{formData.bio.length}/250 characters</p>
-          </div>
-
-          {/* GoFast Handle */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              GoFast Handle <span className="text-red-500">*</span>
-            </label>
-            <p className="text-xs text-gray-400 mb-2">This is for quick lookup and tagging others. We recommend using your first name but you can make it however you like.</p>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="text-gray-500 text-sm">@</span>
               </div>
-              <input
-                type="text"
-                value={formData.gofastHandle}
-                onChange={(e) => handleInputChange('gofastHandle', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                className="w-full pl-8 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                required
-                disabled={loading}
-              />
-            </div>
-          </div>
 
-          {/* Birthday */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Birthday <span className="text-red-500">*</span>
-            </label>
-            <input 
-              type="date" 
-              value={formData.birthday} 
-              onChange={(e) => handleInputChange('birthday', e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              required
-              disabled={loading}
-            />
-          </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    First name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.firstName}
+                    onChange={(e) => handleInputChange('firstName', e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Last name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.lastName}
+                    onChange={(e) => handleInputChange('lastName', e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
 
-          {/* Gender */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Gender <span className="text-red-500">*</span>
-            </label>
-            <div className="flex gap-4">
-              <label className="flex items-center">
-                <input 
-                  type="radio" 
-                  name="gender" 
-                  value="male" 
-                  checked={formData.gender === 'male'}
-                  onChange={(e) => handleInputChange('gender', e.target.value)}
-                  className="mr-2"
-                  required
-                  disabled={loading}
-                />
-                Male
-              </label>
-              <label className="flex items-center">
-                <input 
-                  type="radio" 
-                  name="gender" 
-                  value="female" 
-                  checked={formData.gender === 'female'}
-                  onChange={(e) => handleInputChange('gender', e.target.value)}
-                  className="mr-2"
-                  required
-                  disabled={loading}
-                />
-                Female
-              </label>
-            </div>
-          </div>
-
-          {/* City and State */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                City <span className="text-red-500">*</span>
-              </label>
-              <input 
-                type="text" 
-                value={formData.city} 
-                onChange={(e) => handleInputChange('city', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                required
-                disabled={loading}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                State <span className="text-red-500">*</span>
-              </label>
-              <input 
-                type="text" 
-                value={formData.state} 
-                onChange={(e) => handleInputChange('state', e.target.value)}
-                maxLength={2}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                required
-                disabled={loading}
-              />
-            </div>
-          </div>
-
-          {/* Primary Sport */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Primary Sport <span className="text-red-500">*</span>
-            </label>
-            <select 
-              value={formData.primarySport} 
-              onChange={(e) => handleInputChange('primarySport', e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              required
-              disabled={loading}
-            >
-              <option value="">Select your primary sport</option>
-              <option value="running">🏃‍♂️ Running</option>
-              <option value="cycling">🚴‍♂️ Cycling</option>
-              <option value="swimming">🏊‍♂️ Swimming</option>
-              <option value="triathlon">🏊‍♂️🚴‍♂️🏃‍♂️ Triathlon</option>
-              <option value="ultra-racing">🏃‍♂️ Ultra Racing</option>
-              <option value="hiking">🥾 Hiking</option>
-              <option value="trail-running">🏔️ Trail Running</option>
-              <option value="track-field">🏃‍♂️ Track & Field</option>
-            </select>
-            <p className="text-xs text-gray-400 mt-1">🎯 This helps us match you with the right community!</p>
-          </div>
-
-          <div className="border-t border-gray-100 pt-6 space-y-4">
-            <h3 className="text-sm font-semibold text-gray-900">Training baseline</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Current 5K pace
+                  Phone <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
+                <input
+                  type="tel"
+                  value={formData.phoneNumber}
+                  onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  disabled={loading}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  GoFast handle <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 text-sm">@</span>
+                  <input
+                    type="text"
+                    value={formData.gofastHandle}
+                    onChange={(e) => handleHandleChange(e.target.value)}
+                    onBlur={handleHandleBlur}
+                    className={`w-full pl-8 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-orange-500 ${
+                      handleStatus === 'taken'
+                        ? 'border-red-500'
+                        : handleStatus === 'available'
+                          ? 'border-green-500'
+                          : 'border-gray-300'
+                    }`}
+                    disabled={loading}
+                  />
+                </div>
+                {handleStatus === 'checking' && <p className="text-xs text-gray-500 mt-1">Checking…</p>}
+                {handleError && <p className="text-xs text-red-600 mt-1">{handleError}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Birthday <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={formData.birthday}
+                  onChange={(e) => handleInputChange('birthday', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  disabled={loading}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Gender <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-4">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="gender"
+                      value="male"
+                      checked={formData.gender === 'male'}
+                      onChange={(e) => handleInputChange('gender', e.target.value)}
+                      className="mr-2"
+                      disabled={loading}
+                    />
+                    Male
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="gender"
+                      value="female"
+                      checked={formData.gender === 'female'}
+                      onChange={(e) => handleInputChange('gender', e.target.value)}
+                      className="mr-2"
+                      disabled={loading}
+                    />
+                    Female
+                  </label>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    City <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.city}
+                    onChange={(e) => handleInputChange('city', e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    State <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.state}
+                    onChange={(e) => handleInputChange('state', e.target.value)}
+                    maxLength={2}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 uppercase"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => router.push('/profile')}
+                  className="flex-1 bg-gray-200 text-gray-800 py-3 rounded-lg font-semibold hover:bg-gray-300"
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={saveYouTab}
+                  disabled={loading || handleStatus === 'taken'}
+                  className="flex-1 bg-orange-500 text-white py-3 rounded-lg font-semibold hover:bg-orange-600 disabled:opacity-50"
+                >
+                  {loading ? 'Saving…' : 'Save You'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'gofast-page' && (
+            <div className="space-y-5">
+              <div className="rounded-xl border border-orange-100 bg-orange-50/50 p-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-1">Banner photo</h3>
+                <p className="text-xs text-gray-600 mb-3">
+                  Large hero on your public GoFast Page. Separate from your profile circle.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleBannerClick}
+                  className="w-full aspect-[21/9] max-h-36 bg-gray-200 rounded-lg overflow-hidden flex items-center justify-center hover:bg-gray-300"
+                >
+                  {formData.bannerPreview ? (
+                    <img src={formData.bannerPreview} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-gray-500 text-sm">Tap to add banner</span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBannerClick}
+                  className="mt-2 text-orange-600 text-sm font-medium"
+                >
+                  {formData.bannerPreview ? 'Change banner' : 'Add banner'}
+                </button>
+                <input
+                  ref={bannerInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleBannerUpload}
+                  className="hidden"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bio (public)</label>
+                <textarea
+                  value={formData.bio}
+                  onChange={(e) => handleInputChange('bio', e.target.value)}
+                  maxLength={250}
+                  rows={3}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  disabled={loading}
+                />
+                <p className="text-xs text-gray-500 mt-1">{formData.bio.length}/250</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Primary sport <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <select
+                  value={formData.primarySport}
+                  onChange={(e) => handleInputChange('primarySport', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  disabled={loading}
+                >
+                  <option value="">Select…</option>
+                  <option value="running">Running</option>
+                  <option value="cycling">Cycling</option>
+                  <option value="swimming">Swimming</option>
+                  <option value="triathlon">Triathlon</option>
+                  <option value="ultra-racing">Ultra racing</option>
+                  <option value="hiking">Hiking</option>
+                  <option value="trail-running">Trail running</option>
+                  <option value="track-field">Track & field</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Instagram</label>
+                <input
+                  type="text"
+                  value={formData.instagram}
+                  onChange={(e) => handleInputChange('instagram', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href="/profile/gofast-page"
+                  className="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                >
+                  Preview in app
+                </Link>
+                {liveGoFastUrl ? (
+                  <a
+                    href={liveGoFastUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-4 py-2 rounded-lg border border-orange-200 text-sm font-semibold text-orange-800 hover:bg-orange-50"
+                  >
+                    View live GoFast Page
+                  </a>
+                ) : null}
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => router.push('/profile')}
+                  className="flex-1 bg-gray-200 text-gray-800 py-3 rounded-lg font-semibold hover:bg-gray-300"
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={saveGoFastTab}
+                  disabled={loading}
+                  className="flex-1 bg-orange-500 text-white py-3 rounded-lg font-semibold hover:bg-orange-600 disabled:opacity-50"
+                >
+                  {loading ? 'Saving…' : 'Save GoFast Page'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'training' && (
+            <div className="space-y-5">
+              <p className="text-sm text-gray-600">
+                These help tune workouts and pacing. You can refine them anytime.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Current 5K pace</label>
                 <input
                   type="text"
                   value={formData.fiveKPace}
-                  onChange={(e) => handleInputChange("fiveKPace", e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  onChange={(e) => handleInputChange('fiveKPace', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                   disabled={loading}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Weekly mileage
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Weekly mileage</label>
                 <input
                   type="number"
                   min={0}
                   step={1}
                   value={formData.weeklyMileage}
-                  onChange={(e) => handleInputChange("weeklyMileage", e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  onChange={(e) => handleInputChange('weeklyMileage', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                   disabled={loading}
                 />
               </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => router.push('/profile')}
+                  className="flex-1 bg-gray-200 text-gray-800 py-3 rounded-lg font-semibold hover:bg-gray-300"
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={saveTrainingTab}
+                  disabled={loading}
+                  className="flex-1 bg-orange-500 text-white py-3 rounded-lg font-semibold hover:bg-orange-600 disabled:opacity-50"
+                >
+                  {loading ? 'Saving…' : 'Save training'}
+                </button>
+              </div>
             </div>
-          </div>
-
-          {/* Instagram */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Instagram Handle
-            </label>
-            <p className="text-xs text-gray-400 mb-2">In case people want to discover the real you outside of your primary sport.</p>
-            <input
-              type="text"
-              value={formData.instagram}
-              onChange={(e) => handleInputChange('instagram', e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              disabled={loading}
-            />
-          </div>
-
-          {/* Submit Button */}
-          <div className="pt-4 flex gap-4">
-            <button
-              type="button"
-              onClick={() => router.push('/profile')}
-              disabled={loading}
-              className="flex-1 bg-gray-200 text-gray-700 py-4 px-6 rounded-lg font-bold text-lg hover:bg-gray-300 transition-colors disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 bg-orange-500 text-white py-4 px-6 rounded-lg font-bold text-lg hover:bg-orange-600 transition-colors shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-            >
-              {loading ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
+          )}
         </div>
       </div>
     </AthleteAppShell>
   );
 }
 
+export default function AthleteEditProfilePage() {
+  return (
+    <Suspense
+      fallback={
+        <AthleteAppShell>
+          <div className="flex min-h-[50vh] items-center justify-center px-6 py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
+          </div>
+        </AthleteAppShell>
+      }
+    >
+      <AthleteEditProfileInner />
+    </Suspense>
+  );
+}

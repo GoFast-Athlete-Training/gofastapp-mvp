@@ -89,59 +89,139 @@ export async function PUT(
       }, { status: 403 });
     }
 
-    // Validate required fields
-    if (!body.firstName || !body.lastName || !body.gofastHandle || !body.birthday || !body.gender || !body.city || !body.state || !body.primarySport) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Missing required fields',
-        message: 'All required fields must be provided'
-      }, { status: 400 });
-    }
+    // Partial update: only keys present on the body are applied (tab saves / onboarding).
+    const data: Record<string, unknown> = {};
+    const has = (k: string) => Object.prototype.hasOwnProperty.call(body, k);
+    const trimReq = (v: unknown) => String(v ?? '').trim();
 
-    // Store handle value for error handling
-    const handleValue = body.gofastHandle;
-
-    // Check if gofastHandle is unique (if changed)
-    if (body.gofastHandle && body.gofastHandle !== athlete.gofastHandle) {
-      const existing = await prisma.athlete.findUnique({
-        where: { gofastHandle: body.gofastHandle },
-      });
-
-      if (existing) {
-        return NextResponse.json({ 
-          success: false, 
-          error: 'Handle taken',
-          field: 'gofastHandle',
-          message: `Handle "@${body.gofastHandle}" is already taken`
-        }, { status: 400 });
+    if (has('firstName')) {
+      const v = trimReq(body.firstName);
+      if (!v) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid firstName', message: 'First name is required when provided' },
+          { status: 400 }
+        );
       }
+      data.firstName = v;
+    }
+    if (has('lastName')) {
+      const v = trimReq(body.lastName);
+      if (!v) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid lastName', message: 'Last name is required when provided' },
+          { status: 400 }
+        );
+      }
+      data.lastName = v;
+    }
+    if (has('gofastHandle')) {
+      const v = trimReq(body.gofastHandle).toLowerCase();
+      if (!v) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid gofastHandle', message: 'Handle is required when provided' },
+          { status: 400 }
+        );
+      }
+      if (v !== athlete.gofastHandle) {
+        const existing = await prisma.athlete.findUnique({
+          where: { gofastHandle: v },
+        });
+        if (existing) {
+          return NextResponse.json({
+            success: false,
+            error: 'Handle taken',
+            field: 'gofastHandle',
+            message: `Handle "@${v}" is already taken`,
+          }, { status: 400 });
+        }
+      }
+      data.gofastHandle = v;
+    }
+    if (has('birthday')) {
+      if (!body.birthday) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid birthday', message: 'Birthday is required when provided' },
+          { status: 400 }
+        );
+      }
+      data.birthday = new Date(body.birthday);
+    }
+    if (has('gender')) {
+      const v = trimReq(body.gender);
+      if (!v) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid gender', message: 'Gender is required when provided' },
+          { status: 400 }
+        );
+      }
+      data.gender = v;
+    }
+    if (has('city')) {
+      const v = trimReq(body.city);
+      if (!v) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid city', message: 'City is required when provided' },
+          { status: 400 }
+        );
+      }
+      data.city = v;
+    }
+    if (has('state')) {
+      const v = trimReq(body.state);
+      if (!v) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid state', message: 'State is required when provided' },
+          { status: 400 }
+        );
+      }
+      data.state = v;
+    }
+    if (has('phoneNumber')) {
+      data.phoneNumber =
+        body.phoneNumber == null || body.phoneNumber === '' ? null : String(body.phoneNumber);
+    }
+    if (has('primarySport')) {
+      data.primarySport =
+        body.primarySport == null || trimReq(body.primarySport) === ''
+          ? null
+          : trimReq(body.primarySport);
+    }
+    if (has('bio')) {
+      data.bio = body.bio == null || trimReq(body.bio) === '' ? null : trimReq(body.bio);
+    }
+    if (has('instagram')) {
+      data.instagram =
+        body.instagram == null || trimReq(body.instagram) === '' ? null : trimReq(body.instagram);
+    }
+    if (has('photoURL')) {
+      data.photoURL = body.photoURL == null || body.photoURL === '' ? null : String(body.photoURL);
+    }
+    if (has('myBestRunPhotoURL')) {
+      data.myBestRunPhotoURL =
+        body.myBestRunPhotoURL == null || body.myBestRunPhotoURL === ''
+          ? null
+          : String(body.myBestRunPhotoURL);
+    }
+    if (has('fiveKPace')) {
+      data.fiveKPace = body.fiveKPace === '' || body.fiveKPace == null ? null : body.fiveKPace;
+    }
+    if (has('weeklyMileage')) {
+      data.weeklyMileage =
+        body.weeklyMileage == null || body.weeklyMileage === ''
+          ? null
+          : Number(body.weeklyMileage);
     }
 
-    // Update athlete profile (fiveKPace, weeklyMileage optional — for workout generator fallback)
-    const updated = await updateAthlete(athleteId, {
-      firstName: body.firstName,
-      lastName: body.lastName,
-      phoneNumber: body.phoneNumber || null,
-      gofastHandle: body.gofastHandle,
-      birthday: body.birthday ? new Date(body.birthday) : null,
-      gender: body.gender,
-      city: body.city,
-      state: body.state,
-      primarySport: body.primarySport,
-      bio: body.bio || null,
-      instagram: body.instagram || null,
-      photoURL: body.photoURL || null,
-      ...(Object.prototype.hasOwnProperty.call(body, 'myBestRunPhotoURL') && {
-        myBestRunPhotoURL:
-          body.myBestRunPhotoURL == null || body.myBestRunPhotoURL === ''
-            ? null
-            : String(body.myBestRunPhotoURL),
-      }),
-      ...(body.fiveKPace !== undefined && { fiveKPace: body.fiveKPace === "" ? null : body.fiveKPace }),
-      ...(body.weeklyMileage !== undefined && { weeklyMileage: body.weeklyMileage == null ? null : Number(body.weeklyMileage) }),
-    });
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'No fields to update', message: 'Provide at least one field to update' },
+        { status: 400 }
+      );
+    }
 
-    if (body.fiveKPace !== undefined) {
+    const updated = await updateAthlete(athleteId, data);
+
+    if (has('fiveKPace')) {
       await syncAthleteFiveKPaceToActivePlan(athleteId);
     }
 

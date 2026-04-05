@@ -16,7 +16,7 @@ type AthleteRow = {
   gender: string;
   city: string;
   state: string;
-  primarySport: string;
+  primarySport?: string | null;
   phoneNumber?: string | null;
   bio?: string | null;
   instagram?: string | null;
@@ -24,13 +24,6 @@ type AthleteRow = {
   fiveKPace?: string | null;
   weeklyMileage?: number | null;
 };
-
-function birthdayToInput(b: string | Date | null | undefined): string {
-  if (!b) return "";
-  const d = typeof b === "string" ? new Date(b) : b;
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toISOString().split("T")[0];
-}
 
 function parseFiveKPaceToParts(raw: string | null | undefined): {
   minutes: string;
@@ -101,20 +94,6 @@ export default function ProfileTrainingPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!athleteId || !base) return;
-    const bday = birthdayToInput(base.birthday);
-    if (
-      !base.firstName ||
-      !base.lastName ||
-      !base.gofastHandle ||
-      !bday ||
-      !base.gender ||
-      !base.city ||
-      !base.state ||
-      !base.primarySport
-    ) {
-      setError("Complete required profile fields on Edit all fields first.");
-      return;
-    }
     const pm = fiveKPaceMinutes.trim();
     const ps = fiveKPaceSeconds.trim();
     if ((pm && !ps) || (!pm && ps)) {
@@ -135,18 +114,6 @@ export default function ProfileTrainingPage() {
     setSuccess(false);
     try {
       await api.put(`/athlete/${athleteId}/profile`, {
-        firstName: base.firstName,
-        lastName: base.lastName,
-        phoneNumber: base.phoneNumber ?? "",
-        gofastHandle: base.gofastHandle.trim().toLowerCase(),
-        birthday: bday,
-        gender: base.gender,
-        city: base.city,
-        state: base.state,
-        primarySport: base.primarySport,
-        bio: base.bio ?? "",
-        instagram: base.instagram ?? "",
-        photoURL: base.photoURL ?? null,
         fiveKPace: assembledFiveKPace || null,
         weeklyMileage: (() => {
           const t = weeklyMileage.trim();
