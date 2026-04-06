@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { parseOptionalWorkoutDate } from "@/lib/training/workout-date-parse";
+import { ymdFromDate } from "@/lib/training/plan-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -186,7 +187,11 @@ export async function POST(request: NextRequest) {
       date: dateRaw,
     } = body;
 
-    const scheduleDate = parseOptionalWorkoutDate(dateRaw);
+    // Same calendar convention as plan workouts + Garmin push: YYYY-MM-DD → UTC noon via parseOptionalWorkoutDate.
+    // If standalone builder omits date, default to UTC “today” so schedule + Connect stay aligned.
+    const scheduleDate =
+      parseOptionalWorkoutDate(dateRaw) ??
+      parseOptionalWorkoutDate(ymdFromDate(new Date()));
 
     if (!title) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
@@ -207,7 +212,7 @@ export async function POST(request: NextRequest) {
         description,
         workoutType: workoutType as any,
         athleteId: athlete.id,
-        ...(scheduleDate ? { date: scheduleDate } : {}),
+        date: scheduleDate,
         segments: {
           create: segments.map((seg: any, index: number) => ({
             id: `segment_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`,

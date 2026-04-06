@@ -12,11 +12,18 @@ import {
 } from "@/lib/domain-garmin";
 import { summarizeGarminTokenForLogs } from "@/lib/garmin-access-token-claims";
 import { dateForDayInWeek, dayNameToOurDow } from "@/lib/training/schedule-parser";
+import { ymdFromDate } from "@/lib/training/plan-utils";
 
 export const dynamic = "force-dynamic";
 
-function scheduleDateFromWorkoutDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
+/** Calendar YYYY-MM-DD in UTC — same as plan generation (`ymdFromDate` / Mon–Sun UTC weeks). */
+function garminScheduleYmdFromDate(date: Date): string {
+  return ymdFromDate(date);
+}
+
+/** UTC “today” as a calendar date when a standalone workout has no `date` (optional on create). */
+function utcTodayYmd(): string {
+  return ymdFromDate(new Date());
 }
 
 /**
@@ -77,7 +84,7 @@ export async function POST(
           workout.weekNumber,
           ourDow
         );
-        scheduledDate = scheduleDateFromWorkoutDate(canonical);
+        scheduledDate = garminScheduleYmdFromDate(canonical);
       } catch {
         if (!workout.date) {
           return NextResponse.json(
@@ -88,19 +95,34 @@ export async function POST(
             { status: 400 }
           );
         }
-        scheduledDate = scheduleDateFromWorkoutDate(workout.date);
+        scheduledDate = garminScheduleYmdFromDate(workout.date);
       }
     } else if (workout.date) {
-      scheduledDate = scheduleDateFromWorkoutDate(workout.date);
+      scheduledDate = garminScheduleYmdFromDate(workout.date);
     } else {
-      return NextResponse.json(
-        {
-          error:
-            "Workout must have a scheduled date to add to your Garmin calendar. Set a date on the workout first.",
-        },
-        { status: 400 }
+      scheduledDate = utcTodayYmd();
+      console.warn(
+        `[GARMIN_PUSH] workout ${id} has no workout.date (common for standalone create); scheduling on Garmin for UTC calendar today ${scheduledDate}. Set a date on the workout to pick another day.`
       );
     }
+
+    console.log(
+      "[GARMIN_PUSH] schedule",
+      JSON.stringify({
+        scheduledDate,
+        source:
+          workout.planId &&
+          workout.weekNumber != null &&
+          workout.dayAssigned?.trim() &&
+          workout.training_plans?.startDate
+            ? "plan_week_day"
+            : workout.date
+              ? "workout_date"
+              : "utc_today_fallback",
+        workoutDateStored:
+          workout.date != null ? workout.date.toISOString() : null,
+      })
+    );
 
     const token = await requireGarminTokenFresh(auth.athlete.id);
     garminAccessTokenForLogs = token;

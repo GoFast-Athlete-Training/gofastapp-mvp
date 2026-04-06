@@ -373,7 +373,8 @@ export default function CreateWorkoutPage() {
               className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
             />
             <p className="mt-1 text-xs text-gray-500">
-              If you pick a day, this workout shows on your home dashboard (e.g. Tue, Mar 25) so it&apos;s clear which day it&apos;s for.
+              Leave blank to use today&apos;s date (UTC calendar day). Otherwise this day is stored like plan
+              workouts and used when you push to Garmin.
             </p>
           </div>
 
