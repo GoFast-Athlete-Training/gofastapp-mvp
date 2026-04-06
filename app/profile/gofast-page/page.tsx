@@ -243,7 +243,8 @@ export default function GoFastPageStudioRoute() {
       <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 sm:p-5">
         <h2 className="text-sm font-semibold text-gray-900">Your public link</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Anyone can open this URL — no app required. It pulls together your banner, bio, location, sport,
+          Anyone can open this URL — no app required. It pulls together your race-moment photo, bio,
+          location, sport,
           runs, and training highlights.
         </p>
         {liveUrl ? (
@@ -283,9 +284,10 @@ export default function GoFastPageStudioRoute() {
             </h2>
 
             <div className="rounded-lg border border-orange-100 bg-orange-50/50 p-3 mb-5">
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Banner photo</h3>
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Favorite race moment</h3>
               <p className="text-xs text-gray-600 mb-3">
-                This is the large hero on your public page (separate from your profile circle).
+                A horizontal action shot you love — not a designed cover. Shows wide at the top of your
+                public page (separate from your profile circle).
               </p>
               <button
                 type="button"
@@ -295,7 +297,7 @@ export default function GoFastPageStudioRoute() {
                 {bannerPreview ? (
                   <img src={bannerPreview} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-gray-500 text-sm">Tap to add banner</span>
+                  <span className="text-gray-500 text-sm">Tap to add a photo</span>
                 )}
               </button>
               <button
@@ -303,7 +305,7 @@ export default function GoFastPageStudioRoute() {
                 onClick={handleBannerPick}
                 className="mt-2 text-orange-600 text-sm font-medium"
               >
-                {bannerPreview ? "Change banner" : "Add banner"}
+                {bannerPreview ? "Change photo" : "Add photo"}
               </button>
               <input
                 ref={bannerInputRef}

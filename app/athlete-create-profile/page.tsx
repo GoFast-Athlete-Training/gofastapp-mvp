@@ -407,7 +407,8 @@ export default function AthleteCreateProfilePage() {
               {loading ? 'Saving…' : 'Continue'}
             </button>
             <p className="text-center text-sm text-gray-500 mt-3">
-              Photo, bio, sport, and GoFast Page banner — add anytime under Profile → Edit profile.
+              Photo, bio, sport, and a favorite race-moment shot for your public page — add anytime under
+              Profile → Edit profile.
             </p>
           </div>
         </form>

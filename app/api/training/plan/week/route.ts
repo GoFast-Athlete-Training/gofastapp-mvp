@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { buildPlanWeekCards } from "@/lib/training/plan-week-cards";
+import { effectiveTrainingWeekCount } from "@/lib/training/plan-utils";
 
 /**
  * GET /api/training/plan/week?planId=&weekNumber=
@@ -43,20 +44,26 @@ export async function GET(request: NextRequest) {
     if (!plan) {
       return NextResponse.json({ error: "Plan not found" }, { status: 404 });
     }
-    if (weekNumber > plan.totalWeeks) {
+    const race = plan.race_registry;
+    const effectiveWeeks = effectiveTrainingWeekCount(
+      plan.startDate,
+      plan.totalWeeks,
+      race?.raceDate ?? null
+    );
+    if (weekNumber > effectiveWeeks) {
       return NextResponse.json(
-        { error: `weekNumber must be <= ${plan.totalWeeks}` },
+        { error: `weekNumber must be <= ${effectiveWeeks}` },
         { status: 400 }
       );
     }
 
-    const race = plan.race_registry;
     const days = await buildPlanWeekCards({
       planId: plan.id,
       athleteId: auth.athlete.id,
       planStartDate: plan.startDate,
       planWeeks: plan.planWeeks,
       weekNumber,
+      storedTotalWeeks: plan.totalWeeks,
       raceDate: race?.raceDate ?? null,
       raceName: race?.name ?? null,
       raceDistanceMiles: race?.distanceMiles ?? null,

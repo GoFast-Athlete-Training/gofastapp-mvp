@@ -6,6 +6,7 @@ import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { planScheduleDaysForWeek } from "@/lib/training/plan-schedule";
 import {
   currentTrainingWeekNumber,
+  effectiveTrainingWeekCount,
   utcDateOnly,
   ymdFromDate,
 } from "@/lib/training/plan-utils";
@@ -84,15 +85,20 @@ export async function GET(request: NextRequest) {
       plan.planWeeks != null &&
       plan.totalWeeks >= 1
     ) {
-      const startWeek = currentTrainingWeekNumber(
+      const effectiveWeeks = effectiveTrainingWeekCount(
         plan.startDate,
         plan.totalWeeks,
+        race?.raceDate ?? null
+      );
+      const startWeek = currentTrainingWeekNumber(
+        plan.startDate,
+        effectiveWeeks,
         now
       );
 
       for (
         let weekNum = startWeek;
-        weekNum <= plan.totalWeeks;
+        weekNum <= effectiveWeeks;
         weekNum++
       ) {
         const weekDays = planScheduleDaysForWeek({
@@ -102,6 +108,7 @@ export async function GET(request: NextRequest) {
           raceDate: race?.raceDate ?? null,
           raceName: race?.name ?? null,
           raceDistanceMiles: race?.distanceMiles ?? null,
+          totalWeeks: effectiveWeeks,
         });
 
         for (const d of weekDays) {

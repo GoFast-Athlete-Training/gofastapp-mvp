@@ -27,8 +27,24 @@ export function mondayUtcOfWeekContaining(date: Date): Date {
 }
 
 /**
+ * When true, race day is a Monday (UTC) that starts a new ISO week; we treat it as the
+ * final day of the prior training week instead of a standalone Mon–Sun "plan week".
+ */
+export function mondayRaceFoldsIntoPriorPlanWeek(
+  planStart: Date,
+  raceDate: Date
+): boolean {
+  const raceDay = utcDateOnly(raceDate);
+  if (raceDay.getUTCDay() !== 1) return false;
+  const planStartMon = mondayUtcOfWeekContaining(planStart);
+  const raceWeekMon = mondayUtcOfWeekContaining(raceDate);
+  return raceWeekMon.getTime() > planStartMon.getTime();
+}
+
+/**
  * Inclusive count of Mon–Sun calendar weeks from the week containing plan
  * start through the week containing race day.
+ * If the race is a Monday (not in plan-start week), that day is folded into the prior week — not counted as its own week.
  */
 export function calendarTrainingWeekCount(planStart: Date, raceDate: Date): number {
   const firstMon = mondayUtcOfWeekContaining(planStart);
@@ -39,7 +55,26 @@ export function calendarTrainingWeekCount(planStart: Date, raceDate: Date): numb
   const diffDays = Math.round(
     (lastMon.getTime() - firstMon.getTime()) / 86400000
   );
-  return Math.max(1, diffDays / 7 + 1);
+  let count = Math.max(1, diffDays / 7 + 1);
+  if (mondayRaceFoldsIntoPriorPlanWeek(planStart, raceDate)) {
+    count = Math.max(1, count - 1);
+  }
+  return count;
+}
+
+/**
+ * Effective number of training weeks for API/UI when a race is linked (Monday-race fold).
+ * Without a race, uses stored `totalWeeks`.
+ */
+export function effectiveTrainingWeekCount(
+  planStart: Date,
+  storedTotalWeeks: number,
+  raceDate: Date | null | undefined
+): number {
+  if (raceDate == null) {
+    return Math.max(1, storedTotalWeeks);
+  }
+  return calendarTrainingWeekCount(planStart, raceDate);
 }
 
 export function totalWeeksFromDates(planStartDate: Date, raceDate: Date): number {
@@ -105,16 +140,38 @@ export function preferredDaysToHuman(days: number[]): string {
     .join(", ");
 }
 
+export type CalendarWeekRangeLabelOpts = {
+  raceDate?: Date | string | null;
+  /** Effective last week (e.g. from effectiveTrainingWeekCount) */
+  totalWeeks?: number;
+};
+
 /** Mon–Sun range for training week index (1-based), UTC calendar alignment. */
 export function formatCalendarWeekRangeLabel(
   planStartRaw: Date | string,
-  weekNumber: number
+  weekNumber: number,
+  opts?: CalendarWeekRangeLabelOpts
 ): string {
   const planStart =
     typeof planStartRaw === "string" ? new Date(planStartRaw) : planStartRaw;
   const firstMonday = mondayUtcOfWeekContaining(planStart);
-  const weekMon = addDaysUtc(firstMonday, weekNumber - 1);
-  const weekSun = addDaysUtc(weekMon, 6);
+  const weekMon = addDaysUtc(firstMonday, (weekNumber - 1) * 7);
+  let rangeEndDay = addDaysUtc(weekMon, 6);
+  if (
+    opts?.raceDate != null &&
+    opts.totalWeeks != null &&
+    weekNumber === opts.totalWeeks
+  ) {
+    const r =
+      typeof opts.raceDate === "string" ? new Date(opts.raceDate) : opts.raceDate;
+    const raceUtc = utcDateOnly(r);
+    if (
+      mondayRaceFoldsIntoPriorPlanWeek(planStart, raceUtc) &&
+      utcDateOnly(addDaysUtc(weekMon, 7)).getTime() === raceUtc.getTime()
+    ) {
+      rangeEndDay = raceUtc;
+    }
+  }
   const opt: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
   /** Local display without TZ drift from UTC-midnight Date (see formatPlanDateDisplay). */
   function fmtUtcDay(d: Date, extra: Intl.DateTimeFormatOptions): string {
@@ -123,11 +180,11 @@ export function formatCalendarWeekRangeLabel(
     return anchor.toLocaleDateString(undefined, { ...opt, ...extra });
   }
   const yMon = weekMon.getUTCFullYear();
-  const ySun = weekSun.getUTCFullYear();
+  const yEnd = rangeEndDay.getUTCFullYear();
   const left = fmtUtcDay(weekMon, {
-    ...(yMon !== ySun ? { year: "numeric" } : {}),
+    ...(yMon !== yEnd ? { year: "numeric" } : {}),
   });
-  const right = fmtUtcDay(weekSun, { year: "numeric" });
+  const right = fmtUtcDay(rangeEndDay, { year: "numeric" });
   return `${left} – ${right}`;
 }
 

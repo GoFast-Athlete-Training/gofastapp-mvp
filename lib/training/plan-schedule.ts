@@ -10,22 +10,48 @@ import {
   dayAbbrToOurDow,
   dayAbbrToDayName,
 } from "./schedule-parser";
-import { addDaysUtc, mondayUtcOfWeekContaining, utcDateOnly } from "./plan-utils";
+import {
+  addDaysUtc,
+  calendarTrainingWeekCount,
+  mondayRaceFoldsIntoPriorPlanWeek,
+  mondayUtcOfWeekContaining,
+  utcDateOnly,
+} from "./plan-utils";
 import { nOffsetFromWeekAnchor, phaseForCatalogue } from "./generate-plan";
 import { formatPlannedWorkoutTitle } from "./workout-display-title";
 import { titleFromLadderIndex } from "./algo-workout-segments";
 
 export type WeekBounds = { weekStart: Date; weekEnd: Date };
 
+export type WeekBoundsOpts = {
+  raceDate?: Date | null;
+  totalWeeks?: number;
+};
+
 export function weekBoundsFromPlan(
   planStartDate: Date,
-  weekNumber: number
+  weekNumber: number,
+  opts?: WeekBoundsOpts
 ): WeekBounds {
   const firstMonday = mondayUtcOfWeekContaining(planStartDate);
   const weekStart = addDaysUtc(firstMonday, (weekNumber - 1) * 7);
   const weekEnd = new Date(weekStart);
   weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
   weekEnd.setUTCHours(23, 59, 59, 999);
+  if (
+    opts?.raceDate &&
+    opts.totalWeeks != null &&
+    weekNumber === opts.totalWeeks &&
+    mondayRaceFoldsIntoPriorPlanWeek(planStartDate, opts.raceDate)
+  ) {
+    const raceUtc = utcDateOnly(opts.raceDate);
+    const nextMon = addDaysUtc(utcDateOnly(weekStart), 7);
+    if (nextMon.getTime() === raceUtc.getTime()) {
+      const x = new Date(raceUtc);
+      x.setUTCHours(23, 59, 59, 999);
+      return { weekStart, weekEnd: x };
+    }
+  }
   return { weekStart, weekEnd };
 }
 
@@ -74,6 +100,17 @@ function scheduleEntryForWeek(
   return { schedule: entry.schedule };
 }
 
+function maxWeekNumberInPlanWeeks(planWeeks: unknown): number {
+  if (!planWeeks || !Array.isArray(planWeeks)) return 1;
+  let m = 1;
+  for (const w of planWeeks) {
+    if (!w || typeof w !== "object") continue;
+    const n = Number((w as Record<string, unknown>).weekNumber);
+    if (Number.isFinite(n)) m = Math.max(m, n);
+  }
+  return m;
+}
+
 /**
  * Expand one week of `planWeeks` into scheduled days (intent only — no DB).
  */
@@ -84,6 +121,8 @@ export function planScheduleDaysForWeek(params: {
   raceDate: Date | null;
   raceName: string | null;
   raceDistanceMiles: number | null;
+  /** Effective training week count; when omitted, uses max week index in planWeeks JSON */
+  totalWeeks?: number;
 }): PlanScheduleDay[] {
   const {
     planStartDate,
@@ -97,7 +136,17 @@ export function planScheduleDaysForWeek(params: {
   const entry = scheduleEntryForWeek(planWeeks, weekNumber);
   if (!entry) return [];
 
-  const { weekStart, weekEnd } = weekBoundsFromPlan(planStartDate, weekNumber);
+  const resolvedTotalWeeks =
+    params.totalWeeks ?? maxWeekNumberInPlanWeeks(planWeeks);
+
+  const { weekStart, weekEnd } = weekBoundsFromPlan(
+    planStartDate,
+    weekNumber,
+    {
+      raceDate,
+      totalWeeks: resolvedTotalWeeks,
+    }
+  );
   const weekAnchorUtc = utcDateOnly(weekStart);
   const raceUtc = raceDate ? utcDateOnly(raceDate) : null;
   const weekNOffset =
@@ -106,55 +155,76 @@ export function planScheduleDaysForWeek(params: {
   const tokens = parseScheduleString(entry.schedule);
   const out: PlanScheduleDay[] = [];
 
-  for (const token of tokens) {
-    const ourDow = dayAbbrToOurDow(token.dayAbbr);
-    const date = dateForDayInWeek(planStartDate, weekNumber, ourDow);
-    const estMeters = milesToMeters(token.miles);
-    const planLadderIndex =
-      token.workoutType === "Intervals" || token.workoutType === "Tempo"
-        ? (token.ladderIndex ?? null)
-        : null;
+  function pushFromTokens(
+    tokenList: ReturnType<typeof parseScheduleString>,
+    scheduleWeekNum: number,
+    displayWeekNum: number
+  ) {
+    for (const token of tokenList) {
+      const ourDow = dayAbbrToOurDow(token.dayAbbr);
+      const date = dateForDayInWeek(planStartDate, scheduleWeekNum, ourDow);
+      const estMeters = milesToMeters(token.miles);
+      const planLadderIndex =
+        token.workoutType === "Intervals" || token.workoutType === "Tempo"
+          ? (token.ladderIndex ?? null)
+          : null;
 
-    const isRaceDay =
-      raceUtc != null &&
-      utcDateOnly(date).getTime() === raceUtc.getTime() &&
-      token.workoutType === "LongRun";
+      const isRaceDay =
+        raceUtc != null &&
+        utcDateOnly(date).getTime() === raceUtc.getTime() &&
+        token.workoutType === "LongRun";
 
-    let title: string;
-    if (isRaceDay) {
-      title = formatPlannedWorkoutTitle(
-        "LongRun",
-        raceDistanceMiles != null
-          ? milesToMeters(raceDistanceMiles)
-          : estMeters,
-        { isRace: true, raceName: raceName ?? undefined }
-      );
-    } else if (
-      token.workoutType === "Intervals" ||
-      token.workoutType === "Tempo"
-    ) {
-      title = titleFromLadderIndex(
-        token.workoutType,
-        token.ladderIndex ?? 0
-      )!;
-    } else {
-      title = formatPlannedWorkoutTitle(token.workoutType, estMeters);
+      let title: string;
+      if (isRaceDay) {
+        title = formatPlannedWorkoutTitle(
+          "LongRun",
+          raceDistanceMiles != null
+            ? milesToMeters(raceDistanceMiles)
+            : estMeters,
+          { isRace: true, raceName: raceName ?? undefined }
+        );
+      } else if (
+        token.workoutType === "Intervals" ||
+        token.workoutType === "Tempo"
+      ) {
+        title = titleFromLadderIndex(
+          token.workoutType,
+          token.ladderIndex ?? 0
+        )!;
+      } else {
+        title = formatPlannedWorkoutTitle(token.workoutType, estMeters);
+      }
+
+      const phaseOffset = isRaceDay ? 0 : (weekNOffset ?? 0);
+      const nForRow = isRaceDay ? 0 : weekNOffset;
+
+      out.push({
+        dateKey: dateKeyUtc(date),
+        date,
+        title,
+        workoutType: token.workoutType,
+        weekNumber: displayWeekNum,
+        dayAssigned: dayAbbrToDayName(token.dayAbbr),
+        planLadderIndex,
+        nOffset: nForRow,
+        phase: phaseForCatalogue(phaseOffset),
+        estimatedDistanceInMeters: estMeters,
+      });
     }
+  }
 
-    const phaseOffset = weekNOffset ?? 0;
+  pushFromTokens(tokens, weekNumber, weekNumber);
 
-    out.push({
-      dateKey: dateKeyUtc(date),
-      date,
-      title,
-      workoutType: token.workoutType,
-      weekNumber,
-      dayAssigned: dayAbbrToDayName(token.dayAbbr),
-      planLadderIndex,
-      nOffset: weekNOffset,
-      phase: phaseForCatalogue(phaseOffset),
-      estimatedDistanceInMeters: estMeters,
-    });
+  const foldNext =
+    raceUtc != null &&
+    mondayRaceFoldsIntoPriorPlanWeek(planStartDate, raceUtc) &&
+    weekNumber === resolvedTotalWeeks;
+  if (foldNext) {
+    const nextEntry = scheduleEntryForWeek(planWeeks, weekNumber + 1);
+    if (nextEntry) {
+      const nextTokens = parseScheduleString(nextEntry.schedule);
+      pushFromTokens(nextTokens, weekNumber + 1, weekNumber);
+    }
   }
 
   const startKey = dateKeyUtc(weekStart);
@@ -162,8 +232,14 @@ export function planScheduleDaysForWeek(params: {
   const clipped = out.filter(
     (d) => d.dateKey >= startKey && d.dateKey <= endKey
   );
-  clipped.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
-  return clipped;
+  const seen = new Set<string>();
+  const deduped: PlanScheduleDay[] = [];
+  for (const d of clipped.sort((a, b) => a.dateKey.localeCompare(b.dateKey))) {
+    if (seen.has(d.dateKey)) continue;
+    seen.add(d.dateKey);
+    deduped.push(d);
+  }
+  return deduped;
 }
 
 /**
@@ -193,10 +269,18 @@ export function planScheduleDayForDateKey(params: {
       )
       .filter((n) => Number.isFinite(n))
   );
+  const raceUtcForCount = params.raceDate
+    ? utcDateOnly(params.raceDate)
+    : null;
+  const totalWeeksForSchedule =
+    raceUtcForCount != null
+      ? calendarTrainingWeekCount(params.planStartDate, raceUtcForCount)
+      : Math.max(1, params.maxWeekNumber ?? fromEntries);
   const maxWeek = Math.max(
     1,
     params.maxWeekNumber ?? fromEntries,
-    fromEntries
+    fromEntries,
+    totalWeeksForSchedule
   );
 
   for (; weekNumber <= maxWeek; weekNumber++) {
@@ -207,6 +291,7 @@ export function planScheduleDayForDateKey(params: {
       raceDate: params.raceDate,
       raceName: params.raceName,
       raceDistanceMiles: params.raceDistanceMiles,
+      totalWeeks: totalWeeksForSchedule,
     });
     const hit = days.find((d) => d.dateKey === params.dateKey);
     if (hit) return hit;

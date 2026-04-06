@@ -216,7 +216,7 @@ export default function ProfilePage() {
                   <img src={myBestRunPhotoURL} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-xs text-gray-400 px-2 text-center">
-                    No banner yet
+                    No race moment photo yet
                   </div>
                 )}
               </div>
@@ -227,7 +227,7 @@ export default function ProfilePage() {
                 These fields are visible on your public page. Everything under Account below stays in-app unless noted.
               </p>
               <div className="flex flex-wrap gap-2 mt-3">
-                {pill('Banner', !!myBestRunPhotoURL)}
+                {pill('Race moment', !!myBestRunPhotoURL)}
                 {pill('Bio', !!(bio && bio.trim()))}
                 {pill('Sport', !!primarySport)}
                 {pill('Instagram', !!(instagram && instagram.trim()))}

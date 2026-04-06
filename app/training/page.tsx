@@ -10,6 +10,7 @@ import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import {
   currentTrainingWeekNumber,
+  effectiveTrainingWeekCount,
   formatCalendarWeekRangeLabel,
   formatPlanDateDisplay,
 } from "@/lib/training/plan-utils";
@@ -35,6 +36,14 @@ function hasSchedule(p: PlanDetailHub): boolean {
   return Array.isArray(p.planWeeks) && (p.planWeeks as unknown[]).length > 0;
 }
 
+function effectiveWeeksForPlanHub(p: PlanDetailHub): number {
+  return effectiveTrainingWeekCount(
+    new Date(p.startDate),
+    p.totalWeeks,
+    p.race_registry?.raceDate ? new Date(p.race_registry.raceDate) : null
+  );
+}
+
 export default function TrainingHubPage() {
   const router = useRouter();
   const [authReady, setAuthReady] = useState(false);
@@ -53,10 +62,18 @@ export default function TrainingHubPage() {
     return p || null;
   }, [planDetail, athleteFiveKPace]);
 
+  const effectiveTotalWeeks = useMemo(
+    () => (planDetail ? effectiveWeeksForPlanHub(planDetail) : 1),
+    [planDetail]
+  );
+
   const calendarRangeLabel = useMemo(() => {
     if (!planDetail) return "";
-    return formatCalendarWeekRangeLabel(planDetail.startDate, weekNumber);
-  }, [planDetail, weekNumber]);
+    return formatCalendarWeekRangeLabel(planDetail.startDate, weekNumber, {
+      raceDate: planDetail.race_registry?.raceDate ?? null,
+      totalWeeks: effectiveTotalWeeks,
+    });
+  }, [planDetail, weekNumber, effectiveTotalWeeks]);
 
   const loadHub = useCallback(async () => {
     setLoading(true);
@@ -83,7 +100,10 @@ export default function TrainingHubPage() {
       setPlanDetail(plan);
       setAthleteFiveKPace(athPace);
       if (hasSchedule(plan)) {
-        const wn = currentTrainingWeekNumber(plan.startDate, plan.totalWeeks);
+        const wn = currentTrainingWeekNumber(
+          plan.startDate,
+          effectiveWeeksForPlanHub(plan)
+        );
         setWeekNumber(wn);
         setLoadingWeek(true);
         try {
@@ -225,7 +245,7 @@ export default function TrainingHubPage() {
                     <p className="mt-1 text-sm text-gray-600">{planDetail.race_registry.name}</p>
                   )}
                   <p className="mt-3 text-base font-semibold text-gray-900">
-                    Week {weekNumber} of {planDetail.totalWeeks}
+                    Week {weekNumber} of {effectiveTotalWeeks}
                   </p>
                   {calendarRangeLabel && (
                     <p className="mt-1 text-sm text-gray-600">Calendar week: {calendarRangeLabel}</p>

@@ -399,7 +399,7 @@ function AthleteEditProfileInner() {
     'about-you': {
       title: 'About You',
       subtitle:
-        'Public hero banner, bio, Instagram, and optional GoFast Container. These fields shape how the world sees you.',
+        'Favorite race-moment photo, bio, Instagram, and optional GoFast Container. These fields shape how the world sees you on your public page.',
     },
     'goal-perf': {
       title: 'Goal & Performance',
@@ -455,7 +455,7 @@ function AthleteEditProfileInner() {
               </p>
               <nav className="flex flex-col gap-0.5" aria-label="Profile sections">
                 {sectionNavItem('profile-info', 'Profile Info', 'Photo, name & account')}
-                {sectionNavItem('about-you', 'About You', 'Public page & banner')}
+                {sectionNavItem('about-you', 'About You', 'Race moment & public page')}
                 {sectionNavItem('goal-perf', 'Goal & Performance', 'Sport, pace & mileage')}
               </nav>
             </div>
@@ -673,9 +673,11 @@ function AthleteEditProfileInner() {
           {activeTab === 'about-you' && (
             <div className="space-y-5">
               <div className="rounded-xl border border-orange-100 bg-orange-50/50 p-4">
-                <h3 className="text-sm font-semibold text-gray-900 mb-1">Banner photo</h3>
+                <h3 className="text-sm font-semibold text-gray-900 mb-1">Favorite race moment</h3>
                 <p className="text-xs text-gray-600 mb-3">
-                  Large hero on your public GoFast Page. Separate from your profile circle.
+                  Not a cover graphic — just a horizontal photo you love from a race or run (think 4×6
+                  landscape). It appears wide across the top of your public GoFast Page, separate from your
+                  profile circle.
                 </p>
                 <button
                   type="button"
@@ -685,7 +687,7 @@ function AthleteEditProfileInner() {
                   {formData.bannerPreview ? (
                     <img src={formData.bannerPreview} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-gray-500 text-sm">Tap to add banner</span>
+                    <span className="text-gray-500 text-sm">Tap to add a photo</span>
                   )}
                 </button>
                 <button
@@ -693,7 +695,7 @@ function AthleteEditProfileInner() {
                   onClick={handleBannerClick}
                   className="mt-2 text-orange-600 text-sm font-medium"
                 >
-                  {formData.bannerPreview ? 'Change banner' : 'Add banner'}
+                  {formData.bannerPreview ? 'Change photo' : 'Add photo'}
                 </button>
                 <input
                   ref={bannerInputRef}

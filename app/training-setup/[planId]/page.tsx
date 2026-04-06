@@ -15,6 +15,7 @@ import {
 } from "@/lib/training/plan-phases";
 import { cataloguePhaseFallbackForWeek } from "@/lib/training/generate-plan";
 import {
+  effectiveTrainingWeekCount,
   formatCalendarWeekRangeLabel,
   formatPlanDateDisplay,
 } from "@/lib/training/plan-utils";
@@ -173,6 +174,22 @@ export default function TrainingSetupPlanPage({
     [plan?.phases]
   );
 
+  const effectiveTotalWeeks = useMemo(() => {
+    if (!plan) return 1;
+    return effectiveTrainingWeekCount(
+      new Date(plan.startDate),
+      plan.totalWeeks,
+      plan.race_registry?.raceDate
+        ? new Date(plan.race_registry.raceDate)
+        : null
+    );
+  }, [plan]);
+
+  useEffect(() => {
+    if (!plan) return;
+    setWeekNumber((wn) => Math.min(wn, effectiveTotalWeeks));
+  }, [plan?.id, effectiveTotalWeeks]);
+
   const weekEntries = useMemo(() => {
     if (!plan) return [];
     const raw = parsePlanWeekEntries(plan.planWeeks);
@@ -236,10 +253,26 @@ export default function TrainingSetupPlanPage({
     plan?.startDate,
   ]);
 
+  const showWeekPhaseBadge = useMemo(() => {
+    const relevant = weekEntries.filter(
+      (e) => e.weekNumber <= effectiveTotalWeeks
+    );
+    if (relevant.length < 2) return false;
+    const labels = new Set(
+      relevant.map((e) =>
+        phaseNameForWeek(phaseRanges, e.weekNumber, e.phase?.trim() ?? "")
+      )
+    );
+    return labels.size > 1;
+  }, [weekEntries, effectiveTotalWeeks, phaseRanges]);
+
   const calendarWeekRangeLabel = useMemo(() => {
     if (!plan) return "";
-    return formatCalendarWeekRangeLabel(plan.startDate, weekNumber);
-  }, [plan, weekNumber]);
+    return formatCalendarWeekRangeLabel(plan.startDate, weekNumber, {
+      raceDate: plan.race_registry?.raceDate ?? null,
+      totalWeeks: effectiveTotalWeeks,
+    });
+  }, [plan, weekNumber, effectiveTotalWeeks]);
 
   const fetchWeekWorkouts = useCallback(
     async (wn: number) => {
@@ -339,7 +372,7 @@ export default function TrainingSetupPlanPage({
 
   function goNextWeek() {
     if (!plan) return;
-    setWeekNumber((n) => Math.min(plan.totalWeeks, n + 1));
+    setWeekNumber((n) => Math.min(effectiveTotalWeeks, n + 1));
   }
 
   function openPlanDay(day: PlanDayCard) {
@@ -379,7 +412,7 @@ export default function TrainingSetupPlanPage({
             </p>
           )}
           <p className="mb-4 text-sm text-gray-600">
-            {plan.totalWeeks} weeks · Start{" "}
+            {effectiveTotalWeeks} weeks · Start{" "}
             {formatPlanDateDisplay(plan.startDate)}
           </p>
 
@@ -539,9 +572,9 @@ export default function TrainingSetupPlanPage({
                       Week preview
                     </p>
                     <p className="text-lg font-semibold text-gray-900 sm:text-xl">
-                      Week {weekNumber} of {plan.totalWeeks}
+                      Week {weekNumber} of {effectiveTotalWeeks}
                     </p>
-                    {weekPhaseLabel && (
+                    {showWeekPhaseBadge && weekPhaseLabel && (
                       <span className="mt-1 inline-block rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">
                         {weekPhaseLabel}
                       </span>
@@ -565,7 +598,7 @@ export default function TrainingSetupPlanPage({
                     <button
                       type="button"
                       onClick={goNextWeek}
-                      disabled={weekNumber >= plan.totalWeeks}
+                      disabled={weekNumber >= effectiveTotalWeeks}
                       className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-100 disabled:opacity-40"
                       aria-label="Next week"
                     >

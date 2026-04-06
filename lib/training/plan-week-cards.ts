@@ -3,7 +3,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { utcDateOnly } from "./plan-utils";
+import { effectiveTrainingWeekCount, utcDateOnly } from "./plan-utils";
 import { planScheduleDaysForWeek, weekBoundsFromPlan } from "./plan-schedule";
 
 export type PlanDayCard = {
@@ -40,10 +40,17 @@ export async function buildPlanWeekCards(params: {
   planStartDate: Date;
   planWeeks: unknown;
   weekNumber: number;
+  storedTotalWeeks: number;
   raceDate: Date | null;
   raceName: string | null;
   raceDistanceMiles: number | null;
 }): Promise<PlanDayCard[]> {
+  const effectiveWeeks = effectiveTrainingWeekCount(
+    params.planStartDate,
+    params.storedTotalWeeks,
+    params.raceDate
+  );
+
   const scheduled = planScheduleDaysForWeek({
     planStartDate: params.planStartDate,
     planWeeks: params.planWeeks,
@@ -51,11 +58,16 @@ export async function buildPlanWeekCards(params: {
     raceDate: params.raceDate,
     raceName: params.raceName,
     raceDistanceMiles: params.raceDistanceMiles,
+    totalWeeks: effectiveWeeks,
   });
 
   const { weekStart, weekEnd } = weekBoundsFromPlan(
     params.planStartDate,
-    params.weekNumber
+    params.weekNumber,
+    {
+      raceDate: params.raceDate,
+      totalWeeks: effectiveWeeks,
+    }
   );
   const { gte, lte } = utcDayRange(weekStart, weekEnd);
 

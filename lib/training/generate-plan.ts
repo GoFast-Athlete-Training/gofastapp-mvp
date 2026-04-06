@@ -609,6 +609,32 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
         planLadderIndex: null,
       });
     }
+
+    /* Race on Monday immediately after this week's Sunday: folded into this week (see calendarTrainingWeekCount). */
+    const mondayFolded =
+      weekNumber === weekCount &&
+      raceUtc.getUTCDay() === 1 &&
+      utcDateOnly(addDaysUtc(weekAnchor, 7)).getTime() === raceUtc.getTime();
+    if (mondayFolded) {
+      out.push({
+        title: formatPlannedWorkoutTitle(
+          "LongRun",
+          milesToMeters(input.raceDistanceMiles),
+          { isRace: true, raceName: input.raceName }
+        ),
+        workoutType: "LongRun",
+        athleteId: input.athleteId,
+        planId: input.planId,
+        date: utcDateOnly(raceUtc),
+        phase: phaseForCatalogue(0),
+        estimatedDistanceInMeters: milesToMeters(input.raceDistanceMiles),
+        nOffset: 0,
+        weekNumber,
+        dayAssigned: DAY_NAMES[raceOurDow - 1],
+        catalogueWorkoutId: null,
+        planLadderIndex: null,
+      });
+    }
   }
 
   return out;
