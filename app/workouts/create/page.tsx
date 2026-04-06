@@ -31,13 +31,48 @@ type ApiSegment = {
   title: string;
   durationType: string;
   durationValue: number;
-  targets?: Array<{ type: string; valueLow?: number; valueHigh?: number }>;
+  targets?: Array<{
+    type: string;
+    valueLow?: number;
+    valueHigh?: number;
+    /** Some generators send a single PACE scalar (sec/km, v2). */
+    value?: number;
+  }>;
   repeatCount?: number;
 };
 
 /** Sec/km (stored API value, encoding v2) to "M:SS" per mile — shared with workout detail */
 function secPerKmToPaceDisplay(value: number): string {
   return formatStoredPaceAsMinPerMile(value, 2);
+}
+
+/** Pace band from a target object (sec/km, encoding v2). Case-insensitive type; supports single `value`. */
+function paceBandSecKmFromTarget(t: { type?: string; valueLow?: number; valueHigh?: number; value?: number }): {
+  low?: number;
+  high?: number;
+} {
+  if (String(t.type ?? "").toUpperCase() !== "PACE") return {};
+  const vl = typeof t.valueLow === "number" && Number.isFinite(t.valueLow) ? t.valueLow : undefined;
+  const vh = typeof t.valueHigh === "number" && Number.isFinite(t.valueHigh) ? t.valueHigh : undefined;
+  const v = typeof t.value === "number" && Number.isFinite(t.value) ? t.value : undefined;
+  if (vl != null && vh != null) {
+    return { low: Math.min(vl, vh), high: Math.max(vl, vh) };
+  }
+  if (v != null) return { low: v, high: v };
+  if (vl != null) return { low: vl, high: vl };
+  if (vh != null) return { low: vh, high: vh };
+  return {};
+}
+
+function hrBandFromTarget(t: { type?: string; valueLow?: number; valueHigh?: number }): {
+  min?: number;
+  max?: number;
+} {
+  if (String(t.type ?? "").toUpperCase() !== "HEART_RATE") return {};
+  const lo = typeof t.valueLow === "number" && Number.isFinite(t.valueLow) ? t.valueLow : undefined;
+  const hi = typeof t.valueHigh === "number" && Number.isFinite(t.valueHigh) ? t.valueHigh : undefined;
+  if (lo == null || hi == null) return {};
+  return { min: Math.min(lo, hi), max: Math.max(lo, hi) };
 }
 
 /** Map AI-derived segments into fixed warmup / mainWork / cooldown slots */
@@ -51,16 +86,32 @@ function apiSegmentsToSlots(
   for (const seg of segments) {
     const title = (seg.title ?? "").toLowerCase();
     const miles = typeof seg.durationValue === "number" && seg.durationValue > 0 ? seg.durationValue : 0;
-    const paceTarget = seg.targets?.find((t) => t.type === "PACE");
-    const paceValueLow = paceTarget?.valueLow;
-    const paceValueHigh = paceTarget?.valueHigh != null ? paceTarget.valueHigh : paceValueLow;
-    const hrTarget = seg.targets?.find((t) => t.type === "HEART_RATE");
+    let paceValueLow: number | undefined;
+    let paceValueHigh: number | undefined;
+    for (const raw of seg.targets ?? []) {
+      const band = paceBandSecKmFromTarget(raw);
+      if (band.low != null) {
+        paceValueLow = band.low;
+        paceValueHigh = band.high ?? band.low;
+        break;
+      }
+    }
+    let hrMin: number | undefined;
+    let hrMax: number | undefined;
+    for (const raw of seg.targets ?? []) {
+      const hr = hrBandFromTarget(raw);
+      if (hr.min != null && hr.max != null) {
+        hrMin = hr.min;
+        hrMax = hr.max;
+        break;
+      }
+    }
     const slot: SlotData = {
       miles,
       paceValueLow,
       paceValueHigh,
-      hrMin: hrTarget?.valueLow,
-      hrMax: hrTarget?.valueHigh,
+      hrMin,
+      hrMax,
       repeatCount: seg.repeatCount ?? undefined,
     };
 

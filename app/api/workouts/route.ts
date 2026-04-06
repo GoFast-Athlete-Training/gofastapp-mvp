@@ -218,6 +218,7 @@ export async function POST(request: NextRequest) {
             targets: seg.targets || null, // JSON array of target objects
             repeatCount: seg.repeatCount || null,
             notes: seg.notes || null,
+            paceTargetEncodingVersion: 2,
           })),
         },
       },

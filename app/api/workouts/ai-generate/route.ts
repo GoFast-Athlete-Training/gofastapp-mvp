@@ -60,7 +60,11 @@ function paceStringToInternalValue(paceStr: string): number {
  */
 function normalizeOpenAIBlobResponse(parsed: unknown, sourceText: string): AiGenerateResponse {
   const obj = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
-  const rawSegments = Array.isArray(obj.segments) ? obj.segments : [];
+  const rawSegments = Array.isArray(obj.segments)
+    ? obj.segments
+    : Array.isArray(obj.steps)
+      ? obj.steps
+      : [];
   const segments: ApiSegment[] = rawSegments
     .map((s: unknown, i: number) => {
       if (!s || typeof s !== "object") return null;
@@ -79,8 +83,8 @@ function normalizeOpenAIBlobResponse(parsed: unknown, sourceText: string): AiGen
         if (!t || typeof t !== "object" || typeof (t as Record<string, unknown>).type !== "string")
           continue;
         const tt = t as Record<string, unknown>;
-        const type = String(tt.type);
-        if (type === "PACE") {
+        const typeUpper = String(tt.type).toUpperCase();
+        if (typeUpper === "PACE") {
           const paceLow = typeof tt.paceLow === "string" ? tt.paceLow.trim() : null;
           const paceHigh = typeof tt.paceHigh === "string" ? tt.paceHigh.trim() : null;
           if (paceLow || paceHigh) {
@@ -91,11 +95,34 @@ function normalizeOpenAIBlobResponse(parsed: unknown, sourceText: string): AiGen
             } catch {
               // skip invalid pace
             }
-          } else if (typeof tt.valueLow === "number" && typeof tt.valueHigh === "number") {
-            targets.push({ type: "PACE", valueLow: tt.valueLow, valueHigh: tt.valueHigh });
+          } else {
+            const vl = typeof tt.valueLow === "number" && Number.isFinite(tt.valueLow) ? tt.valueLow : undefined;
+            const vh = typeof tt.valueHigh === "number" && Number.isFinite(tt.valueHigh) ? tt.valueHigh : undefined;
+            const vv = typeof tt.value === "number" && Number.isFinite(tt.value) ? tt.value : undefined;
+            if (vl != null && vh != null) {
+              targets.push({
+                type: "PACE",
+                valueLow: Math.min(vl, vh),
+                valueHigh: Math.max(vl, vh),
+              });
+            } else if (vv != null) {
+              targets.push({ type: "PACE", valueLow: vv, valueHigh: vv });
+            } else if (vl != null) {
+              targets.push({ type: "PACE", valueLow: vl, valueHigh: vl });
+            } else if (vh != null) {
+              targets.push({ type: "PACE", valueLow: vh, valueHigh: vh });
+            }
           }
-        } else if (type === "HEART_RATE" && typeof tt.valueLow === "number" && typeof tt.valueHigh === "number") {
-          targets.push({ type: "HEART_RATE", valueLow: tt.valueLow, valueHigh: tt.valueHigh });
+        } else if (
+          typeUpper === "HEART_RATE" &&
+          typeof tt.valueLow === "number" &&
+          typeof tt.valueHigh === "number"
+        ) {
+          targets.push({
+            type: "HEART_RATE",
+            valueLow: Math.min(tt.valueLow, tt.valueHigh),
+            valueHigh: Math.max(tt.valueLow, tt.valueHigh),
+          });
         }
       }
       const repeatCount =
