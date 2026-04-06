@@ -1,18 +1,21 @@
 /**
- * One-time: normalize workout_segments.targets PACE values from legacy storage
- * (sec/mile × km/mi) to true sec/km, and set paceTargetEncodingVersion = 2.
+ * Data migration: set workout_segments.paceTargetEncodingVersion = 2 for all rows.
  *
- * Run after prisma migrate deploy adds the column (existing rows start at version 1):
+ * - Rows at version 1: PACE numbers in targets are legacy inflated storage; rewrite to
+ *   true sec/km using the same rule as paceTargetStoredToGarminSecPerKm(..., 1).
+ * - Rows at any other non-2 value: only bump the column to 2 (do not rewrite JSON).
+ *
+ * Run against your DB (DATABASE_URL in env):
  *   npm run db:migrate-pace-targets
  *
- * Safe to re-run only if rows remain at version 1; do not run after segments are v2.
+ * Safe to re-run: rows already at v2 are skipped.
  */
 
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
-import { LEGACY_PACE_TARGET_STORAGE_FACTOR } from "../lib/workout-generator/pace-calculator";
+import { paceTargetStoredToGarminSecPerKm } from "../lib/workout-generator/pace-calculator";
 
-function normalizeTargetsJson(targets: unknown): {
+function normalizeV1TargetsJson(targets: unknown): {
   next: Prisma.InputJsonValue;
   touchedPace: boolean;
 } | null {
@@ -28,7 +31,7 @@ function normalizeTargetsJson(targets: unknown): {
     for (const k of ["value", "valueLow", "valueHigh"] as const) {
       const v = nextObj[k];
       if (typeof v === "number" && Number.isFinite(v)) {
-        nextObj[k] = Math.round(v / LEGACY_PACE_TARGET_STORAGE_FACTOR);
+        nextObj[k] = paceTargetStoredToGarminSecPerKm(v, 1);
       }
     }
     return nextObj;
@@ -38,19 +41,31 @@ function normalizeTargetsJson(targets: unknown): {
 
 async function main(): Promise<void> {
   const rows = await prisma.workout_segments.findMany({
-    where: { paceTargetEncodingVersion: 1 },
-    select: { id: true, targets: true },
+    where: { NOT: { paceTargetEncodingVersion: 2 } },
+    select: {
+      id: true,
+      targets: true,
+      paceTargetEncodingVersion: true,
+    },
   });
 
   let updated = 0;
+  let paceFieldsRewritten = 0;
+
   for (const row of rows) {
-    const norm = normalizeTargetsJson(row.targets);
+    const wasV1 = row.paceTargetEncodingVersion === 1;
     const data: Prisma.workout_segmentsUpdateInput = {
       paceTargetEncodingVersion: 2,
     };
-    if (norm?.touchedPace) {
-      data.targets = norm.next;
+
+    if (wasV1) {
+      const norm = normalizeV1TargetsJson(row.targets);
+      if (norm?.touchedPace) {
+        data.targets = norm.next;
+        paceFieldsRewritten++;
+      }
     }
+
     await prisma.workout_segments.update({
       where: { id: row.id },
       data,
@@ -59,7 +74,10 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `[migrate-legacy-pace-targets] Updated ${updated} segment row(s) to encoding v2.`
+    `[migrate-legacy-pace-targets] Updated ${updated} segment row(s) to encoding v2` +
+      (paceFieldsRewritten
+        ? ` (rewrote PACE numbers on ${paceFieldsRewritten} row(s) from legacy v1 storage).`
+        : ".")
   );
 }
 
