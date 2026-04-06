@@ -61,6 +61,13 @@ export default function AthleteHomePage() {
   const [connectingGarmin, setConnectingGarmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [primaryGoal, setPrimaryGoal] = useState<any>(null);
+  const [paceNotifications, setPaceNotifications] = useState<
+    {
+      id: string;
+      adjustmentSecPerMile: number;
+      summaryMessage: string | null;
+    }[]
+  >([]);
 
   const loadHome = useCallback(async () => {
     const athleteId = LocalStorageAPI.getAthleteId();
@@ -91,9 +98,10 @@ export default function AthleteHomePage() {
       return;
     }
 
-    const [goalsRes, upcomingRes] = await Promise.allSettled([
+    const [goalsRes, upcomingRes, paceRes] = await Promise.allSettled([
       api.get('/goals?status=ACTIVE'),
       api.get('/training/upcoming'),
+      api.get(`/athlete/${athleteId}/pace-notifications`),
     ]);
 
     if (goalsRes.status === 'fulfilled') {
@@ -107,6 +115,12 @@ export default function AthleteHomePage() {
       setUpcomingSessions(upcomingRes.value.data?.sessions ?? []);
     } else {
       console.warn('athlete-home: upcoming training fetch failed', upcomingRes.reason);
+    }
+
+    if (paceRes.status === 'fulfilled') {
+      setPaceNotifications(paceRes.value.data?.notifications ?? []);
+    } else {
+      setPaceNotifications([]);
     }
 
     const garminFromStorage =
@@ -279,6 +293,42 @@ export default function AthleteHomePage() {
               <h1 className="text-2xl font-bold text-gray-900 mb-1">Welcome back, {athlete.firstName}!</h1>
               <p className="text-gray-600 text-sm">Here&apos;s your training at a glance</p>
             </div>
+
+            {paceNotifications.length > 0 && paceNotifications[0]?.summaryMessage ? (
+              <div
+                className={`mb-6 rounded-xl border p-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 ${
+                  paceNotifications[0].adjustmentSecPerMile > 0
+                    ? 'border-emerald-200 bg-emerald-50'
+                    : 'border-gray-200 bg-white'
+                }`}
+              >
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {paceNotifications[0].adjustmentSecPerMile > 0
+                      ? 'Your 5K pace was updated'
+                      : 'Weekly training review'}
+                  </p>
+                  <p className="text-sm text-gray-700 mt-1">{paceNotifications[0].summaryMessage}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const athleteId = LocalStorageAPI.getAthleteId();
+                    const top = paceNotifications[0];
+                    if (!athleteId || !top) return;
+                    try {
+                      await api.patch(`/athlete/${athleteId}/pace-notifications`, { logId: top.id });
+                      setPaceNotifications((prev) => prev.filter((n) => n.id !== top.id));
+                    } catch (e) {
+                      console.error('dismiss pace notification', e);
+                    }
+                  }}
+                  className="shrink-0 text-sm font-medium text-orange-600 hover:text-orange-700"
+                >
+                  Dismiss
+                </button>
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
               {nextRun ? (

@@ -43,20 +43,14 @@ function longRun(
   totalMiles: number,
   _paces: TrainingPaces
 ): SegmentDescriptor[] {
-  const main = round(totalMiles * 0.88, 2);
-  const cd = round(totalMiles - main, 2);
-  const segs: SegmentDescriptor[] = [
-    { title: "Long Run", durationType: "DISTANCE", durationValue: main, paceZone: "longRun" },
-  ];
-  if (cd > 0.05) {
-    segs.push({
-      title: "Cooldown",
+  return [
+    {
+      title: "Long Run",
       durationType: "DISTANCE",
-      durationValue: cd,
-      paceZone: "easy",
-    });
-  }
-  return segs;
+      durationValue: round(totalMiles, 2),
+      paceZone: "longRun",
+    },
+  ];
 }
 
 function intervals(

@@ -110,6 +110,11 @@ export function dayAbbrToOurDow(abbr: string): number {
   return n;
 }
 
+/** Full weekday name e.g. "Tuesday" → ourDow 1=Monday..7=Sunday */
+export function dayNameToOurDow(dayName: string): number {
+  return dayAbbrToOurDow(dayNameToAbbr(dayName.trim()));
+}
+
 /**
  * Split schedule on spaces; each token is DAY:milesTYPE[-iN] where TYPE is E,T,I,L,LR,...
  */

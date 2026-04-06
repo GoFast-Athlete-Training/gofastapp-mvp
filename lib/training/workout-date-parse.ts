@@ -12,7 +12,8 @@ export function parseOptionalWorkoutDate(input: unknown): Date | undefined {
     if (y < 1970 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return undefined;
     return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
   }
-  const parsed = new Date(s);
+  const hasTz = /Z$/i.test(s) || /[+-]\d{2}:?\d{2}$/.test(s);
+  const parsed = new Date(hasTz ? s : `${s}Z`);
   if (Number.isNaN(parsed.getTime())) return undefined;
   return parsed;
 }

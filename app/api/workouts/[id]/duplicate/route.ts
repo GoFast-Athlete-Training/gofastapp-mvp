@@ -104,7 +104,6 @@ export async function POST(request: NextRequest, ctx: Ctx) {
             planId: null,
             catalogueWorkoutId: source.catalogueWorkoutId,
             date: scheduleDate,
-            phase: null,
             estimatedDistanceInMeters: source.estimatedDistanceInMeters,
             nOffset: null,
             weekNumber: null,

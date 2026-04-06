@@ -8,6 +8,7 @@ import {
 } from "@/lib/garmin-workouts/garmin-training-api";
 import { GarminNotConnectedError, requireGarminToken } from "@/lib/domain-garmin";
 import { summarizeGarminTokenForLogs } from "@/lib/garmin-access-token-claims";
+import { dateForDayInWeek, dayNameToOurDow } from "@/lib/training/schedule-parser";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,9 @@ export async function POST(
         segments: {
           orderBy: { stepOrder: "asc" },
         },
+        training_plans: {
+          select: { id: true, startDate: true },
+        },
       },
     });
 
@@ -56,7 +60,36 @@ export async function POST(
       );
     }
 
-    if (!workout.date) {
+    let scheduledDate: string;
+    if (
+      workout.planId &&
+      workout.weekNumber != null &&
+      workout.dayAssigned?.trim() &&
+      workout.training_plans?.startDate
+    ) {
+      try {
+        const ourDow = dayNameToOurDow(workout.dayAssigned);
+        const canonical = dateForDayInWeek(
+          workout.training_plans.startDate,
+          workout.weekNumber,
+          ourDow
+        );
+        scheduledDate = scheduleDateFromWorkoutDate(canonical);
+      } catch {
+        if (!workout.date) {
+          return NextResponse.json(
+            {
+              error:
+                "Workout must have a scheduled date to add to your Garmin calendar. Set a date on the workout first.",
+            },
+            { status: 400 }
+          );
+        }
+        scheduledDate = scheduleDateFromWorkoutDate(workout.date);
+      }
+    } else if (workout.date) {
+      scheduledDate = scheduleDateFromWorkoutDate(workout.date);
+    } else {
       return NextResponse.json(
         {
           error:
@@ -113,7 +146,6 @@ export async function POST(
       }
     }
 
-    const scheduledDate = scheduleDateFromWorkoutDate(workout.date);
     const scheduleResult = await client.scheduleWorkout(garminWorkoutId, scheduledDate);
     const garminScheduleId = scheduleResult.scheduleId;
 

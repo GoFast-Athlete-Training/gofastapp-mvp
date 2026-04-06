@@ -90,10 +90,35 @@ model Athlete {
   race_event_rsvps        race_event_rsvps[]
   training_preferences    TrainingPreferences?
   run_journal_entries     run_journal_entries[]
+  pace_adjustment_logs    pace_adjustment_log[]
   hosted_container_memberships  gofast_container_memberships[] @relation("ContainerHost")
   member_container_memberships   gofast_container_memberships[] @relation("ContainerMember")
   container_messages_as_host     gofast_container_messages[]    @relation("ContainerMessages")
   container_messages_as_author   gofast_container_messages[]    @relation("ContainerMessageAuthor")
+}
+
+/// Weekly batch analysis result: optional 5K pace adjustment + in-app notification payload.
+model pace_adjustment_log {
+  id                           String         @id @default(cuid())
+  athleteId                    String
+  planId                       String?
+  weekNumber                   Int?
+  previousPaceSecPerMile       Int
+  newPaceSecPerMile            Int
+  adjustmentSecPerMile         Int
+  qualityWorkoutsCount         Int            @default(0)
+  qualityAvgDeltaSecPerMile    Int?
+  longRunCompleted             Boolean        @default(false)
+  longRunCompletionRatio       Float?
+  weeklyMileageCompletionPct   Float?
+  summaryMessage               String?
+  seenAt                       DateTime?
+  createdAt                    DateTime       @default(now())
+  Athlete                      Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  training_plans               training_plans? @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  @@index([athleteId, seenAt])
+  @@index([planId, weekNumber])
 }
 
 model gofast_container_memberships {
@@ -960,6 +985,7 @@ model training_plans {
   Athlete              Athlete                @relation(fields: [athleteId], references: [id])
   race_registry        race_registry?         @relation(fields: [raceId], references: [id])
   athlete_goal         AthleteGoal?           @relation(fields: [athleteGoalId], references: [id], onDelete: SetNull)
+  pace_adjustment_logs pace_adjustment_log[]
 
   @@index([athleteGoalId])
   @@index([athleteId, lifecycleStatus])
@@ -1015,8 +1041,6 @@ model workouts {
   catalogueWorkoutId        String?
   /// Scheduled calendar date for plan workouts
   date                      DateTime?
-  /// base | build | peak | taper
-  phase                     String?
   /// Garmin field: planned total distance in meters (source of truth before segment expansion)
   estimatedDistanceInMeters Float?
   /// Weeks before race: first week = -(totalWeeks-1), race week = 0; null for standalone
@@ -1046,8 +1070,6 @@ model workouts {
   derivedPerformanceDirection     String?
   derivedAgainstTargetPace        Int?
   evaluationEligibleFlag          Boolean             @default(false)
-  /// Lap-based adaptive 5K credit applied once per workout (idempotent on detail re-ingest)
-  adaptiveFiveKCreditAppliedAt    DateTime?
   /// Public share path slug for /mytrainingruns/[slug] (e.g. acole842719); set when athlete creates a join link
   slug                      String?             @unique
   createdAt                 DateTime            @default(now())

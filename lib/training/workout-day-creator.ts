@@ -23,7 +23,8 @@ function parseDateParam(dateParam: string): Date {
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
     return new Date(`${s}T12:00:00.000Z`);
   }
-  const d = new Date(s);
+  const hasTz = /Z$/i.test(s) || /[+-]\d{2}:?\d{2}$/.test(s);
+  const d = new Date(hasTz ? s : `${s}Z`);
   if (Number.isNaN(d.getTime())) throw new Error("Invalid date");
   return d;
 }
@@ -111,7 +112,6 @@ export async function findOrCreateWorkoutForPlanDay(params: {
         athleteId,
         planId,
         date: scheduled.date,
-        phase: null,
         estimatedDistanceInMeters: scheduled.estimatedDistanceInMeters,
         catalogueWorkoutId: null,
         weekNumber: scheduled.weekNumber,
