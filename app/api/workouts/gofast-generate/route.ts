@@ -12,11 +12,30 @@ import {
   descriptorsToApiSegments,
   type ApiSegment,
 } from "@/lib/workout-generator/templates";
+import type { TrainingPaces } from "@/lib/workout-generator/pace-calculator";
 
 function formatPaceFromSecondsPerMile(secPerMile: number): string {
   const m = Math.floor(secPerMile / 60);
   const s = Math.round(secPerMile % 60);
   return `${m}:${s.toString().padStart(2, "0")}/mile`;
+}
+
+/** Pace shown in title/description must match template zones (not raw goal/marathon pace). */
+function prescribedPaceSecPerMileForType(
+  workoutType: string,
+  paces: TrainingPaces
+): number {
+  switch (workoutType) {
+    case "Tempo":
+      return paces.tempo;
+    case "LongRun":
+      return paces.longRun;
+    case "Intervals":
+      return paces.interval;
+    case "Easy":
+    default:
+      return paces.easy;
+  }
 }
 
 /** Pick total miles for workout type (e.g. 5–7 for Easy/Tempo/LongRun) */
@@ -94,8 +113,11 @@ export async function POST(request: NextRequest) {
     const descriptors = getTemplateSegments(workoutType, totalMiles, paces);
     const segments = descriptorsToApiSegments(descriptors, paces);
 
-    const suggestedTitle = `${totalMiles} Mile ${workoutType} @ ${formatPaceFromSecondsPerMile(paces.goalSecondsPerMile)}`;
-    const suggestedDescription = `GoFast ${workoutType} workout, ${totalMiles} miles. Goal pace ${formatPaceFromSecondsPerMile(paces.goalSecondsPerMile)}.`;
+    const prescribed = prescribedPaceSecPerMileForType(workoutType, paces);
+    const prescribedStr = formatPaceFromSecondsPerMile(prescribed);
+    const anchorStr = formatPaceFromSecondsPerMile(paces.goalSecondsPerMile);
+    const suggestedTitle = `${totalMiles} Mile ${workoutType} @ ${prescribedStr}`;
+    const suggestedDescription = `GoFast ${workoutType} workout, ${totalMiles} miles. Target ~${prescribedStr} (zones from ${anchorStr} anchor).`;
 
     const result: GoFastGenerateResponse = {
       segments,
