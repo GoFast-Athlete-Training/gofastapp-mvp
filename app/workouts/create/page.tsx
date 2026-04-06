@@ -1,25 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, FileText, Pencil } from "lucide-react";
 import Link from "next/link";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import api from "@/lib/api";
+import { PaceMiSplitEditor } from "@/components/workout/PaceMiSplitEditor";
+import { parseSplitPaceToSecPerMile, secPerMileToSplitStrings } from "@/lib/workout/pace-mi-split";
 import {
-  parsePaceToSecondsPerMile,
-  secondsPerMileToSecondsPerKm,
   formatStoredPaceAsMinPerMile,
+  secondsPerMileToSecondsPerKm,
+  storedPaceSecondsKmToSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
 
 const WORKOUT_TYPES = ["Easy", "Tempo", "LongRun", "Intervals"] as const;
 
+/** Stored PACE targets are sec/km, encoding v2 (same as workout detail / Garmin). */
+const PACE_SLOT_ENC = 2 as const;
+
 export interface SlotData {
   miles: number;
-  /** PACE target min (sec/km); display as M:SS in UI */
+  /** PACE API valueLow (sec/km, v2) — faster bound; same as detail editor “Pace low”. */
   paceValueLow?: number;
-  /** PACE target max (sec/km); display as M:SS in UI */
+  /** PACE API valueHigh (sec/km, v2) — slower bound; “Pace high”. */
   paceValueHigh?: number;
   hrMin?: number;
   hrMax?: number;
@@ -146,6 +151,35 @@ function slotOneLine(slot: SlotData): string {
   return [mi, pace].filter(Boolean).join(" — ") || "—";
 }
 
+function slotToPaceSplitState(slot: SlotData | null): {
+  lowMin: string;
+  lowSec: string;
+  highMin: string;
+  highSec: string;
+} {
+  let lowMin = "";
+  let lowSec = "";
+  let highMin = "";
+  let highSec = "";
+  if (slot?.paceValueLow != null) {
+    const secMi = Math.round(
+      storedPaceSecondsKmToSecondsPerMile(slot.paceValueLow, PACE_SLOT_ENC)
+    );
+    const lo = secPerMileToSplitStrings(secMi);
+    lowMin = lo.min;
+    lowSec = lo.sec;
+  }
+  if (slot?.paceValueHigh != null) {
+    const secMi = Math.round(
+      storedPaceSecondsKmToSecondsPerMile(slot.paceValueHigh, PACE_SLOT_ENC)
+    );
+    const hi = secPerMileToSplitStrings(secMi);
+    highMin = hi.min;
+    highSec = hi.sec;
+  }
+  return { lowMin, lowSec, highMin, highSec };
+}
+
 export default function CreateWorkoutPage() {
   const router = useRouter();
   const [workoutType, setWorkoutType] = useState<string>("Easy");
@@ -165,11 +199,100 @@ export default function CreateWorkoutPage() {
   /** YYYY-MM-DD from date input; optional, shown on home & workout cards */
   const [scheduledDate, setScheduledDate] = useState("");
   const [editingSlot, setEditingSlot] = useState<"warmup" | "mainWork" | "cooldown" | null>(null);
-  /** While editing a slot, M:SS strings for pace inputs (so user can type partial values) */
-  const [editingPaceLowStr, setEditingPaceLowStr] = useState("");
-  const [editingPaceHighStr, setEditingPaceHighStr] = useState("");
+  /** Pace low / high split fields while a slot editor is open (matches /workouts/[id]). */
+  const [editingPaceLowMin, setEditingPaceLowMin] = useState("");
+  const [editingPaceLowSec, setEditingPaceLowSec] = useState("");
+  const [editingPaceHighMin, setEditingPaceHighMin] = useState("");
+  const [editingPaceHighSec, setEditingPaceHighSec] = useState("");
 
   const hasSlots = warmup !== null || mainWork !== null || cooldown !== null;
+
+  const getSlot = (key: "warmup" | "mainWork" | "cooldown") =>
+    key === "warmup" ? warmup : key === "mainWork" ? mainWork : cooldown;
+  const setSlot = (key: "warmup" | "mainWork" | "cooldown", value: SlotData | null) => {
+    if (key === "warmup") setWarmup(value);
+    else if (key === "mainWork") setMainWork(value);
+    else setCooldown(value);
+  };
+
+  useEffect(() => {
+    if (!editingSlot) return;
+    const label =
+      editingSlot === "warmup"
+        ? "Warmup"
+        : editingSlot === "mainWork"
+          ? "Main Work"
+          : "Cooldown";
+    const ctx = `${label} segment`;
+    const base = getSlot(editingSlot) ?? { miles: 0 };
+
+    let paceValueLow: number | undefined;
+    if (!editingPaceLowMin.trim() && !editingPaceLowSec.trim()) {
+      paceValueLow = undefined;
+    } else {
+      try {
+        const secMi = parseSplitPaceToSecPerMile(
+          editingPaceLowMin,
+          editingPaceLowSec,
+          ctx,
+          "low"
+        );
+        paceValueLow = Number.isFinite(secMi)
+          ? secondsPerMileToSecondsPerKm(secMi)
+          : base.paceValueLow;
+      } catch {
+        paceValueLow = base.paceValueLow;
+      }
+    }
+
+    let paceValueHigh: number | undefined;
+    if (!editingPaceHighMin.trim() && !editingPaceHighSec.trim()) {
+      paceValueHigh = undefined;
+    } else {
+      try {
+        const secMi = parseSplitPaceToSecPerMile(
+          editingPaceHighMin,
+          editingPaceHighSec,
+          ctx,
+          "high"
+        );
+        paceValueHigh = Number.isFinite(secMi)
+          ? secondsPerMileToSecondsPerKm(secMi)
+          : base.paceValueHigh;
+      } catch {
+        paceValueHigh = base.paceValueHigh;
+      }
+    }
+
+    if (paceValueLow === base.paceValueLow && paceValueHigh === base.paceValueHigh) return;
+
+    setSlot(editingSlot, {
+      ...base,
+      paceValueLow,
+      paceValueHigh,
+    });
+  }, [
+    editingSlot,
+    editingPaceLowMin,
+    editingPaceLowSec,
+    editingPaceHighMin,
+    editingPaceHighSec,
+    warmup,
+    mainWork,
+    cooldown,
+  ]);
+
+  const clearSegmentsUsePasteInstead = () => {
+    setWarmup(null);
+    setMainWork(null);
+    setCooldown(null);
+    setEditingSlot(null);
+    setEditingPaceLowMin("");
+    setEditingPaceLowSec("");
+    setEditingPaceHighMin("");
+    setEditingPaceHighSec("");
+    setDeriveError(null);
+  };
 
   const handleDerive = async () => {
     const text = sourceText.trim();
@@ -270,14 +393,6 @@ export default function CreateWorkoutPage() {
     } finally {
       setGoFastGenerating(false);
     }
-  };
-
-  const getSlot = (key: "warmup" | "mainWork" | "cooldown") =>
-    key === "warmup" ? warmup : key === "mainWork" ? mainWork : cooldown;
-  const setSlot = (key: "warmup" | "mainWork" | "cooldown", value: SlotData | null) => {
-    if (key === "warmup") setWarmup(value);
-    else if (key === "mainWork") setMainWork(value);
-    else setCooldown(value);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -428,32 +543,44 @@ export default function CreateWorkoutPage() {
             )}
           </div>
 
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Paste your workout</h2>
-            <p className="text-sm text-gray-600 mb-3">
-              Paste a description from a coach, Runna, or Strava and we’ll turn it into segments.
-            </p>
-            <textarea
-              value={sourceText}
-              onChange={(e) => setSourceText(e.target.value)}
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              placeholder="e.g. 15 miles today — 2 mile warmup, 10 at marathon pace, 3 mile cooldown"
-            />
-            {deriveError && <p className="text-sm text-red-600 mt-1">{deriveError}</p>}
-            <button
-              type="button"
-              onClick={handleDerive}
-              disabled={deriving}
-              className="mt-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:opacity-50 flex items-center gap-2"
-            >
-              <FileText className="w-4 h-4" />
-              {deriving ? "Deriving…" : "Derive workout"}
-            </button>
-          </div>
+          {!hasSlots && (
+            <div className="mb-8">
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">Paste your workout</h2>
+              <p className="text-sm text-gray-600 mb-3">
+                Paste a description from a coach, Runna, or Strava and we’ll turn it into segments.
+              </p>
+              <textarea
+                value={sourceText}
+                onChange={(e) => setSourceText(e.target.value)}
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                placeholder="e.g. 15 miles today — 2 mile warmup, 10 at marathon pace, 3 mile cooldown"
+              />
+              {deriveError && <p className="text-sm text-red-600 mt-1">{deriveError}</p>}
+              <button
+                type="button"
+                onClick={handleDerive}
+                disabled={deriving}
+                className="mt-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:opacity-50 flex items-center gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                {deriving ? "Deriving…" : "Derive workout"}
+              </button>
+            </div>
+          )}
 
           {hasSlots && (
             <>
+              <div className="mb-6 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={clearSegmentsUsePasteInstead}
+                  className="text-sm text-orange-700 hover:text-orange-900 underline underline-offset-2"
+                >
+                  Clear segments and paste a workout instead
+                </button>
+              </div>
+
               <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
@@ -506,8 +633,10 @@ export default function CreateWorkoutPage() {
                               onClick={() => {
                                 setSlot(key, { miles: 0 });
                                 setEditingSlot(key);
-                                setEditingPaceLowStr("");
-                                setEditingPaceHighStr("");
+                                setEditingPaceLowMin("");
+                                setEditingPaceLowSec("");
+                                setEditingPaceHighMin("");
+                                setEditingPaceHighSec("");
                               }}
                               className="text-sm px-3 py-1.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
                             >
@@ -522,9 +651,11 @@ export default function CreateWorkoutPage() {
                                     setEditingSlot(null);
                                   } else {
                                     setEditingSlot(key);
-                                    const s = getSlot(key);
-                                    setEditingPaceLowStr(s?.paceValueLow != null ? secPerKmToPaceDisplay(s.paceValueLow) : "");
-                                    setEditingPaceHighStr(s?.paceValueHigh != null ? secPerKmToPaceDisplay(s.paceValueHigh) : "");
+                                    const sp = slotToPaceSplitState(getSlot(key));
+                                    setEditingPaceLowMin(sp.lowMin);
+                                    setEditingPaceLowSec(sp.lowSec);
+                                    setEditingPaceHighMin(sp.highMin);
+                                    setEditingPaceHighSec(sp.highSec);
                                   }
                                 }}
                                 className="text-sm px-3 py-1.5 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 inline-flex items-center gap-1"
@@ -555,51 +686,29 @@ export default function CreateWorkoutPage() {
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                             />
                           </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Target min (M:SS/mi)</label>
-                            <input
-                              type="text"
-                              value={editingSlot === key ? editingPaceLowStr : (slot?.paceValueLow != null ? secPerKmToPaceDisplay(slot.paceValueLow) : "")}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                if (editingSlot === key) setEditingPaceLowStr(v);
-                                try {
-                                  if (v.trim()) {
-                                    const secKm = secondsPerMileToSecondsPerKm(parsePaceToSecondsPerMile(v.trim()));
-                                    setSlot(key, { ...(getSlot(key) ?? { miles: 0 }), paceValueLow: secKm });
-                                  } else {
-                                    setSlot(key, { ...(getSlot(key) ?? { miles: 0 }), paceValueLow: undefined });
-                                  }
-                                } catch {
-                                  // keep typing; slot not updated until valid
-                                }
-                              }}
-                              placeholder="8:15"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Target max (M:SS/mi)</label>
-                            <input
-                              type="text"
-                              value={editingSlot === key ? editingPaceHighStr : (slot?.paceValueHigh != null ? secPerKmToPaceDisplay(slot.paceValueHigh) : "")}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                if (editingSlot === key) setEditingPaceHighStr(v);
-                                try {
-                                  if (v.trim()) {
-                                    const secKm = secondsPerMileToSecondsPerKm(parsePaceToSecondsPerMile(v.trim()));
-                                    setSlot(key, { ...(getSlot(key) ?? { miles: 0 }), paceValueHigh: secKm });
-                                  } else {
-                                    setSlot(key, { ...(getSlot(key) ?? { miles: 0 }), paceValueHigh: undefined });
-                                  }
-                                } catch {
-                                  // keep typing; slot not updated until valid
-                                }
-                              }}
-                              placeholder="8:45"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
-                            />
+                          <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <span className="text-xs font-semibold uppercase text-gray-500 block mb-1">
+                                Pace low
+                              </span>
+                              <PaceMiSplitEditor
+                                minValue={editingPaceLowMin}
+                                secValue={editingPaceLowSec}
+                                onMinChange={setEditingPaceLowMin}
+                                onSecChange={setEditingPaceLowSec}
+                              />
+                            </div>
+                            <div>
+                              <span className="text-xs font-semibold uppercase text-gray-500 block mb-1">
+                                Pace high
+                              </span>
+                              <PaceMiSplitEditor
+                                minValue={editingPaceHighMin}
+                                secValue={editingPaceHighSec}
+                                onMinChange={setEditingPaceHighMin}
+                                onSecChange={setEditingPaceHighSec}
+                              />
+                            </div>
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">HR min</label>
@@ -643,6 +752,10 @@ export default function CreateWorkoutPage() {
                                 onClick={() => {
                                   setSlot(key, null);
                                   setEditingSlot(null);
+                                  setEditingPaceLowMin("");
+                                  setEditingPaceLowSec("");
+                                  setEditingPaceHighMin("");
+                                  setEditingPaceHighSec("");
                                 }}
                                 className="ml-2 text-sm px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg"
                               >
