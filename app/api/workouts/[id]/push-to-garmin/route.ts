@@ -6,7 +6,10 @@ import {
   GarminApiError,
   createGarminTrainingApiForAthlete,
 } from "@/lib/garmin-workouts/garmin-training-api";
-import { GarminNotConnectedError, requireGarminToken } from "@/lib/domain-garmin";
+import {
+  GarminNotConnectedError,
+  requireGarminTokenFresh,
+} from "@/lib/domain-garmin";
 import { summarizeGarminTokenForLogs } from "@/lib/garmin-access-token-claims";
 import { dateForDayInWeek, dayNameToOurDow } from "@/lib/training/schedule-parser";
 
@@ -99,7 +102,7 @@ export async function POST(
       );
     }
 
-    const token = await requireGarminToken(auth.athlete.id);
+    const token = await requireGarminTokenFresh(auth.athlete.id);
     garminAccessTokenForLogs = token;
 
     const garminWorkout = assembleGarminWorkout({
@@ -125,6 +128,11 @@ export async function POST(
         paceTargetEncodingVersion: seg.paceTargetEncodingVersion,
       })),
     });
+
+    console.log(
+      "[GARMIN_PUSH] assembled payload",
+      JSON.stringify(garminWorkout, null, 2)
+    );
 
     const client = createGarminTrainingApiForAthlete(auth.athlete.id, token);
 
@@ -160,6 +168,7 @@ export async function POST(
       garminWorkoutId,
       garminScheduleId,
       scheduledDate,
+      debugPayload: garminWorkout,
     });
   } catch (error: unknown) {
     if (error instanceof GarminNotConnectedError) {

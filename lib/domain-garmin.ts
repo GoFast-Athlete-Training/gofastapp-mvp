@@ -1,5 +1,10 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
+import { decodeGarminAccessTokenClaims } from './garmin-access-token-claims';
+import { refreshGarminToken } from './garmin-refresh-token';
+
+/** Refresh access token this many seconds before JWT / metadata expiry to avoid 401 + retry noise. */
+const GARMIN_TOKEN_FRESH_SKEW_SEC = 300;
 
 const GARMIN_REGISTRATION_URL =
   'https://apis.garmin.com/wellness-api/rest/user/registration';
@@ -50,6 +55,65 @@ export async function requireGarminToken(athleteId: string): Promise<string> {
   if (!t) {
     throw new GarminNotConnectedError();
   }
+  return t;
+}
+
+/**
+ * Same as {@link requireGarminToken}, but refreshes first when the stored access token is
+ * expired or within {@link GARMIN_TOKEN_FRESH_SKEW_SEC} of expiry (JWT `exp`, else
+ * `garmin_connected_at` + `garmin_expires_in`). Use before Training API calls to reduce
+ * "Token is not active" 401s that succeed only after retry.
+ */
+export async function requireGarminTokenFresh(athleteId: string): Promise<string> {
+  const athlete = await prisma.athlete.findUnique({
+    where: { id: athleteId },
+    select: {
+      garmin_access_token: true,
+      garmin_refresh_token: true,
+      garmin_expires_in: true,
+      garmin_connected_at: true,
+    },
+  });
+  const t = athlete?.garmin_access_token?.trim();
+  if (!t) {
+    throw new GarminNotConnectedError();
+  }
+  if (!athlete?.garmin_refresh_token?.trim()) {
+    return t;
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const claims = decodeGarminAccessTokenClaims(t);
+  let needsRefresh = false;
+
+  if (typeof claims?.exp === 'number' && Number.isFinite(claims.exp)) {
+    needsRefresh = claims.exp <= nowSec + GARMIN_TOKEN_FRESH_SKEW_SEC;
+  } else if (
+    athlete.garmin_connected_at != null &&
+    athlete.garmin_expires_in != null &&
+    Number.isFinite(athlete.garmin_expires_in) &&
+    athlete.garmin_expires_in > 0
+  ) {
+    const issuedMs = athlete.garmin_connected_at.getTime();
+    const expiresMs = issuedMs + athlete.garmin_expires_in * 1000;
+    needsRefresh = Date.now() >= expiresMs - GARMIN_TOKEN_FRESH_SKEW_SEC * 1000;
+  }
+
+  if (!needsRefresh) {
+    return t;
+  }
+
+  const refreshed = await refreshGarminToken(athleteId);
+  if (refreshed.success && refreshed.accessToken?.trim()) {
+    console.log(
+      `[GARMIN] Proactive token refresh for athlete ${athleteId} (avoid expired Training API bearer)`
+    );
+    return refreshed.accessToken.trim();
+  }
+
+  console.warn(
+    `[GARMIN] Proactive refresh skipped or failed for ${athleteId}; using stored token (${refreshed.error ?? 'unknown'})`
+  );
   return t;
 }
 

@@ -382,7 +382,7 @@ function secPerMileToSplitStrings(totalSec: number): { min: string; sec: string 
   const rounded = Math.max(0, Math.round(totalSec));
   return {
     min: String(Math.floor(rounded / 60)),
-    sec: String(rounded % 60),
+    sec: String(rounded % 60).padStart(2, "0"),
   };
 }
 
@@ -560,7 +560,7 @@ function quickPaceDisplayStrings(
       o?.quickPaceLowSec !== undefined
         ? o.quickPaceLowSec
         : baseLow != null
-          ? String(Math.round(baseLow % 60))
+          ? String(Math.round(baseLow % 60)).padStart(2, "0")
           : "",
     highMin:
       o?.quickPaceHighMin !== undefined
@@ -572,13 +572,23 @@ function quickPaceDisplayStrings(
       o?.quickPaceHighSec !== undefined
         ? o.quickPaceHighSec
         : baseHigh != null
-          ? String(Math.round(baseHigh % 60))
+          ? String(Math.round(baseHigh % 60)).padStart(2, "0")
           : "",
   };
 }
 
 /** Stepper cap for minutes/mile; typing can still enter higher via keyboard. */
 const PACE_MIN_STEPPER_MAX = 99;
+
+function paceSecondsStepperDisplay(secValue: string): string {
+  const t = secValue.trim();
+  if (t === "") return "";
+  const digits = t.replace(/\D/g, "");
+  if (digits === "") return "";
+  const n = parseInt(digits, 10);
+  if (!Number.isFinite(n)) return "";
+  return String(Math.min(59, n)).padStart(2, "0");
+}
 
 function PaceMiSplitEditor({
   minValue,
@@ -609,7 +619,7 @@ function PaceMiSplitEditor({
     let next = cur + delta;
     while (next < 0) next += 60;
     while (next > 59) next -= 60;
-    onSecChange(String(next));
+    onSecChange(String(next).padStart(2, "0"));
   };
 
   const stepperCol = (label: string, value: string, which: "min" | "sec") => (
@@ -645,7 +655,7 @@ function PaceMiSplitEditor({
               }
               const n = parseInt(v, 10);
               if (!Number.isFinite(n)) return;
-              onSecChange(String(Math.min(59, n)));
+              onSecChange(String(Math.min(59, n)).padStart(2, "0"));
             }
           }}
           onKeyDown={(e) => {
@@ -679,7 +689,7 @@ function PaceMiSplitEditor({
       <span className="text-xl text-gray-400 pb-2 select-none" aria-hidden>
         :
       </span>
-      {stepperCol("Seconds", secValue, "sec")}
+      {stepperCol("Seconds", paceSecondsStepperDisplay(secValue), "sec")}
       <span className="text-xs text-gray-500 pb-2 select-none">/mi</span>
     </div>
   );
