@@ -18,9 +18,89 @@ import {
   convertMinutesToSeconds,
 } from "./types";
 import {
+  KM_PER_MILE,
   normalizePaceTargetEncodingVersion,
   paceTargetStoredToGarminSecPerKm,
 } from "../workout-generator/pace-calculator";
+
+/** Garmin running SPEED targets: meters per second (approx. 1.2–7.5 m/s). */
+const MIN_RUN_SPEED_MPS = 1.2;
+const MAX_RUN_SPEED_MPS = 7.5;
+
+/**
+ * Pace as seconds per kilometer → speed in m/s.
+ * Uses mph = 3600 / secPerMile then mps = mph × 0.44704 (equivalent to 1000 / secPerKm).
+ */
+function paceSecKmToSpeedMps(secPerKm: number): number {
+  if (!Number.isFinite(secPerKm) || secPerKm <= 0) {
+    throw new Error(`Garmin pace→speed: invalid sec/km (${secPerKm})`);
+  }
+  const secPerMile = secPerKm * KM_PER_MILE;
+  const mph = 3600 / secPerMile;
+  return mph * 0.44704;
+}
+
+function roundSpeedMps(n: number): number {
+  return Math.round(n * 1000) / 1000;
+}
+
+function assertRunningSpeedMps(mps: number, label: string): void {
+  if (!Number.isFinite(mps) || mps < MIN_RUN_SPEED_MPS || mps > MAX_RUN_SPEED_MPS) {
+    throw new Error(
+      `Garmin ${label}: speed ${mps} m/s outside allowed running range [${MIN_RUN_SPEED_MPS}, ${MAX_RUN_SPEED_MPS}]`
+    );
+  }
+}
+
+/**
+ * Store PACE (sec/km after encoding fix) on the wire as SPEED (m/s).
+ * Slower pace (larger sec/km) → lower m/s; faster → higher m/s.
+ */
+function applyPaceBandAsGarminSpeed(
+  step: GarminWorkoutStep,
+  secKmFast: number,
+  secKmSlow: number,
+  stepOrder: number,
+  role: "primary" | "secondary"
+): void {
+  const fast = Math.min(secKmFast, secKmSlow);
+  const slow = Math.max(secKmFast, secKmSlow);
+  const mpsHigh = roundSpeedMps(paceSecKmToSpeedMps(fast));
+  const mpsLow = roundSpeedMps(paceSecKmToSpeedMps(slow));
+  assertRunningSpeedMps(mpsLow, `${role} speed low`);
+  assertRunningSpeedMps(mpsHigh, `${role} speed high`);
+
+  const secPerMileFast = fast * KM_PER_MILE;
+  const secPerMileSlow = slow * KM_PER_MILE;
+  console.log(
+    "[GARMIN_PACE_TO_SPEED]",
+    JSON.stringify({
+      role,
+      stepOrder,
+      paceSecPerKmFast: fast,
+      paceSecPerKmSlow: slow,
+      paceSecPerMileFast: Math.round(secPerMileFast),
+      paceSecPerMileSlow: Math.round(secPerMileSlow),
+      mphFast: roundSpeedMps(3600 / secPerMileFast),
+      mphSlow: roundSpeedMps(3600 / secPerMileSlow),
+      mpsLow,
+      mpsHigh,
+      targetType: "SPEED",
+    })
+  );
+
+  if (role === "primary") {
+    step.targetType = GarminTargetType.SPEED;
+    step.targetValueLow = mpsLow;
+    step.targetValueHigh = mpsHigh;
+    step.targetValue = undefined;
+  } else {
+    step.secondaryTargetType = GarminTargetType.SPEED;
+    step.secondaryTargetValueLow = mpsLow;
+    step.secondaryTargetValueHigh = mpsHigh;
+    step.secondaryTargetValue = undefined;
+  }
+}
 
 export interface WorkoutSegment {
   id: string;
@@ -144,16 +224,37 @@ function buildSegmentStep(stepOrder: number, segment: WorkoutSegment): GarminWor
         return paceTargetStoredToGarminSecPerKm(n, paceEnc);
       };
 
-      // PACE values must be true sec/km on the wire; stored blobs may be v1 legacy
+      // PACE in DB is sec/km (v1/v2 normalized). Garmin devices handle SPEED (m/s) more reliably.
       if (GarminTargetType[targetType] === GarminTargetType.PACE) {
-        if (primaryTarget.valueLow !== undefined) {
-          step.targetValueLow = mapPace(primaryTarget.valueLow);
+        const lo =
+          primaryTarget.valueLow !== undefined
+            ? mapPace(primaryTarget.valueLow)
+            : undefined;
+        const hi =
+          primaryTarget.valueHigh !== undefined
+            ? mapPace(primaryTarget.valueHigh)
+            : undefined;
+        const single =
+          primaryTarget.value !== undefined ? mapPace(primaryTarget.value) : undefined;
+
+        let secFast: number | undefined;
+        let secSlow: number | undefined;
+        if (lo !== undefined && hi !== undefined) {
+          secFast = lo;
+          secSlow = hi;
+        } else if (single !== undefined) {
+          secFast = single;
+          secSlow = single;
+        } else if (lo !== undefined) {
+          secFast = lo;
+          secSlow = lo;
+        } else if (hi !== undefined) {
+          secFast = hi;
+          secSlow = hi;
         }
-        if (primaryTarget.valueHigh !== undefined) {
-          step.targetValueHigh = mapPace(primaryTarget.valueHigh);
-        }
-        if (primaryTarget.value !== undefined && step.targetValueLow === undefined) {
-          step.targetValue = mapPace(primaryTarget.value);
+
+        if (secFast !== undefined && secSlow !== undefined) {
+          applyPaceBandAsGarminSpeed(step, secFast, secSlow, stepOrder, "primary");
         }
       } else {
         if (primaryTarget.valueLow !== undefined) {
@@ -176,17 +277,35 @@ function buildSegmentStep(stepOrder: number, segment: WorkoutSegment): GarminWor
           step.secondaryTargetType = GarminTargetType[secondaryTargetType];
           
           if (GarminTargetType[secondaryTargetType] === GarminTargetType.PACE) {
-            if (secondaryTarget.valueLow !== undefined) {
-              step.secondaryTargetValueLow = mapPace(secondaryTarget.valueLow);
+            const lo2 =
+              secondaryTarget.valueLow !== undefined
+                ? mapPace(secondaryTarget.valueLow)
+                : undefined;
+            const hi2 =
+              secondaryTarget.valueHigh !== undefined
+                ? mapPace(secondaryTarget.valueHigh)
+                : undefined;
+            const single2 =
+              secondaryTarget.value !== undefined
+                ? mapPace(secondaryTarget.value)
+                : undefined;
+            let sFast: number | undefined;
+            let sSlow: number | undefined;
+            if (lo2 !== undefined && hi2 !== undefined) {
+              sFast = lo2;
+              sSlow = hi2;
+            } else if (single2 !== undefined) {
+              sFast = single2;
+              sSlow = single2;
+            } else if (lo2 !== undefined) {
+              sFast = lo2;
+              sSlow = lo2;
+            } else if (hi2 !== undefined) {
+              sFast = hi2;
+              sSlow = hi2;
             }
-            if (secondaryTarget.valueHigh !== undefined) {
-              step.secondaryTargetValueHigh = mapPace(secondaryTarget.valueHigh);
-            }
-            if (
-              secondaryTarget.value !== undefined &&
-              step.secondaryTargetValueLow === undefined
-            ) {
-              step.secondaryTargetValue = mapPace(secondaryTarget.value);
+            if (sFast !== undefined && sSlow !== undefined) {
+              applyPaceBandAsGarminSpeed(step, sFast, sSlow, stepOrder, "secondary");
             }
           } else {
             if (secondaryTarget.valueLow !== undefined) {
