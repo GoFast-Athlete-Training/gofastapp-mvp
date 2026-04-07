@@ -362,12 +362,18 @@ function mapIntensityFromTitle(title: string): GarminIntensity {
   if (lower.includes("cooldown") || lower.includes("cool-down")) {
     return GarminIntensity.COOLDOWN;
   }
-  if (lower.includes("recovery") || lower.includes("rest")) {
-    return GarminIntensity.INTERVAL_REST;
+  if (lower.includes("recovery")) {
+    return GarminIntensity.RECOVERY;
+  }
+  if (lower.includes("rest")) {
+    return GarminIntensity.REST;
   }
   if (lower.includes("interval") || lower.includes("repeat")) {
-    return GarminIntensity.INTERVAL_TARGET;
+    return GarminIntensity.INTERVAL;
   }
-  
+  if (/\bmain\b/.test(lower)) {
+    return GarminIntensity.MAIN;
+  }
+
   return GarminIntensity.ACTIVE;
 }

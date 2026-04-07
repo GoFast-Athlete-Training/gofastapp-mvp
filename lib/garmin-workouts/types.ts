@@ -20,14 +20,15 @@ export enum GarminSport {
   // ... other sports (10 total options)
 }
 
+/** Values accepted by Garmin Training API `Intensity` (see gateway enum). */
 export enum GarminIntensity {
   WARMUP = "WARMUP",
-  ACTIVE = "ACTIVE",
-  RECOVERY = "RECOVERY",
-  COOLDOWN = "COOLDOWN",
   REST = "REST",
-  INTERVAL_TARGET = "INTERVAL_TARGET",
-  INTERVAL_REST = "INTERVAL_REST",
+  INTERVAL = "INTERVAL",
+  ACTIVE = "ACTIVE",
+  MAIN = "MAIN",
+  COOLDOWN = "COOLDOWN",
+  RECOVERY = "RECOVERY",
 }
 
 export enum GarminDurationType {
