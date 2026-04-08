@@ -192,16 +192,11 @@ export async function evaluateLapSegmentsAfterDetail(
   const avgDelta = Math.round(
     deltas.reduce((a, b) => a + b, 0) / deltas.length
   );
-  let direction: string;
-  if (avgDelta > 5) direction = "positive";
-  else if (avgDelta < -5) direction = "negative";
-  else direction = "neutral";
 
   await prisma.workouts.update({
     where: { id: workout.id },
     data: {
-      derivedPerformanceDeltaSeconds: avgDelta,
-      derivedPerformanceDirection: direction,
+      paceDeltaSecPerMile: avgDelta,
       evaluationEligibleFlag: true,
     },
   });

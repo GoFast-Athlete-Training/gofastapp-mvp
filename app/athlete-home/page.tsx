@@ -14,6 +14,7 @@ import {
   formatPaceTargetSingleForDisplay,
   normalizePaceTargetEncodingVersion,
 } from '@/lib/workout-generator/pace-calculator';
+import { metersToMiDisplay } from '@/lib/training/workout-preview-payload';
 
 function homeSessionPaceLabel(
   segments:
@@ -53,6 +54,38 @@ function formatSecPerMile(sec: number | null | undefined): string {
   return `${m}:${s.toString().padStart(2, '0')}/mi`;
 }
 
+function formatDurationMin(sec: number | null | undefined): string | null {
+  if (sec == null || !Number.isFinite(sec) || sec <= 0) return null;
+  const m = Math.round(sec / 60);
+  return m > 0 ? `${m} min` : null;
+}
+
+function homeLastRunDayLabel(activityStartTime: string | null, date: string | null): string {
+  const raw = activityStartTime ?? date;
+  if (!raw) return '';
+  try {
+    return new Date(raw).toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return '';
+  }
+}
+
+/** target − actual (sec/mi); positive = faster than target */
+function homeBeatTargetLine(delta: number | null | undefined): string | null {
+  if (delta != null && Number.isFinite(delta)) {
+    const n = Math.round(delta);
+    const abs = Math.abs(n);
+    if (n > 0) return `Beat target by ${abs} sec/mi`;
+    if (n < 0) return `${abs} sec/mi slower than target`;
+    return 'On target pace';
+  }
+  return null;
+}
+
 /** Title-case distance labels (marathon → Marathon, half marathon → Half Marathon). */
 function normalizeGoalDistanceLabel(raw: unknown): string {
   if (raw == null) return '';
@@ -74,6 +107,18 @@ function normalizeGoalDistanceLabel(raw: unknown): string {
 type ActivePlanSummary = { name: string; hasSchedule: boolean };
 type GoingRunRow = { id: string; title: string; date: string; city: string };
 
+type LastLoggedWorkoutStrip = {
+  id: string;
+  title: string;
+  workoutType?: string;
+  date: string | null;
+  activityStartTime: string | null;
+  actualAvgPaceSecPerMile: number | null;
+  actualDistanceMeters: number | null;
+  actualDurationSeconds: number | null;
+  paceDeltaSecPerMile: number | null;
+};
+
 export default function AthleteHomePage() {
   const router = useRouter();
   const [athlete, setAthlete] = useState<any>(null);
@@ -91,6 +136,7 @@ export default function AthleteHomePage() {
   >([]);
   const [activePlanSummary, setActivePlanSummary] = useState<ActivePlanSummary | null>(null);
   const [myGoingRuns, setMyGoingRuns] = useState<GoingRunRow[]>([]);
+  const [lastLoggedWorkout, setLastLoggedWorkout] = useState<LastLoggedWorkoutStrip | null>(null);
 
   const loadHome = useCallback(async () => {
     const athleteId = LocalStorageAPI.getAthleteId();
@@ -121,11 +167,12 @@ export default function AthleteHomePage() {
       return;
     }
 
-    const [goalsRes, upcomingRes, paceRes, goingRes] = await Promise.allSettled([
+    const [goalsRes, upcomingRes, paceRes, goingRes, lastRunRes] = await Promise.allSettled([
       api.get('/goals?status=ACTIVE'),
       api.get('/training/upcoming'),
       api.get(`/athlete/${athleteId}/pace-notifications`),
       api.get('/me/my-going-runs'),
+      api.get('/me/last-logged-workout'),
     ]);
 
     if (goalsRes.status === 'fulfilled') {
@@ -163,6 +210,17 @@ export default function AthleteHomePage() {
       setPaceNotifications(paceRes.value.data?.notifications ?? []);
     } else {
       setPaceNotifications([]);
+    }
+
+    if (lastRunRes.status === 'fulfilled') {
+      const w = lastRunRes.value.data?.workout as LastLoggedWorkoutStrip | null | undefined;
+      if (w && typeof w.id === 'string' && typeof w.title === 'string') {
+        setLastLoggedWorkout(w);
+      } else {
+        setLastLoggedWorkout(null);
+      }
+    } else {
+      setLastLoggedWorkout(null);
     }
 
     const garminFromStorage =
@@ -346,6 +404,16 @@ export default function AthleteHomePage() {
     'block rounded-xl border-2 border-sky-200 bg-sky-50/70 p-5 shadow-sm hover:border-sky-300 hover:shadow-md transition-all h-full';
   const cardTraining =
     'block rounded-xl border-2 border-emerald-200 bg-emerald-50/80 p-5 shadow-sm hover:border-emerald-300 hover:shadow-md transition-all h-full';
+
+  const lastRunDayLabelHome = lastLoggedWorkout
+    ? homeLastRunDayLabel(lastLoggedWorkout.activityStartTime, lastLoggedWorkout.date)
+    : '';
+  const lastRunBeatLineHome = lastLoggedWorkout
+    ? homeBeatTargetLine(lastLoggedWorkout.paceDeltaSecPerMile)
+    : null;
+  const lastRunDurationHome = lastLoggedWorkout
+    ? formatDurationMin(lastLoggedWorkout.actualDurationSeconds)
+    : null;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -548,6 +616,53 @@ export default function AthleteHomePage() {
                 </Link>
               )}
             </div>
+
+            {lastLoggedWorkout ? (
+              <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Your last run
+                  </p>
+                  <p className="text-sm text-gray-900 mt-1 leading-snug">
+                    <span className="font-semibold">{lastLoggedWorkout.title}</span>
+                    {lastRunDayLabelHome ? (
+                      <>
+                        {' '}
+                        · {lastRunDayLabelHome}
+                      </>
+                    ) : null}
+                    {lastLoggedWorkout.actualDistanceMeters != null &&
+                    lastLoggedWorkout.actualDistanceMeters > 0 ? (
+                      <>
+                        {' '}
+                        · {metersToMiDisplay(lastLoggedWorkout.actualDistanceMeters)}
+                      </>
+                    ) : null}
+                    {lastLoggedWorkout.actualAvgPaceSecPerMile != null ? (
+                      <>
+                        {' '}
+                        · {formatSecPerMile(lastLoggedWorkout.actualAvgPaceSecPerMile)}
+                      </>
+                    ) : null}
+                    {lastRunDurationHome ? (
+                      <>
+                        {' '}
+                        · {lastRunDurationHome}
+                      </>
+                    ) : null}
+                  </p>
+                  {lastRunBeatLineHome ? (
+                    <p className="text-sm text-gray-700 mt-1">{lastRunBeatLineHome}</p>
+                  ) : null}
+                </div>
+                <Link
+                  href={`/workouts/${lastLoggedWorkout.id}`}
+                  className="shrink-0 text-sm font-semibold text-orange-600 hover:text-orange-700"
+                >
+                  View results →
+                </Link>
+              </div>
+            ) : null}
 
             {!garminConnected && (
               <div className="rounded-xl border border-orange-200 bg-white p-4 flex flex-wrap items-center gap-4">

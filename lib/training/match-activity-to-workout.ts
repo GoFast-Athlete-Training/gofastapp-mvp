@@ -6,6 +6,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { extractGarminWorkoutIdFromSummary } from "./extract-garmin-workout-id";
+import { applyWorkoutPaceCredit } from "./apply-workout-pace-credit";
 import {
   normalizePaceTargetEncodingVersion,
   storedPaceSecondsKmToSecondsPerMile,
@@ -56,6 +57,23 @@ function paceTargetSecPerMileFromSegment(
   return Math.round(storedPaceSecondsKmToSecondsPerMile(low, enc));
 }
 
+function hrTargetMidpointBpmFromTargets(targets: unknown): number | null {
+  if (!Array.isArray(targets) || targets.length === 0) return null;
+  for (const raw of targets) {
+    const t = raw as SegmentTarget;
+    const typ = String(t?.type || "").toUpperCase();
+    if (typ !== "HEART_RATE" && typ !== "HEARTRATE") continue;
+    const low = t.valueLow ?? t.value;
+    const high = t.valueHigh ?? low;
+    if (low == null || typeof low !== "number") continue;
+    if (high != null && typeof high === "number") {
+      return Math.round((low + high) / 2);
+    }
+    return Math.round(low);
+  }
+  return null;
+}
+
 function pickMainPaceTargetSecPerMile(
   segments: {
     title: string;
@@ -79,11 +97,40 @@ function pickMainPaceTargetSecPerMile(
   return { targetSecPerMile: null };
 }
 
-function deriveDirection(deltaSecPerMile: number): "positive" | "negative" | "neutral" {
-  if (deltaSecPerMile > 5) return "positive";
-  if (deltaSecPerMile < -5) return "negative";
-  return "neutral";
+function pickMainHrTargetBpm(
+  segments: {
+    title: string;
+    targets: unknown;
+    stepOrder: number;
+    paceTargetEncodingVersion: number;
+  }[]
+): number | null {
+  const sorted = [...segments].sort((a, b) => a.stepOrder - b.stepOrder);
+  for (const seg of sorted) {
+    const title = (seg.title || "").toLowerCase();
+    if (title.includes("warmup") || title.includes("warm-up")) continue;
+    if (title.includes("cooldown") || title.includes("cool-down")) continue;
+    const h = hrTargetMidpointBpmFromTargets(seg.targets);
+    if (h != null) return h;
+  }
+  for (const seg of sorted) {
+    const h = hrTargetMidpointBpmFromTargets(seg.targets);
+    if (h != null) return h;
+  }
+  return null;
 }
+
+/** When no catalogue row: same defaults as pace-calculator OFFSETS_SEC_PER_MILE (tempo / interval). */
+function defaultRepPaceOffsetSecPerMile(workoutType: string): number | null {
+  if (workoutType === "Tempo") return 15;
+  if (workoutType === "Intervals") return -10;
+  return null;
+}
+
+const workoutMatchInclude = {
+  segments: { orderBy: { stepOrder: "asc" as const } },
+  workout_catalogue: { select: { repPaceOffsetSecPerMile: true } },
+};
 
 /**
  * Match activity to at most one workout; promote summary fields onto workouts.
@@ -128,7 +175,7 @@ export async function tryMatchActivityToTrainingWorkout(
         garminWorkoutId,
         matchedActivityId: null,
       },
-      include: { segments: { orderBy: { stepOrder: "asc" } } },
+      include: workoutMatchInclude,
     });
   }
 
@@ -141,7 +188,7 @@ export async function tryMatchActivityToTrainingWorkout(
         matchedActivityId: null,
       },
       orderBy: { date: "asc" },
-      include: { segments: { orderBy: { stepOrder: "asc" } } },
+      include: workoutMatchInclude,
     });
   }
 
@@ -157,16 +204,37 @@ export async function tryMatchActivityToTrainingWorkout(
 
   const paceSecPerMile = speedMpsToSecPerMile(activity.averageSpeed);
 
-  const { targetSecPerMile } = pickMainPaceTargetSecPerMile(candidate.segments);
+  const { targetSecPerMile: targetPaceSecPerMile } = pickMainPaceTargetSecPerMile(candidate.segments);
 
-  let derivedDelta: number | null = null;
-  let derivedDirection: string | null = null;
+  let paceDeltaSecPerMile: number | null = null;
   let evaluationEligible = false;
 
-  if (targetSecPerMile != null && paceSecPerMile != null) {
-    derivedDelta = targetSecPerMile - paceSecPerMile;
-    derivedDirection = deriveDirection(derivedDelta);
+  if (targetPaceSecPerMile != null && paceSecPerMile != null) {
+    paceDeltaSecPerMile = targetPaceSecPerMile - paceSecPerMile;
     evaluationEligible = true;
+  }
+
+  let hrDeltaBpm: number | null = null;
+  const hrTargetMid = pickMainHrTargetBpm(candidate.segments);
+  if (hrTargetMid != null && activity.averageHeartRate != null) {
+    hrDeltaBpm = Math.round(hrTargetMid - activity.averageHeartRate);
+  }
+
+  let creditedFiveKPace: number | null = null;
+  if (
+    (candidate.workoutType === "Tempo" || candidate.workoutType === "Intervals") &&
+    paceSecPerMile != null &&
+    paceDeltaSecPerMile != null &&
+    paceDeltaSecPerMile >= 0
+  ) {
+    const catalogueOff = candidate.workout_catalogue?.repPaceOffsetSecPerMile;
+    const offset =
+      catalogueOff != null && Number.isFinite(catalogueOff)
+        ? catalogueOff
+        : defaultRepPaceOffsetSecPerMile(candidate.workoutType);
+    if (offset != null) {
+      creditedFiveKPace = Math.round(paceSecPerMile - offset);
+    }
   }
 
   await prisma.workouts.update({
@@ -181,15 +249,29 @@ export async function tryMatchActivityToTrainingWorkout(
       actualElevationGain: activity.elevationGain ?? null,
       actualCalories: activity.calories ?? null,
       actualSteps: activity.steps ?? null,
-      derivedPerformanceDeltaSeconds: derivedDelta,
-      derivedPerformanceDirection: derivedDirection,
-      derivedAgainstTargetPace: targetSecPerMile,
+      paceDeltaSecPerMile,
+      targetPaceSecPerMile,
+      hrDeltaBpm,
+      creditedFiveKPaceSecPerMile: creditedFiveKPace,
       evaluationEligibleFlag: evaluationEligible,
       updatedAt: new Date(),
     },
   });
 
   await setIngestion("MATCHED");
+
+  if (creditedFiveKPace != null) {
+    try {
+      await applyWorkoutPaceCredit({
+        athleteId: activity.athleteId,
+        creditedFiveKPaceSecPerMile: creditedFiveKPace,
+        planId: candidate.planId ?? null,
+        weekNumber: candidate.weekNumber ?? null,
+      });
+    } catch (err) {
+      console.error("applyWorkoutPaceCredit after match:", err);
+    }
+  }
 
   return { matched: true, workoutId: candidate.id };
 }

@@ -120,9 +120,10 @@ export async function POST(request: NextRequest, ctx: Ctx) {
             actualElevationGain: null,
             actualCalories: null,
             actualSteps: null,
-            derivedPerformanceDeltaSeconds: null,
-            derivedPerformanceDirection: null,
-            derivedAgainstTargetPace: null,
+            paceDeltaSecPerMile: null,
+            targetPaceSecPerMile: null,
+            hrDeltaBpm: null,
+            creditedFiveKPaceSecPerMile: null,
             evaluationEligibleFlag: false,
             segments:
               source.segments.length > 0

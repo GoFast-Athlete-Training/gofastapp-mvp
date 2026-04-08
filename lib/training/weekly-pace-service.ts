@@ -1,6 +1,5 @@
 /**
- * End-of-week batch: quality pace + long run + mileage → optional Athlete.fiveKPace adjustment
- * and pace_adjustment_log row for in-app notification.
+ * Weekly cron: writes a recap notification only (no pace math — credits run per-workout on match).
  */
 
 import { TrainingPlanLifecycle } from "@prisma/client";
@@ -8,12 +7,6 @@ import { prisma } from "@/lib/prisma";
 import { addDaysUtc, utcDateOnly } from "@/lib/training/plan-utils";
 import { dateForDayInWeek } from "@/lib/training/schedule-parser";
 import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
-import { syncAthleteFiveKPaceToActivePlan } from "@/lib/training/plan-lifecycle";
-
-const LR_MIN_RATIO = 0.85;
-const MILEAGE_MIN_PCT = 0.8;
-const STRONG_QUALITY_DELTA = 5;
-const MAX_ADJUST_SEC = 10;
 
 function secondsPerMileToPaceString(sec: number): string {
   const minutes = Math.floor(sec / 60);
@@ -44,27 +37,33 @@ export function planWeekNumberEndingOnSunday(
   return null;
 }
 
-export type WeeklyPaceResult =
+export type WeeklySummaryResult =
   | { ok: true; skipped: true; reason: string }
-  | { ok: true; planId: string; weekNumber: number; adjustmentSecPerMile: number }
+  | { ok: true; planId: string; weekNumber: number }
   | { ok: false; error: string };
 
+const WEEKLY_RECAP_PREFIX = "Weekly recap —";
+
 /**
- * Analyze one plan week and optionally adjust pace + write pace_adjustment_log.
+ * End-of-week wrap-up: one pace_adjustment_log row with adjustment 0 and a human summary only.
  */
-export async function runWeeklyPaceAnalysis(params: {
+export async function generateWeeklySummary(params: {
   athleteId: string;
   planId: string;
   weekNumber: number;
-}): Promise<WeeklyPaceResult> {
+}): Promise<WeeklySummaryResult> {
   const { athleteId, planId, weekNumber } = params;
 
   const existing = await prisma.pace_adjustment_log.findFirst({
-    where: { planId, weekNumber },
+    where: {
+      planId,
+      weekNumber,
+      summaryMessage: { startsWith: WEEKLY_RECAP_PREFIX },
+    },
     select: { id: true },
   });
   if (existing) {
-    return { ok: true, skipped: true, reason: "already_processed" };
+    return { ok: true, skipped: true, reason: "already_summarized" };
   }
 
   const athlete = await prisma.athlete.findUnique({
@@ -75,6 +74,9 @@ export async function runWeeklyPaceAnalysis(params: {
     return { ok: true, skipped: true, reason: "no_five_k_pace" };
   }
 
+  const currentSec = parsePaceToSecondsPerMile(athlete.fiveKPace.trim());
+  const paceDisplay = `${secondsPerMileToPaceString(currentSec)}/mi`;
+
   const weekWorkouts = await prisma.workouts.findMany({
     where: { athleteId, planId, weekNumber },
     select: {
@@ -83,8 +85,6 @@ export async function runWeeklyPaceAnalysis(params: {
       matchedActivityId: true,
       estimatedDistanceInMeters: true,
       actualDistanceMeters: true,
-      evaluationEligibleFlag: true,
-      derivedPerformanceDeltaSeconds: true,
     },
   });
 
@@ -92,160 +92,49 @@ export async function runWeeklyPaceAnalysis(params: {
     return { ok: true, skipped: true, reason: "no_workouts_in_week" };
   }
 
-  const quality = weekWorkouts.filter(
-    (w) =>
-      (w.workoutType === "Tempo" || w.workoutType === "Intervals") &&
-      w.evaluationEligibleFlag &&
-      w.derivedPerformanceDeltaSeconds != null
-  );
-  const qualityDeltas = quality.map((w) => w.derivedPerformanceDeltaSeconds!);
-  const qualityCount = qualityDeltas.length;
-  const qualityAvgDelta =
-    qualityCount > 0
-      ? Math.round(
-          qualityDeltas.reduce((a, b) => a + b, 0) / qualityCount
-        )
-      : null;
-
-  const longRun = weekWorkouts.find((w) => w.workoutType === "LongRun");
-  let longRunCompleted = false;
-  let longRunCompletionRatio: number | null = null;
-  if (
-    longRun?.matchedActivityId &&
-    longRun.estimatedDistanceInMeters != null &&
-    longRun.estimatedDistanceInMeters > 0 &&
-    longRun.actualDistanceMeters != null &&
-    longRun.actualDistanceMeters > 0
-  ) {
-    longRunCompleted = true;
-    longRunCompletionRatio =
-      longRun.actualDistanceMeters / longRun.estimatedDistanceInMeters;
-  }
-
-  let plannedMeters = 0;
+  const matched = weekWorkouts.filter((w) => w.matchedActivityId != null);
   let actualMeters = 0;
-  for (const w of weekWorkouts) {
-    if (w.estimatedDistanceInMeters != null && w.estimatedDistanceInMeters > 0) {
-      plannedMeters += w.estimatedDistanceInMeters;
-    }
-    if (w.matchedActivityId && w.actualDistanceMeters != null && w.actualDistanceMeters > 0) {
+  for (const w of matched) {
+    if (w.actualDistanceMeters != null && w.actualDistanceMeters > 0) {
       actualMeters += w.actualDistanceMeters;
     }
   }
-  const weeklyMileageCompletionPct =
-    plannedMeters > 0 ? actualMeters / plannedMeters : null;
+  const miLogged = actualMeters > 0 ? (actualMeters / 1609.34).toFixed(1) : "0";
 
-  const longRunBonus =
-    longRunCompleted && longRunCompletionRatio != null && longRunCompletionRatio >= LR_MIN_RATIO;
-  const mileageBonus =
-    weeklyMileageCompletionPct != null && weeklyMileageCompletionPct >= MILEAGE_MIN_PCT;
+  const longRun = weekWorkouts.find((w) => w.workoutType === "LongRun");
+  const longDone =
+    !!longRun?.matchedActivityId &&
+    longRun.actualDistanceMeters != null &&
+    longRun.actualDistanceMeters > 0;
 
-  if (qualityCount === 0 && !longRunCompleted) {
-    return { ok: true, skipped: true, reason: "insufficient_data" };
-  }
+  const summaryMessage = `${WEEKLY_RECAP_PREFIX} Week ${weekNumber}: ${matched.length} of ${weekWorkouts.length} sessions logged, ~${miLogged} mi${longDone ? ", long run done" : ""}. Your current 5K pace is ${paceDisplay}.`;
 
-  let adjustSec = 0;
-  if (
-    qualityCount >= 1 &&
-    qualityAvgDelta != null &&
-    qualityAvgDelta >= STRONG_QUALITY_DELTA &&
-    (longRunBonus || mileageBonus)
-  ) {
-    adjustSec = 5;
-  } else if (
-    qualityCount >= 1 &&
-    qualityAvgDelta != null &&
-    qualityAvgDelta >= 0 &&
-    longRunBonus &&
-    mileageBonus
-  ) {
-    adjustSec = 3;
-  }
-
-  adjustSec = Math.min(adjustSec, MAX_ADJUST_SEC);
-
-  const rawPrev = athlete.fiveKPace!.trim();
-  const previousSec = parsePaceToSecondsPerMile(rawPrev);
-
-  if (adjustSec <= 0) {
-    await prisma.pace_adjustment_log.create({
-      data: {
-        athleteId,
-        planId,
-        weekNumber,
-        previousPaceSecPerMile: previousSec,
-        newPaceSecPerMile: previousSec,
-        adjustmentSecPerMile: 0,
-        qualityWorkoutsCount: qualityCount,
-        qualityAvgDeltaSecPerMile: qualityAvgDelta,
-        longRunCompleted,
-        longRunCompletionRatio,
-        weeklyMileageCompletionPct,
-        summaryMessage: buildNoChangeSummary({
-          qualityCount,
-          qualityAvgDelta,
-          longRunBonus,
-          mileageBonus,
-        }),
-      },
-    });
-    return { ok: true, planId, weekNumber, adjustmentSecPerMile: 0 };
-  }
-
-  const newSec = Math.max(
-    previousSec - adjustSec,
-    Math.floor(previousSec * 0.9)
-  );
-  const newPaceStr = secondsPerMileToPaceString(newSec);
-  const summaryMessage = `Based on last week (${qualityCount} quality workout${qualityCount === 1 ? "" : "s"}${longRunCompleted ? ", long run done" : ""}${mileageBonus ? ", strong mileage" : ""}), your 5K pace is now ${newPaceStr}.`;
-
-  await prisma.$transaction(async (tx) => {
-    await tx.athlete.update({
-      where: { id: athleteId },
-      data: { fiveKPace: newPaceStr, updatedAt: new Date() },
-    });
-    await tx.pace_adjustment_log.create({
-      data: {
-        athleteId,
-        planId,
-        weekNumber,
-        previousPaceSecPerMile: previousSec,
-        newPaceSecPerMile: newSec,
-        adjustmentSecPerMile: previousSec - newSec,
-        qualityWorkoutsCount: qualityCount,
-        qualityAvgDeltaSecPerMile: qualityAvgDelta,
-        longRunCompleted,
-        longRunCompletionRatio,
-        weeklyMileageCompletionPct,
-        summaryMessage,
-      },
-    });
+  await prisma.pace_adjustment_log.create({
+    data: {
+      athleteId,
+      planId,
+      weekNumber,
+      previousPaceSecPerMile: currentSec,
+      newPaceSecPerMile: currentSec,
+      adjustmentSecPerMile: 0,
+      qualityWorkoutsCount: matched.length,
+      qualityAvgDeltaSecPerMile: null,
+      longRunCompleted: longDone,
+      longRunCompletionRatio: null,
+      weeklyMileageCompletionPct: null,
+      summaryMessage,
+    },
   });
 
-  await syncAthleteFiveKPaceToActivePlan(athleteId);
-
-  return { ok: true, planId, weekNumber, adjustmentSecPerMile: previousSec - newSec };
-}
-
-function buildNoChangeSummary(p: {
-  qualityCount: number;
-  qualityAvgDelta: number | null;
-  longRunBonus: boolean;
-  mileageBonus: boolean;
-}): string {
-  if (p.qualityCount === 0) {
-    return "Weekly review: not enough quality pace data to adjust your 5K pace yet.";
-  }
-  return `Weekly review: no pace change this week (quality avg ${p.qualityAvgDelta ?? 0}s/mi vs targets; volume checks: long run ${p.longRunBonus ? "met" : "not met"}, mileage ${p.mileageBonus ? "met" : "not met"}).`;
+  return { ok: true, planId, weekNumber };
 }
 
 /**
- * Cron entry: for each ACTIVE plan, if the training week that ended last Sunday matches a plan
- * week N, run analysis for that N.
+ * Cron entry: for each ACTIVE plan, write a weekly recap for the plan week that ended last Sunday.
  */
 export async function runWeeklyPaceBatchForActivePlans(now: Date = new Date()): Promise<{
   plansChecked: number;
-  results: WeeklyPaceResult[];
+  results: WeeklySummaryResult[];
 }> {
   const yesterday = addDaysUtc(utcDateOnly(now), -1);
   const endingSunday = utcSundayEndingWeekContaining(yesterday);
@@ -260,7 +149,7 @@ export async function runWeeklyPaceBatchForActivePlans(now: Date = new Date()): 
     },
   });
 
-  const results: WeeklyPaceResult[] = [];
+  const results: WeeklySummaryResult[] = [];
 
   for (const plan of plans) {
     const weekNumber = planWeekNumberEndingOnSunday(
@@ -270,7 +159,7 @@ export async function runWeeklyPaceBatchForActivePlans(now: Date = new Date()): 
     );
     if (weekNumber == null) continue;
 
-    const r = await runWeeklyPaceAnalysis({
+    const r = await generateWeeklySummary({
       athleteId: plan.athleteId,
       planId: plan.id,
       weekNumber,

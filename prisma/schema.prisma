@@ -1065,10 +1065,15 @@ model workouts {
   actualElevationGain       Float?
   actualCalories            Int?
   actualSteps               Int?
-  /// Phase-1 evaluation: overall pace vs main segment target (sec/mile delta semantics: target - actual, positive = beat target)
-  derivedPerformanceDeltaSeconds  Int?
-  derivedPerformanceDirection     String?
-  derivedAgainstTargetPace        Int?
+  /// Pace delta (sec/mi): targetPaceSecPerMile − actualAvgPaceSecPerMile. Positive = faster than prescribed.
+  paceDeltaSecPerMile             Int?
+  /// Main-segment target pace snapshot (sec/mi) used for paceDeltaSecPerMile.
+  targetPaceSecPerMile            Int?
+  /// HR delta (bpm): target zone midpoint − actualAverageHeartRate. Positive = under zone.
+  hrDeltaBpm                      Int?
+  /// For quality workouts (Tempo/Intervals): implied 5K pace when paceDeltaSecPerMile >= 0.
+  /// Formula: actualAvgPaceSecPerMile − catalogue rep offset.
+  creditedFiveKPaceSecPerMile   Int?
   evaluationEligibleFlag          Boolean             @default(false)
   /// Public share path slug for /mytrainingruns/[slug] (e.g. acole842719); set when athlete creates a join link
   slug                      String?             @unique

@@ -13,7 +13,7 @@ export type UpcomingWorkoutRow = {
   workoutType: string;
   date: string | null;
   matchedActivityId: string | null;
-  derivedPerformanceDirection?: string | null;
+  paceDeltaSecPerMile?: number | null;
   segments?: {
     stepOrder: number;
     targets: unknown;
@@ -51,10 +51,12 @@ function mainPaceTargetLabel(segments: UpcomingWorkoutRow["segments"]): string |
 
 function statusFor(w: UpcomingWorkoutRow): { label: string; className: string } {
   if (w.matchedActivityId) {
-    const d = w.derivedPerformanceDirection;
-    if (d === "positive") return { label: "Completed · on target", className: "bg-emerald-50 text-emerald-800" };
-    if (d === "negative") return { label: "Completed · review", className: "bg-amber-50 text-amber-900" };
-    if (d === "neutral") return { label: "Completed", className: "bg-gray-100 text-gray-800" };
+    const p = w.paceDeltaSecPerMile;
+    if (p != null && Number.isFinite(p)) {
+      if (p > 5) return { label: "Completed · beat target", className: "bg-emerald-50 text-emerald-800" };
+      if (p < -5) return { label: "Completed · review", className: "bg-amber-50 text-amber-900" };
+      return { label: "Completed", className: "bg-gray-100 text-gray-800" };
+    }
     return { label: "Completed", className: "bg-gray-100 text-gray-800" };
   }
   const d = w.date ? new Date(w.date) : null;

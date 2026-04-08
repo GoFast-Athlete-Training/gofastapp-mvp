@@ -121,8 +121,9 @@ interface Workout {
   actualDistanceMeters?: number | null;
   actualAvgPaceSecPerMile?: number | null;
   actualDurationSeconds?: number | null;
-  derivedPerformanceDeltaSeconds?: number | null;
-  derivedPerformanceDirection?: string | null;
+  paceDeltaSecPerMile?: number | null;
+  targetPaceSecPerMile?: number | null;
+  hrDeltaBpm?: number | null;
   evaluationEligibleFlag?: boolean;
   matched_activity?: MatchedActivitySummary | null;
   planId?: string | null;
@@ -2168,18 +2169,27 @@ export default function WorkoutDetailPage() {
                   </dd>
                 </div>
               )}
-              {workout.derivedPerformanceDeltaSeconds != null && (
+              {workout.paceDeltaSecPerMile != null && (
                 <div>
                   <dt className="text-gray-500">Vs main target (pace)</dt>
                   <dd className="font-medium text-gray-900">
-                    {workout.derivedPerformanceDeltaSeconds > 0
-                      ? `${workout.derivedPerformanceDeltaSeconds}s/mi faster than target`
-                      : workout.derivedPerformanceDeltaSeconds < 0
-                        ? `${Math.abs(workout.derivedPerformanceDeltaSeconds)}s/mi slower than target`
+                    {workout.paceDeltaSecPerMile > 0
+                      ? `${workout.paceDeltaSecPerMile}s/mi faster than target`
+                      : workout.paceDeltaSecPerMile < 0
+                        ? `${Math.abs(workout.paceDeltaSecPerMile)}s/mi slower than target`
                         : "On target"}
-                    {workout.derivedPerformanceDirection
-                      ? ` (${workout.derivedPerformanceDirection})`
-                      : ""}
+                  </dd>
+                </div>
+              )}
+              {workout.hrDeltaBpm != null && (
+                <div>
+                  <dt className="text-gray-500">Vs target HR (mid)</dt>
+                  <dd className="font-medium text-gray-900">
+                    {workout.hrDeltaBpm > 0
+                      ? `${workout.hrDeltaBpm} bpm under zone`
+                      : workout.hrDeltaBpm < 0
+                        ? `${Math.abs(workout.hrDeltaBpm)} bpm above zone`
+                        : "On target"}
                   </dd>
                 </div>
               )}
