@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, FileText, Pencil } from "lucide-react";
 import Link from "next/link";
 import TopNav from "@/components/shared/TopNav";
@@ -14,6 +14,7 @@ import {
   secondsPerMileToSecondsPerKm,
   storedPaceSecondsKmToSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
+import { workoutDetailPathWithBackHref } from "@/lib/training/workout-nav-query";
 
 const WORKOUT_TYPES = ["Easy", "Tempo", "LongRun", "Intervals"] as const;
 
@@ -182,6 +183,8 @@ function slotToPaceSplitState(slot: SlotData | null): {
 
 export default function CreateWorkoutPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromBuildARun = searchParams.get("from") === "build-a-run";
   const [workoutType, setWorkoutType] = useState<string>("Easy");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -449,7 +452,14 @@ export default function CreateWorkoutPage() {
 
       const response = await api.post("workouts", workoutData);
       const { workout } = response.data;
-      router.push(`/workouts/${workout.id}?created=1`);
+      const detailBase = workoutDetailPathWithBackHref(
+        workout.id,
+        fromBuildARun ? "/build-a-run" : "/workouts"
+      );
+      const detailUrl = detailBase.includes("?")
+        ? `${detailBase}&created=1`
+        : `${detailBase}?created=1`;
+      router.push(detailUrl);
     } catch (error) {
       console.error("Error creating workout:", error);
       alert("Failed to create workout");
@@ -466,11 +476,11 @@ export default function CreateWorkoutPage() {
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         <Link
-          href="/workouts"
+          href={fromBuildARun ? "/build-a-run" : "/workouts"}
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
-          Back to Workouts
+          {fromBuildARun ? "Back to Build a Run" : "Back to Workouts"}
         </Link>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-6">

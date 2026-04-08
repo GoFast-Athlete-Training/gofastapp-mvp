@@ -248,7 +248,18 @@ export async function GET(request: NextRequest) {
 
     const sessions = merged.slice(0, limit);
 
-    return NextResponse.json({ sessions });
+    const planWeeksArr =
+      plan?.planWeeks != null && Array.isArray(plan.planWeeks as unknown[])
+        ? (plan.planWeeks as unknown[])
+        : [];
+    const activePlanSummary = plan
+      ? {
+          name: plan.name,
+          hasSchedule: planWeeksArr.length > 0,
+        }
+      : null;
+
+    return NextResponse.json({ sessions, activePlanSummary });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Failed to load upcoming";
     console.error("GET /api/training/upcoming", e);

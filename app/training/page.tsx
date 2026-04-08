@@ -44,6 +44,13 @@ function effectiveWeeksForPlanHub(p: PlanDetailHub): number {
   );
 }
 
+function planDayMilesDisplay(meters: number | null | undefined): string {
+  if (meters == null || !Number.isFinite(meters) || meters <= 0) return "—";
+  const mi = meters / 1609.34;
+  if (mi >= 10) return `${Math.round(mi)} mi`;
+  return `${mi.toFixed(1)} mi`;
+}
+
 export default function TrainingHubPage() {
   const router = useRouter();
   const [authReady, setAuthReady] = useState(false);
@@ -184,7 +191,7 @@ export default function TrainingHubPage() {
           </p>
         </div>
 
-        {authReady && loading && (
+        {loading && (
           <p className="mb-6 text-sm text-gray-500">Loading your training…</p>
         )}
 
@@ -288,6 +295,24 @@ export default function TrainingHubPage() {
               </div>
             </div>
 
+            <Link
+              href="/workouts"
+              className="block rounded-2xl border-2 border-orange-200 bg-orange-50/80 p-5 shadow-sm hover:border-orange-300 transition"
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide text-orange-800">
+                Go Train today
+              </p>
+              <p className="mt-1 text-lg font-semibold text-gray-900">
+                Today&apos;s session &amp; Garmin
+              </p>
+              <p className="mt-1 text-sm text-gray-600">
+                Open the workout on your calendar day, adjust segments, and push to your watch.
+              </p>
+              <span className="mt-3 inline-block text-sm font-semibold text-orange-800">
+                Open Go Train →
+              </span>
+            </Link>
+
             <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
                 This week
@@ -305,22 +330,23 @@ export default function TrainingHubPage() {
                       <button
                         type="button"
                         onClick={() => openPlanDay(w)}
-                        className="flex w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-lg border border-gray-100 px-3 py-2.5 text-sm text-left hover:border-orange-200 hover:bg-orange-50/40 transition"
+                        className="grid w-full grid-cols-[3.25rem_1fr_minmax(0,5rem)] sm:grid-cols-[3.5rem_1fr_minmax(0,5.5rem)] items-center gap-2 sm:gap-3 rounded-lg border border-gray-100 px-3 py-2.5 text-sm text-left hover:border-orange-200 hover:bg-orange-50/40 transition"
                       >
-                        <span className="font-medium text-gray-900">
-                          {displayWorkoutListTitle(w)}
+                        <span className="font-semibold text-gray-500 tabular-nums shrink-0">
+                          {formatPlanDateDisplay(w.dateKey || String(w.date), {
+                            weekday: "short",
+                          })}
                         </span>
-                        <span className="text-gray-500 text-right">
-                          {w.date
-                            ? formatPlanDateDisplay(w.date, {
-                                weekday: "short",
-                                month: "short",
-                                day: "numeric",
-                              })
-                            : "—"}
+                        <span className="font-medium text-gray-900 min-w-0 truncate">
+                          {displayWorkoutListTitle(w)}
                           {w.matchedActivityId ? (
-                            <span className="ml-2 text-emerald-700 font-medium">Done</span>
+                            <span className="ml-2 text-emerald-700 font-medium whitespace-nowrap">
+                              Done
+                            </span>
                           ) : null}
+                        </span>
+                        <span className="text-gray-600 text-right tabular-nums text-xs sm:text-sm shrink-0">
+                          {planDayMilesDisplay(w.estimatedDistanceInMeters)}
                         </span>
                       </button>
                     </li>

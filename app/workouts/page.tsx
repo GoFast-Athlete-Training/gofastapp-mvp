@@ -517,12 +517,6 @@ function WorkoutPreviewPanel({
         >
           {opening ? "Opening…" : "Open workout"}
         </button>
-        <Link
-          href={`/workouts/${workoutId}?edit=1`}
-          className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
-        >
-          Customize
-        </Link>
       </div>
     </div>
   );

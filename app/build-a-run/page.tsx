@@ -69,7 +69,7 @@ export default function BuildARunPage() {
                   workout.
                 </p>
                 <Link
-                  href="/workouts/create"
+                  href="/workouts/create?from=build-a-run"
                   className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
                 >
                   <Plus className="h-5 w-5" />
