@@ -298,9 +298,17 @@ export default function RacesBrowsePage() {
                   </div>
                   <div className="mt-4 flex flex-wrap items-center gap-2">
                     {signedUp ? (
-                      <span className="inline-flex items-center rounded-full bg-green-50 text-green-800 text-xs font-medium px-3 py-1">
-                        On my calendar
-                      </span>
+                      <>
+                        <Link
+                          href={`/race-hub/${race.id}`}
+                          className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-4 py-2"
+                        >
+                          Race Hub →
+                        </Link>
+                        <span className="inline-flex items-center rounded-full bg-green-50 text-green-800 text-xs font-medium px-3 py-1">
+                          On my calendar
+                        </span>
+                      </>
                     ) : (
                       <button
                         type="button"
