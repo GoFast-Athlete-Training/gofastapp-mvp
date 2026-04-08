@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getAthleteFromBearer } from "@/lib/race-container-auth";
 import { requireRaceMembership } from "@/lib/race-container-membership";
 
-/** PATCH /api/race-container/[raceRegistryId]/messages/[messageId] — author only */
+/** PATCH /api/race-hub/[raceRegistryId]/messages/[messageId] — author only */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ raceRegistryId: string; messageId: string }> }

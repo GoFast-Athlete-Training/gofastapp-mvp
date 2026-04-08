@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getAthleteFromBearer } from "@/lib/race-container-auth";
 import { requireRaceMembership } from "@/lib/race-container-membership";
 
-/** GET /api/race-container/[raceRegistryId]/messages */
+/** GET /api/race-hub/[raceRegistryId]/messages */
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ raceRegistryId: string }> }
@@ -59,7 +59,7 @@ export async function GET(
   }
 }
 
-/** POST /api/race-container/[raceRegistryId]/messages */
+/** POST /api/race-hub/[raceRegistryId]/messages */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ raceRegistryId: string }> }

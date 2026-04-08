@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAthleteFromBearer } from "@/lib/race-container-auth";
 
-/** POST /api/race-container/[raceRegistryId]/join — join race container (chatter access) */
+/** POST /api/race-hub/[raceRegistryId]/join — join Race Hub (full membership: chatter, events, announcements) */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ raceRegistryId: string }> }
@@ -45,12 +45,12 @@ export async function POST(
 
     return NextResponse.json({ success: true, membership });
   } catch (err) {
-    console.error("race-container join:", err);
+    console.error("race-hub join:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
 
-/** DELETE /api/race-container/[raceRegistryId]/join — leave race container */
+/** DELETE /api/race-hub/[raceRegistryId]/join — leave Race Hub */
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ raceRegistryId: string }> }
@@ -75,7 +75,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("race-container leave:", err);
+    console.error("race-hub leave:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

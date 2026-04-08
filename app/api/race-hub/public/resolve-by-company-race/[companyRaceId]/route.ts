@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 /**
- * GET /api/race-container/public/resolve-by-company-race/[companyRaceId]
+ * GET /api/race-hub/public/resolve-by-company-race/[companyRaceId]
  * Maps GoFastCompany races.id → race_registry row (for public slug pages).
  * No auth — only returns minimal safe fields.
  */

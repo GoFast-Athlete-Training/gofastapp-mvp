@@ -3,7 +3,7 @@
 ## `race_memberships` (new)
 
 - **Purpose:** Athlete has joined the **race container** and can use race chatter, see race events in the app, and post messages scoped to `race_registry.id`.
-- **Gate:** `GET/POST /api/race-container/[raceRegistryId]/messages`, announcements (read), events (read/create), event RSVPs.
+- **Gate:** `GET/POST /api/race-hub/[raceRegistryId]/messages`, announcements (read), events (read/create), event RSVPs.
 
 ## `athlete_race_signups` (existing)
 
@@ -14,7 +14,7 @@
 
 After **`POST /api/race-signups`** succeeds, the API now also **`upsertRaceMembershipFromSignup`**, so declaring a race signup automatically creates a `race_memberships` row when missing. That unblocks chatter without a separate “join container” call for athletes who already use race signups.
 
-Athletes can still **`POST /api/race-container/[raceRegistryId]/join`** to join the container only (e.g. chatter-first flows).
+Athletes can **`POST /api/race-hub/[raceRegistryId]/join`** to join the Race Hub (full membership: chatter, members, announcements, events).
 
 ## `run_crew_specific_races` (legacy junction)
 
