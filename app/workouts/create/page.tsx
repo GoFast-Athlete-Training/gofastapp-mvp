@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, FileText, Pencil } from "lucide-react";
 import Link from "next/link";
@@ -181,7 +181,7 @@ function slotToPaceSplitState(slot: SlotData | null): {
   return { lowMin, lowSec, highMin, highSec };
 }
 
-export default function CreateWorkoutPage() {
+function CreateWorkoutPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromBuildARun = searchParams.get("from") === "build-a-run";
@@ -803,5 +803,13 @@ export default function CreateWorkoutPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function CreateWorkoutPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500" /></div>}>
+      <CreateWorkoutPageInner />
+    </Suspense>
   );
 }
