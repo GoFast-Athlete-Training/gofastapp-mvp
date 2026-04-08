@@ -7,8 +7,12 @@ import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 
+type ProfileStep = 'intro' | 'form' | 'success';
+
 export default function AthleteCreateProfilePage() {
   const router = useRouter();
+  const [step, setStep] = useState<ProfileStep>('intro');
+  const [nextRouteAfterSuccess, setNextRouteAfterSuccess] = useState<string>('/goals');
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -182,19 +186,21 @@ export default function AthleteCreateProfilePage() {
         photoURL,
       });
 
+      let nextPath = '/goals';
       const createCrewIntent = LocalStorageAPI.getRunCrewCreateIntent();
       if (createCrewIntent) {
         LocalStorageAPI.removeRunCrewCreateIntent();
-        router.push('/runcrew/create');
+        nextPath = '/runcrew/create';
       } else {
         const joinIntent = localStorage.getItem('runCrewJoinIntent');
         const joinIntentHandle = localStorage.getItem('runCrewJoinIntentHandle');
         if (joinIntent && joinIntentHandle) {
-          router.push(`/join/runcrew/${joinIntentHandle}/confirm`);
-        } else {
-          router.push('/goals');
+          nextPath = `/join/runcrew/${joinIntentHandle}/confirm`;
         }
       }
+      setNextRouteAfterSuccess(nextPath);
+      setLoading(false);
+      setStep('success');
     } catch (err: unknown) {
       console.error('❌ Profile creation failed:', err);
       setLoading(false);
@@ -221,6 +227,151 @@ export default function AthleteCreateProfilePage() {
       }
     }
   };
+
+  const handleContinueAfterSuccess = () => {
+    router.push(nextRouteAfterSuccess);
+  };
+
+  if (step === 'intro') {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
+        <div className="max-w-lg w-full bg-white rounded-2xl shadow-lg p-8">
+          <div className="text-center mb-8">
+            <Image
+              src="/logo.jpg"
+              alt="GoFast"
+              width={64}
+              height={64}
+              className="w-16 h-16 rounded-full mx-auto mb-4"
+            />
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+              You&apos;re almost in — let&apos;s set up your profile
+            </h1>
+            <p className="text-gray-600 text-sm">
+              A few details help us personalize your training, runs, and races.
+            </p>
+          </div>
+
+          <ul className="space-y-4 mb-8 text-left text-gray-700 text-sm">
+            <li className="flex gap-3">
+              <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-lg">
+                @
+              </span>
+              <span>
+                <strong className="text-gray-900">Your GoFast handle</strong> creates your public page and how others
+                find you.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-lg">
+                📍
+              </span>
+              <span>
+                <strong className="text-gray-900">City and state</strong> help surface nearby community runs and races
+                that fit you.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-lg">
+                🎂
+              </span>
+              <span>
+                <strong className="text-gray-900">Birthday</strong> is used for age-group context and results where
+                relevant.
+              </span>
+            </li>
+          </ul>
+
+          <button
+            type="button"
+            onClick={() => setStep('form')}
+            className="w-full bg-orange-500 text-white py-4 px-6 rounded-lg font-bold text-lg hover:bg-orange-600 transition-colors shadow-lg"
+          >
+            Set up my profile →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'success') {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
+        <div className="max-w-2xl w-full bg-white rounded-2xl shadow-lg p-8">
+          <div className="text-center mb-8">
+            <Image
+              src="/logo.jpg"
+              alt="GoFast"
+              width={64}
+              height={64}
+              className="w-16 h-16 rounded-full mx-auto mb-4"
+            />
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+              You&apos;re in! Here&apos;s what&apos;s waiting for you
+            </h1>
+            <p className="text-gray-600 text-sm">
+              Your GoFast home is where everything comes together.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4 mb-8">
+            <div className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50">
+              <span className="flex-shrink-0 w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-xl shadow-sm">
+                📋
+              </span>
+              <div>
+                <h3 className="font-semibold text-gray-900 text-sm mb-1">Training dashboard</h3>
+                <p className="text-xs text-gray-600 leading-snug">
+                  Next session, race countdown, and goal pace — at a glance.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50">
+              <span className="flex-shrink-0 w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-xl shadow-sm">
+                👥
+              </span>
+              <div>
+                <h3 className="font-semibold text-gray-900 text-sm mb-1">Find a run with others</h3>
+                <p className="text-xs text-gray-600 leading-snug">
+                  Browse and RSVP to community runs near you.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50">
+              <span className="flex-shrink-0 w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-xl shadow-sm">
+                🏁
+              </span>
+              <div>
+                <h3 className="font-semibold text-gray-900 text-sm mb-1">Discover races</h3>
+                <p className="text-xs text-gray-600 leading-snug">
+                  Search the race registry and set goal times.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50">
+              <span className="flex-shrink-0 w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-xl shadow-sm">
+                ⏱️
+              </span>
+              <div>
+                <h3 className="font-semibold text-gray-900 text-sm mb-1">Track your progress</h3>
+                <p className="text-xs text-gray-600 leading-snug">
+                  Log workouts and watch your pace improve over time.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleContinueAfterSuccess}
+            className="w-full bg-orange-500 text-white py-4 px-6 rounded-lg font-bold text-lg hover:bg-orange-600 transition-colors shadow-lg"
+          >
+            Let&apos;s go →
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6">

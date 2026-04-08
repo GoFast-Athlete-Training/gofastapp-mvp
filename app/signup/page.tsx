@@ -407,27 +407,51 @@ function SignupPageContent() {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <div className="grid sm:grid-cols-2 gap-4 mb-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-xl">
-                  👥
+                  📋
                 </div>
                 <div>
-                  <h3 className="text-base font-semibold text-white mb-1">Join RunCrews</h3>
+                  <h3 className="text-base font-semibold text-white mb-1">Train</h3>
                   <p className="text-sm text-white/80">
-                    Find running groups that match your pace and goals
+                    Build a training plan around your goal race and pace
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-xl">
-                  🏃
+                  👥
                 </div>
                 <div>
-                  <h3 className="text-base font-semibold text-white mb-1">Organize Runs</h3>
+                  <h3 className="text-base font-semibold text-white mb-1">Find others</h3>
                   <p className="text-sm text-white/80">
-                    Plan group runs and coordinate with your crew
+                    Join RunCrews and RSVP to community runs near you
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-xl">
+                  🏁
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-white mb-1">Find races</h3>
+                  <p className="text-sm text-white/80">
+                    Browse local races and lock in your next goal
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-xl">
+                  ⏱️
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-white mb-1">PR</h3>
+                  <p className="text-sm text-white/80">
+                    Track your pace over time and watch yourself get faster
                   </p>
                 </div>
               </div>
