@@ -300,7 +300,7 @@ export default function RacesBrowsePage() {
                     {signedUp ? (
                       <>
                         <Link
-                          href={`/race-hub/${race.id}`}
+                          href={`/race-hub/${race.id}?join=1`}
                           className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-4 py-2"
                         >
                           Race Hub →
