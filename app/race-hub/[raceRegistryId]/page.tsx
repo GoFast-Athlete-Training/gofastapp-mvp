@@ -12,7 +12,16 @@ import TopNav from "@/components/shared/TopNav";
 import MemberDetailCard from "@/components/RunCrew/MemberDetailCard";
 import AnnouncementCard from "@/components/RunCrew/AnnouncementCard";
 import RaceMessageFeed from "@/components/races/RaceMessageFeed";
-import { Calendar, MapPin, Trophy } from "lucide-react";
+import {
+  Calendar,
+  Clock,
+  ExternalLink,
+  Info,
+  MapPin,
+  Package,
+  Route,
+  Trophy,
+} from "lucide-react";
 
 type RaceSummary = {
   id: string;
@@ -21,7 +30,52 @@ type RaceSummary = {
   city: string | null;
   state: string | null;
   distanceMiles: number;
+  raceType: string;
+  logoUrl: string | null;
+  distanceLabelSnap: string | null;
+  registrationUrl: string | null;
+  description: string | null;
+  courseMapUrl: string | null;
+  resultsUrl: string | null;
+  startTime: string | null;
+  packetPickupLocation: string | null;
+  packetPickupDate: string | null;
+  packetPickupTime: string | null;
+  packetPickupDescription: string | null;
+  spectatorInfo: string | null;
+  logisticsInfo: string | null;
+  gearDropInstructions: string | null;
 };
+
+function raceTypeBadgeLabel(raceType: string | null | undefined): string {
+  if (!raceType?.trim()) return "Race";
+  const t = raceType.trim();
+  if (t.length <= 4 && !t.includes("_")) return t.toUpperCase();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+function distanceSnapToChips(snap: string | null | undefined): string[] {
+  if (!snap?.trim()) return [];
+  return snap
+    .split("|")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function formatRaceStartTimeLabel(iso: string | null | undefined): string | null {
+  if (!iso?.trim()) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function isHttpOrPathUrl(url: string | null | undefined): boolean {
+  const u = url?.trim() ?? "";
+  return u.startsWith("http") || u.startsWith("/");
+}
 
 type MembershipRow = {
   id: string;
@@ -275,6 +329,11 @@ function RaceHubPageInner() {
   }
 
   const locationText = [race.city, race.state].filter(Boolean).join(", ") || null;
+  const distanceChips = distanceSnapToChips(race.distanceLabelSnap);
+  const raceStartLabel = formatRaceStartTimeLabel(race.startTime);
+  const mapEmbedUrl = `https://www.google.com/maps/embed?q=${encodeURIComponent(
+    locationText || "Race location"
+  )}`;
   const dateLabel = race.raceDate
     ? new Date(race.raceDate).toLocaleDateString(undefined, {
         weekday: "long",
@@ -293,12 +352,21 @@ function RaceHubPageInner() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-4 min-w-0 flex-1">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-2xl border-2 border-gray-200 flex-shrink-0">
-                <Trophy className="w-8 h-8" />
-              </div>
+              {race.logoUrl?.trim() &&
+              (race.logoUrl.startsWith("http") || race.logoUrl.startsWith("/")) ? (
+                <img
+                  src={race.logoUrl}
+                  alt=""
+                  className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl object-contain bg-white border-2 border-gray-200 flex-shrink-0 p-1"
+                />
+              ) : (
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-2xl border-2 border-gray-200 flex-shrink-0">
+                  <Trophy className="w-8 h-8" />
+                </div>
+              )}
               <div className="min-w-0 flex-1">
                 <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">{race.name}</h1>
-                <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-600">
+                <div className="mt-2 flex flex-wrap gap-2 sm:gap-3 text-sm text-gray-600 items-center">
                   {dateLabel ? (
                     <span className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
@@ -311,8 +379,18 @@ function RaceHubPageInner() {
                       {locationText}
                     </span>
                   ) : null}
-                  {race.distanceMiles != null ? (
-                    <span className="text-gray-500">{race.distanceMiles} mi</span>
+                  {distanceChips.map((label, idx) => (
+                    <span
+                      key={`${label}-${idx}`}
+                      className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800"
+                    >
+                      {label}
+                    </span>
+                  ))}
+                  {distanceChips.length === 0 ? (
+                    <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
+                      {raceTypeBadgeLabel(race.raceType)}
+                    </span>
                   ) : null}
                 </div>
               </div>
@@ -339,49 +417,120 @@ function RaceHubPageInner() {
       ) : (
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-            <aside className="lg:col-span-4 space-y-6 min-w-0">
-              <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-bold text-gray-900">Runners here</h2>
-                  <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{memberships.length}</span>
-                </div>
-                {memberships.length === 0 ? (
-                  <p className="text-sm text-gray-500 text-center py-6">No members yet. Invite friends from the public race page.</p>
-                ) : (
-                  <div className="space-y-3 max-h-[480px] overflow-y-auto">
-                    {memberships.map((m) => (
-                      <MemberDetailCard
-                        key={m.id}
-                        member={{
-                          id: m.id,
-                          athleteId: m.athleteId,
-                          role: mapRaceRoleToCrewRole(m.role),
-                          athlete: {
-                            id: m.Athlete.id,
-                            firstName: m.Athlete.firstName,
-                            lastName: m.Athlete.lastName,
-                            gofastHandle: m.Athlete.gofastHandle,
-                            photoURL: m.Athlete.photoURL,
-                            bio: m.Athlete.bio,
-                          },
-                          joinedAt: m.joinedAt,
-                        }}
-                        showRole
-                        currentUserId={athleteId ?? undefined}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-5 overflow-hidden min-w-0">
-                <h2 className="text-lg font-semibold text-gray-900 mb-1">Race chatter</h2>
-                <p className="text-xs text-gray-500 mb-4">Talk logistics, pacing, and meetups.</p>
-                <RaceMessageFeed raceRegistryId={raceRegistryId} />
-              </section>
-            </aside>
-
             <div className="lg:col-span-8 space-y-6 min-w-0">
+              {race.description?.trim() ? (
+                <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+                  <h2 className="text-lg font-bold text-gray-900 mb-3">About this race</h2>
+                  <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
+                    {race.description}
+                  </div>
+                </section>
+              ) : null}
+
+              {race.courseMapUrl?.trim() && isHttpOrPathUrl(race.courseMapUrl) ? (
+                <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+                  <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                    <Route className="w-5 h-5 text-orange-600" />
+                    Course map
+                  </h2>
+                  <div className="rounded-lg overflow-hidden border border-gray-200">
+                    <img
+                      src={race.courseMapUrl.trim()}
+                      alt="Course map"
+                      className="w-full h-auto"
+                    />
+                  </div>
+                </section>
+              ) : null}
+
+              {(race.packetPickupLocation ||
+                race.packetPickupDate ||
+                race.packetPickupTime ||
+                race.packetPickupDescription) && (
+                <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+                  <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <Package className="w-5 h-5 text-orange-600" />
+                    Packet pickup
+                  </h2>
+                  <div className="space-y-3 text-sm">
+                    {race.packetPickupLocation?.trim() ? (
+                      <div>
+                        <p className="font-semibold text-gray-900">Location</p>
+                        <p className="text-gray-700">{race.packetPickupLocation}</p>
+                      </div>
+                    ) : null}
+                    {(race.packetPickupDate || race.packetPickupTime) && (
+                      <div>
+                        <p className="font-semibold text-gray-900">Date and time</p>
+                        <p className="text-gray-700">
+                          {race.packetPickupDate
+                            ? new Date(race.packetPickupDate).toLocaleDateString(undefined, {
+                                weekday: "long",
+                                month: "long",
+                                day: "numeric",
+                                year: "numeric",
+                              })
+                            : null}
+                          {race.packetPickupDate && race.packetPickupTime?.trim()
+                            ? " · "
+                            : ""}
+                          {race.packetPickupTime?.trim() ?? ""}
+                        </p>
+                      </div>
+                    )}
+                    {race.packetPickupDescription?.trim() ? (
+                      <div>
+                        <p className="font-semibold text-gray-900">Details</p>
+                        <p className="text-gray-700 whitespace-pre-line">
+                          {race.packetPickupDescription}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                </section>
+              )}
+
+              {(race.spectatorInfo?.trim() ||
+                race.logisticsInfo?.trim() ||
+                race.gearDropInstructions?.trim()) && (
+                <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <Info className="w-5 h-5 text-orange-600" />
+                    Spectators and logistics
+                  </h2>
+                  {race.spectatorInfo?.trim() ? (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-1">
+                        Spectators
+                      </p>
+                      <div className="text-gray-700 text-sm whitespace-pre-line">
+                        {race.spectatorInfo}
+                      </div>
+                    </div>
+                  ) : null}
+                  {race.logisticsInfo?.trim() ? (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-1">
+                        Parking and transit
+                      </p>
+                      <div className="text-gray-700 text-sm whitespace-pre-line">
+                        {race.logisticsInfo}
+                      </div>
+                    </div>
+                  ) : null}
+                  {race.gearDropInstructions?.trim() ? (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-1">
+                        Gear drop / bag check
+                      </p>
+                      <div className="text-gray-700 text-sm whitespace-pre-line">
+                        {race.gearDropInstructions}
+                      </div>
+                    </div>
+                  ) : null}
+                </section>
+              )}
+
               {isAdmin ? (
                 <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                   <h2 className="text-lg font-bold text-gray-900 mb-4">Post announcement</h2>
@@ -476,6 +625,135 @@ function RaceHubPageInner() {
                 )}
               </section>
             </div>
+
+            <aside className="lg:col-span-4 space-y-6 min-w-0">
+              <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6">
+                <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <Info className="w-5 h-5 text-orange-600" />
+                  Race details
+                </h2>
+                <div className="space-y-3 text-sm">
+                  {dateLabel ? (
+                    <div className="flex gap-2">
+                      <Calendar className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-gray-900">Date</p>
+                        <p className="text-gray-700">{dateLabel}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                  {raceStartLabel ? (
+                    <div className="flex gap-2">
+                      <Clock className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-gray-900">Start</p>
+                        <p className="text-gray-700">{raceStartLabel}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                  {locationText ? (
+                    <div className="flex gap-2">
+                      <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-gray-900">Location</p>
+                        <p className="text-gray-700">{locationText}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                  {distanceChips.length > 0 ? (
+                    <div>
+                      <p className="font-semibold text-gray-900 mb-1">Distances</p>
+                      <p className="text-gray-700">{distanceChips.join(" · ")}</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="font-semibold text-gray-900 mb-1">Distance</p>
+                      <p className="text-gray-700">{raceTypeBadgeLabel(race.raceType)}</p>
+                    </div>
+                  )}
+                  {race.registrationUrl?.trim() ? (
+                    <a
+                      href={race.registrationUrl.trim()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-orange-600 font-medium hover:underline"
+                    >
+                      Register
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  ) : null}
+                  {race.resultsUrl?.trim() ? (
+                    <a
+                      href={race.resultsUrl.trim()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-orange-600 font-medium hover:underline"
+                    >
+                      Results
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  ) : null}
+                </div>
+                {locationText ? (
+                  <div className="mt-4 rounded-lg overflow-hidden border border-gray-200 h-48">
+                    <iframe
+                      title="Race location"
+                      width="100%"
+                      height="100%"
+                      style={{ border: 0 }}
+                      loading="lazy"
+                      allowFullScreen
+                      referrerPolicy="no-referrer-when-downgrade"
+                      src={mapEmbedUrl}
+                    />
+                  </div>
+                ) : null}
+              </section>
+
+              <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold text-gray-900">Runners here</h2>
+                  <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                    {memberships.length}
+                  </span>
+                </div>
+                {memberships.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-6">
+                    No members yet. Invite friends from the public race page.
+                  </p>
+                ) : (
+                  <div className="space-y-3 max-h-[480px] overflow-y-auto">
+                    {memberships.map((m) => (
+                      <MemberDetailCard
+                        key={m.id}
+                        member={{
+                          id: m.id,
+                          athleteId: m.athleteId,
+                          role: mapRaceRoleToCrewRole(m.role),
+                          athlete: {
+                            id: m.Athlete.id,
+                            firstName: m.Athlete.firstName,
+                            lastName: m.Athlete.lastName,
+                            gofastHandle: m.Athlete.gofastHandle,
+                            photoURL: m.Athlete.photoURL,
+                            bio: m.Athlete.bio,
+                          },
+                          joinedAt: m.joinedAt,
+                        }}
+                        showRole
+                        currentUserId={athleteId ?? undefined}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-5 overflow-hidden min-w-0">
+                <h2 className="text-lg font-semibold text-gray-900 mb-1">Race chatter</h2>
+                <p className="text-xs text-gray-500 mb-4">Talk logistics, pacing, and meetups.</p>
+                <RaceMessageFeed raceRegistryId={raceRegistryId} />
+              </section>
+            </aside>
           </div>
         </main>
       )}

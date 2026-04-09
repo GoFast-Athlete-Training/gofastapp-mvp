@@ -342,6 +342,16 @@ model race_registry {
   companyRaceId           String?                   @unique
   /// External image URL for browse cards (editorial asset or CDN).
   logoUrl                 String?
+  /// Pipe-joined distance labels from promoted registrations at prodpush — read-only snapshot; set by sync only.
+  distanceLabelSnap       String?
+  /// Racer-facing snapshot from Company; set by sync only.
+  packetPickupLocation     String?
+  packetPickupDate         DateTime?
+  packetPickupTime         String?
+  packetPickupDescription  String?
+  spectatorInfo           String?
+  logisticsInfo           String?
+  gearDropInstructions    String?
   run_crew_specific_races  run_crew_specific_races[]
   run_crews                run_crews[]
   training_plans           training_plans[]

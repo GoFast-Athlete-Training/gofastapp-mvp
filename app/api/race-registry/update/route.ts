@@ -54,6 +54,32 @@ function logoUrlFromPayload(racePayload: IncomingRace): string | null {
   return null;
 }
 
+/** When key absent, return undefined (do not update). When present, allow null to clear. */
+function readOptionalTrimmedString(
+  payload: IncomingRace,
+  key: string
+): string | null | undefined {
+  if (!(key in payload)) return undefined;
+  const v = payload[key];
+  if (v === null) return null;
+  if (typeof v === "string") return v.trim() || null;
+  return null;
+}
+
+function readOptionalDateTime(
+  payload: IncomingRace,
+  key: string
+): Date | null | undefined {
+  if (!(key in payload)) return undefined;
+  const v = payload[key];
+  if (v === null) return null;
+  if (typeof v === "string" && v.trim()) {
+    const d = new Date(v.trim());
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
 /** Map company `startTime` (ISO or same-day clock time) onto registry `startTime`. */
 function parseRegistryStartTime(
   raceDate: Date,
@@ -186,6 +212,45 @@ export async function POST(request: NextRequest) {
       racePayload.startTime
     );
 
+    let distanceLabelSnap: string | null | undefined = undefined;
+    if ("distanceLabelSnap" in racePayload) {
+      const raw = racePayload.distanceLabelSnap;
+      if (raw === null) distanceLabelSnap = null;
+      else if (typeof raw === "string") distanceLabelSnap = raw.trim() || null;
+      else distanceLabelSnap = null;
+    }
+
+    const packetPickupLocation = readOptionalTrimmedString(
+      racePayload,
+      "packetPickupLocation"
+    );
+    const packetPickupTime = readOptionalTrimmedString(
+      racePayload,
+      "packetPickupTime"
+    );
+    const packetPickupDescription = readOptionalTrimmedString(
+      racePayload,
+      "packetPickupDescription"
+    );
+    const spectatorInfo = readOptionalTrimmedString(racePayload, "spectatorInfo");
+    const logisticsInfo = readOptionalTrimmedString(racePayload, "logisticsInfo");
+    const gearDropInstructions = readOptionalTrimmedString(
+      racePayload,
+      "gearDropInstructions"
+    );
+    const courseMapUrlFromPayload = readOptionalTrimmedString(
+      racePayload,
+      "courseMapUrl"
+    );
+    const resultsUrlFromPayload = readOptionalTrimmedString(
+      racePayload,
+      "resultsUrl"
+    );
+    const packetPickupDate = readOptionalDateTime(
+      racePayload,
+      "packetPickupDate"
+    );
+
     const updateData = {
       name: nameVal,
       slug: slugVal,
@@ -201,6 +266,28 @@ export async function POST(request: NextRequest) {
       ...(tagList.length > 0 ? { tags: tagList } : {}),
       logoUrl,
       ...(startTimeParsed ? { startTime: startTimeParsed } : {}),
+      ...(distanceLabelSnap !== undefined
+        ? { distanceLabelSnap }
+        : {}),
+      ...(packetPickupLocation !== undefined
+        ? { packetPickupLocation }
+        : {}),
+      ...(packetPickupDate !== undefined ? { packetPickupDate } : {}),
+      ...(packetPickupTime !== undefined ? { packetPickupTime } : {}),
+      ...(packetPickupDescription !== undefined
+        ? { packetPickupDescription }
+        : {}),
+      ...(spectatorInfo !== undefined ? { spectatorInfo } : {}),
+      ...(logisticsInfo !== undefined ? { logisticsInfo } : {}),
+      ...(gearDropInstructions !== undefined
+        ? { gearDropInstructions }
+        : {}),
+      ...(courseMapUrlFromPayload !== undefined
+        ? { courseMapUrl: courseMapUrlFromPayload }
+        : {}),
+      ...(resultsUrlFromPayload !== undefined
+        ? { resultsUrl: resultsUrlFromPayload }
+        : {}),
       updatedAt: new Date(),
     };
 
