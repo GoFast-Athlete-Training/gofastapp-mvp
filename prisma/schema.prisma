@@ -302,6 +302,8 @@ model race_registry {
   courseType              String?
   currentParticipants     Int?
   description             String?
+  /// Short tagline / card summary (from Company sync).
+  summaryPhrase           String?
   /// Canonical race distance in meters (aligned with GoFastCompany race_registrations).
   distanceMeters          Int?
   earlyBirdDeadline       DateTime?
@@ -337,8 +339,8 @@ model race_registry {
   tags                    String[]                  @default([])
   timezone                String?
   typicalWeather          String?
-  /// When set, matches GoFastCompany races.id (canonical editorial record).
-  companyRaceId           String?                   @unique
+  /// When set, matches GoFastCompany races.id (multiple registry rows per race = multiple distances).
+  companyRaceId           String?
   /// External image URL for browse cards (editorial asset or CDN).
   logoUrl                 String?
   /// Distance label from registration or pipe-joined snapshot from company sync.
@@ -370,6 +372,7 @@ model race_registry {
   @@index([raceDate])
   @@index([slug])
   @@index([tags])
+  @@index([companyRaceId])
 }
 
 /// Course segments mirrored from GoFastCompany race_course_segments (prodpush).

@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -188,8 +189,8 @@ function parseRegistryStartTime(
 /**
  * POST /api/race-registry/update
  * Receives race payload from GoFastCompany (prodpush). Upserts race_registry.
- * Prefer companyRaceId (GoFastCompany races.id). Optional registryId / prodRaceId
- * is race_registry.id when the row already exists in the athlete app.
+ * Lookup order: slug (per distance) → registryId → companyRaceId+slug → legacy companyRaceId.
+ * New rows require `slug`; `companyRaceId` is GoFastCompany races.id (may repeat across distances).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -336,6 +337,34 @@ export async function POST(request: NextRequest) {
       "packetPickupDate"
     );
 
+    const summaryPhrase = readOptionalTrimmedString(racePayload, "summaryPhrase");
+    let charityNameResolved: string | null | undefined = undefined;
+    if ("charityName" in racePayload) {
+      charityNameResolved =
+        readOptionalTrimmedString(racePayload, "charityName") ?? null;
+    } else if ("charitySupports" in racePayload) {
+      charityNameResolved =
+        readOptionalTrimmedString(racePayload, "charitySupports") ?? null;
+    }
+    const charityUrlExtra = readOptionalTrimmedString(racePayload, "charityUrl");
+    const officialWebsiteUrl = readOptionalTrimmedString(racePayload, "raceUrl");
+    const registrationCloseDate = readOptionalDateTime(
+      racePayload,
+      "registrationDeadline"
+    );
+
+    let registrationFee: number | null | undefined = undefined;
+    if ("priceCents" in racePayload) {
+      const raw = racePayload.priceCents;
+      if (raw === null) registrationFee = null;
+      else if (typeof raw === "number" && Number.isFinite(raw)) {
+        registrationFee = Math.round(raw) / 100;
+      } else if (typeof raw === "string" && raw.trim()) {
+        const n = parseInt(raw.trim(), 10);
+        registrationFee = Number.isFinite(n) ? n / 100 : null;
+      } else registrationFee = null;
+    }
+
     const updateData = {
       name: nameVal,
       slug: slugVal,
@@ -370,6 +399,18 @@ export async function POST(request: NextRequest) {
       ...(resultsUrlFromPayload !== undefined
         ? { resultsUrl: resultsUrlFromPayload }
         : {}),
+      ...(summaryPhrase !== undefined ? { summaryPhrase } : {}),
+      ...(charityNameResolved !== undefined
+        ? { charityName: charityNameResolved }
+        : {}),
+      ...(charityUrlExtra !== undefined ? { charityUrl: charityUrlExtra } : {}),
+      ...(officialWebsiteUrl !== undefined
+        ? { officialWebsiteUrl }
+        : {}),
+      ...(registrationCloseDate !== undefined
+        ? { registrationCloseDate }
+        : {}),
+      ...(registrationFee !== undefined ? { registrationFee } : {}),
       updatedAt: new Date(),
     };
 
@@ -387,12 +428,23 @@ export async function POST(request: NextRequest) {
       | Awaited<ReturnType<typeof prisma.race_registry.findUnique>>
       | null = null;
 
-    if (registryId) {
+    /** Prefer slug (per-distance), then explicit registry id, then companyRaceId + slug, then legacy companyRaceId. */
+    if (slugVal) {
+      target = await prisma.race_registry.findUnique({
+        where: { slug: slugVal },
+      });
+    }
+    if (!target && registryId) {
       target = await prisma.race_registry.findUnique({
         where: { id: registryId },
       });
     }
-    if (!target) {
+    if (!target && companyRaceId && slugVal) {
+      target = await prisma.race_registry.findFirst({
+        where: { companyRaceId, slug: slugVal },
+      });
+    }
+    if (!target && companyRaceId) {
       target = await prisma.race_registry.findFirst({
         where: { companyRaceId },
       });
@@ -401,19 +453,6 @@ export async function POST(request: NextRequest) {
       target = await prisma.race_registry.findUnique({
         where: { id: companyRaceId },
       });
-    }
-    if (!target && slugVal) {
-      const bySlug = await prisma.race_registry.findUnique({
-        where: { slug: slugVal },
-      });
-      if (
-        bySlug &&
-        (!bySlug.companyRaceId ||
-          bySlug.companyRaceId === companyRaceId ||
-          (registryId && bySlug.id === registryId))
-      ) {
-        target = bySlug;
-      }
     }
 
     let row;
@@ -428,7 +467,16 @@ export async function POST(request: NextRequest) {
         select: selectRace,
       });
     } else {
-      const newId = registryId ?? companyRaceId;
+      if (!slugVal) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "slug is required to create a new race_registry row",
+          },
+          { status: 400, headers: corsHeaders }
+        );
+      }
+      const newId = registryId ?? randomUUID();
       const collision = await prisma.race_registry.findUnique({
         where: { id: newId },
       });
@@ -449,7 +497,7 @@ export async function POST(request: NextRequest) {
             isActive: true,
             isCancelled: false,
             ...updateData,
-            slug: slugVal ?? slugFinal,
+            slug: slugVal,
           },
           select: selectRace,
         });
