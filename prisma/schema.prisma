@@ -282,7 +282,6 @@ model prompt_instructions {
 model race_registry {
   id                      String                    @id
   name                    String
-  raceType                String
   city                    String?
   state                   String?
   country                 String?                   @default("USA")
@@ -303,8 +302,8 @@ model race_registry {
   courseType              String?
   currentParticipants     Int?
   description             String?
-  distanceKm              Float?
-  distanceMiles           Float
+  /// Canonical race distance in meters (aligned with GoFastCompany race_registrations).
+  distanceMeters          Int?
   earlyBirdDeadline       DateTime?
   earlyBirdFee            Float?
   elevationGain           Float?
@@ -342,8 +341,8 @@ model race_registry {
   companyRaceId           String?                   @unique
   /// External image URL for browse cards (editorial asset or CDN).
   logoUrl                 String?
-  /// Pipe-joined distance labels from promoted registrations at prodpush — read-only snapshot; set by sync only.
-  distanceLabelSnap       String?
+  /// Distance label from registration or pipe-joined snapshot from company sync.
+  distanceLabel           String?
   /// Racer-facing snapshot from Company; set by sync only.
   packetPickupLocation     String?
   packetPickupDate         DateTime?
@@ -369,7 +368,6 @@ model race_registry {
   @@index([city, state])
   @@index([isActive])
   @@index([raceDate])
-  @@index([raceType])
   @@index([slug])
   @@index([tags])
 }

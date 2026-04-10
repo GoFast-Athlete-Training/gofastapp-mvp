@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { metersToMiles } from "@/lib/pace-utils";
 
 function normalizeSlug(raw: string): string {
   return (raw || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -76,8 +77,8 @@ export async function GET(
             raceDate: true,
             city: true,
             state: true,
-            distanceMiles: true,
-            raceType: true,
+            distanceMeters: true,
+            distanceLabel: true,
           },
         },
       },
@@ -135,8 +136,12 @@ export async function GET(
             raceDate: primaryGoal.race_registry.raceDate.toISOString(),
             city: primaryGoal.race_registry.city,
             state: primaryGoal.race_registry.state,
-            distanceMiles: primaryGoal.race_registry.distanceMiles,
-            raceType: primaryGoal.race_registry.raceType,
+            distanceMeters: primaryGoal.race_registry.distanceMeters,
+            distanceLabel: primaryGoal.race_registry.distanceLabel,
+            distanceMiles:
+              primaryGoal.race_registry.distanceMeters != null
+                ? metersToMiles(primaryGoal.race_registry.distanceMeters)
+                : null,
           }
         : null,
       cityRun: upcoming

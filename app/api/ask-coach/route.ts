@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { prisma } from "@/lib/prisma";
 import { askReikiCoach } from "@/lib/coach/reiki-coach";
+import { metersToMiles } from "@/lib/pace-utils";
 
 /** POST /api/ask-coach — { message: string } */
 export async function POST(request: NextRequest) {
@@ -30,8 +31,8 @@ export async function POST(request: NextRequest) {
             raceDate: true,
             city: true,
             state: true,
-            distanceMiles: true,
-            raceType: true,
+            distanceMeters: true,
+            distanceLabel: true,
           },
         },
       },
@@ -47,8 +48,13 @@ export async function POST(request: NextRequest) {
       }
       if (activeGoal.race_registry) {
         const r = activeGoal.race_registry;
+        const dist =
+          r.distanceLabel?.trim() ||
+          (r.distanceMeters != null
+            ? `${metersToMiles(r.distanceMeters).toFixed(1)} mi`
+            : "");
         bits.push(
-          `Race: ${r.name}${r.raceDate ? ` on ${r.raceDate.toISOString().slice(0, 10)}` : ""}${r.city ? ` (${r.city}${r.state ? `, ${r.state}` : ""})` : ""}${r.distanceMiles != null ? ` — ${r.distanceMiles} mi` : ""}`
+          `Race: ${r.name}${r.raceDate ? ` on ${r.raceDate.toISOString().slice(0, 10)}` : ""}${r.city ? ` (${r.city}${r.state ? `, ${r.state}` : ""})` : ""}${dist ? ` — ${dist}` : ""}`
         );
       }
       goalSummary = bits.join(". ");

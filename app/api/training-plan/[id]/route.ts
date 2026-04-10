@@ -25,8 +25,8 @@ export async function GET(request: NextRequest, context: Ctx) {
             id: true,
             name: true,
             raceDate: true,
-            distanceMiles: true,
-            raceType: true,
+            distanceMeters: true,
+            distanceLabel: true,
           },
         },
         athlete_goal: {
@@ -187,8 +187,8 @@ export async function PATCH(request: NextRequest, context: Ctx) {
             id: true,
             name: true,
             raceDate: true,
-            distanceMiles: true,
-            raceType: true,
+            distanceMeters: true,
+            distanceLabel: true,
           },
         },
         athlete_goal: {

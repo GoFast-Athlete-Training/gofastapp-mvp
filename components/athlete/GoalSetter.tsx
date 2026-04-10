@@ -5,13 +5,13 @@ import Link from "next/link";
 import { ArrowLeft, Check } from "lucide-react";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import api from "@/lib/api";
-import { deriveGoalPaces } from "@/lib/pace-utils";
+import { deriveGoalPaces, metersToMiles } from "@/lib/pace-utils";
 
 type RaceRegistry = {
   id: string;
   name: string;
-  raceType: string;
-  distanceMiles: number;
+  distanceLabel: string | null;
+  distanceMeters: number | null;
   raceDate: string;
   city?: string | null;
   state?: string | null;
@@ -63,8 +63,8 @@ function formatSecPerMile(sec: number): string {
 function mapApiRaceToRegistry(r: {
   id: string;
   name: string;
-  raceType: string;
-  distanceMiles: number;
+  distanceLabel: string | null;
+  distanceMeters: number | null;
   raceDate: string | Date;
   city?: string | null;
   state?: string | null;
@@ -76,12 +76,21 @@ function mapApiRaceToRegistry(r: {
   return {
     id: r.id,
     name: r.name,
-    raceType: r.raceType,
-    distanceMiles: r.distanceMiles,
+    distanceLabel: r.distanceLabel,
+    distanceMeters: r.distanceMeters,
     raceDate: d,
     city: r.city,
     state: r.state,
   };
+}
+
+function formatRegistryDistanceLine(r: RaceRegistry): string {
+  const label = r.distanceLabel?.trim();
+  if (label) return label;
+  if (r.distanceMeters != null && Number.isFinite(r.distanceMeters)) {
+    return `${metersToMiles(r.distanceMeters).toFixed(1)} mi`;
+  }
+  return "—";
 }
 
 function normalizeDistanceToValue(stored: string): string {
@@ -153,7 +162,7 @@ function assembleGoalTimePreview(
   m: string,
   s: string
 ): string {
-  const k = normalizeDistanceToValue(selectedRace.raceType);
+  const k = normalizeDistanceToValue(selectedRace.distanceLabel ?? "");
   const isLong = isLongRaceDistanceKey(k);
   if (isLong) {
     const hh = h.padStart(2, "0") || "0";
@@ -180,7 +189,7 @@ function validateAndAssembleGoalTime(
   const allEmpty = !h.trim() && !m.trim() && !s.trim();
   if (allEmpty) return { ok: true, goalTime: null };
 
-  const k = normalizeDistanceToValue(selectedRace.raceType);
+  const k = normalizeDistanceToValue(selectedRace.distanceLabel ?? "");
   const isLong = isLongRaceDistanceKey(k);
 
   if (isLong) {
@@ -319,8 +328,8 @@ export default function GoalSetter({
           race_registry: {
             id: string;
             name: string;
-            raceType: string;
-            distanceMiles: number;
+            distanceLabel: string | null;
+            distanceMeters: number | null;
             raceDate: string | Date;
             city?: string | null;
             state?: string | null;
@@ -388,8 +397,8 @@ export default function GoalSetter({
                 race: {
                   id: string;
                   name: string;
-                  raceType: string;
-                  distanceMiles: number;
+                  distanceLabel: string | null;
+                  distanceMeters: number | null;
                   raceDate: string | Date;
                   city?: string | null;
                   state?: string | null;
@@ -479,12 +488,15 @@ export default function GoalSetter({
       goalSeconds
     );
     if (!v.ok || !v.goalTime) return null;
-    const distanceKey = normalizeDistanceToValue(selectedRace.raceType);
+    const distanceKey = normalizeDistanceToValue(selectedRace.distanceLabel ?? "");
     try {
       const { goalRacePace } = deriveGoalPaces({
         distance: distanceKey,
         goalTime: v.goalTime,
-        distanceMiles: selectedRace.distanceMiles ?? null,
+        distanceMiles:
+          selectedRace.distanceMeters != null
+            ? metersToMiles(selectedRace.distanceMeters)
+            : null,
       });
       return goalRacePace;
     } catch {
@@ -514,8 +526,8 @@ export default function GoalSetter({
         race?: {
           id: string;
           name: string;
-          raceType: string;
-          distanceMiles: number;
+          distanceLabel: string | null;
+          distanceMeters: number | null;
           raceDate: string | Date;
           city?: string | null;
           state?: string | null;
@@ -617,7 +629,7 @@ export default function GoalSetter({
         return;
       }
 
-      const distanceForApi = normalizeDistanceToValue(selectedRace.raceType);
+      const distanceForApi = normalizeDistanceToValue(selectedRace.distanceLabel ?? "");
       const nameForApi =
         goalName.trim() || selectedRace.name;
       const bodyBase = {
@@ -689,7 +701,7 @@ export default function GoalSetter({
 
   const isLongRaceUi =
     selectedRace != null &&
-    isLongRaceDistanceKey(normalizeDistanceToValue(selectedRace.raceType));
+    isLongRaceDistanceKey(normalizeDistanceToValue(selectedRace.distanceLabel ?? ""));
 
   if (loading || !athleteId) {
     return (
@@ -827,7 +839,7 @@ export default function GoalSetter({
                   </p>
                   <p className="text-base font-semibold text-gray-900 mt-1">{selectedRace.name}</p>
                   <p className="text-sm text-gray-600 mt-1">
-                    {selectedRace.distanceMiles} mi · {formatRaceDateDisplay(selectedRace.raceDate)}
+                    {formatRegistryDistanceLine(selectedRace)} · {formatRaceDateDisplay(selectedRace.raceDate)}
                     {(selectedRace.city || selectedRace.state) && (
                       <>
                         {" "}
@@ -1028,7 +1040,7 @@ export default function GoalSetter({
                           >
                             <span className="font-medium text-gray-900">{race.name}</span>
                             <span className="block text-xs text-gray-600 mt-1">
-                              {race.distanceMiles} mi · {formatRaceDateDisplay(race.raceDate)}
+                              {formatRegistryDistanceLine(race)} · {formatRaceDateDisplay(race.raceDate)}
                               {(race.city || race.state) &&
                                 ` · ${[race.city, race.state].filter(Boolean).join(", ")}`}
                             </span>
@@ -1068,7 +1080,7 @@ export default function GoalSetter({
                       >
                         <span className="font-medium text-gray-900">{race.name}</span>
                         <span className="block text-xs text-gray-600 mt-1">
-                          {race.distanceMiles} mi · {formatRaceDateDisplay(race.raceDate)}
+                          {formatRegistryDistanceLine(race)} · {formatRaceDateDisplay(race.raceDate)}
                           {(race.city || race.state) &&
                             ` · ${[race.city, race.state].filter(Boolean).join(", ")}`}
                         </span>

@@ -93,7 +93,7 @@ export async function planGeneratePostHandler(
         race_registry: {
           raceDate: plan.race_registry.raceDate,
           name: plan.race_registry.name,
-          distanceMiles: plan.race_registry.distanceMiles,
+          distanceMeters: plan.race_registry.distanceMeters,
         },
       },
       weeklyMileageTarget,

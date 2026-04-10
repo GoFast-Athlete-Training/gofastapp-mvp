@@ -495,8 +495,8 @@ export async function getDiscoverableRunCrews(options?: {
         select: {
           id: true,
           name: true,
-          raceType: true,
-          distanceMiles: true,
+          distanceLabel: true,
+          distanceMeters: true,
           raceDate: true,
           city: true,
           state: true,
@@ -579,8 +579,8 @@ export async function getDiscoverableRunCrews(options?: {
       race: crew.race_registry ? {
         id: crew.race_registry.id,
         name: crew.race_registry.name,
-        raceType: crew.race_registry.raceType,
-        distanceMiles: crew.race_registry.distanceMiles,
+        distanceLabel: crew.race_registry.distanceLabel,
+        distanceMeters: crew.race_registry.distanceMeters,
         raceDate: crew.race_registry.raceDate,
         city: crew.race_registry.city,
         state: crew.race_registry.state,

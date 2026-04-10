@@ -43,7 +43,7 @@ export async function GET(request: Request) {
         city: true,
         race_registry: {
           select: {
-            raceType: true,
+            distanceLabel: true,
             state: true,
             city: true,
           },

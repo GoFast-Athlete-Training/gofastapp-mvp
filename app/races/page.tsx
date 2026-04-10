@@ -17,8 +17,8 @@ const BOSTON_TAG = "boston-qualifier";
 type CatalogRace = {
   id: string;
   name: string;
-  raceType: string;
-  distanceMiles: number;
+  distanceLabel: string | null;
+  distanceMeters: number | null;
   raceDate: string;
   city: string | null;
   state: string | null;
@@ -291,7 +291,10 @@ export default function RacesBrowsePage() {
                           </div>
                         )}
                         <div>
-                          {race.distanceMiles} mi · {race.raceType}
+                          {race.distanceLabel?.trim() ||
+                            (race.distanceMeters != null
+                              ? `${(race.distanceMeters / 1609.344).toFixed(1)} mi`
+                              : "—")}
                         </div>
                       </dl>
                     </div>

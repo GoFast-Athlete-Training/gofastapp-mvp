@@ -3,6 +3,11 @@
  * Run: npx tsx scripts/seed-demo-races.ts
  */
 import { prisma } from "../lib/prisma";
+import { METERS_PER_MILE } from "../lib/pace-utils";
+
+function milesToMeters(miles: number): number {
+  return Math.round(miles * METERS_PER_MILE);
+}
 
 const now = new Date();
 const y = now.getUTCFullYear();
@@ -15,8 +20,8 @@ const demos = [
   {
     id: "demo_seed_boston_marathon",
     name: "Boston Marathon",
-    raceType: "marathon",
-    distanceMiles: 26.2,
+    distanceLabel: "Marathon",
+    distanceMeters: milesToMeters(26.2),
     raceDate: d(3, 21, 14, 0),
     city: "Boston",
     state: "MA",
@@ -28,8 +33,8 @@ const demos = [
   {
     id: "demo_seed_chicago_marathon",
     name: "Chicago Marathon",
-    raceType: "marathon",
-    distanceMiles: 26.2,
+    distanceLabel: "Marathon",
+    distanceMeters: milesToMeters(26.2),
     raceDate: d(9, 12, 7, 30),
     city: "Chicago",
     state: "IL",
@@ -41,8 +46,8 @@ const demos = [
   {
     id: "demo_seed_nyc_marathon",
     name: "TCS New York City Marathon",
-    raceType: "marathon",
-    distanceMiles: 26.2,
+    distanceLabel: "Marathon",
+    distanceMeters: milesToMeters(26.2),
     raceDate: d(10, 2, 9, 0),
     city: "New York",
     state: "NY",
@@ -53,8 +58,8 @@ const demos = [
   {
     id: "demo_seed_austin_half",
     name: "Austin Half Marathon",
-    raceType: "half",
-    distanceMiles: 13.1,
+    distanceLabel: "Half Marathon",
+    distanceMeters: milesToMeters(13.1),
     raceDate: d(1, 15, 15, 0),
     city: "Austin",
     state: "TX",
@@ -65,8 +70,8 @@ const demos = [
   {
     id: "demo_seed_denver_10k",
     name: "Denver Sunrise 10K",
-    raceType: "10k",
-    distanceMiles: 6.2,
+    distanceLabel: "10K",
+    distanceMeters: 10_000,
     raceDate: d(8, 7, 8, 0),
     city: "Denver",
     state: "CO",
@@ -76,8 +81,8 @@ const demos = [
   {
     id: "demo_seed_seattle_5k",
     name: "Seattle Waterfront 5K",
-    raceType: "5k",
-    distanceMiles: 3.1,
+    distanceLabel: "5K",
+    distanceMeters: 5_000,
     raceDate: d(8, 20, 9, 0),
     city: "Seattle",
     state: "WA",
@@ -88,8 +93,8 @@ const demos = [
   {
     id: "demo_seed_portland_half",
     name: "Portland Autumn Half",
-    raceType: "half",
-    distanceMiles: 13.1,
+    distanceLabel: "Half Marathon",
+    distanceMeters: milesToMeters(13.1),
     raceDate: d(9, 5, 8, 30),
     city: "Portland",
     state: "OR",
@@ -99,8 +104,8 @@ const demos = [
   {
     id: "demo_seed_miami_marathon",
     name: "Miami Marathon",
-    raceType: "marathon",
-    distanceMiles: 26.2,
+    distanceLabel: "Marathon",
+    distanceMeters: milesToMeters(26.2),
     raceDate: d(0, 26, 6, 0),
     city: "Miami",
     state: "FL",
@@ -111,8 +116,8 @@ const demos = [
   {
     id: "demo_seed_nashville_10m",
     name: "Music City 10 Miler",
-    raceType: "10m",
-    distanceMiles: 10,
+    distanceLabel: "10 Mile",
+    distanceMeters: milesToMeters(10),
     raceDate: d(3, 6, 7, 0),
     city: "Nashville",
     state: "TN",
@@ -122,8 +127,8 @@ const demos = [
   {
     id: "demo_seed_phoenix_10k",
     name: "Desert Dash 10K",
-    raceType: "10k",
-    distanceMiles: 6.2,
+    distanceLabel: "10K",
+    distanceMeters: 10_000,
     raceDate: d(10, 15, 7, 0),
     city: "Phoenix",
     state: "AZ",
@@ -141,8 +146,8 @@ async function main() {
       create: {
         id: row.id,
         name: row.name,
-        raceType: row.raceType,
-        distanceMiles: row.distanceMiles,
+        distanceLabel: row.distanceLabel,
+        distanceMeters: row.distanceMeters,
         raceDate: row.raceDate,
         city: row.city,
         state: row.state,
@@ -159,8 +164,8 @@ async function main() {
       },
       update: {
         name: row.name,
-        raceType: row.raceType,
-        distanceMiles: row.distanceMiles,
+        distanceLabel: row.distanceLabel,
+        distanceMeters: row.distanceMeters,
         raceDate: row.raceDate,
         city: row.city,
         state: row.state,

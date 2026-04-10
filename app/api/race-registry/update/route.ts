@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { mapRaceCategoryToRegistry } from "@/lib/race-category-map";
 
 export const dynamic = "force-dynamic";
 
@@ -254,10 +253,7 @@ export async function POST(request: NextRequest) {
         ? String(racePayload.slug).trim()
         : null;
 
-    const category =
-      racePayload.category != null ? String(racePayload.category) : null;
-    const { raceType, distanceMiles, isVirtual } =
-      mapRaceCategoryToRegistry(category);
+    const isVirtual = Boolean(racePayload.isVirtual);
 
     const locationCity =
       racePayload.locationCity != null
@@ -284,12 +280,29 @@ export async function POST(request: NextRequest) {
       racePayload.startTime
     );
 
-    let distanceLabelSnap: string | null | undefined = undefined;
-    if ("distanceLabelSnap" in racePayload) {
+    let distanceLabel: string | null | undefined = undefined;
+    if ("distanceLabel" in racePayload) {
+      const raw = racePayload.distanceLabel;
+      if (raw === null) distanceLabel = null;
+      else if (typeof raw === "string") distanceLabel = raw.trim() || null;
+      else distanceLabel = null;
+    } else if ("distanceLabelSnap" in racePayload) {
       const raw = racePayload.distanceLabelSnap;
-      if (raw === null) distanceLabelSnap = null;
-      else if (typeof raw === "string") distanceLabelSnap = raw.trim() || null;
-      else distanceLabelSnap = null;
+      if (raw === null) distanceLabel = null;
+      else if (typeof raw === "string") distanceLabel = raw.trim() || null;
+      else distanceLabel = null;
+    }
+
+    let distanceMeters: number | null | undefined = undefined;
+    if ("distanceMeters" in racePayload) {
+      const raw = racePayload.distanceMeters;
+      if (raw === null) distanceMeters = null;
+      else if (typeof raw === "number" && Number.isFinite(raw))
+        distanceMeters = Math.round(raw);
+      else if (typeof raw === "string" && raw.trim()) {
+        const n = parseInt(raw.trim(), 10);
+        distanceMeters = Number.isFinite(n) ? n : null;
+      } else distanceMeters = null;
     }
 
     const packetPickupLocation = readOptionalTrimmedString(
@@ -327,8 +340,6 @@ export async function POST(request: NextRequest) {
       name: nameVal,
       slug: slugVal,
       raceDate,
-      raceType,
-      distanceMiles,
       isVirtual,
       city: locationCity,
       state,
@@ -338,9 +349,8 @@ export async function POST(request: NextRequest) {
       ...(tagList.length > 0 ? { tags: tagList } : {}),
       logoUrl,
       ...(startTimeParsed ? { startTime: startTimeParsed } : {}),
-      ...(distanceLabelSnap !== undefined
-        ? { distanceLabelSnap }
-        : {}),
+      ...(distanceLabel !== undefined ? { distanceLabel } : {}),
+      ...(distanceMeters !== undefined ? { distanceMeters } : {}),
       ...(packetPickupLocation !== undefined
         ? { packetPickupLocation }
         : {}),

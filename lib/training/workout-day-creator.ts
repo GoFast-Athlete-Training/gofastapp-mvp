@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { utcDateOnly } from "./plan-utils";
 import { buildPlanWorkoutApiSegments } from "./workout-segment-generator";
 import { planScheduleDayForDateKey } from "./plan-schedule";
+import { metersToMiles } from "@/lib/pace-utils";
 
 function utcDayBounds(d: Date): { gte: Date; lte: Date } {
   const x = utcDateOnly(d);
@@ -57,7 +58,7 @@ export async function findOrCreateWorkoutForPlanDay(params: {
         select: {
           raceDate: true,
           name: true,
-          distanceMiles: true,
+          distanceMeters: true,
         },
       },
     },
@@ -70,15 +71,17 @@ export async function findOrCreateWorkoutForPlanDay(params: {
   const dateKey = utcDateOnly(anchor).toISOString().slice(0, 10);
   const race = plan.race_registry;
 
+  const raceDistanceMiles =
+    race?.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
+      ? metersToMiles(Number(race.distanceMeters))
+      : null;
+
   const scheduled = planScheduleDayForDateKey({
     planStartDate: plan.startDate,
     planWeeks: plan.planWeeks,
     raceDate: race?.raceDate ?? null,
     raceName: race?.name ?? null,
-    raceDistanceMiles:
-      race?.distanceMiles != null && Number.isFinite(Number(race.distanceMiles))
-        ? Number(race.distanceMiles)
-        : null,
+    raceDistanceMiles,
     dateKey,
     maxWeekNumber: plan.totalWeeks,
   });

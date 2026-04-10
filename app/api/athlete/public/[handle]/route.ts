@@ -48,8 +48,8 @@ export async function GET(
             raceDate: true,
             city: true,
             state: true,
-            distanceMiles: true,
-            raceType: true,
+            distanceMeters: true,
+            distanceLabel: true,
             isActive: true,
             isCancelled: true,
           },
@@ -70,8 +70,8 @@ export async function GET(
           raceDate: r.raceDate.toISOString(),
           city: r.city,
           state: r.state,
-          distanceMiles: r.distanceMiles,
-          raceType: r.raceType,
+          distanceMeters: r.distanceMeters,
+          distanceLabel: r.distanceLabel,
         };
       });
 

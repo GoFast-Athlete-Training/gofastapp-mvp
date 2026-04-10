@@ -26,7 +26,7 @@ export async function GET(request: Request) {
       select: {
         race_registry: {
           select: {
-            raceType: true,
+            distanceLabel: true,
           },
         },
       },
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     const raceTypes = Array.from(
       new Set(
         crewsWithRaces
-          .map((crew) => crew.race_registry?.raceType)
+          .map((crew) => crew.race_registry?.distanceLabel)
           .filter((type): type is string => !!type)
       )
     ).sort();

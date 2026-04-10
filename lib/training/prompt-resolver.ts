@@ -13,7 +13,7 @@ export interface TrainingPromptInputs {
   totalWeeks: number;
   raceName: string;
   raceDistanceMiles: number | null;
-  raceTypeLabel: string;
+  distanceLabel: string;
   goalTime?: string | null;
   currentWeeklyMileage?: number | null;
   preferredDaysHuman: string;
@@ -63,7 +63,7 @@ export async function resolveTrainingPrompt(
       inputs.raceDistanceMiles != null
         ? String(inputs.raceDistanceMiles)
         : "unknown",
-    raceType: inputs.raceTypeLabel,
+    raceType: inputs.distanceLabel,
     goalTime: inputs.goalTime ?? "not specified",
     currentWeeklyMileage:
       inputs.currentWeeklyMileage != null
@@ -95,7 +95,7 @@ export async function resolveTrainingPrompt(
   userParts.push(
     [
       "## Athlete Inputs",
-      `- Race: ${inputs.raceName} (${inputs.raceTypeLabel}${inputs.raceDistanceMiles != null ? `, ${inputs.raceDistanceMiles} mi` : ""})`,
+      `- Race: ${inputs.raceName} (${inputs.distanceLabel}${inputs.raceDistanceMiles != null ? `, ${inputs.raceDistanceMiles} mi` : ""})`,
       `- Goal Time: ${inputs.goalTime ?? "not specified"}`,
       `- Current Weekly Mileage: ${inputs.currentWeeklyMileage ?? "not specified"} miles/week`,
       `- Total Weeks: ${inputs.totalWeeks}`,

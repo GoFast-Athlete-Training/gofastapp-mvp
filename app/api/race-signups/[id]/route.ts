@@ -67,8 +67,8 @@ export async function PATCH(
           select: {
             id: true,
             name: true,
-            raceType: true,
-            distanceMiles: true,
+            distanceLabel: true,
+            distanceMeters: true,
             raceDate: true,
             city: true,
             state: true,

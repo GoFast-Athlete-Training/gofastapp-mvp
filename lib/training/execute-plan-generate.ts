@@ -10,11 +10,12 @@ import {
 } from "@/lib/training/generate-plan";
 import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
 import { Prisma } from "@prisma/client";
+import { metersToMiles } from "@/lib/pace-utils";
 
 type RaceForGenerate = {
   raceDate: Date;
   name: string;
-  distanceMiles: number;
+  distanceMeters: number | null;
 };
 
 export async function executePlanGenerate(params: {
@@ -53,6 +54,10 @@ export async function executePlanGenerate(params: {
 
   const race = plan.race_registry;
   const weekCount = calendarTrainingWeekCount(plan.startDate, race.raceDate);
+  const raceDistanceMiles =
+    race.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
+      ? metersToMiles(Number(race.distanceMeters))
+      : 3.1;
   const drafts = generatePlanWorkoutRows({
     planId: plan.id,
     athleteId,
@@ -63,7 +68,7 @@ export async function executePlanGenerate(params: {
     minWeeklyMiles: params.minWeeklyMiles,
     preferredDays,
     raceName: race.name,
-    raceDistanceMiles: race.distanceMiles,
+    raceDistanceMiles,
     preferredLongRunDow: plan.preferredLongRunDow,
   });
   assignRotationalIdentifiers(drafts);

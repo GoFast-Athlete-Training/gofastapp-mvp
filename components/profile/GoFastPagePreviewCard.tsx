@@ -33,8 +33,8 @@ export type GoFastPageRace = {
   raceDate: string;
   city: string | null;
   state: string | null;
-  distanceMiles: number;
-  raceType: string;
+  distanceLabel: string | null;
+  distanceMeters: number | null;
 };
 
 export type GoFastPageLastRun = {
@@ -442,7 +442,10 @@ export default function GoFastPagePreviewCard({
                     </p>
                   </div>
                   <div className="text-sm text-amber-400/90 font-medium shrink-0">
-                    {r.distanceMiles} mi · {r.raceType}
+                    {r.distanceLabel?.trim() ||
+                      (r.distanceMeters != null
+                        ? `${(r.distanceMeters / 1609.344).toFixed(1)} mi`
+                        : "—")}
                   </div>
                 </li>
               ))}

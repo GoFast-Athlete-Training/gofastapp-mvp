@@ -32,10 +32,9 @@ type RaceSummary = {
   raceDate: string;
   city: string | null;
   state: string | null;
-  distanceMiles: number;
-  raceType: string;
+  distanceMeters: number | null;
   logoUrl: string | null;
-  distanceLabelSnap: string | null;
+  distanceLabel: string | null;
   registrationUrl: string | null;
   description: string | null;
   courseMapUrl: string | null;
@@ -50,9 +49,9 @@ type RaceSummary = {
   gearDropInstructions: string | null;
 };
 
-function raceTypeBadgeLabel(raceType: string | null | undefined): string {
-  if (!raceType?.trim()) return "Race";
-  const t = raceType.trim();
+function distanceLabelBadge(label: string | null | undefined): string {
+  if (!label?.trim()) return "Race";
+  const t = label.trim();
   if (t.length <= 4 && !t.includes("_")) return t.toUpperCase();
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
@@ -345,7 +344,7 @@ function RaceHubPageInner() {
   }
 
   const locationText = [race.city, race.state].filter(Boolean).join(", ") || null;
-  const distanceChips = distanceSnapToChips(race.distanceLabelSnap);
+  const distanceChips = distanceSnapToChips(race.distanceLabel);
   const raceStartLabel = formatRaceStartTimeLabel(race.startTime);
   const mapEmbedUrl = `https://www.google.com/maps/embed?q=${encodeURIComponent(
     locationText || "Race location"
@@ -405,7 +404,7 @@ function RaceHubPageInner() {
                   ))}
                   {distanceChips.length === 0 ? (
                     <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
-                      {raceTypeBadgeLabel(race.raceType)}
+                      {distanceLabelBadge(race.distanceLabel)}
                     </span>
                   ) : null}
                 </div>
@@ -708,7 +707,7 @@ function RaceHubPageInner() {
                   ) : (
                     <div>
                       <p className="font-semibold text-gray-900 mb-1">Distance</p>
-                      <p className="text-gray-700">{raceTypeBadgeLabel(race.raceType)}</p>
+                      <p className="text-gray-700">{distanceLabelBadge(race.distanceLabel)}</p>
                     </div>
                   )}
                   {race.registrationUrl?.trim() ? (

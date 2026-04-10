@@ -3,6 +3,19 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
+import { metersToMiles } from '@/lib/pace-utils';
+
+const PRESET_BY_KEY: Record<
+  string,
+  { distanceLabel: string; distanceMeters: number }
+> = {
+  '5k': { distanceLabel: '5K', distanceMeters: 5000 },
+  '10k': { distanceLabel: '10K', distanceMeters: 10000 },
+  '10m': { distanceLabel: '10 Mile', distanceMeters: 16093 },
+  half: { distanceLabel: 'Half Marathon', distanceMeters: 21097 },
+  marathon: { distanceLabel: 'Marathon', distanceMeters: 42195 },
+  ultra: { distanceLabel: 'Ultra', distanceMeters: 80467 },
+};
 
 function pushRaceToCompanyUpstream(
   race: {
@@ -12,8 +25,8 @@ function pushRaceToCompanyUpstream(
     city: string | null;
     state: string | null;
     registrationUrl: string | null;
-    raceType: string;
-    distanceMiles: number;
+    distanceLabel: string;
+    distanceMeters: number;
   },
   authHeader: string | null
 ) {
@@ -38,8 +51,8 @@ function pushRaceToCompanyUpstream(
     cityName: race.city,
     state: race.state,
     registrationUrl: race.registrationUrl,
-    raceType: race.raceType,
-    distanceMiles: race.distanceMiles,
+    raceType: race.distanceLabel,
+    distanceMiles: metersToMiles(race.distanceMeters),
   });
 
   void fetch(`${base}/api/race-registrations/create`, {
@@ -81,18 +94,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate miles from raceType
-    const milesMap: { [key: string]: number } = {
-      '5k': 3.1,
-      '10k': 6.2,
-      '10m': 10,
-      'half': 13.1,
-      'marathon': 26.2,
-      'ultra': 50, // Default for ultra
-    };
-
-    const finalRaceType = raceType?.toLowerCase() || '5k';
-    const distanceMiles = milesMap[finalRaceType] || 3.1;
+    const finalRaceType = (raceType?.toLowerCase() || '5k') as string;
+    const preset =
+      PRESET_BY_KEY[finalRaceType] ?? PRESET_BY_KEY['5k'];
 
     // Parse date string and create UTC date (race dates are date-only)
     const raceDate = new Date(date);
@@ -113,8 +117,8 @@ export async function POST(request: NextRequest) {
         data: {
           id: generateId(),
           name: name.trim(),
-          raceType: finalRaceType,
-          distanceMiles: distanceMiles,
+          distanceLabel: preset.distanceLabel,
+          distanceMeters: preset.distanceMeters,
           raceDate: raceDate,
           city: city || null,
           state: state || null,
@@ -132,8 +136,8 @@ export async function POST(request: NextRequest) {
         city: race.city,
         state: race.state,
         registrationUrl: race.registrationUrl ?? null,
-        raceType: race.raceType,
-        distanceMiles: race.distanceMiles,
+        distanceLabel: race.distanceLabel ?? preset.distanceLabel,
+        distanceMeters: race.distanceMeters ?? preset.distanceMeters,
       },
       authHeader
     );
@@ -143,8 +147,8 @@ export async function POST(request: NextRequest) {
       race: {
         id: race.id,
         name: race.name,
-        raceType: race.raceType,
-        distanceMiles: race.distanceMiles,
+        distanceLabel: race.distanceLabel,
+        distanceMeters: race.distanceMeters,
         raceDate: race.raceDate,
         city: race.city,
         state: race.state,
@@ -163,4 +167,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

@@ -11,6 +11,7 @@ import {
   ymdFromDate,
 } from "@/lib/training/plan-utils";
 import { TrainingPlanLifecycle } from "@prisma/client";
+import { metersToMiles } from "@/lib/pace-utils";
 
 function utcStartOfDayFromKey(dateKey: string): Date {
   return new Date(`${dateKey}T00:00:00.000Z`);
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
       orderBy: { updatedAt: "desc" },
       include: {
         race_registry: {
-          select: { raceDate: true, name: true, distanceMiles: true },
+          select: { raceDate: true, name: true, distanceMeters: true },
         },
       },
     });
@@ -108,7 +109,11 @@ export async function GET(request: NextRequest) {
           weekNumber: weekNum,
           raceDate: race?.raceDate ?? null,
           raceName: race?.name ?? null,
-          raceDistanceMiles: race?.distanceMiles ?? null,
+          raceDistanceMiles:
+            race?.distanceMeters != null &&
+            Number.isFinite(Number(race.distanceMeters))
+              ? metersToMiles(Number(race.distanceMeters))
+              : null,
           totalWeeks: effectiveWeeks,
         });
 

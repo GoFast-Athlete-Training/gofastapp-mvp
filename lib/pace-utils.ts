@@ -10,6 +10,12 @@ import {
   raceTimeToGoalPaceSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
 
+export const METERS_PER_MILE = 1609.344;
+
+export function metersToMiles(meters: number): number {
+  return meters / METERS_PER_MILE;
+}
+
 const MILES_5K = RACE_DISTANCES_MILES["5k"];
 
 /** Normalize stored distance string to pace-calculator key */

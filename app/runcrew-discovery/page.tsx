@@ -32,8 +32,8 @@ interface DiscoverableRunCrew {
   race: {
     id: string;
     name: string;
-    raceType: string | null;
-    distanceMiles: number | null;
+    distanceLabel: string | null;
+    distanceMeters: number | null;
     raceDate: Date | null;
     city: string | null;
     state: string | null;
@@ -77,8 +77,8 @@ export default function RunCrewDiscoveryPage() {
   const [availableRaces, setAvailableRaces] = useState<Array<{
     id: string;
     name: string;
-    raceType: string;
-    distanceMiles: number;
+    distanceLabel: string | null;
+    distanceMeters: number | null;
     raceDate: Date | string;
     city: string | null;
     state: string | null;
@@ -130,8 +130,8 @@ export default function RunCrewDiscoveryPage() {
         const races: Array<{
           id: string;
           name: string;
-          raceType: string;
-          distanceMiles: number;
+          distanceLabel: string | null;
+          distanceMeters: number | null;
           raceDate: Date | string;
           city: string | null;
           state: string | null;
@@ -782,7 +782,11 @@ export default function RunCrewDiscoveryPage() {
                               {crew.race.raceDate && (
                                 <div className="text-xs text-gray-600">
                                   {new Date(crew.race.raceDate).toLocaleDateString()}
-                                  {crew.race.distanceMiles && ` • ${crew.race.distanceMiles} miles`}
+                                  {crew.race.distanceLabel?.trim()
+                                    ? ` • ${crew.race.distanceLabel.trim()}`
+                                    : crew.race.distanceMeters != null
+                                      ? ` • ${(crew.race.distanceMeters / 1609.344).toFixed(1)} mi`
+                                      : ""}
                                 </div>
                               )}
                             </div>

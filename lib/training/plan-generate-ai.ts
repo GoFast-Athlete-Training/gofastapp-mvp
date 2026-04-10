@@ -66,7 +66,7 @@ export async function generatePlanOutlineWithOpenAI(params: {
   totalWeeks: number;
   raceName: string;
   raceDistanceMiles: number;
-  raceTypeLabel: string;
+  distanceLabel: string;
   goalTime?: string | null;
   currentWeeklyMileage?: number | null;
   preferredDaysHuman: string;
@@ -81,7 +81,7 @@ export async function generatePlanOutlineWithOpenAI(params: {
     totalWeeks: params.totalWeeks,
     raceName: params.raceName,
     raceDistanceMiles: params.raceDistanceMiles,
-    raceTypeLabel: params.raceTypeLabel,
+    distanceLabel: params.distanceLabel,
     goalTime: params.goalTime,
     currentWeeklyMileage: params.currentWeeklyMileage,
     preferredDaysHuman: params.preferredDaysHuman,
@@ -102,7 +102,7 @@ export async function generatePlanOutlineWithOpenAI(params: {
         : SYSTEM_LONG;
     user = [
       `totalWeeks: ${params.totalWeeks}`,
-      `race: ${params.raceName} (${params.raceTypeLabel}, ${params.raceDistanceMiles} mi)`,
+      `race: ${params.raceName} (${params.distanceLabel}, ${params.raceDistanceMiles} mi)`,
       `goalTime: ${params.goalTime ?? "not specified"}`,
       `currentWeeklyMileage: ${params.currentWeeklyMileage ?? "not specified"}`,
       `athlete preferred training days: ${params.preferredDaysHuman}`,

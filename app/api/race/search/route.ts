@@ -9,8 +9,8 @@ const BOSTON_QUALIFIER_TAG = 'boston-qualifier';
 const raceSearchSelect = {
   id: true,
   name: true,
-  raceType: true,
-  distanceMiles: true,
+  distanceLabel: true,
+  distanceMeters: true,
   raceDate: true,
   city: true,
   state: true,
