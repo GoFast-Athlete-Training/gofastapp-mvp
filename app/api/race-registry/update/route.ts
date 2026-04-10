@@ -46,6 +46,78 @@ function tagsFromPayload(racePayload: IncomingRace): string[] {
   return [...new Set(out)];
 }
 
+/** Upsert segments from Company prodpush; omit key to leave existing rows unchanged. */
+async function syncRegistryCourseSegments(
+  raceRegistryId: string,
+  racePayload: IncomingRace
+): Promise<void> {
+  if (!("courseSegments" in racePayload)) return;
+  const segments = racePayload.courseSegments;
+  if (!Array.isArray(segments)) return;
+
+  const incomingIds: string[] = [];
+  for (const item of segments) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const companySegmentId =
+      typeof o.companySegmentId === "string" && o.companySegmentId.trim()
+        ? o.companySegmentId.trim()
+        : typeof o.id === "string" && o.id.trim()
+          ? o.id.trim()
+          : "";
+    if (!companySegmentId) continue;
+    const orderRaw = o.order;
+    const order =
+      typeof orderRaw === "number" && Number.isFinite(orderRaw)
+        ? orderRaw
+        : parseInt(String(orderRaw ?? 0), 10) || 0;
+    const name =
+      typeof o.name === "string" ? o.name.trim() : String(o.name ?? "").trim();
+    if (!name) continue;
+    incomingIds.push(companySegmentId);
+    const mileMarker =
+      typeof o.mileMarker === "string" ? o.mileMarker.trim() || null : null;
+    const description =
+      typeof o.description === "string" ? o.description.trim() || null : null;
+    const runTip =
+      typeof o.runTip === "string" ? o.runTip.trim() || null : null;
+
+    await prisma.race_registry_course_segments.upsert({
+      where: { companySegmentId },
+      create: {
+        raceRegistryId,
+        companySegmentId,
+        order,
+        name,
+        mileMarker,
+        description,
+        runTip,
+      },
+      update: {
+        raceRegistryId,
+        order,
+        name,
+        mileMarker,
+        description,
+        runTip,
+      },
+    });
+  }
+
+  if (incomingIds.length === 0) {
+    await prisma.race_registry_course_segments.deleteMany({
+      where: { raceRegistryId },
+    });
+    return;
+  }
+  await prisma.race_registry_course_segments.deleteMany({
+    where: {
+      raceRegistryId,
+      companySegmentId: { notIn: incomingIds },
+    },
+  });
+}
+
 function logoUrlFromPayload(racePayload: IncomingRace): string | null {
   for (const key of ["raceLogo", "raceDisplayPhoto", "ogImage"] as const) {
     const v = racePayload[key];
@@ -373,6 +445,8 @@ export async function POST(request: NextRequest) {
         });
       }
     }
+
+    await syncRegistryCourseSegments(row.id, racePayload);
 
     const response = NextResponse.json({ success: true, race: row });
     Object.entries(corsHeaders).forEach(([k, v]) =>

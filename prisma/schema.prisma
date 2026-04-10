@@ -363,6 +363,7 @@ model race_registry {
   race_announcements       race_announcements[]
   race_events              race_events[]
   city_runs_tagged         city_runs[]               @relation("CityRunRaceRegistry")
+  course_segments          race_registry_course_segments[]
 
   @@index([charitySupported])
   @@index([city, state])
@@ -371,6 +372,25 @@ model race_registry {
   @@index([raceType])
   @@index([slug])
   @@index([tags])
+}
+
+/// Course segments mirrored from GoFastCompany race_course_segments (prodpush).
+model race_registry_course_segments {
+  id               String        @id @default(cuid())
+  raceRegistryId   String
+  /// GoFastCompany race_course_segments.id
+  companySegmentId String        @unique
+  order            Int
+  name             String
+  mileMarker       String?
+  description      String?
+  runTip           String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  raceRegistry     race_registry @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
+
+  @@index([raceRegistryId])
 }
 
 /// Universal athlete goal (1:N). Goal paces derived and stored on create/update.

@@ -14,11 +14,14 @@ import AnnouncementCard from "@/components/RunCrew/AnnouncementCard";
 import RaceMessageFeed from "@/components/races/RaceMessageFeed";
 import {
   Calendar,
+  ChevronDown,
+  ChevronRight,
   Clock,
   ExternalLink,
   Info,
   MapPin,
   Package,
+  Plus,
   Route,
   Trophy,
 } from "lucide-react";
@@ -118,6 +121,16 @@ function mapRaceRoleToCrewRole(
   return "member";
 }
 
+function memberInitials(a: MembershipRow["Athlete"]): string {
+  const f = a.firstName?.trim()?.[0] ?? "";
+  const l = a.lastName?.trim()?.[0] ?? "";
+  const h = a.gofastHandle?.trim();
+  if (f && l) return `${f}${l}`.toUpperCase();
+  if (f) return f.toUpperCase();
+  if (h) return h.slice(0, 2).toUpperCase();
+  return "?";
+}
+
 function RaceHubPageInner() {
   const params = useParams();
   const router = useRouter();
@@ -135,6 +148,8 @@ function RaceHubPageInner() {
   const [announceTitle, setAnnounceTitle] = useState("");
   const [announceBody, setAnnounceBody] = useState("");
   const [postingAnnounce, setPostingAnnounce] = useState(false);
+  const [showAnnounceForm, setShowAnnounceForm] = useState(false);
+  const [runnersExpanded, setRunnersExpanded] = useState(false);
 
   const athleteId = LocalStorageAPI.getAthleteId();
   const joinRequested = searchParams.get("join") === "1";
@@ -267,6 +282,7 @@ function RaceHubPageInner() {
       });
       setAnnounceTitle("");
       setAnnounceBody("");
+      setShowAnnounceForm(false);
       const aRes = await api.get(`/race-hub/${encodeURIComponent(raceRegistryId.trim())}/announcements`);
       setAnnouncements((aRes.data?.announcements as AnnouncementRow[]) || []);
     } catch (err) {
@@ -416,32 +432,323 @@ function RaceHubPageInner() {
         </main>
       ) : (
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-            <div className="lg:col-span-8 space-y-6 min-w-0">
-              {race.description?.trim() ? (
-                <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-                  <h2 className="text-lg font-bold text-gray-900 mb-3">About this race</h2>
-                  <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
-                    {race.description}
-                  </div>
-                </section>
-              ) : null}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
+            {/* Community: chat first, then announcements, meetups, runners (minimal) */}
+            <div className="lg:col-span-8 space-y-6 min-w-0 order-1">
+              <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 min-w-0">
+                <h2 className="text-xl font-bold text-gray-900 mb-1">Race chatter</h2>
+                <p className="text-sm text-gray-500 mb-4">
+                  Logistics, pacing, and meetups — this is the main thread.
+                </p>
+                <RaceMessageFeed
+                  raceRegistryId={raceRegistryId}
+                  messageListClassName="min-h-[min(18rem,45vh)] max-h-[min(32rem,60vh)]"
+                />
+              </section>
 
-              {race.courseMapUrl?.trim() && isHttpOrPathUrl(race.courseMapUrl) ? (
-                <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-                  <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                    <Route className="w-5 h-5 text-orange-600" />
-                    Course map
-                  </h2>
-                  <div className="rounded-lg overflow-hidden border border-gray-200">
-                    <img
-                      src={race.courseMapUrl.trim()}
-                      alt="Course map"
-                      className="w-full h-auto"
+              <section className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-lg font-bold text-gray-900">Announcements</h2>
+                  {isAdmin ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAnnounceForm((v) => !v)}
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 hover:text-orange-700"
+                    >
+                      <Plus className="w-4 h-4" />
+                      {showAnnounceForm ? "Cancel" : "New announcement"}
+                    </button>
+                  ) : null}
+                </div>
+                {isAdmin && showAnnounceForm ? (
+                  <form
+                    onSubmit={(e) => void postAnnouncement(e)}
+                    className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3"
+                  >
+                    <input
+                      type="text"
+                      value={announceTitle}
+                      onChange={(e) => setAnnounceTitle(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      placeholder="Title"
+                    />
+                    <textarea
+                      value={announceBody}
+                      onChange={(e) => setAnnounceBody(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      rows={3}
+                      placeholder="Details for the group…"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        disabled={postingAnnounce || !announceTitle.trim() || !announceBody.trim()}
+                        className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold disabled:opacity-50"
+                      >
+                        {postingAnnounce ? "Posting…" : "Publish"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAnnounceForm(false);
+                          setAnnounceTitle("");
+                          setAnnounceBody("");
+                        }}
+                        className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+                {announcements.length === 0 ? (
+                  <p className="text-sm text-gray-500 bg-white rounded-xl border border-gray-200 p-6">
+                    No announcements yet.
+                  </p>
+                ) : (
+                  announcements.map((a) => (
+                    <AnnouncementCard
+                      key={a.id}
+                      announcement={{
+                        id: a.id,
+                        title: a.title,
+                        content: a.content,
+                        createdAt: a.createdAt,
+                        author: {
+                          firstName: a.Athlete?.firstName || "",
+                          lastName: a.Athlete?.lastName || "",
+                        },
+                      }}
+                    />
+                  ))
+                )}
+              </section>
+
+              <section className="space-y-4">
+                <h2 className="text-lg font-bold text-gray-900">Meetups &amp; events</h2>
+                {events.length === 0 ? (
+                  <p className="text-sm text-gray-500 bg-white rounded-xl border border-gray-200 p-6">
+                    No events posted yet.
+                  </p>
+                ) : (
+                  <ul className="space-y-4">
+                    {events.map((ev) => {
+                      const myStatus = ev.race_event_rsvps?.[0]?.status ?? null;
+                      return (
+                        <li
+                          key={ev.id}
+                          className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm"
+                        >
+                          <p className="font-semibold text-gray-900">{ev.title}</p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {new Date(ev.date).toLocaleDateString()} · {ev.time} · {ev.venue}
+                          </p>
+                          {ev.description ? (
+                            <p className="text-sm text-gray-700 mt-2 whitespace-pre-line">
+                              {ev.description}
+                            </p>
+                          ) : null}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {(["going", "maybe", "not-going"] as const).map((status) => (
+                              <button
+                                key={status}
+                                type="button"
+                                onClick={() => void setRsvp(ev.id, status)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                                  myStatus === status
+                                    ? status === "going"
+                                      ? "bg-green-600 text-white"
+                                      : status === "maybe"
+                                        ? "bg-amber-500 text-white"
+                                        : "bg-gray-600 text-white"
+                                    : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                                }`}
+                              >
+                                {status === "going"
+                                  ? "Going"
+                                  : status === "maybe"
+                                    ? "Maybe"
+                                    : "Can't go"}
+                              </button>
+                            ))}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+
+              <section className="border-t border-gray-200 pt-5 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setRunnersExpanded((v) => !v)}
+                  className="w-full flex items-center justify-between gap-3 text-left rounded-xl border border-gray-100 bg-gray-50/80 hover:bg-gray-100/80 px-3 py-2.5 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-xs font-medium text-gray-400 uppercase tracking-wide shrink-0">
+                      Who&apos;s here
+                    </span>
+                    {memberships.length > 0 ? (
+                      <div className="flex items-center -space-x-2">
+                        {memberships.slice(0, 6).map((m) => (
+                          <div
+                            key={m.id}
+                            className="relative w-8 h-8 rounded-full border-2 border-white bg-gray-200 overflow-hidden flex items-center justify-center text-[10px] font-semibold text-gray-700 shrink-0"
+                            title={
+                              [m.Athlete.firstName, m.Athlete.lastName]
+                                .filter(Boolean)
+                                .join(" ") ||
+                              m.Athlete.gofastHandle ||
+                              "Runner"
+                            }
+                          >
+                            {m.Athlete.photoURL ? (
+                              <img
+                                src={m.Athlete.photoURL}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              memberInitials(m.Athlete)
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    <span className="text-sm text-gray-500 truncate">
+                      {memberships.length === 0
+                        ? "No one yet"
+                        : `${memberships.length} runner${memberships.length === 1 ? "" : "s"}`}
+                      {memberships.length > 6
+                        ? ` · +${memberships.length - 6} more`
+                        : ""}
+                    </span>
+                  </div>
+                  {runnersExpanded ? (
+                    <ChevronDown className="w-5 h-5 text-gray-400 shrink-0" />
+                  ) : (
+                    <ChevronRight className="w-5 h-5 text-gray-400 shrink-0" />
+                  )}
+                </button>
+                {runnersExpanded ? (
+                  <div className="mt-3 space-y-2 max-h-[min(24rem,50vh)] overflow-y-auto pr-1">
+                    {memberships.length === 0 ? (
+                      <p className="text-sm text-gray-500 py-4 text-center">
+                        No members yet. Invite friends from the public race page.
+                      </p>
+                    ) : (
+                      memberships.map((m) => (
+                        <MemberDetailCard
+                          key={m.id}
+                          member={{
+                            id: m.id,
+                            athleteId: m.athleteId,
+                            role: mapRaceRoleToCrewRole(m.role),
+                            athlete: {
+                              id: m.Athlete.id,
+                              firstName: m.Athlete.firstName,
+                              lastName: m.Athlete.lastName,
+                              gofastHandle: m.Athlete.gofastHandle,
+                              photoURL: m.Athlete.photoURL,
+                              bio: m.Athlete.bio,
+                            },
+                            joinedAt: m.joinedAt,
+                          }}
+                          showRole
+                          currentUserId={athleteId ?? undefined}
+                        />
+                      ))
+                    )}
+                  </div>
+                ) : null}
+              </section>
+            </div>
+
+            {/* Race info: one column */}
+            <aside className="lg:col-span-4 space-y-6 min-w-0 order-2">
+              <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6">
+                <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <Info className="w-5 h-5 text-orange-600" />
+                  Race details
+                </h2>
+                <div className="space-y-3 text-sm">
+                  {dateLabel ? (
+                    <div className="flex gap-2">
+                      <Calendar className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-gray-900">Date</p>
+                        <p className="text-gray-700">{dateLabel}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                  {raceStartLabel ? (
+                    <div className="flex gap-2">
+                      <Clock className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-gray-900">Start</p>
+                        <p className="text-gray-700">{raceStartLabel}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                  {locationText ? (
+                    <div className="flex gap-2">
+                      <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-gray-900">Location</p>
+                        <p className="text-gray-700">{locationText}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                  {distanceChips.length > 0 ? (
+                    <div>
+                      <p className="font-semibold text-gray-900 mb-1">Distances</p>
+                      <p className="text-gray-700">{distanceChips.join(" · ")}</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="font-semibold text-gray-900 mb-1">Distance</p>
+                      <p className="text-gray-700">{raceTypeBadgeLabel(race.raceType)}</p>
+                    </div>
+                  )}
+                  {race.registrationUrl?.trim() ? (
+                    <a
+                      href={race.registrationUrl.trim()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-orange-600 font-medium hover:underline"
+                    >
+                      Register
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  ) : null}
+                  {race.resultsUrl?.trim() ? (
+                    <a
+                      href={race.resultsUrl.trim()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-orange-600 font-medium hover:underline"
+                    >
+                      Results
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  ) : null}
+                </div>
+                {locationText ? (
+                  <div className="mt-4 rounded-lg overflow-hidden border border-gray-200 h-48">
+                    <iframe
+                      title="Race location"
+                      width="100%"
+                      height="100%"
+                      style={{ border: 0 }}
+                      loading="lazy"
+                      allowFullScreen
+                      referrerPolicy="no-referrer-when-downgrade"
+                      src={mapEmbedUrl}
                     />
                   </div>
-                </section>
-              ) : null}
+                ) : null}
+              </section>
 
               {(race.packetPickupLocation ||
                 race.packetPickupDate ||
@@ -531,228 +838,30 @@ function RaceHubPageInner() {
                 </section>
               )}
 
-              {isAdmin ? (
+              {race.courseMapUrl?.trim() && isHttpOrPathUrl(race.courseMapUrl) ? (
                 <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-                  <h2 className="text-lg font-bold text-gray-900 mb-4">Post announcement</h2>
-                  <form onSubmit={(e) => void postAnnouncement(e)} className="space-y-3">
-                    <input
-                      type="text"
-                      value={announceTitle}
-                      onChange={(e) => setAnnounceTitle(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                      placeholder="Title"
+                  <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                    <Route className="w-5 h-5 text-orange-600" />
+                    Course map
+                  </h2>
+                  <div className="rounded-lg overflow-hidden border border-gray-200">
+                    <img
+                      src={race.courseMapUrl.trim()}
+                      alt="Course map"
+                      className="w-full h-auto"
                     />
-                    <textarea
-                      value={announceBody}
-                      onChange={(e) => setAnnounceBody(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                      rows={3}
-                      placeholder="Details for the group…"
-                    />
-                    <button
-                      type="submit"
-                      disabled={postingAnnounce || !announceTitle.trim() || !announceBody.trim()}
-                      className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold disabled:opacity-50"
-                    >
-                      {postingAnnounce ? "Posting…" : "Publish"}
-                    </button>
-                  </form>
+                  </div>
                 </section>
               ) : null}
 
-              <section className="space-y-4">
-                <h2 className="text-xl font-bold text-gray-900">Announcements</h2>
-                {announcements.length === 0 ? (
-                  <p className="text-sm text-gray-500 bg-white rounded-xl border p-6">No announcements yet.</p>
-                ) : (
-                  announcements.map((a) => (
-                    <AnnouncementCard
-                      key={a.id}
-                      announcement={{
-                        id: a.id,
-                        title: a.title,
-                        content: a.content,
-                        createdAt: a.createdAt,
-                        author: {
-                          firstName: a.Athlete?.firstName || "",
-                          lastName: a.Athlete?.lastName || "",
-                        },
-                      }}
-                    />
-                  ))
-                )}
-              </section>
-
-              <section className="space-y-4">
-                <h2 className="text-xl font-bold text-gray-900">Meetups &amp; events</h2>
-                {events.length === 0 ? (
-                  <p className="text-sm text-gray-500 bg-white rounded-xl border p-6">No events posted yet.</p>
-                ) : (
-                  <ul className="space-y-4">
-                    {events.map((ev) => {
-                      const myStatus = ev.race_event_rsvps?.[0]?.status ?? null;
-                      return (
-                        <li key={ev.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-                          <p className="font-semibold text-gray-900">{ev.title}</p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {new Date(ev.date).toLocaleDateString()} · {ev.time} · {ev.venue}
-                          </p>
-                          {ev.description ? <p className="text-sm text-gray-700 mt-2 whitespace-pre-line">{ev.description}</p> : null}
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {(["going", "maybe", "not-going"] as const).map((status) => (
-                              <button
-                                key={status}
-                                type="button"
-                                onClick={() => void setRsvp(ev.id, status)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                                  myStatus === status
-                                    ? status === "going"
-                                      ? "bg-green-600 text-white"
-                                      : status === "maybe"
-                                        ? "bg-amber-500 text-white"
-                                        : "bg-gray-600 text-white"
-                                    : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                                }`}
-                              >
-                                {status === "going" ? "Going" : status === "maybe" ? "Maybe" : "Can't go"}
-                              </button>
-                            ))}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </section>
-            </div>
-
-            <aside className="lg:col-span-4 space-y-6 min-w-0">
-              <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <Info className="w-5 h-5 text-orange-600" />
-                  Race details
-                </h2>
-                <div className="space-y-3 text-sm">
-                  {dateLabel ? (
-                    <div className="flex gap-2">
-                      <Calendar className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold text-gray-900">Date</p>
-                        <p className="text-gray-700">{dateLabel}</p>
-                      </div>
-                    </div>
-                  ) : null}
-                  {raceStartLabel ? (
-                    <div className="flex gap-2">
-                      <Clock className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold text-gray-900">Start</p>
-                        <p className="text-gray-700">{raceStartLabel}</p>
-                      </div>
-                    </div>
-                  ) : null}
-                  {locationText ? (
-                    <div className="flex gap-2">
-                      <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold text-gray-900">Location</p>
-                        <p className="text-gray-700">{locationText}</p>
-                      </div>
-                    </div>
-                  ) : null}
-                  {distanceChips.length > 0 ? (
-                    <div>
-                      <p className="font-semibold text-gray-900 mb-1">Distances</p>
-                      <p className="text-gray-700">{distanceChips.join(" · ")}</p>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="font-semibold text-gray-900 mb-1">Distance</p>
-                      <p className="text-gray-700">{raceTypeBadgeLabel(race.raceType)}</p>
-                    </div>
-                  )}
-                  {race.registrationUrl?.trim() ? (
-                    <a
-                      href={race.registrationUrl.trim()}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-orange-600 font-medium hover:underline"
-                    >
-                      Register
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  ) : null}
-                  {race.resultsUrl?.trim() ? (
-                    <a
-                      href={race.resultsUrl.trim()}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-orange-600 font-medium hover:underline"
-                    >
-                      Results
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  ) : null}
-                </div>
-                {locationText ? (
-                  <div className="mt-4 rounded-lg overflow-hidden border border-gray-200 h-48">
-                    <iframe
-                      title="Race location"
-                      width="100%"
-                      height="100%"
-                      style={{ border: 0 }}
-                      loading="lazy"
-                      allowFullScreen
-                      referrerPolicy="no-referrer-when-downgrade"
-                      src={mapEmbedUrl}
-                    />
+              {race.description?.trim() ? (
+                <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+                  <h2 className="text-lg font-bold text-gray-900 mb-3">About this race</h2>
+                  <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
+                    {race.description}
                   </div>
-                ) : null}
-              </section>
-
-              <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-bold text-gray-900">Runners here</h2>
-                  <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                    {memberships.length}
-                  </span>
-                </div>
-                {memberships.length === 0 ? (
-                  <p className="text-sm text-gray-500 text-center py-6">
-                    No members yet. Invite friends from the public race page.
-                  </p>
-                ) : (
-                  <div className="space-y-3 max-h-[480px] overflow-y-auto">
-                    {memberships.map((m) => (
-                      <MemberDetailCard
-                        key={m.id}
-                        member={{
-                          id: m.id,
-                          athleteId: m.athleteId,
-                          role: mapRaceRoleToCrewRole(m.role),
-                          athlete: {
-                            id: m.Athlete.id,
-                            firstName: m.Athlete.firstName,
-                            lastName: m.Athlete.lastName,
-                            gofastHandle: m.Athlete.gofastHandle,
-                            photoURL: m.Athlete.photoURL,
-                            bio: m.Athlete.bio,
-                          },
-                          joinedAt: m.joinedAt,
-                        }}
-                        showRole
-                        currentUserId={athleteId ?? undefined}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-5 overflow-hidden min-w-0">
-                <h2 className="text-lg font-semibold text-gray-900 mb-1">Race chatter</h2>
-                <p className="text-xs text-gray-500 mb-4">Talk logistics, pacing, and meetups.</p>
-                <RaceMessageFeed raceRegistryId={raceRegistryId} />
-              </section>
+                </section>
+              ) : null}
             </aside>
           </div>
         </main>

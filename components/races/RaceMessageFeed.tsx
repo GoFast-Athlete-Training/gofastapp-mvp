@@ -8,6 +8,8 @@ interface RaceMessageFeedProps {
   raceRegistryId: string;
   topics?: string[];
   selectedTopic?: string;
+  /** Override scroll area height (e.g. taller hub layout). */
+  messageListClassName?: string;
 }
 
 type ApiAthlete = {
@@ -44,6 +46,7 @@ export default function RaceMessageFeed({
   raceRegistryId,
   topics = ["general", "logistics", "training"],
   selectedTopic = "general",
+  messageListClassName = "max-h-96",
 }: RaceMessageFeedProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -155,7 +158,9 @@ export default function RaceMessageFeed({
         </div>
       )}
 
-      <div className="space-y-3 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50">
+      <div
+        className={`space-y-3 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50 ${messageListClassName}`}
+      >
         {messages.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-8">No messages yet. Say hello!</p>
         ) : (
