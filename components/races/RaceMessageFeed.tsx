@@ -4,6 +4,23 @@ import { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 
+/** Default chatter channels for race hub (stored as message topic strings). */
+export const RACE_HUB_DEFAULT_TOPICS = [
+  "general",
+  "pace-goals",
+  "social-meetups",
+  "tips",
+  "ask-the-community",
+] as const;
+
+const TOPIC_LABELS: Record<string, string> = {
+  general: "General",
+  "pace-goals": "Pace goals",
+  "social-meetups": "Social / meetups",
+  tips: "Tips",
+  "ask-the-community": "Ask the community",
+};
+
 interface RaceMessageFeedProps {
   raceRegistryId: string;
   topics?: string[];
@@ -44,7 +61,7 @@ function normalizeMessage(raw: Record<string, unknown>): Message | null {
 
 export default function RaceMessageFeed({
   raceRegistryId,
-  topics = ["general", "logistics", "training"],
+  topics = [...RACE_HUB_DEFAULT_TOPICS],
   selectedTopic = "general",
   messageListClassName = "max-h-96",
 }: RaceMessageFeedProps) {
@@ -135,7 +152,7 @@ export default function RaceMessageFeed({
     Boolean(currentUserId && message.athlete?.id === currentUserId);
 
   const labelForTopic = (t: string) =>
-    t.charAt(0).toUpperCase() + t.slice(1).replace(/-/g, " ");
+    TOPIC_LABELS[t] ?? t.charAt(0).toUpperCase() + t.slice(1).replace(/-/g, " ");
 
   return (
     <div className="space-y-4">

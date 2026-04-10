@@ -11,7 +11,10 @@ import api from "@/lib/api";
 import TopNav from "@/components/shared/TopNav";
 import MemberDetailCard from "@/components/RunCrew/MemberDetailCard";
 import AnnouncementCard from "@/components/RunCrew/AnnouncementCard";
-import RaceMessageFeed from "@/components/races/RaceMessageFeed";
+import RaceMessageFeed, {
+  RACE_HUB_DEFAULT_TOPICS,
+} from "@/components/races/RaceMessageFeed";
+import { getPublicRacePageUrl } from "@/lib/public-race-url";
 import {
   Calendar,
   ChevronDown,
@@ -20,41 +23,24 @@ import {
   ExternalLink,
   Info,
   MapPin,
-  Package,
   Plus,
-  Route,
   Trophy,
 } from "lucide-react";
 
+/** Fields used by the hub; registry still stores full racer-facing columns for future use. */
 type RaceSummary = {
   id: string;
   name: string;
+  slug: string | null;
+  companyRaceId: string | null;
   raceDate: string;
   city: string | null;
   state: string | null;
   distanceMeters: number | null;
   logoUrl: string | null;
   distanceLabel: string | null;
-  registrationUrl: string | null;
-  description: string | null;
-  courseMapUrl: string | null;
-  resultsUrl: string | null;
   startTime: string | null;
-  packetPickupLocation: string | null;
-  packetPickupDate: string | null;
-  packetPickupTime: string | null;
-  packetPickupDescription: string | null;
-  spectatorInfo: string | null;
-  logisticsInfo: string | null;
-  gearDropInstructions: string | null;
 };
-
-function distanceLabelBadge(label: string | null | undefined): string {
-  if (!label?.trim()) return "Race";
-  const t = label.trim();
-  if (t.length <= 4 && !t.includes("_")) return t.toUpperCase();
-  return t.charAt(0).toUpperCase() + t.slice(1);
-}
 
 function distanceSnapToChips(snap: string | null | undefined): string[] {
   if (!snap?.trim()) return [];
@@ -74,9 +60,18 @@ function formatRaceStartTimeLabel(iso: string | null | undefined): string | null
   });
 }
 
-function isHttpOrPathUrl(url: string | null | undefined): boolean {
-  const u = url?.trim() ?? "";
-  return u.startsWith("http") || u.startsWith("/");
+/** Distance line for header + sidebar when distanceLabel (pipe-joined) is empty. */
+function formatDistanceFallback(
+  distanceMeters: number | null | undefined
+): string {
+  const m = distanceMeters;
+  if (m == null || !Number.isFinite(m) || m <= 0) return "—";
+  const km = m / 1000;
+  if (km >= 40) return "Marathon";
+  if (km >= 20 && km <= 23) return "Half marathon";
+  if (km >= 9.5 && km <= 10.5) return "10K";
+  if (km >= 4.5 && km <= 5.5) return "5K";
+  return `${km.toFixed(1)} km`;
 }
 
 type MembershipRow = {
@@ -345,10 +340,10 @@ function RaceHubPageInner() {
 
   const locationText = [race.city, race.state].filter(Boolean).join(", ") || null;
   const distanceChips = distanceSnapToChips(race.distanceLabel);
+  const distanceFallback =
+    distanceChips.length > 0 ? null : formatDistanceFallback(race.distanceMeters);
   const raceStartLabel = formatRaceStartTimeLabel(race.startTime);
-  const mapEmbedUrl = `https://www.google.com/maps/embed?q=${encodeURIComponent(
-    locationText || "Race location"
-  )}`;
+  const publicRaceUrl = getPublicRacePageUrl(race.slug);
   const dateLabel = race.raceDate
     ? new Date(race.raceDate).toLocaleDateString(undefined, {
         weekday: "long",
@@ -402,9 +397,9 @@ function RaceHubPageInner() {
                       {label}
                     </span>
                   ))}
-                  {distanceChips.length === 0 ? (
+                  {distanceChips.length === 0 && distanceFallback ? (
                     <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
-                      {distanceLabelBadge(race.distanceLabel)}
+                      {distanceFallback}
                     </span>
                   ) : null}
                 </div>
@@ -418,7 +413,7 @@ function RaceHubPageInner() {
         <main className="max-w-lg mx-auto px-4 py-12 text-center">
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Join the Race Hub</h2>
           <p className="text-gray-600 mb-6">
-            Members see who else is running, race-day chatter, meetups, and announcements.
+            Chat with other runners, plan shakeouts and meetups, and see race announcements — all in one place.
           </p>
           <button
             type="button"
@@ -437,11 +432,13 @@ function RaceHubPageInner() {
               <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 min-w-0">
                 <h2 className="text-xl font-bold text-gray-900 mb-1">Race chatter</h2>
                 <p className="text-sm text-gray-500 mb-4">
-                  Logistics, pacing, and meetups — this is the main thread.
+                  Pace goals, meetups, tips — this is where the crew talks. Full course and logistics live on the
+                  public race page.
                 </p>
                 <RaceMessageFeed
                   raceRegistryId={raceRegistryId}
-                  messageListClassName="min-h-[min(18rem,45vh)] max-h-[min(32rem,60vh)]"
+                  topics={[...RACE_HUB_DEFAULT_TOPICS]}
+                  messageListClassName="min-h-[min(22rem,50vh)] max-h-[min(36rem,65vh)]"
                 />
               </section>
 
@@ -524,10 +521,15 @@ function RaceHubPageInner() {
               </section>
 
               <section className="space-y-4">
-                <h2 className="text-lg font-bold text-gray-900">Meetups &amp; events</h2>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Group runs &amp; meetups</h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Shakeouts, brunch runs, carpools — add anything social.
+                  </p>
+                </div>
                 {events.length === 0 ? (
                   <p className="text-sm text-gray-500 bg-white rounded-xl border border-gray-200 p-6">
-                    No events posted yet.
+                    No group runs or meetups yet. Post one for the crew.
                   </p>
                 ) : (
                   <ul className="space-y-4">
@@ -664,12 +666,12 @@ function RaceHubPageInner() {
               </section>
             </div>
 
-            {/* Race info: one column */}
+            {/* At-a-glance race facts; full packet/course/copy lives on public race page */}
             <aside className="lg:col-span-4 space-y-6 min-w-0 order-2">
               <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6">
                 <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                   <Info className="w-5 h-5 text-orange-600" />
-                  Race details
+                  At a glance
                 </h2>
                 <div className="space-y-3 text-sm">
                   {dateLabel ? (
@@ -707,160 +709,27 @@ function RaceHubPageInner() {
                   ) : (
                     <div>
                       <p className="font-semibold text-gray-900 mb-1">Distance</p>
-                      <p className="text-gray-700">{distanceLabelBadge(race.distanceLabel)}</p>
+                      <p className="text-gray-700">{distanceFallback ?? "—"}</p>
                     </div>
                   )}
-                  {race.registrationUrl?.trim() ? (
-                    <a
-                      href={race.registrationUrl.trim()}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-orange-600 font-medium hover:underline"
-                    >
-                      Register
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  ) : null}
-                  {race.resultsUrl?.trim() ? (
-                    <a
-                      href={race.resultsUrl.trim()}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-orange-600 font-medium hover:underline"
-                    >
-                      Results
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  ) : null}
                 </div>
-                {locationText ? (
-                  <div className="mt-4 rounded-lg overflow-hidden border border-gray-200 h-48">
-                    <iframe
-                      title="Race location"
-                      width="100%"
-                      height="100%"
-                      style={{ border: 0 }}
-                      loading="lazy"
-                      allowFullScreen
-                      referrerPolicy="no-referrer-when-downgrade"
-                      src={mapEmbedUrl}
-                    />
-                  </div>
-                ) : null}
+                {publicRaceUrl ? (
+                  <a
+                    href={publicRaceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-600 transition-colors"
+                  >
+                    Full race info
+                    <ExternalLink className="w-4 h-4 shrink-0" />
+                  </a>
+                ) : (
+                  <p className="mt-4 text-xs text-gray-500">
+                    Public race page link appears when this race has a slug on the catalog. Packet pickup, course map,
+                    and registration stay there.
+                  </p>
+                )}
               </section>
-
-              {(race.packetPickupLocation ||
-                race.packetPickupDate ||
-                race.packetPickupTime ||
-                race.packetPickupDescription) && (
-                <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-                  <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <Package className="w-5 h-5 text-orange-600" />
-                    Packet pickup
-                  </h2>
-                  <div className="space-y-3 text-sm">
-                    {race.packetPickupLocation?.trim() ? (
-                      <div>
-                        <p className="font-semibold text-gray-900">Location</p>
-                        <p className="text-gray-700">{race.packetPickupLocation}</p>
-                      </div>
-                    ) : null}
-                    {(race.packetPickupDate || race.packetPickupTime) && (
-                      <div>
-                        <p className="font-semibold text-gray-900">Date and time</p>
-                        <p className="text-gray-700">
-                          {race.packetPickupDate
-                            ? new Date(race.packetPickupDate).toLocaleDateString(undefined, {
-                                weekday: "long",
-                                month: "long",
-                                day: "numeric",
-                                year: "numeric",
-                              })
-                            : null}
-                          {race.packetPickupDate && race.packetPickupTime?.trim()
-                            ? " · "
-                            : ""}
-                          {race.packetPickupTime?.trim() ?? ""}
-                        </p>
-                      </div>
-                    )}
-                    {race.packetPickupDescription?.trim() ? (
-                      <div>
-                        <p className="font-semibold text-gray-900">Details</p>
-                        <p className="text-gray-700 whitespace-pre-line">
-                          {race.packetPickupDescription}
-                        </p>
-                      </div>
-                    ) : null}
-                  </div>
-                </section>
-              )}
-
-              {(race.spectatorInfo?.trim() ||
-                race.logisticsInfo?.trim() ||
-                race.gearDropInstructions?.trim()) && (
-                <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
-                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    <Info className="w-5 h-5 text-orange-600" />
-                    Spectators and logistics
-                  </h2>
-                  {race.spectatorInfo?.trim() ? (
-                    <div>
-                      <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-1">
-                        Spectators
-                      </p>
-                      <div className="text-gray-700 text-sm whitespace-pre-line">
-                        {race.spectatorInfo}
-                      </div>
-                    </div>
-                  ) : null}
-                  {race.logisticsInfo?.trim() ? (
-                    <div>
-                      <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-1">
-                        Parking and transit
-                      </p>
-                      <div className="text-gray-700 text-sm whitespace-pre-line">
-                        {race.logisticsInfo}
-                      </div>
-                    </div>
-                  ) : null}
-                  {race.gearDropInstructions?.trim() ? (
-                    <div>
-                      <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-1">
-                        Gear drop / bag check
-                      </p>
-                      <div className="text-gray-700 text-sm whitespace-pre-line">
-                        {race.gearDropInstructions}
-                      </div>
-                    </div>
-                  ) : null}
-                </section>
-              )}
-
-              {race.courseMapUrl?.trim() && isHttpOrPathUrl(race.courseMapUrl) ? (
-                <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-                  <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                    <Route className="w-5 h-5 text-orange-600" />
-                    Course map
-                  </h2>
-                  <div className="rounded-lg overflow-hidden border border-gray-200">
-                    <img
-                      src={race.courseMapUrl.trim()}
-                      alt="Course map"
-                      className="w-full h-auto"
-                    />
-                  </div>
-                </section>
-              ) : null}
-
-              {race.description?.trim() ? (
-                <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-                  <h2 className="text-lg font-bold text-gray-900 mb-3">About this race</h2>
-                  <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
-                    {race.description}
-                  </div>
-                </section>
-              ) : null}
             </aside>
           </div>
         </main>

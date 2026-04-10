@@ -25,6 +25,8 @@ export async function GET(
       select: {
         id: true,
         name: true,
+        slug: true,
+        companyRaceId: true,
         distanceLabel: true,
         distanceMeters: true,
         raceDate: true,
