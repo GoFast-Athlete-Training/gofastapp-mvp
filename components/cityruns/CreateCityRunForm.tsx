@@ -1,13 +1,24 @@
 "use client";
 
 /**
- * Athlete CityRun from workout — structure aligned with GoFastCompany CreateRunModal (minus staff sources).
- * POST /api/cityrun/from-workout. Card 1: workout summary; Card 2: full run logistics + Strava route URL.
+ * Athlete CityRun from workout — two-panel UX: workout context (read-only) + route / meet / time.
+ * POST /api/cityrun/from-workout.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Activity, CalendarClock, Copy, CheckCircle2, ExternalLink, MapPin, Image as ImageIcon } from "lucide-react";
+import {
+  Activity,
+  CalendarClock,
+  Copy,
+  CheckCircle2,
+  ExternalLink,
+  MapPin,
+  Image as ImageIcon,
+  ChevronDown,
+  ChevronRight,
+  Route,
+} from "lucide-react";
 import GooglePlacesAutocomplete from "@/components/RunCrew/GooglePlacesAutocomplete";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
@@ -59,6 +70,18 @@ function initialTotalMilesString(meters: number | null | undefined): string {
   return String(rounded);
 }
 
+function formatDateLabel(isoDate: string): string {
+  if (!isoDate.trim()) return "";
+  const d = new Date(`${isoDate}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export interface CreateCityRunFormProps {
   workout: CreateCityRunFormWorkout;
   onCancel?: () => void;
@@ -104,6 +127,8 @@ export default function CreateCityRunForm({
   const [stravaMapUrl, setStravaMapUrl] = useState("");
   const [mapImageUrl, setMapImageUrl] = useState("");
   const [routePhotos, setRoutePhotos] = useState<string[]>([]);
+
+  const [moreDetailsOpen, setMoreDetailsOpen] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -165,12 +190,23 @@ export default function CreateCityRunForm({
     []
   );
 
+  const effectiveTitle = (title.trim() || workout.title).trim();
+
+  const canSubmit =
+    Boolean(meetUpPoint.trim()) &&
+    Boolean(meetUpStreetAddress.trim()) &&
+    Boolean(meetUpCity.trim()) &&
+    Boolean(meetUpState.trim()) &&
+    (!endPointSameAsStart
+      ? Boolean(endPoint.trim() && endStreetAddress.trim() && endCity.trim() && endState.trim())
+      : true);
+
   const handleSubmit = async () => {
     if (!LocalStorageAPI.getAthleteId()) {
       setError("Sign in so we can verify it’s your workout.");
       return;
     }
-    if (!title.trim()) {
+    if (!effectiveTitle) {
       setError("Add a title for this public run.");
       return;
     }
@@ -208,7 +244,7 @@ export default function CreateCityRunForm({
 
       const { data } = await api.post<CityRunFromWorkoutSuccess>("/cityrun/from-workout", {
         workoutId: workout.id,
-        title: title.trim(),
+        title: effectiveTitle,
         gofastCity,
         cityName: meetUpCity.trim(),
         state: meetUpState.trim(),
@@ -355,49 +391,410 @@ export default function CreateCityRunForm({
 
   const plannedMilesLabel = formatPlannedMiles(workout.estimatedDistanceInMeters ?? null);
   const existingRuns = workout.city_runs ?? [];
+  const dateLabel = formatDateLabel(runDate);
+
+  const workoutPanel = !hideWorkoutSummary ? (
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-fit lg:sticky lg:top-6">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+        <Activity className="w-4 h-4 text-sky-600" />
+        From your workout
+      </p>
+      <div className="flex flex-wrap items-center gap-2 mb-2">
+        <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-900">
+          {workout.workoutType}
+        </span>
+        {plannedMilesLabel ? (
+          <span className="text-xs text-gray-600">{plannedMilesLabel}</span>
+        ) : null}
+      </div>
+      {dateLabel ? (
+        <p className="text-sm text-gray-700 mb-2 flex items-center gap-1.5">
+          <CalendarClock className="w-4 h-4 text-gray-400 shrink-0" />
+          {dateLabel}
+        </p>
+      ) : null}
+      <p className="font-medium text-gray-900 text-base">{headline}</p>
+      {workout.description ? (
+        <p className="text-gray-600 text-sm mt-2 whitespace-pre-wrap">{workout.description}</p>
+      ) : null}
+      {workout.segments.length > 0 ? (
+        <div className="mt-4 border-t border-gray-100 pt-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Segments</p>
+          <ul className="text-sm text-gray-700 space-y-1.5">
+            {workout.segments.map((s) => (
+              <li key={s.id}>
+                <span className="font-medium text-gray-800">{s.title}</span>
+                <span className="text-gray-500">
+                  {" "}
+                  · {s.durationType === "DISTANCE" ? `${s.durationValue} mi` : `${s.durationValue} min`}
+                  {s.repeatCount != null && s.repeatCount > 1 ? ` ×${s.repeatCount}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  ) : null;
+
+  const primaryForm = (
+    <div className="space-y-5 bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+      <div>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-2">
+          <Route className="w-4 h-4 text-orange-500" />
+          You add
+        </p>
+        <p className="text-xs text-gray-500">Design a route, pick a meetup spot, and set a start time.</p>
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+          Design a route
+        </label>
+        <input
+          type="url"
+          value={stravaMapUrl}
+          onChange={(e) => setStravaMapUrl(e.target.value)}
+          placeholder="https://www.strava.com/routes/…"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+        />
+        <p className="text-xs text-gray-500 mt-1">Paste a Strava route link so the map shows on your invite.</p>
+      </div>
+
+      <div className="space-y-2">
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1">
+          <MapPin className="w-3.5 h-3.5" />
+          Where to meet
+        </label>
+        <GooglePlacesAutocomplete
+          value={meetUpPoint}
+          onChange={(e) => setMeetUpPoint(e.target.value)}
+          onPlaceSelected={handleStartPlaceSelected}
+          placeholder="Search for a location…"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+        />
+        <p className="text-xs text-gray-500">Pick a result so we can list city and address correctly.</p>
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+          Start time <span className="font-normal text-gray-400">(optional)</span>
+        </label>
+        <div className="flex gap-2 items-center flex-wrap">
+          <input
+            type="number"
+            min={1}
+            max={12}
+            value={startHour}
+            onChange={(e) => setStartHour(e.target.value)}
+            className="w-14 border border-gray-300 rounded-lg px-2 py-2 text-sm text-center"
+            aria-label="Hour"
+          />
+          <span className="text-gray-400">:</span>
+          <input
+            type="number"
+            min={0}
+            max={59}
+            value={startMinute}
+            onChange={(e) => setStartMinute(e.target.value)}
+            className="w-14 border border-gray-300 rounded-lg px-2 py-2 text-sm text-center"
+            aria-label="Minute"
+          />
+          <select
+            value={startPeriod}
+            onChange={(e) => setStartPeriod(e.target.value as "AM" | "PM")}
+            className="border border-gray-300 rounded-lg px-2 py-2 text-sm min-w-[5rem]"
+            aria-label="AM or PM"
+          >
+            <option value="AM">AM</option>
+            <option value="PM">PM</option>
+          </select>
+        </div>
+      </div>
+
+      {error ? (
+        <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+      ) : null}
+
+      <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2 border-t border-gray-100">
+        {onCancel ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => void handleSubmit()}
+          disabled={busy || !canSubmit}
+          className="flex-1 py-2 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {busy ? "Creating…" : "Create invite"}
+        </button>
+      </div>
+
+      <div className="border-t border-gray-100 pt-2">
+        <button
+          type="button"
+          onClick={() => setMoreDetailsOpen((o) => !o)}
+          className="flex items-center gap-2 text-sm font-medium text-sky-800 hover:text-sky-950 w-full text-left py-1"
+          aria-expanded={moreDetailsOpen}
+        >
+          {moreDetailsOpen ? (
+            <ChevronDown className="w-4 h-4 shrink-0" />
+          ) : (
+            <ChevronRight className="w-4 h-4 shrink-0" />
+          )}
+          More details
+        </button>
+
+        {moreDetailsOpen ? (
+          <div className="mt-4 space-y-4 pl-0 sm:pl-1">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                Title
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+              <p className="text-xs text-gray-500 mt-1">Defaults to your workout name.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={runDate}
+                  onChange={(e) => setRunDate(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                  Timezone <span className="font-normal text-gray-400">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                  placeholder="e.g. America/New_York"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                Description
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                Post-run activity <span className="font-normal text-gray-400">(optional)</span>
+              </label>
+              <textarea
+                value={postRunActivity}
+                onChange={(e) => setPostRunActivity(e.target.value)}
+                rows={2}
+                placeholder="E.g., Coffee nearby…"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div className="space-y-2 border-t border-gray-100 pt-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Start address</p>
+              <p className="text-xs text-gray-500">If Places didn’t fill everything, edit below.</p>
+              <input
+                type="text"
+                value={meetUpStreetAddress}
+                onChange={(e) => setMeetUpStreetAddress(e.target.value)}
+                placeholder="Street address"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  value={meetUpCity}
+                  onChange={(e) => setMeetUpCity(e.target.value)}
+                  placeholder="City"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+                <input
+                  type="text"
+                  value={meetUpState}
+                  maxLength={2}
+                  onChange={(e) => setMeetUpState(e.target.value.toUpperCase())}
+                  placeholder="State"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <input
+                type="text"
+                value={meetUpZip}
+                onChange={(e) => setMeetUpZip(e.target.value)}
+                placeholder="ZIP (optional)"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div className="border-t border-gray-100 pt-4 space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={endPointSameAsStart}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    setEndPointSameAsStart(on);
+                    if (!on) {
+                      setEndPoint("");
+                      setEndStreetAddress("");
+                      setEndCity("");
+                      setEndState("");
+                    }
+                  }}
+                  className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                />
+                <span className="text-sm font-medium text-gray-800">Finish same as start</span>
+              </label>
+
+              {!endPointSameAsStart ? (
+                <div className="space-y-3 pl-1">
+                  <GooglePlacesAutocomplete
+                    value={endPoint}
+                    onChange={(e) => setEndPoint(e.target.value)}
+                    onPlaceSelected={handleEndPlaceSelected}
+                    placeholder="Search end location…"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={endStreetAddress}
+                    onChange={(e) => setEndStreetAddress(e.target.value)}
+                    placeholder="End street address"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      value={endCity}
+                      onChange={(e) => setEndCity(e.target.value)}
+                      placeholder="End city"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    />
+                    <input
+                      type="text"
+                      value={endState}
+                      maxLength={2}
+                      onChange={(e) => setEndState(e.target.value.toUpperCase())}
+                      placeholder="End state"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                Total miles
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min={0}
+                value={totalMiles}
+                onChange={(e) => setTotalMiles(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+              <p className="text-xs text-gray-500 mt-1">Pre-filled from your workout.</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                Map image URL <span className="font-normal text-gray-400">(optional)</span>
+              </label>
+              <input
+                type="url"
+                value={mapImageUrl}
+                onChange={(e) => setMapImageUrl(e.target.value)}
+                placeholder="Screenshot or image URL of your route"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+              {mapImageUrl.trim() ? (
+                <img
+                  src={mapImageUrl.trim()}
+                  alt="Map preview"
+                  className="mt-2 max-w-md rounded-lg border border-gray-200"
+                  onError={(ev) => {
+                    (ev.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              ) : null}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-1">
+                <ImageIcon className="w-3.5 h-3.5" />
+                Route photos <span className="font-normal text-gray-400">(optional, up to {MAX_ROUTE_PHOTOS})</span>
+              </label>
+              <div className="space-y-2">
+                {routePhotos.map((photo, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <input
+                      type="url"
+                      value={photo}
+                      onChange={(e) => {
+                        const next = [...routePhotos];
+                        next[idx] = e.target.value;
+                        setRoutePhotos(next);
+                      }}
+                      placeholder="Image URL"
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setRoutePhotos(routePhotos.filter((_, i) => i !== idx))}
+                      className="px-3 text-sm text-red-600 hover:bg-red-50 rounded-lg border border-red-100"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+                {routePhotos.length < MAX_ROUTE_PHOTOS ? (
+                  <button
+                    type="button"
+                    onClick={() => setRoutePhotos([...routePhotos, ""])}
+                    className="text-sm text-sky-700 font-medium hover:underline"
+                  >
+                    + Add photo URL
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
 
   return (
     <div className={className}>
-      {!hideWorkoutSummary ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm mb-6">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-            <Activity className="w-4 h-4 text-sky-600" />
-            Your workout
-          </p>
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-900">
-              {workout.workoutType}
-            </span>
-            {plannedMilesLabel ? (
-              <span className="text-xs text-gray-600">{plannedMilesLabel}</span>
-            ) : null}
-          </div>
-          <p className="font-medium text-gray-900 text-base">{headline}</p>
-          {workout.description ? (
-            <p className="text-gray-600 text-sm mt-2 whitespace-pre-wrap">{workout.description}</p>
-          ) : null}
-          {workout.segments.length > 0 ? (
-            <div className="mt-4 border-t border-gray-100 pt-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                Segments
-              </p>
-              <ul className="text-sm text-gray-700 space-y-1.5">
-                {workout.segments.map((s) => (
-                  <li key={s.id}>
-                    <span className="font-medium text-gray-800">{s.title}</span>
-                    <span className="text-gray-500">
-                      {" "}
-                      · {s.durationType === "DISTANCE" ? `${s.durationValue} mi` : `${s.durationValue} min`}
-                      {s.repeatCount != null && s.repeatCount > 1 ? ` ×${s.repeatCount}` : ""}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
       {existingRuns.length > 0 ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-3 mb-6 text-sm text-amber-950">
           <p className="font-medium text-amber-900">
@@ -431,355 +828,14 @@ export default function CreateCityRunForm({
         </div>
       ) : null}
 
-      <div className="space-y-5 bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-2">
-          <CalendarClock className="w-4 h-4 text-orange-500" />
-          Run logistics
-        </p>
-        <p className="text-xs text-gray-500 -mt-3">
-          Same fields staff use for public CityRuns — add a Strava route URL so the map shows on your invite.
-        </p>
-
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Title
-          </label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
+      {workoutPanel ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {workoutPanel}
+          {primaryForm}
         </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Description
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Post-run activity (optional)
-          </label>
-          <textarea
-            value={postRunActivity}
-            onChange={(e) => setPostRunActivity(e.target.value)}
-            rows={2}
-            placeholder="E.g., Coffee nearby, stretching…"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-              Date
-            </label>
-            <input
-              type="date"
-              value={runDate}
-              onChange={(e) => setRunDate(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-              Start time (optional)
-            </label>
-            <div className="flex gap-2 items-center">
-              <input
-                type="number"
-                min={1}
-                max={12}
-                value={startHour}
-                onChange={(e) => setStartHour(e.target.value)}
-                className="w-14 border border-gray-300 rounded-lg px-2 py-2 text-sm text-center"
-                aria-label="Hour"
-              />
-              <span className="text-gray-400">:</span>
-              <input
-                type="number"
-                min={0}
-                max={59}
-                value={startMinute}
-                onChange={(e) => setStartMinute(e.target.value)}
-                className="w-14 border border-gray-300 rounded-lg px-2 py-2 text-sm text-center"
-                aria-label="Minute"
-              />
-              <select
-                value={startPeriod}
-                onChange={(e) => setStartPeriod(e.target.value as "AM" | "PM")}
-                className="flex-1 border border-gray-300 rounded-lg px-2 py-2 text-sm"
-                aria-label="AM or PM"
-              >
-                <option value="AM">AM</option>
-                <option value="PM">PM</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Timezone (optional)
-          </label>
-          <input
-            type="text"
-            value={timezone}
-            onChange={(e) => setTimezone(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-        </div>
-
-        <div className="space-y-2 border-t border-gray-100 pt-4">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1">
-            <MapPin className="w-3.5 h-3.5" />
-            Start point
-          </label>
-          <GooglePlacesAutocomplete
-            value={meetUpPoint}
-            onChange={(e) => setMeetUpPoint(e.target.value)}
-            onPlaceSelected={handleStartPlaceSelected}
-            placeholder="Search for a location…"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-          <p className="text-xs text-gray-500">Pick a result to fill address and city for listings.</p>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Street address
-          </label>
-          <input
-            type="text"
-            value={meetUpStreetAddress}
-            onChange={(e) => setMeetUpStreetAddress(e.target.value)}
-            placeholder="e.g. 1234 Wilson Blvd"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-              City
-            </label>
-            <input
-              type="text"
-              value={meetUpCity}
-              onChange={(e) => setMeetUpCity(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-              State
-            </label>
-            <input
-              type="text"
-              value={meetUpState}
-              maxLength={2}
-              onChange={(e) => setMeetUpState(e.target.value.toUpperCase())}
-              placeholder="VA"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            ZIP (optional)
-          </label>
-          <input
-            type="text"
-            value={meetUpZip}
-            onChange={(e) => setMeetUpZip(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-        </div>
-
-        <div className="border-t border-gray-100 pt-4 space-y-3">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={endPointSameAsStart}
-              onChange={(e) => {
-                const on = e.target.checked;
-                setEndPointSameAsStart(on);
-                if (!on) {
-                  setEndPoint("");
-                  setEndStreetAddress("");
-                  setEndCity("");
-                  setEndState("");
-                }
-              }}
-              className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
-            />
-            <span className="text-sm font-medium text-gray-800">Finish same as start</span>
-          </label>
-
-          {!endPointSameAsStart ? (
-            <div className="space-y-3 pl-1">
-              <GooglePlacesAutocomplete
-                value={endPoint}
-                onChange={(e) => setEndPoint(e.target.value)}
-                onPlaceSelected={handleEndPlaceSelected}
-                placeholder="Search end location…"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
-              <input
-                type="text"
-                value={endStreetAddress}
-                onChange={(e) => setEndStreetAddress(e.target.value)}
-                placeholder="End street address"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  value={endCity}
-                  onChange={(e) => setEndCity(e.target.value)}
-                  placeholder="End city"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                />
-                <input
-                  type="text"
-                  value={endState}
-                  maxLength={2}
-                  onChange={(e) => setEndState(e.target.value.toUpperCase())}
-                  placeholder="End state"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-            </div>
-          ) : null}
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Total miles
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            min={0}
-            value={totalMiles}
-            onChange={(e) => setTotalMiles(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-          <p className="text-xs text-gray-500 mt-1">Pre-filled from your workout; edit if needed.</p>
-        </div>
-
-        <div className="border-t border-gray-100 pt-4 space-y-2">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Strava route URL
-          </label>
-          <input
-            type="url"
-            value={stravaMapUrl}
-            onChange={(e) => setStravaMapUrl(e.target.value)}
-            placeholder="https://www.strava.com/routes/…"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-          <p className="text-xs text-gray-500">
-            No URL usually means no route on the public invite page — add one if you can.
-          </p>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Map image URL (optional)
-          </label>
-          <input
-            type="url"
-            value={mapImageUrl}
-            onChange={(e) => setMapImageUrl(e.target.value)}
-            placeholder="Screenshot or image URL of your route"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-          {mapImageUrl.trim() ? (
-            <img
-              src={mapImageUrl.trim()}
-              alt="Map preview"
-              className="mt-2 max-w-md rounded-lg border border-gray-200"
-              onError={(ev) => {
-                (ev.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-          ) : null}
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-1">
-            <ImageIcon className="w-3.5 h-3.5" />
-            Route photos (optional, up to {MAX_ROUTE_PHOTOS})
-          </label>
-          <div className="space-y-2">
-            {routePhotos.map((photo, idx) => (
-              <div key={idx} className="flex gap-2">
-                <input
-                  type="url"
-                  value={photo}
-                  onChange={(e) => {
-                    const next = [...routePhotos];
-                    next[idx] = e.target.value;
-                    setRoutePhotos(next);
-                  }}
-                  placeholder="Image URL"
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => setRoutePhotos(routePhotos.filter((_, i) => i !== idx))}
-                  className="px-3 text-sm text-red-600 hover:bg-red-50 rounded-lg border border-red-100"
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
-            {routePhotos.length < MAX_ROUTE_PHOTOS ? (
-              <button
-                type="button"
-                onClick={() => setRoutePhotos([...routePhotos, ""])}
-                className="text-sm text-sky-700 font-medium hover:underline"
-              >
-                + Add photo URL
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        {error ? (
-          <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
-        ) : null}
-
-        <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2 border-t border-gray-100">
-          {onCancel ? (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="flex-1 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => void handleSubmit()}
-            disabled={busy}
-            className="flex-1 py-2 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg disabled:opacity-50"
-          >
-            {busy ? "Creating…" : "Create public links"}
-          </button>
-        </div>
-      </div>
+      ) : (
+        primaryForm
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, ListOrdered } from "lucide-react";
+import { ArrowLeft, Users } from "lucide-react";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import api from "@/lib/api";
@@ -59,7 +59,7 @@ export default function BuildARunPage() {
         <div className="flex flex-1 overflow-hidden">
           <AthleteSidebar />
           <main className="flex-1 overflow-y-auto">
-            <div className="max-w-lg mx-auto px-4 py-12 text-center">
+            <div className="max-w-4xl mx-auto px-4 py-12 text-center">
               <div className="animate-spin rounded-full h-10 w-10 border-2 border-orange-500 border-t-transparent mx-auto" />
             </div>
           </main>
@@ -91,7 +91,7 @@ export default function BuildARunPage() {
       <div className="flex flex-1 overflow-hidden">
         <AthleteSidebar />
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-lg mx-auto px-4 sm:px-6 py-8">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
             <button
               type="button"
               onClick={() => router.push(`/workouts/${workout.id}`)}
@@ -105,25 +105,13 @@ export default function BuildARunPage() {
               <Users className="w-6 h-6 text-sky-600" />
               <h1 className="text-xl font-semibold text-gray-900">Build a Run</h1>
             </div>
-            <p className="text-sm text-gray-600 mb-2">
-              Let others join this workout — set where and when you&apos;re meeting. You&apos;ll get a
-              CityRun RSVP link and a training share page.
+            <p className="text-sm text-gray-600 mb-1">
+              Your workout is set — design a route, pick a spot, and set a time. You&apos;ll get a CityRun
+              RSVP link and a training share page.
             </p>
-            <p className="text-xs text-gray-500 mb-6">
+            <p className="text-xs text-gray-500 mb-8">
               Your run is published as approved so friends can RSVP right away.
             </p>
-
-            <div className="rounded-xl border border-sky-100 bg-sky-50/80 p-4 mb-6">
-              <p className="text-xs font-semibold uppercase tracking-wide text-sky-800 mb-3 flex items-center gap-2">
-                <ListOrdered className="w-4 h-4" />
-                Here&apos;s what you need to do
-              </p>
-              <ol className="list-decimal list-inside text-sm text-sky-950 space-y-2">
-                <li>Confirm the workout below (tied to your plan).</li>
-                <li>Search for your meetup with Google Places.</li>
-                <li>Set date and optional start time, then create your links.</li>
-              </ol>
-            </div>
 
             <CreateCityRunForm
               workout={workout}
