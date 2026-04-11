@@ -6,8 +6,22 @@ export const RUNCREW_JOIN_INTENT_HANDLE_KEY = 'runCrewJoinIntentHandle';
 export const RUNCREW_CREATE_INTENT_KEY = 'runCrewCreateIntent';
 
 const ATHLETE_ID_KEY = 'athleteId';
+const COACH_ID_KEY = 'coachId';
 
 export const LocalStorageAPI = {
+  setCoachId(id: string) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(COACH_ID_KEY, id);
+    }
+  },
+
+  getCoachId() {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(COACH_ID_KEY);
+    }
+    return null;
+  },
+
   setAthleteId(id: string) {
     if (typeof window !== 'undefined') {
       localStorage.setItem(ATHLETE_ID_KEY, id);

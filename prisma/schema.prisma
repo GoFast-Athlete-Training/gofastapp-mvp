@@ -97,6 +97,28 @@ model Athlete {
   container_messages_as_author   gofast_container_messages[]    @relation("ContainerMessageAuthor")
 }
 
+/// Human coach — first-class entity (Firebase auth), parallel to Athlete. Used as userId in race_trainer_members when role = COACH.
+model Coach {
+  id         String   @id @default(cuid())
+  firebaseId String   @unique
+  email      String?
+  companyId  String
+  firstName  String?
+  lastName   String?
+  photoURL   String?
+  bio        String?
+  specialty  String?
+  city       String?
+  state      String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  go_fast_companies go_fast_companies @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("coaches")
+}
+
 /// Weekly batch analysis result: optional 5K pace adjustment + in-app notification payload.
 model pace_adjustment_log {
   id                           String         @id @default(cuid())
@@ -241,6 +263,7 @@ model go_fast_companies {
   createdAt DateTime  @default(now())
   updatedAt DateTime
   Athlete   Athlete[]
+  Coach     Coach[]
 }
 
 model join_codes {
