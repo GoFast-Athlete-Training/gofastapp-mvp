@@ -20,6 +20,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  Copy,
   ExternalLink,
   Info,
   MapPin,
@@ -144,6 +145,7 @@ function RaceHubPageInner() {
   const [postingAnnounce, setPostingAnnounce] = useState(false);
   const [showAnnounceForm, setShowAnnounceForm] = useState(false);
   const [runnersExpanded, setRunnersExpanded] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
 
   const athleteId = LocalStorageAPI.getAthleteId();
   const joinRequested = searchParams.get("join") === "1";
@@ -355,6 +357,19 @@ function RaceHubPageInner() {
 
   const notMember = !myMembership;
 
+  const copyInviteLink = async () => {
+    const s = race.slug?.trim();
+    if (!s || typeof window === "undefined") return;
+    const url = `${window.location.origin}/join/race/${encodeURIComponent(s)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setInviteCopied(true);
+      window.setTimeout(() => setInviteCopied(false), 2000);
+    } catch (e) {
+      console.error("Copy invite link:", e);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <TopNav showBack backUrl="/races" backLabel="My Races" />
@@ -405,6 +420,16 @@ function RaceHubPageInner() {
                 </div>
               </div>
             </div>
+            {myMembership && race.slug?.trim() ? (
+              <button
+                type="button"
+                onClick={() => void copyInviteLink()}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition-colors sm:self-start"
+              >
+                <Copy className="w-4 h-4 text-orange-600" />
+                {inviteCopied ? "Copied!" : "Copy invite link"}
+              </button>
+            ) : null}
           </div>
         </div>
       </header>
