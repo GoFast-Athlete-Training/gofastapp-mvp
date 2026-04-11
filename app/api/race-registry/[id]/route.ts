@@ -37,6 +37,7 @@ export async function GET(
         logoUrl: true,
         description: true,
         courseMapUrl: true,
+        courseSlug: true,
         resultsUrl: true,
         startTime: true,
         packetPickupLocation: true,

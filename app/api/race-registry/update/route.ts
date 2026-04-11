@@ -328,6 +328,10 @@ export async function POST(request: NextRequest) {
       racePayload,
       "courseMapUrl"
     );
+    const courseSlugFromPayload = readOptionalTrimmedString(
+      racePayload,
+      "courseSlug"
+    );
     const resultsUrlFromPayload = readOptionalTrimmedString(
       racePayload,
       "resultsUrl"
@@ -395,6 +399,9 @@ export async function POST(request: NextRequest) {
         : {}),
       ...(courseMapUrlFromPayload !== undefined
         ? { courseMapUrl: courseMapUrlFromPayload }
+        : {}),
+      ...(courseSlugFromPayload !== undefined
+        ? { courseSlug: courseSlugFromPayload }
         : {}),
       ...(resultsUrlFromPayload !== undefined
         ? { resultsUrl: resultsUrlFromPayload }

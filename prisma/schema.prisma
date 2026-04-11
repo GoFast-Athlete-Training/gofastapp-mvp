@@ -321,6 +321,8 @@ model race_registry {
   charitySupported        Boolean                   @default(false)
   charityUrl              String?
   courseMapUrl            String?
+  /// Public content site /course/[slug] — from Company race_courses.slug (prodpush).
+  courseSlug              String?
   courseProfile           Json?
   courseType              String?
   currentParticipants     Int?

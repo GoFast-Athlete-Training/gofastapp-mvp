@@ -14,7 +14,10 @@ import AnnouncementCard from "@/components/RunCrew/AnnouncementCard";
 import RaceMessageFeed, {
   RACE_HUB_DEFAULT_TOPICS,
 } from "@/components/races/RaceMessageFeed";
-import { getPublicRacePageUrl } from "@/lib/public-race-url";
+import {
+  getPublicCoursePageUrl,
+  getPublicRacePageUrl,
+} from "@/lib/public-race-url";
 import {
   Calendar,
   ChevronDown,
@@ -41,6 +44,8 @@ type RaceSummary = {
   logoUrl: string | null;
   distanceLabel: string | null;
   startTime: string | null;
+  /** Company race_courses.slug — public course page at /course/[slug] after prodpush. */
+  courseSlug: string | null;
 };
 
 function distanceSnapToChips(snap: string | null | undefined): string[] {
@@ -346,6 +351,7 @@ function RaceHubPageInner() {
     distanceChips.length > 0 ? null : formatDistanceFallback(race.distanceMeters);
   const raceStartLabel = formatRaceStartTimeLabel(race.startTime);
   const publicRaceUrl = getPublicRacePageUrl(race.slug);
+  const courseTipsUrl = getPublicCoursePageUrl(race.courseSlug);
   const dateLabel = race.raceDate
     ? new Date(race.raceDate).toLocaleDateString(undefined, {
         weekday: "long",
@@ -754,6 +760,17 @@ function RaceHubPageInner() {
                     and registration stay there.
                   </p>
                 )}
+                {courseTipsUrl ? (
+                  <a
+                    href={courseTipsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800 hover:bg-gray-50 transition-colors"
+                  >
+                    Course tips
+                    <ExternalLink className="w-4 h-4 shrink-0" />
+                  </a>
+                ) : null}
               </section>
             </aside>
           </div>
