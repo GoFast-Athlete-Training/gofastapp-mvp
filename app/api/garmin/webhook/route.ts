@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 
+import { waitUntil } from '@vercel/functions';
 import { handleActivitySummary } from '@/lib/garmin-events/handleActivitySummary';
 import { handleActivityDetail } from '@/lib/garmin-events/handleActivityDetail';
 import { handleActivityFile } from '@/lib/garmin-events/handleActivityFile';
@@ -123,7 +124,7 @@ export async function POST(request: Request) {
   });
 
   const rawText = await readRawBody(request);
-  void processWebhookSafely(rawText);
+  waitUntil(processWebhookSafely(rawText));
   return new Response('OK', { status: 200 });
 }
 
@@ -137,7 +138,7 @@ export async function PUT(request: Request) {
   });
 
   const rawText = await readRawBody(request);
-  void processWebhookSafely(rawText);
+  waitUntil(processWebhookSafely(rawText));
   return new Response('OK', { status: 200 });
 }
 

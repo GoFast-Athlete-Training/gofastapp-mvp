@@ -49,18 +49,21 @@ export async function POST(request: NextRequest) {
 
     const activitiesUrl = 'https://apis.garmin.com/wellness-api/rest/activities';
 
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 30);
-    const startDateStr = startDate.toISOString().split('T')[0];
+    /** Garmin Wellness API expects Unix seconds, not calendar startDate strings. */
+    const uploadEndTimeInSeconds = Math.floor(Date.now() / 1000);
+    const uploadStartTimeInSeconds = uploadEndTimeInSeconds - 30 * 24 * 60 * 60;
 
     const fetchActivities = (token: string) =>
-      fetch(`${activitiesUrl}?startDate=${startDateStr}`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      fetch(
+        `${activitiesUrl}?uploadStartTimeInSeconds=${uploadStartTimeInSeconds}&uploadEndTimeInSeconds=${uploadEndTimeInSeconds}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
     let response = await fetchActivities(accessToken);
 
