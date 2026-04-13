@@ -28,7 +28,7 @@ const demos = [
     tags: ["boston-qualifier", "major", "road"],
     registrationUrl: "https://example.com/register/boston",
     logoUrl: "https://images.unsplash.com/photo-1576678927484-cc907957088c?w=200&h=200&fit=crop",
-    startTime: d(3, 21, 14, 0),
+    startTime: "10:00 AM",
   },
   {
     id: "demo_seed_chicago_marathon",
@@ -41,7 +41,7 @@ const demos = [
     tags: ["boston-qualifier", "major", "flat"],
     registrationUrl: "https://example.com/register/chicago",
     logoUrl: "https://images.unsplash.com/photo-1494522358652-f30e61a603d5?w=200&h=200&fit=crop",
-    startTime: d(9, 12, 7, 30),
+    startTime: "7:30 AM",
   },
   {
     id: "demo_seed_nyc_marathon",

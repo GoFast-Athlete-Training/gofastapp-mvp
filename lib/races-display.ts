@@ -29,16 +29,22 @@ export function countdownLabel(iso: string): string {
   return `${d} days away`;
 }
 
-export function formatStartTime(iso: string | null | undefined): string | null {
-  if (!iso) return null;
+/** Race catalog start time: plain label from sync (e.g. "10:00 AM") or legacy ISO-ish strings. */
+export function formatStartTime(raw: string | null | undefined): string | null {
+  if (!raw?.trim()) return null;
+  const s = raw.trim();
+  // Wall-clock labels from GoFastCompany — show as-is (no UTC conversion).
+  if (!/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    return s;
+  }
   try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return null;
+    const d = new Date(s.includes("T") ? s : s.replace(" ", "T"));
+    if (Number.isNaN(d.getTime())) return s;
     return d.toLocaleTimeString(undefined, {
       hour: "numeric",
       minute: "2-digit",
     });
   } catch {
-    return null;
+    return s;
   }
 }

@@ -358,7 +358,8 @@ model race_registry {
   startLat                Float?
   startLng                Float?
   startLocation           String?
-  startTime               DateTime?
+  /// Wall-clock label from GoFastCompany (e.g. "10:00 AM"); not a timezone-aware instant.
+  startTime               String?
   stravaSegmentUrl        String?
   surfaceType             String?
   tags                    String[]                  @default([])

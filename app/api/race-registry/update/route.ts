@@ -152,40 +152,6 @@ function readOptionalDateTime(
   return null;
 }
 
-/** Map company `startTime` (ISO or same-day clock time) onto registry `startTime`. */
-function parseRegistryStartTime(
-  raceDate: Date,
-  raw: unknown
-): Date | null {
-  if (raw == null || raw === "") return null;
-  const s = String(raw).trim();
-  const asIso = new Date(s);
-  if (!Number.isNaN(asIso.getTime()) && (s.includes("T") || /^\d{4}-\d{2}-\d{2}/.test(s))) {
-    return asIso;
-  }
-  const y = raceDate.getUTCFullYear();
-  const m = raceDate.getUTCMonth();
-  const d = raceDate.getUTCDate();
-  const match = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?/i);
-  if (!match) return null;
-  let h = parseInt(match[1], 10);
-  const min = parseInt(match[2], 10);
-  const sec = match[3] ? parseInt(match[3], 10) : 0;
-  const ap = match[4]?.toUpperCase();
-  if (ap === "PM" && h < 12) h += 12;
-  if (ap === "AM" && h === 12) h = 0;
-  if (
-    Number.isNaN(h) ||
-    Number.isNaN(min) ||
-    Number.isNaN(sec) ||
-    min > 59 ||
-    sec > 59
-  ) {
-    return null;
-  }
-  return new Date(Date.UTC(y, m, d, h, min, sec, 0));
-}
-
 /**
  * POST /api/race-registry/update
  * Receives race payload from GoFastCompany (prodpush). Upserts race_registry.
@@ -276,10 +242,7 @@ export async function POST(request: NextRequest) {
     /** Slim sync: course, charity, venue, keywords, external URLs stay on company only. */
     const tagList = tagsFromPayload(racePayload);
     const logoUrl = logoUrlFromPayload(racePayload);
-    const startTimeParsed = parseRegistryStartTime(
-      raceDate,
-      racePayload.startTime
-    );
+    const startTimeStr = readOptionalTrimmedString(racePayload, "startTime");
 
     let distanceLabel: string | null | undefined = undefined;
     if ("distanceLabel" in racePayload) {
@@ -381,7 +344,7 @@ export async function POST(request: NextRequest) {
       companyRaceId,
       ...(tagList.length > 0 ? { tags: tagList } : {}),
       logoUrl,
-      ...(startTimeParsed ? { startTime: startTimeParsed } : {}),
+      ...(startTimeStr !== undefined ? { startTime: startTimeStr } : {}),
       ...(distanceLabel !== undefined ? { distanceLabel } : {}),
       ...(distanceMeters !== undefined ? { distanceMeters } : {}),
       ...(packetPickupLocation !== undefined

@@ -56,14 +56,9 @@ function distanceSnapToChips(snap: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
-function formatRaceStartTimeLabel(iso: string | null | undefined): string | null {
-  if (!iso?.trim()) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+/** Wall-clock label from race_registry (same string GoFastCompany sends); do not parse as Date/UTC. */
+function formatRaceStartTimeLabel(raw: string | null | undefined): string | null {
+  return raw?.trim() || null;
 }
 
 /** Distance line for header + sidebar when distanceLabel (pipe-joined) is empty. */
@@ -458,21 +453,8 @@ function RaceHubPageInner() {
       ) : (
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
-            {/* Community: chat first, then announcements, meetups, runners (minimal) */}
-            <div className="lg:col-span-8 space-y-6 min-w-0 order-1">
-              <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 min-w-0">
-                <h2 className="text-xl font-bold text-gray-900 mb-1">Race chatter</h2>
-                <p className="text-sm text-gray-500 mb-4">
-                  Pace goals, meetups, tips — this is where the crew talks. Full course and logistics live on the
-                  public race page.
-                </p>
-                <RaceMessageFeed
-                  raceRegistryId={raceRegistryId}
-                  topics={[...RACE_HUB_DEFAULT_TOPICS]}
-                  messageListClassName="min-h-[min(22rem,50vh)] max-h-[min(36rem,65vh)]"
-                />
-              </section>
-
+            {/* Left: announcements + race chatter */}
+            <div className="lg:col-span-6 space-y-6 min-w-0 order-1">
               <section className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h2 className="text-lg font-bold text-gray-900">Announcements</h2>
@@ -549,6 +531,96 @@ function RaceHubPageInner() {
                     />
                   ))
                 )}
+              </section>
+
+              <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 min-w-0">
+                <h2 className="text-xl font-bold text-gray-900 mb-1">Race chatter</h2>
+                <p className="text-sm text-gray-500 mb-4">
+                  Pace goals, meetups, tips — this is where the crew talks. Full course and logistics live on the
+                  public race page.
+                </p>
+                <RaceMessageFeed
+                  raceRegistryId={raceRegistryId}
+                  topics={[...RACE_HUB_DEFAULT_TOPICS]}
+                  messageListClassName="min-h-[min(14rem,35vh)] max-h-[min(28rem,55vh)]"
+                />
+              </section>
+            </div>
+
+            {/* Right: race info, course, group runs, who's here */}
+            <aside className="lg:col-span-6 space-y-6 min-w-0 order-2">
+              <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6">
+                <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <Info className="w-5 h-5 text-orange-600" />
+                  At a glance
+                </h2>
+                <div className="space-y-3 text-sm">
+                  {dateLabel ? (
+                    <div className="flex gap-2">
+                      <Calendar className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-gray-900">Date</p>
+                        <p className="text-gray-700">{dateLabel}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                  {raceStartLabel ? (
+                    <div className="flex gap-2">
+                      <Clock className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-gray-900">Start</p>
+                        <p className="text-gray-700">{raceStartLabel}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                  {locationText ? (
+                    <div className="flex gap-2">
+                      <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-gray-900">Location</p>
+                        <p className="text-gray-700">{locationText}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                  {distanceChips.length > 0 ? (
+                    <div>
+                      <p className="font-semibold text-gray-900 mb-1">Distances</p>
+                      <p className="text-gray-700">{distanceChips.join(" · ")}</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="font-semibold text-gray-900 mb-1">Distance</p>
+                      <p className="text-gray-700">{distanceFallback ?? "—"}</p>
+                    </div>
+                  )}
+                </div>
+                {publicRaceUrl ? (
+                  <a
+                    href={publicRaceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-600 transition-colors"
+                  >
+                    Full race info
+                    <ExternalLink className="w-4 h-4 shrink-0" />
+                  </a>
+                ) : (
+                  <p className="mt-4 text-xs text-gray-500">
+                    Public race page link appears when this race has a slug on the catalog. Packet pickup, course map,
+                    and registration stay there.
+                  </p>
+                )}
+                {courseTipsUrl ? (
+                  <a
+                    href={courseTipsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800 hover:bg-gray-50 transition-colors"
+                  >
+                    Course tips
+                    <ExternalLink className="w-4 h-4 shrink-0" />
+                  </a>
+                ) : null}
               </section>
 
               <section className="space-y-4">
@@ -693,83 +765,6 @@ function RaceHubPageInner() {
                       ))
                     )}
                   </div>
-                ) : null}
-              </section>
-            </div>
-
-            {/* At-a-glance race facts; full packet/course/copy lives on public race page */}
-            <aside className="lg:col-span-4 space-y-6 min-w-0 order-2">
-              <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <Info className="w-5 h-5 text-orange-600" />
-                  At a glance
-                </h2>
-                <div className="space-y-3 text-sm">
-                  {dateLabel ? (
-                    <div className="flex gap-2">
-                      <Calendar className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold text-gray-900">Date</p>
-                        <p className="text-gray-700">{dateLabel}</p>
-                      </div>
-                    </div>
-                  ) : null}
-                  {raceStartLabel ? (
-                    <div className="flex gap-2">
-                      <Clock className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold text-gray-900">Start</p>
-                        <p className="text-gray-700">{raceStartLabel}</p>
-                      </div>
-                    </div>
-                  ) : null}
-                  {locationText ? (
-                    <div className="flex gap-2">
-                      <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold text-gray-900">Location</p>
-                        <p className="text-gray-700">{locationText}</p>
-                      </div>
-                    </div>
-                  ) : null}
-                  {distanceChips.length > 0 ? (
-                    <div>
-                      <p className="font-semibold text-gray-900 mb-1">Distances</p>
-                      <p className="text-gray-700">{distanceChips.join(" · ")}</p>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="font-semibold text-gray-900 mb-1">Distance</p>
-                      <p className="text-gray-700">{distanceFallback ?? "—"}</p>
-                    </div>
-                  )}
-                </div>
-                {publicRaceUrl ? (
-                  <a
-                    href={publicRaceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-600 transition-colors"
-                  >
-                    Full race info
-                    <ExternalLink className="w-4 h-4 shrink-0" />
-                  </a>
-                ) : (
-                  <p className="mt-4 text-xs text-gray-500">
-                    Public race page link appears when this race has a slug on the catalog. Packet pickup, course map,
-                    and registration stay there.
-                  </p>
-                )}
-                {courseTipsUrl ? (
-                  <a
-                    href={courseTipsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800 hover:bg-gray-50 transition-colors"
-                  >
-                    Course tips
-                    <ExternalLink className="w-4 h-4 shrink-0" />
-                  </a>
                 ) : null}
               </section>
             </aside>
