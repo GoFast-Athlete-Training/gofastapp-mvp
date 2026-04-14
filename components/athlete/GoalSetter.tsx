@@ -267,8 +267,10 @@ function daysUntil(iso: string): number | null {
 
 export default function GoalSetter({
   initialRaceRegistryId,
+  hideBackLink = false,
 }: {
   initialRaceRegistryId?: string;
+  hideBackLink?: boolean;
 } = {}) {
   const [athleteId, setAthleteId] = useState<string | null>(null);
   const [goal, setGoal] = useState<AthleteGoalRow | null>(null);
@@ -715,13 +717,15 @@ export default function GoalSetter({
 
   return (
     <div>
-      <Link
-        href="/athlete-home"
-        className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
-      >
-        <ArrowLeft className="w-5 h-5" />
-        Back to home
-      </Link>
+      {!hideBackLink ? (
+        <Link
+          href="/athlete-home"
+          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back to home
+        </Link>
+      ) : null}
 
       <header className="mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
@@ -766,49 +770,46 @@ export default function GoalSetter({
       )}
 
       {goal && !editing && (
-        <div className="mb-8 bg-white rounded-xl shadow-md border border-gray-100 p-6">
+        <div className="mb-8 rounded-xl border border-orange-200 border-l-4 border-l-orange-500 bg-gradient-to-br from-orange-50 to-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-xl font-bold text-gray-900">
                 {goal.race_registry?.name ||
                   goal.name?.trim() ||
                   "Your active race goal"}
               </h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="mt-1 text-sm text-gray-700">
                 {distanceDisplayLabel(normalizeDistanceToValue(goal.distance))}
                 {goal.goalTime ? ` · ${goal.goalTime}` : ""}
               </p>
               {goal.race_registry && (
-                <p className="text-sm text-gray-600 mt-2">
+                <p className="mt-2 text-sm text-gray-700">
                   Race day: {formatRaceDateDisplay(goal.race_registry.raceDate)}
                 </p>
               )}
               {!goal.race_registry && (
-                <p className="text-sm text-amber-800 mt-2">
+                <p className="mt-2 text-sm text-amber-800">
                   No race linked — edit to pick a race.
                 </p>
               )}
-              {daysLeft != null && (
-                <p className="text-sm text-gray-600 mt-2">
-                  {daysLeft >= 0 ? (
-                    <>
-                      <span className="font-semibold text-gray-900">{daysLeft}</span>{" "}
-                      days to race
-                    </>
-                  ) : (
-                    <span className="text-amber-800">
-                      Race date has passed — time to set a new goal?
+              {(daysLeft != null || goal.goalRacePace != null) && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {daysLeft != null &&
+                    (daysLeft >= 0 ? (
+                      <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-sm font-semibold text-orange-800">
+                        {daysLeft} days to race
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-sm font-semibold text-amber-900">
+                        Race date has passed — time to set a new goal?
+                      </span>
+                    ))}
+                  {goal.goalRacePace != null && (
+                    <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-sm font-semibold text-orange-800">
+                      Goal race pace ~ {formatSecPerMile(goal.goalRacePace)}
                     </span>
                   )}
-                </p>
-              )}
-              {goal.goalRacePace != null && (
-                <p className="text-sm text-gray-600 mt-2">
-                  Goal race pace ~{" "}
-                  <span className="font-semibold text-gray-900">
-                    {formatSecPerMile(goal.goalRacePace)}
-                  </span>
-                </p>
+                </div>
               )}
             </div>
             <button
