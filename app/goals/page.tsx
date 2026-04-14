@@ -1,4 +1,4 @@
-import GoalSetter from "@/components/athlete/GoalSetter";
+import { redirect } from "next/navigation";
 
 export default async function GoalsPage({
   searchParams,
@@ -6,9 +6,10 @@ export default async function GoalsPage({
   searchParams: Promise<{ raceRegistryId?: string }>;
 }) {
   const sp = await searchParams;
-  return (
-    <div className="max-w-6xl mx-auto py-2 px-4 sm:px-0">
-      <GoalSetter initialRaceRegistryId={sp.raceRegistryId} />
-    </div>
-  );
+  if (sp.raceRegistryId) {
+    redirect(
+      `/profile?goalRace=${encodeURIComponent(sp.raceRegistryId)}#goal`
+    );
+  }
+  redirect("/profile#goal");
 }

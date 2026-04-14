@@ -163,6 +163,22 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         }
         data.athleteGoalId = gid;
       }
+      if ("presetId" in body) {
+        const raw = body.presetId;
+        if (raw === null || raw === "") {
+          data.presetId = null;
+        } else {
+          const pid = String(raw).trim();
+          const exists = await prisma.training_plan_preset.findUnique({
+            where: { id: pid },
+            select: { id: true },
+          });
+          if (!exists) {
+            return NextResponse.json({ error: "presetId not found" }, { status: 400 });
+          }
+          data.presetId = pid;
+        }
+      }
     }
 
     if (typeof body.currentFiveKPace === "string") {

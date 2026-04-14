@@ -19,6 +19,11 @@ enum TrainingPlanLifecycle {
   ARCHIVED
 }
 
+enum CoachReviewStatus {
+  DRAFT
+  PUBLISHED
+}
+
 model Athlete {
   id                      String                   @id
   firebaseId              String                   @unique
@@ -196,15 +201,6 @@ model ambassador_payouts {
   @@index([processedAt])
 }
 
-model ai_roles {
-  id                   String                 @id
-  name                 String
-  content              String
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime
-  training_gen_prompts training_gen_prompts[]
-}
-
 model athlete_activities {
   id               String            @id
   athleteId        String
@@ -274,28 +270,6 @@ model join_codes {
   expiresAt DateTime?
   isActive  Boolean   @default(true)
   run_crews run_crews @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-}
-
-model must_haves {
-  id                   String                 @id
-  name                 String
-  fields               Json
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime
-  training_gen_prompts training_gen_prompts[]
-}
-
-model prompt_instructions {
-  id                   String                @id
-  promptId             String?
-  title                String
-  content              String
-  order                Int                   @default(0)
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime
-  training_gen_prompts training_gen_prompts? @relation(fields: [promptId], references: [id], onDelete: Cascade)
-
-  @@index([promptId, order])
 }
 
 // TODO(race-prep): Athlete-facing course preview / training-plan tie-in may need a
@@ -588,44 +562,6 @@ model TrainingPreferences {
   Athlete              Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
   @@map("training_preferences")
-}
-
-model return_json_formats {
-  id                   String                 @id
-  name                 String
-  schema               Json
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime
-  example              Json?
-  training_gen_prompts training_gen_prompts[]
-}
-
-model rule_set_items {
-  id              String          @id
-  topicId         String
-  text            String
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime
-  rule_set_topics rule_set_topics @relation(fields: [topicId], references: [id])
-}
-
-model rule_set_topics {
-  id             String           @id
-  rulesetId      String
-  name           String
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime
-  rule_set_items rule_set_items[]
-  rule_sets      rule_sets        @relation(fields: [rulesetId], references: [id])
-}
-
-model rule_sets {
-  id                   String                 @id
-  name                 String
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime
-  rule_set_topics      rule_set_topics[]
-  training_gen_prompts training_gen_prompts[]
 }
 
 model run_clubs {
@@ -997,21 +933,60 @@ model training_days_executed {
   Athlete     Athlete  @relation(fields: [athleteId], references: [id])
 }
 
-model training_gen_prompts {
-  id                  String                @id
-  name                String
-  description         String?
-  aiRoleId            String
-  ruleSetId           String?
-  mustHavesId         String
-  returnFormatId      String
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime
-  prompt_instructions prompt_instructions[]
-  ai_roles            ai_roles              @relation(fields: [aiRoleId], references: [id])
-  must_haves          must_haves            @relation(fields: [mustHavesId], references: [id])
-  return_json_formats return_json_formats   @relation(fields: [returnFormatId], references: [id])
-  rule_sets           rule_sets?            @relation(fields: [ruleSetId], references: [id])
+/// Top-level generation preset (e.g. Elite Marathon, Basic, Marine Corps Marathon).
+model training_plan_preset {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  title       String
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  volumeConstraints preset_volume_constraints?
+  workoutConfig     preset_workout_config?
+  training_plans    training_plans[]
+}
+
+/// Volume / taper / mileage bolton for a preset.
+model preset_volume_constraints {
+  id        String @id @default(cuid())
+  presetId  String @unique
+  training_plan_preset training_plan_preset @relation(fields: [presetId], references: [id], onDelete: Cascade)
+
+  taperWeeks             Int   @default(3)
+  peakWeeks              Int   @default(4)
+  taperLongRunAnchors    Json
+  peakLongRunMiles       Int   @default(22)
+  cutbackWeekModulo      Int   @default(3)
+  weeklyMileageMultiplier Float @default(2.5)
+  taperMileageReduction   Float @default(0.75)
+  longRunCapFraction      Float @default(0.4)
+  minWeeklyMiles          Int   @default(40)
+  minLongMiles            Float @default(8)
+  minEasyPerDayMiles      Float @default(3)
+  minEasyWeekMiles        Float @default(4)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Quality / DOW placement bolton for a preset.
+model preset_workout_config {
+  id       String @id @default(cuid())
+  presetId String @unique
+  training_plan_preset training_plan_preset @relation(fields: [presetId], references: [id], onDelete: Cascade)
+
+  tempoStartMiles    Float @default(5)
+  intervalStartMiles Float @default(5)
+  minTempoMiles      Float @default(3)
+  minIntervalMiles   Float @default(3)
+  tempoIdealDow      Int   @default(2)
+  intervalIdealDow   Int   @default(4)
+  longRunDefaultDow  Int   @default(6)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model training_plans {
@@ -1019,18 +994,24 @@ model training_plans {
   athleteId            String
   raceId               String?
   athleteGoalId        String?
+  /// Optional link to a training_plan_preset; null = generation uses hardcoded defaults
+  presetId             String?
   name                 String
   currentWeeklyMileage Int?
-  /// Athlete weekly mileage target (miles); UI copy treats this as typical week volume, not a separate “peak”; falls back at generation time
+  /// Athlete weekly mileage target (miles); falls back at generation time
   weeklyMileageTarget  Int?
-  /// Snapshot of current 5K pace (same string format as Athlete.fiveKPace) for plan-scoped hydration/comparison
+  /// Snapshot of current 5K pace for plan-scoped hydration/comparison
   currentFiveKPace     String?
   lifecycleStatus      TrainingPlanLifecycle  @default(ACTIVE)
+  coachReviewStatus    CoachReviewStatus      @default(DRAFT)
+  publishedAt          DateTime?
+  /// Company user id who published this plan to the training group
+  publishedBy          String?
   startDate            DateTime
   totalWeeks           Int
-  /// AI-generated phase ranges: [{ name, startWeek, endWeek }]
+  /// Phase ranges snapshot: [{ name, startWeek, endWeek }]
   phases               Json?
-  /// Weekly schedule freeze-frame: [{ weekNumber, schedule }]; optional legacy `phase` on entries ignored for new plans
+  /// Weekly schedule freeze-frame: [{ weekNumber, schedule }]; source of truth for pre-materialization edits
   planWeeks            Json?
   /// Snapshot of preferred training days 1=Mon..7=Sun
   preferredDays        Int[]                  @default([])
@@ -1043,19 +1024,13 @@ model training_plans {
   race_registry        race_registry?         @relation(fields: [raceId], references: [id])
   athlete_goal         AthleteGoal?           @relation(fields: [athleteGoalId], references: [id], onDelete: SetNull)
   pace_adjustment_logs pace_adjustment_log[]
+  training_plan_preset training_plan_preset? @relation(fields: [presetId], references: [id])
 
   @@index([athleteGoalId])
   @@index([athleteId, lifecycleStatus])
+  @@index([presetId])
 }
 
-model training_schemas {
-  id          String   @id
-  name        String   @unique
-  description String?
-  schemaJson  Json
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime
-}
 
 /// Coach-curated prescriptions: intervals/tempo/long templates with pace offsets from current 5K.
 model workout_catalogue {

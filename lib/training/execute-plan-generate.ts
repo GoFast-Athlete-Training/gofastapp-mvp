@@ -1,5 +1,6 @@
 /**
  * One-shot plan generate: writes `planWeeks` + plan scalars only (no `workouts` rows).
+ * Loads training_plan_preset boltons when presetId is set; falls back to hardcoded defaults.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -7,7 +8,9 @@ import {
   assignRotationalIdentifiers,
   generatePlanWorkoutRows,
   planWeeksSnapshotFromGeneratedRows,
+  type PlanGenConfig,
 } from "@/lib/training/generate-plan";
+import { presetBoltonsToPlanGenConfig } from "@/lib/training/preset-to-plan-gen-config";
 import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
 import { Prisma } from "@prisma/client";
 import { metersToMiles } from "@/lib/pace-utils";
@@ -24,6 +27,7 @@ export async function executePlanGenerate(params: {
   athleteWeeklyMileage: number | null;
   plan: {
     id: string;
+    presetId?: string | null;
     startDate: Date;
     preferredDays: number[];
     preferredLongRunDow: number | null;
@@ -35,9 +39,26 @@ export async function executePlanGenerate(params: {
   minWeeklyMiles: number;
 }): Promise<{ planId: string; weekCount: number }> {
   const { athleteId, plan } = params;
-  const prefs = await prisma.trainingPreferences.findUnique({
-    where: { athleteId },
-  });
+  const [prefs, rawPreset] = await Promise.all([
+    prisma.trainingPreferences.findUnique({ where: { athleteId } }),
+    plan.presetId
+      ? prisma.training_plan_preset.findUnique({
+          where: { id: plan.presetId },
+          include: {
+            volumeConstraints: true,
+            workoutConfig: true,
+          },
+        })
+      : Promise.resolve(null),
+  ]);
+
+  const config: PlanGenConfig | undefined =
+    rawPreset?.volumeConstraints && rawPreset?.workoutConfig
+      ? presetBoltonsToPlanGenConfig(
+          rawPreset.volumeConstraints,
+          rawPreset.workoutConfig
+        )
+      : undefined;
 
   let weeklyMileageTarget = params.weeklyMileageTarget;
   weeklyMileageTarget = Math.max(
@@ -70,6 +91,7 @@ export async function executePlanGenerate(params: {
     raceName: race.name,
     raceDistanceMiles,
     preferredLongRunDow: plan.preferredLongRunDow,
+    config,
   });
   assignRotationalIdentifiers(drafts);
 

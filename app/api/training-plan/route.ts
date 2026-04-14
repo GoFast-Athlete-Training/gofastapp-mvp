@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
       fiveKPace: bodyFiveK,
       current5KPace: bodyLegacy5k,
       syncAthleteBaseline,
+      presetId: bodyPresetId,
     } = body;
     const body5k = bodyFiveK ?? bodyLegacy5k;
 
@@ -137,6 +138,19 @@ export async function POST(request: NextRequest) {
         ? name.trim()
         : `Training — ${race.name}`;
 
+    let presetIdResolved: string | null = null;
+    if (bodyPresetId != null && bodyPresetId !== "") {
+      const pid = String(bodyPresetId).trim();
+      const exists = await prisma.training_plan_preset.findUnique({
+        where: { id: pid },
+        select: { id: true },
+      });
+      if (!exists) {
+        return NextResponse.json({ error: "presetId not found" }, { status: 400 });
+      }
+      presetIdResolved = pid;
+    }
+
     const now = new Date();
     const plan = await prisma.$transaction(async (tx) => {
       await tx.training_plans.updateMany({
@@ -166,6 +180,7 @@ export async function POST(request: NextRequest) {
           currentFiveKPace: fiveKPaceResolved,
           lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
           preferredDays,
+          ...(presetIdResolved ? { presetId: presetIdResolved } : {}),
           updatedAt: now,
         },
       });

@@ -15,6 +15,19 @@ import {
   normalizePaceTargetEncodingVersion,
 } from '@/lib/workout-generator/pace-calculator';
 import { metersToMiDisplay } from '@/lib/training/workout-preview-payload';
+import {
+  fetchTrainingPlanDetail,
+  fetchPlanWeekSchedule,
+  type PlanDayCard,
+} from '@/lib/training/fetch-plan-week-client';
+import {
+  currentTrainingWeekNumber,
+  effectiveTrainingWeekCount,
+  formatPlanDateDisplay,
+  utcDateOnly,
+  ymdFromDate,
+} from '@/lib/training/plan-utils';
+import { displayWorkoutListTitle } from '@/lib/training/workout-display-title';
 
 function homeSessionPaceLabel(
   segments:
@@ -107,6 +120,13 @@ function normalizeGoalDistanceLabel(raw: unknown): string {
 type ActivePlanSummary = { name: string; hasSchedule: boolean };
 type GoingRunRow = { id: string; title: string; date: string; city: string };
 
+function planDayMilesHome(meters: number | null | undefined): string {
+  if (meters == null || !Number.isFinite(meters) || meters <= 0) return '—';
+  const mi = meters / 1609.34;
+  if (mi >= 10) return `${Math.round(mi)} mi`;
+  return `${mi.toFixed(1)} mi`;
+}
+
 type LastLoggedWorkoutStrip = {
   id: string;
   title: string;
@@ -137,6 +157,7 @@ export default function AthleteHomePage() {
   const [activePlanSummary, setActivePlanSummary] = useState<ActivePlanSummary | null>(null);
   const [myGoingRuns, setMyGoingRuns] = useState<GoingRunRow[]>([]);
   const [lastLoggedWorkout, setLastLoggedWorkout] = useState<LastLoggedWorkoutStrip | null>(null);
+  const [todayPlanDay, setTodayPlanDay] = useState<PlanDayCard | null>(null);
 
   const loadHome = useCallback(async () => {
     const athleteId = LocalStorageAPI.getAthleteId();
@@ -222,6 +243,44 @@ export default function AthleteHomePage() {
     } else {
       setLastLoggedWorkout(null);
     }
+
+    let todayPlan: PlanDayCard | null = null;
+    const upcomingData =
+      upcomingRes.status === 'fulfilled'
+        ? (upcomingRes.value.data as {
+            activePlanSummary?: ActivePlanSummary | null;
+          })
+        : null;
+    const hasSchedule = Boolean(upcomingData?.activePlanSummary?.hasSchedule);
+    if (hasSchedule) {
+      try {
+        const listRes = await api.get('/training-plan?status=active');
+        const plans = listRes.data?.plans as { id: string }[] | undefined;
+        const planId = Array.isArray(plans) && plans[0]?.id ? plans[0].id : null;
+        const u = auth.currentUser;
+        if (planId && u) {
+          const token = await u.getIdToken();
+          const { plan: raw } = await fetchTrainingPlanDetail(planId, token);
+          const p = raw as {
+            startDate: string;
+            totalWeeks: number;
+            race_registry?: { raceDate?: string } | null;
+          };
+          const eff = effectiveTrainingWeekCount(
+            new Date(p.startDate),
+            p.totalWeeks,
+            p.race_registry?.raceDate ? new Date(p.race_registry.raceDate) : null
+          );
+          const wn = currentTrainingWeekNumber(p.startDate, eff);
+          const { days } = await fetchPlanWeekSchedule(planId, wn, token);
+          const todayKey = ymdFromDate(utcDateOnly(new Date()));
+          todayPlan = days.find((d) => d.dateKey === todayKey) ?? null;
+        }
+      } catch (e) {
+        console.warn('athlete-home: today plan day fetch failed', e);
+      }
+    }
+    setTodayPlanDay(todayPlan);
 
     const garminFromStorage =
       typeof window !== 'undefined' && localStorage.getItem('garminConnected') === 'true';
@@ -464,6 +523,84 @@ export default function AthleteHomePage() {
               </div>
             ) : null}
 
+            {/* Goal summary — manage in Profile */}
+            <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm">
+              {primaryGoal ? (
+                <>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Race goal
+                    </p>
+                    <p className="text-gray-900 font-semibold mt-0.5 truncate">
+                      {raceName || 'Your goal'}
+                      {raceDateStr ? (
+                        <span className="font-normal text-gray-600">
+                          {' '}
+                          · {raceDateStr}
+                        </span>
+                      ) : null}
+                    </p>
+                    {goalDaysLeft != null ? (
+                      <p className="text-sm text-gray-600 mt-1">
+                        {goalDaysLeft === 0
+                          ? 'Race day'
+                          : `${goalDaysLeft} day${goalDaysLeft === 1 ? '' : 's'} to go`}
+                      </p>
+                    ) : null}
+                  </div>
+                  <Link
+                    href="/profile#goal"
+                    className="shrink-0 text-sm font-semibold text-orange-600 hover:text-orange-700"
+                  >
+                    Manage goal
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-700">
+                    Set your race goal once — it anchors your plan and calendar.
+                  </p>
+                  <Link
+                    href="/profile#goal"
+                    className="shrink-0 inline-flex justify-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+                  >
+                    Set goal in profile
+                  </Link>
+                </>
+              )}
+            </div>
+
+            {/* Today&apos;s run — primary CTA */}
+            {todayPlanDay && (
+              <div className="mb-6 rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-5 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-orange-900">
+                  Today&apos;s run
+                </p>
+                <h2 className="mt-1 text-xl sm:text-2xl font-bold text-gray-900 leading-snug">
+                  {displayWorkoutListTitle(todayPlanDay)}
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  {formatPlanDateDisplay(todayPlanDay.dateKey || String(todayPlanDay.date), {
+                    weekday: 'long',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                  {todayPlanDay.matchedActivityId ? (
+                    <span className="ml-2 font-semibold text-emerald-700">· Done</span>
+                  ) : null}
+                </p>
+                <p className="text-sm text-gray-600 mt-0.5 tabular-nums">
+                  Planned: {planDayMilesHome(todayPlanDay.estimatedDistanceInMeters)}
+                </p>
+                <Link
+                  href={`/training/day/${todayPlanDay.dateKey}`}
+                  className="mt-4 inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+                >
+                  Open today&apos;s session
+                </Link>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-8">
               {showTrainingAtGlance ? (
                 <div className={`${cardTraining} lg:col-span-3 cursor-default hover:border-emerald-200`}>
@@ -549,10 +686,10 @@ export default function AthleteHomePage() {
                   </div>
                   <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm font-medium text-emerald-900">
                     <Link href="/training" className="hover:underline">
-                      Calendar &amp; week view
+                      Training hub
                     </Link>
-                    <Link href="/goals" className="hover:underline">
-                      Goals
+                    <Link href="/profile#goal" className="hover:underline">
+                      Goal in profile
                     </Link>
                     <Link href="/workouts" className="hover:underline">
                       Go Train

@@ -8,6 +8,7 @@ import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import Link from 'next/link';
 import MissingPaceBanner from '@/components/profile/MissingPaceBanner';
+import GoalSetter from '@/components/athlete/GoalSetter';
 
 const RUNNER_BASE =
   process.env.NEXT_PUBLIC_RUNNER_PHOTO_URL?.replace(/\/$/, '') ||
@@ -36,6 +37,22 @@ export default function ProfilePage() {
   const [athleteProfile, setAthleteProfile] = useState<Record<string, unknown> | null>(null);
   const [publicExtras, setPublicExtras] = useState<PublicGoalPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [goalRaceFromQuery, setGoalRaceFromQuery] = useState<string | undefined>();
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const u = new URLSearchParams(window.location.search);
+    const g = u.get('goalRace');
+    if (g) setGoalRaceFromQuery(g);
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    if (typeof window === 'undefined') return;
+    if (window.location.hash !== '#goal') return;
+    requestAnimationFrame(() => {
+      document.getElementById('goal')?.scrollIntoView({ behavior: 'smooth' });
+    });
+  }, [loading]);
 
   useEffect(() => {
     const id = LocalStorageAPI.getAthleteId();
@@ -206,6 +223,13 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      <section
+        id="goal"
+        className="scroll-mt-24 rounded-2xl border border-orange-100 bg-orange-50/40 p-4 sm:p-6 mb-10 shadow-sm"
+      >
+        <GoalSetter initialRaceRegistryId={goalRaceFromQuery} hideBackLink />
+      </section>
+
       <div className="space-y-10">
         {/* GoFast Page crosswalk */}
         <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -283,7 +307,7 @@ export default function ProfilePage() {
           ) : (
             <p className="text-sm text-gray-600">
               No active plan or chasing goal yet.{' '}
-              <Link href="/goals" className="font-semibold text-orange-600 hover:text-orange-700">
+              <Link href="#goal" className="font-semibold text-orange-600 hover:text-orange-700">
                 Set a goal
               </Link>
             </p>

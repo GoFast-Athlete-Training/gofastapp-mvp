@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { BookOpen, MessageCircle, Trash2, Users } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
@@ -13,6 +13,8 @@ import {
   effectiveTrainingWeekCount,
   formatCalendarWeekRangeLabel,
   formatPlanDateDisplay,
+  utcDateOnly,
+  ymdFromDate,
 } from "@/lib/training/plan-utils";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import {
@@ -180,14 +182,16 @@ export default function TrainingHubPage() {
   const showDashboard = !!planDetail && hasSchedule(planDetail);
   const showIncompletePlan = !!planDetail && !hasSchedule(planDetail);
 
+  const todayKey = ymdFromDate(utcDateOnly(new Date()));
+  const todayPlanDay = weekDays.find((d) => d.dateKey === todayKey) ?? null;
+
   return (
     <AthleteAppShell>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">My Training</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Training</h1>
           <p className="text-gray-600">
-            Your active plan and this week at a glance. Go Train for logging and standalone
-            workouts.
+            Today&apos;s run, your week, and tools — Go Train for logging and standalone workouts.
           </p>
         </div>
 
@@ -241,6 +245,100 @@ export default function TrainingHubPage() {
 
         {showDashboard && planDetail && (
           <div className="space-y-6 mb-8">
+            {/* Today's run — hero */}
+            {!loadingWeek && (
+              <div className="rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-6 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-orange-900">
+                  Today&apos;s run
+                </p>
+                {todayPlanDay ? (
+                  <>
+                    <h2 className="mt-2 text-2xl font-bold text-gray-900">
+                      {displayWorkoutListTitle(todayPlanDay)}
+                    </h2>
+                    <p className="mt-1 text-sm text-gray-600">
+                      {formatPlanDateDisplay(todayPlanDay.dateKey || String(todayPlanDay.date), {
+                        weekday: "long",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                      {todayPlanDay.matchedActivityId ? (
+                        <span className="ml-2 font-semibold text-emerald-700">· Done</span>
+                      ) : null}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600 tabular-nums">
+                      Planned: {planDayMilesDisplay(todayPlanDay.estimatedDistanceInMeters)}
+                    </p>
+                    <Link
+                      href={`/training/day/${todayPlanDay.dateKey}`}
+                      className="mt-5 inline-flex justify-center rounded-xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-700"
+                    >
+                      Open today&apos;s session
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-2 text-lg font-semibold text-gray-900">
+                      No session on the schedule for today
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Check this week below, or log a standalone workout.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <Link
+                        href="/workouts"
+                        className="inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+                      >
+                        Go Train
+                      </Link>
+                      <Link
+                        href="/workouts/create"
+                        className="inline-flex justify-center rounded-xl border-2 border-orange-300 bg-white px-5 py-2.5 text-sm font-semibold text-orange-900 hover:bg-orange-50"
+                      >
+                        Log a workout
+                      </Link>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            {loadingWeek && (
+              <p className="text-sm text-gray-500 mb-2">Loading today &amp; this week…</p>
+            )}
+
+            {/* Hub: AI Coach, Journal, Pod */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
+                More in training
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Link
+                  href="/ask-coach"
+                  className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-orange-200 hover:bg-orange-50/40 transition flex flex-col gap-2"
+                >
+                  <MessageCircle className="h-6 w-6 text-orange-600 shrink-0" aria-hidden />
+                  <span className="font-semibold text-gray-900">AI Coach</span>
+                  <span className="text-xs text-gray-600">Questions about your plan or pacing</span>
+                </Link>
+                <Link
+                  href="/journal"
+                  className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-orange-200 hover:bg-orange-50/40 transition flex flex-col gap-2"
+                >
+                  <BookOpen className="h-6 w-6 text-orange-600 shrink-0" aria-hidden />
+                  <span className="font-semibold text-gray-900">Training journal</span>
+                  <span className="text-xs text-gray-600">Notes and how training feels</span>
+                </Link>
+                <Link
+                  href="/my-runcrews"
+                  className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-orange-200 hover:bg-orange-50/40 transition flex flex-col gap-2"
+                >
+                  <Users className="h-6 w-6 text-orange-600 shrink-0" aria-hidden />
+                  <span className="font-semibold text-gray-900">Training pod</span>
+                  <span className="text-xs text-gray-600">Your crew and accountability</span>
+                </Link>
+              </div>
+            </div>
+
             <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/80 p-6 shadow-sm">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -295,24 +393,6 @@ export default function TrainingHubPage() {
               </div>
             </div>
 
-            <Link
-              href="/workouts"
-              className="block rounded-2xl border-2 border-orange-200 bg-orange-50/80 p-5 shadow-sm hover:border-orange-300 transition"
-            >
-              <p className="text-xs font-semibold uppercase tracking-wide text-orange-800">
-                Go Train today
-              </p>
-              <p className="mt-1 text-lg font-semibold text-gray-900">
-                Today&apos;s session &amp; Garmin
-              </p>
-              <p className="mt-1 text-sm text-gray-600">
-                Open the workout on your calendar day, adjust segments, and push to your watch.
-              </p>
-              <span className="mt-3 inline-block text-sm font-semibold text-orange-800">
-                Open Go Train →
-              </span>
-            </Link>
-
             <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
                 This week
@@ -357,12 +437,51 @@ export default function TrainingHubPage() {
           </div>
         )}
 
+        {authReady && !loading && !showDashboard && (
+          <div className="mb-8">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
+              More in training
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Link
+                href="/ask-coach"
+                className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-orange-200 hover:bg-orange-50/40 transition flex flex-col gap-2"
+              >
+                <MessageCircle className="h-6 w-6 text-orange-600 shrink-0" aria-hidden />
+                <span className="font-semibold text-gray-900">AI Coach</span>
+                <span className="text-xs text-gray-600">Questions about your plan or pacing</span>
+              </Link>
+              <Link
+                href="/journal"
+                className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-orange-200 hover:bg-orange-50/40 transition flex flex-col gap-2"
+              >
+                <BookOpen className="h-6 w-6 text-orange-600 shrink-0" aria-hidden />
+                <span className="font-semibold text-gray-900">Training journal</span>
+                <span className="text-xs text-gray-600">Notes and how training feels</span>
+              </Link>
+              <Link
+                href="/my-runcrews"
+                className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-orange-200 hover:bg-orange-50/40 transition flex flex-col gap-2"
+              >
+                <Users className="h-6 w-6 text-orange-600 shrink-0" aria-hidden />
+                <span className="font-semibold text-gray-900">Training pod</span>
+                <span className="text-xs text-gray-600">Your crew and accountability</span>
+              </Link>
+            </div>
+          </div>
+        )}
+
         <div className="mt-10 rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-5 text-sm text-gray-600">
           <p className="font-medium text-gray-800 mb-2">More</p>
           <ul className="flex flex-wrap gap-x-5 gap-y-2">
             <li>
               <Link href="/training-setup" className="text-orange-600 hover:text-orange-700 font-medium">
                 {planDetail ? "Create or replace a plan" : "Plan setup"}
+              </Link>
+            </li>
+            <li>
+              <Link href="/build-a-run" className="text-orange-600 hover:text-orange-700 font-medium">
+                Build a run
               </Link>
             </li>
             <li>

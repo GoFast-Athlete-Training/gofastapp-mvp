@@ -2,18 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
-import {
-  Home,
-  Target,
-  Dumbbell,
-  LayoutDashboard,
-  Users,
-  Trophy,
-  User,
-  MessageCircle,
-  BookOpen,
-  Zap,
-} from "lucide-react";
+import { Home, LayoutDashboard, MapPin, Trophy, User } from "lucide-react";
 
 type NavItem = {
   label: string;
@@ -22,35 +11,41 @@ type NavItem = {
   match?: (pathname: string | null) => boolean;
 };
 
+function trainingHubMatch(p: string | null): boolean {
+  if (!p) return false;
+  return (
+    p === "/training" ||
+    p.startsWith("/training-setup") ||
+    p.startsWith("/training/day") ||
+    p.startsWith("/workouts") ||
+    p.startsWith("/journal") ||
+    p.startsWith("/ask-coach") ||
+    p.startsWith("/my-runcrews") ||
+    p.startsWith("/build-a-run")
+  );
+}
+
 const navItems: NavItem[] = [
   { label: "Home", href: "/athlete-home", icon: Home },
-  { label: "Goals", href: "/goals", icon: Target },
   {
-    label: "My Training",
+    label: "Train",
     href: "/training",
     icon: LayoutDashboard,
-    match: (p) => p === "/training" || !!p?.startsWith("/training-setup"),
+    match: trainingHubMatch,
   },
   {
-    label: "Go Train",
-    href: "/workouts",
-    icon: Dumbbell,
-    match: (p) =>
-      p === "/workouts" ||
-      (!!p?.startsWith("/workouts/") && p !== "/workouts/create"),
+    label: "Run",
+    href: "/gorun",
+    icon: MapPin,
+    match: (p) => !!p && (p === "/gorun" || p.startsWith("/gorun/")),
   },
-  {
-    label: "Build a Run",
-    href: "/build-a-run",
-    icon: Zap,
-    match: (p) =>
-      !!p?.startsWith("/build-a-run") || p === "/workouts/create",
-  },
-  { label: "Training Pod", href: "/my-runcrews", icon: Users },
   { label: "Races", href: "/races", icon: Trophy },
-  { label: "Profile", href: "/profile", icon: User },
-  { label: "Ask a Coach", href: "/ask-coach", icon: MessageCircle },
-  { label: "Training Journal", href: "/journal", icon: BookOpen },
+  {
+    label: "Profile",
+    href: "/profile",
+    icon: User,
+    match: (p) => !!p && p.startsWith("/profile"),
+  },
 ];
 
 export default function AthleteSidebar() {

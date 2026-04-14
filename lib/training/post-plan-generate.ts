@@ -85,6 +85,7 @@ export async function planGeneratePostHandler(
       athleteWeeklyMileage: athlete.weeklyMileage,
       plan: {
         id: plan.id,
+        presetId: plan.presetId,
         startDate: plan.startDate,
         preferredDays: plan.preferredDays ?? [],
         preferredLongRunDow: plan.preferredLongRunDow ?? null,
