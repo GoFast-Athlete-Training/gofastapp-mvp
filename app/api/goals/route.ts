@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
             raceDate: true,
             city: true,
             state: true,
+            logoUrl: true,
           },
         },
       },

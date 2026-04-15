@@ -1,5 +1,15 @@
 'use client';
 
+import type { LucideIcon } from 'lucide-react';
+import {
+  Calendar,
+  Footprints,
+  MapPin,
+  Mountain,
+  Timer,
+  Wind,
+  Zap,
+} from 'lucide-react';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
@@ -13,6 +23,7 @@ import {
   formatPaceTargetRangeForDisplay,
   formatPaceTargetSingleForDisplay,
   normalizePaceTargetEncodingVersion,
+  RACE_DISTANCES_MILES,
 } from '@/lib/workout-generator/pace-calculator';
 import { metersToMiDisplay } from '@/lib/training/workout-preview-payload';
 import {
@@ -27,7 +38,8 @@ import {
   utcDateOnly,
   ymdFromDate,
 } from '@/lib/training/plan-utils';
-import { displayWorkoutListTitle } from '@/lib/training/workout-display-title';
+import { formatPlannedWorkoutTitle } from '@/lib/training/workout-display-title';
+import { normalizeDistanceForPace } from '@/lib/pace-utils';
 
 function homeSessionPaceLabel(
   segments:
@@ -125,6 +137,58 @@ function planDayMilesHome(meters: number | null | undefined): string {
   const mi = meters / 1609.34;
   if (mi >= 10) return `${Math.round(mi)} mi`;
   return `${mi.toFixed(1)} mi`;
+}
+
+const MILES_5K_RIEGEL = RACE_DISTANCES_MILES['5k'] ?? 3.10686;
+
+function workoutTypeMeta(workoutType: string): { Icon: LucideIcon; label: string } {
+  switch (workoutType) {
+    case 'Easy':
+      return { Icon: Wind, label: 'Easy run' };
+    case 'Tempo':
+      return { Icon: Zap, label: 'Tempo' };
+    case 'Intervals':
+      return { Icon: Timer, label: 'Intervals' };
+    case 'LongRun':
+      return { Icon: Mountain, label: 'Long run' };
+    default:
+      return { Icon: Footprints, label: 'Workout' };
+  }
+}
+
+/** Parse "6:48/mi" or "6:48" style pace → sec/mile */
+function parsePaceStringToSecPerMile(pace: string): number | null {
+  const t = pace.trim();
+  const m = t.match(/^(\d+):(\d{2})/);
+  if (!m) return null;
+  const sec = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  return sec > 0 ? sec : null;
+}
+
+function formatFinishClock(totalSec: number): string {
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Riegel projection: current 5K pace → estimated race time & avg pace at goal distance.
+ */
+function projectRaceFromFiveKPace(
+  fiveKPaceStr: string,
+  eventMiles: number
+): { projectedFinish: string; projectedPace: string } | null {
+  const secPerMile = parsePaceStringToSecPerMile(fiveKPaceStr);
+  if (!secPerMile || !Number.isFinite(eventMiles) || eventMiles <= 0) return null;
+  const fiveKSec = secPerMile * MILES_5K_RIEGEL;
+  const projSec = Math.round(fiveKSec * Math.pow(eventMiles / MILES_5K_RIEGEL, 1.06));
+  const paceSecPerMile = projSec / eventMiles;
+  return {
+    projectedFinish: formatFinishClock(projSec),
+    projectedPace: formatSecPerMile(Math.round(paceSecPerMile)),
+  };
 }
 
 type LastLoggedWorkoutStrip = {
@@ -454,10 +518,6 @@ export default function AthleteHomePage() {
     Boolean(activePlanSummary?.hasSchedule) || Boolean(primaryGoal);
 
   const goalDistanceNorm = normalizeGoalDistanceLabel(primaryGoal?.distance);
-  const goalHeadline =
-    goalDistanceNorm && primaryGoal?.goalTime
-      ? `${goalDistanceNorm} · ${primaryGoal.goalTime}`
-      : goalDistanceNorm || primaryGoal?.goalTime || null;
 
   const cardFindRun =
     'block rounded-xl border-2 border-sky-200 bg-sky-50/70 p-5 shadow-sm hover:border-sky-300 hover:shadow-md transition-all h-full';
@@ -474,6 +534,60 @@ export default function AthleteHomePage() {
     ? formatDurationMin(lastLoggedWorkout.actualDurationSeconds)
     : null;
 
+  const fiveKPaceStr =
+    typeof athlete?.fiveKPace === 'string' && athlete.fiveKPace.trim()
+      ? athlete.fiveKPace.trim()
+      : null;
+
+  const distanceKeyForProjection =
+    primaryGoal != null
+      ? normalizeDistanceForPace(
+          String(primaryGoal.distance ?? ''),
+          primaryGoal.race_registry?.distanceMeters != null
+            ? Number(primaryGoal.race_registry.distanceMeters)
+            : null
+        )
+      : null;
+
+  const eventMilesForProjection =
+    distanceKeyForProjection && RACE_DISTANCES_MILES[distanceKeyForProjection] != null
+      ? RACE_DISTANCES_MILES[distanceKeyForProjection]
+      : primaryGoal?.race_registry?.distanceMeters != null &&
+          Number.isFinite(Number(primaryGoal.race_registry.distanceMeters))
+        ? Number(primaryGoal.race_registry.distanceMeters) / 1609.344
+        : null;
+
+  const paceProjection =
+    fiveKPaceStr && eventMilesForProjection != null && eventMilesForProjection > 0
+      ? projectRaceFromFiveKPace(fiveKPaceStr, eventMilesForProjection)
+      : null;
+
+  const raceLogoUrl =
+    typeof primaryGoal?.race_registry?.logoUrl === 'string' && primaryGoal.race_registry.logoUrl.trim()
+      ? primaryGoal.race_registry.logoUrl.trim()
+      : null;
+  const raceCity = primaryGoal?.race_registry?.city ?? null;
+  const raceState = primaryGoal?.race_registry?.state ?? null;
+  const raceCityState =
+    [raceCity, raceState].filter((x) => x && String(x).trim()).join(', ') || null;
+
+  let todayRunIcon = Footprints;
+  let todayTypeLabel = 'Workout';
+  let todayStoredTitleSubtitle: string | null = null;
+  if (todayPlanDay) {
+    const tm = workoutTypeMeta(todayPlanDay.workoutType);
+    todayRunIcon = tm.Icon;
+    todayTypeLabel = tm.label;
+    const rawT = todayPlanDay.title.trim();
+    const plannedTitle = formatPlannedWorkoutTitle(
+      todayPlanDay.workoutType,
+      todayPlanDay.estimatedDistanceInMeters
+    );
+    if (rawT && rawT !== plannedTitle) {
+      todayStoredTitleSubtitle = rawT;
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
@@ -487,165 +601,198 @@ export default function AthleteHomePage() {
               <p className="text-gray-600 text-sm">Here&apos;s your training at a glance</p>
             </div>
 
-            {paceNotifications.length > 0 && paceNotifications[0]?.summaryMessage ? (
-              <div
-                className={`mb-6 rounded-xl border p-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 ${
-                  paceNotifications[0].adjustmentSecPerMile > 0
-                    ? 'border-emerald-200 bg-emerald-50'
-                    : 'border-gray-200 bg-white'
-                }`}
-              >
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {paceNotifications[0].adjustmentSecPerMile > 0
-                      ? 'Your 5K pace was updated'
-                      : 'Weekly training review'}
-                  </p>
-                  <p className="text-sm text-gray-700 mt-1">{paceNotifications[0].summaryMessage}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const athleteId = LocalStorageAPI.getAthleteId();
-                    const top = paceNotifications[0];
-                    if (!athleteId || !top) return;
-                    try {
-                      await api.patch(`/athlete/${athleteId}/pace-notifications`, { logId: top.id });
-                      setPaceNotifications((prev) => prev.filter((n) => n.id !== top.id));
-                    } catch (e) {
-                      console.error('dismiss pace notification', e);
-                    }
-                  }}
-                  className="shrink-0 text-sm font-medium text-orange-600 hover:text-orange-700"
-                >
-                  Dismiss
-                </button>
-              </div>
-            ) : null}
-
-            {/* Goal summary — manage in Profile */}
-            <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm">
-              {primaryGoal ? (
-                <>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      Race goal
+            {/* Row 1: Today + Race goal */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">
+              <div className="lg:col-span-3">
+                {todayPlanDay ? (
+                  <div className="rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-5 shadow-sm h-full flex flex-col">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-orange-900">
+                      Today&apos;s run
                     </p>
-                    <p className="text-gray-900 font-semibold mt-0.5 truncate">
-                      {raceName || 'Your goal'}
-                      {raceDateStr ? (
-                        <span className="font-normal text-gray-600">
-                          {' '}
-                          · {raceDateStr}
-                        </span>
-                      ) : null}
-                    </p>
-                    {goalDaysLeft != null ? (
-                      <p className="text-sm text-gray-600 mt-1">
-                        {goalDaysLeft === 0
-                          ? 'Race day'
-                          : `${goalDaysLeft} day${goalDaysLeft === 1 ? '' : 's'} to go`}
-                      </p>
-                    ) : null}
+                    <div className="mt-3 flex items-start gap-3">
+                      {(() => {
+                        const Icon = todayRunIcon;
+                        return <Icon className="h-9 w-9 shrink-0 text-orange-600" aria-hidden />;
+                      })()}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-2xl font-bold text-gray-900 leading-tight">{todayTypeLabel}</p>
+                        <p className="text-lg font-semibold text-gray-800 tabular-nums mt-1">
+                          {planDayMilesHome(todayPlanDay.estimatedDistanceInMeters)} total
+                        </p>
+                        {todayStoredTitleSubtitle ? (
+                          <p className="text-xs text-gray-600 mt-2 italic leading-snug">
+                            {todayStoredTitleSubtitle}
+                            <span className="not-italic text-gray-500 block mt-1">
+                              Plan details (intervals, structure) — total volume above.
+                            </span>
+                          </p>
+                        ) : null}
+                        <p className="text-sm text-gray-600 mt-2">
+                          {formatPlanDateDisplay(todayPlanDay.dateKey || String(todayPlanDay.date), {
+                            weekday: 'long',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                          {todayPlanDay.matchedActivityId ? (
+                            <span className="ml-2 font-semibold text-emerald-700">· Done</span>
+                          ) : null}
+                        </p>
+                        <Link
+                          href={`/training/day/${todayPlanDay.dateKey}`}
+                          className="mt-4 inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 w-full sm:w-auto"
+                        >
+                          Open today&apos;s session
+                        </Link>
+                      </div>
+                    </div>
                   </div>
-                  <Link
-                    href="/profile#goal"
-                    className="shrink-0 text-sm font-semibold text-orange-600 hover:text-orange-700"
-                  >
-                    Manage goal
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm text-gray-700">
-                    Set your race goal once — it anchors your plan and calendar.
-                  </p>
-                  <Link
-                    href="/profile#goal"
-                    className="shrink-0 inline-flex justify-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
-                  >
-                    Set goal in profile
-                  </Link>
-                </>
-              )}
+                ) : activePlanSummary?.hasSchedule ? (
+                  <div className="rounded-xl border border-dashed border-gray-300 bg-white p-5 shadow-sm h-full flex flex-col justify-center">
+                    <p className="text-sm font-medium text-gray-800">No session on your schedule today</p>
+                    <p className="text-gray-600 text-sm mt-1">Log a run or check your week in Training.</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Link
+                        href="/workouts"
+                        className="text-sm font-semibold text-orange-600 hover:text-orange-700"
+                      >
+                        Go Train →
+                      </Link>
+                      <Link href="/training" className="text-sm font-semibold text-gray-700 hover:text-gray-900">
+                        Week view →
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full">
+                    <p className="text-sm text-gray-700">Start a plan to see today&apos;s sessions here.</p>
+                    <Link
+                      href="/training-setup"
+                      className="mt-3 inline-block text-sm font-semibold text-orange-600 hover:text-orange-700"
+                    >
+                      Start or connect a plan →
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              <div className="lg:col-span-2">
+                {primaryGoal ? (
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm h-full flex flex-col">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Race goal</p>
+                    <div className="mt-2 flex gap-3 items-start">
+                      {raceLogoUrl ? (
+                        <img
+                          src={raceLogoUrl}
+                          alt=""
+                          className="h-10 w-10 rounded-lg object-contain shrink-0 border border-gray-100 bg-white"
+                        />
+                      ) : null}
+                      <div className="min-w-0 flex-1">
+                        <h2 className="text-lg font-bold text-gray-900 leading-snug">
+                          {raceName || 'Your goal'}
+                        </h2>
+                        {goalDistanceNorm ? (
+                          <p className="text-xs text-gray-500 mt-0.5">{goalDistanceNorm}</p>
+                        ) : null}
+                        {raceCityState ? (
+                          <p className="text-sm text-gray-600 mt-1 flex items-center gap-1.5">
+                            <MapPin className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
+                            {raceCityState}
+                          </p>
+                        ) : null}
+                        <p className="text-sm text-gray-600 mt-1 flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
+                          {raceDateStr ?? '—'}
+                          {goalDaysLeft != null ? (
+                            <span className="text-gray-500">
+                              ·{' '}
+                              {goalDaysLeft === 0
+                                ? 'Race day'
+                                : `${goalDaysLeft} day${goalDaysLeft === 1 ? '' : 's'} to go`}
+                            </span>
+                          ) : null}
+                        </p>
+                      </div>
+                    </div>
+                    <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-sm border-t border-gray-100 pt-3">
+                      <div>
+                        <dt className="text-gray-500 text-xs">Goal time</dt>
+                        <dd className="font-semibold text-gray-900 tabular-nums">
+                          {primaryGoal.goalTime?.trim() ? primaryGoal.goalTime : '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-gray-500 text-xs">Goal pace</dt>
+                        <dd className="font-semibold text-gray-900 tabular-nums">
+                          {primaryGoal.goalRacePace != null
+                            ? formatSecPerMile(primaryGoal.goalRacePace)
+                            : '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-gray-500 text-xs">Current 5K</dt>
+                        <dd className="font-semibold text-gray-900 tabular-nums">
+                          {fiveKPaceStr ?? '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-gray-500 text-xs">Projected (from 5K)</dt>
+                        <dd className="font-semibold text-gray-900 tabular-nums leading-tight">
+                          {paceProjection ? (
+                            <>
+                              {paceProjection.projectedFinish}
+                              <span className="block text-xs font-normal text-gray-600">
+                                {paceProjection.projectedPace} avg
+                              </span>
+                            </>
+                          ) : (
+                            '—'
+                          )}
+                        </dd>
+                      </div>
+                    </dl>
+                    <Link
+                      href="/profile#goal"
+                      className="mt-3 text-sm font-semibold text-orange-600 hover:text-orange-700"
+                    >
+                      Manage goal →
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 p-4 h-full flex flex-col justify-center">
+                    <p className="text-sm text-gray-700">Set your race goal to anchor your plan.</p>
+                    <Link
+                      href="/profile#goal"
+                      className="mt-2 inline-flex justify-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 w-full"
+                    >
+                      Set goal in profile
+                    </Link>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Today&apos;s run — primary CTA */}
-            {todayPlanDay && (
-              <div className="mb-6 rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-orange-900">
-                  Today&apos;s run
-                </p>
-                <h2 className="mt-1 text-xl sm:text-2xl font-bold text-gray-900 leading-snug">
-                  {displayWorkoutListTitle(todayPlanDay)}
-                </h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  {formatPlanDateDisplay(todayPlanDay.dateKey || String(todayPlanDay.date), {
-                    weekday: 'long',
-                    month: 'short',
-                    day: 'numeric',
-                  })}
-                  {todayPlanDay.matchedActivityId ? (
-                    <span className="ml-2 font-semibold text-emerald-700">· Done</span>
-                  ) : null}
-                </p>
-                <p className="text-sm text-gray-600 mt-0.5 tabular-nums">
-                  Planned: {planDayMilesHome(todayPlanDay.estimatedDistanceInMeters)}
-                </p>
-                <Link
-                  href={`/training/day/${todayPlanDay.dateKey}`}
-                  className="mt-4 inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
-                >
-                  Open today&apos;s session
-                </Link>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-8">
+            {/* Row 2: Training + Find a run */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">
               {showTrainingAtGlance ? (
                 <div className={`${cardTraining} lg:col-span-3 cursor-default hover:border-emerald-200`}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800 mb-1">
                     Training plan
                   </p>
                   {activePlanSummary?.name ? (
-                    <h2 className="text-xl font-semibold text-gray-900 leading-snug">
+                    <h2 className="text-lg font-semibold text-gray-900 leading-snug">
                       {activePlanSummary.name}
                     </h2>
                   ) : (
-                    <h2 className="text-xl font-semibold text-gray-900 leading-snug">Your training</h2>
+                    <h2 className="text-lg font-semibold text-gray-900 leading-snug">Your training</h2>
                   )}
-                  {raceName ? (
-                    <p className="text-sm text-gray-700 mt-2">
-                      <span className="font-medium text-gray-900">{raceName}</span>
-                      {raceDateStr ? (
-                        <span className="text-gray-600">
-                          {' '}
-                          · {raceDateStr}
-                          {goalDaysLeft != null ? ` · ${goalDaysLeft} days out` : ''}
-                        </span>
-                      ) : null}
-                    </p>
-                  ) : primaryGoal ? (
-                    <p className="text-sm text-gray-600 mt-2">Set your race in Goals to lock the calendar.</p>
-                  ) : null}
-                  {goalHeadline ? (
-                    <p className="text-base font-semibold text-gray-900 mt-3">{goalHeadline}</p>
-                  ) : null}
-                  {primaryGoal?.goalRacePace != null ? (
-                    <p className="text-sm text-gray-600 mt-1">
-                      Race pace{' '}
-                      <span className="font-medium text-gray-900">
-                        {formatSecPerMile(primaryGoal.goalRacePace)}
-                      </span>
-                    </p>
-                  ) : null}
-                  <div className="mt-4 pt-4 border-t border-emerald-200/80">
+                  <div className="mt-3 pt-3 border-t border-emerald-200/80">
                     <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900 mb-2">
-                      Next training session
+                      Next session
                     </p>
                     {nextTraining ? (
                       <>
-                        <p className="text-lg font-semibold text-gray-900 leading-snug">
+                        <p className="text-base font-semibold text-gray-900 leading-snug">
                           {nextTraining.title}
                         </p>
                         <p className="text-sm text-gray-600 mt-1">
@@ -667,7 +814,7 @@ export default function AthleteHomePage() {
                         ) : null}
                         <Link
                           href={nextTrainingHref}
-                          className="text-sm font-semibold text-emerald-800 mt-3 inline-block hover:underline"
+                          className="text-sm font-semibold text-emerald-800 mt-2 inline-block hover:underline"
                         >
                           Open workout →
                         </Link>
@@ -679,17 +826,17 @@ export default function AthleteHomePage() {
                           href="/training"
                           className="text-sm font-semibold text-emerald-800 mt-2 inline-block hover:underline"
                         >
-                          My Training →
+                          Training hub →
                         </Link>
                       </>
                     )}
                   </div>
-                  <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm font-medium text-emerald-900">
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm font-medium text-emerald-900">
                     <Link href="/training" className="hover:underline">
                       Training hub
                     </Link>
                     <Link href="/profile#goal" className="hover:underline">
-                      Goal in profile
+                      Goal
                     </Link>
                     <Link href="/workouts" className="hover:underline">
                       Go Train
@@ -703,7 +850,7 @@ export default function AthleteHomePage() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800 mb-1">
                     Training plan
                   </p>
-                  <h2 className="text-xl font-semibold text-gray-900">Start your plan</h2>
+                  <h2 className="text-lg font-semibold text-gray-900">Start your plan</h2>
                   <p className="text-sm text-gray-700 mt-2">
                     Connect a schedule from your goal or build workouts week by week.
                   </p>
@@ -722,18 +869,18 @@ export default function AthleteHomePage() {
                     Find a run with others
                   </h2>
                   <p className="text-xs font-medium text-sky-900/80 mb-1">You&apos;re going</p>
-                  <p className="text-lg font-semibold text-gray-900 leading-snug">{nextGoingRun.title}</p>
+                  <p className="text-base font-semibold text-gray-900 leading-snug">{nextGoingRun.title}</p>
                   <p className="text-sm text-gray-600 mt-1">
                     {nextGoingDay ?? 'Date TBD'}
                     {nextGoingRun.city ? ` · ${nextGoingRun.city}` : ''}
                   </p>
                   <Link
                     href={`/gorun/${nextGoingRun.id}`}
-                    className="text-sm font-semibold text-sky-800 mt-4 inline-block hover:underline"
+                    className="text-sm font-semibold text-sky-800 mt-3 inline-block hover:underline"
                   >
                     Open meetup →
                   </Link>
-                  <p className="text-xs text-sky-900/70 mt-4 pt-3 border-t border-sky-200/80">
+                  <p className="text-xs text-sky-900/70 mt-3 pt-3 border-t border-sky-200/80">
                     <Link href="/gorun" className="font-medium hover:underline">
                       Browse more runs →
                     </Link>
@@ -744,10 +891,10 @@ export default function AthleteHomePage() {
                   <h2 className="text-xs font-semibold uppercase tracking-wide text-sky-800 mb-2">
                     Find a run with others
                   </h2>
-                  <p className="text-gray-800 leading-relaxed">
+                  <p className="text-gray-800 text-sm leading-relaxed">
                     RSVP to a community run and show up with a crew. No plan required.
                   </p>
-                  <span className="text-sm font-semibold text-sky-800 mt-4 inline-block">
+                  <span className="text-sm font-semibold text-sky-800 mt-3 inline-block">
                     Browse runs →
                   </span>
                 </Link>
@@ -798,6 +945,42 @@ export default function AthleteHomePage() {
                 >
                   View results →
                 </Link>
+              </div>
+            ) : null}
+
+            {paceNotifications.length > 0 && paceNotifications[0]?.summaryMessage ? (
+              <div
+                className={`mb-4 rounded-lg border px-3 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm ${
+                  paceNotifications[0].adjustmentSecPerMile > 0
+                    ? 'border-emerald-200 bg-emerald-50/90'
+                    : 'border-gray-200 bg-white'
+                }`}
+              >
+                <p className="text-gray-800 min-w-0">
+                  <span className="font-medium">
+                    {paceNotifications[0].adjustmentSecPerMile > 0
+                      ? '5K pace updated · '
+                      : 'Weekly review · '}
+                  </span>
+                  <span className="text-gray-700">{paceNotifications[0].summaryMessage}</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const athleteId = LocalStorageAPI.getAthleteId();
+                    const top = paceNotifications[0];
+                    if (!athleteId || !top) return;
+                    try {
+                      await api.patch(`/athlete/${athleteId}/pace-notifications`, { logId: top.id });
+                      setPaceNotifications((prev) => prev.filter((n) => n.id !== top.id));
+                    } catch (e) {
+                      console.error('dismiss pace notification', e);
+                    }
+                  }}
+                  className="shrink-0 text-xs font-semibold text-orange-600 hover:text-orange-700"
+                >
+                  Dismiss
+                </button>
               </div>
             ) : null}
 

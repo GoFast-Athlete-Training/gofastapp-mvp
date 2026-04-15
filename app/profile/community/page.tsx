@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Users, Compass } from "lucide-react";
+import { Users, Compass, UserSearch } from "lucide-react";
 
 export default function ProfileCommunityPage() {
   return (
@@ -24,6 +24,18 @@ export default function ProfileCommunityPage() {
           <div>
             <p className="font-semibold text-gray-900">My RunCrews</p>
             <p className="text-sm text-gray-600">Open a crew you&apos;re in</p>
+          </div>
+        </Link>
+        <Link
+          href="/find-runners"
+          className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 bg-white hover:border-orange-200 hover:bg-orange-50/50 transition-colors"
+        >
+          <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
+            <UserSearch className="h-6 w-6 text-orange-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900">Find other runners</p>
+            <p className="text-sm text-gray-600">Same goal race, next city run, join in</p>
           </div>
         </Link>
         <Link
