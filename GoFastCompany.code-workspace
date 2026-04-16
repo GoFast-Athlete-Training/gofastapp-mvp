@@ -17,6 +17,9 @@
 		},
 		{
 			"path": "../../Ignite/IgniteBd-Next-combine"
+		},
+		{
+			"path": "../GoFastLanding"
 		}
 	],
 	"settings": {}
