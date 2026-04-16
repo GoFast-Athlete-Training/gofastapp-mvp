@@ -23,6 +23,7 @@ function isMissingPostRunActivityColumn(error: any) {
  * - workflowStatus: DEVELOP | PENDING | SUBMITTED | APPROVED
  * - pastOnly: "true" = only runs with startDate before today (for adding photos, etc.)
  * - upcomingOnly: default "true"; "false" = return all runs (no date filter)
+ * - runClubId: filter to runs for this run_clubs.id (when set, no default date filter unless pastOnly/upcomingOnly)
  */
 function getStartOfTodayUTC() {
   const d = new Date();
@@ -49,15 +50,19 @@ export async function GET(request: Request) {
     const workflowStatus = searchParams.get('workflowStatus');
     const pastOnly = searchParams.get('pastOnly') === 'true';
     const upcomingOnly = searchParams.get('upcomingOnly') !== 'false';
+    const runClubIdFilter = searchParams.get('runClubId')?.trim();
 
     const where: any = {};
     if (workflowStatus && ['DEVELOP', 'PENDING', 'SUBMITTED', 'APPROVED'].includes(workflowStatus)) {
       where.workflowStatus = workflowStatus;
     }
+    if (runClubIdFilter) {
+      where.runClubId = runClubIdFilter;
+    }
     const startOfToday = getStartOfTodayUTC();
     if (pastOnly) {
       where.date = { lt: startOfToday };
-    } else if (upcomingOnly) {
+    } else if (upcomingOnly && !runClubIdFilter) {
       where.date = { gte: startOfToday };
     }
 
@@ -73,6 +78,7 @@ export async function GET(request: Request) {
           dayOfWeek: true,
           date: true,
           runClubId: true,
+          runSeriesId: true,
           meetUpPoint: true,
           meetUpStreetAddress: true,
           meetUpCity: true,
@@ -135,6 +141,7 @@ export async function GET(request: Request) {
           dayOfWeek: true,
           date: true,
           runClubId: true,
+          runSeriesId: true,
           meetUpPoint: true,
           meetUpStreetAddress: true,
           meetUpCity: true,

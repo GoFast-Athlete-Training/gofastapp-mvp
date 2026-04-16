@@ -48,6 +48,11 @@ export async function GET(
         runSchedule: true, // Include runSchedule
         runUrl: true,
         logoUrl: true,
+        state: true,
+        neighborhood: true,
+        websiteUrl: true,
+        instagramUrl: true,
+        stravaUrl: true,
         runSeries: {
           select: {
             id: true,
@@ -130,6 +135,10 @@ export async function PUT(
     if (body.runUrl !== undefined) updateData.runUrl = body.runUrl?.trim() || null;
     if (body.stravaUrl !== undefined) updateData.stravaUrl = body.stravaUrl?.trim() || null;
     if (body.logoUrl !== undefined) updateData.logoUrl = body.logoUrl?.trim() || null;
+    if (body.runSchedule !== undefined) {
+      const trimmed = body.runSchedule?.trim() ?? '';
+      updateData.runSchedule = trimmed.length > 0 ? trimmed : null;
+    }
 
     console.log('🔄 PUT: Updating run_clubs:', {
       id,
@@ -146,6 +155,7 @@ export async function PUT(
         slug: true,
         city: true,
         allRunsDescription: true,
+        runSchedule: true,
       },
     });
 

@@ -301,11 +301,7 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
               )}
             </div>
 
-            <CityRunRouteMedia
-              routePhotos={run.routePhotos}
-              mapImageUrl={run.mapImageUrl}
-              stravaMapUrl={run.stravaMapUrl}
-            />
+            <CityRunRouteMedia routePhotos={run.routePhotos} mapImageUrl={run.mapImageUrl} />
           </div>
 
           {goingPanel}

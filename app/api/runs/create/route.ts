@@ -134,6 +134,10 @@ export async function POST(request: NextRequest) {
       routeId,
       workoutId,
       newRoute,
+      /** Direct prod run_clubs.id (e.g. Company build-instance) */
+      runClubId: bodyRunClubId,
+      /** Link instance to run_series (e.g. Company build-instance) */
+      runSeriesId: bodyRunSeriesId,
     } = body;
 
     const hadExplicitCity = !!(
@@ -386,6 +390,40 @@ export async function POST(request: NextRequest) {
         finalRunClubId = existingRunClub.id;
       }
       // If not found, will be null - runClub data will be hydrated on display if missing
+    } else if (bodyRunClubId && String(bodyRunClubId).trim()) {
+      const id = String(bodyRunClubId).trim();
+      const existingById = await prisma.run_clubs.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+      if (existingById) {
+        finalRunClubId = existingById.id;
+      }
+    }
+
+    let resolvedRunSeriesId: string | null = null;
+    if (bodyRunSeriesId && String(bodyRunSeriesId).trim()) {
+      const seriesId = String(bodyRunSeriesId).trim();
+      const rs = await prisma.run_series.findUnique({
+        where: { id: seriesId },
+        select: { id: true, runClubId: true },
+      });
+      if (!rs) {
+        return NextResponse.json(
+          { success: false, error: 'runSeriesId not found' },
+          { status: 404, headers: corsHeaders }
+        );
+      }
+      if (finalRunClubId && rs.runClubId && rs.runClubId !== finalRunClubId) {
+        return NextResponse.json(
+          { success: false, error: 'runSeriesId does not belong to the selected run club' },
+          { status: 400, headers: corsHeaders }
+        );
+      }
+      if (!finalRunClubId && rs.runClubId) {
+        finalRunClubId = rs.runClubId;
+      }
+      resolvedRunSeriesId = rs.id;
     }
 
     // Per-club duplicate check (same club + same title+date or same webUrl)
@@ -435,6 +473,7 @@ export async function POST(request: NextRequest) {
       slug: runSlug, // URL-friendly slug for better shareability
       runCrewId: runCrewId?.trim() || null,
       runClubId: finalRunClubId, // ✅ Use FK instead of runClubSlug
+      runSeriesId: resolvedRunSeriesId,
       staffGeneratedId: staffGeneratedId?.trim() || null,
       athleteGeneratedId: athleteGeneratedId?.trim() || null,
       title: title.trim(),

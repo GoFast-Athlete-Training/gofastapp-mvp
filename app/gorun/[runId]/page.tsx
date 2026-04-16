@@ -276,6 +276,7 @@ function CityRunPreRSVP({
   const formatDate = (d: string) =>
     new Date(d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
+  // Series sidebar: only when this run row has runSeriesId in DB (not inferred from URL slug).
   const isSeries = run.runSeriesId != null;
 
   const goingSummary =
@@ -388,11 +389,7 @@ function CityRunPreRSVP({
         )}
       </div>
 
-      <CityRunRouteMedia
-        routePhotos={run.routePhotos}
-        mapImageUrl={run.mapImageUrl}
-        stravaMapUrl={run.stravaMapUrl}
-      />
+      <CityRunRouteMedia routePhotos={run.routePhotos} mapImageUrl={run.mapImageUrl} />
     </>
   );
 

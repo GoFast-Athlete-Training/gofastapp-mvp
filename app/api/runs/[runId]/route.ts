@@ -53,6 +53,15 @@ const UNSUPPORTED_CITY_RUN_FIELDS = [
   'igPostGraphic',
 ] as const;
 
+/** Strip empty strings from JSON routePhotos for API consumers. */
+function normalizeRoutePhotosForResponse(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const out = value
+    .filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
+    .map((u) => u.trim());
+  return out.length > 0 ? out : null;
+}
+
 async function logCityRunsRuntimeDiagnostics(context: string) {
   try {
     const rows = (await prisma.$queryRawUnsafe(
@@ -417,7 +426,7 @@ export async function GET(
         description: run.description,
         postRunActivity: run.postRunActivity ?? null,
         stravaMapUrl: run.stravaMapUrl,
-        routePhotos: run.routePhotos as string[] | null ?? null,
+        routePhotos: normalizeRoutePhotosForResponse(run.routePhotos),
         mapImageUrl: run.mapImageUrl ?? null,
         staffNotes: run.staffNotes ?? null,
         stravaUrl: run.stravaUrl ?? null,
