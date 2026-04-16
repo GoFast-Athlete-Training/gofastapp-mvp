@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
 import { prisma } from '@/lib/prisma';
+import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
 
 function generateId() {
   const timestamp = Date.now().toString(36);
@@ -19,9 +20,13 @@ export async function GET(
   { params }: { params: Promise<{ runId: string }> }
 ) {
   try {
-    const { runId } = await params;
-    if (!runId) {
+    const segment = ((await params).runId || '').trim();
+    if (!segment) {
       return NextResponse.json({ error: 'Missing run id' }, { status: 400 });
+    }
+    const resolvedId = await resolveCityRunIdBySegment(segment);
+    if (!resolvedId) {
+      return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
     }
 
     const auth = await requireAthleteFromBearer(request);
@@ -33,19 +38,19 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const topic = searchParams.get('topic') || undefined;
 
-    const run = await prisma.city_runs.findUnique({ where: { id: runId }, select: { id: true } });
+    const run = await prisma.city_runs.findUnique({ where: { id: resolvedId }, select: { id: true } });
     if (!run) {
       return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
     }
     const membership = await prisma.city_run_rsvps.findUnique({
-      where: { runId_athleteId: { runId, athleteId: athlete.id } },
+      where: { runId_athleteId: { runId: resolvedId, athleteId: athlete.id } },
     });
     if (!membership || membership.status !== 'going') {
       return NextResponse.json({ error: 'RSVP required to view messages' }, { status: 403 });
     }
 
     const messages = await prisma.city_run_messages.findMany({
-      where: { runId, ...(topic ? { topic } : {}) },
+      where: { runId: resolvedId, ...(topic ? { topic } : {}) },
       include: {
         Athlete: {
           select: { id: true, firstName: true, lastName: true, photoURL: true },
@@ -70,9 +75,13 @@ export async function POST(
   { params }: { params: Promise<{ runId: string }> }
 ) {
   try {
-    const { runId } = await params;
-    if (!runId) {
+    const segment = ((await params).runId || '').trim();
+    if (!segment) {
       return NextResponse.json({ error: 'Missing run id' }, { status: 400 });
+    }
+    const resolvedId = await resolveCityRunIdBySegment(segment);
+    if (!resolvedId) {
+      return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
     }
 
     let body: any = {};
@@ -86,14 +95,14 @@ export async function POST(
     }
     const { athlete } = auth;
 
-    const run = await prisma.city_runs.findUnique({ where: { id: runId }, select: { id: true } });
+    const run = await prisma.city_runs.findUnique({ where: { id: resolvedId }, select: { id: true } });
     if (!run) {
       return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
     }
 
     // RSVP = membership. Must be RSVP'd "going" to post.
     const membership = await prisma.city_run_rsvps.findUnique({
-      where: { runId_athleteId: { runId, athleteId: athlete.id } },
+      where: { runId_athleteId: { runId: resolvedId, athleteId: athlete.id } },
     });
     if (!membership || membership.status !== 'going') {
       return NextResponse.json({ error: 'RSVP required to post messages' }, { status: 403 });
@@ -107,7 +116,7 @@ export async function POST(
     const message = await prisma.city_run_messages.create({
       data: {
         id: generateId(),
-        runId,
+        runId: resolvedId,
         athleteId: athlete.id,
         content: content.trim(),
         topic: topic || 'general',

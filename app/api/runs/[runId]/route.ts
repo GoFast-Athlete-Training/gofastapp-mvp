@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma';
 import { normalizeWebsiteUrl, normalizeStravaUrl, normalizeInstagramUrl } from '@/lib/runclub-urls';
 import { saveRunClub } from '@/lib/save-runclub';
 import { toCanonicalDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
+import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
 
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
@@ -113,9 +114,15 @@ export async function GET(
       athlete = byId;
     }
 
-    const { runId } = await params;
+    const segment = ((await params).runId || '').trim();
+    const resolvedId = await resolveCityRunIdBySegment(segment);
+    if (!resolvedId) {
+      return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
+    }
+
     console.log('[GET /api/runs/[runId]] Runtime info', {
-      runId,
+      segment,
+      resolvedId,
       commitSha: RUNTIME_COMMIT_SHA,
       dbHost: getDbHost(),
     });
@@ -125,7 +132,7 @@ export async function GET(
     let run: any;
     try {
       run = await prisma.city_runs.findUnique({
-        where: { id: runId },
+        where: { id: resolvedId },
         select: {
           id: true,
           slug: true,
@@ -219,7 +226,7 @@ export async function GET(
         await logCityRunsRuntimeDiagnostics('GET /api/runs/[runId] initial');
       }
       run = await prisma.city_runs.findUnique({
-        where: { id: runId },
+        where: { id: resolvedId },
         select: {
           id: true,
           slug: true,
@@ -378,6 +385,7 @@ export async function GET(
       success: true,
       run: {
         id: run.id,
+        slug: run.slug ?? null,
         title: run.title,
         gofastCity: run.gofastCity,
         // For series: dayOfWeek from setup is source of truth; fallback to run.dayOfWeek (legacy)
@@ -464,11 +472,15 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const { runId } = await params;
+    const segment = ((await params).runId || '').trim();
+    const resolvedId = await resolveCityRunIdBySegment(segment);
+    if (!resolvedId) {
+      return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
+    }
     const body = await request.json();
 
     const run = await prisma.city_runs.findUnique({
-      where: { id: runId },
+      where: { id: resolvedId },
       select: { id: true, runClubId: true, gofastCity: true },
     });
 
@@ -644,7 +656,7 @@ export async function PUT(
       return NextResponse.json({
         success: true,
         run: await prisma.city_runs.findUnique({
-          where: { id: runId },
+          where: { id: resolvedId },
           select: { id: true },
         }),
       });
@@ -653,7 +665,7 @@ export async function PUT(
     let updated;
     try {
       updated = await prisma.city_runs.update({
-        where: { id: runId },
+        where: { id: resolvedId },
         data: updateData as Parameters<typeof prisma.city_runs.update>[0]['data'],
       });
     } catch (error: any) {
@@ -663,7 +675,7 @@ export async function PUT(
         delete updateData[field];
       }
       updated = await prisma.city_runs.update({
-        where: { id: runId },
+        where: { id: resolvedId },
         data: updateData as Parameters<typeof prisma.city_runs.update>[0]['data'],
       });
     }
@@ -736,11 +748,15 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const { runId } = await params;
+    const segment = ((await params).runId || '').trim();
+    const resolvedId = await resolveCityRunIdBySegment(segment);
+    if (!resolvedId) {
+      return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
+    }
 
     // Check if run exists
     const run = await prisma.city_runs.findUnique({
-      where: { id: runId },
+      where: { id: resolvedId },
       select: { id: true },
     });
 
@@ -750,7 +766,7 @@ export async function DELETE(
 
     // Delete the run (cascade will delete RSVPs)
     await prisma.city_runs.delete({
-      where: { id: runId },
+      where: { id: resolvedId },
     });
 
     return NextResponse.json({

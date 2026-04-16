@@ -4,6 +4,70 @@ import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
 import { prisma } from '@/lib/prisma';
+import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
+
+/**
+ * GET /api/runs/[runId]/rsvp
+ * Public list of RSVPs for a city run (no auth). Used by marketing site.
+ * [runId] can be id or slug. Only returns RSVPs when the run is APPROVED.
+ */
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ runId: string }> }
+) {
+  try {
+    const { runId } = await params;
+    const segment = (runId || '').trim();
+    if (!segment) {
+      return NextResponse.json({ error: 'Missing run id' }, { status: 400 });
+    }
+
+    let run = await prisma.city_runs.findUnique({
+      where: { id: segment },
+      select: { id: true, workflowStatus: true },
+    });
+    if (!run) {
+      run = await prisma.city_runs.findUnique({
+        where: { slug: segment },
+        select: { id: true, workflowStatus: true },
+      });
+    }
+    if (!run) {
+      return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
+    }
+    if (run.workflowStatus !== 'APPROVED') {
+      return NextResponse.json({ success: true, rsvps: [] });
+    }
+
+    const rows = await prisma.city_run_rsvps.findMany({
+      where: { runId: run.id },
+      select: {
+        id: true,
+        status: true,
+        athleteId: true,
+        Athlete: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    const rsvps = rows.map((r) => ({
+      id: r.id,
+      status: r.status,
+      athleteId: r.athleteId,
+      Athlete: r.Athlete,
+    }));
+
+    return NextResponse.json({ success: true, rsvps });
+  } catch (err) {
+    console.error('Error listing CityRun RSVPs:', err);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
+}
 
 function generateId(): string {
   const timestamp = Date.now().toString(36);
@@ -23,9 +87,13 @@ export async function POST(
   { params }: { params: Promise<{ runId: string }> }
 ) {
   try {
-    const { runId } = await params;
-    if (!runId) {
+    const segment = ((await params).runId || '').trim();
+    if (!segment) {
       return NextResponse.json({ error: 'Missing run id' }, { status: 400 });
+    }
+    const resolvedId = await resolveCityRunIdBySegment(segment);
+    if (!resolvedId) {
+      return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
     }
 
     let body: any = {};
@@ -44,7 +112,7 @@ export async function POST(
     }
     const { athlete } = auth;
 
-    const run = await prisma.city_runs.findUnique({ where: { id: runId } });
+    const run = await prisma.city_runs.findUnique({ where: { id: resolvedId } });
     if (!run) {
       return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
     }
@@ -53,7 +121,7 @@ export async function POST(
     const parsedOccurrenceDate = occurrenceDate ? new Date(occurrenceDate) : null;
 
     const rsvp = await prisma.city_run_rsvps.upsert({
-      where: { runId_athleteId: { runId, athleteId: athlete.id } },
+      where: { runId_athleteId: { runId: resolvedId, athleteId: athlete.id } },
       update: {
         status,
         rsvpPhotoUrls: normalizedRsvpPhotoUrls,
@@ -61,7 +129,7 @@ export async function POST(
       },
       create: {
         id: generateId(),
-        runId,
+        runId: resolvedId,
         athleteId: athlete.id,
         status,
         rsvpPhotoUrls: normalizedRsvpPhotoUrls,

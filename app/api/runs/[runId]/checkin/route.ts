@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
 import { prisma } from '@/lib/prisma';
+import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
 
 function generateId() {
   const timestamp = Date.now().toString(36);
@@ -20,8 +21,10 @@ export async function GET(
   { params }: { params: Promise<{ runId: string }> }
 ) {
   try {
-    const { runId } = await params;
-    if (!runId) return NextResponse.json({ error: 'Missing run id' }, { status: 400 });
+    const segment = ((await params).runId || '').trim();
+    if (!segment) return NextResponse.json({ error: 'Missing run id' }, { status: 400 });
+    const resolvedId = await resolveCityRunIdBySegment(segment);
+    if (!resolvedId) return NextResponse.json({ error: 'Run not found' }, { status: 404 });
 
     const auth = await requireAthleteFromBearer(request);
     if ('error' in auth) {
@@ -30,7 +33,7 @@ export async function GET(
     const { athlete } = auth;
 
     const checkins = await prisma.city_run_checkins.findMany({
-      where: { runId },
+      where: { runId: resolvedId },
       include: {
         Athlete: { select: { id: true, firstName: true, lastName: true, photoURL: true } },
       },
@@ -59,8 +62,10 @@ export async function POST(
   { params }: { params: Promise<{ runId: string }> }
 ) {
   try {
-    const { runId } = await params;
-    if (!runId) return NextResponse.json({ error: 'Missing run id' }, { status: 400 });
+    const segment = ((await params).runId || '').trim();
+    if (!segment) return NextResponse.json({ error: 'Missing run id' }, { status: 400 });
+    const resolvedId = await resolveCityRunIdBySegment(segment);
+    if (!resolvedId) return NextResponse.json({ error: 'Run not found' }, { status: 404 });
 
     const auth = await requireAthleteFromBearer(request);
     if ('error' in auth) {
@@ -68,14 +73,14 @@ export async function POST(
     }
     const { athlete } = auth;
 
-    const run = await prisma.city_runs.findUnique({ where: { id: runId } });
+    const run = await prisma.city_runs.findUnique({ where: { id: resolvedId } });
     if (!run) return NextResponse.json({ error: 'Run not found' }, { status: 404 });
 
     const body = await request.json().catch(() => ({}));
     const { runPhotoUrl, runShouts } = body;
 
     const checkin = await prisma.city_run_checkins.upsert({
-      where: { runId_athleteId: { runId, athleteId: athlete.id } },
+      where: { runId_athleteId: { runId: resolvedId, athleteId: athlete.id } },
       update: {
         runPhotoUrl: runPhotoUrl ?? undefined,
         runShouts: runShouts ?? undefined,
@@ -83,7 +88,7 @@ export async function POST(
       },
       create: {
         id: generateId(),
-        runId,
+        runId: resolvedId,
         athleteId: athlete.id,
         runPhotoUrl: runPhotoUrl ?? null,
         runShouts: runShouts ?? null,

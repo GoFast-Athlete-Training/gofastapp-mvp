@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { MapPin, Clock, Map, Users, Send, CheckCircle, Trophy } from 'lucide-react';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import CityRunRouteMedia from '@/components/runs/CityRunRouteMedia';
 
 interface RunClub {
   slug: string;
@@ -58,6 +59,8 @@ interface Run {
   pace: string | null;
   description: string | null;
   stravaMapUrl: string | null;
+  routePhotos?: string[] | null;
+  mapImageUrl?: string | null;
   runClub?: RunClub | null;
   rsvps?: Rsvp[];
 }
@@ -97,7 +100,6 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
   }, [run.date]);
 
   const going = rsvps.filter(r => r.status === 'going');
-  const myRsvp = rsvps.find(r => r.athleteId === athleteId);
 
   useEffect(() => {
     fetchMessages();
@@ -176,9 +178,32 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
   const formatMessageTime = (d: string) =>
     new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
+  const goingPanel = (
+    <div className="bg-white rounded-xl shadow-sm p-6 lg:sticky lg:top-4 order-1 lg:order-2">
+      <div className="flex items-center gap-2 mb-4">
+        <Users className="h-5 w-5 text-gray-400" />
+        <h2 className="font-semibold text-gray-900">Going ({going.length})</h2>
+      </div>
+      {going.length === 0 ? (
+        <p className="text-sm text-gray-400">No one yet — you're the first!</p>
+      ) : (
+        <div className="flex flex-wrap gap-3">
+          {going.map((r) => (
+            <div key={r.id} className="flex items-center gap-2">
+              <Avatar athlete={r.Athlete} size={8} />
+              <span className="text-sm text-gray-700">
+                {r.Athlete?.firstName} {r.Athlete?.lastName}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+      <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
 
         {/* You're going banner */}
         <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-3">
@@ -211,89 +236,79 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
           </div>
         )}
 
-        {/* Run header */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          {run.runClub && (
-            <div className="flex items-center gap-3 mb-4">
-              {run.runClub.logoUrl && (
-                <img src={run.runClub.logoUrl} alt={run.runClub.name} className="w-10 h-10 rounded-full object-cover" />
+        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-3 lg:items-start lg:gap-6">
+          <div className="space-y-4 lg:col-span-2 order-2 lg:order-1">
+            {/* Run header */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              {run.runClub && (
+                <div className="flex items-center gap-3 mb-4">
+                  {run.runClub.logoUrl && (
+                    <img src={run.runClub.logoUrl} alt={run.runClub.name} className="w-10 h-10 rounded-full object-cover" />
+                  )}
+                  <span className="text-sm font-medium text-gray-600">{run.runClub.name}</span>
+                </div>
               )}
-              <span className="text-sm font-medium text-gray-600">{run.runClub.name}</span>
-            </div>
-          )}
 
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">{run.title}</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-4">{run.title}</h1>
 
-          <div className="space-y-2 text-gray-700">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-gray-400" />
-              <span>
-                {run.dayOfWeek
-                  ? `Every ${run.dayOfWeek} · Next: ${formatDate(run.date)}`
-                  : formatDate(run.date)}
-                {formatTime() && <span className="ml-1 text-gray-500">at {formatTime()}</span>}
-              </span>
-            </div>
-            <div className="flex items-start gap-2">
-              <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
-              <div>
-                <div className="font-medium">{run.meetUpPoint}</div>
-                {(run.meetUpStreetAddress || run.meetUpCity) && (
-                  <div className="text-sm text-gray-500">
-                    {[run.meetUpStreetAddress, run.meetUpCity, run.meetUpState].filter(Boolean).join(', ')}
+              <div className="space-y-2 text-gray-700">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-gray-400" />
+                  <span>
+                    {run.dayOfWeek
+                      ? `Every ${run.dayOfWeek} · Next: ${formatDate(run.date)}`
+                      : formatDate(run.date)}
+                    {formatTime() && <span className="ml-1 text-gray-500">at {formatTime()}</span>}
+                  </span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                  <div>
+                    <div className="font-medium">{run.meetUpPoint}</div>
+                    {(run.meetUpStreetAddress || run.meetUpCity) && (
+                      <div className="text-sm text-gray-500">
+                        {[run.meetUpStreetAddress, run.meetUpCity, run.meetUpState].filter(Boolean).join(', ')}
+                      </div>
+                    )}
+                    {run.meetUpLat && run.meetUpLng && (
+                      <a
+                        href={`https://www.google.com/maps?q=${run.meetUpLat},${run.meetUpLng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-orange-500 hover:text-orange-600"
+                      >
+                        Open in Maps →
+                      </a>
+                    )}
+                  </div>
+                </div>
+                {(run.totalMiles || run.pace) && (
+                  <div className="flex gap-4 text-sm pt-1">
+                    {run.totalMiles && <span><span className="text-gray-400">Distance</span> {run.totalMiles} mi</span>}
+                    {run.pace && <span><span className="text-gray-400">Pace</span> {run.pace}</span>}
                   </div>
                 )}
-                {run.meetUpLat && run.meetUpLng && (
-                  <a
-                    href={`https://www.google.com/maps?q=${run.meetUpLat},${run.meetUpLng}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-orange-500 hover:text-orange-600"
-                  >
-                    Open in Maps →
+                {run.stravaMapUrl && (
+                  <a href={run.stravaMapUrl} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-orange-500 hover:text-orange-600 pt-1">
+                    <Map className="h-4 w-4" /> View Route
                   </a>
                 )}
               </div>
+
+              {run.description && (
+                <p className="mt-4 text-gray-700 text-sm whitespace-pre-wrap border-t border-gray-100 pt-4">{run.description}</p>
+              )}
             </div>
-            {(run.totalMiles || run.pace) && (
-              <div className="flex gap-4 text-sm pt-1">
-                {run.totalMiles && <span><span className="text-gray-400">Distance</span> {run.totalMiles} mi</span>}
-                {run.pace && <span><span className="text-gray-400">Pace</span> {run.pace}</span>}
-              </div>
-            )}
-            {run.stravaMapUrl && (
-              <a href={run.stravaMapUrl} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm text-orange-500 hover:text-orange-600 pt-1">
-                <Map className="h-4 w-4" /> View Route
-              </a>
-            )}
+
+            <CityRunRouteMedia
+              routePhotos={run.routePhotos}
+              mapImageUrl={run.mapImageUrl}
+              stravaMapUrl={run.stravaMapUrl}
+            />
           </div>
 
-          {run.description && (
-            <p className="mt-4 text-gray-700 text-sm whitespace-pre-wrap border-t border-gray-100 pt-4">{run.description}</p>
-          )}
-        </div>
-
-        {/* Who's going */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="h-5 w-5 text-gray-400" />
-            <h2 className="font-semibold text-gray-900">Going ({going.length})</h2>
-          </div>
-          {going.length === 0 ? (
-            <p className="text-sm text-gray-400">No one yet — you're the first!</p>
-          ) : (
-            <div className="flex flex-wrap gap-3">
-              {going.map(r => (
-                <div key={r.id} className="flex items-center gap-2">
-                  <Avatar athlete={r.Athlete} size={8} />
-                  <span className="text-sm text-gray-700">
-                    {r.Athlete?.firstName} {r.Athlete?.lastName}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          {goingPanel}
         </div>
 
         {/* Messaging */}
