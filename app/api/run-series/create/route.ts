@@ -58,6 +58,8 @@ export async function POST(request: NextRequest) {
       runClub: runClubPayload, // Source of truth from Company acq_run_clubs; upsert to run_clubs
       runClubId,
       runClubSlug,
+      /** If set, upsert this prod run_series row by slug (Company ↔ prod brother-sister key; no shared UUID). */
+      seriesSlug,
       dayOfWeek,
       name,
       description,
@@ -161,17 +163,35 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // Find or create the setup for this (runClubId + dayOfWeek) pair
-    // For multi-site support: if meetUpCity is provided, also match by city to allow multiple series per day
-    // Use the looked-up runClub.id (from run_clubs table) - THIS IS THE FK
-    const whereClause: any = { runClubId: runClub.id, dayOfWeek: canonicalDay };
-    if (meetUpCity?.trim()) {
-      // Multi-site: match by city too, so same club can have multiple Tuesday runs at different locations
-      whereClause.meetUpCity = meetUpCity.trim();
+    // Prefer explicit series slug (Company prodpush) for stable upserts; else match by day (+ city).
+    let setup: Awaited<ReturnType<typeof prisma.run_series.findUnique>> | null = null;
+    const seriesSlugTrim = seriesSlug != null ? String(seriesSlug).trim() : '';
+    if (seriesSlugTrim) {
+      const bySlug = await prisma.run_series.findUnique({
+        where: { slug: seriesSlugTrim },
+      });
+      if (bySlug) {
+        if (bySlug.runClubId !== runClub.id) {
+          const conflictRes = NextResponse.json(
+            { success: false, error: 'seriesSlug already exists for another run club' },
+            { status: 409 }
+          );
+          Object.entries(corsHeaders).forEach(([k, v]) => conflictRes.headers.set(k, v));
+          return conflictRes;
+        }
+        setup = bySlug;
+      }
     }
-    let setup = await prisma.run_series.findFirst({
-      where: whereClause,
-    });
+
+    if (!setup) {
+      const whereClause: any = { runClubId: runClub.id, dayOfWeek: canonicalDay };
+      if (meetUpCity?.trim()) {
+        whereClause.meetUpCity = meetUpCity.trim();
+      }
+      setup = await prisma.run_series.findFirst({
+        where: whereClause,
+      });
+    }
 
     const baseName = name?.trim() || `${runClub.name} ${canonicalDay.charAt(0) + canonicalDay.slice(1).toLowerCase()} Run`;
 
@@ -209,8 +229,10 @@ export async function POST(request: NextRequest) {
         console.error('[run-series/create] Updated series but runClubId is null!', { seriesId: setup.id, runClubId: runClub.id });
       }
     } else {
-      const slugBase = slugifyForSeries((runClub.slug || runClub.id) + '-' + canonicalDay.toLowerCase());
-      const slug = await generateUniqueSeriesSlug(prisma, slugBase);
+      const slugHint =
+        seriesSlugTrim ||
+        slugifyForSeries((runClub.slug || runClub.id) + '-' + canonicalDay.toLowerCase());
+      const slug = await generateUniqueSeriesSlug(prisma, slugifyForSeries(slugHint));
       setup = await prisma.run_series.create({
         data: {
           id: generateId(),
