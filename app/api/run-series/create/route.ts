@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { buildSeriesSlug } from '@/lib/seriesSlug';
 import { toCanonicalDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 
 export const dynamic = 'force-dynamic';
@@ -231,7 +232,7 @@ export async function POST(request: NextRequest) {
     } else {
       const slugHint =
         seriesSlugTrim ||
-        slugifyForSeries((runClub.slug || runClub.id) + '-' + canonicalDay.toLowerCase());
+        buildSeriesSlug(runClub.slug || runClub.id, canonicalDay, gofastCity || meetUpCity);
       const slug = await generateUniqueSeriesSlug(prisma, slugifyForSeries(slugHint));
       setup = await prisma.run_series.create({
         data: {
