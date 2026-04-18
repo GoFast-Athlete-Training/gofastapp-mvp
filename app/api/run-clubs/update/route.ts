@@ -46,7 +46,6 @@ export async function POST(request: NextRequest) {
       id,
       name: nameVal,
       allRunsDescription: rc.allRunsDescription ? `${String(rc.allRunsDescription).substring(0, 50)}...` : null,
-      runSchedule: rc.runSchedule ? `${String(rc.runSchedule).substring(0, 50)}...` : null,
       fieldsReceived: Object.keys(rc).length,
     });
 
@@ -64,11 +63,6 @@ export async function POST(request: NextRequest) {
         const trimmed = String(rc.allRunsDescription).trim();
         return trimmed.length > 0 ? trimmed : null;
       })(),
-      runSchedule: (() => {
-        if (rc.runSchedule == null) return null;
-        const trimmed = String(rc.runSchedule).trim();
-        return trimmed.length > 0 ? trimmed : null;
-      })(),
       logoUrl: rc.logoUrl != null ? String(rc.logoUrl).trim() || null : null,
       instagramUrl: rc.instagramUrl != null ? String(rc.instagramUrl).trim() || null : null,
       state: rc.state != null ? String(rc.state).trim() || null : null,
@@ -79,7 +73,6 @@ export async function POST(request: NextRequest) {
     console.log('📥 PRODUCT UPDATE: Processed updateData:', {
       id,
       allRunsDescription: updateData.allRunsDescription ? `${updateData.allRunsDescription.substring(0, 50)}...` : null,
-      runSchedule: updateData.runSchedule ? `${updateData.runSchedule.substring(0, 50)}...` : null,
     });
 
     // Original genius design: Company ID = Product app ID!
@@ -120,7 +113,6 @@ export async function POST(request: NextRequest) {
             slug: true,
             city: true,
             allRunsDescription: true,
-            runSchedule: true, // Include runSchedule
             runUrl: true,
             logoUrl: true,
           },
@@ -137,7 +129,6 @@ export async function POST(request: NextRequest) {
             slug: true,
             city: true,
             allRunsDescription: true,
-            runSchedule: true, // Include runSchedule
             runUrl: true,
             logoUrl: true,
           },
@@ -153,19 +144,17 @@ export async function POST(request: NextRequest) {
             slug: true,
             city: true,
             allRunsDescription: true,
-            runSchedule: true, // Include runSchedule
             runUrl: true,
             logoUrl: true,
           },
         });
       }
       
-      // Verify what was actually saved (ALL fields, not just allRunsDescription)
+      // Verify what was actually saved
       const verified = await prisma.run_clubs.findUnique({
         where: { id: runClub.id },
         select: {
           allRunsDescription: true,
-          runSchedule: true, // Verify runSchedule too
         },
       });
       
@@ -174,15 +163,11 @@ export async function POST(request: NextRequest) {
         slug: runClub.slug,
         allRunsDescription: verified?.allRunsDescription ? `${verified.allRunsDescription.substring(0, 100)}...` : null,
         allRunsDescriptionLength: verified?.allRunsDescription?.length || 0,
-        runSchedule: verified?.runSchedule ? `${verified.runSchedule.substring(0, 100)}...` : null,
-        runScheduleLength: verified?.runSchedule?.length || 0,
         allRunsDescriptionMatches: verified?.allRunsDescription === updateData.allRunsDescription,
-        runScheduleMatches: verified?.runSchedule === updateData.runSchedule,
       });
       
       // Update runClub with verified values
       runClub.allRunsDescription = verified?.allRunsDescription || null;
-      runClub.runSchedule = verified?.runSchedule || null;
     } else {
       // No ID provided - slug-based matching (fallback)
       const existing = await prisma.run_clubs.findUnique({ where: { slug: slugFinal } });
@@ -196,7 +181,6 @@ export async function POST(request: NextRequest) {
             slug: true,
             city: true,
             allRunsDescription: true,
-            runSchedule: true, // Include runSchedule
             runUrl: true,
             logoUrl: true,
           },
@@ -210,7 +194,6 @@ export async function POST(request: NextRequest) {
             slug: true,
             city: true,
             allRunsDescription: true,
-            runSchedule: true, // Include runSchedule
             runUrl: true,
             logoUrl: true,
           },
@@ -222,7 +205,6 @@ export async function POST(request: NextRequest) {
       id: runClub.id,
       name: runClub.name,
       allRunsDescription: runClub.allRunsDescription ? `${runClub.allRunsDescription.substring(0, 50)}...` : null,
-      runSchedule: runClub.runSchedule ? `${runClub.runSchedule.substring(0, 50)}...` : null,
     });
 
     const response = NextResponse.json({

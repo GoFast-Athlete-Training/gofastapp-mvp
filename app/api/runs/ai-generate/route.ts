@@ -167,20 +167,8 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Also check runSchedule if runClubId provided (for track inference)
-    if (!extractedRunType && runClubId) {
-      try {
-        const runClub = await prisma.run_clubs.findUnique({
-          where: { id: runClubId },
-          select: { id: true }, // We'd need runSchedule but it's not in run_clubs model
-        });
-        // Note: runSchedule is on acq_run_clubs in GoFastCompany, not run_clubs in gofastapp-mvp
-        // So we can't check it here - it's handled in the frontend component
-      } catch (error) {
-        // Ignore - runSchedule check happens in frontend
-      }
-    }
-    
+    // Club-level run type hints can be expanded later (e.g. from run_series / allRunsDescription).
+
     // Extract workout description/focus (e.g. "emphasizes speed training for those want to increase threshold")
     let extractedWorkoutDescription = null;
     const workoutDescriptionPatterns = [

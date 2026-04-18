@@ -61,11 +61,6 @@ export async function POST(request: NextRequest) {
         const trimmed = String(rc.allRunsDescription).trim();
         return trimmed.length > 0 ? trimmed : null;
       })(),
-      runSchedule: (() => {
-        if (rc.runSchedule == null) return null;
-        const trimmed = String(rc.runSchedule).trim();
-        return trimmed.length > 0 ? trimmed : null;
-      })(),
       logoUrl: rc.logoUrl != null ? String(rc.logoUrl).trim() || null : null,
       instagramUrl: rc.instagramUrl != null ? String(rc.instagramUrl).trim() || null : null,
       syncedAt: new Date(),

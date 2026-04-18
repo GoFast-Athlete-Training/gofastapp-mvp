@@ -9,6 +9,39 @@ import { handleDeregistration } from '@/lib/garmin-events/handleDeregistration';
 
 const DEBUG = process.env.GARMIN_DEBUG === 'true';
 
+function readUserIdFromObject(item: unknown): string | null {
+  if (item !== null && typeof item === 'object' && 'userId' in item) {
+    const u = (item as { userId?: unknown }).userId;
+    if (u !== undefined && u !== null && String(u).length > 0) {
+      return String(u);
+    }
+  }
+  return null;
+}
+
+/** Garmin userId may live on the body, or on the first activities / activityDetails / activityFiles item. */
+function resolveGarminUserIdFromBody(body: Record<string, unknown>): string | null {
+  if (body.userId !== undefined && body.userId !== null && String(body.userId).length > 0) {
+    return String(body.userId);
+  }
+  const acts = body.activities;
+  if (Array.isArray(acts) && acts.length > 0) {
+    const u = readUserIdFromObject(acts[0]);
+    if (u) return u;
+  }
+  const details = body.activityDetails;
+  if (Array.isArray(details) && details.length > 0) {
+    const u = readUserIdFromObject(details[0]);
+    if (u) return u;
+  }
+  const files = body.activityFiles;
+  if (Array.isArray(files) && files.length > 0) {
+    const u = readUserIdFromObject(files[0]);
+    if (u) return u;
+  }
+  return null;
+}
+
 type GarminWebhookCategory =
   | 'ACTIVITY'
   | 'WORKOUT'
@@ -100,16 +133,6 @@ function normalizeParsedToObject(parsed: unknown): Record<string, unknown> {
   }
 }
 
-function safeRun(label: string, fn: () => unknown): void {
-  void (async () => {
-    try {
-      await fn();
-    } catch (err: unknown) {
-      console.error(`[GARMIN WEBHOOK] ${label}:`, err);
-    }
-  })();
-}
-
 function readRawBody(request: Request): Promise<string> {
   return request.text().catch(() => '');
 }
@@ -164,14 +187,9 @@ async function processWebhookSafely(rawText: string): Promise<void> {
 
     const topLevelUserId =
       body.userId !== undefined && body.userId !== null ? String(body.userId) : null;
-    const firstActivityUserId =
-      firstActivity &&
-      typeof firstActivity === 'object' &&
-      firstActivity !== null &&
-      'userId' in firstActivity
-        ? String((firstActivity as { userId?: unknown }).userId ?? '')
-        : null;
-    const userIdLog = topLevelUserId ?? firstActivityUserId ?? '(none)';
+    const firstActivityUserId = readUserIdFromObject(firstActivity);
+    const garminUserId = resolveGarminUserIdFromBody(body);
+    const userIdLog = garminUserId ?? '(none)';
 
     let keys: string[] = [];
     try {
@@ -199,9 +217,14 @@ async function processWebhookSafely(rawText: string): Promise<void> {
     }
 
     if (hasActivitiesArray && isPing) {
-      safeRun('handlePingActivities', async () => {
-        await handlePingActivities(activities as any, body.userId as string | undefined);
-      });
+      try {
+        await handlePingActivities(
+          activities as any,
+          (body.userId as string | undefined) ?? garminUserId ?? undefined
+        );
+      } catch (err: unknown) {
+        console.error('[GARMIN WEBHOOK] handlePingActivities:', err);
+      }
       return;
     }
 
@@ -209,29 +232,33 @@ async function processWebhookSafely(rawText: string): Promise<void> {
     console.log('[GARMIN DETECT]', { category, userId: userIdLog });
 
     if (category === 'PERMISSION') {
-      safeRun('handlePermissionChange', async () => {
+      try {
         await handlePermissionChange({
-          userId: body.userId as string | undefined,
+          userId: (body.userId as string | undefined) ?? garminUserId ?? undefined,
           permissions: body.permissions as Parameters<typeof handlePermissionChange>[0]['permissions'],
           scopes: body.scopes as Parameters<typeof handlePermissionChange>[0]['scopes'],
           ...body,
         } as Parameters<typeof handlePermissionChange>[0]);
-      });
+      } catch (err: unknown) {
+        console.error('[GARMIN WEBHOOK] handlePermissionChange:', err);
+      }
       return;
     }
 
     if (category === 'DEREGISTRATION') {
-      safeRun('handleDeregistration', async () => {
+      try {
         await handleDeregistration({
-          userId: body.userId as string | undefined,
+          userId: (body.userId as string | undefined) ?? garminUserId ?? undefined,
           reason: body.reason as string | undefined,
           ...body,
         } as Parameters<typeof handleDeregistration>[0]);
-      });
+      } catch (err: unknown) {
+        console.error('[GARMIN WEBHOOK] handleDeregistration:', err);
+      }
       return;
     }
 
-    void dispatchLegacyEventType(body);
+    await dispatchLegacyEventType(body, garminUserId);
   } catch (error: unknown) {
     console.error('❌ [GARMIN WEBHOOK] processWebhookSafely:', error);
   }
@@ -239,63 +266,89 @@ async function processWebhookSafely(rawText: string): Promise<void> {
 
 /**
  * Legacy eventType routing for ACTIVITY / WORKOUT / UNKNOWN.
+ * Awaited so waitUntil(processWebhookSafely) keeps the function alive until DB work finishes.
  */
-async function dispatchLegacyEventType(body: Record<string, unknown>): Promise<void> {
+async function dispatchLegacyEventType(
+  body: Record<string, unknown>,
+  garminUserId: string | null
+): Promise<void> {
   const eventType = detectEventTypeSafe(body);
+  const userIdParam = (body.userId as string | undefined) ?? garminUserId ?? undefined;
 
   if (DEBUG) {
     console.log(`🔍 Detected legacy event type: ${eventType}`);
   }
 
   switch (eventType) {
-    case 'ACTIVITY_SUMMARY':
-      safeRun('handleActivitySummary', async () => {
-        const acts = Array.isArray(body.activities) ? body.activities : [];
-        const result = await handleActivitySummary(acts as any, body.userId as string | undefined);
+    case 'ACTIVITY_SUMMARY': {
+      const acts = Array.isArray(body.activities) ? body.activities : [];
+      try {
+        const result = await handleActivitySummary(acts as any, userIdParam);
         console.log('📩 Garmin ACTIVITY_SUMMARY result', {
           ...result,
-          userId: body.userId ?? '(none)',
+          userId: garminUserId ?? '(none)',
         });
-      });
+      } catch (err: unknown) {
+        console.error('[GARMIN WEBHOOK] handleActivitySummary:', err);
+      }
       break;
+    }
 
-    case 'ACTIVITY_DETAIL':
-      safeRun('handleActivityDetail', async () => {
-        await handleActivityDetail(
+    case 'ACTIVITY_DETAIL': {
+      try {
+        const result = await handleActivityDetail(
           (Array.isArray(body.activityDetails) ? body.activityDetails : []) as any,
-          body.userId as string | undefined
+          userIdParam
         );
-      });
+        console.log('📩 Garmin ACTIVITY_DETAIL result', {
+          ...result,
+          userId: garminUserId ?? '(none)',
+        });
+      } catch (err: unknown) {
+        console.error('[GARMIN WEBHOOK] handleActivityDetail:', err);
+      }
       break;
+    }
 
-    case 'ACTIVITY_FILE':
-      safeRun('handleActivityFile', async () => {
-        await handleActivityFile(
+    case 'ACTIVITY_FILE': {
+      try {
+        const result = await handleActivityFile(
           (Array.isArray(body.activityFiles) ? body.activityFiles : []) as any,
-          body.userId as string | undefined
+          userIdParam
         );
-      });
+        console.log('📩 Garmin ACTIVITY_FILE result', {
+          ...result,
+          userId: garminUserId ?? '(none)',
+        });
+      } catch (err: unknown) {
+        console.error('[GARMIN WEBHOOK] handleActivityFile:', err);
+      }
       break;
+    }
 
     case 'USER_PERMISSION_CHANGED':
-      safeRun('handlePermissionChange(legacy)', async () => {
+      try {
         await handlePermissionChange({
-          userId: body.userId as string | undefined,
+          userId: userIdParam,
           permissions: body.permissions as Parameters<typeof handlePermissionChange>[0]['permissions'],
           scopes: body.scopes as Parameters<typeof handlePermissionChange>[0]['scopes'],
           ...body,
         } as Parameters<typeof handlePermissionChange>[0]);
-      });
+      } catch (err: unknown) {
+        console.error('[GARMIN WEBHOOK] handlePermissionChange(legacy):', err);
+      }
       break;
 
     case 'USER_DEREGISTER':
-      safeRun('handleDeregistration(legacy)', async () => {
+      try {
         await handleDeregistration({
-          userId: body.userId as string | undefined,
+          userId: userIdParam,
           reason: body.reason as string | undefined,
           ...body,
         } as Parameters<typeof handleDeregistration>[0]);
-      });
+      } catch (err: unknown) {
+        console.error('[GARMIN WEBHOOK] handleDeregistration(legacy):', err);
+      }
       break;
 
     case 'MOVEIQ':
@@ -309,13 +362,16 @@ async function dispatchLegacyEventType(body: Record<string, unknown>): Promise<v
       break;
 
     case 'MANUALLY_UPDATED':
-      if (
-        Array.isArray(body.activities) &&
-        body.activities.length > 0
-      ) {
-        safeRun('handleActivitySummary(MANUALLY_UPDATED)', async () => {
-          await handleActivitySummary(body.activities as any, body.userId as string | undefined);
-        });
+      if (Array.isArray(body.activities) && body.activities.length > 0) {
+        try {
+          const result = await handleActivitySummary(body.activities as any, userIdParam);
+          console.log('📩 Garmin ACTIVITY_SUMMARY result (MANUALLY_UPDATED)', {
+            ...result,
+            userId: garminUserId ?? '(none)',
+          });
+        } catch (err: unknown) {
+          console.error('[GARMIN WEBHOOK] handleActivitySummary(MANUALLY_UPDATED):', err);
+        }
       }
       break;
 
