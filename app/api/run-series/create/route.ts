@@ -249,6 +249,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Re-link orphaned city_runs (runSeriesId null) to this series for same club + day (+ time when set).
+    const orphanWhere: {
+      runClubId: string;
+      dayOfWeek: string;
+      runSeriesId: null;
+      startTimeHour?: number;
+      startTimeMinute?: number;
+    } = {
+      runClubId: runClub.id,
+      dayOfWeek: canonicalDay,
+      runSeriesId: null,
+    };
+    if (setup.startTimeHour != null && setup.startTimeMinute != null) {
+      orphanWhere.startTimeHour = setup.startTimeHour;
+      orphanWhere.startTimeMinute = setup.startTimeMinute;
+    }
+    await prisma.city_runs.updateMany({
+      where: orphanWhere,
+      data: { runSeriesId: setup.id },
+    });
+
     // Series-only path: no city_run row when createFirstRun is false.
     if (!createRun) {
       const response = NextResponse.json({
