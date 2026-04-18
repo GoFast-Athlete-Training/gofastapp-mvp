@@ -455,7 +455,7 @@ export default function TrainingHubPage() {
                       </span>
                       <span className="text-gray-500">
                         {" "}
-                        (positive = slower than target)
+                        (positive = faster than target)
                       </span>
                     </p>
                   )}
