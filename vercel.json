@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/weekly-pace",
       "schedule": "0 4 * * 1"
+    },
+    {
+      "path": "/api/cron/auto-push-garmin",
+      "schedule": "0 5 * * *"
     }
   ]
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import TopNav from '@/components/shared/TopNav';
 import api from '@/lib/api';
@@ -122,11 +123,8 @@ export default function ActivitiesPage() {
           <h2 className="text-base font-semibold text-gray-900 mb-3">Recent activity</h2>
           {activities.length > 0 ? (
             <ul className="space-y-3">
-              {activities.map((activity, index) => (
-                <li
-                  key={activity.id || activity.sourceActivityId || index}
-                  className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm hover:border-orange-200/60 transition-colors"
-                >
+              {activities.map((activity, index) => {
+                const inner = (
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-gray-900 truncate">
@@ -164,8 +162,24 @@ export default function ActivitiesPage() {
                       <Activity className="w-4 h-4 text-gray-500" />
                     </div>
                   </div>
-                </li>
-              ))}
+                );
+                return (
+                  <li key={activity.id || activity.sourceActivityId || index}>
+                    {activity.id ? (
+                      <Link
+                        href={`/activities/${activity.id}`}
+                        className="block bg-white rounded-xl border border-gray-100 p-4 shadow-sm hover:border-orange-200/60 transition-colors"
+                      >
+                        {inner}
+                      </Link>
+                    ) : (
+                      <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+                        {inner}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">

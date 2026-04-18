@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { Trophy, ArrowLeft, ImagePlus, Loader2, MessageSquare } from 'lucide-react';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import CityRunActivityLinkPanel from '@/components/runs/CityRunActivityLinkPanel';
 
 interface Checkin {
   id: string;
@@ -140,6 +141,8 @@ export default function CityRunPostRunContainer({ run, myCheckin: initialCheckin
             {checkins.length} {checkins.length === 1 ? 'runner' : 'runners'} showed up
           </div>
         </div>
+
+        <CityRunActivityLinkPanel runId={run.id} runDateIso={run.date} />
 
         {/* ── Photos section ──────────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">

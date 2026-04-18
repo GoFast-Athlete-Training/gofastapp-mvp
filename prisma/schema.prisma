@@ -81,6 +81,7 @@ model Athlete {
   city_run_rsvps          city_run_rsvps[]
   city_run_messages       city_run_messages[]
   city_run_checkins       city_run_checkins[]
+  city_run_activity_links city_run_activity_links[]
   city_runs               city_runs[]
   routes                  routes[]
   training_days_executed  training_days_executed[]
@@ -231,8 +232,27 @@ model athlete_activities {
   updatedAt        DateTime
   Athlete          Athlete           @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   matched_workout  workouts?         @relation("WorkoutMatchedActivity")
+  city_run_activity_links city_run_activity_links[]
 
   @@index([athleteId, ingestionStatus])
+}
+
+/// Athlete linked a synced activity (or attendance-only) to a city run for credit / history.
+model city_run_activity_links {
+  id             String   @id @default(cuid())
+  cityRunId      String
+  athleteId      String
+  activityId     String?
+  linkedManually Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  city_runs          city_runs           @relation(fields: [cityRunId], references: [id], onDelete: Cascade)
+  Athlete            Athlete             @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  athlete_activities athlete_activities? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+
+  @@unique([cityRunId, athleteId])
+  @@index([athleteId])
+  @@index([activityId])
 }
 
 model cities {
@@ -799,6 +819,7 @@ model city_runs {
   city_run_rsvps      city_run_rsvps[]
   city_run_messages   city_run_messages[]
   city_run_checkins   city_run_checkins[]
+  city_run_activity_links city_run_activity_links[]
   Athlete             Athlete?             @relation(fields: [athleteGeneratedId], references: [id], onDelete: Cascade)
   run_crews           run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
   runClub             run_clubs?           @relation(fields: [runClubId], references: [id], onDelete: SetNull)

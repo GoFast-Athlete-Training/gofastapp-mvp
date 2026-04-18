@@ -302,6 +302,25 @@ export default function TrainingHubPage() {
                 )}
               </div>
             )}
+
+            {!loadingWeek && (
+              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Last run &amp; analysis
+                </p>
+                <p className="mt-1 text-sm text-gray-700">
+                  See your last synced run, recent Garmin history, and how you did vs plan targets on
+                  Go Train.
+                </p>
+                <Link
+                  href="/workouts"
+                  className="mt-3 inline-flex justify-center rounded-xl bg-white px-4 py-2 text-sm font-semibold text-orange-700 ring-1 ring-orange-200 hover:bg-orange-50"
+                >
+                  Open Go Train →
+                </Link>
+              </div>
+            )}
+
             {loadingWeek && (
               <p className="text-sm text-gray-500 mb-2">Loading today &amp; this week…</p>
             )}
