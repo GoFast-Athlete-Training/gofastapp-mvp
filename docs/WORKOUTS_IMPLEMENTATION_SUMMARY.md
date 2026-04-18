@@ -14,7 +14,7 @@ Created `/lib/garmin-workouts/` with:
 - **types.ts** - All Garmin enums and types (Sport, Intensity, DurationType, TargetType, etc.)
 - **converters.ts** - Conversion functions from our model to Garmin format
 - **api-client.ts** - Garmin API client (create, get, update, delete workouts)
-- **activity-mapper.ts** - Maps activities back to training days
+- Activity → planned workout matching lives in `lib/training/match-activity-to-workout.ts` (materialized `workouts` rows)
 
 ### 3. UI Implementation
 

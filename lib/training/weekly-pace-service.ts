@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { addDaysUtc, utcDateOnly } from "@/lib/training/plan-utils";
 import { dateForDayInWeek } from "@/lib/training/schedule-parser";
 import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
+import { loadWeekPerformanceSnapshot } from "@/lib/training/week-performance-metrics";
 
 function secondsPerMileToPaceString(sec: number): string {
   const minutes = Math.floor(sec / 60);
@@ -77,37 +78,42 @@ export async function generateWeeklySummary(params: {
   const currentSec = parsePaceToSecondsPerMile(athlete.fiveKPace.trim());
   const paceDisplay = `${secondsPerMileToPaceString(currentSec)}/mi`;
 
-  const weekWorkouts = await prisma.workouts.findMany({
-    where: { athleteId, planId, weekNumber },
+  const plan = await prisma.training_plans.findFirst({
+    where: { id: planId, athleteId },
     select: {
-      id: true,
-      workoutType: true,
-      matchedActivityId: true,
-      estimatedDistanceInMeters: true,
-      actualDistanceMeters: true,
+      startDate: true,
+      totalWeeks: true,
+      race_registry: { select: { raceDate: true } },
     },
   });
+  if (!plan) {
+    return { ok: true, skipped: true, reason: "plan_not_found" };
+  }
 
-  if (weekWorkouts.length === 0) {
+  const metrics = await loadWeekPerformanceSnapshot({
+    planId,
+    athleteId,
+    planStartDate: plan.startDate,
+    weekNumber,
+    storedTotalWeeks: plan.totalWeeks,
+    raceDate: plan.race_registry?.raceDate ?? null,
+  });
+
+  if (metrics.sessionsPlanned === 0) {
     return { ok: true, skipped: true, reason: "no_workouts_in_week" };
   }
 
-  const matched = weekWorkouts.filter((w) => w.matchedActivityId != null);
-  let actualMeters = 0;
-  for (const w of matched) {
-    if (w.actualDistanceMeters != null && w.actualDistanceMeters > 0) {
-      actualMeters += w.actualDistanceMeters;
-    }
-  }
-  const miLogged = actualMeters > 0 ? (actualMeters / 1609.34).toFixed(1) : "0";
+  const miLogged =
+    metrics.actualMetersMatched > 0
+      ? (metrics.actualMetersMatched / 1609.34).toFixed(1)
+      : "0";
 
-  const longRun = weekWorkouts.find((w) => w.workoutType === "LongRun");
-  const longDone =
-    !!longRun?.matchedActivityId &&
-    longRun.actualDistanceMeters != null &&
-    longRun.actualDistanceMeters > 0;
+  const qualityLine =
+    metrics.qualityAvgDeltaSecPerMile != null
+      ? ` Quality avg vs target: ${metrics.qualityAvgDeltaSecPerMile > 0 ? "+" : ""}${metrics.qualityAvgDeltaSecPerMile} sec/mi.`
+      : "";
 
-  const summaryMessage = `${WEEKLY_RECAP_PREFIX} Week ${weekNumber}: ${matched.length} of ${weekWorkouts.length} sessions logged, ~${miLogged} mi${longDone ? ", long run done" : ""}. Your current 5K pace is ${paceDisplay}.`;
+  const summaryMessage = `${WEEKLY_RECAP_PREFIX} Week ${weekNumber}: ${metrics.sessionsCompleted} of ${metrics.sessionsPlanned} sessions logged, ~${miLogged} mi${metrics.longRunCompleted ? ", long run done" : ""}.${qualityLine} Your current 5K pace is ${paceDisplay}.`;
 
   await prisma.pace_adjustment_log.create({
     data: {
@@ -117,11 +123,11 @@ export async function generateWeeklySummary(params: {
       previousPaceSecPerMile: currentSec,
       newPaceSecPerMile: currentSec,
       adjustmentSecPerMile: 0,
-      qualityWorkoutsCount: matched.length,
-      qualityAvgDeltaSecPerMile: null,
-      longRunCompleted: longDone,
-      longRunCompletionRatio: null,
-      weeklyMileageCompletionPct: null,
+      qualityWorkoutsCount: metrics.qualitySessionsCompleted,
+      qualityAvgDeltaSecPerMile: metrics.qualityAvgDeltaSecPerMile,
+      longRunCompleted: metrics.longRunCompleted,
+      longRunCompletionRatio: metrics.longRunCompletionRatio,
+      weeklyMileageCompletionPct: metrics.weeklyMileageCompletionPct,
       summaryMessage,
     },
   });

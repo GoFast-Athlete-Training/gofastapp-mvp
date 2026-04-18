@@ -84,7 +84,6 @@ model Athlete {
   city_run_activity_links city_run_activity_links[]
   city_runs               city_runs[]
   routes                  routes[]
-  training_days_executed  training_days_executed[]
   training_plans          training_plans[]
   workouts                workouts[]
   athlete_goals           AthleteGoal[]
@@ -937,21 +936,6 @@ model run_crews {
   city_runs               city_runs[]
   run_crew_specific_races run_crew_specific_races[]
   race_registry           race_registry?            @relation(fields: [trainingForRace], references: [id])
-}
-
-model training_days_executed {
-  id          String   @id
-  athleteId   String
-  activityId  String?  @unique
-  weekIndex   Int
-  dayIndex    Int
-  date        DateTime
-  plannedData Json?
-  analysis    Json?
-  feedback    Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime
-  Athlete     Athlete  @relation(fields: [athleteId], references: [id])
 }
 
 /// Top-level generation preset (e.g. Elite Marathon, Basic, Marine Corps Marathon).

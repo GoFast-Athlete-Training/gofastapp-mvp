@@ -21,6 +21,7 @@ import {
   fetchTrainingPlanDetail,
   fetchPlanWeekSchedule,
   type PlanDayCard,
+  type WeekPerformanceSnapshot,
 } from "@/lib/training/fetch-plan-week-client";
 
 type PlanDetailHub = {
@@ -61,6 +62,8 @@ export default function TrainingHubPage() {
   const [athleteFiveKPace, setAthleteFiveKPace] = useState<string | null>(null);
   const [weekNumber, setWeekNumber] = useState(1);
   const [weekDays, setWeekDays] = useState<PlanDayCard[]>([]);
+  const [weekPerformance, setWeekPerformance] =
+    useState<WeekPerformanceSnapshot | null>(null);
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [hubError, setHubError] = useState<string | null>(null);
@@ -89,6 +92,7 @@ export default function TrainingHubPage() {
     setHubError(null);
     setPlanDetail(null);
     setWeekDays([]);
+    setWeekPerformance(null);
     try {
       const u = auth.currentUser;
       if (!u) return;
@@ -116,11 +120,17 @@ export default function TrainingHubPage() {
         setWeekNumber(wn);
         setLoadingWeek(true);
         try {
-          const { days } = await fetchPlanWeekSchedule(planId, wn, token);
+          const { days, weekPerformance: wp } = await fetchPlanWeekSchedule(
+            planId,
+            wn,
+            token
+          );
           setWeekDays(days);
+          setWeekPerformance(wp);
         } catch (e) {
           setHubError(e instanceof Error ? e.message : "Could not load this week");
           setWeekDays([]);
+          setWeekPerformance(null);
         } finally {
           setLoadingWeek(false);
         }
@@ -416,6 +426,58 @@ export default function TrainingHubPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
                 This week
               </p>
+              {!loadingWeek && weekPerformance && weekPerformance.sessionsPlanned > 0 && (
+                <div className="mb-4 rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3 text-sm text-gray-800">
+                  <p className="font-semibold text-gray-900">Week performance</p>
+                  <p className="mt-1 tabular-nums">
+                    {weekPerformance.sessionsCompleted} of{" "}
+                    {weekPerformance.sessionsPlanned} sessions logged
+                    {weekPerformance.qualitySessionsPlanned > 0
+                      ? ` · ${weekPerformance.qualitySessionsCompleted}/${weekPerformance.qualitySessionsPlanned} quality (tempo/intervals)`
+                      : ""}
+                  </p>
+                  {weekPerformance.plannedMetersTotal > 0 && (
+                    <p className="mt-1 tabular-nums text-gray-700">
+                      Volume: ~
+                      {(weekPerformance.actualMetersMatched / 1609.34).toFixed(1)} mi actual vs ~
+                      {(weekPerformance.plannedMetersTotal / 1609.34).toFixed(1)} mi planned
+                      {weekPerformance.weeklyMileageCompletionPct != null
+                        ? ` (${weekPerformance.weeklyMileageCompletionPct.toFixed(0)}% of planned)`
+                        : ""}
+                    </p>
+                  )}
+                  {weekPerformance.qualityAvgDeltaSecPerMile != null && (
+                    <p className="mt-1 text-gray-700">
+                      Quality avg vs target pace:{" "}
+                      <span className="font-mono tabular-nums">
+                        {weekPerformance.qualityAvgDeltaSecPerMile > 0 ? "+" : ""}
+                        {weekPerformance.qualityAvgDeltaSecPerMile} sec/mi
+                      </span>
+                      <span className="text-gray-500">
+                        {" "}
+                        (positive = slower than target)
+                      </span>
+                    </p>
+                  )}
+                  {weekPerformance.longRunCompletionRatio != null && (
+                    <p className="mt-1 text-gray-700">
+                      Long run:{" "}
+                      {weekPerformance.longRunCompleted
+                        ? `logged (${Math.round(weekPerformance.longRunCompletionRatio * 100)}% of planned distance)`
+                        : "not logged yet"}
+                    </p>
+                  )}
+                </div>
+              )}
+              {!loadingWeek &&
+                weekPerformance &&
+                weekPerformance.sessionsPlanned === 0 &&
+                weekDays.length > 0 && (
+                  <p className="mb-3 text-sm text-gray-600">
+                    Open a scheduled day to create workouts — then logged runs will show in week
+                    performance.
+                  </p>
+                )}
               {loadingWeek && (
                 <p className="text-sm text-gray-500">Loading workouts…</p>
               )}

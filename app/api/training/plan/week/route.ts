@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { buildPlanWeekCards } from "@/lib/training/plan-week-cards";
 import { effectiveTrainingWeekCount } from "@/lib/training/plan-utils";
+import { loadWeekPerformanceSnapshot } from "@/lib/training/week-performance-metrics";
 import { metersToMiles } from "@/lib/pace-utils";
 
 /**
@@ -74,7 +75,16 @@ export async function GET(request: NextRequest) {
       raceDistanceMiles,
     });
 
-    return NextResponse.json({ weekNumber, days });
+    const weekPerformance = await loadWeekPerformanceSnapshot({
+      planId: plan.id,
+      athleteId: auth.athlete.id,
+      planStartDate: plan.startDate,
+      weekNumber,
+      storedTotalWeeks: plan.totalWeeks,
+      raceDate: race?.raceDate ?? null,
+    });
+
+    return NextResponse.json({ weekNumber, days, weekPerformance });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Failed to load week";
     console.error("GET /api/training/plan/week", e);

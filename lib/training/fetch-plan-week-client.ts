@@ -3,6 +3,9 @@
  */
 
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
+import type { WeekPerformanceSnapshot } from "@/lib/training/week-performance-types";
+
+export type { WeekPerformanceSnapshot };
 
 export type PlanDayCard = {
   workoutId: string | null;
@@ -44,16 +47,23 @@ export async function fetchPlanWeekSchedule(
   planId: string,
   weekNumber: number,
   bearerToken: string
-): Promise<{ days: PlanDayCard[] }> {
+): Promise<{ days: PlanDayCard[]; weekPerformance: WeekPerformanceSnapshot | null }> {
   const res = await fetch(
     `/api/training/plan/week?planId=${encodeURIComponent(planId)}&weekNumber=${weekNumber}`,
     { headers: athleteBearerFetchHeaders(bearerToken) }
   );
-  const data = (await res.json()) as { error?: string; days?: PlanDayCard[] };
+  const data = (await res.json()) as {
+    error?: string;
+    days?: PlanDayCard[];
+    weekPerformance?: WeekPerformanceSnapshot | null;
+  };
   if (!res.ok) {
     throw new Error(typeof data.error === "string" ? data.error : "Failed to load week");
   }
-  return { days: Array.isArray(data.days) ? data.days : [] };
+  return {
+    days: Array.isArray(data.days) ? data.days : [],
+    weekPerformance: data.weekPerformance ?? null,
+  };
 }
 
 /**
