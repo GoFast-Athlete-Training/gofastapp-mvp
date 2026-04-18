@@ -18,6 +18,7 @@ export function toCanonicalCity(raw: string | null | undefined): string {
     .trim()
     .toLowerCase()
     .replace(/\./g, "")
+    .replace(/,/g, "")
     .replace(/\s+/g, " ");
 
   const aliases: Record<string, string> = {
@@ -30,9 +31,12 @@ export function toCanonicalCity(raw: string | null | undefined): string {
     arlington: "arlington",
     "arlington va": "arlington",
     alexandria: "alexandria",
+    "alexandria va": "alexandria",
     bethesda: "bethesda",
+    "bethesda md": "bethesda",
     silver: "silver-spring",
     "silver spring": "silver-spring",
+    "silver spring md": "silver-spring",
   };
 
   return aliases[norm] ?? (slugifySegment(raw) || "unknown");
