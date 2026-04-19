@@ -98,7 +98,7 @@ export default function WorkoutsPage() {
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
             <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Go Train</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Workouts</h1>
               <p className="text-gray-600 leading-relaxed">
                 Your hub for today&apos;s sessions — structure loads here first. Open a workout to
                 set it up on your watch, customize segments, or invite others. Full calendar:{" "}

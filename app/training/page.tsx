@@ -8,6 +8,14 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
+import WeekStrip from "@/components/training/WeekStrip";
+import TrainingSubNav, {
+  TrainingSubNavMobile,
+  scrollToTrainingSection,
+  type TrainingSubNavKey,
+} from "@/components/training/TrainingSubNav";
+import api from "@/lib/api";
+import { metersToMiDisplay } from "@/lib/training/workout-preview-payload";
 import {
   currentTrainingWeekNumber,
   effectiveTrainingWeekCount,
@@ -54,6 +62,30 @@ function planDayMilesDisplay(meters: number | null | undefined): string {
   return `${mi.toFixed(1)} mi`;
 }
 
+function formatSecPerMile(sec: number | null | undefined): string {
+  if (sec == null || sec <= 0) return "—";
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s.toString().padStart(2, "0")}/mi`;
+}
+
+type LastWorkoutStrip = {
+  id: string;
+  title: string;
+  paceDeltaSecPerMile: number | null;
+  actualAvgPaceSecPerMile: number | null;
+  actualDistanceMeters: number | null;
+};
+
+type FallbackActivityStrip = {
+  id: string;
+  activityName: string | null;
+  activityType: string | null;
+  startTime: string | null;
+  distance: number | null;
+  duration: number | null;
+};
+
 export default function TrainingHubPage() {
   const router = useRouter();
   const [authReady, setAuthReady] = useState(false);
@@ -67,6 +99,10 @@ export default function TrainingHubPage() {
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [hubError, setHubError] = useState<string | null>(null);
+  const [activeSubNav, setActiveSubNav] = useState<TrainingSubNavKey>("today");
+  const [selectedDayKey, setSelectedDayKey] = useState<string>("");
+  const [lastWorkout, setLastWorkout] = useState<LastWorkoutStrip | null>(null);
+  const [fallbackActivity, setFallbackActivity] = useState<FallbackActivityStrip | null>(null);
 
   const paceDisplay = useMemo(() => {
     if (!planDetail) return null;
@@ -127,6 +163,7 @@ export default function TrainingHubPage() {
           );
           setWeekDays(days);
           setWeekPerformance(wp);
+          setSelectedDayKey(ymdFromDate(utcDateOnly(new Date())));
         } catch (e) {
           setHubError(e instanceof Error ? e.message : "Could not load this week");
           setWeekDays([]);
@@ -163,6 +200,48 @@ export default function TrainingHubPage() {
     void loadHub();
   }, [authReady, loadHub]);
 
+  useEffect(() => {
+    if (!authReady) return;
+    void (async () => {
+      try {
+        const res = await api.get("/me/last-logged-workout");
+        const w = res.data?.workout;
+        if (w && typeof w.id === "string" && typeof w.title === "string") {
+          setLastWorkout({
+            id: w.id,
+            title: w.title,
+            paceDeltaSecPerMile: w.paceDeltaSecPerMile ?? null,
+            actualAvgPaceSecPerMile: w.actualAvgPaceSecPerMile ?? null,
+            actualDistanceMeters: w.actualDistanceMeters ?? null,
+          });
+        } else {
+          setLastWorkout(null);
+        }
+        const fa = res.data?.fallbackActivity;
+        if (fa?.id) {
+          setFallbackActivity({
+            id: fa.id,
+            activityName: fa.activityName ?? null,
+            activityType: fa.activityType ?? null,
+            startTime: fa.startTime ?? null,
+            distance: fa.distance ?? null,
+            duration: fa.duration ?? null,
+          });
+        } else {
+          setFallbackActivity(null);
+        }
+      } catch {
+        setLastWorkout(null);
+        setFallbackActivity(null);
+      }
+    })();
+  }, [authReady]);
+
+  function handleSubNav(key: TrainingSubNavKey) {
+    setActiveSubNav(key);
+    scrollToTrainingSection(key);
+  }
+
   async function deleteActivePlan() {
     if (!planDetail) return;
     if (
@@ -193,15 +272,25 @@ export default function TrainingHubPage() {
   const showIncompletePlan = !!planDetail && !hasSchedule(planDetail);
 
   const todayKey = ymdFromDate(utcDateOnly(new Date()));
-  const todayPlanDay = weekDays.find((d) => d.dateKey === todayKey) ?? null;
+  const focusKey = selectedDayKey || todayKey;
+  const focusPlanDay = weekDays.find((d) => d.dateKey === focusKey) ?? null;
+  const focusIsToday = focusKey === todayKey;
 
   return (
     <AthleteAppShell>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
-        <div className="mb-8">
+      <div className="flex w-full">
+        <TrainingSubNav active={activeSubNav} onNavigate={handleSubNav} />
+        <div className="flex-1 min-w-0">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
+        <TrainingSubNavMobile active={activeSubNav} onNavigate={handleSubNav} />
+        <div className="mb-6 lg:mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Training</h1>
-          <p className="text-gray-600">
-            Today&apos;s run, your week, and tools — Go Train for logging and standalone workouts.
+          <p className="text-gray-600 text-sm sm:text-base">
+            Your week at a glance, recent runs, and tools. Use{" "}
+            <Link href="/workouts" className="font-semibold text-orange-600 hover:text-orange-700">
+              Workouts
+            </Link>{" "}
+            to log standalone sessions or open the full run log.
           </p>
         </div>
 
@@ -255,120 +344,208 @@ export default function TrainingHubPage() {
 
         {showDashboard && planDetail && (
           <div className="space-y-6 mb-8">
-            {/* Today's run — hero */}
-            {!loadingWeek && (
-              <div className="rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-6 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-orange-900">
-                  Today&apos;s run
-                </p>
-                {todayPlanDay ? (
-                  <>
-                    <h2 className="mt-2 text-2xl font-bold text-gray-900">
-                      {displayWorkoutListTitle(todayPlanDay)}
-                    </h2>
-                    <p className="mt-1 text-sm text-gray-600">
-                      {formatPlanDateDisplay(todayPlanDay.dateKey || String(todayPlanDay.date), {
-                        weekday: "long",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                      {todayPlanDay.matchedActivityId ? (
-                        <span className="ml-2 font-semibold text-emerald-700">· Done</span>
+            <div id="training-section-today" className="scroll-mt-24">
+              {!loadingWeek && weekDays.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                    This week
+                  </p>
+                  <WeekStrip
+                    days={weekDays}
+                    todayKey={todayKey}
+                    selectedDateKey={focusKey}
+                    onSelectDay={(d) => {
+                      setSelectedDayKey(d.dateKey);
+                      setActiveSubNav("today");
+                    }}
+                  />
+                </div>
+              )}
+
+              {!loadingWeek && (
+                <div className="rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-6 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-orange-900">
+                    {focusIsToday ? "Today" : "Selected day"}
+                  </p>
+                  {focusPlanDay ? (
+                    <>
+                      <h2 className="mt-2 text-2xl font-bold text-gray-900">
+                        {displayWorkoutListTitle(focusPlanDay)}
+                      </h2>
+                      <p className="mt-1 text-sm text-gray-600">
+                        {formatPlanDateDisplay(focusPlanDay.dateKey || String(focusPlanDay.date), {
+                          weekday: "long",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                        {focusPlanDay.matchedActivityId ? (
+                          <span className="ml-2 font-semibold text-emerald-700">· Done</span>
+                        ) : null}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-600 tabular-nums">
+                        Planned: {planDayMilesDisplay(focusPlanDay.estimatedDistanceInMeters)}
+                      </p>
+                      <div className="mt-5 flex flex-wrap gap-3">
+                        <Link
+                          href={`/training/day/${focusPlanDay.dateKey}`}
+                          className="inline-flex justify-center rounded-xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-700"
+                        >
+                          Open session
+                        </Link>
+                        {focusPlanDay.workoutId ? (
+                          <Link
+                            href={`/workouts/${focusPlanDay.workoutId}`}
+                            className="inline-flex justify-center rounded-xl border-2 border-orange-400 bg-white px-6 py-3 text-sm font-semibold text-orange-900 hover:bg-orange-50"
+                          >
+                            Workout detail
+                          </Link>
+                        ) : null}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-2 text-lg font-semibold text-gray-900">
+                        {focusIsToday
+                          ? "No session on the schedule for today"
+                          : "Rest or unscheduled on this day"}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-600">
+                        Pick another day above, or log a standalone workout.
+                      </p>
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <Link
+                          href="/workouts"
+                          className="inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+                        >
+                          Workouts
+                        </Link>
+                        <Link
+                          href="/workouts/create"
+                          className="inline-flex justify-center rounded-xl border-2 border-orange-300 bg-white px-5 py-2.5 text-sm font-semibold text-orange-900 hover:bg-orange-50"
+                        >
+                          Log a workout
+                        </Link>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div id="training-section-analysis" className="scroll-mt-24">
+              {!loadingWeek && (
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Last run &amp; analysis
+                  </p>
+                  {lastWorkout ? (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-sm text-gray-900">
+                        <span className="font-semibold">{lastWorkout.title}</span>
+                        {lastWorkout.actualDistanceMeters != null &&
+                        lastWorkout.actualDistanceMeters > 0 ? (
+                          <>
+                            {" "}
+                            · {metersToMiDisplay(lastWorkout.actualDistanceMeters)}
+                          </>
+                        ) : null}
+                        {lastWorkout.actualAvgPaceSecPerMile != null ? (
+                          <>
+                            {" "}
+                            · {formatSecPerMile(lastWorkout.actualAvgPaceSecPerMile)}
+                          </>
+                        ) : null}
+                      </p>
+                      {lastWorkout.paceDeltaSecPerMile != null &&
+                      Number.isFinite(lastWorkout.paceDeltaSecPerMile) ? (
+                        <p className="text-sm text-gray-700">
+                          {lastWorkout.paceDeltaSecPerMile > 0
+                            ? `Beat target by ${Math.round(Math.abs(lastWorkout.paceDeltaSecPerMile))} sec/mi`
+                            : lastWorkout.paceDeltaSecPerMile < 0
+                              ? `${Math.round(Math.abs(lastWorkout.paceDeltaSecPerMile))} sec/mi slower than target`
+                              : "On target pace"}
+                        </p>
                       ) : null}
-                    </p>
-                    <p className="mt-1 text-sm text-gray-600 tabular-nums">
-                      Planned: {planDayMilesDisplay(todayPlanDay.estimatedDistanceInMeters)}
-                    </p>
-                    <Link
-                      href={`/training/day/${todayPlanDay.dateKey}`}
-                      className="mt-5 inline-flex justify-center rounded-xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-700"
-                    >
-                      Open today&apos;s session
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    <p className="mt-2 text-lg font-semibold text-gray-900">
-                      No session on the schedule for today
-                    </p>
-                    <p className="mt-1 text-sm text-gray-600">
-                      Check this week below, or log a standalone workout.
-                    </p>
-                    <div className="mt-4 flex flex-wrap gap-3">
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Link
+                          href={`/workouts/${lastWorkout.id}`}
+                          className="inline-flex rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+                        >
+                          View workout analysis
+                        </Link>
+                        <Link
+                          href="/workouts"
+                          className="inline-flex rounded-xl px-4 py-2 text-sm font-semibold text-orange-700 ring-1 ring-orange-200 hover:bg-orange-50"
+                        >
+                          All workouts &amp; history
+                        </Link>
+                      </div>
+                    </div>
+                  ) : fallbackActivity ? (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-sm text-gray-800">
+                        <span className="font-semibold">
+                          {fallbackActivity.activityName || "Synced run"}
+                        </span>
+                        {fallbackActivity.activityType ? (
+                          <span className="text-gray-600"> · {fallbackActivity.activityType}</span>
+                        ) : null}
+                        {fallbackActivity.startTime ? (
+                          <>
+                            {" "}
+                            ·{" "}
+                            {new Date(fallbackActivity.startTime).toLocaleDateString(undefined, {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </>
+                        ) : null}
+                        {fallbackActivity.distance != null && fallbackActivity.distance > 0 ? (
+                          <> · {metersToMiDisplay(fallbackActivity.distance)}</>
+                        ) : null}
+                      </p>
+                      <p className="text-sm text-amber-900 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                        Not linked to a plan workout yet. Open the activity to match it to a scheduled
+                        session when you&apos;re ready.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          href={`/activities/${fallbackActivity.id}`}
+                          className="inline-flex rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+                        >
+                          View activity
+                        </Link>
+                        <Link
+                          href="/workouts"
+                          className="inline-flex rounded-xl px-4 py-2 text-sm font-semibold text-orange-700 ring-1 ring-orange-200 hover:bg-orange-50"
+                        >
+                          Workouts hub
+                        </Link>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="mt-1 text-sm text-gray-700">
+                        Connect Garmin and complete a run, or log a workout to see analysis here.
+                      </p>
                       <Link
                         href="/workouts"
-                        className="inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+                        className="mt-3 inline-flex justify-center rounded-xl bg-white px-4 py-2 text-sm font-semibold text-orange-700 ring-1 ring-orange-200 hover:bg-orange-50"
                       >
-                        Go Train
+                        Open Workouts
                       </Link>
-                      <Link
-                        href="/workouts/create"
-                        className="inline-flex justify-center rounded-xl border-2 border-orange-300 bg-white px-5 py-2.5 text-sm font-semibold text-orange-900 hover:bg-orange-50"
-                      >
-                        Log a workout
-                      </Link>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            {!loadingWeek && (
-              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Last run &amp; analysis
-                </p>
-                <p className="mt-1 text-sm text-gray-700">
-                  See your last synced run, recent Garmin history, and how you did vs plan targets on
-                  Go Train.
-                </p>
-                <Link
-                  href="/workouts"
-                  className="mt-3 inline-flex justify-center rounded-xl bg-white px-4 py-2 text-sm font-semibold text-orange-700 ring-1 ring-orange-200 hover:bg-orange-50"
-                >
-                  Open Go Train →
-                </Link>
-              </div>
-            )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
 
             {loadingWeek && (
               <p className="text-sm text-gray-500 mb-2">Loading today &amp; this week…</p>
             )}
 
-            {/* Hub: AI Coach, Journal, Pod */}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
-                More in training
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Link
-                  href="/ask-coach"
-                  className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-orange-200 hover:bg-orange-50/40 transition flex flex-col gap-2"
-                >
-                  <MessageCircle className="h-6 w-6 text-orange-600 shrink-0" aria-hidden />
-                  <span className="font-semibold text-gray-900">AI Coach</span>
-                  <span className="text-xs text-gray-600">Questions about your plan or pacing</span>
-                </Link>
-                <Link
-                  href="/journal"
-                  className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-orange-200 hover:bg-orange-50/40 transition flex flex-col gap-2"
-                >
-                  <BookOpen className="h-6 w-6 text-orange-600 shrink-0" aria-hidden />
-                  <span className="font-semibold text-gray-900">Training journal</span>
-                  <span className="text-xs text-gray-600">Notes and how training feels</span>
-                </Link>
-                <Link
-                  href="/my-runcrews"
-                  className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-orange-200 hover:bg-orange-50/40 transition flex flex-col gap-2"
-                >
-                  <Users className="h-6 w-6 text-orange-600 shrink-0" aria-hidden />
-                  <span className="font-semibold text-gray-900">Training pod</span>
-                  <span className="text-xs text-gray-600">Your crew and accountability</span>
-                </Link>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/80 p-6 shadow-sm">
+            <div id="training-section-plan" className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/80 p-6 shadow-sm scroll-mt-24">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
@@ -407,7 +584,7 @@ export default function TrainingHubPage() {
                     href="/workouts"
                     className="inline-flex justify-center rounded-xl border-2 border-emerald-600 bg-white px-5 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
                   >
-                    Go Train
+                    Workouts
                   </Link>
                   <button
                     type="button"
@@ -422,9 +599,12 @@ export default function TrainingHubPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div
+              id="training-section-week"
+              className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm scroll-mt-24"
+            >
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
-                This week
+                Week list
               </p>
               {!loadingWeek && weekPerformance && weekPerformance.sessionsPlanned > 0 && (
                 <div className="mb-4 rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3 text-sm text-gray-800">
@@ -572,10 +752,12 @@ export default function TrainingHubPage() {
             </li>
             <li>
               <Link href="/workouts" className="text-gray-700 hover:text-gray-900 font-medium">
-                All workouts (Go Train)
+                All workouts
               </Link>
             </li>
           </ul>
+        </div>
+          </div>
         </div>
       </div>
     </AthleteAppShell>

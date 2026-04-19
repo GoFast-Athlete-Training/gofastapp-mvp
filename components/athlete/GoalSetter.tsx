@@ -763,7 +763,7 @@ export default function GoalSetter({
               href="/workouts"
               className="inline-flex items-center justify-center px-4 py-2 rounded-lg border-2 border-gray-200 text-gray-800 text-sm font-medium hover:bg-gray-50 transition-colors"
             >
-              Go Train / workouts
+              Workouts
             </Link>
           </div>
         </div>

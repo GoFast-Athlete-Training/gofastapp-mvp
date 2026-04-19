@@ -694,7 +694,7 @@ export default function TrainingSetupPlanPage({
               My Training
             </Link>
             <Link href="/workouts" className="hover:text-orange-600">
-              Go Train
+              Workouts
             </Link>
           </div>
         </div>

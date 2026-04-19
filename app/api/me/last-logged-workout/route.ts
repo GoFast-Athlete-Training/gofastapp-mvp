@@ -39,7 +39,31 @@ export async function GET(request: Request) {
     });
 
     if (!w) {
-      return NextResponse.json({ workout: null });
+      const fallbackActivity = await prisma.athlete_activities.findFirst({
+        where: {
+          athleteId: auth.athlete.id,
+          startTime: { not: null },
+        },
+        orderBy: { startTime: "desc" },
+        select: {
+          id: true,
+          activityName: true,
+          activityType: true,
+          startTime: true,
+          distance: true,
+          duration: true,
+          source: true,
+        },
+      });
+      return NextResponse.json({
+        workout: null,
+        fallbackActivity: fallbackActivity
+          ? {
+              ...fallbackActivity,
+              startTime: fallbackActivity.startTime?.toISOString() ?? null,
+            }
+          : null,
+      });
     }
 
     const { matched_activity, ...rest } = w;
@@ -49,6 +73,7 @@ export async function GET(request: Request) {
         date: rest.date?.toISOString() ?? null,
         activityStartTime: matched_activity?.startTime?.toISOString() ?? null,
       },
+      fallbackActivity: null,
     });
   } catch (err: unknown) {
     console.error("GET /api/me/last-logged-workout:", err);

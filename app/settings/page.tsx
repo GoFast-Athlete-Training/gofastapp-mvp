@@ -7,7 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { DollarSign, Hash, Sparkles, Globe, Copy, Check } from 'lucide-react';
 import { LocalStorageAPI } from '@/lib/localstorage';
-import TopNav from '@/components/shared/TopNav';
+import AthleteAppShell from '@/components/athlete/AthleteAppShell';
 import api from '@/lib/api';
 
 export default function SettingsPage() {
@@ -78,12 +78,17 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <TopNav />
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+    <AthleteAppShell>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
           <p className="text-gray-600 mt-2">Manage your account settings and integrations</p>
+          <Link
+            href="/athlete-home"
+            className="inline-flex mt-3 text-sm font-semibold text-orange-600 hover:text-orange-700"
+          >
+            ← Back to home
+          </Link>
         </div>
 
         {!athleteReady ? (
@@ -265,7 +270,7 @@ export default function SettingsPage() {
           </div>
         </div>
         )}
-      </main>
-    </div>
+      </div>
+    </AthleteAppShell>
   );
 }

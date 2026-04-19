@@ -101,8 +101,21 @@ export async function handleActivitySummary(
         },
       });
 
+      console.log('✅ athlete_activity created', {
+        id: created.id,
+        sourceActivityId,
+        athleteId: athlete.id,
+        activityType: activity.activityType,
+        startTime: created.startTime?.toISOString() ?? null,
+        ingestionStatus: 'RECEIVED',
+      });
+
       try {
         await tryMatchActivityToTrainingWorkout(created.id);
+        console.log('✅ match attempt complete', {
+          id: created.id,
+          sourceActivityId,
+        });
       } catch (matchErr) {
         console.warn('tryMatchActivityToTrainingWorkout:', matchErr);
       }

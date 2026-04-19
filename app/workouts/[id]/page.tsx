@@ -1174,7 +1174,7 @@ export default function WorkoutDetailPage() {
                   href="/workouts"
                   className="mt-4 inline-block text-orange-600 hover:text-orange-700"
                 >
-                  Back to Go Train
+                  Back to Workouts
                 </Link>
               </div>
             </div>
@@ -1214,7 +1214,7 @@ export default function WorkoutDetailPage() {
       ? backLabelFromPath(planPreviewBackFromStash)
       : goTrainCtx
         ? backLabelFromGoTrainContext(goTrainCtx)
-        : "Back to Go Train";
+        : "Back to Workouts";
 
   const structuredTotals = structuredSegmentTotals(sortedSegments);
   const structuredParts = [
@@ -1267,7 +1267,7 @@ export default function WorkoutDetailPage() {
   );
   const detailEyebrow =
     goTrainCtx || fromGoTrainStash || simpleBackPathOnly === "/workouts"
-      ? "Go Train"
+      ? "Workouts"
       : simpleBackPathOnly?.startsWith("/training/day/") ||
           planPreviewPathOnly.startsWith("/training/day/")
         ? "Workout"

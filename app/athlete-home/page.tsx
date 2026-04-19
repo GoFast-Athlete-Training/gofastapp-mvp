@@ -221,6 +221,13 @@ export default function AthleteHomePage() {
   const [activePlanSummary, setActivePlanSummary] = useState<ActivePlanSummary | null>(null);
   const [myGoingRuns, setMyGoingRuns] = useState<GoingRunRow[]>([]);
   const [lastLoggedWorkout, setLastLoggedWorkout] = useState<LastLoggedWorkoutStrip | null>(null);
+  const [lastFallbackActivity, setLastFallbackActivity] = useState<{
+    id: string;
+    activityName: string | null;
+    activityType: string | null;
+    startTime: string | null;
+    distance: number | null;
+  } | null>(null);
   const [todayPlanDay, setTodayPlanDay] = useState<PlanDayCard | null>(null);
 
   const loadHome = useCallback(async () => {
@@ -298,14 +305,38 @@ export default function AthleteHomePage() {
     }
 
     if (lastRunRes.status === 'fulfilled') {
-      const w = lastRunRes.value.data?.workout as LastLoggedWorkoutStrip | null | undefined;
+      const data = lastRunRes.value.data as {
+        workout?: LastLoggedWorkoutStrip | null;
+        fallbackActivity?: {
+          id: string;
+          activityName?: string | null;
+          activityType?: string | null;
+          startTime?: string | null;
+          distance?: number | null;
+        } | null;
+      };
+      const w = data?.workout;
       if (w && typeof w.id === 'string' && typeof w.title === 'string') {
         setLastLoggedWorkout(w);
+        setLastFallbackActivity(null);
       } else {
         setLastLoggedWorkout(null);
+        const fa = data?.fallbackActivity;
+        if (fa?.id) {
+          setLastFallbackActivity({
+            id: fa.id,
+            activityName: fa.activityName ?? null,
+            activityType: fa.activityType ?? null,
+            startTime: fa.startTime ?? null,
+            distance: fa.distance ?? null,
+          });
+        } else {
+          setLastFallbackActivity(null);
+        }
       }
     } else {
       setLastLoggedWorkout(null);
+      setLastFallbackActivity(null);
     }
 
     let todayPlan: PlanDayCard | null = null;
@@ -655,7 +686,7 @@ export default function AthleteHomePage() {
                         href="/workouts"
                         className="text-sm font-semibold text-orange-600 hover:text-orange-700"
                       >
-                        Go Train →
+                        Workouts →
                       </Link>
                       <Link href="/training" className="text-sm font-semibold text-gray-700 hover:text-gray-900">
                         Week view →
@@ -839,7 +870,7 @@ export default function AthleteHomePage() {
                       Goal
                     </Link>
                     <Link href="/workouts" className="hover:underline">
-                      Go Train
+                      Workouts
                     </Link>
                   </div>
                 </div>
@@ -944,6 +975,45 @@ export default function AthleteHomePage() {
                   className="shrink-0 text-sm font-semibold text-orange-600 hover:text-orange-700"
                 >
                   View results →
+                </Link>
+              </div>
+            ) : lastFallbackActivity ? (
+              <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50/60 p-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                    Latest synced activity
+                  </p>
+                  <p className="text-sm text-gray-900 mt-1 leading-snug">
+                    <span className="font-semibold">
+                      {lastFallbackActivity.activityName || 'Run'}
+                    </span>
+                    {lastFallbackActivity.activityType ? (
+                      <span className="text-gray-600"> · {lastFallbackActivity.activityType}</span>
+                    ) : null}
+                    {lastFallbackActivity.startTime ? (
+                      <>
+                        {' '}
+                        ·{' '}
+                        {new Date(lastFallbackActivity.startTime).toLocaleDateString('en-US', {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </>
+                    ) : null}
+                    {lastFallbackActivity.distance != null && lastFallbackActivity.distance > 0 ? (
+                      <> · {metersToMiDisplay(lastFallbackActivity.distance)}</>
+                    ) : null}
+                  </p>
+                  <p className="text-xs text-amber-900 mt-2">
+                    Not linked to a plan workout yet — open to match or review.
+                  </p>
+                </div>
+                <Link
+                  href={`/activities/${lastFallbackActivity.id}`}
+                  className="shrink-0 text-sm font-semibold text-orange-600 hover:text-orange-700"
+                >
+                  View activity →
                 </Link>
               </div>
             ) : null}
