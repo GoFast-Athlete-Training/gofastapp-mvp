@@ -124,10 +124,16 @@ export async function POST(request: NextRequest) {
     
     if (id) {
       // Check if club with this ID already exists
-      const existingById = await prisma.run_clubs.findUnique({ where: { id } });
-      
+      const existingById = await prisma.run_clubs.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+
       // Check if club with this slug already exists (might have different ID)
-      const existingBySlug = await prisma.run_clubs.findUnique({ where: { slug: slugFinal } });
+      const existingBySlug = await prisma.run_clubs.findUnique({
+        where: { slug: slugFinal },
+        select: { id: true },
+      });
       
       console.log('📥 PRODUCT UPDATE: Checking existing clubs:', {
         id,
@@ -213,7 +219,10 @@ export async function POST(request: NextRequest) {
       runClub.allRunsDescription = verified?.allRunsDescription || null;
     } else {
       // No ID provided - slug-based matching (fallback)
-      const existing = await prisma.run_clubs.findUnique({ where: { slug: slugFinal } });
+      const existing = await prisma.run_clubs.findUnique({
+        where: { slug: slugFinal },
+        select: { id: true },
+      });
       if (existing) {
         runClub = await prisma.run_clubs.update({
           where: { id: existing.id },

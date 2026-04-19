@@ -1,5 +1,17 @@
 import { prisma } from './prisma';
 
+/** Fields we read/compare — explicit select avoids Prisma loading dropped columns (e.g. legacy runSchedule). */
+const RUN_CLUB_SAVE_SELECT = {
+  id: true,
+  name: true,
+  logoUrl: true,
+  city: true,
+  description: true,
+  websiteUrl: true,
+  instagramUrl: true,
+  stravaUrl: true,
+} as const;
+
 /**
  * Check if RunClub exists in gofastapp-mvp database
  * 
@@ -14,6 +26,7 @@ export async function checkRunClubExists(slug: string): Promise<any | null> {
   try {
     const existing = await prisma.run_clubs.findUnique({
       where: { slug: slug.trim() },
+      select: RUN_CLUB_SAVE_SELECT,
     });
     return existing;
   } catch (error: any) {
@@ -100,6 +113,7 @@ export async function saveRunClub(runClub: {
           syncedAt: new Date(),
           updatedAt: new Date(),
         },
+        select: RUN_CLUB_SAVE_SELECT,
       });
       return created;
     }
