@@ -103,6 +103,14 @@ export default function TrainingHubPage() {
   const [selectedDayKey, setSelectedDayKey] = useState<string>("");
   const [lastWorkout, setLastWorkout] = useState<LastWorkoutStrip | null>(null);
   const [fallbackActivity, setFallbackActivity] = useState<FallbackActivityStrip | null>(null);
+  const [garminSyncLoading, setGarminSyncLoading] = useState(false);
+  const [garminSyncResult, setGarminSyncResult] = useState<{
+    fetched: number;
+    saved: number;
+    skipped: number;
+    errors: number;
+  } | null>(null);
+  const [garminSyncError, setGarminSyncError] = useState<string | null>(null);
 
   const paceDisplay = useMemo(() => {
     if (!planDetail) return null;
@@ -200,42 +208,78 @@ export default function TrainingHubPage() {
     void loadHub();
   }, [authReady, loadHub]);
 
-  useEffect(() => {
-    if (!authReady) return;
-    void (async () => {
-      try {
-        const res = await api.get("/me/last-logged-workout");
-        const w = res.data?.workout;
-        if (w && typeof w.id === "string" && typeof w.title === "string") {
-          setLastWorkout({
-            id: w.id,
-            title: w.title,
-            paceDeltaSecPerMile: w.paceDeltaSecPerMile ?? null,
-            actualAvgPaceSecPerMile: w.actualAvgPaceSecPerMile ?? null,
-            actualDistanceMeters: w.actualDistanceMeters ?? null,
-          });
-        } else {
-          setLastWorkout(null);
-        }
-        const fa = res.data?.fallbackActivity;
-        if (fa?.id) {
-          setFallbackActivity({
-            id: fa.id,
-            activityName: fa.activityName ?? null,
-            activityType: fa.activityType ?? null,
-            startTime: fa.startTime ?? null,
-            distance: fa.distance ?? null,
-            duration: fa.duration ?? null,
-          });
-        } else {
-          setFallbackActivity(null);
-        }
-      } catch {
+  const refreshLastRunStrip = useCallback(async () => {
+    try {
+      const res = await api.get("/me/last-logged-workout");
+      const w = res.data?.workout;
+      if (w && typeof w.id === "string" && typeof w.title === "string") {
+        setLastWorkout({
+          id: w.id,
+          title: w.title,
+          paceDeltaSecPerMile: w.paceDeltaSecPerMile ?? null,
+          actualAvgPaceSecPerMile: w.actualAvgPaceSecPerMile ?? null,
+          actualDistanceMeters: w.actualDistanceMeters ?? null,
+        });
+      } else {
         setLastWorkout(null);
+      }
+      const fa = res.data?.fallbackActivity;
+      if (fa?.id) {
+        setFallbackActivity({
+          id: fa.id,
+          activityName: fa.activityName ?? null,
+          activityType: fa.activityType ?? null,
+          startTime: fa.startTime ?? null,
+          distance: fa.distance ?? null,
+          duration: fa.duration ?? null,
+        });
+      } else {
         setFallbackActivity(null);
       }
-    })();
-  }, [authReady]);
+    } catch {
+      setLastWorkout(null);
+      setFallbackActivity(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authReady) return;
+    void refreshLastRunStrip();
+  }, [authReady, refreshLastRunStrip]);
+
+  async function syncGarminNow() {
+    setGarminSyncLoading(true);
+    setGarminSyncResult(null);
+    setGarminSyncError(null);
+    try {
+      const u = auth.currentUser;
+      if (!u) {
+        setGarminSyncError("Not signed in");
+        return;
+      }
+      const token = await u.getIdToken();
+      const res = await fetch("/api/garmin/sync", {
+        method: "POST",
+        headers: athleteBearerFetchHeaders(token),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        summary?: { fetched: number; saved: number; skipped: number; errors: number };
+      };
+      if (!res.ok) {
+        setGarminSyncError(data.error ?? `Sync failed (${res.status})`);
+        return;
+      }
+      if (data.summary) {
+        setGarminSyncResult(data.summary);
+      }
+      await refreshLastRunStrip();
+    } catch (e: unknown) {
+      setGarminSyncError(e instanceof Error ? e.message : "Sync failed");
+    } finally {
+      setGarminSyncLoading(false);
+    }
+  }
 
   function handleSubNav(key: TrainingSubNavKey) {
     setActiveSubNav(key);
@@ -537,6 +581,34 @@ export default function TrainingHubPage() {
                       </Link>
                     </>
                   )}
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <p className="text-xs text-gray-500 mb-2">
+                      Missed a webhook or a run isn&apos;t showing? Pull the last 30 days from Garmin.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void syncGarminNow()}
+                      disabled={garminSyncLoading}
+                      className="inline-flex items-center justify-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
+                    >
+                      {garminSyncLoading ? "Syncing…" : "Sync from Garmin"}
+                    </button>
+                    {garminSyncResult ? (
+                      <p className="mt-2 text-xs text-gray-600">
+                        {garminSyncResult.saved > 0
+                          ? `Saved ${garminSyncResult.saved} new activit${garminSyncResult.saved === 1 ? "y" : "ies"}.`
+                          : garminSyncResult.fetched === 0
+                            ? "Garmin returned no activities in this window."
+                            : `Up to date (${garminSyncResult.skipped} already had, ${garminSyncResult.fetched} checked).`}
+                        {garminSyncResult.errors > 0
+                          ? ` ${garminSyncResult.errors} error(s).`
+                          : null}
+                      </p>
+                    ) : null}
+                    {garminSyncError ? (
+                      <p className="mt-2 text-xs text-red-600">{garminSyncError}</p>
+                    ) : null}
+                  </div>
                 </div>
               )}
             </div>

@@ -121,6 +121,7 @@ export async function POST(request: NextRequest) {
             athleteId: athlete.id,
             sourceActivityId,
             source: 'garmin',
+            ingestionStatus: 'RECEIVED',
             activityType: activity.activityType ?? undefined,
             activityName: activity.activityName ?? undefined,
             startTime: norm.startTime,
@@ -135,6 +136,11 @@ export async function POST(request: NextRequest) {
             summaryData: activity as object,
             updatedAt: now,
           },
+        });
+        console.log('✅ sync: athlete_activity created', {
+          id: created.id,
+          sourceActivityId,
+          activityType: activity.activityType,
         });
         try {
           await tryMatchActivityToTrainingWorkout(created.id);
