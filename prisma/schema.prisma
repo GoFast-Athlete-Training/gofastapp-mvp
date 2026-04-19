@@ -584,12 +584,36 @@ model TrainingPreferences {
   @@map("training_preferences")
 }
 
+/// Public brand row — prodpush from Company acq_brands; slug is the bridge key.
+model brands {
+  id              String    @id @default(uuid())
+  slug            String    @unique
+  name            String
+  brandType       BrandType @default(OTHER)
+  description     String?
+  websiteUrl      String?
+  instagramHandle String?
+  logoUrl         String?
+  syncedAt        DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  run_clubs       run_clubs[]
+
+  @@map("brands")
+}
+
 model run_clubs {
   id        String   @id @default(uuid())
   slug      String   @unique
   name      String
+  brandId   String?
+  brands    brands?  @relation(fields: [brandId], references: [id], onDelete: SetNull)
   logoUrl      String?
   city         String?
+  /// Canonical city slug (dc, arlington) — synced from Company prodpush; computed from city when set.
+  gofastCity   String?
+  /// Club runs in multiple municipalities; series rows need per-row city from Places.
+  isMultiSite  Boolean  @default(false)
   state        String?
   neighborhood String?
   description String?              // General club description (for downstream display)
@@ -606,6 +630,7 @@ model run_clubs {
   clubLeaders  Athlete[]          // Reverse relation for Athlete.runClubId
   runSeries    run_series[]       // Recurring series this club owns (run_series.runClubId → run_clubs)
 
+  @@index([brandId])
   @@index([city])
   @@index([slug])
 }
@@ -812,6 +837,8 @@ model city_runs {
   runSeriesId         String?              // null = standalone; set = series occurrence (FK to run_series)
   /// Optional: tag this run to a race registry (training for X marathon, etc.).
   raceRegistryId      String?
+  /// Idempotent key for Company → prod shakeout sync (one row per race_run_event window). Null for normal city_runs.
+  shakeoutDedupeKey   String?              @unique
   locationId          String?              // FK to run_locations (auto-seeded or manually linked)
   routeId             String?              // Optional saved route (reference path + media)
   workoutId           String?              // Optional structured workout for join-my-workout
@@ -1281,6 +1308,15 @@ enum RunWorkflowStatus {
   PENDING
   SUBMITTED
   APPROVED
+}
+
+/// Synced from GoFastCompany acq_brands (slug bridge).
+enum BrandType {
+  SHOE
+  APPAREL
+  RUN_STORE_CHAIN
+  GEAR
+  OTHER
 }
 
 enum RouteShape {

@@ -17,7 +17,8 @@ export async function OPTIONS() {
 /**
  * POST /api/admin/nuclear-reset-run-clubs
  * DESTRUCTIVE: deletes all prod run_clubs, run_series, and club/series-linked city_runs.
- * Requires Firebase staff token + body.confirm + env GOFAST_NUCLEAR_RUN_CLUBS_SECRET match.
+ * Requires a valid Firebase ID token whose custom claims include `staffId` (Company staff — set when linking Firebase in Company app).
+ * Body must include { "confirm": "RESET_RUN_CLUB_UNIVERSE" }.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -25,30 +26,33 @@ export async function POST(request: NextRequest) {
     if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
     }
+
+    let decoded: import('firebase-admin/auth').DecodedIdToken;
     try {
-      await adminAuth.verifyIdToken(authHeader.substring(7));
+      decoded = await adminAuth.verifyIdToken(authHeader.substring(7));
     } catch {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401, headers: corsHeaders });
     }
 
-    const secret = process.env.GOFAST_NUCLEAR_RUN_CLUBS_SECRET;
-    if (!secret?.trim()) {
-      return NextResponse.json(
-        { success: false, error: 'GOFAST_NUCLEAR_RUN_CLUBS_SECRET is not configured' },
-        { status: 503, headers: corsHeaders }
-      );
-    }
-
-    const body = (await request.json().catch(() => ({}))) as {
-      confirm?: string;
-      secret?: string;
-    };
-    if (body.confirm !== 'RESET_RUN_CLUB_UNIVERSE' || body.secret !== secret) {
+    const rawStaffId = (decoded as Record<string, unknown>).staffId;
+    const staffId =
+      typeof rawStaffId === 'string' && rawStaffId.trim() !== '' ? rawStaffId.trim() : null;
+    if (!staffId) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            'Invalid confirmation. Send JSON { "confirm": "RESET_RUN_CLUB_UNIVERSE", "secret": "<env secret>" }',
+          error: 'Company staff only. Sign in with a staff account (Firebase token must include staffId). Try signing out and back in.',
+        },
+        { status: 403, headers: corsHeaders }
+      );
+    }
+
+    const body = (await request.json().catch(() => ({}))) as { confirm?: string };
+    if (body.confirm !== 'RESET_RUN_CLUB_UNIVERSE') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid confirmation. Send JSON { "confirm": "RESET_RUN_CLUB_UNIVERSE" }',
         },
         { status: 400, headers: corsHeaders }
       );

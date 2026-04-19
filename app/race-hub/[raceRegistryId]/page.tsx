@@ -109,6 +109,18 @@ type RaceEventRow = {
   race_event_rsvps?: { status: string }[];
 };
 
+type ShakeoutRunRow = {
+  id: string;
+  title: string;
+  date: string;
+  meetUpPoint: string;
+  pace: string | null;
+  totalMiles: number | null;
+  description: string | null;
+  gorunPath: string;
+  myRsvp: { status: string } | null;
+};
+
 function mapRaceRoleToCrewRole(
   role: string
 ): "member" | "manager" | "admin" {
@@ -136,6 +148,7 @@ function RaceHubPageInner() {
   const [memberships, setMemberships] = useState<MembershipRow[]>([]);
   const [announcements, setAnnouncements] = useState<AnnouncementRow[]>([]);
   const [events, setEvents] = useState<RaceEventRow[]>([]);
+  const [shakeouts, setShakeouts] = useState<ShakeoutRunRow[]>([]);
   const [myMembership, setMyMembership] = useState<MembershipRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -181,15 +194,18 @@ function RaceHubPageInner() {
       setMyMembership(mine);
 
       if (mine) {
-        const [aRes, eRes] = await Promise.all([
+        const [aRes, eRes, shRes] = await Promise.all([
           api.get(`/race-hub/${encodeURIComponent(id)}/announcements`),
           api.get(`/race-hub/${encodeURIComponent(id)}/events`),
+          api.get(`/race-hub/${encodeURIComponent(id)}/shakeouts`),
         ]);
         setAnnouncements((aRes.data?.announcements as AnnouncementRow[]) || []);
         setEvents((eRes.data?.events as RaceEventRow[]) || []);
+        setShakeouts((shRes.data?.shakeouts as ShakeoutRunRow[]) || []);
       } else {
         setAnnouncements([]);
         setEvents([]);
+        setShakeouts([]);
       }
       return { isMember: Boolean(mine) };
     } catch (e: unknown) {
@@ -198,6 +214,7 @@ function RaceHubPageInner() {
         setMyMembership(null);
         setAnnouncements([]);
         setEvents([]);
+        setShakeouts([]);
         return { isMember: false };
       }
       throw e;
@@ -297,6 +314,18 @@ function RaceHubPageInner() {
       );
       const eRes = await api.get(`/race-hub/${encodeURIComponent(raceRegistryId.trim())}/events`);
       setEvents((eRes.data?.events as RaceEventRow[]) || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const setShakeoutRunRsvp = async (runId: string, status: "going" | "not-going") => {
+    const id = raceRegistryId?.trim();
+    if (!id) return;
+    try {
+      await api.post(`/runs/${encodeURIComponent(runId)}/rsvp`, { status });
+      const sRes = await api.get(`/race-hub/${encodeURIComponent(id)}/shakeouts`);
+      setShakeouts((sRes.data?.shakeouts as ShakeoutRunRow[]) || []);
     } catch (err) {
       console.error(err);
     }
@@ -625,9 +654,72 @@ function RaceHubPageInner() {
 
               <section className="space-y-4">
                 <div>
+                  <h2 className="text-lg font-bold text-gray-900">Official shakeouts</h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    City runs synced from race HQ — same RSVPs and check-ins as club runs.
+                  </p>
+                </div>
+                {shakeouts.length === 0 ? (
+                  <p className="text-sm text-gray-500 bg-white rounded-xl border border-gray-200 p-6">
+                    No official shakeouts yet. They appear after staff prodpush from the race wizard
+                    (race registrations must exist in the app first).
+                  </p>
+                ) : (
+                  <ul className="space-y-4">
+                    {shakeouts.map((sh) => {
+                      const my = sh.myRsvp?.status ?? null;
+                      return (
+                        <li
+                          key={sh.id}
+                          className="bg-white rounded-xl border border-orange-200 p-4 shadow-sm"
+                        >
+                          <p className="font-semibold text-gray-900">{sh.title}</p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {new Date(sh.date).toLocaleString()} · {sh.meetUpPoint}
+                            {sh.pace ? ` · ${sh.pace}` : ""}
+                            {sh.totalMiles != null ? ` · ${sh.totalMiles} mi` : ""}
+                          </p>
+                          {sh.description ? (
+                            <p className="text-sm text-gray-700 mt-2 whitespace-pre-line">
+                              {sh.description}
+                            </p>
+                          ) : null}
+                          <div className="mt-3 flex flex-wrap gap-2 items-center">
+                            <Link
+                              href={sh.gorunPath}
+                              className="inline-flex items-center gap-1 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600"
+                            >
+                              Open run
+                            </Link>
+                            {(["going", "not-going"] as const).map((status) => (
+                              <button
+                                key={status}
+                                type="button"
+                                onClick={() => void setShakeoutRunRsvp(sh.id, status)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                                  my === status
+                                    ? status === "going"
+                                      ? "bg-green-600 text-white"
+                                      : "bg-gray-600 text-white"
+                                    : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                                }`}
+                              >
+                                {status === "going" ? "Going" : "Can't go"}
+                              </button>
+                            ))}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+
+              <section className="space-y-4">
+                <div>
                   <h2 className="text-lg font-bold text-gray-900">Group runs &amp; meetups</h2>
                   <p className="text-sm text-gray-500 mt-1">
-                    Shakeouts, brunch runs, carpools — add anything social.
+                    Community-led meetups — brunch runs, carpools, informal hangs.
                   </p>
                 </div>
                 {events.length === 0 ? (

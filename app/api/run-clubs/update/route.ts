@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Product app owns parse/validate/transform - all the magic happens here
-    const updateData = {
+    const updateData: Prisma.run_clubsUpdateInput = {
       name: nameVal,
       slug: slugFinal,
       city: rc.city != null ? String(rc.city).trim() || null : null,
@@ -70,9 +71,51 @@ export async function POST(request: NextRequest) {
       syncedAt: new Date(),
     };
 
+    if ("gofastCity" in rc) {
+      updateData.gofastCity =
+        rc.gofastCity != null && String(rc.gofastCity).trim() !== ""
+          ? String(rc.gofastCity).trim()
+          : null;
+    }
+    if ("isMultiSite" in rc) {
+      updateData.isMultiSite = rc.isMultiSite === true;
+    }
+
+    /** Resolved from `brandSlug` for updates (relation) and creates (unchecked `brandId`). */
+    let brandIdPatch: string | null | undefined = undefined;
+    if ("brandSlug" in rc) {
+      const raw = rc.brandSlug;
+      if (raw == null || (typeof raw === "string" && !raw.trim())) {
+        brandIdPatch = null;
+      } else {
+        const slug = String(raw).trim().toLowerCase();
+        const brandRow = await prisma.brands.findUnique({ where: { slug } });
+        brandIdPatch = brandRow?.id ?? null;
+      }
+      updateData.brands =
+        brandIdPatch === null
+          ? { disconnect: true }
+          : brandIdPatch
+            ? { connect: { id: brandIdPatch } }
+            : { disconnect: true };
+    }
+
+    const toUncheckedCreate = (
+      extra: Record<string, unknown>
+    ): Prisma.run_clubsUncheckedCreateInput => {
+      const { brands: _drop, ...rest } = updateData as Record<string, unknown>;
+      return {
+        ...rest,
+        ...extra,
+        ...(brandIdPatch !== undefined ? { brandId: brandIdPatch } : {}),
+      } as Prisma.run_clubsUncheckedCreateInput;
+    };
+
+    const ard =
+      typeof updateData.allRunsDescription === "string" ? updateData.allRunsDescription : null;
     console.log('📥 PRODUCT UPDATE: Processed updateData:', {
       id,
-      allRunsDescription: updateData.allRunsDescription ? `${updateData.allRunsDescription.substring(0, 50)}...` : null,
+      allRunsDescription: ard ? `${ard.substring(0, 50)}...` : null,
     });
 
     // Original genius design: Company ID = Product app ID!
@@ -137,7 +180,7 @@ export async function POST(request: NextRequest) {
         // No existing club - create new one
         console.log('📥 PRODUCT UPDATE: Creating new club:', { id, slug: slugFinal });
         runClub = await prisma.run_clubs.create({
-          data: { id, ...updateData },
+          data: toUncheckedCreate({ id }),
           select: {
             id: true,
             name: true,
@@ -163,7 +206,7 @@ export async function POST(request: NextRequest) {
         slug: runClub.slug,
         allRunsDescription: verified?.allRunsDescription ? `${verified.allRunsDescription.substring(0, 100)}...` : null,
         allRunsDescriptionLength: verified?.allRunsDescription?.length || 0,
-        allRunsDescriptionMatches: verified?.allRunsDescription === updateData.allRunsDescription,
+        allRunsDescriptionMatches: verified?.allRunsDescription === ard,
       });
       
       // Update runClub with verified values
@@ -187,7 +230,7 @@ export async function POST(request: NextRequest) {
         });
       } else {
         runClub = await prisma.run_clubs.create({
-          data: { ...updateData, slug: slugFinal },
+          data: toUncheckedCreate({ slug: slugFinal }),
           select: {
             id: true,
             name: true,

@@ -11,8 +11,8 @@ export function slugifySegment(s: string): string {
     .slice(0, 48);
 }
 
-/** Normalize display / schedule text to gofast city code (dc, arlington, …). */
-export function toCanonicalCity(raw: string | null | undefined): string {
+/** Map city text to gofast city slug (dc, arlington, …). Keep in sync with GoFastCompany lib/acqRunSeries.ts */
+export function toCitySlug(raw: string | null | undefined): string {
   if (raw == null || !String(raw).trim()) return "unknown";
   const norm = String(raw)
     .trim()
@@ -28,6 +28,7 @@ export function toCanonicalCity(raw: string | null | undefined): string {
     washington: "dc",
     "washington d c": "dc",
     "d c": "dc",
+    "district of columbia": "dc",
     arlington: "arlington",
     "arlington va": "arlington",
     alexandria: "alexandria",
@@ -42,6 +43,9 @@ export function toCanonicalCity(raw: string | null | undefined): string {
   return aliases[norm] ?? (slugifySegment(raw) || "unknown");
 }
 
+/** @deprecated Use toCitySlug */
+export const toCanonicalCity = toCitySlug;
+
 /**
  * Pattern: {clubSlug}-{canonicalDay lower}-{canonicalCity slug}.
  * City segment is required (use "unknown" if missing).
@@ -53,6 +57,6 @@ export function buildSeriesSlug(
 ): string {
   const club = slugifySegment(clubSlug || "club") || "club";
   const day = canonicalDayUpper.toLowerCase();
-  const city = slugifySegment(toCanonicalCity(cityRaw ?? ""));
+  const city = slugifySegment(toCitySlug(cityRaw ?? ""));
   return `${club}-${day}-${city}`;
 }
