@@ -8,6 +8,8 @@ import { prisma } from '@/lib/prisma';
 import { activityExists } from '@/lib/garmin-events/dedupe';
 import { normalizeActivityFields } from '@/lib/garmin-events/normalizeActivityFields';
 import { tryMatchActivityToTrainingWorkout } from '@/lib/training/match-activity-to-workout';
+import { utcDateOnly, ymdFromDate } from '@/lib/training/plan-utils';
+import { parseUtcYmdToUploadWindow } from '@/lib/garmin-events/garmin-upload-window-utc';
 
 function generateId(): string {
   const timestamp = Date.now().toString(36);
@@ -18,7 +20,8 @@ function generateId(): string {
 /**
  * POST /api/garmin/sync
  *
- * Manual sync endpoint for pulling recent activities from Garmin.
+ * Body (optional JSON): { "date": "YYYY-MM-DD" } — UTC calendar day for upload-time window (max 86400s per Garmin).
+ * Omitted date defaults to today UTC (same convention as training plan date keys).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -47,11 +50,28 @@ export async function POST(request: NextRequest) {
       throw e;
     }
 
-    const activitiesUrl = 'https://apis.garmin.com/wellness-api/rest/activities';
+    let bodyDate: string | undefined;
+    try {
+      const body = (await request.json()) as { date?: unknown };
+      if (body && typeof body.date === 'string' && body.date.trim()) {
+        bodyDate = body.date.trim();
+      }
+    } catch {
+      /* empty or non-JSON body */
+    }
 
-    /** Garmin Wellness API expects Unix seconds, not calendar startDate strings. */
-    const uploadEndTimeInSeconds = Math.floor(Date.now() / 1000);
-    const uploadStartTimeInSeconds = uploadEndTimeInSeconds - 30 * 24 * 60 * 60;
+    const ymd = bodyDate ?? ymdFromDate(utcDateOnly(new Date()));
+    const window = parseUtcYmdToUploadWindow(ymd);
+    if (!window) {
+      return NextResponse.json(
+        { error: 'Invalid date; use YYYY-MM-DD (UTC calendar day).' },
+        { status: 400 }
+      );
+    }
+
+    const { uploadStartTimeInSeconds, uploadEndTimeInSeconds, dateUtc } = window;
+
+    const activitiesUrl = 'https://apis.garmin.com/wellness-api/rest/activities';
 
     const fetchActivities = (token: string) =>
       fetch(
@@ -82,8 +102,15 @@ export async function POST(request: NextRequest) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('❌ Garmin activities fetch failed:', response.status, errorText);
+      let message = errorText;
+      try {
+        const j = JSON.parse(errorText) as { errorMessage?: string };
+        if (j.errorMessage) message = j.errorMessage;
+      } catch {
+        /* keep raw */
+      }
       return NextResponse.json(
-        { error: `Failed to fetch activities: ${response.status}` },
+        { error: message || `Failed to fetch activities: ${response.status}` },
         { status: response.status }
       );
     }
@@ -168,6 +195,11 @@ export async function POST(request: NextRequest) {
         saved,
         skipped,
         errors
+      },
+      window: {
+        dateUtc,
+        uploadStartTimeInSeconds,
+        uploadEndTimeInSeconds
       },
       message: `Synced ${saved} new activities`
     });
