@@ -32,6 +32,8 @@ function prescribedPaceSecPerMileForType(
       return paces.longRun;
     case "Intervals":
       return paces.interval;
+    case "Race":
+      return paces.marathon;
     case "Easy":
     default:
       return paces.easy;
@@ -45,6 +47,8 @@ function pickTotalMiles(workoutType: string): number {
       return 5;
     case "LongRun":
       return 8;
+    case "Race":
+      return 13.1;
     case "Tempo":
       return 6;
     case "Easy":

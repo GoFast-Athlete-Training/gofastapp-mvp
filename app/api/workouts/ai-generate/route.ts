@@ -33,7 +33,7 @@ export interface AiGenerateResponse {
 }
 
 /** Allowed workout types for blob path; contract with create page. */
-const BLOB_WORKOUT_TYPES = ["Easy", "Tempo", "LongRun", "Intervals"] as const;
+const BLOB_WORKOUT_TYPES = ["Easy", "Tempo", "LongRun", "Intervals", "Race"] as const;
 
 /**
  * Normalize request body for blob path. Contract: { sourceText, workoutType } only.
@@ -305,7 +305,8 @@ When the user explicitly mentions warmup or cooldown (e.g. "2 mi warmup", "coold
 }
 
 Rules:
-- Default: If the user does NOT explicitly mention warmup or cooldown (or warm-up, cool-down), return ONE segment only with title "Main" or "Main Work" or "Easy" containing the full distance. Do not infer or add Warmup/Cooldown.
+- Tabular splits: If each non-empty line is exactly "DISTANCE PACE PACE" (miles or decimal miles, then two M:SS/mile paces), output ONE segment per line with titles "Segment 1", "Segment 2", … and the given distance and pace band. Do not merge these into a single segment.
+- Default (non-tabular): If the user does NOT explicitly mention warmup or cooldown (or warm-up, cool-down), return ONE segment only with title "Main" or "Main Work" or "Easy" containing the full distance. Do not infer or add Warmup/Cooldown.
 - Only output segments titled "Warmup" or "Cooldown" when the user's text explicitly mentions them (e.g. "2 mile warmup", "warm up 1 mi", "cooldown 2 miles").
 - Each segment: stepOrder (1-based), title, durationType ("DISTANCE" or "TIME"), durationValue (miles or minutes), targets. For intervals use repeatCount (e.g. 6x800m = durationValue 0.5 miles, repeatCount 6).
 - PACE targets: "paceLow" and "paceHigh" as M:SS/mile strings (e.g. "8:15", "8:45"). HEART_RATE: valueLow/valueHigh in bpm when user mentions zone 1-5.

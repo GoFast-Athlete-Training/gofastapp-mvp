@@ -11,12 +11,13 @@ import { PaceMiSplitEditor } from "@/components/workout/PaceMiSplitEditor";
 import { parseSplitPaceToSecPerMile, secPerMileToSplitStrings } from "@/lib/workout/pace-mi-split";
 import {
   formatStoredPaceAsMinPerMile,
+  parsePaceToSecondsPerMile,
   secondsPerMileToSecondsPerKm,
   storedPaceSecondsKmToSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
 import { workoutDetailPathWithBackHref } from "@/lib/training/workout-nav-query";
 
-const WORKOUT_TYPES = ["Easy", "Tempo", "LongRun", "Intervals"] as const;
+const WORKOUT_TYPES = ["Easy", "Tempo", "LongRun", "Intervals", "Race"] as const;
 
 /** Stored PACE targets are sec/km, encoding v2 (same as workout detail / Garmin). */
 const PACE_SLOT_ENC = 2 as const;
@@ -46,6 +47,48 @@ type ApiSegment = {
   }>;
   repeatCount?: number;
 };
+
+/** One line = miles + two M:SS/mile paces (pace band); all lines must match for tabular paste. */
+const TABULAR_MILE_PACE_ROW = /^\s*(\d+\.?\d*)\s+(\d{1,2}:\d{2})\s+(\d{1,2}:\d{2})\s*$/;
+
+/**
+ * Parse coach-style split lines into API-shaped segments (deterministic; skips AI).
+ * Example line: `5 7:00 7:20` → 5 mi, pace band 7:00–7:20/mi.
+ */
+function tryParseTabularMilePacePaste(text: string): ApiSegment[] | null {
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return null;
+  const out: ApiSegment[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(TABULAR_MILE_PACE_ROW);
+    if (!m) return null;
+    const dist = parseFloat(m[1]);
+    if (!Number.isFinite(dist) || dist <= 0) return null;
+    let valueLow: number;
+    let valueHigh: number;
+    try {
+      const s1 = parsePaceToSecondsPerMile(m[2].trim());
+      const s2 = parsePaceToSecondsPerMile(m[3].trim());
+      const k1 = secondsPerMileToSecondsPerKm(s1);
+      const k2 = secondsPerMileToSecondsPerKm(s2);
+      valueLow = Math.min(k1, k2);
+      valueHigh = Math.max(k1, k2);
+    } catch {
+      return null;
+    }
+    out.push({
+      stepOrder: i + 1,
+      title: `Segment ${i + 1}`,
+      durationType: "DISTANCE",
+      durationValue: dist,
+      targets: [{ type: "PACE", valueLow, valueHigh }],
+    });
+  }
+  return out;
+}
 
 /** Sec/km (stored API value, encoding v2) to "M:SS" per mile — shared with workout detail */
 function secPerKmToPaceDisplay(value: number): string {
@@ -81,12 +124,14 @@ function hrBandFromTarget(t: { type?: string; valueLow?: number; valueHigh?: num
   return { min: Math.min(lo, hi), max: Math.max(lo, hi) };
 }
 
-/** Map AI-derived segments into fixed warmup / mainWork / cooldown slots */
-function apiSegmentsToSlots(
-  segments: ApiSegment[]
-): { warmup: SlotData | null; mainWork: SlotData | null; cooldown: SlotData | null } {
+/** Map AI-derived segments into warmup, ordered main segments, and cooldown (no merging). */
+function apiSegmentsToSlots(segments: ApiSegment[]): {
+  warmup: SlotData | null;
+  mainSegments: SlotData[];
+  cooldown: SlotData | null;
+} {
   let warmup: SlotData | null = null;
-  let mainWork: SlotData | null = null;
+  const mainSegments: SlotData[] = [];
   let cooldown: SlotData | null = null;
 
   for (const seg of segments) {
@@ -126,22 +171,11 @@ function apiSegmentsToSlots(
     } else if (/cooldown|cool.down|cool down/.test(title)) {
       cooldown = slot;
     } else {
-      if (mainWork) {
-        mainWork = {
-          miles: mainWork.miles + miles,
-          paceValueLow: mainWork.paceValueLow ?? slot.paceValueLow,
-          paceValueHigh: mainWork.paceValueHigh ?? slot.paceValueHigh,
-          hrMin: mainWork.hrMin ?? slot.hrMin,
-          hrMax: mainWork.hrMax ?? slot.hrMax,
-          repeatCount: mainWork.repeatCount ?? slot.repeatCount,
-        };
-      } else {
-        mainWork = slot;
-      }
+      mainSegments.push(slot);
     }
   }
 
-  return { warmup, mainWork, cooldown };
+  return { warmup, mainSegments, cooldown };
 }
 
 function slotOneLine(slot: SlotData): string {
@@ -181,6 +215,11 @@ function slotToPaceSplitState(slot: SlotData | null): {
   return { lowMin, lowSec, highMin, highSec };
 }
 
+type EditingTarget =
+  | { kind: "warmup" }
+  | { kind: "cooldown" }
+  | { kind: "main"; index: number };
+
 function CreateWorkoutPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -189,7 +228,7 @@ function CreateWorkoutPageInner() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [warmup, setWarmup] = useState<SlotData | null>(null);
-  const [mainWork, setMainWork] = useState<SlotData | null>(null);
+  const [mainSegments, setMainSegments] = useState<SlotData[]>([]);
   const [cooldown, setCooldown] = useState<SlotData | null>(null);
 
   const [sourceText, setSourceText] = useState("");
@@ -201,33 +240,35 @@ function CreateWorkoutPageInner() {
   const [saving, setSaving] = useState(false);
   /** YYYY-MM-DD from date input; optional, shown on home & workout cards */
   const [scheduledDate, setScheduledDate] = useState("");
-  const [editingSlot, setEditingSlot] = useState<"warmup" | "mainWork" | "cooldown" | null>(null);
+  const [editingTarget, setEditingTarget] = useState<EditingTarget | null>(null);
   /** Pace low / high split fields while a slot editor is open (matches /workouts/[id]). */
   const [editingPaceLowMin, setEditingPaceLowMin] = useState("");
   const [editingPaceLowSec, setEditingPaceLowSec] = useState("");
   const [editingPaceHighMin, setEditingPaceHighMin] = useState("");
   const [editingPaceHighSec, setEditingPaceHighSec] = useState("");
 
-  const hasSlots = warmup !== null || mainWork !== null || cooldown !== null;
+  const hasSlots = warmup !== null || mainSegments.length > 0 || cooldown !== null;
 
-  const getSlot = (key: "warmup" | "mainWork" | "cooldown") =>
-    key === "warmup" ? warmup : key === "mainWork" ? mainWork : cooldown;
-  const setSlot = (key: "warmup" | "mainWork" | "cooldown", value: SlotData | null) => {
-    if (key === "warmup") setWarmup(value);
-    else if (key === "mainWork") setMainWork(value);
-    else setCooldown(value);
-  };
+  const hasPositiveMiles =
+    (warmup?.miles ?? 0) > 0 ||
+    (cooldown?.miles ?? 0) > 0 ||
+    mainSegments.some((s) => s.miles > 0);
 
   useEffect(() => {
-    if (!editingSlot) return;
+    if (!editingTarget) return;
     const label =
-      editingSlot === "warmup"
+      editingTarget.kind === "warmup"
         ? "Warmup"
-        : editingSlot === "mainWork"
-          ? "Main Work"
-          : "Cooldown";
+        : editingTarget.kind === "cooldown"
+          ? "Cooldown"
+          : `Segment ${editingTarget.index + 1}`;
     const ctx = `${label} segment`;
-    const base = getSlot(editingSlot) ?? { miles: 0 };
+    const base =
+      editingTarget.kind === "warmup"
+        ? warmup ?? { miles: 0 }
+        : editingTarget.kind === "cooldown"
+          ? cooldown ?? { miles: 0 }
+          : mainSegments[editingTarget.index] ?? { miles: 0 };
 
     let paceValueLow: number | undefined;
     if (!editingPaceLowMin.trim() && !editingPaceLowSec.trim()) {
@@ -269,27 +310,32 @@ function CreateWorkoutPageInner() {
 
     if (paceValueLow === base.paceValueLow && paceValueHigh === base.paceValueHigh) return;
 
-    setSlot(editingSlot, {
-      ...base,
-      paceValueLow,
-      paceValueHigh,
-    });
+    const next = { ...base, paceValueLow, paceValueHigh };
+    if (editingTarget.kind === "warmup") setWarmup(next);
+    else if (editingTarget.kind === "cooldown") setCooldown(next);
+    else {
+      setMainSegments((prev) => {
+        const copy = [...prev];
+        copy[editingTarget.index] = next;
+        return copy;
+      });
+    }
   }, [
-    editingSlot,
+    editingTarget,
     editingPaceLowMin,
     editingPaceLowSec,
     editingPaceHighMin,
     editingPaceHighSec,
     warmup,
-    mainWork,
+    mainSegments,
     cooldown,
   ]);
 
   const clearSegmentsUsePasteInstead = () => {
     setWarmup(null);
-    setMainWork(null);
+    setMainSegments([]);
     setCooldown(null);
-    setEditingSlot(null);
+    setEditingTarget(null);
     setEditingPaceLowMin("");
     setEditingPaceLowSec("");
     setEditingPaceHighMin("");
@@ -307,6 +353,21 @@ function CreateWorkoutPageInner() {
     setNeedsPaceHint(null);
     setDeriving(true);
     try {
+      const tabular = tryParseTabularMilePacePaste(text);
+      if (tabular) {
+        const slots = apiSegmentsToSlots(tabular);
+        setWarmup(slots.warmup);
+        setMainSegments(slots.mainSegments);
+        setCooldown(slots.cooldown);
+        const totalMi =
+          (slots.warmup?.miles ?? 0) +
+          slots.mainSegments.reduce((a, s) => a + s.miles, 0) +
+          (slots.cooldown?.miles ?? 0);
+        setName(`${workoutType} — ${totalMi.toFixed(1)} mi`);
+        setDescription(`Pasted splits (${slots.mainSegments.length} segments).`);
+        return;
+      }
+
       const { data } = await api.post<{
         segments: ApiSegment[];
         suggestedTitle: string;
@@ -314,7 +375,7 @@ function CreateWorkoutPageInner() {
       }>("workouts/ai-generate", { workoutType, sourceText: text });
       const slots = apiSegmentsToSlots(data.segments);
       setWarmup(slots.warmup);
-      setMainWork(slots.mainWork);
+      setMainSegments(slots.mainSegments);
       setCooldown(slots.cooldown);
       setName(data.suggestedTitle);
       setDescription(data.suggestedDescription);
@@ -372,7 +433,7 @@ function CreateWorkoutPageInner() {
       };
       const slots = apiSegmentsToSlots(built.segments);
       setWarmup(slots.warmup);
-      setMainWork(slots.mainWork);
+      setMainSegments(slots.mainSegments);
       setCooldown(slots.cooldown);
       setName(built.suggestedTitle);
       setDescription(built.suggestedDescription);
@@ -400,7 +461,7 @@ function CreateWorkoutPageInner() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!mainWork && !warmup && !cooldown) {
+    if (!hasPositiveMiles) {
       alert("Derive a workout first, or add at least one segment.");
       return;
     }
@@ -419,28 +480,50 @@ function CreateWorkoutPageInner() {
         return targets.length ? targets : undefined;
       };
 
-      const segmentTitles: Record<string, string> = {
-        warmup: "Warmup",
-        mainWork: "Main Work",
-        cooldown: "Cooldown",
-      };
-      const order: ("warmup" | "mainWork" | "cooldown")[] = ["warmup", "mainWork", "cooldown"];
-      const segments = order
-        .filter((k) => {
-          const s = getSlot(k);
-          return s != null && s.miles > 0;
-        })
-        .map((k, i) => {
-          const slot = getSlot(k)!;
-          return {
-            stepOrder: i + 1,
-            title: segmentTitles[k],
+      const segments: Array<{
+        stepOrder: number;
+        title: string;
+        durationType: string;
+        durationValue: number;
+        targets: ReturnType<typeof buildTargets>;
+        repeatCount: number | undefined;
+      }> = [];
+      let step = 1;
+      if (warmup && warmup.miles > 0) {
+        segments.push({
+          stepOrder: step++,
+          title: "Warmup",
+          durationType: "DISTANCE",
+          durationValue: warmup.miles,
+          targets: buildTargets(warmup),
+          repeatCount: warmup.repeatCount,
+        });
+      }
+      const mainsWithMiles = mainSegments.filter((s) => s.miles > 0);
+      let mainOrdinal = 0;
+      for (const slot of mainSegments) {
+        if (slot.miles > 0) {
+          mainOrdinal++;
+          segments.push({
+            stepOrder: step++,
+            title: mainsWithMiles.length === 1 ? "Main Work" : `Segment ${mainOrdinal}`,
             durationType: "DISTANCE",
             durationValue: slot.miles,
             targets: buildTargets(slot),
             repeatCount: slot.repeatCount,
-          };
+          });
+        }
+      }
+      if (cooldown && cooldown.miles > 0) {
+        segments.push({
+          stepOrder: step++,
+          title: "Cooldown",
+          durationType: "DISTANCE",
+          durationValue: cooldown.miles,
+          targets: buildTargets(cooldown),
+          repeatCount: cooldown.repeatCount,
         });
+      }
 
       const workoutData = {
         title: name,
@@ -557,14 +640,17 @@ function CreateWorkoutPageInner() {
             <div className="mb-8">
               <h2 className="text-lg font-semibold text-gray-900 mb-2">Paste your workout</h2>
               <p className="text-sm text-gray-600 mb-3">
-                Paste a description from a coach, Runna, or Strava and we’ll turn it into segments.
+                Paste prose from a coach, Runna, or Strava — or one line per split:{" "}
+                <span className="font-mono text-gray-800">miles pace pace</span> (e.g.{" "}
+                <span className="font-mono text-gray-800">5 7:00 7:20</span>) for a pace band per
+                segment.
               </p>
               <textarea
                 value={sourceText}
                 onChange={(e) => setSourceText(e.target.value)}
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                placeholder="e.g. 15 miles today — 2 mile warmup, 10 at marathon pace, 3 mile cooldown"
+                placeholder="e.g. 15 miles today — 2 mile warmup, 10 at marathon pace, 3 mile cooldown — or paste split lines: 5 7:00 7:20"
               />
               {deriveError && <p className="text-sm text-red-600 mt-1">{deriveError}</p>}
               <button
@@ -616,22 +702,22 @@ function CreateWorkoutPageInner() {
               <div className="mb-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Segments</h2>
                 <p className="text-sm text-gray-500 mb-4">
-                  Warmup, main work, and cooldown. Add or edit each slot.
+                  Optional warmup and cooldown; one or more main segments (intervals, splits, or a single
+                  block).
                 </p>
 
                 {(
                   [
-                    { key: "warmup" as const, label: "Warmup" },
-                    { key: "mainWork" as const, label: "Main Work" },
-                    { key: "cooldown" as const, label: "Cooldown" },
+                    { kind: "warmup" as const, label: "Warmup" },
+                    { kind: "cooldown" as const, label: "Cooldown" },
                   ] as const
-                ).map(({ key, label }) => {
-                  const slot = getSlot(key);
-                  const isEditing = editingSlot === key;
+                ).map(({ kind, label }) => {
+                  const slot = kind === "warmup" ? warmup : cooldown;
+                  const isEditing = editingTarget?.kind === kind;
 
                   return (
-                    <div key={key} className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50">
-                      <div className="flex items-center justify-between">
+                    <div key={kind} className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
                         <span className="font-medium text-gray-900">{label}</span>
                         <span className="text-sm text-gray-600">
                           {slot ? slotOneLine(slot) : "None"}
@@ -641,8 +727,9 @@ function CreateWorkoutPageInner() {
                             <button
                               type="button"
                               onClick={() => {
-                                setSlot(key, { miles: 0 });
-                                setEditingSlot(key);
+                                if (kind === "warmup") setWarmup({ miles: 0 });
+                                else setCooldown({ miles: 0 });
+                                setEditingTarget({ kind });
                                 setEditingPaceLowMin("");
                                 setEditingPaceLowSec("");
                                 setEditingPaceHighMin("");
@@ -653,32 +740,30 @@ function CreateWorkoutPageInner() {
                               Add
                             </button>
                           ) : (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (isEditing) {
-                                    setEditingSlot(null);
-                                  } else {
-                                    setEditingSlot(key);
-                                    const sp = slotToPaceSplitState(getSlot(key));
-                                    setEditingPaceLowMin(sp.lowMin);
-                                    setEditingPaceLowSec(sp.lowSec);
-                                    setEditingPaceHighMin(sp.highMin);
-                                    setEditingPaceHighSec(sp.highSec);
-                                  }
-                                }}
-                                className="text-sm px-3 py-1.5 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 inline-flex items-center gap-1"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                                Edit
-                              </button>
-                            </>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isEditing) {
+                                  setEditingTarget(null);
+                                } else {
+                                  setEditingTarget({ kind });
+                                  const sp = slotToPaceSplitState(slot);
+                                  setEditingPaceLowMin(sp.lowMin);
+                                  setEditingPaceLowSec(sp.lowSec);
+                                  setEditingPaceHighMin(sp.highMin);
+                                  setEditingPaceHighSec(sp.highSec);
+                                }
+                              }}
+                              className="text-sm px-3 py-1.5 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 inline-flex items-center gap-1"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              Edit
+                            </button>
                           )}
                         </div>
                       </div>
 
-                      {isEditing && (
+                      {isEditing && slot && (
                         <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Miles</label>
@@ -686,13 +771,13 @@ function CreateWorkoutPageInner() {
                               type="number"
                               step="0.1"
                               min={0}
-                              value={slot?.miles ?? ""}
-                              onChange={(e) =>
-                                setSlot(key, {
-                                  ...(getSlot(key) ?? { miles: 0 }),
-                                  miles: parseFloat(e.target.value) || 0,
-                                })
-                              }
+                              value={slot.miles ?? ""}
+                              onChange={(e) => {
+                                const miles = parseFloat(e.target.value) || 0;
+                                if (kind === "warmup")
+                                  setWarmup({ ...slot, miles });
+                                else setCooldown({ ...slot, miles });
+                              }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                             />
                           </div>
@@ -724,13 +809,12 @@ function CreateWorkoutPageInner() {
                             <label className="block text-sm font-medium text-gray-700 mb-1">HR min</label>
                             <input
                               type="number"
-                              value={slot?.hrMin ?? ""}
-                              onChange={(e) =>
-                                setSlot(key, {
-                                  ...(getSlot(key) ?? { miles: 0 }),
-                                  hrMin: parseInt(e.target.value, 10) || undefined,
-                                })
-                              }
+                              value={slot.hrMin ?? ""}
+                              onChange={(e) => {
+                                const hrMin = parseInt(e.target.value, 10) || undefined;
+                                if (kind === "warmup") setWarmup({ ...slot, hrMin });
+                                else setCooldown({ ...slot, hrMin });
+                              }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                             />
                           </div>
@@ -738,46 +822,212 @@ function CreateWorkoutPageInner() {
                             <label className="block text-sm font-medium text-gray-700 mb-1">HR max</label>
                             <input
                               type="number"
-                              value={slot?.hrMax ?? ""}
-                              onChange={(e) =>
-                                setSlot(key, {
-                                  ...(getSlot(key) ?? { miles: 0 }),
-                                  hrMax: parseInt(e.target.value, 10) || undefined,
-                                })
-                              }
+                              value={slot.hrMax ?? ""}
+                              onChange={(e) => {
+                                const hrMax = parseInt(e.target.value, 10) || undefined;
+                                if (kind === "warmup") setWarmup({ ...slot, hrMax });
+                                else setCooldown({ ...slot, hrMax });
+                              }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                             />
                           </div>
                           <div className="md:col-span-2">
                             <button
                               type="button"
-                              onClick={() => setEditingSlot(null)}
+                              onClick={() => setEditingTarget(null)}
                               className="text-sm px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
                             >
                               Done
                             </button>
-                            {slot && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSlot(key, null);
-                                  setEditingSlot(null);
-                                  setEditingPaceLowMin("");
-                                  setEditingPaceLowSec("");
-                                  setEditingPaceHighMin("");
-                                  setEditingPaceHighSec("");
-                                }}
-                                className="ml-2 text-sm px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg"
-                              >
-                                Remove
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (kind === "warmup") setWarmup(null);
+                                else setCooldown(null);
+                                setEditingTarget(null);
+                                setEditingPaceLowMin("");
+                                setEditingPaceLowSec("");
+                                setEditingPaceHighMin("");
+                                setEditingPaceHighSec("");
+                              }}
+                              className="ml-2 text-sm px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg"
+                            >
+                              Remove
+                            </button>
                           </div>
                         </div>
                       )}
                     </div>
                   );
                 })}
+
+                {mainSegments.map((slot, index) => {
+                  const label =
+                    mainSegments.length === 1 ? "Main work" : `Segment ${index + 1}`;
+                  const isEditing =
+                    editingTarget?.kind === "main" && editingTarget.index === index;
+
+                  return (
+                    <div
+                      key={`main-${index}`}
+                      className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50"
+                    >
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="font-medium text-gray-900">{label}</span>
+                        <span className="text-sm text-gray-600">{slotOneLine(slot)}</span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isEditing) {
+                                setEditingTarget(null);
+                              } else {
+                                setEditingTarget({ kind: "main", index });
+                                const sp = slotToPaceSplitState(slot);
+                                setEditingPaceLowMin(sp.lowMin);
+                                setEditingPaceLowSec(sp.lowSec);
+                                setEditingPaceHighMin(sp.highMin);
+                                setEditingPaceHighSec(sp.highSec);
+                              }
+                            }}
+                            className="text-sm px-3 py-1.5 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 inline-flex items-center gap-1"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            Edit
+                          </button>
+                        </div>
+                      </div>
+
+                      {isEditing && (
+                        <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Miles</label>
+                            <input
+                              type="number"
+                              step="0.1"
+                              min={0}
+                              value={slot.miles ?? ""}
+                              onChange={(e) => {
+                                const miles = parseFloat(e.target.value) || 0;
+                                setMainSegments((prev) => {
+                                  const copy = [...prev];
+                                  copy[index] = { ...copy[index], miles };
+                                  return copy;
+                                });
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                            />
+                          </div>
+                          <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <span className="text-xs font-semibold uppercase text-gray-500 block mb-1">
+                                Pace low
+                              </span>
+                              <PaceMiSplitEditor
+                                minValue={editingPaceLowMin}
+                                secValue={editingPaceLowSec}
+                                onMinChange={setEditingPaceLowMin}
+                                onSecChange={setEditingPaceLowSec}
+                              />
+                            </div>
+                            <div>
+                              <span className="text-xs font-semibold uppercase text-gray-500 block mb-1">
+                                Pace high
+                              </span>
+                              <PaceMiSplitEditor
+                                minValue={editingPaceHighMin}
+                                secValue={editingPaceHighSec}
+                                onMinChange={setEditingPaceHighMin}
+                                onSecChange={setEditingPaceHighSec}
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">HR min</label>
+                            <input
+                              type="number"
+                              value={slot.hrMin ?? ""}
+                              onChange={(e) => {
+                                const hrMin = parseInt(e.target.value, 10) || undefined;
+                                setMainSegments((prev) => {
+                                  const copy = [...prev];
+                                  copy[index] = { ...copy[index], hrMin };
+                                  return copy;
+                                });
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">HR max</label>
+                            <input
+                              type="number"
+                              value={slot.hrMax ?? ""}
+                              onChange={(e) => {
+                                const hrMax = parseInt(e.target.value, 10) || undefined;
+                                setMainSegments((prev) => {
+                                  const copy = [...prev];
+                                  copy[index] = { ...copy[index], hrMax };
+                                  return copy;
+                                });
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <button
+                              type="button"
+                              onClick={() => setEditingTarget(null)}
+                              className="text-sm px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                            >
+                              Done
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMainSegments((prev) => prev.filter((_, j) => j !== index));
+                                if (editingTarget?.kind === "main" && editingTarget.index === index) {
+                                  setEditingTarget(null);
+                                  setEditingPaceLowMin("");
+                                  setEditingPaceLowSec("");
+                                  setEditingPaceHighMin("");
+                                  setEditingPaceHighSec("");
+                                } else if (
+                                  editingTarget?.kind === "main" &&
+                                  editingTarget.index > index
+                                ) {
+                                  setEditingTarget({
+                                    kind: "main",
+                                    index: editingTarget.index - 1,
+                                  });
+                                }
+                              }}
+                              className="ml-2 text-sm px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextIndex = mainSegments.length;
+                    setMainSegments((prev) => [...prev, { miles: 0 }]);
+                    setEditingTarget({ kind: "main", index: nextIndex });
+                    setEditingPaceLowMin("");
+                    setEditingPaceLowSec("");
+                    setEditingPaceHighMin("");
+                    setEditingPaceHighSec("");
+                  }}
+                  className="text-sm px-3 py-2 border border-dashed border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 w-full mb-4"
+                >
+                  + Add main segment
+                </button>
               </div>
 
               <div className="flex gap-4 justify-end pt-6 border-t border-gray-200">
@@ -786,11 +1036,7 @@ function CreateWorkoutPageInner() {
                 </Link>
                 <button
                   type="submit"
-                  disabled={
-                    saving ||
-                    !name ||
-                    ![warmup, mainWork, cooldown].some((s) => s != null && s.miles > 0)
-                  }
+                  disabled={saving || !name || !hasPositiveMiles}
                   className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? "Saving…" : "Create workout"}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BookOpen, Calendar, ClipboardList, LayoutGrid, MessageCircle, Users } from "lucide-react";
+import { Activity, BookOpen, Calendar, ClipboardList, Dumbbell, LayoutGrid, MessageCircle, Users } from "lucide-react";
 
 export const TRAINING_SECTION_IDS = {
   today: "training-section-today",
@@ -90,6 +90,15 @@ export default function TrainingSubNav({ active, onNavigate }: Props) {
           >
             <Users className="h-4 w-4 shrink-0 text-orange-600" aria-hidden />
             Training pod
+          </a>
+        </li>
+        <li>
+          <a
+            href="/workouts/create"
+            className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <Dumbbell className="h-4 w-4 shrink-0 text-orange-600" aria-hidden />
+            Build a workout
           </a>
         </li>
       </ul>
