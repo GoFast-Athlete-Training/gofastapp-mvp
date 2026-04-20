@@ -1134,6 +1134,8 @@ model workouts {
   paceDeltaSecPerMile             Int?
   /// Main-segment target pace snapshot (sec/mi) used for paceDeltaSecPerMile.
   targetPaceSecPerMile            Int?
+  /// Upper bound of main-segment pace target (sec/mi); lower/faster bound is targetPaceSecPerMile when both set.
+  targetPaceSecPerMileHigh        Int?
   /// HR delta (bpm): target zone midpoint − actualAverageHeartRate. Positive = under zone.
   hrDeltaBpm                      Int?
   /// For quality workouts (Tempo/Intervals): implied 5K pace when paceDeltaSecPerMile >= 0.

@@ -30,6 +30,7 @@ export async function GET(request: Request) {
         estimatedDistanceInMeters: true,
         paceDeltaSecPerMile: true,
         targetPaceSecPerMile: true,
+        targetPaceSecPerMileHigh: true,
         hrDeltaBpm: true,
         creditedFiveKPaceSecPerMile: true,
         matched_activity: {

@@ -52,6 +52,14 @@ import {
   displayWorkoutListTitle,
   formatPlannedWorkoutTitle,
 } from "@/lib/training/workout-display-title";
+import {
+  paceRangeDeltaMessage,
+  paceVsTargetBadgeText,
+  paceVsTargetLabel,
+  formatPaceTargetRangeDisplay,
+  singleTargetPaceDeltaMessage,
+  type PaceVsTargetLabel,
+} from "@/lib/training/pace-comparison-display";
 import { formatPlanDateDisplay, localYmd } from "@/lib/training/plan-utils";
 
 interface WorkoutSegment {
@@ -123,7 +131,9 @@ interface Workout {
   actualDurationSeconds?: number | null;
   paceDeltaSecPerMile?: number | null;
   targetPaceSecPerMile?: number | null;
+  targetPaceSecPerMileHigh?: number | null;
   hrDeltaBpm?: number | null;
+  creditedFiveKPaceSecPerMile?: number | null;
   evaluationEligibleFlag?: boolean;
   matched_activity?: MatchedActivitySummary | null;
   planId?: string | null;
@@ -1277,6 +1287,42 @@ export default function WorkoutDetailPage() {
   const dateLineDisplay = navDateLine ?? scheduleLabel;
   const weekAndDateLine = [weekLineDisplay, dateLineDisplay].filter(Boolean).join(" · ");
 
+  const hasPaceRangeForResults =
+    workout.targetPaceSecPerMile != null &&
+    workout.targetPaceSecPerMileHigh != null &&
+    workout.targetPaceSecPerMileHigh !== workout.targetPaceSecPerMile;
+
+  const paceVsPlanMessage =
+    hasPaceRangeForResults && workout.actualAvgPaceSecPerMile != null
+      ? paceRangeDeltaMessage(
+          workout.actualAvgPaceSecPerMile,
+          workout.targetPaceSecPerMile,
+          workout.targetPaceSecPerMileHigh
+        )
+      : singleTargetPaceDeltaMessage(workout.paceDeltaSecPerMile);
+
+  let resultsPaceBadgeLabel:
+    | PaceVsTargetLabel
+    | "single_faster"
+    | "single_slower"
+    | "single_on"
+    | null = null;
+  if (hasPaceRangeForResults && workout.actualAvgPaceSecPerMile != null) {
+    const l = paceVsTargetLabel(
+      workout.actualAvgPaceSecPerMile,
+      workout.targetPaceSecPerMile,
+      workout.targetPaceSecPerMileHigh
+    );
+    if (l !== "unknown") resultsPaceBadgeLabel = l;
+  } else if (workout.paceDeltaSecPerMile != null) {
+    resultsPaceBadgeLabel =
+      workout.paceDeltaSecPerMile > 0
+        ? "single_faster"
+        : workout.paceDeltaSecPerMile < 0
+          ? "single_slower"
+          : "single_on";
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
@@ -1337,6 +1383,138 @@ export default function WorkoutDetailPage() {
           <ArrowLeft className="w-5 h-5" />
           {backLabel}
         </Link>
+
+        {isLogged && (workout.matchedActivityId || workout.matched_activity) ? (
+          <div className="rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 to-white p-6 sm:p-8 mb-6 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-emerald-800">
+                  Your run
+                </p>
+                <h2 className="mt-1 text-xl sm:text-2xl font-bold text-gray-900">
+                  Results &amp; analysis
+                </h2>
+                {workout.matched_activity ? (
+                  <p className="mt-2 text-sm text-gray-700">
+                    <span className="font-medium text-gray-900">
+                      {workout.matched_activity.activityName?.trim() || "Run"}
+                    </span>
+                    {workout.matched_activity.startTime ? (
+                      <>
+                        {" "}
+                        ·{" "}
+                        {new Date(workout.matched_activity.startTime).toLocaleString(undefined, {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </>
+                    ) : null}
+                  </p>
+                ) : null}
+              </div>
+              {resultsPaceBadgeLabel != null ? (
+                <div className="shrink-0">
+                  <span
+                    className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                      resultsPaceBadgeLabel === "in_range" || resultsPaceBadgeLabel === "single_on"
+                        ? "bg-emerald-100 text-emerald-900 ring-1 ring-emerald-200"
+                        : resultsPaceBadgeLabel === "faster" ||
+                            resultsPaceBadgeLabel === "single_faster"
+                          ? "bg-sky-100 text-sky-900 ring-1 ring-sky-200"
+                          : "bg-amber-100 text-amber-900 ring-1 ring-amber-200"
+                    }`}
+                  >
+                    {resultsPaceBadgeLabel === "single_faster"
+                      ? "Faster than target"
+                      : resultsPaceBadgeLabel === "single_slower"
+                        ? "Slower than target"
+                        : resultsPaceBadgeLabel === "single_on"
+                          ? "On target"
+                          : paceVsTargetBadgeText(resultsPaceBadgeLabel)}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+
+            <dl className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
+                <dt className="text-xs font-medium text-gray-500">Target pace</dt>
+                <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
+                  {formatPaceTargetRangeDisplay(
+                    workout.targetPaceSecPerMile,
+                    workout.targetPaceSecPerMileHigh
+                  ) ??
+                    (workout.targetPaceSecPerMile != null
+                      ? formatSecPerMile(workout.targetPaceSecPerMile)
+                      : "—")}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
+                <dt className="text-xs font-medium text-gray-500">Your pace</dt>
+                <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
+                  {formatSecPerMile(workout.actualAvgPaceSecPerMile) ?? "—"}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3 sm:col-span-1">
+                <dt className="text-xs font-medium text-gray-500">Vs plan</dt>
+                <dd className="mt-1 text-sm font-semibold text-gray-900">
+                  {paceVsPlanMessage ?? "—"}
+                </dd>
+              </div>
+              {workout.actualDistanceMeters != null && workout.actualDistanceMeters > 0 ? (
+                <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
+                  <dt className="text-xs font-medium text-gray-500">Distance</dt>
+                  <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
+                    {(workout.actualDistanceMeters / 1609.34).toFixed(2)} mi
+                  </dd>
+                </div>
+              ) : null}
+              {workout.actualDurationSeconds != null && workout.actualDurationSeconds > 0 ? (
+                <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
+                  <dt className="text-xs font-medium text-gray-500">Duration</dt>
+                  <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
+                    {Math.round(workout.actualDurationSeconds / 60)} min
+                  </dd>
+                </div>
+              ) : null}
+              {workout.hrDeltaBpm != null ? (
+                <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
+                  <dt className="text-xs font-medium text-gray-500">Vs target HR (mid)</dt>
+                  <dd className="mt-1 text-sm font-semibold text-gray-900">
+                    {workout.hrDeltaBpm > 0
+                      ? `${workout.hrDeltaBpm} bpm under zone`
+                      : workout.hrDeltaBpm < 0
+                        ? `${Math.abs(workout.hrDeltaBpm)} bpm above zone`
+                        : "On target"}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+
+            {workout.training_plans?.currentFiveKPace ? (
+              <p className="mt-4 text-xs text-gray-500">
+                Plan baseline 5K (snapshot): {workout.training_plans.currentFiveKPace}
+                {workout.creditedFiveKPaceSecPerMile != null &&
+                workout.creditedFiveKPaceSecPerMile > 0 ? (
+                  <>
+                    {" "}
+                    · Implied 5K from this run:{" "}
+                    <span className="font-medium text-gray-700">
+                      {formatSecPerMile(workout.creditedFiveKPaceSecPerMile)}
+                    </span>
+                  </>
+                ) : null}
+              </p>
+            ) : null}
+            <p className="mt-3 text-xs text-gray-600">
+              Prescription and segment breakdown below are your plan — scroll down to compare
+              structure to what you ran.
+            </p>
+          </div>
+        ) : null}
 
         <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-5 mb-4">
           <div className="min-w-0">
@@ -2122,86 +2300,6 @@ export default function WorkoutDetailPage() {
             </div>
           )}
         </div>
-        {(workout.matchedActivityId || workout.matched_activity) && (
-          <div className="bg-white rounded-lg border border-emerald-200 p-6 mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">Completed run</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              This plan workout was linked to an activity from your watch (Garmin sync). Targets below
-              are compared when pace data is available.
-            </p>
-            {workout.matched_activity && (
-              <div className="text-sm text-gray-700 mb-4 space-y-1">
-                <p>
-                  <span className="font-medium text-gray-900">Activity:</span>{" "}
-                  {workout.matched_activity.activityName || "Run"} ·{" "}
-                  {workout.matched_activity.startTime
-                    ? new Date(workout.matched_activity.startTime).toLocaleString()
-                    : "—"}
-                </p>
-                <p>
-                  <span className="font-medium text-gray-900">Ingest status:</span>{" "}
-                  {workout.matched_activity.ingestionStatus}
-                </p>
-              </div>
-            )}
-            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              {workout.actualDistanceMeters != null && workout.actualDistanceMeters > 0 && (
-                <div>
-                  <dt className="text-gray-500">Distance</dt>
-                  <dd className="font-medium text-gray-900">
-                    {(workout.actualDistanceMeters / 1609.34).toFixed(2)} mi
-                  </dd>
-                </div>
-              )}
-              {formatSecPerMile(workout.actualAvgPaceSecPerMile) && (
-                <div>
-                  <dt className="text-gray-500">Avg pace</dt>
-                  <dd className="font-medium text-gray-900">
-                    {formatSecPerMile(workout.actualAvgPaceSecPerMile)}
-                  </dd>
-                </div>
-              )}
-              {workout.actualDurationSeconds != null && workout.actualDurationSeconds > 0 && (
-                <div>
-                  <dt className="text-gray-500">Duration</dt>
-                  <dd className="font-medium text-gray-900">
-                    {Math.round(workout.actualDurationSeconds / 60)} min
-                  </dd>
-                </div>
-              )}
-              {workout.paceDeltaSecPerMile != null && (
-                <div>
-                  <dt className="text-gray-500">Vs main target (pace)</dt>
-                  <dd className="font-medium text-gray-900">
-                    {workout.paceDeltaSecPerMile > 0
-                      ? `${workout.paceDeltaSecPerMile}s/mi faster than target`
-                      : workout.paceDeltaSecPerMile < 0
-                        ? `${Math.abs(workout.paceDeltaSecPerMile)}s/mi slower than target`
-                        : "On target"}
-                  </dd>
-                </div>
-              )}
-              {workout.hrDeltaBpm != null && (
-                <div>
-                  <dt className="text-gray-500">Vs target HR (mid)</dt>
-                  <dd className="font-medium text-gray-900">
-                    {workout.hrDeltaBpm > 0
-                      ? `${workout.hrDeltaBpm} bpm under zone`
-                      : workout.hrDeltaBpm < 0
-                        ? `${Math.abs(workout.hrDeltaBpm)} bpm above zone`
-                        : "On target"}
-                  </dd>
-                </div>
-              )}
-            </dl>
-            {workout.training_plans?.currentFiveKPace && (
-              <p className="text-xs text-gray-500 mt-4">
-                Plan baseline 5K (snapshot): {workout.training_plans.currentFiveKPace}
-              </p>
-            )}
-          </div>
-        )}
-
         {workout.workout_catalogue &&
           workout.workoutType !== "Intervals" &&
           workout.workoutType !== "Tempo" && (

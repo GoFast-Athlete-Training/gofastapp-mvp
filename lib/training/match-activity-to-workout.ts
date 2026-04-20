@@ -57,6 +57,20 @@ function paceTargetSecPerMileFromSegment(
   return Math.round(storedPaceSecondsKmToSecondsPerMile(low, enc));
 }
 
+/** Upper bound of PACE target from segment `valueHigh` (same encoding as low). */
+function paceTargetHighSecPerMileFromSegment(
+  targets: unknown,
+  paceTargetEncodingVersion: number
+): number | null {
+  if (!Array.isArray(targets) || targets.length === 0) return null;
+  const t = targets[0] as SegmentTarget;
+  if (!t?.type || String(t.type).toUpperCase() !== "PACE") return null;
+  const highRaw = t.valueHigh;
+  if (highRaw == null || typeof highRaw !== "number" || highRaw <= 0) return null;
+  const enc = normalizePaceTargetEncodingVersion(paceTargetEncodingVersion);
+  return Math.round(storedPaceSecondsKmToSecondsPerMile(highRaw, enc));
+}
+
 function hrTargetMidpointBpmFromTargets(targets: unknown): number | null {
   if (!Array.isArray(targets) || targets.length === 0) return null;
   for (const raw of targets) {
@@ -81,20 +95,32 @@ function pickMainPaceTargetSecPerMile(
     stepOrder: number;
     paceTargetEncodingVersion: number;
   }[]
-): { targetSecPerMile: number | null } {
+): { targetSecPerMile: number | null; targetSecPerMileHigh: number | null } {
   const sorted = [...segments].sort((a, b) => a.stepOrder - b.stepOrder);
   for (const seg of sorted) {
     const title = (seg.title || "").toLowerCase();
     if (title.includes("warmup") || title.includes("warm-up")) continue;
     if (title.includes("cooldown") || title.includes("cool-down")) continue;
     const p = paceTargetSecPerMileFromSegment(seg.targets, seg.paceTargetEncodingVersion);
-    if (p != null) return { targetSecPerMile: p };
+    if (p != null) {
+      const ph = paceTargetHighSecPerMileFromSegment(
+        seg.targets,
+        seg.paceTargetEncodingVersion
+      );
+      return { targetSecPerMile: p, targetSecPerMileHigh: ph };
+    }
   }
   for (const seg of sorted) {
     const p = paceTargetSecPerMileFromSegment(seg.targets, seg.paceTargetEncodingVersion);
-    if (p != null) return { targetSecPerMile: p };
+    if (p != null) {
+      const ph = paceTargetHighSecPerMileFromSegment(
+        seg.targets,
+        seg.paceTargetEncodingVersion
+      );
+      return { targetSecPerMile: p, targetSecPerMileHigh: ph };
+    }
   }
-  return { targetSecPerMile: null };
+  return { targetSecPerMile: null, targetSecPerMileHigh: null };
 }
 
 function pickMainHrTargetBpm(
@@ -204,7 +230,10 @@ export async function tryMatchActivityToTrainingWorkout(
 
   const paceSecPerMile = speedMpsToSecPerMile(activity.averageSpeed);
 
-  const { targetSecPerMile: targetPaceSecPerMile } = pickMainPaceTargetSecPerMile(candidate.segments);
+  const {
+    targetSecPerMile: targetPaceSecPerMile,
+    targetSecPerMileHigh: targetPaceSecPerMileHigh,
+  } = pickMainPaceTargetSecPerMile(candidate.segments);
 
   let paceDeltaSecPerMile: number | null = null;
   let evaluationEligible = false;
@@ -251,6 +280,7 @@ export async function tryMatchActivityToTrainingWorkout(
       actualSteps: activity.steps ?? null,
       paceDeltaSecPerMile,
       targetPaceSecPerMile,
+      targetPaceSecPerMileHigh,
       hrDeltaBpm,
       creditedFiveKPaceSecPerMile: creditedFiveKPace,
       evaluationEligibleFlag: evaluationEligible,

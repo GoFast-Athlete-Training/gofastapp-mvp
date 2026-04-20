@@ -9,6 +9,11 @@ import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import { auth } from "@/lib/firebase";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import { metersToMiDisplay } from "@/lib/training/workout-preview-payload";
+import {
+  formatPaceTargetRangeDisplay,
+  paceRangeDeltaMessage,
+  singleTargetPaceDeltaMessage,
+} from "@/lib/training/pace-comparison-display";
 
 type ActivityPayload = {
   id: string;
@@ -36,6 +41,7 @@ type MatchedWorkoutPayload = {
   actualDurationSeconds: number | null;
   paceDeltaSecPerMile: number | null;
   targetPaceSecPerMile: number | null;
+  targetPaceSecPerMileHigh: number | null;
   hrDeltaBpm: number | null;
   creditedFiveKPaceSecPerMile: number | null;
   segments: Array<{
@@ -249,15 +255,40 @@ export default function ActivityDetailPage() {
                       {String(matched.workoutType).toLowerCase()}
                     </p>
                     <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                      {matched.paceDeltaSecPerMile != null ? (
+                      {matched.targetPaceSecPerMile != null ? (
                         <div>
-                          <dt className="text-gray-500">Vs target pace</dt>
+                          <dt className="text-gray-500">Target pace</dt>
+                          <dd className="font-medium text-gray-900 tabular-nums">
+                            {formatPaceTargetRangeDisplay(
+                              matched.targetPaceSecPerMile,
+                              matched.targetPaceSecPerMileHigh
+                            ) ?? formatSecPerMile(matched.targetPaceSecPerMile)}
+                          </dd>
+                        </div>
+                      ) : null}
+                      {matched.actualAvgPaceSecPerMile != null ? (
+                        <div>
+                          <dt className="text-gray-500">Your pace</dt>
+                          <dd className="font-medium text-gray-900 tabular-nums">
+                            {formatSecPerMile(matched.actualAvgPaceSecPerMile)}
+                          </dd>
+                        </div>
+                      ) : null}
+                      {matched.paceDeltaSecPerMile != null ||
+                      matched.actualAvgPaceSecPerMile != null ? (
+                        <div className="sm:col-span-2">
+                          <dt className="text-gray-500">Vs plan</dt>
                           <dd className="font-medium text-gray-900">
-                            {matched.paceDeltaSecPerMile > 0
-                              ? `${matched.paceDeltaSecPerMile}s/mi faster`
-                              : matched.paceDeltaSecPerMile < 0
-                                ? `${Math.abs(matched.paceDeltaSecPerMile)}s/mi slower`
-                                : "On target"}
+                            {matched.targetPaceSecPerMile != null &&
+                            matched.targetPaceSecPerMileHigh != null &&
+                            matched.targetPaceSecPerMileHigh !== matched.targetPaceSecPerMile &&
+                            matched.actualAvgPaceSecPerMile != null
+                              ? paceRangeDeltaMessage(
+                                  matched.actualAvgPaceSecPerMile,
+                                  matched.targetPaceSecPerMile,
+                                  matched.targetPaceSecPerMileHigh
+                                ) ?? "—"
+                              : singleTargetPaceDeltaMessage(matched.paceDeltaSecPerMile) ?? "—"}
                           </dd>
                         </div>
                       ) : null}
