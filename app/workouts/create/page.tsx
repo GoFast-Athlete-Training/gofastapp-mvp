@@ -124,6 +124,14 @@ function hrBandFromTarget(t: { type?: string; valueLow?: number; valueHigh?: num
   return { min: Math.min(lo, hi), max: Math.max(lo, hi) };
 }
 
+/** e.g. "20 mile long run", "10mi tempo" → miles */
+function extractMilesFromTitle(title: string): number | undefined {
+  const m = title.match(/([\d.]+)\s*(?:mi|mile|miles)\b/i);
+  if (!m) return undefined;
+  const v = parseFloat(m[1]);
+  return Number.isFinite(v) && v > 0 ? v : undefined;
+}
+
 /** Map AI-derived segments into warmup, ordered main segments, and cooldown (no merging). */
 function apiSegmentsToSlots(segments: ApiSegment[]): {
   warmup: SlotData | null;
@@ -136,7 +144,19 @@ function apiSegmentsToSlots(segments: ApiSegment[]): {
 
   for (const seg of segments) {
     const title = (seg.title ?? "").toLowerCase();
-    const miles = typeof seg.durationValue === "number" && seg.durationValue > 0 ? seg.durationValue : 0;
+    const durationType = String(seg.durationType ?? "DISTANCE").toUpperCase();
+    let miles = 0;
+    if (durationType === "TIME") {
+      // Minutes must not be shown as miles; prefer distance from title ("15 mile run").
+      miles = extractMilesFromTitle(seg.title ?? "") ?? 0;
+    } else {
+      miles =
+        typeof seg.durationValue === "number" && seg.durationValue > 0 ? seg.durationValue : 0;
+      if (miles === 0) {
+        const fromTitle = extractMilesFromTitle(seg.title ?? "");
+        if (fromTitle != null) miles = fromTitle;
+      }
+    }
     let paceValueLow: number | undefined;
     let paceValueHigh: number | undefined;
     for (const raw of seg.targets ?? []) {
@@ -240,6 +260,8 @@ function CreateWorkoutPageInner() {
   const [saving, setSaving] = useState(false);
   /** YYYY-MM-DD from date input; optional, shown on home & workout cards */
   const [scheduledDate, setScheduledDate] = useState("");
+  /** Optional override for POST gofast-generate (same idea as Race distance presets). */
+  const [templateDistanceMi, setTemplateDistanceMi] = useState("");
   const [editingTarget, setEditingTarget] = useState<EditingTarget | null>(null);
   /** Pace low / high split fields while a slot editor is open (matches /workouts/[id]). */
   const [editingPaceLowMin, setEditingPaceLowMin] = useState("");
@@ -406,10 +428,16 @@ function CreateWorkoutPageInner() {
     setNeedsPaceHint(null);
     setGoFastGenerating(true);
     try {
+      const parsedMi = parseFloat(templateDistanceMi.trim());
+      const payload: { workoutType: string; totalMiles?: number } = { workoutType };
+      if (Number.isFinite(parsedMi) && parsedMi > 0 && parsedMi <= 500) {
+        payload.totalMiles = parsedMi;
+      }
+
       const { data } = await api.post<
         | { needsPace: true; message: string }
         | { segments: ApiSegment[]; suggestedTitle: string; suggestedDescription: string }
-      >("workouts/gofast-generate", { workoutType });
+      >("workouts/gofast-generate", payload);
 
       if (data && typeof data === "object" && "needsPace" in data && data.needsPace) {
         setNeedsPaceHint(data.message ?? "");

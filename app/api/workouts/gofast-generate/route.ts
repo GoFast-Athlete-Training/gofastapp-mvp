@@ -81,8 +81,17 @@ export async function POST(request: NextRequest) {
     }
     const { athlete } = auth;
 
-    const body = (await request.json()) as { workoutType?: string };
+    const body = (await request.json()) as { workoutType?: string; totalMiles?: number };
     const workoutType = body.workoutType ?? "Easy";
+    const defaultMiles = pickTotalMiles(workoutType);
+    const rawTotal = body.totalMiles;
+    const totalMiles =
+      typeof rawTotal === "number" &&
+      Number.isFinite(rawTotal) &&
+      rawTotal > 0 &&
+      rawTotal <= 500
+        ? rawTotal
+        : defaultMiles;
 
     let goalSecPerMile: number | null = null;
 
@@ -113,7 +122,6 @@ export async function POST(request: NextRequest) {
     }
 
     const paces = getTrainingPaces(goalSecPerMile);
-    const totalMiles = pickTotalMiles(workoutType);
     const descriptors = getTemplateSegments(workoutType, totalMiles, paces);
     const segments = descriptorsToApiSegments(descriptors, paces);
 
