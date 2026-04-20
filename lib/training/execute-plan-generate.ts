@@ -100,7 +100,10 @@ export async function executePlanGenerate(params: {
     plan.currentFiveKPace?.trim() ||
     null;
   const needsFiveKAnchor = drafts.some(
-    (d) => d.workoutType === "Easy" || d.workoutType === "LongRun"
+    (d) =>
+      d.workoutType === "Easy" ||
+      d.workoutType === "LongRun" ||
+      d.workoutType === "Race"
   );
   if (needsFiveKAnchor && !syncedFiveKPace) {
     throw new Error(

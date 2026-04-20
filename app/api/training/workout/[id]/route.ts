@@ -74,7 +74,7 @@ function resolvedPlanLadderIndexForWorkout(params: {
 
 /**
  * GET /api/training/workout/[id]
- * Workout + segments. Lazy create when empty: I/T via algo; Easy/LongRun via
+ * Workout + segments. Lazy create when empty: I/T via algo; Easy/LongRun/Race via
  * templates + plan pace (plan path). Legacy rows may still link a catalogue entry.
  */
 export async function GET(request: NextRequest, context: Ctx) {
@@ -176,7 +176,8 @@ export async function GET(request: NextRequest, context: Ctx) {
           });
         } else if (
           workout.workoutType === "Easy" ||
-          workout.workoutType === "LongRun"
+          workout.workoutType === "LongRun" ||
+          workout.workoutType === "Race"
         ) {
           apiSegs = buildPlanWorkoutApiSegments({
             workoutType: workout.workoutType,

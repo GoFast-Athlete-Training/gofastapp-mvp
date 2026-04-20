@@ -60,7 +60,10 @@ export function computeWeekPerformanceMetrics(
       ? Math.min(100, (actualMetersMatched / plannedMetersTotal) * 100)
       : null;
 
-  const longRun = rows.find((w) => String(w.workoutType) === "LongRun");
+  const longRun = rows.find((w) => {
+    const t = String(w.workoutType);
+    return t === "LongRun" || t === "Race";
+  });
   let longRunCompleted = false;
   let longRunCompletionRatio: number | null = null;
 

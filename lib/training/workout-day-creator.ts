@@ -92,7 +92,8 @@ export async function findOrCreateWorkoutForPlanDay(params: {
 
   const needsPace =
     scheduled.workoutType === "Easy" ||
-    scheduled.workoutType === "LongRun";
+    scheduled.workoutType === "LongRun" ||
+    scheduled.workoutType === "Race";
   if (needsPace && !plan.currentFiveKPace?.trim()) {
     throw new Error(
       "training_plans.currentFiveKPace is missing; set 5K pace on your profile or plan."

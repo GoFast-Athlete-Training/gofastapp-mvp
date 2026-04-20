@@ -340,6 +340,7 @@ function mapWorkoutTypeToSport(workoutType: string): GarminSport {
     case "intervals":
     case "tempo":
     case "longrun":
+    case "race":
     case "easy":
     case "speed":
       return GarminSport.RUNNING;

@@ -53,6 +53,55 @@ function longRun(
   ];
 }
 
+/** Goal marathon / race pace + easy warm-up and optional cool-down. */
+function raceDay(
+  totalMiles: number,
+  _paces: TrainingPaces
+): SegmentDescriptor[] {
+  const warmup = round(
+    Math.min(Math.max(totalMiles * 0.05, 0.5), 2),
+    2
+  );
+  const cooldown = round(
+    Math.min(Math.max(totalMiles * 0.02, 0), 1),
+    2
+  );
+  const main = round(totalMiles - warmup - cooldown, 2);
+  if (main < 0.25) {
+    return [
+      {
+        title: "Race",
+        durationType: "DISTANCE",
+        durationValue: round(totalMiles, 2),
+        paceZone: "marathon",
+      },
+    ];
+  }
+  const segs: SegmentDescriptor[] = [
+    {
+      title: "Warm-up",
+      durationType: "DISTANCE",
+      durationValue: warmup,
+      paceZone: "easy",
+    },
+    {
+      title: "Race",
+      durationType: "DISTANCE",
+      durationValue: main,
+      paceZone: "marathon",
+    },
+  ];
+  if (cooldown > 0) {
+    segs.push({
+      title: "Easy jog / walk",
+      durationType: "DISTANCE",
+      durationValue: cooldown,
+      paceZone: "easy",
+    });
+  }
+  return segs;
+}
+
 function intervals(
   totalMiles: number,
   _paces: TrainingPaces
@@ -89,6 +138,7 @@ const TEMPLATES: Record<string, (totalMiles: number, paces: TrainingPaces) => Se
   Easy: easy,
   Tempo: tempo,
   LongRun: longRun,
+  Race: raceDay,
   Intervals: intervals,
 };
 

@@ -68,6 +68,9 @@ export function workoutTypeToScheduleSuffix(wt: WorkoutType): string {
       return "I";
     case "LongRun":
       return "LR";
+    case "Race":
+      /** Compact schedule strings use LR; race day is distinguished when materializing */
+      return "LR";
     default: {
       const _x: never = wt;
       return _x;
@@ -87,7 +90,7 @@ export function suffixToWorkoutType(suffixRaw: string): WorkoutType {
 }
 
 function typeLetterFromWorkoutType(wt: WorkoutType): string {
-  if (wt === "LongRun") return "L";
+  if (wt === "LongRun" || wt === "Race") return "L";
   if (wt === "Easy") return "E";
   if (wt === "Tempo") return "T";
   return "I";

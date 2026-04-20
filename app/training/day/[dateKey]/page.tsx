@@ -8,20 +8,11 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
-import {
-  addDaysUtc,
-  formatPlanDateDisplay,
-  localYmd,
-  trainingWeekNumberForDateKey,
-  utcDateOnly,
-} from "@/lib/training/plan-utils";
-import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
+import { addDaysUtc, formatPlanDateDisplay, localYmd, utcDateOnly } from "@/lib/training/plan-utils";
 import {
   fetchTrainingPlanDetail,
-  fetchPlanWeekSchedule,
   fetchTrainingWorkoutDetail,
   resolveWorkoutForPlanDay,
-  type PlanDayCard,
 } from "@/lib/training/fetch-plan-week-client";
 import {
   metersToMiDisplay,
@@ -80,22 +71,24 @@ export default function TrainingPlanDayPreviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [planDetail, setPlanDetail] = useState<PlanDetail | null>(null);
-  const [planDay, setPlanDay] = useState<PlanDayCard | null>(null);
-  const [weekNumber, setWeekNumber] = useState(1);
   const [workoutId, setWorkoutId] = useState<string | null>(null);
   const [workoutLoading, setWorkoutLoading] = useState(false);
+  /** Find-or-create by date failed (e.g. no scheduled day) */
   const [workoutError, setWorkoutError] = useState<string | null>(null);
+  /** Workout exists but full detail/segments failed — user can still open workout */
+  const [workoutDetailError, setWorkoutDetailError] = useState<string | null>(null);
   const [workout, setWorkout] = useState<PreviewWorkout | null>(null);
   const [openingWorkout, setOpeningWorkout] = useState(false);
+  /** e.g. navigate to /workouts/[id] failed — does not mean the day is unscheduled */
+  const [openWorkoutError, setOpenWorkoutError] = useState<string | null>(null);
 
   const previewBackPath = useMemo(() => {
     const qs = searchParams.toString();
     return qs ? `${pathname}?${qs}` : pathname;
   }, [pathname, searchParams]);
 
-  const hubBackHref = sourceSetup && planDetail
-    ? `/training-setup/${planDetail.id}`
-    : "/training";
+  const hubBackHref =
+    sourceSetup && planDetail ? `/training-setup/${planDetail.id}` : "/training";
   const hubBackLabel = sourceSetup ? "Back to plan setup" : "Back to My Training";
 
   const prevDateKey = dateKey ? shiftDateKey(dateKey, -1) : null;
@@ -118,9 +111,11 @@ export default function TrainingPlanDayPreviewPage() {
     setLoading(true);
     setError(null);
     setPlanDetail(null);
-    setPlanDay(null);
     setWorkout(null);
     setWorkoutId(null);
+    setWorkoutError(null);
+    setWorkoutDetailError(null);
+    setOpenWorkoutError(null);
     try {
       const u = auth.currentUser;
       if (!u) throw new Error("Sign in required");
@@ -149,26 +144,28 @@ export default function TrainingPlanDayPreviewPage() {
       }
 
       setPlanDetail(plan);
-      const wn = trainingWeekNumberForDateKey(plan.startDate, plan.totalWeeks, dateKey);
-      setWeekNumber(wn);
-      const { days } = await fetchPlanWeekSchedule(plan.id, wn, token);
-      const day = days.find((d) => d.dateKey === dateKey) ?? null;
-      setPlanDay(day);
 
-      if (day) {
-        setWorkoutLoading(true);
+      setWorkoutLoading(true);
+      try {
+        const wid = await resolveWorkoutForPlanDay(plan.id, dateKey, token);
+        setWorkoutId(wid);
         setWorkoutError(null);
         try {
-          const wid =
-            day.workoutId ?? (await resolveWorkoutForPlanDay(plan.id, day.dateKey, token));
-          setWorkoutId(wid);
           const { workout: rawW } = await fetchTrainingWorkoutDetail(wid, token);
           setWorkout(pickWorkoutPayload(rawW));
+          setWorkoutDetailError(null);
         } catch (e) {
-          setWorkoutError(e instanceof Error ? e.message : "Could not load workout");
-        } finally {
-          setWorkoutLoading(false);
+          setWorkout(null);
+          setWorkoutDetailError(
+            e instanceof Error ? e.message : "Could not load workout detail"
+          );
         }
+      } catch (e) {
+        setWorkoutId(null);
+        setWorkout(null);
+        setWorkoutError(e instanceof Error ? e.message : "Could not load workout");
+      } finally {
+        setWorkoutLoading(false);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
@@ -194,42 +191,38 @@ export default function TrainingPlanDayPreviewPage() {
     void load();
   }, [authReady, dateKey, load]);
 
-  const title =
-    workout?.title?.trim() || (planDay ? displayWorkoutListTitle(planDay) : "Workout");
-  const typeLabel = workout?.workoutType || planDay?.workoutType || "";
-  const scheduleMi = planDay
-    ? metersToMiDisplay(planDay.estimatedDistanceInMeters)
-    : metersToMiDisplay(workout?.estimatedDistanceInMeters);
-  const plannedDateLabel = planDay?.date
-    ? formatPlanDateDisplay(planDay.date, {
+  const isRaceDay = workout?.workoutType === "Race";
+  const title = workout?.title?.trim() || "Workout";
+  const typeLabel = isRaceDay ? "Race" : workout?.workoutType || "";
+  const scheduleMi = metersToMiDisplay(workout?.estimatedDistanceInMeters);
+  const plannedDateLabel = dateKey
+    ? formatPlanDateDisplay(dateKey, {
         weekday: "long",
         month: "short",
         day: "numeric",
       })
-    : dateKey
-      ? formatPlanDateDisplay(dateKey, {
-          weekday: "long",
-          month: "short",
-          day: "numeric",
-        })
+    : "—";
+  const weekNumberDisplay =
+    workout?.weekNumber != null && Number.isFinite(workout.weekNumber)
+      ? workout.weekNumber
       : "—";
   const isToday = dateKey != null && dateKey === localYmd(new Date());
+  const canOpenWorkout = workoutId != null;
 
   async function handleDoThisWorkout() {
-    if (!planDetail || !dateKey || !planDay) return;
+    if (!planDetail || !dateKey) return;
     const u = auth.currentUser;
     if (!u) return;
     setOpeningWorkout(true);
+    setOpenWorkoutError(null);
     try {
       const token = await u.getIdToken();
       const wid =
-        workoutId ??
-        planDay.workoutId ??
-        (await resolveWorkoutForPlanDay(planDetail.id, dateKey, token));
+        workoutId ?? (await resolveWorkoutForPlanDay(planDetail.id, dateKey, token));
       stashWorkoutDayNav(wid, { source: "plan-preview", backPath: previewBackPath });
       router.push(`/workouts/${wid}`);
     } catch (e) {
-      setWorkoutError(e instanceof Error ? e.message : "Could not open workout");
+      setOpenWorkoutError(e instanceof Error ? e.message : "Could not open workout");
     } finally {
       setOpeningWorkout(false);
     }
@@ -283,9 +276,14 @@ export default function TrainingPlanDayPreviewPage() {
               {planDetail.name?.trim() ? (
                 <p className="mt-0.5 text-xs text-gray-600 truncate">{planDetail.name}</p>
               ) : null}
+              {isRaceDay ? (
+                <p className="mt-2 inline-flex rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-orange-900">
+                  Race day
+                </p>
+              ) : null}
               <h1 className="mt-2 text-xl font-semibold text-gray-900 leading-snug">{title}</h1>
               <p className="mt-1 text-sm text-gray-600">
-                Week {weekNumber} of {planDetail.totalWeeks} · {plannedDateLabel}
+                Week {weekNumberDisplay} of {planDetail.totalWeeks} · {plannedDateLabel}
               </p>
               <p className="mt-0.5 text-xs text-gray-500">
                 {typeLabel}
@@ -297,18 +295,22 @@ export default function TrainingPlanDayPreviewPage() {
             </div>
 
             <div className="px-5 py-4 space-y-4">
-              {!planDay && (
-                  <p className="text-sm text-gray-600">
-                    No session on your plan for this calendar day.
-                  </p>
-                )}
-
-              {planDay && workoutLoading && (
+              {workoutLoading && (
                 <p className="text-sm text-gray-500">Loading segments…</p>
               )}
               {workoutError && (
                 <p className="text-sm text-red-600" role="alert">
                   {workoutError}
+                </p>
+              )}
+              {workoutDetailError && workoutId && (
+                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2" role="status">
+                  {workoutDetailError} — you can still open the full workout.
+                </p>
+              )}
+              {openWorkoutError && (
+                <p className="text-sm text-red-600" role="alert">
+                  {openWorkoutError}
                 </p>
               )}
               {!workoutLoading && workout && workout.segments.length === 0 && (
@@ -384,7 +386,7 @@ export default function TrainingPlanDayPreviewPage() {
               <button
                 type="button"
                 onClick={() => void handleDoThisWorkout()}
-                disabled={openingWorkout || !planDay || !!workoutError || workoutLoading}
+                disabled={openingWorkout || !canOpenWorkout || workoutLoading || !!workoutError}
                 className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
               >
                 {isToday ? "Let&apos;s go — open workout" : "Do this workout"}

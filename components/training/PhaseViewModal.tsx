@@ -16,6 +16,7 @@ const WORKOUT_TYPE_LABELS: Record<WorkoutType, string> = {
   Tempo: "Quality",
   Intervals: "Quality",
   LongRun: "Long run",
+  Race: "Race",
 };
 
 function renderSchedule(schedule: string): React.ReactNode {
@@ -28,7 +29,7 @@ function renderSchedule(schedule: string): React.ReactNode {
           <li
             key={i}
             className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              t.workoutType === "LongRun"
+              t.workoutType === "LongRun" || t.workoutType === "Race"
                 ? "bg-orange-100 text-orange-800"
                 : t.workoutType === "Easy"
                 ? "bg-gray-100 text-gray-700"

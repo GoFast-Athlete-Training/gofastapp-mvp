@@ -22,6 +22,8 @@ export type PreviewWorkout = {
   workoutType: string;
   description: string | null;
   estimatedDistanceInMeters?: number | null;
+  /** From materialized `workouts.weekNumber` when present */
+  weekNumber?: number | null;
   segments: PreviewSegment[];
 };
 
@@ -35,6 +37,13 @@ export function pickWorkoutPayload(raw: unknown): PreviewWorkout | null {
     typeof w.estimatedDistanceInMeters === "number"
       ? w.estimatedDistanceInMeters
       : null;
+  const weekNumRaw = w.weekNumber;
+  const weekNumber =
+    weekNumRaw == null
+      ? null
+      : typeof weekNumRaw === "number" && Number.isFinite(weekNumRaw)
+        ? weekNumRaw
+        : Number(weekNumRaw);
   const segsRaw = w.segments;
   const segments: PreviewSegment[] = [];
   if (Array.isArray(segsRaw)) {
@@ -81,7 +90,15 @@ export function pickWorkoutPayload(raw: unknown): PreviewWorkout | null {
     }
     segments.sort((a, b) => a.stepOrder - b.stepOrder);
   }
-  return { title, workoutType, description, estimatedDistanceInMeters, segments };
+  return {
+    title,
+    workoutType,
+    description,
+    estimatedDistanceInMeters,
+    weekNumber:
+      weekNumber != null && Number.isFinite(weekNumber) ? weekNumber : null,
+    segments,
+  };
 }
 
 export function metersToMiDisplay(m: number | null | undefined): string | null {

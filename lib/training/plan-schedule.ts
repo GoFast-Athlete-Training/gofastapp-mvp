@@ -202,7 +202,7 @@ export function planScheduleDaysForWeek(params: {
         dateKey: dateKeyUtc(date),
         date,
         title,
-        workoutType: token.workoutType,
+        workoutType: isRaceDay ? "Race" : token.workoutType,
         weekNumber: displayWeekNum,
         dayAssigned: dayAbbrToDayName(token.dayAbbr),
         planLadderIndex,
