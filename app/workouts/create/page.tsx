@@ -627,6 +627,38 @@ function CreateWorkoutPageInner() {
             </select>
           </div>
 
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="template-distance-mi">
+              Template distance (miles)
+            </label>
+            <input
+              id="template-distance-mi"
+              type="number"
+              step="0.1"
+              min={0.1}
+              max={500}
+              value={templateDistanceMi}
+              onChange={(e) => setTemplateDistanceMi(e.target.value)}
+              placeholder={
+                workoutType === "LongRun"
+                  ? "8 (default)"
+                  : workoutType === "Race"
+                    ? "13.1 (default)"
+                    : workoutType === "Tempo"
+                      ? "6 (default)"
+                      : workoutType === "Intervals"
+                        ? "5 (default)"
+                        : "6 (default)"
+              }
+              className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Used when you click <span className="font-medium">Build template from goal / 5K pace</span>.
+              Leave blank for the default distance for this workout type (e.g. Long Run defaults to 8 mi; Race
+              defaults to 13.1 mi). Set to 26.2 for a marathon-distance long run or race template.
+            </p>
+          </div>
+
           <div className="mb-8 rounded-lg border border-orange-100 bg-orange-50/50 p-4">
             <h2 className="text-lg font-semibold text-gray-900 mb-1">Or build from your pacing</h2>
             <p className="text-sm text-gray-600 mb-3">

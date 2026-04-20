@@ -306,6 +306,7 @@ When the user explicitly mentions warmup or cooldown (e.g. "2 mi warmup", "coold
 
 Rules:
 - Tabular splits: If each non-empty line is exactly "DISTANCE PACE PACE" (miles or decimal miles, then two M:SS/mile paces), output ONE segment per line with titles "Segment 1", "Segment 2", … and the given distance and pace band. Do not merge these into a single segment.
+- Distance vs time: For outdoor road/track runs, use durationType "DISTANCE" and durationValue in miles whenever the user gives miles or km (convert km to miles). Use "TIME" with minutes only when they specify duration without distance (e.g. "90 minutes easy"). Do not put minutes into durationValue when the segment is meant to be miles.
 - Default (non-tabular): If the user does NOT explicitly mention warmup or cooldown (or warm-up, cool-down), return ONE segment only with title "Main" or "Main Work" or "Easy" containing the full distance. Do not infer or add Warmup/Cooldown.
 - Only output segments titled "Warmup" or "Cooldown" when the user's text explicitly mentions them (e.g. "2 mile warmup", "warm up 1 mi", "cooldown 2 miles").
 - Each segment: stepOrder (1-based), title, durationType ("DISTANCE" or "TIME"), durationValue (miles or minutes), targets. For intervals use repeatCount (e.g. 6x800m = durationValue 0.5 miles, repeatCount 6).
