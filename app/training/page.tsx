@@ -103,22 +103,6 @@ export default function TrainingHubPage() {
   const [selectedDayKey, setSelectedDayKey] = useState<string>("");
   const [lastWorkout, setLastWorkout] = useState<LastWorkoutStrip | null>(null);
   const [fallbackActivity, setFallbackActivity] = useState<FallbackActivityStrip | null>(null);
-  const [garminSyncLoading, setGarminSyncLoading] = useState(false);
-  const [syncDateYmd, setSyncDateYmd] = useState(() =>
-    ymdFromDate(utcDateOnly(new Date()))
-  );
-  const [garminSyncResult, setGarminSyncResult] = useState<{
-    fetched: number;
-    saved: number;
-    skipped: number;
-    errors: number;
-    window?: {
-      dateUtc: string;
-      uploadStartTimeInSeconds: number;
-      uploadEndTimeInSeconds: number;
-    };
-  } | null>(null);
-  const [garminSyncError, setGarminSyncError] = useState<string | null>(null);
 
   const paceDisplay = useMemo(() => {
     if (!planDetail) return null;
@@ -254,52 +238,6 @@ export default function TrainingHubPage() {
     if (!authReady) return;
     void refreshLastRunStrip();
   }, [authReady, refreshLastRunStrip]);
-
-  async function syncGarminNow() {
-    setGarminSyncLoading(true);
-    setGarminSyncResult(null);
-    setGarminSyncError(null);
-    try {
-      const u = auth.currentUser;
-      if (!u) {
-        setGarminSyncError("Not signed in");
-        return;
-      }
-      const token = await u.getIdToken();
-      const res = await fetch("/api/garmin/sync", {
-        method: "POST",
-        headers: {
-          ...athleteBearerFetchHeaders(token),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ date: syncDateYmd }),
-      });
-      const data = (await res.json()) as {
-        error?: string;
-        summary?: { fetched: number; saved: number; skipped: number; errors: number };
-        window?: {
-          dateUtc: string;
-          uploadStartTimeInSeconds: number;
-          uploadEndTimeInSeconds: number;
-        };
-      };
-      if (!res.ok) {
-        setGarminSyncError(data.error ?? `Sync failed (${res.status})`);
-        return;
-      }
-      if (data.summary) {
-        setGarminSyncResult({
-          ...data.summary,
-          window: data.window,
-        });
-      }
-      await refreshLastRunStrip();
-    } catch (e: unknown) {
-      setGarminSyncError(e instanceof Error ? e.message : "Sync failed");
-    } finally {
-      setGarminSyncLoading(false);
-    }
-  }
 
   function handleSubNav(key: TrainingSubNavKey) {
     setActiveSubNav(key);
@@ -601,62 +539,6 @@ export default function TrainingHubPage() {
                       </Link>
                     </>
                   )}
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    <p className="text-xs text-gray-500 mb-2">
-                      Missed a webhook? Pull activities Garmin received in a single UTC day (same convention as
-                      your plan). One API call = one 24-hour upload window.
-                    </p>
-                    <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1.5 mb-3">
-                      Pick the UTC date when Garmin would have received the upload (not always your local
-                      calendar day). Example: a late-evening US run may show under the next UTC day.
-                    </p>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-                      <div>
-                        <label
-                          htmlFor="garmin-sync-date"
-                          className="block text-xs font-medium text-gray-600 mb-1"
-                        >
-                          UTC date
-                        </label>
-                        <input
-                          id="garmin-sync-date"
-                          type="date"
-                          value={syncDateYmd}
-                          onChange={(e) => setSyncDateYmd(e.target.value)}
-                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => void syncGarminNow()}
-                        disabled={garminSyncLoading}
-                        className="inline-flex items-center justify-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-50 sm:mb-0.5"
-                      >
-                        {garminSyncLoading ? "Syncing…" : "Sync from Garmin"}
-                      </button>
-                    </div>
-                    {garminSyncResult ? (
-                      <p className="mt-2 text-xs text-gray-600">
-                        {garminSyncResult.window?.dateUtc ? (
-                          <span className="font-medium text-gray-800">
-                            Window UTC {garminSyncResult.window.dateUtc}
-                            {" · "}
-                          </span>
-                        ) : null}
-                        {garminSyncResult.saved > 0
-                          ? `Saved ${garminSyncResult.saved} new activit${garminSyncResult.saved === 1 ? "y" : "ies"}.`
-                          : garminSyncResult.fetched === 0
-                            ? "Garmin returned no activities in this window."
-                            : `Up to date (${garminSyncResult.skipped} already had, ${garminSyncResult.fetched} checked).`}
-                        {garminSyncResult.errors > 0
-                          ? ` ${garminSyncResult.errors} error(s).`
-                          : null}
-                      </p>
-                    ) : null}
-                    {garminSyncError ? (
-                      <p className="mt-2 text-xs text-red-600">{garminSyncError}</p>
-                    ) : null}
-                  </div>
                 </div>
               )}
             </div>

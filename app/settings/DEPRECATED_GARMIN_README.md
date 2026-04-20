@@ -16,7 +16,6 @@ Garmin integration has been deprecated for MVP1 to narrow scope and focus on cor
 
 ### API Routes (Preserved, Not Modified)
 - `app/api/garmin/status/route.ts`
-- `app/api/garmin/sync/route.ts`
 - `app/api/garmin/webhook/route.ts`
 - `app/api/auth/garmin/authorize/route.ts`
 - `app/api/auth/garmin/callback/route.ts`
