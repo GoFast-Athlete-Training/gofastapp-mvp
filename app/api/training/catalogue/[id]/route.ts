@@ -2,13 +2,13 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { assertTrainingEngineAuth } from "@/lib/training/training-engine-auth";
+import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { bodyToCatalogueRow } from "@/lib/training/catalogue-row";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
 export async function PUT(request: NextRequest, ctx: RouteCtx) {
-  const authErr = assertTrainingEngineAuth(request);
+  const authErr = await assertStaffBearerAuth(request);
   if (authErr) return authErr;
 
   const { id } = await ctx.params;
@@ -61,7 +61,7 @@ export async function PUT(request: NextRequest, ctx: RouteCtx) {
 }
 
 export async function DELETE(request: NextRequest, ctx: RouteCtx) {
-  const authErr = assertTrainingEngineAuth(request);
+  const authErr = await assertStaffBearerAuth(request);
   if (authErr) return authErr;
 
   const { id } = await ctx.params;

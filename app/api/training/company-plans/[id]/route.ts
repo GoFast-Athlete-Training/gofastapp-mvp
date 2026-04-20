@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { assertTrainingEngineAuth } from "@/lib/training/training-engine-auth";
+import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { ymdFromDate } from "@/lib/training/plan-utils";
 import { CoachReviewStatus } from "@prisma/client";
 
@@ -10,7 +10,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authErr = assertTrainingEngineAuth(request);
+  const authErr = await assertStaffBearerAuth(request);
   if (authErr) return authErr;
 
   const { id } = await params;
@@ -76,7 +76,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authErr = assertTrainingEngineAuth(request);
+  const authErr = await assertStaffBearerAuth(request);
   if (authErr) return authErr;
 
   const { id } = await params;

@@ -1,32 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adminAuth } from "@/lib/firebaseAdmin";
 
 /**
  * Server-to-server auth for training engine CRUD from GoFastCompany.
- * Set GOFAST_TRAINING_ENGINE_SECRET on both apps to the same value.
- * Company sends header: x-gofast-training-engine-secret
+ * Company verifies `company_staff` and forwards `x-gofast-staff-id` + the user's Firebase Bearer token.
  */
-export function assertTrainingEngineAuth(
+export const STAFF_ID_HEADER = "x-gofast-staff-id";
+
+export async function assertStaffBearerAuth(
   request: NextRequest
-): NextResponse | null {
-  const expected = process.env.GOFAST_TRAINING_ENGINE_SECRET?.trim();
-  const got = request.headers.get("x-gofast-training-engine-secret")?.trim();
-
-  if (!expected) {
-    if (process.env.NODE_ENV === "production") {
-      return NextResponse.json(
-        { success: false, error: "GOFAST_TRAINING_ENGINE_SECRET is not configured" },
-        { status: 500 }
-      );
-    }
-    return null;
-  }
-
-  if (got !== expected) {
+): Promise<NextResponse | null> {
+  const staffId = request.headers.get(STAFF_ID_HEADER)?.trim();
+  if (!staffId) {
     return NextResponse.json(
       { success: false, error: "Unauthorized" },
       { status: 401 }
     );
   }
 
-  return null;
+  const auth = request.headers.get("authorization");
+  if (!auth?.startsWith("Bearer ")) {
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
+  try {
+    await adminAuth.verifyIdToken(auth.substring(7));
+    return null;
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
 }

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { assertTrainingEngineAuth } from "@/lib/training/training-engine-auth";
+import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { newEntityId } from "@/lib/training/new-entity-id";
 import {
   bodyToCatalogueRow,
@@ -14,7 +14,7 @@ import {
  * Upserts each row by unique (name, workoutType).
  */
 export async function POST(request: NextRequest) {
-  const authErr = assertTrainingEngineAuth(request);
+  const authErr = await assertStaffBearerAuth(request);
   if (authErr) return authErr;
 
   try {

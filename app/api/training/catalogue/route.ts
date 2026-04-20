@@ -2,12 +2,12 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { assertTrainingEngineAuth } from "@/lib/training/training-engine-auth";
+import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { newEntityId } from "@/lib/training/new-entity-id";
 import { bodyToCatalogueRow } from "@/lib/training/catalogue-row";
 
 export async function GET(request: NextRequest) {
-  const authErr = assertTrainingEngineAuth(request);
+  const authErr = await assertStaffBearerAuth(request);
   if (authErr) return authErr;
 
   try {
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const authErr = assertTrainingEngineAuth(request);
+  const authErr = await assertStaffBearerAuth(request);
   if (authErr) return authErr;
 
   try {

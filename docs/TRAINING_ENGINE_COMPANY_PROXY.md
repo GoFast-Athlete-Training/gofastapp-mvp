@@ -4,16 +4,12 @@ GoFastCompany’s dashboard (`/dashboard/training-engine/*`) calls **this app** 
 
 ## Auth
 
-Set the same value in both apps:
+Company verifies the caller is a `company_staff` row (`requireCompanyStaff`), then forwards:
 
-- **gofastapp-mvp:** `GOFAST_TRAINING_ENGINE_SECRET`
-- **GoFastCompany:** `GOFAST_TRAINING_ENGINE_SECRET`
+- `Authorization: Bearer <Firebase ID token>` (from the logged-in user)
+- `x-gofast-staff-id: <company_staff.id>`
 
-Company forwards `Authorization` from the logged-in user and adds:
-
-`x-gofast-training-engine-secret: <secret>`
-
-**Development:** If the secret is unset on gofastapp-mvp, non-production allows requests (see `lib/training/training-engine-auth.ts`). Production requires the secret.
+The product app verifies the JWT and requires both headers (`lib/training/training-engine-auth.ts`).
 
 ## Routes (gofastapp-mvp)
 
