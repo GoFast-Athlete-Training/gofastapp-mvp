@@ -7,6 +7,7 @@ import {
   MapPin,
   Mountain,
   Timer,
+  Trophy,
   Wind,
   Zap,
 } from 'lucide-react';
@@ -132,6 +133,24 @@ function normalizeGoalDistanceLabel(raw: unknown): string {
 type ActivePlanSummary = { name: string; hasSchedule: boolean };
 type GoingRunRow = { id: string; title: string; date: string; city: string };
 
+/** From GET /api/race-signups — athlete self-declared races + registry snapshot */
+type RaceSignupWithRegistry = {
+  id: string;
+  raceRegistryId: string;
+  race_registry: {
+    id: string;
+    name: string;
+    distanceLabel: string | null;
+    distanceMeters: number | null;
+    raceDate: string;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    registrationUrl: string | null;
+    startTime: string | null;
+  };
+};
+
 function planDayMilesHome(meters: number | null | undefined): string {
   if (meters == null || !Number.isFinite(meters) || meters <= 0) return '—';
   const mi = meters / 1609.34;
@@ -229,6 +248,7 @@ export default function AthleteHomePage() {
     distance: number | null;
   } | null>(null);
   const [todayPlanDay, setTodayPlanDay] = useState<PlanDayCard | null>(null);
+  const [raceSignups, setRaceSignups] = useState<RaceSignupWithRegistry[]>([]);
 
   const loadHome = useCallback(async () => {
     const athleteId = LocalStorageAPI.getAthleteId();
@@ -259,13 +279,15 @@ export default function AthleteHomePage() {
       return;
     }
 
-    const [goalsRes, upcomingRes, paceRes, goingRes, lastRunRes] = await Promise.allSettled([
-      api.get('/goals?status=ACTIVE'),
-      api.get('/training/upcoming'),
-      api.get(`/athlete/${athleteId}/pace-notifications`),
-      api.get('/me/my-going-runs'),
-      api.get('/me/last-logged-workout'),
-    ]);
+    const [goalsRes, upcomingRes, paceRes, goingRes, lastRunRes, raceSignupsRes] =
+      await Promise.allSettled([
+        api.get('/goals?status=ACTIVE'),
+        api.get('/training/upcoming'),
+        api.get(`/athlete/${athleteId}/pace-notifications`),
+        api.get('/me/my-going-runs'),
+        api.get('/me/last-logged-workout'),
+        api.get('/race-signups'),
+      ]);
 
     if (goalsRes.status === 'fulfilled') {
       const goals = goalsRes.value.data?.goals ?? [];
@@ -302,6 +324,14 @@ export default function AthleteHomePage() {
       setPaceNotifications(paceRes.value.data?.notifications ?? []);
     } else {
       setPaceNotifications([]);
+    }
+
+    if (raceSignupsRes.status === 'fulfilled') {
+      const list = raceSignupsRes.value.data?.signups;
+      setRaceSignups(Array.isArray(list) ? (list as RaceSignupWithRegistry[]) : []);
+    } else {
+      console.warn('athlete-home: race signups fetch failed', raceSignupsRes.reason);
+      setRaceSignups([]);
     }
 
     if (lastRunRes.status === 'fulfilled') {
@@ -550,6 +580,33 @@ export default function AthleteHomePage() {
 
   const goalDistanceNorm = normalizeGoalDistanceLabel(primaryGoal?.distance);
 
+  const todayUtcForRace = utcDateOnly(new Date());
+  const raceDaySignupForHome = raceSignups.find((s) => {
+    const rd = utcDateOnly(new Date(s.race_registry.raceDate));
+    return rd.getTime() === todayUtcForRace.getTime();
+  });
+  const upcomingRaceSignupForHome = !raceDaySignupForHome
+    ? raceSignups
+        .filter((s) => {
+          const rd = utcDateOnly(new Date(s.race_registry.raceDate));
+          const diff = rd.getTime() - todayUtcForRace.getTime();
+          return diff > 0 && diff <= 7 * 24 * 60 * 60 * 1000;
+        })
+        .sort(
+          (a, b) =>
+            new Date(a.race_registry.raceDate).getTime() -
+            new Date(b.race_registry.raceDate).getTime()
+        )[0]
+    : undefined;
+  const daysUntilUpcomingRace =
+    upcomingRaceSignupForHome != null
+      ? Math.round(
+          (utcDateOnly(new Date(upcomingRaceSignupForHome.race_registry.raceDate)).getTime() -
+            todayUtcForRace.getTime()) /
+            (24 * 60 * 60 * 1000)
+        )
+      : null;
+
   const cardFindRun =
     'block rounded-xl border-2 border-sky-200 bg-sky-50/70 p-5 shadow-sm hover:border-sky-300 hover:shadow-md transition-all h-full';
   const cardTraining =
@@ -631,6 +688,93 @@ export default function AthleteHomePage() {
               <h1 className="text-2xl font-bold text-gray-900 mb-1">Welcome back, {athlete.firstName}!</h1>
               <p className="text-gray-600 text-sm">Here&apos;s your training at a glance</p>
             </div>
+
+            {raceDaySignupForHome ? (
+              <div className="mb-4 rounded-2xl border-2 border-violet-400 bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-6 text-white shadow-lg">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex gap-4 min-w-0">
+                    <Trophy className="h-12 w-12 shrink-0 text-amber-200" aria-hidden />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-100">
+                        Today is race day
+                      </p>
+                      <h2 className="mt-2 text-2xl font-extrabold leading-tight">
+                        {raceDaySignupForHome.race_registry.name}
+                      </h2>
+                      {raceDaySignupForHome.race_registry.distanceLabel ? (
+                        <p className="mt-1 text-lg font-semibold text-violet-100">
+                          {raceDaySignupForHome.race_registry.distanceLabel}
+                        </p>
+                      ) : null}
+                      <p className="mt-3 text-xl font-bold text-white">
+                        Go get it
+                        {typeof athlete?.firstName === 'string' && athlete.firstName.trim()
+                          ? `, ${athlete.firstName.trim()}`
+                          : ''}
+                        !
+                      </p>
+                      {(() => {
+                        const city = raceDaySignupForHome.race_registry.city;
+                        const st = raceDaySignupForHome.race_registry.state;
+                        const loc =
+                          [city, st].filter((x) => x && String(x).trim()).join(', ') || null;
+                        const stTime = raceDaySignupForHome.race_registry.startTime?.trim();
+                        if (!loc && !stTime) return null;
+                        return (
+                          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-violet-100">
+                            {loc ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                <MapPin className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                                {loc}
+                              </span>
+                            ) : null}
+                            {stTime ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                <Timer className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                                {stTime}
+                              </span>
+                            ) : null}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                  <Link
+                    href={`/race-hub/${raceDaySignupForHome.race_registry.id}`}
+                    className="inline-flex shrink-0 items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-bold text-violet-700 shadow hover:bg-violet-50"
+                  >
+                    Open race hub
+                  </Link>
+                </div>
+              </div>
+            ) : upcomingRaceSignupForHome && daysUntilUpcomingRace != null && daysUntilUpcomingRace > 0 ? (
+              <div className="mb-4 rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-5 shadow-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-violet-800">
+                      Race in {daysUntilUpcomingRace} day{daysUntilUpcomingRace === 1 ? '' : 's'}
+                    </p>
+                    <h2 className="mt-1 text-lg font-bold text-gray-900">
+                      {upcomingRaceSignupForHome.race_registry.name}
+                    </h2>
+                    {upcomingRaceSignupForHome.race_registry.distanceLabel ? (
+                      <p className="text-sm text-gray-600">
+                        {upcomingRaceSignupForHome.race_registry.distanceLabel}
+                      </p>
+                    ) : null}
+                    <p className="mt-2 text-sm text-gray-700">
+                      You&apos;ve put in the work. Race week is here.
+                    </p>
+                  </div>
+                  <Link
+                    href={`/race-hub/${upcomingRaceSignupForHome.race_registry.id}`}
+                    className="inline-flex shrink-0 items-center justify-center rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
+                  >
+                    Race hub
+                  </Link>
+                </div>
+              </div>
+            ) : null}
 
             {/* Row 1: Today + Race goal */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">

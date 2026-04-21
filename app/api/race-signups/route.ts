@@ -24,6 +24,7 @@ const raceInclude = {
     state: true,
     country: true,
     registrationUrl: true,
+    startTime: true,
   },
 } as const;
 
