@@ -1016,10 +1016,11 @@ model preset_workout_config {
   presetId String @unique
   training_plan_preset training_plan_preset @relation(fields: [presetId], references: [id], onDelete: Cascade)
 
-  tempoStartMiles    Float @default(5)
-  intervalStartMiles Float @default(5)
-  minTempoMiles      Float @default(3)
-  minIntervalMiles   Float @default(3)
+  /// Stored as fraction 0–0.5; API/clients use `qualityPercent` (0–50) via normalizer.
+  qualityFraction  Float   @default(0.22)
+  /// Number of quality slots per week (0–2).
+  qualitySessions  Int     @default(1)
+  qualityOnLongRun Boolean @default(false)
   tempoIdealDow      Int   @default(2)
   intervalIdealDow   Int   @default(4)
   longRunDefaultDow  Int   @default(6)
@@ -1056,6 +1057,8 @@ model training_plans {
   preferredDays        Int[]                  @default([])
   /// Preferred long-run day: 6=Saturday, 7=Sunday (default 6)
   preferredLongRunDow  Int?
+  /// User-selected DOWs for quality sessions (1=Mon..7=Sun), max 2 entries
+  preferredQualityDays Int[]                  @default([])
   createdAt            DateTime               @default(now())
   updatedAt            DateTime
   planned_workouts     workouts[]
@@ -1076,9 +1079,11 @@ model workout_catalogue {
   id                           String      @id @default(cuid())
   name                         String
   workoutType                  WorkoutType
+  /// True when this catalogue entry is used for quality slots during plan generation.
+  isQuality                    Boolean     @default(false)
   /// Phases this entry applies to, e.g. ["base","build"]
   intendedPhase                String[]
-  progressionIndex             Int
+  progressionIndex             Int?
   reps                         Int?
   repDistanceMeters            Int?
   recoveryDistanceMeters       Int?

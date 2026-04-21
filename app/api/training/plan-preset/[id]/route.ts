@@ -4,6 +4,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { normalizeTaperLongRuns } from "@/lib/training/preset-volume-helpers";
+import {
+  parseBoltonQualityToFraction,
+  serializePlanPresetForApi,
+} from "@/lib/training/quality-percent";
 
 export async function GET(
   request: NextRequest,
@@ -76,16 +80,6 @@ export async function PATCH(
       "minEasyPerDayMiles",
       "minEasyWeekMiles",
     ] as const;
-    const wkKeys = [
-      "tempoStartMiles",
-      "intervalStartMiles",
-      "minTempoMiles",
-      "minIntervalMiles",
-      "tempoIdealDow",
-      "intervalIdealDow",
-      "longRunDefaultDow",
-    ] as const;
-
     const volumeData: Record<string, unknown> = {};
     const vol = body.volume && typeof body.volume === "object" ? body.volume : body;
     for (const k of volKeys) {
@@ -104,8 +98,24 @@ export async function PATCH(
 
     const workoutData: Record<string, unknown> = {};
     const wk = body.workout && typeof body.workout === "object" ? body.workout : {};
-    for (const k of wkKeys) {
-      if (k in wk && wk[k] != null) workoutData[k] = wk[k];
+    const wkRec = wk as Record<string, unknown>;
+    if ("qualityPercent" in wkRec || "qualityFraction" in wkRec) {
+      const q = parseBoltonQualityToFraction(wkRec);
+      if (q != null) workoutData.qualityFraction = q;
+    }
+    const wkRest = [
+      "qualitySessions",
+      "tempoIdealDow",
+      "intervalIdealDow",
+      "longRunDefaultDow",
+    ] as const;
+    for (const k of wkRest) {
+      if (k in wk && (wk as Record<string, unknown>)[k] != null) {
+        workoutData[k] = (wk as Record<string, unknown>)[k];
+      }
+    }
+    if ("qualityOnLongRun" in wk && typeof wk.qualityOnLongRun === "boolean") {
+      workoutData.qualityOnLongRun = wk.qualityOnLongRun;
     }
 
     const presetData: Record<string, unknown> = {};
@@ -139,7 +149,7 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json({ success: true, preset: updated });
+    return NextResponse.json({ success: true, preset: serializePlanPresetForApi(updated) });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Server error";
     console.error("PATCH /api/training/plan-preset/[id]", e);

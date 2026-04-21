@@ -31,6 +31,7 @@ export async function executePlanGenerate(params: {
     startDate: Date;
     preferredDays: number[];
     preferredLongRunDow: number | null;
+    preferredQualityDays?: number[];
     currentFiveKPace: string | null;
     weeklyMileageTarget: number | null;
     race_registry: RaceForGenerate;
@@ -39,7 +40,7 @@ export async function executePlanGenerate(params: {
   minWeeklyMiles: number;
 }): Promise<{ planId: string; weekCount: number }> {
   const { athleteId, plan } = params;
-  const [prefs, rawPreset] = await Promise.all([
+  const [prefs, rawPreset, catalogueWorkouts] = await Promise.all([
     prisma.trainingPreferences.findUnique({ where: { athleteId } }),
     plan.presetId
       ? prisma.training_plan_preset.findUnique({
@@ -50,6 +51,14 @@ export async function executePlanGenerate(params: {
           },
         })
       : Promise.resolve(null),
+    prisma.workout_catalogue.findMany({
+      select: {
+        id: true,
+        isQuality: true,
+        workoutType: true,
+        progressionIndex: true,
+      },
+    }),
   ]);
 
   const config: PlanGenConfig | undefined =
@@ -91,6 +100,8 @@ export async function executePlanGenerate(params: {
     raceName: race.name,
     raceDistanceMiles,
     preferredLongRunDow: plan.preferredLongRunDow,
+    preferredQualityDays: plan.preferredQualityDays,
+    catalogueWorkouts,
     config,
   });
   assignRotationalIdentifiers(drafts);

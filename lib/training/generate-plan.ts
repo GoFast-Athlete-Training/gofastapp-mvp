@@ -3,14 +3,10 @@
  *
  * 1. Race day - anchor end of plan; race week (`nOffset === 0`) is race-only; day-before-race
  *    is hard-blocked for any workout.
- * 2. Taper - `nOffsetFromWeekAnchor` sets phase and taper-shaped long-run miles + weekly cap
- *    (`longRunMilesForOffset`, `weeklyTotalMiles`, skip LR at `nOffset === -1`).
- * 3. Long run as weekly load - the LR mileage for that week (e.g. 22 mi) is chosen first under
- *    the athlete's desired weekly miles (`weeklyMileageTarget`, `longCap`, `compressQualityToCap`,
- *    `fundEasyMiles`). That LR is a large slice of `weeklyMi`; tempo, interval, and easy split
- *    what remains.
- * 4. Placement - place LR on picker Sat/Sun (preferred-only), then tempo (Tue) and intervals
- *    (Thu) on preferred days with nearest fallback, then easy only on leftover preferred days.
+ * 2. Taper - `nOffsetFromWeekAnchor` sets phase and taper-shaped long-run miles (skip LR at `nOffset === -1`).
+ * 3. Weekly miles = athlete `weeklyMileageTarget` (clamped). Quality miles use preset `qualityFraction` (0–0.5; API uses percent 0–50);
+ *    long run from ladder; easy = remainder. Quality sessions use catalogue rows (`isQuality`) when present.
+ * 4. Placement - LR on Sat/Sun prefs; quality on user `preferredQualityDays` or preset DOWs; easy on leftovers.
  *
  * Partial week 1: skip tempo/interval; LR only if preferred Sat/Sun fall in-window; easy on prefs.
  */
@@ -59,13 +55,14 @@ export interface PlanGenConfig {
   taperMileageReduction?: number;
   longRunCapFraction?: number;
   minWeeklyMiles?: number;
-  tempoStartMiles?: number;
-  intervalStartMiles?: number;
-  minTempoMiles?: number;
-  minIntervalMiles?: number;
+  qualityFraction?: number;
+  qualitySessions?: number;
+  qualityOnLongRun?: boolean;
   minLongMiles?: number;
   minEasyPerDayMiles?: number;
   minEasyWeekMiles?: number;
+  minTempoMiles?: number;
+  minIntervalMiles?: number;
   tempoIdealDow?: number;
   intervalIdealDow?: number;
   longRunDefaultDow?: number;
@@ -126,24 +123,6 @@ export function longRunMilesForOffset(nOffset: number, cfg?: PlanGenConfig): num
   const cyclePeak = peakEntry - (cycleNum + 1) * ladderStep;
   const miles = cyclePeak - (ladderCycleLen - 1 - cyclePos) * ladderStep;
   return Math.max(baseStart, Math.round(miles));
-}
-
-export function weeklyTotalMiles(
-  longRun: number,
-  nOffset: number,
-  weeklyMileageTarget: number,
-  minWeeklyMiles: number = 40,
-  cfg?: PlanGenConfig
-): number {
-  const multiplier = cfg?.weeklyMileageMultiplier ?? 2.5;
-  const taperReduction = cfg?.taperMileageReduction ?? 0.75;
-  const taperWeeks = cfg?.taperWeeks ?? 3;
-  let total = longRun * multiplier;
-  if (nOffset >= -taperWeeks) total *= taperReduction;
-  const rounded = Math.round(total);
-  const floor = Math.max(25, minWeeklyMiles);
-  const cap = Math.max(floor, Math.min(100, weeklyMileageTarget));
-  return Math.max(floor, Math.min(cap, rounded));
 }
 
 function utcDateOnly(d: Date): Date {
@@ -239,111 +218,12 @@ export function cataloguePhaseFallbackForWeek(
   return phaseForCatalogue(nOffset);
 }
 
-function compressQualityToCap(
-  weeklyCap: number,
-  longMi: number,
-  tempoMi: number,
-  intervalMi: number,
-  minTempo: number = 3,
-  minInterval: number = 3,
-  minLong: number = 8
-): { longMi: number; tempoMi: number; intervalMi: number } {
-  let L = longMi;
-  let T = tempoMi;
-  let I = intervalMi;
-  let over = L + T + I - weeklyCap;
-  while (over > 0.05) {
-    let progressed = false;
-    if (I > minInterval) {
-      const d = Math.min(I - minInterval, over);
-      I -= d;
-      over -= d;
-      progressed = true;
-    }
-    if (over <= 0) break;
-    if (T > minTempo) {
-      const d = Math.min(T - minTempo, over);
-      T -= d;
-      over -= d;
-      progressed = true;
-    }
-    if (over <= 0) break;
-    if (L > minLong) {
-      const d = Math.min(L - minLong, over);
-      L -= d;
-      over -= d;
-      progressed = true;
-    }
-    if (!progressed) break;
-  }
-  return { longMi: L, tempoMi: T, intervalMi: I };
-}
-
-function fundEasyMiles(
-  weeklyCap: number,
-  longMi: number,
-  tempoMi: number,
-  intervalMi: number,
-  longCapFromWeekly: number,
-  minTempo: number = 3,
-  minInterval: number = 3,
-  minLong: number = 8,
-  minEasyPerDay: number = 3,
-  minEasyWeek: number = 4
-): { longMi: number; tempoMi: number; intervalMi: number; easyMi: number } {
-  let L = Math.min(longMi, longCapFromWeekly);
-  let T = tempoMi;
-  let I = intervalMi;
-  let easyMi = weeklyCap - L - T - I;
-
-  if (easyMi >= minEasyWeek) {
-    return { longMi: L, tempoMi: T, intervalMi: I, easyMi };
-  }
-
-  const need = minEasyWeek - easyMi;
-  if (need > 0 && L - minLong > 0) {
-    const take = Math.min(need, L - minLong);
-    L -= take;
-    easyMi += take;
-  }
-
-  easyMi = weeklyCap - L - T - I;
-  if (easyMi >= minEasyWeek) {
-    return { longMi: L, tempoMi: T, intervalMi: I, easyMi };
-  }
-
-  const need2 = minEasyWeek - easyMi;
-  if (need2 > 0) {
-    if (I - minInterval > 0) {
-      const take = Math.min(need2, I - minInterval);
-      I -= take;
-      easyMi += take;
-    }
-    easyMi = weeklyCap - L - T - I;
-  }
-  if (easyMi >= minEasyWeek) {
-    return { longMi: L, tempoMi: T, intervalMi: I, easyMi };
-  }
-
-  const need3 = minEasyWeek - easyMi;
-  if (need3 > 0 && T - minTempo > 0) {
-    const take = Math.min(need3, T - minTempo);
-    T -= take;
-    easyMi += take;
-  }
-
-  easyMi = Math.max(0, weeklyCap - L - T - I);
-  const packed = compressQualityToCap(weeklyCap, L, T, I, minTempo, minInterval, minLong);
-  easyMi = Math.max(
-    0,
-    weeklyCap - packed.longMi - packed.tempoMi - packed.intervalMi
-  );
-  return {
-    longMi: packed.longMi,
-    tempoMi: packed.tempoMi,
-    intervalMi: packed.intervalMi,
-    easyMi,
-  };
+/** Minimal catalogue projection for plan generation. */
+export interface CatalogueWorkoutRow {
+  id: string;
+  isQuality: boolean;
+  workoutType: WorkoutType;
+  progressionIndex: number | null;
 }
 
 export interface GeneratePlanInput {
@@ -359,8 +239,12 @@ export interface GeneratePlanInput {
   raceDistanceMiles: number;
   /** Preferred long-run day: 6=Sat, 7=Sun (default 6). */
   preferredLongRunDow?: number | null;
+  /** User-selected quality session DOWs (1–7); max 2. Empty = use preset tempo/interval DOWs. */
+  preferredQualityDays?: number[];
   /** Optional persisted config; omit to use hardcoded defaults for backward compatibility. */
   config?: PlanGenConfig;
+  /** Workout catalogue rows for quality/easy assignment (optional). */
+  catalogueWorkouts?: CatalogueWorkoutRow[];
 }
 
 export interface GeneratedPlanWorkoutRow {
@@ -374,20 +258,26 @@ export interface GeneratedPlanWorkoutRow {
   nOffset: number;
   weekNumber: number;
   dayAssigned: string;
-  catalogueWorkoutId: null;
+  catalogueWorkoutId: string | null;
   /** Intervals/Tempo: set in phase B via assignRotationalIdentifiers */
   planLadderIndex: number | null;
 }
+
+type DayKind = "tempo" | "interval" | "long" | "easy";
+
+type AssignEntry = {
+  kind: DayKind;
+  miles: number;
+  catalogueWorkoutId?: string | null;
+  workoutTypeOverride?: WorkoutType;
+};
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
 function trimEasyAssignmentsToWeeklyTotal(params: {
-  assignment: Map<
-    number,
-    { kind: "tempo" | "interval" | "long" | "easy"; miles: number }
-  >;
+  assignment: Map<number, AssignEntry>;
   weeklyCap: number;
   minEasyPerDay: number;
   minTempo: number;
@@ -413,7 +303,7 @@ function trimEasyAssignmentsToWeeklyTotal(params: {
     const room = v.miles - minEasyPerDay;
     if (room <= 0) continue;
     const shave = Math.min(room, over);
-    assignment.set(dow, { kind: "easy", miles: round2(v.miles - shave) });
+    assignment.set(dow, { ...v, kind: "easy", miles: round2(v.miles - shave) });
     over -= shave;
   }
 
@@ -434,7 +324,7 @@ function trimEasyAssignmentsToWeeklyTotal(params: {
       const room = v.miles - minM;
       if (room <= 0) continue;
       const shave = Math.min(room, over);
-      assignment.set(dow, { kind: v.kind, miles: round2(v.miles - shave) });
+      assignment.set(dow, { ...v, kind: v.kind, miles: round2(v.miles - shave) });
       over -= shave;
     }
   }
@@ -446,24 +336,36 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
   const tempoIdealDow = cfg?.tempoIdealDow ?? DEFAULT_TEMPO_IDEAL_OUR_DOW;
   const intervalIdealDow = cfg?.intervalIdealDow ?? DEFAULT_INTERVAL_IDEAL_OUR_DOW;
   const longRunDefaultDow = cfg?.longRunDefaultDow ?? DEFAULT_LONG_RUN_OUR_DOW;
-  const tempoStart = cfg?.tempoStartMiles ?? 5;
-  const intervalStart = cfg?.intervalStartMiles ?? 5;
   const minTempoMi = cfg?.minTempoMiles ?? 3;
   const minIntervalMi = cfg?.minIntervalMiles ?? 3;
   const minLongMi = cfg?.minLongMiles ?? 8;
   const minEasyPerDay = cfg?.minEasyPerDayMiles ?? 3;
-  const minEasyWeek = cfg?.minEasyWeekMiles ?? 4;
-  const longRunCap = cfg?.longRunCapFraction ?? 0.4;
+  const qualityFraction = cfg?.qualityFraction ?? 0.22;
+  const qualitySessions = Math.min(2, Math.max(0, cfg?.qualitySessions ?? 1));
 
   const preferred =
     input.preferredDays.length > 0
       ? [...input.preferredDays].sort((a, b) => a - b)
       : [1, 2, 3, 4, 5, 6];
 
+  const cat = input.catalogueWorkouts ?? [];
+  const qualityCandidates = cat
+    .filter((w) => w.isQuality)
+    .sort((a, b) => (a.progressionIndex ?? 0) - (b.progressionIndex ?? 0));
+  const easyCat = cat.filter((w) => !w.isQuality && w.workoutType === "Easy");
+
   const raceUtc = utcDateOnly(input.raceDate);
   const planStart = utcDateOnly(input.planStartDate);
   const raceOurDow = ourDowFromUtcDate(raceUtc);
   const longRunIdeal = normalizeLongRunOurDow(input.preferredLongRunDow, longRunDefaultDow);
+
+  const qd = (input.preferredQualityDays ?? [])
+    .filter((d) => d >= 1 && d <= 7)
+    .filter((d) => d !== longRunIdeal);
+  let qualityDow1 = tempoIdealDow;
+  let qualityDow2 = intervalIdealDow;
+  if (qd.length >= 1) qualityDow1 = qd[0];
+  if (qd.length >= 2) qualityDow2 = qd[1];
 
   const out: GeneratedPlanWorkoutRow[] = [];
 
@@ -515,39 +417,24 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
       continue;
     }
 
-    /* LR miles + weekly envelope: long-run distance drives the week's total budget. */
-    let longMi = longRunMilesForOffset(nOffset, cfg);
-    let weeklyMi = weeklyTotalMiles(longMi, nOffset, input.weeklyMileageTarget, minWeekly, cfg);
-    const weeklyLongCap = Math.floor(weeklyMi * longRunCap * 10) / 10;
-    longMi = Math.min(longMi, weeklyLongCap);
+    const longMiRaw = longRunMilesForOffset(nOffset, cfg);
+    const weeklyMi = Math.max(minWeekly, Math.min(100, input.weeklyMileageTarget));
+    const qualityMiTotal =
+      qualitySessions > 0 ? Math.round(weeklyMi * qualityFraction) : 0;
+    let longMi = longMiRaw;
+    if (longMi + qualityMiTotal > weeklyMi) {
+      longMi = Math.max(minLongMi, weeklyMi - qualityMiTotal);
+    }
+    const easyMi = Math.max(0, weeklyMi - longMi - qualityMiTotal);
+    const perSession =
+      qualitySessions > 0 ? Math.max(1, Math.round(qualityMiTotal / qualitySessions)) : 0;
 
-    let tempoMi = tempoStart;
-    let intervalMi = intervalStart;
-    let packed = compressQualityToCap(weeklyMi, longMi, tempoMi, intervalMi, minTempoMi, minIntervalMi, minLongMi);
-    longMi = packed.longMi;
-    tempoMi = packed.tempoMi;
-    intervalMi = packed.intervalMi;
+    const lrCatId =
+      cfg?.qualityOnLongRun && qualityCandidates.length > 0
+        ? qualityCandidates.find((w) => w.workoutType === "LongRun")?.id ?? null
+        : null;
 
-    const funded = fundEasyMiles(
-      weeklyMi,
-      longMi,
-      tempoMi,
-      intervalMi,
-      weeklyLongCap,
-      minTempoMi,
-      minIntervalMi,
-      minLongMi,
-      minEasyPerDay,
-      minEasyWeek
-    );
-    longMi = funded.longMi;
-    tempoMi = funded.tempoMi;
-    intervalMi = funded.intervalMi;
-    /* Easy pool after LR + tempo + interval are budgeted against weeklyMi. */
-    const easyMi = funded.easyMi;
-
-    type DayKind = "tempo" | "interval" | "long" | "easy";
-    const assignment = new Map<number, { kind: DayKind; miles: number }>();
+    const assignment = new Map<number, AssignEntry>();
 
     const dayInPlanWindow = (ourDowArg: number): boolean => {
       const dt = dateForDayInWeek(input.planStartDate, weekNumber, ourDowArg);
@@ -559,25 +446,24 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
     const slotYmd = (ourDow: number): string =>
       ymdFromDate(dateForDayInWeek(input.planStartDate, weekNumber, ourDow));
 
-    const tryPlace = (ourDow: number, kind: DayKind, miles: number): boolean => {
-      if (miles <= 0) return false;
+    const tryPlaceEntry = (ourDow: number, entry: AssignEntry): boolean => {
+      if (entry.miles <= 0) return false;
       if (assignment.has(ourDow)) return false;
       const slotDate = dateForDayInWeek(input.planStartDate, weekNumber, ourDow);
       if (slotDate.getTime() < planStart.getTime()) return false;
       if (nOffset !== 0 && slotDate.getTime() > raceUtc.getTime()) return false;
       if (blockedDates.has(ymdFromDate(slotDate))) return false;
-      assignment.set(ourDow, { kind, miles: round2(miles) });
+      assignment.set(ourDow, { ...entry, miles: round2(entry.miles) });
       return true;
     };
 
-    const tryPlaceQuality = (
+    const tryPlaceQualityEntry = (
       idealOurDow: number,
-      kind: DayKind,
-      miles: number,
+      entry: AssignEntry,
       isLongRun: boolean
     ): boolean => {
       for (const dow of orderQualityCandidates(idealOurDow, isLongRun, preferred)) {
-        if (tryPlace(dow, kind, miles)) return true;
+        if (tryPlaceEntry(dow, entry)) return true;
       }
       return false;
     };
@@ -590,11 +476,16 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
 
     let extraEasyFromSkippedQuality = 0;
     if (partialWeek1) {
-      extraEasyFromSkippedQuality += tempoMi + intervalMi;
+      extraEasyFromSkippedQuality += qualityMiTotal;
     }
 
     const skipLongOnLongRunDay = nOffset === -1;
     let absorbLongIntoEasy = 0;
+    const longEntry: AssignEntry = {
+      kind: "long",
+      miles: longMi,
+      catalogueWorkoutId: lrCatId,
+    };
     if (skipLongOnLongRunDay) {
       absorbLongIntoEasy = longMi;
     } else if (longMi > 0) {
@@ -606,37 +497,54 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
             : preferred.includes(other) && dayInPlanWindow(other)
               ? other
               : null;
-        if (lrDay != null && tryPlace(lrDay, "long", longMi)) {
+        if (lrDay != null && tryPlaceEntry(lrDay, longEntry)) {
           /* ok */
         } else {
           absorbLongIntoEasy = longMi;
         }
-      } else if (!tryPlaceQuality(longRunIdeal, "long", longMi, true)) {
+      } else if (!tryPlaceQualityEntry(longRunIdeal, longEntry, true)) {
         absorbLongIntoEasy = longMi;
       }
     }
 
-    if (!partialWeek1) {
-      if (!tryPlaceQuality(tempoIdealDow, "tempo", tempoMi, false)) {
-        extraEasyFromSkippedQuality += tempoMi;
-      }
-      if (!tryPlaceQuality(intervalIdealDow, "interval", intervalMi, false)) {
-        extraEasyFromSkippedQuality += intervalMi;
+    if (!partialWeek1 && qualitySessions > 0 && perSession > 0) {
+      for (let slot = 0; slot < qualitySessions; slot++) {
+        const idealDow = slot === 0 ? qualityDow1 : qualityDow2;
+        const pick =
+          qualityCandidates.length > 0
+            ? qualityCandidates[(weekNumber - 1 + slot) % qualityCandidates.length]
+            : null;
+        const fallbackKind: DayKind = slot === 0 ? "tempo" : "interval";
+        const wtype = pick?.workoutType;
+        let kind: DayKind = fallbackKind;
+        if (wtype === "Intervals") kind = "interval";
+        else if (wtype === "Tempo") kind = "tempo";
+        const entry: AssignEntry = pick
+          ? {
+              kind,
+              miles: perSession,
+              catalogueWorkoutId: pick.id,
+              workoutTypeOverride: wtype,
+            }
+          : { kind: fallbackKind, miles: perSession };
+        if (!tryPlaceQualityEntry(idealDow, entry, false)) {
+          extraEasyFromSkippedQuality += perSession;
+        }
       }
     }
 
     const usedForQuality = new Set(assignment.keys());
-    const easyCandidates = preferred.filter(
+    const easyDayList = preferred.filter(
       (d) =>
         !usedForQuality.has(d) &&
         dayInPlanWindow(d) &&
         !blockedDates.has(slotYmd(d))
     );
-    /* Easy only on preferred days (no Mon-Sun fallback). */
-    const easyDays = easyCandidates;
+    const easyDays = easyDayList;
 
     let easyBudget = easyMi + absorbLongIntoEasy + extraEasyFromSkippedQuality;
 
+    let easyCatIdx = 0;
     if (easyBudget > 0 && easyDays.length > 0) {
       const base = Math.floor((easyBudget / easyDays.length) * 10) / 10;
       for (let i = 0; i < easyDays.length; i++) {
@@ -647,7 +555,14 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
         if (m < 0.25) continue;
         const d = easyDays[i];
         if (assignment.has(d)) continue;
-        assignment.set(d, { kind: "easy", miles: m });
+        const ec =
+          easyCat.length > 0 ? easyCat[easyCatIdx++ % easyCat.length] : null;
+        assignment.set(d, {
+          kind: "easy",
+          miles: m,
+          catalogueWorkoutId: ec?.id ?? null,
+          workoutTypeOverride: ec ? "Easy" : undefined,
+        });
       }
       const lastEasy = easyDays[easyDays.length - 1];
       const sumEasy = easyDays.reduce((s, d) => {
@@ -659,6 +574,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
         const cur = assignment.get(lastEasy);
         if (cur?.kind === "easy") {
           assignment.set(lastEasy, {
+            ...cur,
             kind: "easy",
             miles: Math.max(minEasyPerDay, round2(cur.miles + miss)),
           });
@@ -675,34 +591,34 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
       minLong: minLongMi,
     });
 
-    for (const [ourDow, { kind, miles }] of assignment) {
-      if (miles < 0.25) continue;
+    for (const [ourDow, ent] of assignment) {
+      if (ent.miles < 0.25) continue;
       const workoutType: WorkoutType =
-        kind === "tempo"
+        ent.workoutTypeOverride ??
+        (ent.kind === "tempo"
           ? "Tempo"
-          : kind === "interval"
+          : ent.kind === "interval"
             ? "Intervals"
-            : kind === "long"
+            : ent.kind === "long"
               ? "LongRun"
-              : "Easy";
+              : "Easy");
       const date = dateForDayInWeek(input.planStartDate, weekNumber, ourDow);
       out.push({
-        title: formatPlannedWorkoutTitle(workoutType, milesToMeters(miles)),
+        title: formatPlannedWorkoutTitle(workoutType, milesToMeters(ent.miles)),
         workoutType,
         athleteId: input.athleteId,
         planId: input.planId,
         date,
         phase,
-        estimatedDistanceInMeters: milesToMeters(miles),
+        estimatedDistanceInMeters: milesToMeters(ent.miles),
         nOffset,
         weekNumber,
         dayAssigned: DAY_NAMES[ourDow - 1],
-        catalogueWorkoutId: null,
+        catalogueWorkoutId: ent.catalogueWorkoutId ?? null,
         planLadderIndex: null,
       });
     }
 
-    /* Race on Monday immediately after this week's Sunday: folded into this week (see calendarTrainingWeekCount). */
     const mondayFolded =
       weekNumber === weekCount &&
       raceUtc.getUTCDay() === 1 &&
@@ -718,7 +634,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
         athleteId: input.athleteId,
         planId: input.planId,
         date: utcDateOnly(raceUtc),
-        phase: phaseForCatalogue(0),
+        phase: phaseForCatalogue(0, cfg),
         estimatedDistanceInMeters: milesToMeters(input.raceDistanceMiles),
         nOffset: 0,
         weekNumber,

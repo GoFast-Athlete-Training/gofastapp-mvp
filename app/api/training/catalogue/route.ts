@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
         name: d.name,
         workoutType: d.workoutType,
         intendedPhase: d.intendedPhase,
+        isQuality: d.isQuality,
         progressionIndex: d.progressionIndex,
         reps: d.reps,
         repDistanceMeters: d.repDistanceMeters,

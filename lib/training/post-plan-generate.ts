@@ -89,6 +89,7 @@ export async function planGeneratePostHandler(
         startDate: plan.startDate,
         preferredDays: plan.preferredDays ?? [],
         preferredLongRunDow: plan.preferredLongRunDow ?? null,
+        preferredQualityDays: plan.preferredQualityDays ?? [],
         currentFiveKPace: plan.currentFiveKPace,
         weeklyMileageTarget: plan.weeklyMileageTarget,
         race_registry: {

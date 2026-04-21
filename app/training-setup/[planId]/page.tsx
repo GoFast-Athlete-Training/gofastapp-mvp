@@ -26,6 +26,7 @@ import {
   type PlanDayCard,
 } from "@/lib/training/fetch-plan-week-client";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
+import { normalizePreferredQualityDays } from "@/lib/training/preferred-quality-days";
 
 type PlanDetail = {
   id: string;
@@ -36,6 +37,7 @@ type PlanDetail = {
   planWeeks: unknown;
   preferredDays: number[];
   preferredLongRunDow?: number | null;
+  preferredQualityDays?: number[];
   weeklyMileageTarget?: number | null;
   currentWeeklyMileage?: number | null;
   _count?: { planned_workouts: number };
@@ -98,6 +100,9 @@ export default function TrainingSetupPlanPage({
   const [preferredDaysLocal, setPreferredDaysLocal] = useState<number[]>([]);
   const [weeklyMilesTarget, setWeeklyMilesTarget] = useState("50");
   const [preferredLongRunDowLocal, setPreferredLongRunDowLocal] = useState(6);
+  const [preferredQualityDaysLocal, setPreferredQualityDaysLocal] = useState<
+    number[]
+  >([]);
   const [error, setError] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
   async function getToken() {
@@ -144,10 +149,19 @@ export default function TrainingSetupPlanPage({
     } else {
       setPreferredLongRunDowLocal(6);
     }
+    const pqd = plan.preferredQualityDays;
+    if (Array.isArray(pqd) && pqd.length > 0) {
+      setPreferredQualityDaysLocal(
+        [...pqd].filter((n) => n >= 1 && n <= 7).sort((a, b) => a - b)
+      );
+    } else {
+      setPreferredQualityDaysLocal([]);
+    }
   }, [
     plan?.id,
     plan?.preferredDays,
     plan?.preferredLongRunDow,
+    plan?.preferredQualityDays,
     plan?.weeklyMileageTarget,
     plan?.currentWeeklyMileage,
   ]);
@@ -299,10 +313,38 @@ export default function TrainingSetupPlanPage({
 
   function togglePreferredDay(d: number) {
     setPreferredDaysLocal((prev) => {
+      let next: number[];
       if (prev.includes(d)) {
-        return prev.filter((x) => x !== d);
+        next = prev.filter((x) => x !== d);
+      } else {
+        next = [...prev, d].sort((a, b) => a - b);
       }
-      return [...prev, d].sort((a, b) => a - b);
+      setPreferredQualityDaysLocal((q) =>
+        q.filter((x) => next.includes(x) && x !== preferredLongRunDowLocal)
+      );
+      return next;
+    });
+  }
+
+  function toggleQualityDay(d: number) {
+    if (!preferredDaysLocal.includes(d) || d === preferredLongRunDowLocal) {
+      return;
+    }
+    setPreferredQualityDaysLocal((prev) => {
+      const next = prev.includes(d)
+        ? prev.filter((x) => x !== d)
+        : [...prev, d].sort((a, b) => a - b);
+      const norm = normalizePreferredQualityDays(
+        next,
+        preferredDaysLocal,
+        preferredLongRunDowLocal
+      );
+      if (!norm.ok) {
+        setError(norm.error);
+        return prev;
+      }
+      setError(null);
+      return norm.value;
     });
   }
 
@@ -323,6 +365,16 @@ export default function TrainingSetupPlanPage({
       }
       targetMiles = Math.max(25, Math.min(100, targetMiles));
 
+      const qNorm = normalizePreferredQualityDays(
+        preferredQualityDaysLocal,
+        normalized,
+        preferredLongRunDowLocal
+      );
+      if (!qNorm.ok) {
+        setError(qNorm.error);
+        return;
+      }
+
       const patchRes = await fetch(`/api/training-plan/${planId}`, {
         method: "PATCH",
         headers: {
@@ -333,6 +385,7 @@ export default function TrainingSetupPlanPage({
           preferredDays: normalized,
           weeklyMileageTarget: targetMiles,
           preferredLongRunDow: preferredLongRunDowLocal,
+          preferredQualityDays: qNorm.value,
         }),
       });
       const patchData = await patchRes.json();
@@ -512,8 +565,8 @@ export default function TrainingSetupPlanPage({
                   Long run day
                 </p>
                 <p className="mb-3 text-xs text-gray-500">
-                  Tempo is Tuesday, intervals Thursday; pick Saturday or Sunday for
-                  your long run.
+                  Pick Saturday or Sunday for your long run. Quality sessions avoid
+                  this day.
                 </p>
                 <div className="flex flex-wrap gap-3">
                   {LONG_RUN_DAY_OPTIONS.map(({ value, label }) => (
@@ -526,11 +579,53 @@ export default function TrainingSetupPlanPage({
                         name="preferredLongRunDow"
                         className="border-gray-300 text-orange-600 focus:ring-orange-500"
                         checked={preferredLongRunDowLocal === value}
-                        onChange={() => setPreferredLongRunDowLocal(value)}
+                        onChange={() => {
+                          setPreferredLongRunDowLocal(value);
+                          setPreferredQualityDaysLocal((q) =>
+                            q.filter((d) => d !== value)
+                          );
+                        }}
                       />
                       {label}
                     </label>
                   ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-sm font-medium text-gray-800">
+                  Quality session days (optional)
+                </p>
+                <p className="mb-3 text-xs text-gray-500">
+                  Choose up to two days from your preferred days (not your long run
+                  day). They must be at least two days apart. If you skip this, we
+                  use the preset defaults (often Tuesday and Thursday).
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {DAY_OPTIONS.map(({ value, label }) => {
+                    const inPrefs = preferredDaysLocal.includes(value);
+                    const isLr = value === preferredLongRunDowLocal;
+                    const disabled = !inPrefs || isLr;
+                    return (
+                      <label
+                        key={value}
+                        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2.5 text-sm ${
+                          disabled
+                            ? "cursor-not-allowed border-gray-100 bg-gray-100 text-gray-400"
+                            : "cursor-pointer border-gray-200 bg-gray-50 has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300 text-orange-600 focus:ring-orange-500 disabled:opacity-40"
+                          checked={preferredQualityDaysLocal.includes(value)}
+                          disabled={disabled}
+                          onChange={() => toggleQualityDay(value)}
+                        />
+                        {label}
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 

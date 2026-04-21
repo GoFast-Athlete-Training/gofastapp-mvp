@@ -29,7 +29,7 @@ export async function selectNextCatalogueWorkout(
     const lastPhases = last.intendedPhase.map((p) => p.toLowerCase());
     const lastInCurrentPhase = lastPhases.includes(phaseNorm);
 
-    if (lastInCurrentPhase) {
+    if (lastInCurrentPhase && last.progressionIndex != null) {
       const next = await prisma.workout_catalogue.findFirst({
         where: {
           workoutType,

@@ -28,7 +28,8 @@ export type CatalogueRowInput = {
   name: string;
   workoutType: WorkoutType;
   intendedPhase: string[];
-  progressionIndex: number;
+  isQuality: boolean;
+  progressionIndex: number | null;
   reps?: number | null;
   repDistanceMeters?: number | null;
   recoveryDistanceMeters?: number | null;
@@ -53,10 +54,20 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
   const wt = parseWorkoutType(body.workoutType);
   if (!wt) return { ok: false, error: "workoutType must be Easy, Tempo, Intervals, or LongRun" };
 
-  const progressionIndex = Number(body.progressionIndex);
-  if (!Number.isFinite(progressionIndex)) {
-    return { ok: false, error: "progressionIndex must be a number" };
+  let progressionIndex: number | null = null;
+  if (
+    body.progressionIndex !== null &&
+    body.progressionIndex !== undefined &&
+    body.progressionIndex !== ""
+  ) {
+    const pi = Number(body.progressionIndex);
+    if (!Number.isFinite(pi)) {
+      return { ok: false, error: "progressionIndex must be a number or empty" };
+    }
+    progressionIndex = Math.round(pi);
   }
+
+  const isQuality = body.isQuality === true;
 
   const intendedPhase = parseIntendedPhase(body.intendedPhase);
   if (intendedPhase.length === 0) {
@@ -76,7 +87,8 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
       name,
       workoutType: wt,
       intendedPhase,
-      progressionIndex: Math.round(progressionIndex),
+      isQuality,
+      progressionIndex,
       reps: num("reps") != null ? Math.round(num("reps")!) : null,
       repDistanceMeters:
         num("repDistanceMeters") != null ? Math.round(num("repDistanceMeters")!) : null,

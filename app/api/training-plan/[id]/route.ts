@@ -6,6 +6,7 @@ import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { totalWeeksFromDates, ymdFromDate } from "@/lib/training/plan-utils";
 import { TrainingPlanLifecycle } from "@prisma/client";
 import { archiveOtherActivePlans } from "@/lib/training/plan-lifecycle";
+import { normalizePreferredQualityDays } from "@/lib/training/preferred-quality-days";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -117,6 +118,14 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     const data: Record<string, unknown> = { updatedAt: new Date() };
 
     if (!scheduleLocked) {
+      let nextPreferredDays = (existing.preferredDays ?? []).filter(
+        (n) => n >= 1 && n <= 7
+      );
+      let nextLongRun: number | null =
+        existing.preferredLongRunDow === 6 || existing.preferredLongRunDow === 7
+          ? existing.preferredLongRunDow
+          : null;
+
       if (typeof body.name === "string") data.name = body.name.trim();
       if (body.startDate != null) {
         const d = new Date(body.startDate);
@@ -132,18 +141,21 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         data.currentWeeklyMileage = Number(body.currentWeeklyMileage);
       }
       if (Array.isArray(body.preferredDays)) {
-        data.preferredDays = body.preferredDays
+        nextPreferredDays = body.preferredDays
           .map((n: unknown) => Number(n))
           .filter((n: number) => n >= 1 && n <= 7);
+        data.preferredDays = nextPreferredDays;
       }
       if ("preferredLongRunDow" in body) {
         const v = body.preferredLongRunDow;
         if (v === null || v === undefined || v === "") {
           data.preferredLongRunDow = null;
+          nextLongRun = null;
         } else {
           const n = Number(v);
           if (n === 6 || n === 7) {
             data.preferredLongRunDow = n;
+            nextLongRun = n;
           }
         }
       }
@@ -178,6 +190,25 @@ export async function PATCH(request: NextRequest, context: Ctx) {
           }
           data.presetId = pid;
         }
+      }
+
+      const shouldNormalizeQuality =
+        Array.isArray(body.preferredQualityDays) ||
+        Array.isArray(body.preferredDays) ||
+        "preferredLongRunDow" in body;
+      if (shouldNormalizeQuality) {
+        const rawQuality = Array.isArray(body.preferredQualityDays)
+          ? body.preferredQualityDays
+          : (existing.preferredQualityDays ?? []);
+        const norm = normalizePreferredQualityDays(
+          rawQuality,
+          nextPreferredDays,
+          nextLongRun
+        );
+        if (!norm.ok) {
+          return NextResponse.json({ error: norm.error }, { status: 400 });
+        }
+        data.preferredQualityDays = norm.value;
       }
     }
 

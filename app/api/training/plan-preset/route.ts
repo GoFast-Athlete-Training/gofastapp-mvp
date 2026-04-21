@@ -4,6 +4,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { normalizeTaperLongRuns } from "@/lib/training/preset-volume-helpers";
+import {
+  parseBoltonQualityToFraction,
+  serializePlanPresetForApi,
+} from "@/lib/training/quality-percent";
 
 function slugifyPresetTitle(title: string): string {
   const s = title
@@ -25,7 +29,10 @@ export async function GET(request: NextRequest) {
       workoutConfig: true,
     },
   });
-  return NextResponse.json({ success: true, presets });
+  return NextResponse.json({
+    success: true,
+    presets: presets.map(serializePlanPresetForApi),
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -59,6 +66,8 @@ export async function POST(request: NextRequest) {
 
     const vol = volume && typeof volume === "object" ? volume : {};
     const wk = workout && typeof workout === "object" ? workout : {};
+    const wkRec = wk as Record<string, unknown>;
+    const qualityFraction = parseBoltonQualityToFraction(wkRec) ?? 0.22;
 
     const taperWeeks = typeof vol.taperWeeks === "number" ? vol.taperWeeks : 3;
     const taperLongRuns = normalizeTaperLongRuns(taperWeeks, vol.taperLongRuns);
@@ -107,13 +116,12 @@ export async function POST(request: NextRequest) {
         },
         workoutConfig: {
           create: {
-            tempoStartMiles:
-              typeof wk.tempoStartMiles === "number" ? wk.tempoStartMiles : 5,
-            intervalStartMiles:
-              typeof wk.intervalStartMiles === "number" ? wk.intervalStartMiles : 5,
-            minTempoMiles: typeof wk.minTempoMiles === "number" ? wk.minTempoMiles : 3,
-            minIntervalMiles:
-              typeof wk.minIntervalMiles === "number" ? wk.minIntervalMiles : 3,
+            qualityFraction,
+            qualitySessions:
+              typeof wk.qualitySessions === "number" && Number.isFinite(wk.qualitySessions)
+                ? Math.min(2, Math.max(0, Math.round(wk.qualitySessions)))
+                : 1,
+            qualityOnLongRun: wk.qualityOnLongRun === true,
             tempoIdealDow: typeof wk.tempoIdealDow === "number" ? wk.tempoIdealDow : 2,
             intervalIdealDow:
               typeof wk.intervalIdealDow === "number" ? wk.intervalIdealDow : 4,
@@ -128,7 +136,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, preset }, { status: 201 });
+    return NextResponse.json(
+      { success: true, preset: serializePlanPresetForApi(preset) },
+      { status: 201 }
+    );
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Server error";
     console.error("POST /api/training/plan-preset", e);

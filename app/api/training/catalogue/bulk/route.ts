@@ -29,8 +29,13 @@ export async function POST(request: NextRequest) {
     const parsedRows: CatalogueRowInput[] = [];
     const errors: { index: number; error: string }[] = [];
 
+    const explicitIsQualityFlags: boolean[] = [];
+
     for (let i = 0; i < body.items!.length; i++) {
       const row = body.items![i] as Record<string, unknown>;
+      explicitIsQualityFlags.push(
+        Object.prototype.hasOwnProperty.call(row, "isQuality")
+      );
       const parsed = bodyToCatalogueRow(row);
       if (!parsed.ok) {
         errors.push({ index: i, error: parsed.error });
@@ -66,32 +71,38 @@ export async function POST(request: NextRequest) {
 
     await prisma.$transaction(async (tx) => {
       const now = new Date();
-      for (const d of parsedRows) {
+      for (let idx = 0; idx < parsedRows.length; idx++) {
+        const d = parsedRows[idx];
+        const explicitIsQuality = explicitIsQualityFlags[idx];
         const existing = await tx.workout_catalogue.findUnique({
           where: {
             name_workoutType: { name: d.name, workoutType: d.workoutType },
           },
         });
         if (existing) {
+          const updateData: Record<string, unknown> = {
+            intendedPhase: d.intendedPhase,
+            progressionIndex: d.progressionIndex,
+            reps: d.reps,
+            repDistanceMeters: d.repDistanceMeters,
+            recoveryDistanceMeters: d.recoveryDistanceMeters,
+            warmupMiles: d.warmupMiles,
+            cooldownMiles: d.cooldownMiles,
+            repPaceOffsetSecPerMile: d.repPaceOffsetSecPerMile,
+            recoveryPaceOffsetSecPerMile: d.recoveryPaceOffsetSecPerMile,
+            overallPaceOffsetSecPerMile: d.overallPaceOffsetSecPerMile,
+            intendedHeartRateZone: d.intendedHeartRateZone,
+            intendedHRBpmLow: d.intendedHRBpmLow,
+            intendedHRBpmHigh: d.intendedHRBpmHigh,
+            notes: d.notes,
+            updatedAt: now,
+          };
+          if (explicitIsQuality) {
+            updateData.isQuality = d.isQuality;
+          }
           await tx.workout_catalogue.update({
             where: { id: existing.id },
-            data: {
-              intendedPhase: d.intendedPhase,
-              progressionIndex: d.progressionIndex,
-              reps: d.reps,
-              repDistanceMeters: d.repDistanceMeters,
-              recoveryDistanceMeters: d.recoveryDistanceMeters,
-              warmupMiles: d.warmupMiles,
-              cooldownMiles: d.cooldownMiles,
-              repPaceOffsetSecPerMile: d.repPaceOffsetSecPerMile,
-              recoveryPaceOffsetSecPerMile: d.recoveryPaceOffsetSecPerMile,
-              overallPaceOffsetSecPerMile: d.overallPaceOffsetSecPerMile,
-              intendedHeartRateZone: d.intendedHeartRateZone,
-              intendedHRBpmLow: d.intendedHRBpmLow,
-              intendedHRBpmHigh: d.intendedHRBpmHigh,
-              notes: d.notes,
-              updatedAt: now,
-            },
+            data: updateData as object,
           });
           updated++;
         } else {
@@ -101,6 +112,7 @@ export async function POST(request: NextRequest) {
               name: d.name,
               workoutType: d.workoutType,
               intendedPhase: d.intendedPhase,
+              isQuality: explicitIsQuality ? d.isQuality : false,
               progressionIndex: d.progressionIndex,
               reps: d.reps,
               repDistanceMeters: d.repDistanceMeters,
