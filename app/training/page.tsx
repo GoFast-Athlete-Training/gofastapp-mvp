@@ -9,6 +9,7 @@ import { auth } from "@/lib/firebase";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import WeekStrip from "@/components/training/WeekStrip";
+import AnalysisDeepPanel from "@/components/training/AnalysisDeepPanel";
 import TrainingSubNav, {
   TrainingSubNavMobile,
   scrollToTrainingSection,
@@ -31,6 +32,11 @@ import {
   type PlanDayCard,
   type WeekPerformanceSnapshot,
 } from "@/lib/training/fetch-plan-week-client";
+import {
+  formatPaceTargetRangeDisplay,
+  paceRangeDeltaMessage,
+  singleTargetPaceDeltaMessage,
+} from "@/lib/training/pace-comparison-display";
 
 type PlanDetailHub = {
   id: string;
@@ -69,13 +75,55 @@ function formatSecPerMile(sec: number | null | undefined): string {
   return `${m}:${s.toString().padStart(2, "0")}/mi`;
 }
 
+function formatDurationSeconds(sec: number | null | undefined): string | null {
+  if (sec == null || !Number.isFinite(sec) || sec <= 0) return null;
+  const m = Math.floor(sec / 60);
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  if (h > 0) return `${h}h ${rm}m`;
+  return `${m} min`;
+}
+
 type LastWorkoutStrip = {
   id: string;
   title: string;
+  workoutType: string | null;
   paceDeltaSecPerMile: number | null;
   actualAvgPaceSecPerMile: number | null;
   actualDistanceMeters: number | null;
+  actualDurationSeconds: number | null;
+  estimatedDistanceInMeters: number | null;
+  targetPaceSecPerMile: number | null;
+  targetPaceSecPerMileHigh: number | null;
+  hrDeltaBpm: number | null;
+  creditedFiveKPaceSecPerMile: number | null;
 };
+
+function lastRunStubVsPlanMessage(w: LastWorkoutStrip): string | null {
+  const hasPaceRange =
+    w.targetPaceSecPerMile != null &&
+    w.targetPaceSecPerMileHigh != null &&
+    w.targetPaceSecPerMileHigh !== w.targetPaceSecPerMile;
+  if (hasPaceRange && w.actualAvgPaceSecPerMile != null) {
+    return paceRangeDeltaMessage(
+      w.actualAvgPaceSecPerMile,
+      w.targetPaceSecPerMile,
+      w.targetPaceSecPerMileHigh
+    );
+  }
+  return singleTargetPaceDeltaMessage(w.paceDeltaSecPerMile);
+}
+
+function lastRunPlannedVsActualLine(w: LastWorkoutStrip): string | null {
+  const planned = planDayMilesDisplay(w.estimatedDistanceInMeters);
+  const actual =
+    w.actualDistanceMeters != null && w.actualDistanceMeters > 0
+      ? metersToMiDisplay(w.actualDistanceMeters)
+      : null;
+  if (planned === "—" && !actual) return null;
+  if (actual) return `${planned} planned · ${actual} run`;
+  return `${planned} planned`;
+}
 
 type FallbackActivityStrip = {
   id: string;
@@ -208,9 +256,16 @@ export default function TrainingHubPage() {
         setLastWorkout({
           id: w.id,
           title: w.title,
+          workoutType: typeof w.workoutType === "string" ? w.workoutType : null,
           paceDeltaSecPerMile: w.paceDeltaSecPerMile ?? null,
           actualAvgPaceSecPerMile: w.actualAvgPaceSecPerMile ?? null,
           actualDistanceMeters: w.actualDistanceMeters ?? null,
+          actualDurationSeconds: w.actualDurationSeconds ?? null,
+          estimatedDistanceInMeters: w.estimatedDistanceInMeters ?? null,
+          targetPaceSecPerMile: w.targetPaceSecPerMile ?? null,
+          targetPaceSecPerMileHigh: w.targetPaceSecPerMileHigh ?? null,
+          hrDeltaBpm: w.hrDeltaBpm ?? null,
+          creditedFiveKPaceSecPerMile: w.creditedFiveKPaceSecPerMile ?? null,
         });
       } else {
         setLastWorkout(null);
@@ -277,6 +332,16 @@ export default function TrainingHubPage() {
   const focusKey = selectedDayKey || todayKey;
   const focusPlanDay = weekDays.find((d) => d.dateKey === focusKey) ?? null;
   const focusIsToday = focusKey === todayKey;
+
+  const lastRunPlannedVsActualDisplay = useMemo(
+    () => (lastWorkout ? lastRunPlannedVsActualLine(lastWorkout) : null),
+    [lastWorkout]
+  );
+
+  const lastRunVsPlanStub = useMemo(
+    () => (lastWorkout ? lastRunStubVsPlanMessage(lastWorkout) : null),
+    [lastWorkout]
+  );
 
   return (
     <AthleteAppShell>
@@ -365,45 +430,122 @@ export default function TrainingHubPage() {
               )}
 
               {!loadingWeek && (
-                <div className="rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-6 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-orange-900">
+                <div
+                  className={
+                    focusPlanDay?.matchedActivityId
+                      ? "rounded-2xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm"
+                      : "rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-6 shadow-sm"
+                  }
+                >
+                  <p
+                    className={`text-xs font-semibold uppercase tracking-wide ${
+                      focusPlanDay?.matchedActivityId ? "text-emerald-900" : "text-orange-900"
+                    }`}
+                  >
                     {focusIsToday ? "Today" : "Selected day"}
                   </p>
                   {focusPlanDay ? (
-                    <>
-                      <h2 className="mt-2 text-2xl font-bold text-gray-900">
-                        {displayWorkoutListTitle(focusPlanDay)}
-                      </h2>
-                      <p className="mt-1 text-sm text-gray-600">
-                        {formatPlanDateDisplay(focusPlanDay.dateKey || String(focusPlanDay.date), {
-                          weekday: "long",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                        {focusPlanDay.matchedActivityId ? (
+                    focusPlanDay.matchedActivityId ? (
+                      <>
+                        <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                          Workout complete
+                        </p>
+                        <h2 className="mt-1 text-2xl font-bold text-gray-900">
+                          You crushed it
+                        </h2>
+                        <p className="mt-2 text-lg font-semibold text-gray-800">
+                          {displayWorkoutListTitle(focusPlanDay)}
+                        </p>
+                        <p className="mt-1 text-sm text-gray-600">
+                          {formatPlanDateDisplay(focusPlanDay.dateKey || String(focusPlanDay.date), {
+                            weekday: "long",
+                            month: "short",
+                            day: "numeric",
+                          })}
                           <span className="ml-2 font-semibold text-emerald-700">· Done</span>
-                        ) : null}
-                      </p>
-                      <p className="mt-1 text-sm text-gray-600 tabular-nums">
-                        Planned: {planDayMilesDisplay(focusPlanDay.estimatedDistanceInMeters)}
-                      </p>
-                      <div className="mt-5 flex flex-wrap gap-3">
-                        <Link
-                          href={`/training/day/${focusPlanDay.dateKey}`}
-                          className="inline-flex justify-center rounded-xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-700"
-                        >
-                          Open session
-                        </Link>
-                        {focusPlanDay.workoutId ? (
+                        </p>
+                        <div className="mt-4 space-y-1 rounded-xl border border-emerald-100 bg-white/70 px-4 py-3 text-sm text-gray-800">
+                          <p className="tabular-nums">
+                            <span className="text-gray-500">Planned: </span>
+                            {planDayMilesDisplay(focusPlanDay.estimatedDistanceInMeters)}
+                          </p>
+                          {focusPlanDay.actualDistanceMeters != null &&
+                          focusPlanDay.actualDistanceMeters > 0 ? (
+                            <p className="tabular-nums font-medium text-gray-900">
+                              Ran: {metersToMiDisplay(focusPlanDay.actualDistanceMeters)}
+                            </p>
+                          ) : null}
+                          {focusPlanDay.actualAvgPaceSecPerMile != null ? (
+                            <p className="tabular-nums">
+                              <span className="text-gray-500">Pace: </span>
+                              {formatSecPerMile(focusPlanDay.actualAvgPaceSecPerMile)}
+                            </p>
+                          ) : null}
+                          {formatDurationSeconds(focusPlanDay.actualDurationSeconds) ? (
+                            <p className="tabular-nums">
+                              <span className="text-gray-500">Time: </span>
+                              {formatDurationSeconds(focusPlanDay.actualDurationSeconds)}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="mt-5 flex flex-wrap gap-3">
+                          {focusPlanDay.workoutId ? (
+                            <Link
+                              href={`/workouts/${focusPlanDay.workoutId}`}
+                              className="inline-flex justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
+                            >
+                              View results
+                            </Link>
+                          ) : null}
+                          {focusPlanDay.workoutId ? (
+                            <Link
+                              href={`/workouts/${focusPlanDay.workoutId}`}
+                              className="inline-flex justify-center rounded-xl border-2 border-emerald-400 bg-white px-6 py-3 text-sm font-semibold text-emerald-900 hover:bg-emerald-50"
+                            >
+                              Workout detail
+                            </Link>
+                          ) : null}
                           <Link
-                            href={`/workouts/${focusPlanDay.workoutId}`}
-                            className="inline-flex justify-center rounded-xl border-2 border-orange-400 bg-white px-6 py-3 text-sm font-semibold text-orange-900 hover:bg-orange-50"
+                            href={`/training/day/${focusPlanDay.dateKey}`}
+                            className="inline-flex justify-center rounded-xl px-6 py-3 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-200 hover:bg-emerald-50"
                           >
-                            Workout detail
+                            Session / day
                           </Link>
-                        ) : null}
-                      </div>
-                    </>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <h2 className="mt-2 text-2xl font-bold text-gray-900">
+                          {displayWorkoutListTitle(focusPlanDay)}
+                        </h2>
+                        <p className="mt-1 text-sm text-gray-600">
+                          {formatPlanDateDisplay(focusPlanDay.dateKey || String(focusPlanDay.date), {
+                            weekday: "long",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </p>
+                        <p className="mt-1 text-sm text-gray-600 tabular-nums">
+                          Planned: {planDayMilesDisplay(focusPlanDay.estimatedDistanceInMeters)}
+                        </p>
+                        <div className="mt-5 flex flex-wrap gap-3">
+                          <Link
+                            href={`/training/day/${focusPlanDay.dateKey}`}
+                            className="inline-flex justify-center rounded-xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-700"
+                          >
+                            Open session
+                          </Link>
+                          {focusPlanDay.workoutId ? (
+                            <Link
+                              href={`/workouts/${focusPlanDay.workoutId}`}
+                              className="inline-flex justify-center rounded-xl border-2 border-orange-400 bg-white px-6 py-3 text-sm font-semibold text-orange-900 hover:bg-orange-50"
+                            >
+                              Workout detail
+                            </Link>
+                          ) : null}
+                        </div>
+                      </>
+                    )
                   ) : (
                     <>
                       <p className="mt-2 text-lg font-semibold text-gray-900">
@@ -436,54 +578,96 @@ export default function TrainingHubPage() {
 
             <div id="training-section-analysis" className="scroll-mt-24">
               {!loadingWeek && (
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Last run &amp; analysis
-                  </p>
-                  {lastWorkout ? (
-                    <div className="mt-3 space-y-2">
-                      <p className="text-sm text-gray-900">
-                        <span className="font-semibold">{lastWorkout.title}</span>
-                        {lastWorkout.actualDistanceMeters != null &&
-                        lastWorkout.actualDistanceMeters > 0 ? (
-                          <>
-                            {" "}
-                            · {metersToMiDisplay(lastWorkout.actualDistanceMeters)}
-                          </>
-                        ) : null}
-                        {lastWorkout.actualAvgPaceSecPerMile != null ? (
-                          <>
-                            {" "}
-                            · {formatSecPerMile(lastWorkout.actualAvgPaceSecPerMile)}
-                          </>
-                        ) : null}
-                      </p>
-                      {lastWorkout.paceDeltaSecPerMile != null &&
-                      Number.isFinite(lastWorkout.paceDeltaSecPerMile) ? (
-                        <p className="text-sm text-gray-700">
-                          {lastWorkout.paceDeltaSecPerMile > 0
-                            ? `Beat target by ${Math.round(Math.abs(lastWorkout.paceDeltaSecPerMile))} sec/mi`
-                            : lastWorkout.paceDeltaSecPerMile < 0
-                              ? `${Math.round(Math.abs(lastWorkout.paceDeltaSecPerMile))} sec/mi slower than target`
-                              : "On target pace"}
+                <>
+                  <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Last run &amp; analysis
+                    </p>
+                    {lastWorkout ? (
+                      <div className="mt-3 space-y-3">
+                        <p className="text-sm text-gray-900">
+                          <span className="font-semibold">{lastWorkout.title}</span>
+                          {lastWorkout.workoutType ? (
+                            <span className="text-gray-600"> · {lastWorkout.workoutType}</span>
+                          ) : null}
                         </p>
-                      ) : null}
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        <Link
-                          href={`/workouts/${lastWorkout.id}`}
-                          className="inline-flex rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
-                        >
-                          View workout analysis
-                        </Link>
-                        <Link
-                          href="/workouts"
-                          className="inline-flex rounded-xl px-4 py-2 text-sm font-semibold text-orange-700 ring-1 ring-orange-200 hover:bg-orange-50"
-                        >
-                          All workouts &amp; history
-                        </Link>
+                        <p className="text-sm text-gray-800 tabular-nums">
+                          {lastWorkout.actualDistanceMeters != null &&
+                          lastWorkout.actualDistanceMeters > 0 ? (
+                            <>
+                              {metersToMiDisplay(lastWorkout.actualDistanceMeters)}
+                              {lastWorkout.actualAvgPaceSecPerMile != null ? (
+                                <> · {formatSecPerMile(lastWorkout.actualAvgPaceSecPerMile)}</>
+                              ) : null}
+                              {formatDurationSeconds(lastWorkout.actualDurationSeconds) ? (
+                                <>
+                                  {" "}
+                                  · {formatDurationSeconds(lastWorkout.actualDurationSeconds)}
+                                </>
+                              ) : null}
+                            </>
+                          ) : lastWorkout.actualAvgPaceSecPerMile != null ? (
+                            <>{formatSecPerMile(lastWorkout.actualAvgPaceSecPerMile)}</>
+                          ) : (
+                            <span className="text-gray-600">Distance &amp; pace syncing…</span>
+                          )}
+                        </p>
+                        {lastRunPlannedVsActualDisplay ? (
+                          <p className="text-sm text-gray-700">{lastRunPlannedVsActualDisplay}</p>
+                        ) : null}
+                        <div className="rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-2.5 text-sm text-gray-800">
+                          <p className="text-xs font-medium text-gray-500">Target pace (plan)</p>
+                          <p className="mt-0.5 font-semibold tabular-nums text-gray-900">
+                            {formatPaceTargetRangeDisplay(
+                              lastWorkout.targetPaceSecPerMile,
+                              lastWorkout.targetPaceSecPerMileHigh
+                            ) ??
+                              (lastWorkout.targetPaceSecPerMile != null
+                                ? formatSecPerMile(lastWorkout.targetPaceSecPerMile)
+                                : "—")}
+                          </p>
+                          {lastRunVsPlanStub ? (
+                            <p className="mt-2 text-sm text-gray-800">
+                              <span className="font-medium">Vs plan: </span>
+                              {lastRunVsPlanStub}
+                            </p>
+                          ) : null}
+                          {lastWorkout.hrDeltaBpm != null ? (
+                            <p className="mt-2 text-sm text-gray-800">
+                              <span className="font-medium">Heart rate: </span>
+                              {lastWorkout.hrDeltaBpm > 0
+                                ? `${lastWorkout.hrDeltaBpm} bpm under target zone`
+                                : lastWorkout.hrDeltaBpm < 0
+                                  ? `${Math.abs(lastWorkout.hrDeltaBpm)} bpm above target zone`
+                                  : "On target vs zone"}
+                            </p>
+                          ) : null}
+                          {lastWorkout.creditedFiveKPaceSecPerMile != null &&
+                          lastWorkout.creditedFiveKPaceSecPerMile > 0 ? (
+                            <p className="mt-2 text-xs text-gray-600">
+                              Implied 5K from effort:{" "}
+                              <span className="font-mono font-medium text-gray-800">
+                                {formatSecPerMile(lastWorkout.creditedFiveKPaceSecPerMile)}
+                              </span>
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <Link
+                            href={`/workouts/${lastWorkout.id}`}
+                            className="inline-flex rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+                          >
+                            View workout analysis
+                          </Link>
+                          <Link
+                            href="/workouts"
+                            className="inline-flex rounded-xl px-4 py-2 text-sm font-semibold text-orange-700 ring-1 ring-orange-200 hover:bg-orange-50"
+                          >
+                            All workouts &amp; history
+                          </Link>
+                        </div>
                       </div>
-                    </div>
-                  ) : fallbackActivity ? (
+                    ) : fallbackActivity ? (
                     <div className="mt-3 space-y-2">
                       <p className="text-sm text-gray-800">
                         <span className="font-semibold">
@@ -539,7 +723,9 @@ export default function TrainingHubPage() {
                       </Link>
                     </>
                   )}
-                </div>
+                  </div>
+                  {lastWorkout ? <AnalysisDeepPanel workoutId={lastWorkout.id} /> : null}
+                </>
               )}
             </div>
 
