@@ -29,6 +29,10 @@ export type CatalogueRowInput = {
   workoutType: WorkoutType;
   intendedPhase: string[];
   isQuality: boolean;
+  isLadderCapable: boolean;
+  ladderStepMeters: number | null;
+  minLadderMeters: number | null;
+  maxLadderMeters: number | null;
   progressionIndex: number | null;
   reps?: number | null;
   repDistanceMeters?: number | null;
@@ -68,6 +72,7 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
   }
 
   const isQuality = body.isQuality === true;
+  const isLadderCapable = body.isLadderCapable === true;
 
   const intendedPhase = parseIntendedPhase(body.intendedPhase);
   if (intendedPhase.length === 0) {
@@ -88,6 +93,13 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
       workoutType: wt,
       intendedPhase,
       isQuality,
+      isLadderCapable,
+      ladderStepMeters:
+        num("ladderStepMeters") != null ? Math.round(num("ladderStepMeters")!) : null,
+      minLadderMeters:
+        num("minLadderMeters") != null ? Math.round(num("minLadderMeters")!) : null,
+      maxLadderMeters:
+        num("maxLadderMeters") != null ? Math.round(num("maxLadderMeters")!) : null,
       progressionIndex,
       reps: num("reps") != null ? Math.round(num("reps")!) : null,
       repDistanceMeters:

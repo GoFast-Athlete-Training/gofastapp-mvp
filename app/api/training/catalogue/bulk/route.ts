@@ -30,11 +30,15 @@ export async function POST(request: NextRequest) {
     const errors: { index: number; error: string }[] = [];
 
     const explicitIsQualityFlags: boolean[] = [];
+    const explicitIsLadderCapableFlags: boolean[] = [];
 
     for (let i = 0; i < body.items!.length; i++) {
       const row = body.items![i] as Record<string, unknown>;
       explicitIsQualityFlags.push(
         Object.prototype.hasOwnProperty.call(row, "isQuality")
+      );
+      explicitIsLadderCapableFlags.push(
+        Object.prototype.hasOwnProperty.call(row, "isLadderCapable")
       );
       const parsed = bodyToCatalogueRow(row);
       if (!parsed.ok) {
@@ -74,6 +78,7 @@ export async function POST(request: NextRequest) {
       for (let idx = 0; idx < parsedRows.length; idx++) {
         const d = parsedRows[idx];
         const explicitIsQuality = explicitIsQualityFlags[idx];
+        const explicitIsLadderCapable = explicitIsLadderCapableFlags[idx];
         const existing = await tx.workout_catalogue.findUnique({
           where: {
             name_workoutType: { name: d.name, workoutType: d.workoutType },
@@ -82,6 +87,9 @@ export async function POST(request: NextRequest) {
         if (existing) {
           const updateData: Record<string, unknown> = {
             intendedPhase: d.intendedPhase,
+            ladderStepMeters: d.ladderStepMeters,
+            minLadderMeters: d.minLadderMeters,
+            maxLadderMeters: d.maxLadderMeters,
             progressionIndex: d.progressionIndex,
             reps: d.reps,
             repDistanceMeters: d.repDistanceMeters,
@@ -100,6 +108,9 @@ export async function POST(request: NextRequest) {
           if (explicitIsQuality) {
             updateData.isQuality = d.isQuality;
           }
+          if (explicitIsLadderCapable) {
+            updateData.isLadderCapable = d.isLadderCapable;
+          }
           await tx.workout_catalogue.update({
             where: { id: existing.id },
             data: updateData as object,
@@ -113,6 +124,10 @@ export async function POST(request: NextRequest) {
               workoutType: d.workoutType,
               intendedPhase: d.intendedPhase,
               isQuality: explicitIsQuality ? d.isQuality : false,
+              isLadderCapable: explicitIsLadderCapable ? d.isLadderCapable : false,
+              ladderStepMeters: d.ladderStepMeters,
+              minLadderMeters: d.minLadderMeters,
+              maxLadderMeters: d.maxLadderMeters,
               progressionIndex: d.progressionIndex,
               reps: d.reps,
               repDistanceMeters: d.repDistanceMeters,

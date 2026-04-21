@@ -1081,6 +1081,14 @@ model workout_catalogue {
   workoutType                  WorkoutType
   /// True when this catalogue entry is used for quality slots during plan generation.
   isQuality                    Boolean     @default(false)
+  /// Whether this entry uses a pyramid rep structure (e.g. Up and Over).
+  isLadderCapable              Boolean     @default(false)
+  /// Distance step between ladder rungs (meters). Null = not a ladder workout.
+  ladderStepMeters             Int?
+  /// Shortest rung in the ladder (meters).
+  minLadderMeters              Int?
+  /// Peak rung in the ladder (meters).
+  maxLadderMeters              Int?
   /// Phases this entry applies to, e.g. ["base","build"]
   intendedPhase                String[]
   progressionIndex             Int?
