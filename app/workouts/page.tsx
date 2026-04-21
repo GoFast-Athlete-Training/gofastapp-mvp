@@ -11,6 +11,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import {
   currentTrainingWeekNumber,
+  effectiveTrainingWeekCount,
   formatPlanDateDisplay,
   localYmd,
 } from "@/lib/training/plan-utils";
@@ -590,19 +591,34 @@ function GoTrainToday() {
           planWeeks?: unknown;
           startDate: string;
           totalWeeks: number;
+          race_registry?: { raceDate?: string } | null;
         };
         planName = typeof p.name === "string" && p.name.trim() ? p.name.trim() : null;
-        totalWeeks =
+        const storedWeeks =
           typeof p.totalWeeks === "number" && Number.isFinite(p.totalWeeks)
             ? p.totalWeeks
             : null;
+        const effectiveWeeks =
+          storedWeeks != null
+            ? effectiveTrainingWeekCount(
+                new Date(p.startDate),
+                storedWeeks,
+                p.race_registry?.raceDate
+                  ? new Date(p.race_registry.raceDate)
+                  : null
+              )
+            : null;
+        totalWeeks = effectiveWeeks;
         const scheduled =
           Array.isArray(p.planWeeks) && (p.planWeeks as unknown[]).length > 0;
         if (!scheduled) {
           hasActiveSchedule = false;
         } else {
           hasActiveSchedule = true;
-          const wn = currentTrainingWeekNumber(p.startDate, p.totalWeeks);
+          const wn =
+            effectiveWeeks != null
+              ? currentTrainingWeekNumber(p.startDate, effectiveWeeks)
+              : 1;
           currentWeekNumber = wn;
           const { days } = await fetchPlanWeekSchedule(planId, wn, token);
           todayCard = days.find((d) => d.dateKey === todayKey) ?? null;

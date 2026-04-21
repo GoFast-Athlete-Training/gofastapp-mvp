@@ -3,15 +3,16 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
+import { normalizeTaperLongRuns } from "@/lib/training/preset-volume-helpers";
 
-const DEFAULT_ANCHORS = {
-  "0": 0,
-  "-1": 9,
-  "-2": 13,
-  "-3": 15,
-  "-4": 21,
-  "-5": 21,
-};
+function slugifyPresetTitle(title: string): string {
+  const s = title
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return s || "preset";
+}
 
 export async function GET(request: NextRequest) {
   const authErr = await assertStaffBearerAuth(request);
@@ -33,14 +34,20 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { slug, title, description, volume, workout } = body;
+    const { slug: slugBody, title, description, volume, workout } = body;
 
-    if (!slug || !title) {
+    if (!title || typeof title !== "string" || !title.trim()) {
       return NextResponse.json(
-        { success: false, error: "slug and title are required" },
+        { success: false, error: "title is required" },
         { status: 400 }
       );
     }
+
+    const slugRaw =
+      typeof slugBody === "string" && slugBody.trim()
+        ? slugBody.trim().toLowerCase()
+        : slugifyPresetTitle(title);
+    const slug = slugRaw.replace(/[^a-z0-9-]/g, "").replace(/^-+|-+$/g, "") || slugifyPresetTitle(title);
 
     const existing = await prisma.training_plan_preset.findUnique({ where: { slug } });
     if (existing) {
@@ -53,14 +60,12 @@ export async function POST(request: NextRequest) {
     const vol = volume && typeof volume === "object" ? volume : {};
     const wk = workout && typeof workout === "object" ? workout : {};
 
-    const taperAnchors =
-      vol.taperLongRunAnchors && typeof vol.taperLongRunAnchors === "object"
-        ? vol.taperLongRunAnchors
-        : DEFAULT_ANCHORS;
+    const taperWeeks = typeof vol.taperWeeks === "number" ? vol.taperWeeks : 3;
+    const taperLongRuns = normalizeTaperLongRuns(taperWeeks, vol.taperLongRuns);
 
     const preset = await prisma.training_plan_preset.create({
       data: {
-        slug: String(slug).trim().toLowerCase(),
+        slug,
         title: String(title).trim(),
         description:
           typeof description === "string" && description.trim()
@@ -68,10 +73,18 @@ export async function POST(request: NextRequest) {
             : null,
         volumeConstraints: {
           create: {
-            taperWeeks: typeof vol.taperWeeks === "number" ? vol.taperWeeks : 3,
+            taperWeeks,
             peakWeeks: typeof vol.peakWeeks === "number" ? vol.peakWeeks : 4,
-            taperLongRunAnchors: taperAnchors,
-            peakLongRunMiles: typeof vol.peakLongRunMiles === "number" ? vol.peakLongRunMiles : 22,
+            taperLongRuns,
+            baseStartMiles:
+              typeof vol.baseStartMiles === "number" ? vol.baseStartMiles : 8,
+            ladderStep: typeof vol.ladderStep === "number" ? vol.ladderStep : 2,
+            ladderCycleLen:
+              typeof vol.ladderCycleLen === "number" ? vol.ladderCycleLen : 4,
+            peakEntryMiles:
+              typeof vol.peakEntryMiles === "number" ? vol.peakEntryMiles : 18,
+            peakLongRunMiles:
+              typeof vol.peakLongRunMiles === "number" ? vol.peakLongRunMiles : 22,
             cutbackWeekModulo:
               typeof vol.cutbackWeekModulo === "number" ? vol.cutbackWeekModulo : 3,
             weeklyMileageMultiplier:

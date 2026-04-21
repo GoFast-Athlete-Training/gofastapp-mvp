@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
+import { normalizeTaperLongRuns } from "@/lib/training/preset-volume-helpers";
 
 export async function GET(
   request: NextRequest,
@@ -60,7 +61,11 @@ export async function PATCH(
     const volKeys = [
       "taperWeeks",
       "peakWeeks",
-      "taperLongRunAnchors",
+      "taperLongRuns",
+      "baseStartMiles",
+      "ladderStep",
+      "ladderCycleLen",
+      "peakEntryMiles",
       "peakLongRunMiles",
       "cutbackWeekModulo",
       "weeklyMileageMultiplier",
@@ -85,6 +90,16 @@ export async function PATCH(
     const vol = body.volume && typeof body.volume === "object" ? body.volume : body;
     for (const k of volKeys) {
       if (k in vol && vol[k] != null) volumeData[k] = vol[k];
+    }
+    if ("taperWeeks" in volumeData || "taperLongRuns" in volumeData) {
+      const tw =
+        typeof volumeData.taperWeeks === "number"
+          ? volumeData.taperWeeks
+          : existing.volumeConstraints?.taperWeeks ?? 3;
+      volumeData.taperLongRuns = normalizeTaperLongRuns(
+        tw,
+        volumeData.taperLongRuns ?? existing.volumeConstraints?.taperLongRuns
+      );
     }
 
     const workoutData: Record<string, unknown> = {};

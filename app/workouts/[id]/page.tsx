@@ -15,7 +15,8 @@ import {
   ChevronUp,
   ChevronDown,
   ListOrdered,
-  Copy,
+  CopyPlus,
+  RefreshCw,
   Watch,
 } from "lucide-react";
 import Link from "next/link";
@@ -608,6 +609,7 @@ export default function WorkoutDetailPage() {
   const [loading, setLoading] = useState(true);
   const [pushing, setPushing] = useState(false);
   const [copyRepushing, setCopyRepushing] = useState(false);
+  const [duplicatingWorkout, setDuplicatingWorkout] = useState(false);
   const [pushStatus, setPushStatus] = useState<{
     success: boolean;
     message: string;
@@ -1086,25 +1088,10 @@ export default function WorkoutDetailPage() {
     setCopyRepushing(true);
     setPushStatus(null);
 
-    const scheduleYmd = (() => {
-      if (workout.date) {
-        const d = new Date(workout.date);
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        return `${y}-${m}-${day}`;
-      }
-      const n = new Date();
-      const y = n.getFullYear();
-      const m = String(n.getMonth() + 1).padStart(2, "0");
-      const day = String(n.getDate()).padStart(2, "0");
-      return `${y}-${m}-${day}`;
-    })();
-
     try {
       const dupRes = await api.post<{ workoutIds: string[] }>(
         `workouts/${workoutId}/duplicate`,
-        { date: scheduleYmd }
+        { date: scheduleYmdForWorkout(workout) }
       );
       const newId = dupRes.data.workoutIds?.[0];
       if (!newId) {
@@ -1159,6 +1146,56 @@ export default function WorkoutDetailPage() {
       });
     } finally {
       setCopyRepushing(false);
+    }
+  };
+
+  const scheduleYmdForWorkout = (w: Workout): string => {
+    if (w.date) {
+      const d = new Date(w.date);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+    const n = new Date();
+    const y = n.getFullYear();
+    const m = String(n.getMonth() + 1).padStart(2, "0");
+    const day = String(n.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  const handleDuplicateWorkout = async () => {
+    if (!workout) return;
+
+    setDuplicatingWorkout(true);
+    setPushStatus(null);
+
+    try {
+      const dupRes = await api.post<{ workoutIds: string[] }>(
+        `workouts/${workoutId}/duplicate`,
+        { date: scheduleYmdForWorkout(workout) }
+      );
+      const newId = dupRes.data.workoutIds?.[0];
+      if (!newId) {
+        throw new Error("Duplicate did not return a workout id");
+      }
+      setPushStatus({
+        success: true,
+        message: "Workout copied. Opening the new copy…",
+      });
+      router.push(`/workouts/${newId}?created=1`);
+    } catch (error: unknown) {
+      console.error("Error duplicating workout:", error);
+      const err = error as { response?: { data?: { error?: string; details?: string } } };
+      setPushStatus({
+        success: false,
+        message:
+          err.response?.data?.error ||
+          err.response?.data?.details ||
+          "Failed to copy workout",
+      });
+    } finally {
+      setDuplicatingWorkout(false);
     }
   };
 
@@ -1642,6 +1679,27 @@ export default function WorkoutDetailPage() {
                   {workout.workoutType}
                 </span>
               </div>
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => void handleDuplicateWorkout()}
+                  disabled={duplicatingWorkout || copyRepushing || pushing}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 shadow-sm"
+                  title="Creates another GoFast workout with the same structure on this calendar date (standalone copy). Does not send to Garmin."
+                >
+                  {duplicatingWorkout ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-700" />
+                      Copying…
+                    </>
+                  ) : (
+                    <>
+                      <CopyPlus className="w-4 h-4" />
+                      Copy workout
+                    </>
+                  )}
+                </button>
+              </div>
               {weekAndDateLine ? (
                 <p className="text-base text-gray-800 font-medium mb-2">{weekAndDateLine}</p>
               ) : null}
@@ -1722,7 +1780,7 @@ export default function WorkoutDetailPage() {
                         <button
                           type="button"
                           onClick={handlePushToGarmin}
-                          disabled={pushing || copyRepushing}
+                          disabled={pushing || copyRepushing || duplicatingWorkout}
                           className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 disabled:opacity-50 shadow-md"
                         >
                           {pushing ? (
@@ -1742,7 +1800,7 @@ export default function WorkoutDetailPage() {
                         <button
                           type="button"
                           onClick={handleCopyAndPushToGarmin}
-                          disabled={copyRepushing || pushing}
+                          disabled={copyRepushing || pushing || duplicatingWorkout}
                           className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border-2 border-orange-400 bg-white text-orange-900 text-sm font-semibold hover:bg-orange-50 disabled:opacity-50 shadow-sm"
                           title="Creates a new copy of this workout and sends it to Garmin. Use if you removed it from Garmin Connect, edited segments, or the watch didn't pick it up."
                         >
@@ -1753,7 +1811,7 @@ export default function WorkoutDetailPage() {
                             </>
                           ) : (
                             <>
-                              <Copy className="w-4 h-4" />
+                              <RefreshCw className="w-4 h-4" />
                               Update on Garmin
                             </>
                           )}
@@ -1763,7 +1821,7 @@ export default function WorkoutDetailPage() {
                         <button
                           type="button"
                           onClick={handleConnectGarmin}
-                          disabled={connectingGarmin}
+                          disabled={connectingGarmin || duplicatingWorkout}
                           className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 disabled:opacity-50 shadow-md"
                         >
                           {connectingGarmin ? "Connecting…" : "Connect Garmin"}

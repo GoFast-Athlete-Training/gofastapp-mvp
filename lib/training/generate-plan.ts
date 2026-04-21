@@ -28,6 +28,7 @@ import {
   ymdFromDate,
 } from "@/lib/training/plan-utils";
 import { formatPlannedWorkoutTitle } from "@/lib/training/workout-display-title";
+import { defaultTaperLongRunsForWeeks } from "@/lib/training/preset-volume-helpers";
 
 const DAY_NAMES = [
   "Monday",
@@ -46,7 +47,12 @@ const DAY_NAMES = [
 export interface PlanGenConfig {
   taperWeeks?: number;
   peakWeeks?: number;
-  taperLongRunAnchors?: Record<string, number>;
+  /** Ordered taper long-run miles; index 0 = furthest from race. Length should match taperWeeks. */
+  taperLongRuns?: number[];
+  baseStartMiles?: number;
+  ladderStep?: number;
+  ladderCycleLen?: number;
+  peakEntryMiles?: number;
   peakLongRunMiles?: number;
   cutbackWeekModulo?: number;
   weeklyMileageMultiplier?: number;
@@ -65,15 +71,6 @@ export interface PlanGenConfig {
   longRunDefaultDow?: number;
 }
 
-const DEFAULT_ANCHORS: Record<number, number> = {
-  0: 0,
-  [-1]: 9,
-  [-2]: 13,
-  [-3]: 15,
-  [-4]: 21,
-  [-5]: 21,
-};
-
 export function phaseForCatalogue(nOffset: number, cfg?: PlanGenConfig): string {
   const taperWeeks = cfg?.taperWeeks ?? 3;
   const peakWeeks = cfg?.peakWeeks ?? 4;
@@ -85,21 +82,50 @@ export function phaseForCatalogue(nOffset: number, cfg?: PlanGenConfig): string 
 
 export function longRunMilesForOffset(nOffset: number, cfg?: PlanGenConfig): number {
   const taperWeeks = cfg?.taperWeeks ?? 3;
-  const anchors = cfg?.taperLongRunAnchors ?? DEFAULT_ANCHORS;
-  const peakLongRunMiles = cfg?.peakLongRunMiles ?? 22;
-  const cutbackWeekModulo = cfg?.cutbackWeekModulo ?? 3;
+  const peakWeeks = cfg?.peakWeeks ?? 4;
+  const peakLongRun = cfg?.peakLongRunMiles ?? 22;
+  const peakEntry = cfg?.peakEntryMiles ?? 18;
+  const baseStart = cfg?.baseStartMiles ?? 8;
+  const ladderStep = cfg?.ladderStep ?? 2;
+  const ladderCycleLen = Math.max(1, cfg?.ladderCycleLen ?? 4);
 
-  const anchorKey = String(nOffset);
-  if (Object.prototype.hasOwnProperty.call(anchors, anchorKey)) {
-    return (anchors as Record<string, number>)[anchorKey];
+  let taperLongRuns = cfg?.taperLongRuns;
+  if (!taperLongRuns || taperLongRuns.length === 0) {
+    taperLongRuns = defaultTaperLongRunsForWeeks(taperWeeks);
   }
-  if (nOffset >= -taperWeeks) {
+  while (taperLongRuns.length < taperWeeks) {
+    taperLongRuns = [...taperLongRuns, taperLongRuns[taperLongRuns.length - 1] ?? 0];
+  }
+  taperLongRuns = taperLongRuns.slice(0, taperWeeks);
+
+  // Race week: no scheduled long run in this model (race is separate row).
+  if (nOffset === 0) {
     return 0;
   }
-  const baseOffset = Math.abs(nOffset) - (taperWeeks + 1);
-  let miles = peakLongRunMiles - baseOffset * 2;
-  if (Math.abs(nOffset) % cutbackWeekModulo === 0) miles -= 2;
-  return Math.max(8, Math.min(peakLongRunMiles, miles));
+
+  // Taper weeks: nOffset in [-taperWeeks, -1]
+  if (nOffset >= -taperWeeks && nOffset < 0) {
+    const idx = taperWeeks + nOffset;
+    const v = taperLongRuns[idx];
+    return typeof v === "number" && Number.isFinite(v) ? Math.max(0, v) : 0;
+  }
+
+  // Peak weeks: ramp from peakEntry to peakLongRun
+  if (nOffset >= -(taperWeeks + peakWeeks)) {
+    const peakPos = Math.abs(nOffset) - taperWeeks - 1;
+    const denom = Math.max(1, peakWeeks - 1);
+    const rampStep = (peakLongRun - peakEntry) / denom;
+    const miles = peakEntry + peakPos * rampStep;
+    return Math.round(Math.min(peakLongRun, Math.max(0, miles)));
+  }
+
+  // Base/build: repeating ladder stepping up toward peakEntry
+  const weeksIntoBuild = Math.abs(nOffset) - taperWeeks - peakWeeks - 1;
+  const cyclePos = weeksIntoBuild % ladderCycleLen;
+  const cycleNum = Math.floor(weeksIntoBuild / ladderCycleLen);
+  const cyclePeak = peakEntry - (cycleNum + 1) * ladderStep;
+  const miles = cyclePeak - (ladderCycleLen - 1 - cyclePos) * ladderStep;
+  return Math.max(baseStart, Math.round(miles));
 }
 
 export function weeklyTotalMiles(

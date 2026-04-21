@@ -6,10 +6,18 @@ export function presetBoltonsToPlanGenConfig(
   volume: preset_volume_constraints,
   workout: preset_workout_config
 ): PlanGenConfig {
+  const taperRuns = Array.isArray(volume.taperLongRuns)
+    ? (volume.taperLongRuns as unknown[]).map((x) => Number(x))
+    : undefined;
+
   return {
     taperWeeks: volume.taperWeeks,
     peakWeeks: volume.peakWeeks,
-    taperLongRunAnchors: volume.taperLongRunAnchors as Record<string, number>,
+    taperLongRuns: taperRuns?.every((n) => Number.isFinite(n)) ? taperRuns : undefined,
+    baseStartMiles: volume.baseStartMiles,
+    ladderStep: volume.ladderStep,
+    ladderCycleLen: volume.ladderCycleLen,
+    peakEntryMiles: volume.peakEntryMiles,
     peakLongRunMiles: volume.peakLongRunMiles,
     cutbackWeekModulo: volume.cutbackWeekModulo,
     weeklyMileageMultiplier: volume.weeklyMileageMultiplier,

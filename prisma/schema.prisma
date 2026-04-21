@@ -989,7 +989,13 @@ model preset_volume_constraints {
 
   taperWeeks             Int   @default(3)
   peakWeeks              Int   @default(4)
-  taperLongRunAnchors    Json
+  /// Ordered taper long-run miles; length should match taperWeeks. Index 0 = furthest from race.
+  taperLongRuns          Json
+  /// Build/base repeating ladder: floor miles, step size, rungs per cycle, first peak-week long run.
+  baseStartMiles         Float @default(8)
+  ladderStep             Float @default(2)
+  ladderCycleLen         Int   @default(4)
+  peakEntryMiles         Float @default(18)
   peakLongRunMiles       Int   @default(22)
   cutbackWeekModulo      Int   @default(3)
   weeklyMileageMultiplier Float @default(2.5)
