@@ -25,6 +25,7 @@ import {
 } from "@/lib/training/plan-utils";
 import { formatPlannedWorkoutTitle } from "@/lib/training/workout-display-title";
 import { defaultTaperLongRunsForWeeks } from "@/lib/training/preset-volume-helpers";
+import { PACE_ANCHOR_MP_SIMULATION } from "@/lib/training/goal-pace-calculator";
 
 const DAY_NAMES = [
   "Monday",
@@ -652,9 +653,13 @@ const LADDER_ROTATION_TYPES = ["Intervals", "Tempo"] as const;
 
 /**
  * Phase B: freeze ladder step 0–3 from ordinal position in plan (per type), not completion.
+ * mpSimulation long runs get a separate rotation for embedded MP fraction scaling.
  * Call after generatePlanWorkoutRows.
  */
-export function assignRotationalIdentifiers(rows: GeneratedPlanWorkoutRow[]): void {
+export function assignRotationalIdentifiers(
+  rows: GeneratedPlanWorkoutRow[],
+  catalogueById?: Map<string, { paceAnchor: string }>
+): void {
   const indexed = rows.map((r, idx) => ({ r, idx }));
   for (const wt of LADDER_ROTATION_TYPES) {
     const subset = indexed
@@ -669,8 +674,35 @@ export function assignRotationalIdentifiers(rows: GeneratedPlanWorkoutRow[]): vo
       x.r.planLadderIndex = ord % 4;
     });
   }
+
+  const mpLongSubset = indexed
+    .filter(
+      (x) =>
+        x.r.workoutType === "LongRun" &&
+        x.r.catalogueWorkoutId != null &&
+        catalogueById?.get(x.r.catalogueWorkoutId)?.paceAnchor ===
+          PACE_ANCHOR_MP_SIMULATION
+    )
+    .sort((a, b) => {
+      const ta = a.r.date.getTime();
+      const tb = b.r.date.getTime();
+      if (ta !== tb) return ta - tb;
+      return a.idx - b.idx;
+    });
+  mpLongSubset.forEach((x, ord) => {
+    x.r.planLadderIndex = ord % 4;
+  });
+
   for (const r of rows) {
-    if (!LADDER_ROTATION_TYPES.includes(r.workoutType as (typeof LADDER_ROTATION_TYPES)[number])) {
+    const isIt = LADDER_ROTATION_TYPES.includes(
+      r.workoutType as (typeof LADDER_ROTATION_TYPES)[number]
+    );
+    const isMpLong =
+      r.workoutType === "LongRun" &&
+      r.catalogueWorkoutId != null &&
+      catalogueById?.get(r.catalogueWorkoutId)?.paceAnchor ===
+        PACE_ANCHOR_MP_SIMULATION;
+    if (!isIt && !isMpLong) {
       r.planLadderIndex = null;
     }
   }
@@ -706,10 +738,7 @@ export function planWeeksSnapshotFromGeneratedRows(
       const milesStr = formatMilesForScheduleToken(mi);
       const suf = workoutTypeToScheduleSuffix(r.workoutType);
       let token = `${abbr}:${milesStr}${suf}`;
-      if (
-        (r.workoutType === "Intervals" || r.workoutType === "Tempo") &&
-        r.planLadderIndex != null
-      ) {
+      if (r.planLadderIndex != null) {
         token += `-i${r.planLadderIndex}`;
       }
       return token;

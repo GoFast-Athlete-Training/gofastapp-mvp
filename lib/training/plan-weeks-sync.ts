@@ -58,10 +58,7 @@ export async function syncWorkoutToPlanWeeks(workoutId: string): Promise<void> {
   const suffix = workoutTypeToScheduleSuffix(workout.workoutType);
 
   let newToken = `${dayAbbr}:${milesStr}${suffix}`;
-  if (
-    (workout.workoutType === "Intervals" || workout.workoutType === "Tempo") &&
-    workout.planLadderIndex != null
-  ) {
+  if (workout.planLadderIndex != null) {
     newToken += `-i${workout.planLadderIndex}`;
   }
 

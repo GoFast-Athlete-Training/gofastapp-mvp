@@ -14,12 +14,7 @@ import { presetBoltonsToPlanGenConfig } from "@/lib/training/preset-to-plan-gen-
 import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
 import { Prisma } from "@prisma/client";
 import { metersToMiles } from "@/lib/pace-utils";
-
-type RaceForGenerate = {
-  raceDate: Date;
-  name: string;
-  distanceMeters: number | null;
-};
+import { goalRacePaceDisplayString } from "@/lib/training/goal-pace-calculator";
 
 export async function executePlanGenerate(params: {
   athleteId: string;
@@ -34,12 +29,24 @@ export async function executePlanGenerate(params: {
     preferredQualityDays?: number[];
     currentFiveKPace: string | null;
     weeklyMileageTarget: number | null;
-    race_registry: RaceForGenerate;
   };
   weeklyMileageTarget: number;
   minWeeklyMiles: number;
 }): Promise<{ planId: string; weekCount: number }> {
   const { athleteId, plan } = params;
+
+  const planRow = await prisma.training_plans.findFirst({
+    where: { id: plan.id, athleteId },
+    include: {
+      race_registry: true,
+      athlete_goal: { select: { goalTime: true } },
+    },
+  });
+  if (!planRow?.race_registry) {
+    throw new Error("Plan not found or has no linked race");
+  }
+  const race = planRow.race_registry;
+
   const [prefs, rawPreset, catalogueWorkouts] = await Promise.all([
     prisma.trainingPreferences.findUnique({ where: { athleteId } }),
     plan.presetId
@@ -57,6 +64,7 @@ export async function executePlanGenerate(params: {
         isQuality: true,
         workoutType: true,
         progressionIndex: true,
+        paceAnchor: true,
       },
     }),
   ]);
@@ -82,7 +90,6 @@ export async function executePlanGenerate(params: {
         ? prefs.preferredDays
         : [1, 2, 3, 4, 5, 6];
 
-  const race = plan.race_registry;
   const weekCount = calendarTrainingWeekCount(plan.startDate, race.raceDate);
   const raceDistanceMiles =
     race.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
@@ -104,7 +111,10 @@ export async function executePlanGenerate(params: {
     catalogueWorkouts,
     config,
   });
-  assignRotationalIdentifiers(drafts);
+  const catalogueById = new Map(
+    catalogueWorkouts.map((c) => [c.id, { paceAnchor: c.paceAnchor }])
+  );
+  assignRotationalIdentifiers(drafts, catalogueById);
 
   const syncedFiveKPace =
     params.athleteFiveKPace?.trim() ||
@@ -124,6 +134,13 @@ export async function executePlanGenerate(params: {
 
   const planWeeksSnapshot = planWeeksSnapshotFromGeneratedRows(drafts, weekCount);
 
+  const mergedGoalTime =
+    planRow.goalRaceTime?.trim() || planRow.athlete_goal?.goalTime?.trim() || null;
+  const imprintPace =
+    mergedGoalTime != null
+      ? goalRacePaceDisplayString(mergedGoalTime, raceDistanceMiles)
+      : null;
+
   await prisma.training_plans.update({
     where: { id: plan.id },
     data: {
@@ -132,6 +149,8 @@ export async function executePlanGenerate(params: {
       weeklyMileageTarget,
       totalWeeks: weekCount,
       ...(syncedFiveKPace != null ? { currentFiveKPace: syncedFiveKPace } : {}),
+      ...(mergedGoalTime ? { goalRaceTime: mergedGoalTime } : {}),
+      ...(imprintPace ? { goalRacePace: imprintPace } : {}),
       updatedAt: new Date(),
     },
   });

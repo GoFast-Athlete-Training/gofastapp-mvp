@@ -165,7 +165,9 @@ export function planScheduleDaysForWeek(params: {
       const date = dateForDayInWeek(planStartDate, scheduleWeekNum, ourDow);
       const estMeters = milesToMeters(token.miles);
       const planLadderIndex =
-        token.workoutType === "Intervals" || token.workoutType === "Tempo"
+        token.workoutType === "Intervals" ||
+        token.workoutType === "Tempo" ||
+        token.workoutType === "LongRun"
           ? (token.ladderIndex ?? null)
           : null;
 

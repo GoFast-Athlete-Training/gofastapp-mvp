@@ -87,6 +87,10 @@ export async function POST(request: NextRequest) {
         if (existing) {
           const updateData: Record<string, unknown> = {
             intendedPhase: d.intendedPhase,
+            paceAnchor: d.paceAnchor,
+            mpFraction: d.mpFraction,
+            mpBlockPosition: d.mpBlockPosition,
+            mpBlockProgression: d.mpBlockProgression,
             ladderStepMeters: d.ladderStepMeters,
             minLadderMeters: d.minLadderMeters,
             maxLadderMeters: d.maxLadderMeters,
@@ -125,6 +129,10 @@ export async function POST(request: NextRequest) {
               intendedPhase: d.intendedPhase,
               isQuality: explicitIsQuality ? d.isQuality : false,
               isLadderCapable: explicitIsLadderCapable ? d.isLadderCapable : false,
+              paceAnchor: d.paceAnchor,
+              mpFraction: d.mpFraction,
+              mpBlockPosition: d.mpBlockPosition,
+              mpBlockProgression: d.mpBlockProgression,
               ladderStepMeters: d.ladderStepMeters,
               minLadderMeters: d.minLadderMeters,
               maxLadderMeters: d.maxLadderMeters,

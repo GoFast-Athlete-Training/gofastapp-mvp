@@ -92,11 +92,6 @@ export async function planGeneratePostHandler(
         preferredQualityDays: plan.preferredQualityDays ?? [],
         currentFiveKPace: plan.currentFiveKPace,
         weeklyMileageTarget: plan.weeklyMileageTarget,
-        race_registry: {
-          raceDate: plan.race_registry.raceDate,
-          name: plan.race_registry.name,
-          distanceMeters: plan.race_registry.distanceMeters,
-        },
       },
       weeklyMileageTarget,
       minWeeklyMiles,

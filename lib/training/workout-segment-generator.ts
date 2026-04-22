@@ -16,6 +16,7 @@ import {
   type ApiSegment,
 } from "@/lib/workout-generator/templates";
 import { catalogueEntryToApiSegments } from "@/lib/training/catalogue-to-segments";
+import { resolveRacePaceSecondsPerMileForPlan } from "@/lib/training/goal-pace-calculator";
 
 function isIntervalsOrTempo(t: WorkoutType): boolean {
   return t === "Intervals" || t === "Tempo";
@@ -42,18 +43,38 @@ export function buildPlanWorkoutApiSegments(params: {
   miles: number;
   currentFiveKPace: string | null;
   catalogueEntry: workout_catalogue | null;
+  goalRacePace?: string | null;
+  goalRaceTime?: string | null;
+  raceDistanceMiles?: number | null;
+  planLadderIndex?: number | null;
 }): ApiSegment[] {
-  const { workoutType, miles, currentFiveKPace, catalogueEntry } = params;
+  const {
+    workoutType,
+    miles,
+    currentFiveKPace,
+    catalogueEntry,
+    goalRacePace,
+    goalRaceTime,
+    raceDistanceMiles,
+    planLadderIndex,
+  } = params;
   if (isIntervalsOrTempo(workoutType)) {
     return [];
   }
   const anchorSecPerMile = anchorSecondsPerMileFromPlanPace(currentFiveKPace);
   const paces = getTrainingPaces(anchorSecPerMile);
+  const racePaceSec = resolveRacePaceSecondsPerMileForPlan({
+    goalRacePace: goalRacePace ?? null,
+    goalRaceTime: goalRaceTime ?? null,
+    raceDistanceMiles: raceDistanceMiles ?? null,
+  });
   if (catalogueEntry != null) {
     return catalogueEntryToApiSegments({
       entry: catalogueEntry,
       scheduleMiles: miles,
       anchorSecondsPerMile: anchorSecPerMile,
+      racePaceSecondsPerMile: racePaceSec,
+      planLadderIndex: planLadderIndex ?? null,
     });
   }
   return descriptorsToApiSegments(

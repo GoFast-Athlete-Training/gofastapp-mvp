@@ -106,6 +106,10 @@ export async function findOrCreateWorkoutForPlanDay(params: {
     miles,
     currentFiveKPace: plan.currentFiveKPace ?? null,
     catalogueEntry: null,
+    goalRacePace: plan.goalRacePace ?? null,
+    goalRaceTime: plan.goalRaceTime ?? null,
+    raceDistanceMiles,
+    planLadderIndex: scheduled.planLadderIndex ?? null,
   });
 
   const workoutId = await prisma.$transaction(async (tx) => {

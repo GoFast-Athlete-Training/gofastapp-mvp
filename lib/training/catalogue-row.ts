@@ -24,12 +24,20 @@ export function parseIntendedPhase(raw: unknown): string[] {
   return [];
 }
 
+const PACE_ANCHORS = new Set(["currentBuildup", "mpSimulation"]);
+const MP_BLOCK_POSITIONS = new Set(["BACK_HALF", "FRONT_HALF", "EVEN"]);
+const MP_BLOCK_PROGRESSIONS = new Set(["flat", "progressive"]);
+
 export type CatalogueRowInput = {
   name: string;
   workoutType: WorkoutType;
   intendedPhase: string[];
   isQuality: boolean;
   isLadderCapable: boolean;
+  paceAnchor: string;
+  mpFraction: number | null;
+  mpBlockPosition: string | null;
+  mpBlockProgression: string;
   ladderStepMeters: number | null;
   minLadderMeters: number | null;
   maxLadderMeters: number | null;
@@ -74,6 +82,42 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
   const isQuality = body.isQuality === true;
   const isLadderCapable = body.isLadderCapable === true;
 
+  let paceAnchor = "currentBuildup";
+  if (typeof body.paceAnchor === "string" && body.paceAnchor.trim()) {
+    const pa = body.paceAnchor.trim();
+    if (!PACE_ANCHORS.has(pa)) {
+      return {
+        ok: false,
+        error: "paceAnchor must be currentBuildup or mpSimulation",
+      };
+    }
+    paceAnchor = pa;
+  }
+
+  let mpBlockProgression = "flat";
+  if (typeof body.mpBlockProgression === "string" && body.mpBlockProgression.trim()) {
+    const p = body.mpBlockProgression.trim().toLowerCase();
+    if (!MP_BLOCK_PROGRESSIONS.has(p)) {
+      return {
+        ok: false,
+        error: "mpBlockProgression must be flat or progressive",
+      };
+    }
+    mpBlockProgression = p;
+  }
+
+  let mpBlockPosition: string | null = null;
+  if (typeof body.mpBlockPosition === "string" && body.mpBlockPosition.trim()) {
+    const pos = body.mpBlockPosition.trim().toUpperCase();
+    if (!MP_BLOCK_POSITIONS.has(pos)) {
+      return {
+        ok: false,
+        error: "mpBlockPosition must be BACK_HALF, FRONT_HALF, or EVEN",
+      };
+    }
+    mpBlockPosition = pos;
+  }
+
   const intendedPhase = parseIntendedPhase(body.intendedPhase);
   if (intendedPhase.length === 0) {
     return { ok: false, error: "intendedPhase must have at least one phase (e.g. base,build)" };
@@ -86,6 +130,15 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
     return Number.isFinite(n) ? n : null;
   };
 
+  let mpFraction: number | null = null;
+  if (body.mpFraction !== null && body.mpFraction !== undefined && body.mpFraction !== "") {
+    const mf = Number(body.mpFraction);
+    if (!Number.isFinite(mf) || mf < 0 || mf > 1) {
+      return { ok: false, error: "mpFraction must be between 0 and 1" };
+    }
+    mpFraction = mf;
+  }
+
   return {
     ok: true,
     data: {
@@ -94,6 +147,10 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
       intendedPhase,
       isQuality,
       isLadderCapable,
+      paceAnchor,
+      mpFraction,
+      mpBlockPosition,
+      mpBlockProgression,
       ladderStepMeters:
         num("ladderStepMeters") != null ? Math.round(num("ladderStepMeters")!) : null,
       minLadderMeters:

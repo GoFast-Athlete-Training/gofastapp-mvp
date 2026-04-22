@@ -13,6 +13,7 @@ import type { ApiSegment } from "@/lib/workout-generator/templates";
 import { ladderIndexFromScheduleForDay } from "@/lib/training/schedule-parser";
 import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 import { newEntityId } from "@/lib/training/new-entity-id";
+import { metersToMiles } from "@/lib/pace-utils";
 import type { Prisma, WorkoutType } from "@prisma/client";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -50,7 +51,8 @@ function resolvedPlanLadderIndexForWorkout(params: {
   }
   if (
     params.workoutType !== "Intervals" &&
-    params.workoutType !== "Tempo"
+    params.workoutType !== "Tempo" &&
+    params.workoutType !== "LongRun"
   ) {
     return undefined;
   }
@@ -97,8 +99,13 @@ export async function GET(request: NextRequest, context: Ctx) {
               name: true,
               totalWeeks: true,
               currentFiveKPace: true,
+              goalRaceTime: true,
+              goalRacePace: true,
               lifecycleStatus: true,
               planWeeks: true,
+              race_registry: {
+                select: { distanceMeters: true },
+              },
             },
           },
           matched_activity: {
@@ -179,6 +186,11 @@ export async function GET(request: NextRequest, context: Ctx) {
           workout.workoutType === "LongRun" ||
           workout.workoutType === "Race"
         ) {
+          const dm = workout.training_plans?.race_registry?.distanceMeters;
+          const raceDistanceMiles =
+            dm != null && Number.isFinite(Number(dm))
+              ? metersToMiles(Number(dm))
+              : null;
           apiSegs = buildPlanWorkoutApiSegments({
             workoutType: workout.workoutType,
             miles: scheduleMiles,
@@ -187,6 +199,10 @@ export async function GET(request: NextRequest, context: Ctx) {
               workout.catalogueWorkoutId && workout.workout_catalogue
                 ? workout.workout_catalogue
                 : null,
+            goalRacePace: workout.training_plans?.goalRacePace ?? null,
+            goalRaceTime: workout.training_plans?.goalRaceTime ?? null,
+            raceDistanceMiles,
+            planLadderIndex: workout.planLadderIndex ?? null,
           });
         }
 

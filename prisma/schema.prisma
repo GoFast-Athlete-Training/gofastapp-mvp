@@ -1042,6 +1042,10 @@ model training_plans {
   weeklyMileageTarget  Int?
   /// Snapshot of current 5K pace for plan-scoped hydration/comparison
   currentFiveKPace     String?
+  /// Goal race finish time, e.g. "2:59:00" (marathon). Drives mpSimulation workouts.
+  goalRaceTime         String?
+  /// Imprinted goal pace per mile, e.g. "6:52" — derived from goalRaceTime + race distance.
+  goalRacePace         String?
   lifecycleStatus      TrainingPlanLifecycle  @default(ACTIVE)
   coachReviewStatus    CoachReviewStatus      @default(DRAFT)
   publishedAt          DateTime?
@@ -1097,7 +1101,15 @@ model workout_catalogue {
   recoveryDistanceMeters       Int?
   warmupMiles                  Float?
   cooldownMiles                Float?
-  /// Sec/mile vs athlete current 5K pace (negative = faster than 5K)
+  /// currentBuildup = offsets vs 5K fitness; mpSimulation = MP block uses plan goal race pace (+ offsets).
+  paceAnchor                   String      @default("currentBuildup")
+  /// Share of scheduled miles at goal MP (peak); scaled by planLadderIndex when building segments.
+  mpFraction                   Float?
+  /// BACK_HALF | FRONT_HALF | EVEN — where the MP block sits in the long run.
+  mpBlockPosition              String?
+  /// flat (MVP) | progressive (future) — pace progression within MP block.
+  mpBlockProgression           String      @default("flat")
+  /// Sec/mile vs anchor (5K fitness or goal MP depending on paceAnchor)
   repPaceOffsetSecPerMile      Int?
   recoveryPaceOffsetSecPerMile Int?
   overallPaceOffsetSecPerMile  Int?

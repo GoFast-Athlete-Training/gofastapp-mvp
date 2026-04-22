@@ -5,6 +5,10 @@
 import type { WorkoutType } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { newEntityId } from "../lib/training/new-entity-id";
+import {
+  PACE_ANCHOR_CURRENT_BUILDUP,
+  PACE_ANCHOR_MP_SIMULATION,
+} from "../lib/training/goal-pace-calculator";
 
 const now = new Date();
 
@@ -14,6 +18,10 @@ type SeedRow = {
   intendedPhase: string[];
   isQuality: boolean;
   isLadderCapable: boolean;
+  paceAnchor: string;
+  mpFraction: number | null;
+  mpBlockPosition: string | null;
+  mpBlockProgression: string;
   ladderStepMeters: number | null;
   minLadderMeters: number | null;
   maxLadderMeters: number | null;
@@ -36,6 +44,10 @@ const rows: SeedRow[] = [
     intendedPhase: ["base", "build", "peak"],
     isQuality: true,
     isLadderCapable: true,
+    paceAnchor: PACE_ANCHOR_CURRENT_BUILDUP,
+    mpFraction: null,
+    mpBlockPosition: null,
+    mpBlockProgression: "flat",
     ladderStepMeters: 200,
     minLadderMeters: 200,
     maxLadderMeters: 800,
@@ -56,6 +68,10 @@ const rows: SeedRow[] = [
     intendedPhase: ["base", "build", "peak"],
     isQuality: true,
     isLadderCapable: false,
+    paceAnchor: PACE_ANCHOR_CURRENT_BUILDUP,
+    mpFraction: null,
+    mpBlockPosition: null,
+    mpBlockProgression: "flat",
     ladderStepMeters: null,
     minLadderMeters: null,
     maxLadderMeters: null,
@@ -76,6 +92,10 @@ const rows: SeedRow[] = [
     intendedPhase: ["base", "build", "peak"],
     isQuality: true,
     isLadderCapable: false,
+    paceAnchor: PACE_ANCHOR_CURRENT_BUILDUP,
+    mpFraction: null,
+    mpBlockPosition: null,
+    mpBlockProgression: "flat",
     ladderStepMeters: null,
     minLadderMeters: null,
     maxLadderMeters: null,
@@ -96,6 +116,10 @@ const rows: SeedRow[] = [
     intendedPhase: ["base", "build", "peak", "taper"],
     isQuality: false,
     isLadderCapable: false,
+    paceAnchor: PACE_ANCHOR_CURRENT_BUILDUP,
+    mpFraction: null,
+    mpBlockPosition: null,
+    mpBlockProgression: "flat",
     ladderStepMeters: null,
     minLadderMeters: null,
     maxLadderMeters: null,
@@ -116,6 +140,10 @@ const rows: SeedRow[] = [
     intendedPhase: ["build", "peak"],
     isQuality: true,
     isLadderCapable: false,
+    paceAnchor: PACE_ANCHOR_MP_SIMULATION,
+    mpFraction: 0.4,
+    mpBlockPosition: "BACK_HALF",
+    mpBlockProgression: "flat",
     ladderStepMeters: null,
     minLadderMeters: null,
     maxLadderMeters: null,
@@ -127,8 +155,8 @@ const rows: SeedRow[] = [
     cooldownMiles: null,
     repPaceOffsetSecPerMile: null,
     recoveryPaceOffsetSecPerMile: null,
-    overallPaceOffsetSecPerMile: 60,
-    notes: null,
+    overallPaceOffsetSecPerMile: 0,
+    notes: "Easy first; final block at imprinted goal race pace. mpFraction scales with plan ladder index.",
   },
   {
     name: "Marathon Test",
@@ -136,6 +164,10 @@ const rows: SeedRow[] = [
     intendedPhase: ["peak"],
     isQuality: true,
     isLadderCapable: false,
+    paceAnchor: PACE_ANCHOR_MP_SIMULATION,
+    mpFraction: 0.55,
+    mpBlockPosition: "BACK_HALF",
+    mpBlockProgression: "flat",
     ladderStepMeters: null,
     minLadderMeters: null,
     maxLadderMeters: null,
@@ -147,8 +179,8 @@ const rows: SeedRow[] = [
     cooldownMiles: null,
     repPaceOffsetSecPerMile: null,
     recoveryPaceOffsetSecPerMile: null,
-    overallPaceOffsetSecPerMile: 45,
-    notes: null,
+    overallPaceOffsetSecPerMile: 0,
+    notes: "Peak long run with larger goal-pace block.",
   },
   {
     name: "Easy Run",
@@ -156,6 +188,10 @@ const rows: SeedRow[] = [
     intendedPhase: ["base", "build", "peak", "taper"],
     isQuality: false,
     isLadderCapable: false,
+    paceAnchor: PACE_ANCHOR_CURRENT_BUILDUP,
+    mpFraction: null,
+    mpBlockPosition: null,
+    mpBlockProgression: "flat",
     ladderStepMeters: null,
     minLadderMeters: null,
     maxLadderMeters: null,
@@ -188,6 +224,10 @@ async function main() {
         intendedPhase: row.intendedPhase,
         isQuality: row.isQuality,
         isLadderCapable: row.isLadderCapable,
+        paceAnchor: row.paceAnchor,
+        mpFraction: row.mpFraction,
+        mpBlockPosition: row.mpBlockPosition,
+        mpBlockProgression: row.mpBlockProgression,
         ladderStepMeters: row.ladderStepMeters,
         minLadderMeters: row.minLadderMeters,
         maxLadderMeters: row.maxLadderMeters,
@@ -210,6 +250,10 @@ async function main() {
         intendedPhase: row.intendedPhase,
         isQuality: row.isQuality,
         isLadderCapable: row.isLadderCapable,
+        paceAnchor: row.paceAnchor,
+        mpFraction: row.mpFraction,
+        mpBlockPosition: row.mpBlockPosition,
+        mpBlockProgression: row.mpBlockProgression,
         ladderStepMeters: row.ladderStepMeters,
         minLadderMeters: row.minLadderMeters,
         maxLadderMeters: row.maxLadderMeters,
