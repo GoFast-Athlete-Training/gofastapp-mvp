@@ -50,6 +50,12 @@ interface RunSeries {
   gofastCity: string | null;
 }
 
+/** Aligns with CityRunGoingContainer / my-past-runs: recap window opens run.date + 4h after local interpretation of date. */
+function cityRunDatePlus4hBeforeNow(runDateIso: string): boolean {
+  const runPlus4h = new Date(new Date(runDateIso).getTime() + 4 * 60 * 60 * 1000);
+  return runPlus4h < new Date();
+}
+
 interface Run {
   id: string;
   slug?: string | null;
@@ -143,11 +149,14 @@ export default function GoRunPage() {
 
       // Checkin fetch is secondary — a 401/500 here (e.g. missing migration on
       // preview DB, or unauthenticated guest) must NOT kill the run page
+      let myCheckinLocal: Checkin | null = null;
       try {
         const checkinRes = await api.get(`/runs/${runId}/checkin`);
         if (checkinRes.data.success) {
-          setCheckins(checkinRes.data.checkins || []);
-          setMyCheckin(checkinRes.data.myCheckin ?? null);
+          const list = (checkinRes.data.checkins || []) as Checkin[];
+          myCheckinLocal = (checkinRes.data.myCheckin ?? null) as Checkin | null;
+          setCheckins(list);
+          setMyCheckin(myCheckinLocal);
         }
       } catch (checkinErr: any) {
         console.warn(
@@ -155,6 +164,28 @@ export default function GoRunPage() {
           checkinErr?.response?.status,
           checkinErr?.response?.data,
         );
+      }
+
+      // MVP1: if they RSVP'd going and the run is in the post-run window, assume attendance — create check-in silently so PostRun opens without a tap.
+      if (
+        !myCheckinLocal &&
+        loaded.currentRSVP === 'going' &&
+        cityRunDatePlus4hBeforeNow(loaded.date)
+      ) {
+        try {
+          await api.post(`/runs/${runId}/checkin`, {});
+          const checkinAgain = await api.get(`/runs/${runId}/checkin`);
+          if (checkinAgain.data.success) {
+            setCheckins((checkinAgain.data.checkins || []) as Checkin[]);
+            setMyCheckin((checkinAgain.data.myCheckin ?? null) as Checkin | null);
+          }
+        } catch (autoErr: any) {
+          console.warn(
+            'gorun: silent auto-checkin failed (status=%s)',
+            autoErr?.response?.status,
+            autoErr?.response?.data,
+          );
+        }
       }
     } catch (err: any) {
       console.error('gorun: run fetch failed', err?.response?.status, err?.response?.data, err?.message);
