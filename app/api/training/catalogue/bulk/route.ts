@@ -30,12 +30,16 @@ export async function POST(request: NextRequest) {
     const errors: { index: number; error: string }[] = [];
 
     const explicitIsQualityFlags: boolean[] = [];
+    const explicitIsLongRunQualityFlags: boolean[] = [];
     const explicitIsLadderCapableFlags: boolean[] = [];
 
     for (let i = 0; i < body.items!.length; i++) {
       const row = body.items![i] as Record<string, unknown>;
       explicitIsQualityFlags.push(
         Object.prototype.hasOwnProperty.call(row, "isQuality")
+      );
+      explicitIsLongRunQualityFlags.push(
+        Object.prototype.hasOwnProperty.call(row, "isLongRunQuality")
       );
       explicitIsLadderCapableFlags.push(
         Object.prototype.hasOwnProperty.call(row, "isLadderCapable")
@@ -78,6 +82,7 @@ export async function POST(request: NextRequest) {
       for (let idx = 0; idx < parsedRows.length; idx++) {
         const d = parsedRows[idx];
         const explicitIsQuality = explicitIsQualityFlags[idx];
+        const explicitIsLongRunQuality = explicitIsLongRunQualityFlags[idx];
         const explicitIsLadderCapable = explicitIsLadderCapableFlags[idx];
         const existing = await tx.workout_catalogue.findUnique({
           where: {
@@ -112,6 +117,9 @@ export async function POST(request: NextRequest) {
           if (explicitIsQuality) {
             updateData.isQuality = d.isQuality;
           }
+          if (explicitIsLongRunQuality) {
+            updateData.isLongRunQuality = d.isLongRunQuality;
+          }
           if (explicitIsLadderCapable) {
             updateData.isLadderCapable = d.isLadderCapable;
           }
@@ -128,6 +136,7 @@ export async function POST(request: NextRequest) {
               workoutType: d.workoutType,
               intendedPhase: d.intendedPhase,
               isQuality: explicitIsQuality ? d.isQuality : false,
+              isLongRunQuality: explicitIsLongRunQuality ? d.isLongRunQuality : false,
               isLadderCapable: explicitIsLadderCapable ? d.isLadderCapable : false,
               paceAnchor: d.paceAnchor,
               mpFraction: d.mpFraction,

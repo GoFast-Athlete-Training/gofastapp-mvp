@@ -17,6 +17,7 @@ type SeedRow = {
   workoutType: WorkoutType;
   intendedPhase: string[];
   isQuality: boolean;
+  isLongRunQuality: boolean;
   isLadderCapable: boolean;
   paceAnchor: string;
   mpFraction: number | null;
@@ -43,6 +44,7 @@ const rows: SeedRow[] = [
     workoutType: "Intervals",
     intendedPhase: ["base", "build", "peak"],
     isQuality: true,
+    isLongRunQuality: false,
     isLadderCapable: true,
     paceAnchor: PACE_ANCHOR_CURRENT_BUILDUP,
     mpFraction: null,
@@ -67,6 +69,7 @@ const rows: SeedRow[] = [
     workoutType: "Tempo",
     intendedPhase: ["base", "build", "peak"],
     isQuality: true,
+    isLongRunQuality: false,
     isLadderCapable: false,
     paceAnchor: PACE_ANCHOR_CURRENT_BUILDUP,
     mpFraction: null,
@@ -91,6 +94,7 @@ const rows: SeedRow[] = [
     workoutType: "Intervals",
     intendedPhase: ["base", "build", "peak"],
     isQuality: true,
+    isLongRunQuality: false,
     isLadderCapable: false,
     paceAnchor: PACE_ANCHOR_CURRENT_BUILDUP,
     mpFraction: null,
@@ -115,6 +119,7 @@ const rows: SeedRow[] = [
     workoutType: "LongRun",
     intendedPhase: ["base", "build", "peak", "taper"],
     isQuality: false,
+    isLongRunQuality: false,
     isLadderCapable: false,
     paceAnchor: PACE_ANCHOR_CURRENT_BUILDUP,
     mpFraction: null,
@@ -139,6 +144,7 @@ const rows: SeedRow[] = [
     workoutType: "LongRun",
     intendedPhase: ["build", "peak"],
     isQuality: true,
+    isLongRunQuality: true,
     isLadderCapable: false,
     paceAnchor: PACE_ANCHOR_MP_SIMULATION,
     mpFraction: 0.4,
@@ -163,6 +169,7 @@ const rows: SeedRow[] = [
     workoutType: "LongRun",
     intendedPhase: ["peak"],
     isQuality: true,
+    isLongRunQuality: true,
     isLadderCapable: false,
     paceAnchor: PACE_ANCHOR_MP_SIMULATION,
     mpFraction: 0.55,
@@ -187,6 +194,7 @@ const rows: SeedRow[] = [
     workoutType: "Easy",
     intendedPhase: ["base", "build", "peak", "taper"],
     isQuality: false,
+    isLongRunQuality: false,
     isLadderCapable: false,
     paceAnchor: PACE_ANCHOR_CURRENT_BUILDUP,
     mpFraction: null,
@@ -223,6 +231,7 @@ async function main() {
         workoutType: row.workoutType,
         intendedPhase: row.intendedPhase,
         isQuality: row.isQuality,
+        isLongRunQuality: row.isLongRunQuality,
         isLadderCapable: row.isLadderCapable,
         paceAnchor: row.paceAnchor,
         mpFraction: row.mpFraction,
@@ -249,6 +258,7 @@ async function main() {
       update: {
         intendedPhase: row.intendedPhase,
         isQuality: row.isQuality,
+        isLongRunQuality: row.isLongRunQuality,
         isLadderCapable: row.isLadderCapable,
         paceAnchor: row.paceAnchor,
         mpFraction: row.mpFraction,

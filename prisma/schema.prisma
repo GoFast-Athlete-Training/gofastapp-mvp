@@ -1085,6 +1085,8 @@ model workout_catalogue {
   workoutType                  WorkoutType
   /// True when this catalogue entry is used for quality slots during plan generation.
   isQuality                    Boolean     @default(false)
+  /// Long-run shelf: false = easy/regular long; true = MP-sim / quality long (build–peak rotation).
+  isLongRunQuality             Boolean     @default(false)
   /// Whether this entry uses a pyramid rep structure (e.g. Up and Over).
   isLadderCapable              Boolean     @default(false)
   /// Distance step between ladder rungs (meters). Null = not a ladder workout.

@@ -31,6 +31,7 @@ export async function PUT(request: NextRequest, ctx: RouteCtx) {
         workoutType: d.workoutType,
         intendedPhase: d.intendedPhase,
         isQuality: d.isQuality,
+        isLongRunQuality: d.isLongRunQuality,
         isLadderCapable: d.isLadderCapable,
         paceAnchor: d.paceAnchor,
         mpFraction: d.mpFraction,

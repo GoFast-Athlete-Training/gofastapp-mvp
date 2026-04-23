@@ -5,7 +5,7 @@
  *    is hard-blocked for any workout.
  * 2. Taper - `nOffsetFromWeekAnchor` sets phase and taper-shaped long-run miles (skip LR at `nOffset === -1`).
  * 3. Weekly miles = athlete `weeklyMileageTarget` (clamped). Quality miles use preset `qualityFraction` (0–0.5; API uses percent 0–50);
- *    long run from ladder; easy = remainder. Quality sessions use catalogue rows (`isQuality`) when present.
+ *    long run from ladder; easy = remainder. Tempo/interval slots use `isQuality` Tempo/Intervals rows; long run uses phase + `isLongRunQuality` + rotation.
  * 4. Placement - LR on Sat/Sun prefs; quality on user `preferredQualityDays` or preset DOWs; easy on leftovers.
  *
  * Partial week 1: skip tempo/interval; LR only if preferred Sat/Sun fall in-window; easy on prefs.
@@ -58,6 +58,7 @@ export interface PlanGenConfig {
   minWeeklyMiles?: number;
   qualityFraction?: number;
   qualitySessions?: number;
+  /** @deprecated Ignored: long-run catalogue row is chosen via phase + isLongRunQuality on catalogue entries. */
   qualityOnLongRun?: boolean;
   minLongMiles?: number;
   minEasyPerDayMiles?: number;
@@ -223,8 +224,54 @@ export function cataloguePhaseFallbackForWeek(
 export interface CatalogueWorkoutRow {
   id: string;
   isQuality: boolean;
+  isLongRunQuality: boolean;
   workoutType: WorkoutType;
+  intendedPhase: string[];
   progressionIndex: number | null;
+}
+
+function cataloguePhaseApplies(phases: string[], weekPhase: string): boolean {
+  const w = weekPhase.trim().toLowerCase();
+  return phases.some((p) => String(p).trim().toLowerCase() === w);
+}
+
+function cmpProgressionThenId(a: CatalogueWorkoutRow, b: CatalogueWorkoutRow): number {
+  const d = (a.progressionIndex ?? 0) - (b.progressionIndex ?? 0);
+  if (d !== 0) return d;
+  return a.id.localeCompare(b.id);
+}
+
+/**
+ * Picks the catalogue row for the weekly long run: phase-scoped LongRun entries,
+ * base → regular shelf (isLongRunQuality false), build/peak/taper → quality shelf with nOffset rotation.
+ */
+export function pickLongRunCatalogueId(params: {
+  phase: string;
+  nOffset: number;
+  catalogue: CatalogueWorkoutRow[];
+}): string | null {
+  const { phase, nOffset, catalogue } = params;
+  const pool = catalogue.filter(
+    (w) => w.workoutType === "LongRun" && cataloguePhaseApplies(w.intendedPhase, phase)
+  );
+  if (pool.length === 0) return null;
+
+  const shelfRegular = pool.filter((w) => !w.isLongRunQuality).sort(cmpProgressionThenId);
+  const shelfQuality = pool.filter((w) => w.isLongRunQuality).sort(cmpProgressionThenId);
+
+  const preferQuality = phase !== "base";
+  const chosen =
+    preferQuality && shelfQuality.length > 0
+      ? shelfQuality
+      : shelfRegular.length > 0
+        ? shelfRegular
+        : shelfQuality;
+
+  if (chosen.length === 0) return null;
+  if (chosen.length === 1) return chosen[0].id;
+
+  const rot = Math.abs(nOffset) % chosen.length;
+  return chosen[rot]?.id ?? null;
 }
 
 export interface GeneratePlanInput {
@@ -350,9 +397,13 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
       : [1, 2, 3, 4, 5, 6];
 
   const cat = input.catalogueWorkouts ?? [];
-  const qualityCandidates = cat
-    .filter((w) => w.isQuality)
-    .sort((a, b) => (a.progressionIndex ?? 0) - (b.progressionIndex ?? 0));
+  const qualitySessionCandidates = cat
+    .filter(
+      (w) =>
+        w.isQuality &&
+        (w.workoutType === "Tempo" || w.workoutType === "Intervals")
+    )
+    .sort(cmpProgressionThenId);
   const easyCat = cat.filter((w) => !w.isQuality && w.workoutType === "Easy");
 
   const raceUtc = utcDateOnly(input.raceDate);
@@ -430,10 +481,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
     const perSession =
       qualitySessions > 0 ? Math.max(1, Math.round(qualityMiTotal / qualitySessions)) : 0;
 
-    const lrCatId =
-      cfg?.qualityOnLongRun && qualityCandidates.length > 0
-        ? qualityCandidates.find((w) => w.workoutType === "LongRun")?.id ?? null
-        : null;
+    const lrCatId = pickLongRunCatalogueId({ phase, nOffset, catalogue: cat });
 
     const assignment = new Map<number, AssignEntry>();
 
@@ -512,8 +560,10 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
       for (let slot = 0; slot < qualitySessions; slot++) {
         const idealDow = slot === 0 ? qualityDow1 : qualityDow2;
         const pick =
-          qualityCandidates.length > 0
-            ? qualityCandidates[(weekNumber - 1 + slot) % qualityCandidates.length]
+          qualitySessionCandidates.length > 0
+            ? qualitySessionCandidates[
+                (weekNumber - 1 + slot) % qualitySessionCandidates.length
+              ]
             : null;
         const fallbackKind: DayKind = slot === 0 ? "tempo" : "interval";
         const wtype = pick?.workoutType;

@@ -62,7 +62,9 @@ export async function executePlanGenerate(params: {
       select: {
         id: true,
         isQuality: true,
+        isLongRunQuality: true,
         workoutType: true,
+        intendedPhase: true,
         progressionIndex: true,
         paceAnchor: true,
       },

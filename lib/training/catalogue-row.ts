@@ -33,6 +33,7 @@ export type CatalogueRowInput = {
   workoutType: WorkoutType;
   intendedPhase: string[];
   isQuality: boolean;
+  isLongRunQuality: boolean;
   isLadderCapable: boolean;
   paceAnchor: string;
   mpFraction: number | null;
@@ -80,6 +81,7 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
   }
 
   const isQuality = body.isQuality === true;
+  const isLongRunQuality = body.isLongRunQuality === true;
   const isLadderCapable = body.isLadderCapable === true;
 
   let paceAnchor = "currentBuildup";
@@ -146,6 +148,7 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
       workoutType: wt,
       intendedPhase,
       isQuality,
+      isLongRunQuality,
       isLadderCapable,
       paceAnchor,
       mpFraction,
