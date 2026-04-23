@@ -132,7 +132,6 @@ function normalizeGoalDistanceLabel(raw: unknown): string {
 
 type ActivePlanSummary = { name: string; hasSchedule: boolean };
 type GoingRunRow = { id: string; title: string; date: string; city: string };
-type PastRunRow = GoingRunRow;
 
 /** From GET /api/race-signups — athlete self-declared races + registry snapshot */
 type RaceSignupWithRegistry = {
@@ -240,7 +239,6 @@ export default function AthleteHomePage() {
   >([]);
   const [activePlanSummary, setActivePlanSummary] = useState<ActivePlanSummary | null>(null);
   const [myGoingRuns, setMyGoingRuns] = useState<GoingRunRow[]>([]);
-  const [myPastRuns, setMyPastRuns] = useState<PastRunRow[]>([]);
   const [lastLoggedWorkout, setLastLoggedWorkout] = useState<LastLoggedWorkoutStrip | null>(null);
   const [lastFallbackActivity, setLastFallbackActivity] = useState<{
     id: string;
@@ -281,13 +279,12 @@ export default function AthleteHomePage() {
       return;
     }
 
-    const [goalsRes, upcomingRes, paceRes, goingRes, pastRunsRes, lastRunRes, raceSignupsRes] =
+    const [goalsRes, upcomingRes, paceRes, goingRes, lastRunRes, raceSignupsRes] =
       await Promise.allSettled([
         api.get('/goals?status=ACTIVE'),
         api.get('/training/upcoming'),
         api.get(`/athlete/${athleteId}/pace-notifications`),
         api.get('/me/my-going-runs'),
-        api.get('/me/my-past-runs'),
         api.get('/me/last-logged-workout'),
         api.get('/race-signups'),
       ]);
@@ -321,13 +318,6 @@ export default function AthleteHomePage() {
       setMyGoingRuns(Array.isArray(runs) ? runs : []);
     } else {
       setMyGoingRuns([]);
-    }
-
-    if (pastRunsRes.status === 'fulfilled') {
-      const runs = pastRunsRes.value.data?.runs;
-      setMyPastRuns(Array.isArray(runs) ? runs : []);
-    } else {
-      setMyPastRuns([]);
     }
 
     if (paceRes.status === 'fulfilled') {
@@ -698,57 +688,6 @@ export default function AthleteHomePage() {
               <h1 className="text-2xl font-bold text-gray-900 mb-1">Welcome back, {athlete.firstName}!</h1>
               <p className="text-gray-600 text-sm">Here&apos;s your training at a glance</p>
             </div>
-
-            {myPastRuns.slice(0, 2).length > 0 ? (
-              <div className="mb-4 space-y-3">
-                {myPastRuns.slice(0, 2).map((pastRun) => {
-                  const pastRunDay =
-                    pastRun?.date != null
-                      ? new Date(pastRun.date).toLocaleDateString('en-US', {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric',
-                        })
-                      : null;
-                  return (
-                    <div
-                      key={pastRun.id}
-                      className="rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-5 shadow-sm"
-                    >
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="flex gap-3 min-w-0">
-                          <Trophy className="h-10 w-10 shrink-0 text-orange-500" aria-hidden />
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold uppercase tracking-[0.15em] text-orange-800">
-                              Post-run recap
-                            </p>
-                            <p className="mt-1 text-base font-semibold text-gray-900 leading-snug">
-                              You ran &quot;{pastRun.title}&quot;
-                              {pastRunDay ? (
-                                <>
-                                  {' '}
-                                  · {pastRunDay}
-                                </>
-                              ) : null}
-                              {pastRun.city ? ` · ${pastRun.city}` : ''}
-                            </p>
-                            <p className="text-sm text-orange-900/85 mt-1">
-                              Add your shouts and see the crew&apos;s recap
-                            </p>
-                          </div>
-                        </div>
-                        <Link
-                          href={`/gorun/${pastRun.id}`}
-                          className="inline-flex shrink-0 items-center justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-orange-700"
-                        >
-                          Open
-                        </Link>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
 
             {raceDaySignupForHome ? (
               <div className="mb-4 rounded-2xl border-2 border-violet-400 bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-6 text-white shadow-lg">

@@ -2,10 +2,13 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import TopNav from '@/components/shared/TopNav';
 import api from '@/lib/api';
-import { MapPin, Calendar, Clock, Map } from 'lucide-react';
+import { MapPin, Calendar, Clock, Trophy } from 'lucide-react';
+
+type HubRunRow = { id: string; title: string; date: string; city: string };
 
 interface Run {
   id: string;
@@ -37,6 +40,8 @@ function GoRunPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [runs, setRuns] = useState<Run[]>([]);
+  const [myGoingRuns, setMyGoingRuns] = useState<HubRunRow[]>([]);
+  const [myPastRuns, setMyPastRuns] = useState<HubRunRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [cityFilter, setCityFilter] = useState<string>('');
   const [dayFilter, setDayFilter] = useState<string>('');
@@ -53,18 +58,22 @@ function GoRunPageContent() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    void fetchHubData();
+  }, [cityFilter, dayFilter, runClubSlug, router]);
 
-    // Check if user is authenticated
+  const fetchHubData = async () => {
     const athleteId = LocalStorageAPI.getAthleteId();
     if (!athleteId) {
       console.warn('// REDIRECT DISABLED: /signup');
+      setMyGoingRuns([]);
+      setMyPastRuns([]);
+      setRuns([]);
+      setAvailableCities([]);
+      setAvailableDays([]);
+      setLoading(false);
       return;
     }
 
-    fetchRuns();
-  }, [cityFilter, dayFilter, runClubSlug, router]);
-
-  const fetchRuns = async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -78,16 +87,33 @@ function GoRunPageContent() {
         params.append('runClubSlug', runClubSlug);
       }
 
-      const response = await api.get(`/runs?${params.toString()}`);
-      
-      if (response.data.success) {
-        const fetchedRuns = response.data.runs || [];
+      const [runsRes, goingRes, pastRes] = await Promise.allSettled([
+        api.get(`/runs?${params.toString()}`),
+        api.get('/me/my-going-runs'),
+        api.get('/me/my-past-runs'),
+      ]);
+
+      if (goingRes.status === 'fulfilled') {
+        const list = goingRes.value.data?.runs;
+        setMyGoingRuns(Array.isArray(list) ? list : []);
+      } else {
+        setMyGoingRuns([]);
+      }
+
+      if (pastRes.status === 'fulfilled') {
+        const list = pastRes.value.data?.runs;
+        setMyPastRuns(Array.isArray(list) ? list : []);
+      } else {
+        setMyPastRuns([]);
+      }
+
+      if (runsRes.status === 'fulfilled' && runsRes.value.data?.success) {
+        const fetchedRuns = runsRes.value.data.runs || [];
         setRuns(fetchedRuns);
-        
-        // Extract unique cities and days
+
         const cities: string[] = [...new Set(fetchedRuns.map((r: Run) => r.gofastCity))].sort() as string[];
         setAvailableCities(cities);
-        
+
         const days = new Set<string>();
         fetchedRuns.forEach((r: Run) => {
           if (r.isRecurring && r.dayOfWeek) {
@@ -98,15 +124,22 @@ function GoRunPageContent() {
             days.add(dayNames[date.getDay()]);
           }
         });
-        const sortedDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-          .filter(d => days.has(d));
+        const sortedDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].filter(
+          (d) => days.has(d)
+        );
         setAvailableDays(sortedDays);
+      } else {
+        setRuns([]);
+        if (runsRes.status === 'rejected') {
+          console.error('Error fetching runs:', runsRes.reason);
+          const err = runsRes.reason as { response?: { status?: number } };
+          if (err?.response?.status === 401) {
+            console.warn('// REDIRECT DISABLED: /signup');
+          }
+        }
       }
-    } catch (error: any) {
-      console.error('Error fetching runs:', error);
-      if (error.response?.status === 401) {
-        console.warn('// REDIRECT DISABLED: /signup');
-      }
+    } catch (error: unknown) {
+      console.error('Error loading run hub:', error);
     } finally {
       setLoading(false);
     }
@@ -135,19 +168,85 @@ function GoRunPageContent() {
     );
   }
 
+  const formatHubRunDate = (iso: string) =>
+    new Date(iso).toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNav />
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Ready to go run?
-          </h1>
-          <p className="text-gray-600">
-            Select your city and see what's happening
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Run hub</h1>
+          <p className="text-gray-600">Your meetups and runs near you</p>
         </div>
+
+        {myGoingRuns.length > 0 ? (
+          <section className="mb-10" aria-labelledby="your-runs-heading">
+            <h2 id="your-runs-heading" className="text-lg font-bold text-sky-900 mb-3">
+              Your runs
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {myGoingRuns.map((r) => (
+                <div
+                  key={r.id}
+                  className="rounded-xl border-2 border-sky-200 bg-sky-50/80 p-5 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">You&apos;re going</p>
+                    <p className="mt-1 font-semibold text-gray-900 leading-snug">{r.title}</p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {formatHubRunDate(r.date)}
+                      {r.city ? ` · ${r.city}` : ''}
+                    </p>
+                  </div>
+                  <Link
+                    href={`/gorun/${r.id}`}
+                    className="inline-flex shrink-0 items-center justify-center rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-sky-700"
+                  >
+                    Open meetup →
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {myPastRuns.length > 0 ? (
+          <section className="mb-10" aria-labelledby="post-run-recaps-heading">
+            <h2 id="post-run-recaps-heading" className="text-lg font-bold text-orange-900 mb-3">
+              Post-run recaps
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {myPastRuns.map((r) => (
+                <div
+                  key={r.id}
+                  className="rounded-xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-5 shadow-sm flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3"
+                >
+                  <div className="flex gap-3 min-w-0">
+                    <Trophy className="h-9 w-9 shrink-0 text-orange-500" aria-hidden />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 leading-snug">
+                        You ran &quot;{r.title}&quot; · {formatHubRunDate(r.date)}
+                        {r.city ? ` · ${r.city}` : ''}
+                      </p>
+                      <p className="text-sm text-orange-900/85 mt-1">Add shouts + see the crew →</p>
+                    </div>
+                  </div>
+                  <Link
+                    href={`/gorun/${r.id}`}
+                    className="inline-flex shrink-0 items-center justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-700"
+                  >
+                    Open recap
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {/* RunClub Filter Banner */}
         {runClubSlug && (
@@ -176,6 +275,11 @@ function GoRunPageContent() {
             </div>
           </div>
         )}
+
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Discover runs</h2>
+          <p className="text-gray-600">Select your city and see what&apos;s happening</p>
+        </div>
 
         {/* Filters */}
         <div className="mb-8 flex flex-wrap gap-4">
