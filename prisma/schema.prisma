@@ -1363,6 +1363,7 @@ enum WorkoutType {
   Intervals
   LongRun
   Race
+  SpeedDuration
 }
 
 enum RunWorkflowStatus {

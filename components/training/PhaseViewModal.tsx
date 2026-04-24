@@ -17,6 +17,7 @@ const WORKOUT_TYPE_LABELS: Record<WorkoutType, string> = {
   Intervals: "Quality",
   LongRun: "Long run",
   Race: "Race",
+  SpeedDuration: "Quality",
 };
 
 function renderSchedule(schedule: string): React.ReactNode {
