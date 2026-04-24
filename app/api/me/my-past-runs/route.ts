@@ -9,6 +9,11 @@ function pastRunsCutoff(): Date {
   return new Date(Date.now() - 4 * 60 * 60 * 1000);
 }
 
+/** Don't nudge for ancient runs; recap is a 48h community moment, not a permanent backlog. */
+function recapUpperBound(): Date {
+  return new Date(Date.now() - 48 * 60 * 60 * 1000);
+}
+
 /**
  * GET /api/me/my-past-runs — city runs this athlete RSVP'd "going" that are past the recap window
  * and have no check-in yet (MVP1 nudge to open post-run UX).
@@ -19,7 +24,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
   const { athlete } = auth;
-  const cutoff = pastRunsCutoff();
+  const pastEnoughForRecap = pastRunsCutoff();
+  const minRecency = recapUpperBound();
 
   try {
     const rsvps = await prisma.city_run_rsvps.findMany({
@@ -27,7 +33,8 @@ export async function GET(request: Request) {
         athleteId: athlete.id,
         status: "going",
         city_runs: {
-          date: { lt: cutoff },
+          // After ~4h post-start (nudge window) but within 48h (no stale nudges)
+          date: { lt: pastEnoughForRecap, gt: minRecency },
           city_run_checkins: {
             none: { athleteId: athlete.id },
           },

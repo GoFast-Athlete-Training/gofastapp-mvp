@@ -5,10 +5,12 @@ import {
   Calendar,
   Footprints,
   MapPin,
+  MessageCircle,
   Mountain,
   Timer,
   Trophy,
   Wind,
+  X,
   Zap,
 } from 'lucide-react';
 import { useEffect, useState, useCallback } from 'react';
@@ -222,6 +224,21 @@ type LastLoggedWorkoutStrip = {
   paceDeltaSecPerMile: number | null;
 };
 
+const CITY_RECAP_DISMISS_STORAGE_KEY = 'athleteHomeDismissedCityRecapRunIds';
+
+function readDismissedCityRecapRunIdsFromStorage(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(CITY_RECAP_DISMISS_STORAGE_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw) as unknown;
+    if (!Array.isArray(arr)) return new Set();
+    return new Set(arr.filter((x): x is string => typeof x === 'string'));
+  } catch {
+    return new Set();
+  }
+}
+
 export default function AthleteHomePage() {
   const router = useRouter();
   const [athlete, setAthlete] = useState<any>(null);
@@ -249,6 +266,10 @@ export default function AthleteHomePage() {
   } | null>(null);
   const [todayPlanDay, setTodayPlanDay] = useState<PlanDayCard | null>(null);
   const [raceSignups, setRaceSignups] = useState<RaceSignupWithRegistry[]>([]);
+  const [myPastRuns, setMyPastRuns] = useState<GoingRunRow[]>([]);
+  const [dismissedRecapRunIds, setDismissedRecapRunIds] = useState<Set<string>>(
+    () => readDismissedCityRecapRunIdsFromStorage()
+  );
 
   const loadHome = useCallback(async () => {
     const athleteId = LocalStorageAPI.getAthleteId();
@@ -279,7 +300,7 @@ export default function AthleteHomePage() {
       return;
     }
 
-    const [goalsRes, upcomingRes, paceRes, goingRes, lastRunRes, raceSignupsRes] =
+    const [goalsRes, upcomingRes, paceRes, goingRes, lastRunRes, raceSignupsRes, pastRunsRes] =
       await Promise.allSettled([
         api.get('/goals?status=ACTIVE'),
         api.get('/training/upcoming'),
@@ -287,6 +308,7 @@ export default function AthleteHomePage() {
         api.get('/me/my-going-runs'),
         api.get('/me/last-logged-workout'),
         api.get('/race-signups'),
+        api.get('/me/my-past-runs'),
       ]);
 
     if (goalsRes.status === 'fulfilled') {
@@ -318,6 +340,13 @@ export default function AthleteHomePage() {
       setMyGoingRuns(Array.isArray(runs) ? runs : []);
     } else {
       setMyGoingRuns([]);
+    }
+
+    if (pastRunsRes.status === 'fulfilled') {
+      const runs = pastRunsRes.value.data?.runs;
+      setMyPastRuns(Array.isArray(runs) ? runs : []);
+    } else {
+      setMyPastRuns([]);
     }
 
     if (paceRes.status === 'fulfilled') {
@@ -537,6 +566,12 @@ export default function AthleteHomePage() {
         )
       : null;
 
+  /** After race day (calendar + 24h), treat as complete for UI — not stuck on "Race day" forever */
+  const goalIsComplete =
+    primaryGoal != null &&
+    primaryGoal.targetByDate != null &&
+    new Date(primaryGoal.targetByDate).getTime() < Date.now() - 24 * 60 * 60 * 1000;
+
   const nextTraining =
     upcomingSessions.find((s: { isPlanSession?: boolean }) => s.isPlanSession) ??
     upcomingSessions[0] ??
@@ -576,7 +611,7 @@ export default function AthleteHomePage() {
       : null;
 
   const showTrainingAtGlance =
-    Boolean(activePlanSummary?.hasSchedule) || Boolean(primaryGoal);
+    Boolean(activePlanSummary?.hasSchedule) || (Boolean(primaryGoal) && !goalIsComplete);
 
   const goalDistanceNorm = normalizeGoalDistanceLabel(primaryGoal?.distance);
 
@@ -606,6 +641,35 @@ export default function AthleteHomePage() {
             (24 * 60 * 60 * 1000)
         )
       : null;
+
+  const cityRecapRun =
+    myPastRuns.find((r) => !dismissedRecapRunIds.has(r.id)) ?? null;
+  const cityRecapDayLabel =
+    cityRecapRun?.date != null
+      ? new Date(cityRecapRun.date).toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        })
+      : null;
+
+  const dismissCityRecapBanner = (runId: string) => {
+    setDismissedRecapRunIds((prev) => {
+      const next = new Set(prev);
+      next.add(runId);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(
+            CITY_RECAP_DISMISS_STORAGE_KEY,
+            JSON.stringify([...next])
+          );
+        } catch {
+          /* ignore */
+        }
+      }
+      return next;
+    });
+  };
 
   const cardFindRun =
     'block rounded-xl border-2 border-sky-200 bg-sky-50/70 p-5 shadow-sm hover:border-sky-300 hover:shadow-md transition-all h-full';
@@ -776,6 +840,55 @@ export default function AthleteHomePage() {
               </div>
             ) : null}
 
+            {cityRecapRun ? (
+              <div className="mb-4 rounded-2xl border-2 border-amber-400/80 bg-gradient-to-br from-amber-50 to-orange-50/90 p-4 sm:p-5 shadow-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex gap-3 min-w-0">
+                    <MessageCircle
+                      className="h-10 w-10 shrink-0 text-amber-600"
+                      strokeWidth={1.75}
+                      aria-hidden
+                    />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-900/90">
+                        Post-run recap
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900 leading-snug">
+                        You ran &ldquo;{cityRecapRun.title}&rdquo;
+                        {cityRecapDayLabel ? (
+                          <>
+                            {' '}
+                            · {cityRecapDayLabel}
+                          </>
+                        ) : null}
+                        {cityRecapRun.city ? ` · ${cityRecapRun.city}` : null}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Add your shouts and see the crew&apos;s recap.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0 sm:flex-col sm:items-end">
+                    <Link
+                      href={`/gorun/${cityRecapRun.id}`}
+                      className="inline-flex items-center justify-center rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-bold text-white shadow hover:bg-amber-700 w-full sm:w-auto"
+                    >
+                      Open
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => dismissCityRecapBanner(cityRecapRun.id)}
+                      className="inline-flex items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-amber-900/80 hover:bg-amber-100/80"
+                      aria-label="Dismiss recap nudge"
+                    >
+                      <X className="h-4 w-4" aria-hidden />
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             {/* Row 1: Today + Race goal */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">
               <div className="lg:col-span-3">
@@ -851,7 +964,42 @@ export default function AthleteHomePage() {
               </div>
 
               <div className="lg:col-span-2">
-                {primaryGoal ? (
+                {primaryGoal && goalIsComplete ? (
+                  <div className="rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm h-full flex flex-col">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Race in the books</p>
+                    <div className="mt-2 flex gap-3 items-start">
+                      <Trophy className="h-10 w-10 shrink-0 text-amber-500" aria-hidden />
+                      <div className="min-w-0 flex-1">
+                        <h2 className="text-lg font-bold text-gray-900 leading-snug">
+                          {raceName || 'Your race'}
+                        </h2>
+                        {goalDistanceNorm ? (
+                          <p className="text-xs text-gray-500 mt-0.5">{goalDistanceNorm}</p>
+                        ) : null}
+                        {raceCityState ? (
+                          <p className="text-sm text-gray-600 mt-1 flex items-center gap-1.5">
+                            <MapPin className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
+                            {raceCityState}
+                          </p>
+                        ) : null}
+                        <p className="text-sm text-gray-600 mt-1 flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
+                          {raceDateStr ?? '—'}
+                        </p>
+                        <p className="text-sm text-gray-700 mt-3 leading-relaxed">
+                          Nice work. When you&apos;re ready, set your next goal so training and the home
+                          view stay in sync.
+                        </p>
+                      </div>
+                    </div>
+                    <Link
+                      href="/profile#goal"
+                      className="mt-4 inline-flex justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 w-full"
+                    >
+                      Set your next goal →
+                    </Link>
+                  </div>
+                ) : primaryGoal ? (
                   <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm h-full flex flex-col">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Race goal</p>
                     <div className="mt-2 flex gap-3 items-start">

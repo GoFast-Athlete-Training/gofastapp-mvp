@@ -52,14 +52,23 @@ export default function CityRunActivityLinkPanel({ runId, runDateIso }: Props) {
   const runDate = useMemo(() => new Date(runDateIso), [runDateIso]);
 
   const eligibleActivities = useMemo(() => {
-    return activities.filter((a) => {
-      if (!a.startTime) return false;
-      return utcCalendarDaysApart(runDate, new Date(a.startTime)) <= 1;
-    });
+    return activities
+      .filter((a) => {
+        if (!a.startTime) return false;
+        const days = Math.abs(utcCalendarDaysApart(runDate, new Date(a.startTime)));
+        return days <= 1;
+      })
+      .sort((a, b) => {
+        const ta = a.startTime ? new Date(a.startTime).getTime() : 0;
+        const tb = b.startTime ? new Date(b.startTime).getTime() : 0;
+        return tb - ta;
+      });
   }, [activities, runDate]);
 
   useEffect(() => {
     let cancelled = false;
+    setSelectedId("");
+    setActivities([]);
     (async () => {
       setLoading(true);
       setError(null);
@@ -86,6 +95,12 @@ export default function CityRunActivityLinkPanel({ runId, runDateIso }: Props) {
     };
   }, [runId]);
 
+  useEffect(() => {
+    if (eligibleActivities.length === 1 && !selectedId) {
+      setSelectedId(eligibleActivities[0].id);
+    }
+  }, [eligibleActivities, selectedId]);
+
   const saveLink = async () => {
     if (!selectedId) return;
     setSaving(true);
@@ -108,7 +123,7 @@ export default function CityRunActivityLinkPanel({ runId, runDateIso }: Props) {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-2 text-sm text-gray-500">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 flex items-center gap-2 text-sm text-gray-500">
         <Loader2 className="h-4 w-4 animate-spin" />
         Loading Garmin link…
       </div>
@@ -116,7 +131,7 @@ export default function CityRunActivityLinkPanel({ runId, runDateIso }: Props) {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 flex items-center gap-2">
         <Watch className="h-4 w-4 text-gray-400" />
         <h2 className="font-semibold text-gray-900 text-sm">Your Garmin activity</h2>
@@ -147,8 +162,8 @@ export default function CityRunActivityLinkPanel({ runId, runDateIso }: Props) {
         ) : (
           <>
             <p className="text-xs text-gray-600 leading-relaxed">
-              Tie this meetup to a synced run for your history. Only activities within a day of this
-              run (UTC) are listed.
+              Tie this meetup to a synced run for your history. Only activities within one calendar day of this
+              run (UTC) are shown.
             </p>
             {eligibleActivities.length === 0 ? (
               <p className="text-sm text-gray-500">
@@ -156,29 +171,46 @@ export default function CityRunActivityLinkPanel({ runId, runDateIso }: Props) {
                 page.
               </p>
             ) : (
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-medium text-gray-700">Pick an activity</label>
-                <select
-                  value={selectedId}
-                  onChange={(e) => setSelectedId(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                >
-                  <option value="">Select…</option>
-                  {eligibleActivities.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {(a.activityName || a.activityType || "Run").replace(/_/g, " ")}
-                      {a.startTime
-                        ? ` · ${new Date(a.startTime).toLocaleString(undefined, {
-                            month: "short",
-                            day: "numeric",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}`
-                        : ""}
-                      {metersToMiShort(a.distance) ? ` · ${metersToMiShort(a.distance)}` : ""}
-                    </option>
-                  ))}
-                </select>
+              <div className="flex flex-col gap-3">
+                <p className="text-xs font-medium text-gray-700">Pick an activity</p>
+                <div className="space-y-2 max-h-[min(20rem,45vh)] overflow-y-auto pr-1">
+                  {eligibleActivities.map((a) => {
+                    const selected = selectedId === a.id;
+                    const title = (a.activityName || a.activityType || "Run").replace(/_/g, " ");
+                    const when = a.startTime
+                      ? new Date(a.startTime).toLocaleString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })
+                      : null;
+                    const dist = metersToMiShort(a.distance);
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => setSelectedId(a.id)}
+                        className={`w-full text-left rounded-xl border px-3 py-2.5 transition ${
+                          selected
+                            ? "border-orange-500 bg-orange-50 ring-1 ring-orange-500"
+                            : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        <p className="text-sm font-semibold text-gray-900 line-clamp-2">{title}</p>
+                        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-gray-600">
+                          {a.activityType ? (
+                            <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-700">
+                              {a.activityType.replace(/_/g, " ")}
+                            </span>
+                          ) : null}
+                          {when ? <span>{when}</span> : null}
+                          {dist ? <span>{dist}</span> : null}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
                 <button
                   type="button"
                   disabled={!selectedId || saving}

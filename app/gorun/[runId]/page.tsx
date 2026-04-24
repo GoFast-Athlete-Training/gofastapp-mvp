@@ -251,15 +251,24 @@ export default function GoRunPage() {
 
   if (myCheckin) {
     return (
-      <>
-        <TopNav />
-        <CityRunPostRunContainer
-          run={run}
-          myCheckin={myCheckin}
-          allCheckins={checkins}
-          onBack={() => router.push('/gorun')}
-        />
-      </>
+      <CityRunPostRunContainer
+        run={{
+          id: run.id,
+          title: run.title,
+          date: run.date,
+          meetUpPoint: run.meetUpPoint,
+          meetUpCity: run.meetUpCity,
+          meetUpStreetAddress: run.meetUpStreetAddress,
+          totalMiles: run.totalMiles,
+          pace: run.pace,
+          stravaMapUrl: run.stravaMapUrl,
+          routePhotos: run.routePhotos,
+          mapImageUrl: run.mapImageUrl,
+          runClub: run.runClub,
+        }}
+        myCheckin={myCheckin}
+        allCheckins={checkins}
+      />
     );
   }
 
