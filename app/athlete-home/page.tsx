@@ -611,7 +611,8 @@ export default function AthleteHomePage() {
       : null;
 
   const showTrainingAtGlance =
-    Boolean(activePlanSummary?.hasSchedule) || (Boolean(primaryGoal) && !goalIsComplete);
+    !goalIsComplete &&
+    (Boolean(activePlanSummary?.hasSchedule) || Boolean(primaryGoal));
 
   const goalDistanceNorm = normalizeGoalDistanceLabel(primaryGoal?.distance);
 
@@ -675,6 +676,7 @@ export default function AthleteHomePage() {
     'block rounded-xl border-2 border-sky-200 bg-sky-50/70 p-5 shadow-sm hover:border-sky-300 hover:shadow-md transition-all h-full';
   const cardTraining =
     'block rounded-xl border-2 border-emerald-200 bg-emerald-50/80 p-5 shadow-sm hover:border-emerald-300 hover:shadow-md transition-all h-full';
+  const findRunColSpanLg = showTrainingAtGlance || !goalIsComplete ? 'lg:col-span-2' : 'lg:col-span-5';
 
   const lastRunDayLabelHome = lastLoggedWorkout
     ? homeLastRunDayLabel(lastLoggedWorkout.activityStartTime, lastLoggedWorkout.date)
@@ -982,10 +984,6 @@ export default function AthleteHomePage() {
                             {raceCityState}
                           </p>
                         ) : null}
-                        <p className="text-sm text-gray-600 mt-1 flex items-center gap-1.5">
-                          <Calendar className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
-                          {raceDateStr ?? '—'}
-                        </p>
                         <p className="text-sm text-gray-700 mt-3 leading-relaxed">
                           Nice work. When you&apos;re ready, set your next goal so training and the home
                           view stay in sync.
@@ -1095,7 +1093,7 @@ export default function AthleteHomePage() {
               </div>
             </div>
 
-            {/* Row 2: Training + Find a run */}
+            {/* Row 2: Training + Find a run (training hidden entirely after a completed goal) */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">
               {showTrainingAtGlance ? (
                 <div className={`${cardTraining} lg:col-span-3 cursor-default hover:border-emerald-200`}>
@@ -1166,7 +1164,7 @@ export default function AthleteHomePage() {
                     </Link>
                   </div>
                 </div>
-              ) : (
+              ) : !goalIsComplete ? (
                 <div
                   className={`${cardTraining} lg:col-span-3 cursor-default hover:border-emerald-200 hover:shadow-sm`}
                 >
@@ -1184,10 +1182,10 @@ export default function AthleteHomePage() {
                     Start or connect a plan →
                   </Link>
                 </div>
-              )}
+              ) : null}
 
               {nextGoingRun ? (
-                <div className={`${cardFindRun} lg:col-span-2`}>
+                <div className={`${cardFindRun} ${findRunColSpanLg}`}>
                   <h2 className="text-xs font-semibold uppercase tracking-wide text-sky-800 mb-2">
                     Find a run with others
                   </h2>
@@ -1210,7 +1208,7 @@ export default function AthleteHomePage() {
                   </p>
                 </div>
               ) : (
-                <Link href="/gorun" className={`${cardFindRun} lg:col-span-2`}>
+                <Link href="/gorun" className={`${cardFindRun} ${findRunColSpanLg}`}>
                   <h2 className="text-xs font-semibold uppercase tracking-wide text-sky-800 mb-2">
                     Find a run with others
                   </h2>
