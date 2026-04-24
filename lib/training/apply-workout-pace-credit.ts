@@ -55,6 +55,7 @@ export async function applyWorkoutPaceCredit(params: {
         athleteId,
         planId: params.planId ?? undefined,
         weekNumber: params.weekNumber ?? undefined,
+        notificationType: "PACE_UPDATE",
         previousPaceSecPerMile: previousSec,
         newPaceSecPerMile: newSec,
         adjustmentSecPerMile: previousSec - newSec,

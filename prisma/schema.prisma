@@ -126,15 +126,19 @@ model Coach {
   @@map("coaches")
 }
 
-/// Weekly batch analysis result: optional 5K pace adjustment + in-app notification payload.
+/// Weekly batch analysis result OR per-workout match notification.
+/// notificationType: 'PACE_UPDATE' (weekly credit) | 'WORKOUT_MATCH' (per-workout feedback).
+/// Pace fields are nullable — only set for PACE_UPDATE rows.
 model pace_adjustment_log {
   id                           String         @id @default(cuid())
   athleteId                    String
   planId                       String?
   weekNumber                   Int?
-  previousPaceSecPerMile       Int
-  newPaceSecPerMile            Int
-  adjustmentSecPerMile         Int
+  workoutId                    String?
+  notificationType             String?        @default("PACE_UPDATE")
+  previousPaceSecPerMile       Int?
+  newPaceSecPerMile            Int?
+  adjustmentSecPerMile         Int?
   qualityWorkoutsCount         Int            @default(0)
   qualityAvgDeltaSecPerMile    Int?
   longRunCompleted             Boolean        @default(false)

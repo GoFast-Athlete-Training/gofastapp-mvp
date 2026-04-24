@@ -18,10 +18,12 @@ export function extractGarminWorkoutIdFromSummary(raw: unknown): number | null {
       : null;
 
   const candidates = [
+    o.parentWorkoutId,
     o.workoutId,
     o.trainingWorkoutId,
     o.trainingPlanWorkoutId,
     o.manualWorkoutId,
+    nested?.parentWorkoutId,
     nested?.workoutId,
     nested?.trainingWorkoutId,
   ];

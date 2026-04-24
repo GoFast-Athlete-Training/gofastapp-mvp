@@ -290,6 +290,36 @@ export async function tryMatchActivityToTrainingWorkout(
 
   await setIngestion("MATCHED");
 
+  if (paceDeltaSecPerMile != null && paceSecPerMile != null) {
+    try {
+      const absD = Math.abs(Math.round(paceDeltaSecPerMile));
+      const direction =
+        paceDeltaSecPerMile > 0.5
+          ? `${absD} sec/mi faster than target`
+          : paceDeltaSecPerMile < -0.5
+          ? `${absD} sec/mi slower than target`
+          : "right on target pace";
+      const miDisplay =
+        distanceMeters != null
+          ? `${(distanceMeters / 1609.34).toFixed(1)} mi @ `
+          : "";
+      const paceMin = Math.floor(paceSecPerMile / 60);
+      const paceSec = String(paceSecPerMile % 60).padStart(2, "0");
+      await prisma.pace_adjustment_log.create({
+        data: {
+          athleteId: activity.athleteId,
+          planId: candidate.planId ?? null,
+          weekNumber: candidate.weekNumber ?? null,
+          workoutId: candidate.id,
+          notificationType: "WORKOUT_MATCH",
+          summaryMessage: `${miDisplay}${paceMin}:${paceSec}/mi — ${direction}.`,
+        },
+      });
+    } catch (err) {
+      console.error("pace_adjustment_log WORKOUT_MATCH insert:", err);
+    }
+  }
+
   if (creditedFiveKPace != null) {
     try {
       await applyWorkoutPaceCredit({
