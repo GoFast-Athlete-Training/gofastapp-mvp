@@ -5,7 +5,9 @@
 
 import { prisma } from "../prisma";
 import { getAthleteByGarminUserId } from "../domain-garmin";
-import { evaluateLapSegmentsAfterDetail } from "../training/evaluate-lap-segments";
+import { parseDetailData } from "../training/detail-data-parser";
+import { convertLapsToDerived } from "../training/lap-converter";
+import { writeLapsToWorkout } from "../training/lap-data-to-workout";
 
 export interface ActivityDetail {
   activityId: string | number;
@@ -64,9 +66,11 @@ export async function handleActivityDetail(
         });
         if (row) {
           try {
-            await evaluateLapSegmentsAfterDetail(row.id);
+            const parsed = parseDetailData(row.detailData);
+            const derived = convertLapsToDerived(parsed.laps, parsed.samples);
+            await writeLapsToWorkout(row.id, derived);
           } catch (lapErr) {
-            console.warn("evaluateLapSegmentsAfterDetail:", lapErr);
+            console.warn("lap pipeline (detailData → workout):", lapErr);
           }
         }
         processed++;

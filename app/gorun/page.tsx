@@ -207,57 +207,104 @@ function GoRunPageContent() {
           <p className="text-gray-600">Your meetups and runs near you</p>
         </div>
 
-        <section className="mb-10" aria-labelledby="your-runs-heading">
-          <h2 id="your-runs-heading" className="text-lg font-bold text-sky-900 mb-3">
-            Upcoming runs
-          </h2>
-          {myGoingRuns.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {myGoingRuns.map((r) => (
-                <div
-                  key={r.id}
-                  className="rounded-xl border-2 border-sky-200 bg-sky-50/80 p-5 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">You&apos;re going</p>
-                    <p className="mt-1 font-semibold text-gray-900 leading-snug">{r.title}</p>
-                    <p className="text-sm text-gray-600 mt-1">
-                      {formatHubRunDate(r.date)}
-                      {r.city ? ` · ${r.city}` : ''}
-                    </p>
-                  </div>
-                  <Link
-                    href={`/gorun/${r.id}`}
-                    className="inline-flex shrink-0 items-center justify-center rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-sky-700"
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+          <section aria-labelledby="your-runs-heading" className="min-w-0 flex flex-col">
+            <h2 id="your-runs-heading" className="text-lg font-bold text-sky-900 mb-3">
+              Upcoming runs
+            </h2>
+            {myGoingRuns.length > 0 ? (
+              <div className="space-y-4 flex-1">
+                {myGoingRuns.map((r) => (
+                  <div
+                    key={r.id}
+                    className="rounded-xl border-2 border-sky-200 bg-sky-50/80 p-5 shadow-sm flex flex-col gap-3"
                   >
-                    Open meetup →
-                  </Link>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-xl border-2 border-dashed border-sky-200 bg-sky-50/40 p-6 text-center">
-              <p className="text-gray-700 font-medium">No upcoming runs yet</p>
-              <p className="text-sm text-gray-600 mt-1">RSVP to a meetup in Discover below and it&apos;ll show up here.</p>
-            </div>
-          )}
-        </section>
-
-        <section className="mb-10" aria-labelledby="did-you-run-heading">
-          <h2 id="did-you-run-heading" className="text-lg font-bold text-orange-900 mb-1 flex items-center gap-2">
-            <HelpCircle className="h-5 w-5 text-orange-600 shrink-0" aria-hidden />
-            Did you run this?
-          </h2>
-          <p className="text-sm text-gray-600 mb-3">You RSVPed — tap when you actually showed up so we can open the crew recap.</p>
-          {myPastRuns.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {myPastRuns.map((r) => (
-                <div
-                  key={r.id}
-                  className="rounded-xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-5 shadow-sm flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3"
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">You&apos;re going</p>
+                      <p className="mt-1 font-semibold text-gray-900 leading-snug">{r.title}</p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {formatHubRunDate(r.date)}
+                        {r.city ? ` · ${r.city}` : ''}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/gorun/${r.id}`}
+                      className="inline-flex shrink-0 items-center justify-center rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-sky-700"
+                    >
+                      Open meetup →
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border-2 border-dashed border-sky-200 bg-sky-50/40 p-6 text-center flex-1 flex flex-col justify-center">
+                <p className="text-gray-700 font-medium">No upcoming runs yet</p>
+                <p className="text-sm text-gray-600 mt-1">Find a meetup and RSVP — it&apos;ll show up here.</p>
+                <a
+                  href="#discover"
+                  className="mt-4 inline-flex items-center justify-center rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-sky-700"
                 >
-                  <div className="flex gap-3 min-w-0">
-                    <Trophy className="h-9 w-9 shrink-0 text-orange-500" aria-hidden />
+                  Discover runs →
+                </a>
+              </div>
+            )}
+          </section>
+
+          <section aria-labelledby="did-you-run-heading" className="min-w-0 flex flex-col">
+            <h2 id="did-you-run-heading" className="text-lg font-bold text-orange-900 mb-1 flex items-center gap-2">
+              <HelpCircle className="h-5 w-5 text-orange-600 shrink-0" aria-hidden />
+              Did you run this?
+            </h2>
+            <p className="text-sm text-gray-600 mb-3">You RSVPed — tap when you actually showed up so we can open the crew recap.</p>
+            {myPastRuns.length > 0 ? (
+              <div className="space-y-4 flex-1">
+                {myPastRuns.map((r) => (
+                  <div
+                    key={r.id}
+                    className="rounded-xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-5 shadow-sm flex flex-col gap-3"
+                  >
+                    <div className="flex gap-3 min-w-0">
+                      <Trophy className="h-9 w-9 shrink-0 text-orange-500" aria-hidden />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 leading-snug">{r.title}</p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {formatHubRunDate(r.date)}
+                          {r.city ? ` · ${r.city}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={confirmingRunId !== null}
+                      onClick={() => void confirmIRan(r.id)}
+                      className="inline-flex shrink-0 items-center justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-60"
+                    >
+                      {confirmingRunId === r.id ? 'Saving…' : 'Yes, I ran it!'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border-2 border-dashed border-orange-200 bg-orange-50/40 p-6 text-center flex-1 flex flex-col justify-center">
+                <p className="text-gray-700 font-medium">Nothing waiting for you</p>
+                <p className="text-sm text-gray-600 mt-1">When a run you RSVPed for is in the books, confirm here to unlock shouts and photos.</p>
+              </div>
+            )}
+          </section>
+
+          <section aria-labelledby="your-recaps-heading" className="min-w-0 flex flex-col">
+            <h2 id="your-recaps-heading" className="text-lg font-bold text-emerald-900 mb-1 flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-emerald-600 shrink-0" aria-hidden />
+              Your recaps
+            </h2>
+            <p className="text-sm text-gray-600 mb-3">Runs you&apos;ve checked into — jump back in anytime.</p>
+            {myRunRecaps.length > 0 ? (
+              <div className="space-y-4 flex-1">
+                {myRunRecaps.map((r) => (
+                  <div
+                    key={r.id}
+                    className="rounded-xl border-2 border-emerald-200 bg-emerald-50/70 p-5 shadow-sm flex flex-col gap-3"
+                  >
                     <div className="min-w-0">
                       <p className="font-semibold text-gray-900 leading-snug">{r.title}</p>
                       <p className="text-sm text-gray-600 mt-1">
@@ -265,64 +312,25 @@ function GoRunPageContent() {
                         {r.city ? ` · ${r.city}` : ''}
                       </p>
                     </div>
+                    <Link
+                      href={`/gorun/${r.id}`}
+                      className="inline-flex shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-700"
+                    >
+                      Open recap →
+                    </Link>
                   </div>
-                  <button
-                    type="button"
-                    disabled={confirmingRunId !== null}
-                    onClick={() => void confirmIRan(r.id)}
-                    className="inline-flex shrink-0 items-center justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-60"
-                  >
-                    {confirmingRunId === r.id ? 'Saving…' : 'Yes, I ran it!'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-xl border-2 border-dashed border-orange-200 bg-orange-50/40 p-6 text-center">
-              <p className="text-gray-700 font-medium">Nothing waiting for you</p>
-              <p className="text-sm text-gray-600 mt-1">When a run you RSVPed for is in the books, confirm here to unlock shouts and photos.</p>
-            </div>
-          )}
-        </section>
-
-        <section className="mb-10" aria-labelledby="your-recaps-heading">
-          <h2 id="your-recaps-heading" className="text-lg font-bold text-emerald-900 mb-1 flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-emerald-600 shrink-0" aria-hidden />
-            Your recaps
-          </h2>
-          <p className="text-sm text-gray-600 mb-3">Runs you&apos;ve checked into — jump back in anytime.</p>
-          {myRunRecaps.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {myRunRecaps.map((r) => (
-                <div
-                  key={r.id}
-                  className="rounded-xl border-2 border-emerald-200 bg-emerald-50/70 p-5 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <p className="font-semibold text-gray-900 leading-snug">{r.title}</p>
-                    <p className="text-sm text-gray-600 mt-1">
-                      {formatHubRunDate(r.date)}
-                      {r.city ? ` · ${r.city}` : ''}
-                    </p>
-                  </div>
-                  <Link
-                    href={`/gorun/${r.id}`}
-                    className="inline-flex shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-700"
-                  >
-                    Open recap →
-                  </Link>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/40 p-6 text-center">
-              <p className="text-gray-700 font-medium">No confirmed runs yet</p>
-              <p className="text-sm text-gray-600 mt-1">
-                After you tap &quot;Yes, I ran it!&quot; above, your recap lands here for good.
-              </p>
-            </div>
-          )}
-        </section>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/40 p-6 text-center flex-1 flex flex-col justify-center">
+                <p className="text-gray-700 font-medium">No confirmed runs yet</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  After you tap &quot;Yes, I ran it!&quot; in the middle column, your recap lands here for good.
+                </p>
+              </div>
+            )}
+          </section>
+        </div>
 
         {/* RunClub Filter Banner */}
         {runClubSlug && (
@@ -352,10 +360,11 @@ function GoRunPageContent() {
           </div>
         )}
 
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Discover runs</h2>
-          <p className="text-gray-600">Select your city and see what&apos;s happening</p>
-        </div>
+        <div id="discover" className="scroll-mt-24">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Discover runs</h2>
+            <p className="text-gray-600">Select your city and see what&apos;s happening</p>
+          </div>
 
         {/* Filters */}
         <div className="mb-8 flex flex-wrap gap-4">
@@ -494,6 +503,7 @@ function GoRunPageContent() {
             </p>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

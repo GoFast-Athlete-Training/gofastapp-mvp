@@ -1223,9 +1223,30 @@ model workout_segments {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   workout          workouts          @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  segment_laps     workout_segment_laps[]
 
   @@index([workoutId])
   @@index([workoutId, stepOrder])
+}
+
+/// One row per Garmin lap window (time boundaries from detailData.laps + derived stats from samples).
+model workout_segment_laps {
+  id                  String            @id @default(cuid())
+  segmentId           String
+  /// 0-based index in the original Garmin Laps[] array
+  lapIndex            Int
+  startTimeInSeconds  Int
+  endTimeInSeconds    Int
+  avgPaceSecPerMile   Int?
+  avgHeartRate        Int?
+  distanceMiles       Float?
+  durationSeconds     Int?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  segment             workout_segments  @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  @@unique([segmentId, lapIndex])
+  @@index([segmentId])
 }
 
 enum EffortType {

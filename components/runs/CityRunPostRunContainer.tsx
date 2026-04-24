@@ -17,7 +17,6 @@ import {
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import TopNav from '@/components/shared/TopNav';
-import CityRunActivityLinkPanel from '@/components/runs/CityRunActivityLinkPanel';
 import CityRunRouteMedia from '@/components/runs/CityRunRouteMedia';
 
 interface Checkin {
@@ -463,8 +462,6 @@ export default function CityRunPostRunContainer({
                 </a>
               ) : null}
             </section>
-
-            <CityRunActivityLinkPanel runId={run.id} runDateIso={run.date} />
 
             <section className="border-t border-gray-200 pt-4">
               <button

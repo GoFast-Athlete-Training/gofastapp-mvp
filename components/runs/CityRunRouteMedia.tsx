@@ -45,7 +45,7 @@ export default function CityRunRouteMedia({
           <div className="p-5">
             <h2 className="text-base font-semibold text-gray-900 mb-3">Route Map</h2>
             <div className="rounded-lg overflow-hidden border border-gray-200">
-              <img src={mapImageUrl} alt="Route map" className="w-full h-auto" />
+              <img src={mapImageUrl} alt="Route map" className="w-full max-h-56 object-cover" />
             </div>
           </div>
         </div>

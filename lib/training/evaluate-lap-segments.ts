@@ -1,4 +1,7 @@
 /**
+ * @deprecated Replaced by detail-data-parser + lap-converter + lap-data-to-workout
+ * (see handleActivityDetail). Kept for reference; not used by the webhook.
+ *
  * Phase-2 evaluation: use ACTIVITY_DETAIL laps + samples vs workout segments (repeat-expanded).
  * Writes per-segment actual pace/distance/duration when lap count matches expanded slots.
  */
