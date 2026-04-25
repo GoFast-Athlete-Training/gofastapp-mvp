@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     const explicitIsQualityFlags: boolean[] = [];
     const explicitIsLongRunQualityFlags: boolean[] = [];
-    const explicitIsLadderCapableFlags: boolean[] = [];
+    const explicitIsLadderFlags: boolean[] = [];
 
     for (let i = 0; i < body.items!.length; i++) {
       const row = body.items![i] as Record<string, unknown>;
@@ -41,8 +41,9 @@ export async function POST(request: NextRequest) {
       explicitIsLongRunQualityFlags.push(
         Object.prototype.hasOwnProperty.call(row, "isLongRunQuality")
       );
-      explicitIsLadderCapableFlags.push(
-        Object.prototype.hasOwnProperty.call(row, "isLadderCapable")
+      explicitIsLadderFlags.push(
+        Object.prototype.hasOwnProperty.call(row, "isLadder") ||
+          Object.prototype.hasOwnProperty.call(row, "isLadderCapable")
       );
       const parsed = bodyToCatalogueRow(row);
       if (!parsed.ok) {
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
         const d = parsedRows[idx];
         const explicitIsQuality = explicitIsQualityFlags[idx];
         const explicitIsLongRunQuality = explicitIsLongRunQualityFlags[idx];
-        const explicitIsLadderCapable = explicitIsLadderCapableFlags[idx];
+        const explicitIsLadder = explicitIsLadderFlags[idx];
         const existing = await tx.workout_catalogue.findUnique({
           where: {
             name_workoutType: { name: d.name, workoutType: d.workoutType },
@@ -91,6 +92,7 @@ export async function POST(request: NextRequest) {
         });
         if (existing) {
           const updateData: Record<string, unknown> = {
+            description: d.description,
             intendedPhase: d.intendedPhase,
             paceAnchor: d.paceAnchor,
             mpFraction: d.mpFraction,
@@ -100,14 +102,20 @@ export async function POST(request: NextRequest) {
             minLadderMeters: d.minLadderMeters,
             maxLadderMeters: d.maxLadderMeters,
             progressionIndex: d.progressionIndex,
-            reps: d.reps,
-            repDistanceMeters: d.repDistanceMeters,
+            workBaseReps: d.workBaseReps,
+            workBaseRepMeters: d.workBaseRepMeters,
             recoveryDistanceMeters: d.recoveryDistanceMeters,
             warmupMiles: d.warmupMiles,
+            warmupPaceOffsetSecPerMile: d.warmupPaceOffsetSecPerMile,
             cooldownMiles: d.cooldownMiles,
-            repPaceOffsetSecPerMile: d.repPaceOffsetSecPerMile,
+            cooldownPaceOffsetSecPerMile: d.cooldownPaceOffsetSecPerMile,
+            workBaseMiles: d.workBaseMiles,
+            workPaceOffsetSecPerMile: d.workPaceOffsetSecPerMile,
+            workBasePaceOffsetSecPerMile: d.workBasePaceOffsetSecPerMile,
             recoveryPaceOffsetSecPerMile: d.recoveryPaceOffsetSecPerMile,
-            overallPaceOffsetSecPerMile: d.overallPaceOffsetSecPerMile,
+            isMP: d.isMP,
+            mpTotalMiles: d.mpTotalMiles,
+            mpPaceOffsetSecPerMile: d.mpPaceOffsetSecPerMile,
             intendedHeartRateZone: d.intendedHeartRateZone,
             intendedHRBpmLow: d.intendedHRBpmLow,
             intendedHRBpmHigh: d.intendedHRBpmHigh,
@@ -120,8 +128,8 @@ export async function POST(request: NextRequest) {
           if (explicitIsLongRunQuality) {
             updateData.isLongRunQuality = d.isLongRunQuality;
           }
-          if (explicitIsLadderCapable) {
-            updateData.isLadderCapable = d.isLadderCapable;
+          if (explicitIsLadder) {
+            updateData.isLadder = d.isLadder;
           }
           await tx.workout_catalogue.update({
             where: { id: existing.id },
@@ -133,11 +141,12 @@ export async function POST(request: NextRequest) {
             data: {
               id: newEntityId(),
               name: d.name,
+              description: d.description,
               workoutType: d.workoutType,
               intendedPhase: d.intendedPhase,
               isQuality: explicitIsQuality ? d.isQuality : false,
               isLongRunQuality: explicitIsLongRunQuality ? d.isLongRunQuality : false,
-              isLadderCapable: explicitIsLadderCapable ? d.isLadderCapable : false,
+              isLadder: explicitIsLadder ? d.isLadder : false,
               paceAnchor: d.paceAnchor,
               mpFraction: d.mpFraction,
               mpBlockPosition: d.mpBlockPosition,
@@ -146,14 +155,20 @@ export async function POST(request: NextRequest) {
               minLadderMeters: d.minLadderMeters,
               maxLadderMeters: d.maxLadderMeters,
               progressionIndex: d.progressionIndex,
-              reps: d.reps,
-              repDistanceMeters: d.repDistanceMeters,
+              workBaseReps: d.workBaseReps,
+              workBaseRepMeters: d.workBaseRepMeters,
               recoveryDistanceMeters: d.recoveryDistanceMeters,
               warmupMiles: d.warmupMiles,
+              warmupPaceOffsetSecPerMile: d.warmupPaceOffsetSecPerMile,
               cooldownMiles: d.cooldownMiles,
-              repPaceOffsetSecPerMile: d.repPaceOffsetSecPerMile,
+              cooldownPaceOffsetSecPerMile: d.cooldownPaceOffsetSecPerMile,
+              workBaseMiles: d.workBaseMiles,
+              workPaceOffsetSecPerMile: d.workPaceOffsetSecPerMile,
+              workBasePaceOffsetSecPerMile: d.workBasePaceOffsetSecPerMile,
               recoveryPaceOffsetSecPerMile: d.recoveryPaceOffsetSecPerMile,
-              overallPaceOffsetSecPerMile: d.overallPaceOffsetSecPerMile,
+              isMP: d.isMP,
+              mpTotalMiles: d.mpTotalMiles,
+              mpPaceOffsetSecPerMile: d.mpPaceOffsetSecPerMile,
               intendedHeartRateZone: d.intendedHeartRateZone,
               intendedHRBpmLow: d.intendedHRBpmLow,
               intendedHRBpmHigh: d.intendedHRBpmHigh,

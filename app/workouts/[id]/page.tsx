@@ -102,14 +102,14 @@ interface WorkoutCatalogue {
   workoutType: string;
   intendedPhase: string[];
   progressionIndex: number;
-  reps: number | null;
-  repDistanceMeters: number | null;
+  workBaseReps: number | null;
+  workBaseRepMeters: number | null;
   recoveryDistanceMeters: number | null;
   warmupMiles: number | null;
   cooldownMiles: number | null;
-  repPaceOffsetSecPerMile: number | null;
+  workBasePaceOffsetSecPerMile: number | null;
   recoveryPaceOffsetSecPerMile: number | null;
-  overallPaceOffsetSecPerMile: number | null;
+  workPaceOffsetSecPerMile: number | null;
   intendedHeartRateZone: string | null;
   intendedHRBpmLow: number | null;
   intendedHRBpmHigh: number | null;
@@ -273,10 +273,10 @@ function CataloguePrescriptionCard({
   );
 
   if (catalogue.workoutType === "Intervals") {
-    const reps = catalogue.reps ?? 6;
-    const repM = catalogue.repDistanceMeters ?? 800;
+    const reps = catalogue.workBaseReps ?? 6;
+    const repM = catalogue.workBaseRepMeters ?? 800;
     const recM = catalogue.recoveryDistanceMeters ?? 400;
-    const intSec = paceSecFromAnchor(anchor, catalogue.repPaceOffsetSecPerMile, p.interval);
+    const intSec = paceSecFromAnchor(anchor, catalogue.workBasePaceOffsetSecPerMile, p.interval);
     const recSec = paceSecFromAnchor(anchor, catalogue.recoveryPaceOffsetSecPerMile, p.recovery);
     return (
       <div className="border border-sky-200 bg-sky-50/60 rounded-lg p-6 mb-6">
@@ -316,7 +316,7 @@ function CataloguePrescriptionCard({
   }
 
   if (catalogue.workoutType === "Easy") {
-    const easySec = paceSecFromAnchor(anchor, catalogue.overallPaceOffsetSecPerMile, p.easy);
+    const easySec = paceSecFromAnchor(anchor, catalogue.workPaceOffsetSecPerMile, p.easy);
     return (
       <div className="border border-slate-200 bg-slate-50 rounded-lg p-6 mb-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-1">Coach prescription</h2>
@@ -334,8 +334,8 @@ function CataloguePrescriptionCard({
     );
   }
 
-  if (catalogue.workoutType === "Tempo") {
-    const tempoSec = paceSecFromAnchor(anchor, catalogue.overallPaceOffsetSecPerMile, p.tempo);
+  if (catalogue.workoutType === "Tempo" || catalogue.workoutType === "SpeedDuration") {
+    const tempoSec = paceSecFromAnchor(anchor, catalogue.workPaceOffsetSecPerMile, p.tempo);
     const easySec = paceSecFromAnchor(anchor, catalogue.recoveryPaceOffsetSecPerMile, p.easy);
     return (
       <div className="border border-indigo-200 bg-indigo-50/50 rounded-lg p-6 mb-6">
@@ -352,7 +352,7 @@ function CataloguePrescriptionCard({
   }
 
   // LongRun
-  const longSec = paceSecFromAnchor(anchor, catalogue.overallPaceOffsetSecPerMile, p.longRun);
+  const longSec = paceSecFromAnchor(anchor, catalogue.workPaceOffsetSecPerMile, p.longRun);
   const mpSec = paceSecFromAnchor(anchor, null, p.marathon);
   return (
     <div className="border border-orange-200 bg-orange-50/50 rounded-lg p-6 mb-6">

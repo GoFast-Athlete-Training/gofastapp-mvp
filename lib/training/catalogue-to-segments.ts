@@ -1,6 +1,6 @@
 /**
  * Build workout_segments payload from a catalogue row + schedule miles + anchors.
- * MP blocks can use goal race pace (mpSimulation) or 5K-derived zones (currentBuildup).
+ * Segment fields mirror workout_catalogue (warmup / work base / ladder / cooldown).
  */
 
 import type { workout_catalogue, WorkoutType } from "@prisma/client";
@@ -23,6 +23,20 @@ function secPerMile(
 ): number {
   if (offset == null) return fallbackZoneSec;
   return Math.max(1, anchor + offset);
+}
+
+/** Pyramid: max down to min by step, then back up (exclude duplicate min on ascent). */
+export function ladderRungsMeters(maxM: number, minM: number, stepM: number): number[] {
+  if (!Number.isFinite(maxM) || !Number.isFinite(minM) || !Number.isFinite(stepM)) {
+    return [];
+  }
+  if (stepM <= 0 || maxM < minM) return [maxM];
+  const down: number[] = [];
+  for (let m = maxM; m >= minM; m -= stepM) {
+    down.push(Math.round(m));
+  }
+  const up = down.length > 1 ? down.slice(0, -1).reverse() : [];
+  return [...down, ...up];
 }
 
 /** Scale peak mpFraction by plan ladder (0–3 → 25%–100% of peak). */
@@ -52,18 +66,83 @@ function mpPaceSecPerMile(params: {
   if (isMpSimulationAnchor(entry.paceAnchor) && racePaceSecPerMile != null) {
     return secPerMile(
       racePaceSecPerMile,
-      entry.overallPaceOffsetSecPerMile,
+      entry.workPaceOffsetSecPerMile,
       racePaceSecPerMile
     );
   }
-  return secPerMile(fitnessAnchorSec, null, paces.marathon);
+  return secPerMile(
+    fitnessAnchorSec,
+    entry.mpPaceOffsetSecPerMile,
+    paces.marathon
+  );
+}
+
+function buildSustainedQualityBlock(params: {
+  entry: workout_catalogue;
+  totalMiles: number;
+  anchorSecondsPerMile: number;
+  title: string;
+}): ApiSegment[] {
+  const { entry, totalMiles, anchorSecondsPerMile, title } = params;
+  const paces = getTrainingPaces(anchorSecondsPerMile);
+  const warmupM = entry.warmupMiles ?? round(totalMiles * 0.15, 2);
+  const cooldownM = entry.cooldownMiles ?? round(totalMiles * 0.15, 2);
+  const prescribedMain = entry.workBaseMiles;
+  const mainM = round(
+    prescribedMain != null && prescribedMain > 0
+      ? Math.min(prescribedMain, Math.max(0.25, totalMiles - warmupM - cooldownM))
+      : Math.max(0.25, totalMiles - warmupM - cooldownM),
+    2
+  );
+  const warmupPace = secPerMile(
+    anchorSecondsPerMile,
+    entry.warmupPaceOffsetSecPerMile ?? entry.recoveryPaceOffsetSecPerMile,
+    paces.easy
+  );
+  const cooldownPace = secPerMile(
+    anchorSecondsPerMile,
+    entry.cooldownPaceOffsetSecPerMile ?? entry.recoveryPaceOffsetSecPerMile,
+    paces.easy
+  );
+  const workPace = secPerMile(
+    anchorSecondsPerMile,
+    entry.workPaceOffsetSecPerMile,
+    paces.tempo
+  );
+  let order = 1;
+  const out: ApiSegment[] = [];
+  if (warmupM > 0) {
+    out.push({
+      stepOrder: order++,
+      title: "Warmup",
+      durationType: "DISTANCE",
+      durationValue: warmupM,
+      targets: [paceTargetFromSecondsPerMile(warmupPace)],
+    });
+  }
+  out.push({
+    stepOrder: order++,
+    title,
+    durationType: "DISTANCE",
+    durationValue: mainM,
+    targets: [paceTargetFromSecondsPerMile(workPace)],
+  });
+  if (cooldownM > 0) {
+    out.push({
+      stepOrder: order++,
+      title: "Cooldown",
+      durationType: "DISTANCE",
+      durationValue: cooldownM,
+      targets: [paceTargetFromSecondsPerMile(cooldownPace)],
+    });
+  }
+  return out;
 }
 
 export function catalogueEntryToApiSegments(params: {
   entry: workout_catalogue;
   scheduleMiles: number;
   anchorSecondsPerMile: number;
-  /** Goal race pace (sec/mile); required for mpSimulation MP blocks when set on entry. */
   racePaceSecondsPerMile?: number | null;
   planLadderIndex?: number | null;
 }): ApiSegment[] {
@@ -82,7 +161,7 @@ export function catalogueEntryToApiSegments(params: {
   if (type === "Easy") {
     const pace = secPerMile(
       anchorSecondsPerMile,
-      entry.overallPaceOffsetSecPerMile,
+      entry.workPaceOffsetSecPerMile,
       paces.easy
     );
     return [
@@ -96,55 +175,6 @@ export function catalogueEntryToApiSegments(params: {
     ];
   }
 
-  if (type === "Tempo") {
-    const warmupM =
-      entry.warmupMiles ?? round(totalMiles * 0.15, 2);
-    const cooldownM =
-      entry.cooldownMiles ?? round(totalMiles * 0.15, 2);
-    const mainM = round(
-      Math.max(0.25, totalMiles - warmupM - cooldownM),
-      2
-    );
-    const easyPace = secPerMile(
-      anchorSecondsPerMile,
-      entry.recoveryPaceOffsetSecPerMile,
-      paces.easy
-    );
-    const tempoPace = secPerMile(
-      anchorSecondsPerMile,
-      entry.overallPaceOffsetSecPerMile,
-      paces.tempo
-    );
-    let order = 1;
-    const out: ApiSegment[] = [];
-    if (warmupM > 0) {
-      out.push({
-        stepOrder: order++,
-        title: "Warmup",
-        durationType: "DISTANCE",
-        durationValue: warmupM,
-        targets: [paceTargetFromSecondsPerMile(easyPace)],
-      });
-    }
-    out.push({
-      stepOrder: order++,
-      title: "Tempo",
-      durationType: "DISTANCE",
-      durationValue: mainM,
-      targets: [paceTargetFromSecondsPerMile(tempoPace)],
-    });
-    if (cooldownM > 0) {
-      out.push({
-        stepOrder: order++,
-        title: "Cooldown",
-        durationType: "DISTANCE",
-        durationValue: cooldownM,
-        targets: [paceTargetFromSecondsPerMile(easyPace)],
-      });
-    }
-    return out;
-  }
-
   if (type === "LongRun") {
     const easyP = secPerMile(
       anchorSecondsPerMile,
@@ -153,7 +183,7 @@ export function catalogueEntryToApiSegments(params: {
     );
     const longP = secPerMile(
       anchorSecondsPerMile,
-      entry.overallPaceOffsetSecPerMile,
+      entry.workPaceOffsetSecPerMile,
       paces.longRun
     );
     const mpP = mpPaceSecPerMile({
@@ -163,6 +193,8 @@ export function catalogueEntryToApiSegments(params: {
     });
 
     const usesConfigurableMp =
+      entry.isMP ||
+      (entry.mpTotalMiles != null && entry.mpTotalMiles > 0) ||
       (entry.mpFraction != null && entry.mpFraction > 0) ||
       isMpSimulationAnchor(entry.paceAnchor);
 
@@ -211,14 +243,17 @@ export function catalogueEntryToApiSegments(params: {
       return out;
     }
 
-    const peakFrac =
-      entry.mpFraction != null && entry.mpFraction > 0
-        ? entry.mpFraction
-        : 0.35;
-    let mpM = round(totalMiles * effectiveMpFraction(peakFrac, planLadderIndex), 2);
+    let mpM: number;
+    if (entry.mpTotalMiles != null && entry.mpTotalMiles > 0) {
+      mpM = round(Math.min(entry.mpTotalMiles, totalMiles * 0.9), 2);
+    } else {
+      const peakFrac =
+        entry.mpFraction != null && entry.mpFraction > 0 ? entry.mpFraction : 0.35;
+      mpM = round(totalMiles * effectiveMpFraction(peakFrac, planLadderIndex), 2);
+    }
     mpM = Math.min(mpM, round(totalMiles * 0.9, 2));
     mpM = Math.max(0.25, mpM);
-    let easyRemain = round(Math.max(0.25, totalMiles - mpM), 2);
+    const easyRemain = round(Math.max(0.25, totalMiles - mpM), 2);
 
     const pos = (entry.mpBlockPosition ?? "BACK_HALF").toUpperCase();
     let order = 1;
@@ -262,15 +297,104 @@ export function catalogueEntryToApiSegments(params: {
     return out;
   }
 
-  // Intervals
-  const reps = entry.reps ?? 6;
-  const repMiles = (entry.repDistanceMeters ?? 800) / 1609.34;
+  const ladderMax = entry.maxLadderMeters;
+  const ladderMin = entry.minLadderMeters;
+  const ladderStep = entry.ladderStepMeters;
+  if (
+    entry.isLadder &&
+    ladderMax != null &&
+    ladderMin != null &&
+    ladderStep != null &&
+    (type === "Intervals" || type === "SpeedDuration" || type === "Tempo")
+  ) {
+    const rungs = ladderRungsMeters(ladderMax, ladderMin, ladderStep);
+    if (rungs.length > 0) {
+      const recMiles = (entry.recoveryDistanceMeters ?? 400) / 1609.34;
+      const warmupM = entry.warmupMiles ?? round(totalMiles * 0.15, 2);
+      const cooldownM = entry.cooldownMiles ?? round(totalMiles * 0.15, 2);
+      const workPace = secPerMile(
+        anchorSecondsPerMile,
+        entry.workBasePaceOffsetSecPerMile,
+        paces.interval
+      );
+      const recPace = secPerMile(
+        anchorSecondsPerMile,
+        entry.recoveryPaceOffsetSecPerMile,
+        paces.recovery
+      );
+      const easyP = secPerMile(
+        anchorSecondsPerMile,
+        entry.warmupPaceOffsetSecPerMile,
+        paces.easy
+      );
+      let order = 1;
+      const out: ApiSegment[] = [];
+      if (warmupM > 0) {
+        out.push({
+          stepOrder: order++,
+          title: "Warmup",
+          durationType: "DISTANCE",
+          durationValue: warmupM,
+          targets: [paceTargetFromSecondsPerMile(easyP)],
+        });
+      }
+      for (let i = 0; i < rungs.length; i++) {
+        const repMiles = rungs[i] / 1609.34;
+        out.push({
+          stepOrder: order++,
+          title: "Work",
+          durationType: "DISTANCE",
+          durationValue: round(repMiles, 3),
+          targets: [paceTargetFromSecondsPerMile(workPace)],
+        });
+        if (i < rungs.length - 1) {
+          out.push({
+            stepOrder: order++,
+            title: "Recovery",
+            durationType: "DISTANCE",
+            durationValue: round(recMiles, 3),
+            targets: [paceTargetFromSecondsPerMile(recPace)],
+          });
+        }
+      }
+      if (cooldownM > 0) {
+        out.push({
+          stepOrder: order++,
+          title: "Cooldown",
+          durationType: "DISTANCE",
+          durationValue: cooldownM,
+          targets: [
+            paceTargetFromSecondsPerMile(
+              secPerMile(
+                anchorSecondsPerMile,
+                entry.cooldownPaceOffsetSecPerMile,
+                paces.easy
+              )
+            ),
+          ],
+        });
+      }
+      return out;
+    }
+  }
+
+  if (type === "Tempo" || type === "SpeedDuration") {
+    return buildSustainedQualityBlock({
+      entry,
+      totalMiles,
+      anchorSecondsPerMile,
+      title: type === "SpeedDuration" ? "Speed / tempo" : "Tempo",
+    });
+  }
+
+  const reps = entry.workBaseReps ?? 6;
+  const repMiles = (entry.workBaseRepMeters ?? 800) / 1609.34;
   const recMiles = (entry.recoveryDistanceMeters ?? 400) / 1609.34;
   const warmupM = entry.warmupMiles ?? round(totalMiles * 0.15, 2);
   const cooldownM = entry.cooldownMiles ?? round(totalMiles * 0.15, 2);
   const intPace = secPerMile(
     anchorSecondsPerMile,
-    entry.repPaceOffsetSecPerMile,
+    entry.workBasePaceOffsetSecPerMile,
     paces.interval
   );
   const recPace = secPerMile(
@@ -278,7 +402,11 @@ export function catalogueEntryToApiSegments(params: {
     entry.recoveryPaceOffsetSecPerMile,
     paces.recovery
   );
-  const easyP = secPerMile(anchorSecondsPerMile, null, paces.easy);
+  const easyP = secPerMile(
+    anchorSecondsPerMile,
+    entry.warmupPaceOffsetSecPerMile,
+    paces.easy
+  );
 
   let order = 1;
   const out: ApiSegment[] = [];
@@ -313,7 +441,15 @@ export function catalogueEntryToApiSegments(params: {
       title: "Cooldown",
       durationType: "DISTANCE",
       durationValue: cooldownM,
-      targets: [paceTargetFromSecondsPerMile(easyP)],
+      targets: [
+        paceTargetFromSecondsPerMile(
+          secPerMile(
+            anchorSecondsPerMile,
+            entry.cooldownPaceOffsetSecPerMile,
+            paces.easy
+          )
+        ),
+      ],
     });
   }
   return out;

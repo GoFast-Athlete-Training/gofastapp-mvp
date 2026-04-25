@@ -1,6 +1,13 @@
 import type { WorkoutType } from "@prisma/client";
 
-const WORKOUT_TYPES: WorkoutType[] = ["Easy", "Tempo", "Intervals", "LongRun"];
+const WORKOUT_TYPES: WorkoutType[] = [
+  "Easy",
+  "Tempo",
+  "Intervals",
+  "LongRun",
+  "Race",
+  "SpeedDuration",
+];
 
 export function parseWorkoutType(raw: unknown): WorkoutType | null {
   if (typeof raw !== "string") return null;
@@ -30,11 +37,12 @@ const MP_BLOCK_PROGRESSIONS = new Set(["flat", "progressive"]);
 
 export type CatalogueRowInput = {
   name: string;
+  description: string | null;
   workoutType: WorkoutType;
   intendedPhase: string[];
   isQuality: boolean;
   isLongRunQuality: boolean;
-  isLadderCapable: boolean;
+  isLadder: boolean;
   paceAnchor: string;
   mpFraction: number | null;
   mpBlockPosition: string | null;
@@ -43,19 +51,43 @@ export type CatalogueRowInput = {
   minLadderMeters: number | null;
   maxLadderMeters: number | null;
   progressionIndex: number | null;
-  reps?: number | null;
-  repDistanceMeters?: number | null;
+  workBaseReps?: number | null;
+  workBaseRepMeters?: number | null;
   recoveryDistanceMeters?: number | null;
   warmupMiles?: number | null;
+  warmupPaceOffsetSecPerMile?: number | null;
   cooldownMiles?: number | null;
-  repPaceOffsetSecPerMile?: number | null;
+  cooldownPaceOffsetSecPerMile?: number | null;
+  workBaseMiles?: number | null;
+  workPaceOffsetSecPerMile?: number | null;
+  workBasePaceOffsetSecPerMile?: number | null;
   recoveryPaceOffsetSecPerMile?: number | null;
-  overallPaceOffsetSecPerMile?: number | null;
+  isMP: boolean;
+  mpTotalMiles?: number | null;
+  mpPaceOffsetSecPerMile?: number | null;
   intendedHeartRateZone?: string | null;
   intendedHRBpmLow?: number | null;
   intendedHRBpmHigh?: number | null;
   notes?: string | null;
 };
+
+function pickNum(body: Record<string, unknown>, keys: string[]): number | null {
+  for (const k of keys) {
+    const v = body[k];
+    if (v === null || v === undefined || v === "") continue;
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function pickBool(body: Record<string, unknown>, keys: string[]): boolean {
+  for (const k of keys) {
+    const v = body[k];
+    if (v === true || v === "true" || v === "1" || v === 1) return true;
+  }
+  return false;
+}
 
 export function bodyToCatalogueRow(body: Record<string, unknown>): {
   ok: true;
@@ -65,7 +97,12 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
   if (!name) return { ok: false, error: "name is required" };
 
   const wt = parseWorkoutType(body.workoutType);
-  if (!wt) return { ok: false, error: "workoutType must be Easy, Tempo, Intervals, or LongRun" };
+  if (!wt) {
+    return {
+      ok: false,
+      error: "workoutType must be Easy, Tempo, Intervals, LongRun, Race, or SpeedDuration",
+    };
+  }
 
   let progressionIndex: number | null = null;
   if (
@@ -80,9 +117,9 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
     progressionIndex = Math.round(pi);
   }
 
-  const isQuality = body.isQuality === true;
-  const isLongRunQuality = body.isLongRunQuality === true;
-  const isLadderCapable = body.isLadderCapable === true;
+  const isQuality = pickBool(body, ["isQuality"]);
+  const isLongRunQuality = pickBool(body, ["isLongRunQuality"]);
+  const isLadder = pickBool(body, ["isLadder", "isLadderCapable"]);
 
   let paceAnchor = "currentBuildup";
   if (typeof body.paceAnchor === "string" && body.paceAnchor.trim()) {
@@ -141,15 +178,25 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
     mpFraction = mf;
   }
 
+  const workBaseRepsRaw = pickNum(body, ["workBaseReps", "reps"]);
+  const workBaseRepMetersRaw = pickNum(body, ["workBaseRepMeters", "repDistanceMeters"]);
+  const workPaceOffsetRaw = pickNum(body, ["workPaceOffsetSecPerMile", "overallPaceOffsetSecPerMile"]);
+  const workBasePaceRaw = pickNum(body, ["workBasePaceOffsetSecPerMile", "repPaceOffsetSecPerMile"]);
+
+  let isMP = pickBool(body, ["isMP"]);
+  if (!isMP && isLongRunQuality) isMP = true;
+
   return {
     ok: true,
     data: {
       name,
+      description:
+        typeof body.description === "string" ? body.description.trim() || null : null,
       workoutType: wt,
       intendedPhase,
       isQuality,
       isLongRunQuality,
-      isLadderCapable,
+      isLadder,
       paceAnchor,
       mpFraction,
       mpBlockPosition,
@@ -161,26 +208,36 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
       maxLadderMeters:
         num("maxLadderMeters") != null ? Math.round(num("maxLadderMeters")!) : null,
       progressionIndex,
-      reps: num("reps") != null ? Math.round(num("reps")!) : null,
-      repDistanceMeters:
-        num("repDistanceMeters") != null ? Math.round(num("repDistanceMeters")!) : null,
+      workBaseReps: workBaseRepsRaw != null ? Math.round(workBaseRepsRaw) : null,
+      workBaseRepMeters: workBaseRepMetersRaw != null ? Math.round(workBaseRepMetersRaw) : null,
       recoveryDistanceMeters:
         num("recoveryDistanceMeters") != null
           ? Math.round(num("recoveryDistanceMeters")!)
           : null,
       warmupMiles: num("warmupMiles"),
-      cooldownMiles: num("cooldownMiles"),
-      repPaceOffsetSecPerMile:
-        num("repPaceOffsetSecPerMile") != null
-          ? Math.round(num("repPaceOffsetSecPerMile")!)
+      warmupPaceOffsetSecPerMile:
+        num("warmupPaceOffsetSecPerMile") != null
+          ? Math.round(num("warmupPaceOffsetSecPerMile")!)
           : null,
+      cooldownMiles: num("cooldownMiles"),
+      cooldownPaceOffsetSecPerMile:
+        num("cooldownPaceOffsetSecPerMile") != null
+          ? Math.round(num("cooldownPaceOffsetSecPerMile")!)
+          : null,
+      workBaseMiles: num("workBaseMiles"),
+      workPaceOffsetSecPerMile:
+        workPaceOffsetRaw != null ? Math.round(workPaceOffsetRaw) : null,
+      workBasePaceOffsetSecPerMile:
+        workBasePaceRaw != null ? Math.round(workBasePaceRaw) : null,
       recoveryPaceOffsetSecPerMile:
         num("recoveryPaceOffsetSecPerMile") != null
           ? Math.round(num("recoveryPaceOffsetSecPerMile")!)
           : null,
-      overallPaceOffsetSecPerMile:
-        num("overallPaceOffsetSecPerMile") != null
-          ? Math.round(num("overallPaceOffsetSecPerMile")!)
+      isMP,
+      mpTotalMiles: num("mpTotalMiles"),
+      mpPaceOffsetSecPerMile:
+        num("mpPaceOffsetSecPerMile") != null
+          ? Math.round(num("mpPaceOffsetSecPerMile")!)
           : null,
       intendedHeartRateZone:
         typeof body.intendedHeartRateZone === "string"

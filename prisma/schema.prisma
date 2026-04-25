@@ -1082,43 +1082,51 @@ model training_plans {
 }
 
 
-/// Coach-curated prescriptions: intervals/tempo/long templates with pace offsets from current 5K.
+/// Coach-curated prescriptions: segment-mirrored fields (warmup / work base / ladder variant / cooldown).
+/// Pace offsets are sec/mile vs current 5K fitness unless paceAnchor is mpSimulation.
 model workout_catalogue {
   id                           String      @id @default(cuid())
   name                         String
+  description                  String?
   workoutType                  WorkoutType
-  /// True when this catalogue entry is used for quality slots during plan generation.
+  /// True when this catalogue entry is used for quality slots during plan generation (legacy plan gen).
   isQuality                    Boolean     @default(false)
-  /// Long-run shelf: false = easy/regular long; true = MP-sim / quality long (build–peak rotation).
+  /// Long-run shelf: false = easy/regular long; true = MP-sim / quality long (legacy plan gen).
   isLongRunQuality             Boolean     @default(false)
-  /// Whether this entry uses a pyramid rep structure (e.g. Up and Over).
-  isLadderCapable              Boolean     @default(false)
-  /// Distance step between ladder rungs (meters). Null = not a ladder workout.
+  /// Pyramid / ladder work variant: max→min by step, then back up (e.g. Up and Over).
+  isLadder                     Boolean     @default(false)
+  /// Distance step between ladder rungs (meters). E.g. 200 with max 800, min 200.
   ladderStepMeters             Int?
-  /// Shortest rung in the ladder (meters).
   minLadderMeters              Int?
-  /// Peak rung in the ladder (meters).
   maxLadderMeters              Int?
-  /// Phases this entry applies to, e.g. ["base","build"]
   intendedPhase                String[]
   progressionIndex             Int?
-  reps                         Int?
-  repDistanceMeters            Int?
+  /// Fixed-rep work (Intervals): number of reps.
+  workBaseReps                 Int?
+  /// Fixed-rep work: meters per rep (e.g. 800).
+  workBaseRepMeters            Int?
   recoveryDistanceMeters       Int?
   warmupMiles                  Float?
+  warmupPaceOffsetSecPerMile   Int?
   cooldownMiles                Float?
-  /// currentBuildup = offsets vs 5K fitness; mpSimulation = MP block uses plan goal race pace (+ offsets).
-  paceAnchor                   String      @default("currentBuildup")
-  /// Share of scheduled miles at goal MP (peak); scaled by planLadderIndex when building segments.
-  mpFraction                   Float?
-  /// BACK_HALF | FRONT_HALF | EVEN — where the MP block sits in the long run.
-  mpBlockPosition              String?
-  /// flat (MVP) | progressive (future) — pace progression within MP block.
-  mpBlockProgression           String      @default("flat")
-  /// Sec/mile vs anchor (5K fitness or goal MP depending on paceAnchor)
-  repPaceOffsetSecPerMile      Int?
+  cooldownPaceOffsetSecPerMile Int?
+  /// Sustained work distance (SpeedDuration / Tempo main block), miles.
+  workBaseMiles                Float?
+  /// Pace offset for easy / long-easy / tempo sustained block (sec/mi vs 5K anchor).
+  workPaceOffsetSecPerMile     Int?
+  /// Pace offset for each work rep or ladder rung (sec/mi vs 5K anchor).
+  workBasePaceOffsetSecPerMile Int?
   recoveryPaceOffsetSecPerMile Int?
-  overallPaceOffsetSecPerMile  Int?
+  paceAnchor                   String      @default("currentBuildup")
+  /// Legacy: fraction of long run at MP when mpTotalMiles not set.
+  mpFraction                   Float?
+  mpBlockPosition              String?
+  mpBlockProgression           String      @default("flat")
+  /// Long run includes a goal-pace or MP-style block (explicit miles in mpTotalMiles when set).
+  isMP                         Boolean     @default(false)
+  mpTotalMiles                 Float?
+  /// Pace offset for the MP block (sec/mi vs 5K anchor).
+  mpPaceOffsetSecPerMile       Int?
   intendedHeartRateZone        String?
   intendedHRBpmLow             Int?
   intendedHRBpmHigh            Int?

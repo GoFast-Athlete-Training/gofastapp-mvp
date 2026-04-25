@@ -155,7 +155,7 @@ function defaultRepPaceOffsetSecPerMile(workoutType: string): number | null {
 
 const workoutMatchInclude = {
   segments: { orderBy: { stepOrder: "asc" as const } },
-  workout_catalogue: { select: { repPaceOffsetSecPerMile: true } },
+  workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true } },
 };
 
 /**
@@ -256,7 +256,7 @@ export async function tryMatchActivityToTrainingWorkout(
     paceDeltaSecPerMile != null &&
     paceDeltaSecPerMile >= 0
   ) {
-    const catalogueOff = candidate.workout_catalogue?.repPaceOffsetSecPerMile;
+    const catalogueOff = candidate.workout_catalogue?.workBasePaceOffsetSecPerMile;
     const offset =
       catalogueOff != null && Number.isFinite(catalogueOff)
         ? catalogueOff

@@ -1,6 +1,6 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
-import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { getAuth, setPersistence, browserLocalPersistence, type Auth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -12,32 +12,36 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-SF8QF8FCE2",
 };
 
-export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+let clientApp: FirebaseApp | undefined;
+let clientAuth: Auth | undefined;
 
-export const auth = getAuth(app);
-
-// Set persistence to keep user logged in across page refreshes
-// This is critical for preventing logout on refresh
-// Only set persistence in browser, and only if auth is available
 if (typeof window !== "undefined") {
   try {
-    setPersistence(auth, browserLocalPersistence).catch((error) => {
-      // Silently fail during build - will work at runtime
+    clientApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    clientAuth = getAuth(clientApp);
+    setPersistence(clientAuth, browserLocalPersistence).catch((error) => {
       if (process.env.NODE_ENV !== "production" || typeof window !== "undefined") {
         console.error("Failed to set auth persistence:", error);
       }
     });
   } catch (error) {
-    // Ignore errors during build
+    console.error("Firebase client initialization failed:", error);
   }
 }
 
+/** Placeholder so `auth.currentUser` during SSR / static prerender is safe (real auth loads in the browser). */
+const authSsrPlaceholder = { currentUser: null } as Auth;
+
+export const app = (clientApp ?? ({} as FirebaseApp)) as FirebaseApp;
+
+export const auth = (clientAuth ?? authSsrPlaceholder) as Auth;
+
 // Initialize Analytics (only in browser, async)
 let analytics: ReturnType<typeof getAnalytics> | null = null;
-if (typeof window !== "undefined") {
+if (typeof window !== "undefined" && clientApp) {
   isSupported().then((yes) => {
-    if (yes) {
-      analytics = getAnalytics(app);
+    if (yes && clientApp) {
+      analytics = getAnalytics(clientApp);
     }
   });
 }

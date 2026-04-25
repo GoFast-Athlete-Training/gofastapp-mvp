@@ -17,6 +17,9 @@ const api = axios.create({
  * request before that happens we get 401s for fully authenticated users.
  */
 function waitForAuthUser(timeoutMs = 5000): Promise<import('firebase/auth').User | null> {
+  if (typeof window === 'undefined') {
+    return Promise.resolve(null);
+  }
   return new Promise((resolve) => {
     // NOTE: auth.currentUser starts as null (not undefined) while Firebase is
     // still rehydrating the session — DO NOT early-return on null here.
@@ -75,6 +78,9 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const config = error.config;
+    if (typeof window === 'undefined') {
+      return Promise.reject(error);
+    }
     if (error?.response?.status === 401 && config && !config[RETRY_KEY]) {
       const user = auth.currentUser;
       if (user) {
