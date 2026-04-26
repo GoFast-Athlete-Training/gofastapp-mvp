@@ -42,7 +42,8 @@ function utcTodayYmd(): string {
  */
 export async function pushWorkoutToGarminForAthlete(
   athleteId: string,
-  workoutId: string
+  workoutId: string,
+  scheduleDateYmdOverride?: string
 ): Promise<PushWorkoutForAthleteResult> {
   try {
     const workout = await prisma.workouts.findFirst({
@@ -62,7 +63,9 @@ export async function pushWorkoutToGarminForAthlete(
     }
 
     let scheduledDate: string;
-    if (
+    if (scheduleDateYmdOverride?.trim()) {
+      scheduledDate = scheduleDateYmdOverride.trim();
+    } else if (
       workout.planId &&
       workout.weekNumber != null &&
       workout.dayAssigned?.trim() &&

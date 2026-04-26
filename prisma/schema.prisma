@@ -65,6 +65,8 @@ model Athlete {
   strava_refresh_token    String?
   strava_expires_at       Int?
   fiveKPace               String?
+  /// Functional threshold power (watts) — bike workout intensity anchor.
+  ftpWatts                Int?
   weeklyMileage           Int?
   role                    AthleteRole               @default(USER)
   runClubId               String?
@@ -88,6 +90,9 @@ model Athlete {
   routes                  routes[]
   training_plans          training_plans[]
   workouts                workouts[]
+  bike_workouts           bike_workout[]
+  swim_workouts           swim_workout[]
+  tri_workouts            tri_workout[]
   athlete_goals           AthleteGoal[]
   athlete_race_signups    athlete_race_signups[]
   race_memberships        race_memberships[]
@@ -1225,6 +1230,7 @@ model workouts {
   matched_activity          athlete_activities? @relation("WorkoutMatchedActivity", fields: [matchedActivityId], references: [id], onDelete: SetNull)
   segments                  workout_segments[]
   city_runs                 city_runs[]
+  tri_workout_leg           tri_workout_leg?
 
   @@index([athleteId])
   @@index([workoutType])
@@ -1283,6 +1289,142 @@ model workout_segment_laps {
 
   @@unique([segmentId, lapIndex])
   @@index([segmentId])
+}
+
+/// Sport for a leg within a tri / multi-sport session (ordering is on tri_workout_leg.legOrder).
+enum TriSport {
+  Swim
+  Bike
+  Run
+}
+
+/// Standalone or tri-linked cycling workout — TIME + power targets (watts).
+model bike_workout {
+  id                       String              @id @default(cuid())
+  athleteId                String
+  title                    String
+  description              String?
+  date                     DateTime?
+  /// Athlete FTP at creation time (optional denormalized snapshot).
+  ftpWattsSnapshot         Int?
+  estimatedDurationSeconds Int?
+  garminWorkoutId          Int?
+  garminScheduleId         Int?
+  notes                    String?
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+  Athlete                  Athlete             @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  steps                    bike_workout_step[]
+  tri_workout_leg          tri_workout_leg?
+
+  @@index([athleteId])
+  @@index([athleteId, date])
+}
+
+model bike_workout_step {
+  id              String       @id @default(cuid())
+  bikeWorkoutId   String
+  stepOrder       Int
+  title           String
+  intensity       String
+  repeatCount     Int?
+  durationType    String
+  durationSeconds Int?
+  powerWattsLow   Int?
+  powerWattsHigh  Int?
+  heartRateLow    Int?
+  heartRateHigh   Int?
+  cadenceLow      Int?
+  cadenceHigh     Int?
+  notes           String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  bikeWorkout     bike_workout @relation(fields: [bikeWorkoutId], references: [id], onDelete: Cascade)
+
+  @@index([bikeWorkoutId])
+  @@index([bikeWorkoutId, stepOrder])
+}
+
+/// Standalone or tri-linked swim workout — distance/time + pace per 100m.
+model swim_workout {
+  id               String              @id @default(cuid())
+  athleteId        String
+  title            String
+  description      String?
+  date             DateTime?
+  poolLengthMeters Int?
+  cssSecPer100m    Int?
+  garminWorkoutId  Int?
+  garminScheduleId Int?
+  notes            String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  Athlete          Athlete             @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  steps            swim_workout_step[]
+  tri_workout_leg  tri_workout_leg?
+
+  @@index([athleteId])
+  @@index([athleteId, date])
+}
+
+model swim_workout_step {
+  id                 String       @id @default(cuid())
+  swimWorkoutId      String
+  stepOrder          Int
+  title              String
+  intensity          String
+  repeatCount        Int?
+  durationType       String
+  durationMeters     Int?
+  durationSeconds    Int?
+  paceSecPer100mLow  Int?
+  paceSecPer100mHigh Int?
+  strokeType         String?
+  equipment          String?
+  heartRateLow       Int?
+  heartRateHigh      Int?
+  notes              String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  swimWorkout        swim_workout @relation(fields: [swimWorkoutId], references: [id], onDelete: Cascade)
+
+  @@index([swimWorkoutId])
+  @@index([swimWorkoutId, stepOrder])
+}
+
+/// Multi-sport session shell — links ordered sport-specific workouts (brick, tri sim, etc.).
+model tri_workout {
+  id          String            @id @default(cuid())
+  athleteId   String
+  title       String
+  description String?
+  date        DateTime?
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  Athlete     Athlete           @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  legs        tri_workout_leg[]
+
+  @@index([athleteId])
+  @@index([athleteId, date])
+}
+
+model tri_workout_leg {
+  id             String      @id @default(cuid())
+  triWorkoutId   String
+  legOrder       Int
+  sport          TriSport
+  title          String?
+  bikeWorkoutId  String?     @unique
+  swimWorkoutId  String?     @unique
+  runWorkoutId   String?     @unique
+  triWorkout     tri_workout @relation(fields: [triWorkoutId], references: [id], onDelete: Cascade)
+  bikeWorkout    bike_workout? @relation(fields: [bikeWorkoutId], references: [id])
+  swimWorkout    swim_workout? @relation(fields: [swimWorkoutId], references: [id])
+  runWorkout     workouts?     @relation(fields: [runWorkoutId], references: [id])
+
+  @@index([triWorkoutId])
+  @@index([triWorkoutId, legOrder])
 }
 
 enum EffortType {
