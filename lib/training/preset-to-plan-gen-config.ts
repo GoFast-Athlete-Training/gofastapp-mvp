@@ -1,5 +1,5 @@
 import type { preset_volume_constraints, preset_workout_config } from "@prisma/client";
-import type { PlanGenConfig } from "@/lib/training/generate-plan";
+import type { PlanGenConfig } from "@/lib/training/generate-plan-from-configs";
 
 /** Merge volume + workout boltons into the flat shape the generator expects. */
 export function presetBoltonsToPlanGenConfig(

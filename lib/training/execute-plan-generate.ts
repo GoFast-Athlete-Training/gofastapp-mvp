@@ -1,23 +1,18 @@
 /**
  * One-shot plan generate: writes `planWeeks` + plan scalars only (no `workouts` rows).
- * Loads `training_plan_preset` boltons when `presetId` is set; falls back to hardcoded defaults.
+ * Loads `training_plan_preset` boltons + optional `runTypeConfig` when `presetId` is set.
  *
- * Orchestration (see also `lib/training/generate-plan.ts` + `lib/training/long-run-engine.ts`):
- * 1. Load plan, race, optional preset; build `PlanGenConfig`.
- * 2. **Total weeks** — `calendarTrainingWeekCount(plan start → race)`.
- * 3. **Weekly miles** — clamped target (`weeklyMileageTarget`, `minWeeklyMiles` cap 100).
- * 4. **Preferred days** — plan `preferredDays`, else athlete `trainingPreferences`, else Mon–Sat.
- * 5. **Long-run day** — passed as `preferredLongRunDow` into `generatePlanWorkoutRows` (with preset `longRunDefaultDow` fallback there).
- * 6. **Long-run engine** — `longRunConfigFromPlanGen` + `generateLongRunSchedule` (miles/rotation on the week). Catalogue IDs are set at materialization, not here.
+ * Config resolution and catalogue rotation live in `generatePlanFromConfigs`;
+ * the pure week builder is `generatePlanWorkoutRows` in `generate-plan.ts`.
  */
 
 import { prisma } from "@/lib/prisma";
 import {
-  assignRotationalIdentifiers,
-  generatePlanWorkoutRows,
-  planWeeksSnapshotFromGeneratedRows,
+  generatePlanFromConfigs,
   type PlanGenConfig,
-} from "@/lib/training/generate-plan";
+  runTypeConfigPositionsToInputs,
+} from "@/lib/training/generate-plan-from-configs";
+import { planWeeksSnapshotFromGeneratedRows } from "@/lib/training/generate-plan";
 import { presetBoltonsToPlanGenConfig } from "@/lib/training/preset-to-plan-gen-config";
 import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
 import { Prisma } from "@prisma/client";
@@ -63,18 +58,51 @@ export async function executePlanGenerate(params: {
           include: {
             volumeConstraints: true,
             workoutConfig: true,
+            runTypeConfig: {
+              include: {
+                positions: { orderBy: { cyclePosition: "asc" } },
+              },
+            },
           },
         })
       : Promise.resolve(null),
   ]);
 
-  const config: PlanGenConfig | undefined =
+  const planConfig: PlanGenConfig | undefined =
     rawPreset?.volumeConstraints && rawPreset?.workoutConfig
       ? presetBoltonsToPlanGenConfig(
           rawPreset.volumeConstraints,
           rawPreset.workoutConfig
         )
       : undefined;
+
+  const runTypeConfigs = rawPreset?.runTypeConfig?.positions?.length
+    ? runTypeConfigPositionsToInputs(
+        rawPreset.runTypeConfig.positions.map((p) => ({
+          cyclePosition: p.cyclePosition,
+          catalogueWorkoutId: p.catalogueWorkoutId,
+          distributionWeight: p.distributionWeight,
+        }))
+      )
+    : undefined;
+
+  const catalogueIds = [
+    ...new Set(
+      (rawPreset?.runTypeConfig?.positions ?? [])
+        .map((p) => p.catalogueWorkoutId)
+        .filter((x): x is string => x != null && x.length > 0)
+    ),
+  ];
+  const catalogueRows =
+    catalogueIds.length > 0
+      ? await prisma.workout_catalogue.findMany({
+          where: { id: { in: catalogueIds } },
+          select: { id: true, paceAnchor: true },
+        })
+      : [];
+  const cataloguePaceById = new Map(
+    catalogueRows.map((r) => [r.id, { paceAnchor: r.paceAnchor }])
+  );
 
   let weeklyMileageTarget = params.weeklyMileageTarget;
   weeklyMileageTarget = Math.max(
@@ -94,22 +122,27 @@ export async function executePlanGenerate(params: {
     race.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
       ? metersToMiles(Number(race.distanceMeters))
       : 3.1;
-  const drafts = generatePlanWorkoutRows({
-    planId: plan.id,
-    athleteId,
-    totalWeeks: weekCount,
-    planStartDate: plan.startDate,
-    raceDate: race.raceDate,
-    weeklyMileageTarget,
-    minWeeklyMiles: params.minWeeklyMiles,
-    preferredDays,
-    raceName: race.name,
-    raceDistanceMiles,
-    preferredLongRunDow: plan.preferredLongRunDow,
-    preferredQualityDays: plan.preferredQualityDays,
-    config,
-  });
-  assignRotationalIdentifiers(drafts);
+  const drafts = generatePlanFromConfigs(
+    {
+      planId: plan.id,
+      athleteId,
+      totalWeeks: weekCount,
+      planStartDate: plan.startDate,
+      raceDate: race.raceDate,
+      weeklyMileageTarget,
+      minWeeklyMiles: params.minWeeklyMiles,
+      preferredDays,
+      raceName: race.name,
+      raceDistanceMiles,
+      preferredLongRunDow: plan.preferredLongRunDow,
+      preferredQualityDays: plan.preferredQualityDays,
+      planConfig,
+      runTypeConfigs,
+    },
+    cataloguePaceById.size > 0
+      ? { cataloguePaceById }
+      : {}
+  );
 
   const syncedFiveKPace =
     params.athleteFiveKPace?.trim() ||
