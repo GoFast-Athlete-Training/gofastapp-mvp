@@ -305,7 +305,7 @@ export function catalogueEntryToApiSegments(params: {
     ladderMax != null &&
     ladderMin != null &&
     ladderStep != null &&
-    (type === "Intervals" || type === "SpeedDuration" || type === "Tempo")
+    (type === "Intervals" || type === "Tempo")
   ) {
     const rungs = ladderRungsMeters(ladderMax, ladderMin, ladderStep);
     if (rungs.length > 0) {
@@ -378,12 +378,12 @@ export function catalogueEntryToApiSegments(params: {
     }
   }
 
-  if (type === "Tempo" || type === "SpeedDuration") {
+  if (type === "Tempo") {
     return buildSustainedQualityBlock({
       entry,
       totalMiles,
       anchorSecondsPerMile,
-      title: type === "SpeedDuration" ? "Speed / tempo" : "Tempo",
+      title: "Tempo",
     });
   }
 

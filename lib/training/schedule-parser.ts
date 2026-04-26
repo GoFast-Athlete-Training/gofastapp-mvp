@@ -71,8 +71,6 @@ export function workoutTypeToScheduleSuffix(wt: WorkoutType): string {
     case "Race":
       /** Compact schedule strings use LR; race day is distinguished when materializing */
       return "LR";
-    case "SpeedDuration":
-      return "T";
     default: {
       const _x: never = wt;
       return _x;

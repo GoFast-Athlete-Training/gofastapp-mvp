@@ -6,12 +6,12 @@ const WORKOUT_TYPES: WorkoutType[] = [
   "Intervals",
   "LongRun",
   "Race",
-  "SpeedDuration",
 ];
 
 export function parseWorkoutType(raw: unknown): WorkoutType | null {
   if (typeof raw !== "string") return null;
   const t = raw.trim();
+  if (t === "SpeedDuration") return "Tempo";
   return WORKOUT_TYPES.includes(t as WorkoutType) ? (t as WorkoutType) : null;
 }
 
