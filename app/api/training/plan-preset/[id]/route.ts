@@ -79,11 +79,26 @@ export async function PATCH(
       "minLongMiles",
       "minEasyPerDayMiles",
       "minEasyWeekMiles",
+      "cutbackFraction",
+      "cyclePeakPool",
+      "cyclePoolBuildCoef",
+      "cyclePoolTaperCoef",
     ] as const;
     const volumeData: Record<string, unknown> = {};
     const vol = body.volume && typeof body.volume === "object" ? body.volume : body;
     for (const k of volKeys) {
-      if (k in vol && vol[k] != null) volumeData[k] = vol[k];
+      if (k in vol) {
+        const v = (vol as Record<string, unknown>)[k];
+        if (k === "cyclePeakPool") {
+          if (v === null || v === "" || (typeof v === "number" && !Number.isFinite(v))) {
+            volumeData.cyclePeakPool = null;
+          } else if (typeof v === "number") {
+            volumeData.cyclePeakPool = v;
+          }
+        } else if (v != null) {
+          (volumeData as Record<string, unknown>)[k] = v;
+        }
+      }
     }
     if ("taperWeeks" in volumeData || "taperLongRuns" in volumeData) {
       const tw =

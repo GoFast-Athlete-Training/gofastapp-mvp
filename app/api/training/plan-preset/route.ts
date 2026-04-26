@@ -111,6 +111,18 @@ export async function POST(request: NextRequest) {
               typeof vol.minEasyPerDayMiles === "number" ? vol.minEasyPerDayMiles : 3,
             minEasyWeekMiles:
               typeof vol.minEasyWeekMiles === "number" ? vol.minEasyWeekMiles : 4,
+            cyclePeakPool:
+              typeof vol.cyclePeakPool === "number" && Number.isFinite(vol.cyclePeakPool)
+                ? vol.cyclePeakPool
+                : null,
+            cyclePoolBuildCoef:
+              typeof vol.cyclePoolBuildCoef === "number" && Number.isFinite(vol.cyclePoolBuildCoef)
+                ? vol.cyclePoolBuildCoef
+                : 1.12,
+            cyclePoolTaperCoef:
+              typeof vol.cyclePoolTaperCoef === "number" && Number.isFinite(vol.cyclePoolTaperCoef)
+                ? vol.cyclePoolTaperCoef
+                : 0.85,
           },
         },
         workoutConfig: {

@@ -982,6 +982,7 @@ model training_plan_preset {
 
   volumeConstraints preset_volume_constraints?
   workoutConfig     preset_workout_config?
+  runTypeConfigs    run_type_config[]
   training_plans    training_plans[]
 }
 
@@ -1011,6 +1012,12 @@ model preset_volume_constraints {
   minEasyWeekMiles        Float @default(4)
   /// Long-run cutback week distance as a fraction of the push (dynamic) miles; default 0.65
   cutbackFraction         Float?
+  /// Total long-run pool miles in the peak training cycle (N-1; before taper pool).
+  cyclePeakPool         Float?
+  /// Multiplier applied backward through build cycles (each prior pool = next / this).
+  cyclePoolBuildCoef    Float  @default(1.12)
+  /// Multiplier from peak to taper pool (N pool = (N-1) * this).
+  cyclePoolTaperCoef   Float  @default(0.85)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1033,6 +1040,28 @@ model preset_workout_config {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// Per-cycle position → catalogue mapping for slot-based long-run / quality planning (bolton on preset).
+model run_type_config {
+  id        String @id @default(cuid())
+  presetId  String
+  training_plan_preset training_plan_preset @relation(fields: [presetId], references: [id], onDelete: Cascade)
+
+  /// Position within the repeating cycle (0-based).
+  cyclePosition      Int
+  /// Coach-defined label (e.g. "Cutback long run").
+  name               String
+  /// Fraction of cycle pool for this slot; positions for a preset should sum to ~1.0.
+  distributionWeight Float  @default(0.25)
+  catalogueWorkoutId String?
+  workout_catalogue  workout_catalogue? @relation(fields: [catalogueWorkoutId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([presetId, cyclePosition])
+  @@index([presetId])
 }
 
 model training_plans {
@@ -1132,6 +1161,7 @@ model workout_catalogue {
   createdAt                    DateTime    @default(now())
   updatedAt                    DateTime    @updatedAt
   workouts                     workouts[]
+  runTypeConfigs               run_type_config[]
 
   @@unique([name, workoutType])
   @@index([workoutType])
