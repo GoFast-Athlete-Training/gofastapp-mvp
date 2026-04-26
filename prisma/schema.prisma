@@ -1089,10 +1089,18 @@ model training_plans {
 model workout_catalogue {
   id                           String      @id @default(cuid())
   name                         String
-  /// URL-safe id for rotation services (e.g. long-run-static). Unique when set; generated from name in UI.
+  /// Free-text sub-type the user types in the app (not a hardcoded select / DB enum). Services look up by this; `slug` (below) is optional kebab normalisation and fallback.
+  runSubType                   String?
+  /// URL-safe kebab-case, unique when set — derived or edited for stable joins; use when normalising or matching `runSubType`.
   slug                         String?     @unique
   description                  String?
   workoutType                  WorkoutType
+  /// Multi-segment work: [{ "miles": 3, "paceOffsetSecPerMile": 30 }, ...] — with `runSubType` + service rules.
+  workSegmentsJson             Json?
+  /// Long-run MP-simulation: shares of total scheduled distance (0–1 each; remainder can be unallocated easy)
+  warmupFraction               Float?
+  workFraction                 Float?
+  cooldownFraction             Float?
   /// True when this catalogue entry is used for quality slots during plan generation (legacy plan gen).
   isQuality                    Boolean     @default(false)
   /// Long-run shelf: false = easy/regular long; true = MP-sim / quality long (legacy plan gen).
@@ -1375,7 +1383,6 @@ enum WorkoutType {
   Intervals
   LongRun
   Race
-  SpeedDuration
 }
 
 enum RunWorkflowStatus {
