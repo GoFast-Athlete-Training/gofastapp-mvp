@@ -7,6 +7,7 @@
 import { prisma } from "@/lib/prisma";
 import { extractGarminWorkoutIdFromSummary } from "./extract-garmin-workout-id";
 import { applyWorkoutPaceCredit } from "./apply-workout-pace-credit";
+import { RUNNING_ACTIVITY_TYPES } from "./activity-type-sets";
 import {
   normalizePaceTargetEncodingVersion,
   storedPaceSecondsKmToSecondsPerMile,
@@ -24,18 +25,6 @@ function utcDayBounds(d: Date): { start: Date; end: Date } {
   end.setUTCHours(23, 59, 59, 999);
   return { start, end };
 }
-
-const RUNNING_ACTIVITY_TYPES = new Set(
-  [
-    "RUNNING",
-    "TRACK_RUNNING",
-    "TREADMILL_RUNNING",
-    "INDOOR_TRACK",
-    "TRAIL_RUNNING",
-    "VIRTUAL_RUNNING",
-    "STREET_RUNNING",
-  ].map((s) => s.toUpperCase())
-);
 
 function isRunningActivityType(activityType: string | null | undefined): boolean {
   if (!activityType) return true; // allow unknown — many payloads omit; treat as eligible for match

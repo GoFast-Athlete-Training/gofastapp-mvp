@@ -229,6 +229,7 @@ model athlete_activities {
   averageHeartRate Int?
   maxHeartRate     Int?
   elevationGain    Float?
+  averagePower     Int?
   steps            Int?
   startLatitude    Float?
   startLongitude   Float?
@@ -242,6 +243,7 @@ model athlete_activities {
   updatedAt        DateTime
   Athlete          Athlete           @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   matched_workout  workouts?         @relation("WorkoutMatchedActivity")
+  matched_bike_workout bike_workout? @relation("BikeWorkoutMatchedActivity")
   city_run_activity_links city_run_activity_links[]
 
   @@index([athleteId, ingestionStatus])
@@ -1310,12 +1312,23 @@ model bike_workout {
   estimatedDurationSeconds Int?
   garminWorkoutId          Int?
   garminScheduleId         Int?
+  matchedActivityId        String?             @unique
+  actualDurationSeconds    Int?
+  actualDistanceMeters     Float?
+  actualAvgPowerWatts      Int?
+  actualAverageHeartRate   Int?
+  actualMaxHeartRate       Int?
+  actualElevationGain      Float?
+  actualCalories           Int?
+  /// actual avg power minus planned step target midpoint (watts); positive = rode above target.
+  powerDeltaWatts          Int?
   notes                    String?
   createdAt                DateTime            @default(now())
   updatedAt                DateTime            @updatedAt
   Athlete                  Athlete             @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   steps                    bike_workout_step[]
   tri_workout_leg          tri_workout_leg?
+  matched_activity         athlete_activities? @relation("BikeWorkoutMatchedActivity", fields: [matchedActivityId], references: [id], onDelete: SetNull)
 
   @@index([athleteId])
   @@index([athleteId, date])

@@ -13,6 +13,7 @@ export interface NormalizedActivityFields {
   averageHeartRate: number | undefined;
   maxHeartRate: number | undefined;
   elevationGain: number | undefined;
+  averagePower: number | undefined;
   steps: number | undefined;
 }
 
@@ -61,6 +62,9 @@ export function normalizeActivityFields(activity: any): NormalizedActivityFields
       ? Math.round(Number(getNum(raw, 'maxHeartRate', 'maxHeartRateInBeatsPerMinute')))
       : undefined;
   const elevationGain = getNum(raw, 'elevationGain', 'totalElevationGainInMeters');
+  const averagePowerRaw = getNum(raw, 'averagePower', 'averagePowerInWatts');
+  const averagePower =
+    averagePowerRaw != null ? Math.round(Number(averagePowerRaw)) : undefined;
   const steps =
     getNum(raw, 'steps') != null ? Math.round(Number(getNum(raw, 'steps'))) : undefined;
 
@@ -73,6 +77,7 @@ export function normalizeActivityFields(activity: any): NormalizedActivityFields
     averageHeartRate,
     maxHeartRate,
     elevationGain,
+    averagePower,
     steps,
   };
 }

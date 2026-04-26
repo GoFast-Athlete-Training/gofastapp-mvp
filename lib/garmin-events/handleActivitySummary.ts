@@ -8,6 +8,8 @@ import { getAthleteByGarminUserId } from '../domain-garmin';
 import { activityExists } from './dedupe';
 import { normalizeActivityFields } from './normalizeActivityFields';
 import { tryMatchActivityToTrainingWorkout } from '../training/match-activity-to-workout';
+import { tryMatchActivityToBikeWorkout } from '../training/match-activity-to-bike-workout';
+import { isCyclingActivityType } from '../training/activity-type-sets';
 
 function generateId(): string {
   const timestamp = Date.now().toString(36);
@@ -95,6 +97,7 @@ export async function handleActivitySummary(
           averageHeartRate: norm.averageHeartRate,
           maxHeartRate: norm.maxHeartRate,
           elevationGain: norm.elevationGain,
+          averagePower: norm.averagePower,
           steps: norm.steps,
           summaryData: activity as object,
           updatedAt: now,
@@ -111,13 +114,17 @@ export async function handleActivitySummary(
       });
 
       try {
-        await tryMatchActivityToTrainingWorkout(created.id);
+        if (isCyclingActivityType(activity.activityType)) {
+          await tryMatchActivityToBikeWorkout(created.id);
+        } else {
+          await tryMatchActivityToTrainingWorkout(created.id);
+        }
         console.log('✅ match attempt complete', {
           id: created.id,
           sourceActivityId,
         });
       } catch (matchErr) {
-        console.warn('tryMatchActivityToTrainingWorkout:', matchErr);
+        console.warn('tryMatchActivityToTrainingWorkout / BikeWorkout:', matchErr);
       }
 
       processed++;
