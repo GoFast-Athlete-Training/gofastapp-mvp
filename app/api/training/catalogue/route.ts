@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { newEntityId } from "@/lib/training/new-entity-id";
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const items = await prisma.workout_catalogue.findMany({
-      orderBy: [{ workoutType: "asc" }, { progressionIndex: "asc" }],
+      orderBy: [{ workoutType: "asc" }, { name: "asc" }],
     });
     return NextResponse.json({ success: true, items });
   } catch (e: unknown) {
@@ -42,21 +43,21 @@ export async function POST(request: NextRequest) {
       data: {
         id: newEntityId(),
         name: d.name,
+        runSubType: d.runSubType,
         slug: d.slug ?? generateCatalogueSlug(d.name),
         description: d.description,
         workoutType: d.workoutType,
-        intendedPhase: d.intendedPhase,
-        isQuality: d.isQuality,
-        isLongRunQuality: d.isLongRunQuality,
-        isLadder: d.isLadder,
+        workSegmentsJson:
+          d.workSegmentsJson === null
+            ? Prisma.JsonNull
+            : (d.workSegmentsJson as Prisma.InputJsonValue),
+        warmupFraction: d.warmupFraction,
+        workFraction: d.workFraction,
+        cooldownFraction: d.cooldownFraction,
         paceAnchor: d.paceAnchor,
         mpFraction: d.mpFraction,
         mpBlockPosition: d.mpBlockPosition,
         mpBlockProgression: d.mpBlockProgression,
-        ladderStepMeters: d.ladderStepMeters,
-        minLadderMeters: d.minLadderMeters,
-        maxLadderMeters: d.maxLadderMeters,
-        progressionIndex: d.progressionIndex,
         workBaseReps: d.workBaseReps,
         workBaseRepMeters: d.workBaseRepMeters,
         recoveryDistanceMeters: d.recoveryDistanceMeters,
@@ -68,7 +69,6 @@ export async function POST(request: NextRequest) {
         workPaceOffsetSecPerMile: d.workPaceOffsetSecPerMile,
         workBasePaceOffsetSecPerMile: d.workBasePaceOffsetSecPerMile,
         recoveryPaceOffsetSecPerMile: d.recoveryPaceOffsetSecPerMile,
-        isMP: d.isMP,
         mpTotalMiles: d.mpTotalMiles,
         mpPaceOffsetSecPerMile: d.mpPaceOffsetSecPerMile,
         intendedHeartRateZone: d.intendedHeartRateZone,

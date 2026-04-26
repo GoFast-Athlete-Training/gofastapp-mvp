@@ -46,7 +46,7 @@ export function buildPlanWorkoutApiSegments(params: {
   goalRacePace?: string | null;
   goalRaceTime?: string | null;
   raceDistanceMiles?: number | null;
-  planLadderIndex?: number | null;
+  planCycleIndex?: number | null;
 }): ApiSegment[] {
   const {
     workoutType,
@@ -56,7 +56,7 @@ export function buildPlanWorkoutApiSegments(params: {
     goalRacePace,
     goalRaceTime,
     raceDistanceMiles,
-    planLadderIndex,
+    planCycleIndex,
   } = params;
   if (isIntervalsOrTempo(workoutType)) {
     return [];
@@ -74,7 +74,7 @@ export function buildPlanWorkoutApiSegments(params: {
       scheduleMiles: miles,
       anchorSecondsPerMile: anchorSecPerMile,
       racePaceSecondsPerMile: racePaceSec,
-      planLadderIndex: planLadderIndex ?? null,
+      planCycleIndex: planCycleIndex ?? null,
     });
   }
   return descriptorsToApiSegments(

@@ -1,4 +1,4 @@
-import type { WorkoutType } from "@prisma/client";
+import type { Prisma, WorkoutType } from "@prisma/client";
 import {
   PACE_ANCHOR_CURRENT_BUILDUP,
   PACE_ANCHOR_MP_SIMULATION,
@@ -6,25 +6,20 @@ import {
 
 export type CatalogueSeedRow = {
   name: string;
-  /** Optional; defaults to kebab-case from `name` at seed time. */
   slug?: string | null;
+  runSubType?: string | null;
   workoutType: WorkoutType;
   description: string | null;
-  intendedPhase: string[];
-  isQuality: boolean;
-  isLongRunQuality: boolean;
-  isMP: boolean;
-  isLadder: boolean;
+  workSegmentsJson: Prisma.InputJsonValue | null;
+  warmupFraction: number | null;
+  workFraction: number | null;
+  cooldownFraction: number | null;
   paceAnchor: string;
   mpFraction: number | null;
   mpTotalMiles: number | null;
   mpPaceOffsetSecPerMile: number | null;
   mpBlockPosition: string | null;
   mpBlockProgression: string;
-  ladderStepMeters: number | null;
-  minLadderMeters: number | null;
-  maxLadderMeters: number | null;
-  progressionIndex: number | null;
   workBaseReps: number | null;
   workBaseRepMeters: number | null;
   workBaseMiles: number | null;
@@ -43,23 +38,25 @@ export type CatalogueSeedRow = {
 export const SEED_CATALOGUE_ROWS: CatalogueSeedRow[] = [
   {
     name: "Up and Over",
+    runSubType: "pyramid",
     workoutType: "Intervals",
-    description: "Pyramid ladder: step 200m, min 200m, max 800m.",
-    intendedPhase: ["base", "build", "peak"],
-    isQuality: true,
-    isLongRunQuality: false,
-    isMP: false,
-    isLadder: true,
+    description: "Pyramid ladder: 200–800–200 m reps at interval pace.",
+    workSegmentsJson: [
+      { distanceMeters: 200, paceOffsetSecPerMile: -30 },
+      { distanceMeters: 400, paceOffsetSecPerMile: -30 },
+      { distanceMeters: 800, paceOffsetSecPerMile: -30 },
+      { distanceMeters: 400, paceOffsetSecPerMile: -30 },
+      { distanceMeters: 200, paceOffsetSecPerMile: -30 },
+    ],
+    warmupFraction: null,
+    workFraction: null,
+    cooldownFraction: null,
     paceAnchor: PACE_ANCHOR_CURRENT_BUILDUP,
     mpFraction: null,
     mpTotalMiles: null,
     mpPaceOffsetSecPerMile: null,
     mpBlockPosition: null,
     mpBlockProgression: "flat",
-    ladderStepMeters: 200,
-    minLadderMeters: 200,
-    maxLadderMeters: 800,
-    progressionIndex: 1,
     workBaseReps: null,
     workBaseRepMeters: null,
     workBaseMiles: null,
@@ -71,27 +68,22 @@ export const SEED_CATALOGUE_ROWS: CatalogueSeedRow[] = [
     workPaceOffsetSecPerMile: null,
     workBasePaceOffsetSecPerMile: -30,
     recoveryPaceOffsetSecPerMile: null,
-    notes: "Pyramid ladder: step 200m, min 200m, max 800m.",
+    notes: "Pyramid ladder via workSegmentsJson.",
   },
   {
     name: "Tempo",
     workoutType: "Tempo",
     description: null,
-    intendedPhase: ["base", "build", "peak"],
-    isQuality: true,
-    isLongRunQuality: false,
-    isMP: false,
-    isLadder: false,
+    workSegmentsJson: null,
+    warmupFraction: null,
+    workFraction: null,
+    cooldownFraction: null,
     paceAnchor: PACE_ANCHOR_CURRENT_BUILDUP,
     mpFraction: null,
     mpTotalMiles: null,
     mpPaceOffsetSecPerMile: null,
     mpBlockPosition: null,
     mpBlockProgression: "flat",
-    ladderStepMeters: null,
-    minLadderMeters: null,
-    maxLadderMeters: null,
-    progressionIndex: 1,
     workBaseReps: null,
     workBaseRepMeters: null,
     workBaseMiles: null,
@@ -109,21 +101,16 @@ export const SEED_CATALOGUE_ROWS: CatalogueSeedRow[] = [
     name: "Interval",
     workoutType: "Intervals",
     description: null,
-    intendedPhase: ["base", "build", "peak"],
-    isQuality: true,
-    isLongRunQuality: false,
-    isMP: false,
-    isLadder: false,
+    workSegmentsJson: null,
+    warmupFraction: null,
+    workFraction: null,
+    cooldownFraction: null,
     paceAnchor: PACE_ANCHOR_CURRENT_BUILDUP,
     mpFraction: null,
     mpTotalMiles: null,
     mpPaceOffsetSecPerMile: null,
     mpBlockPosition: null,
     mpBlockProgression: "flat",
-    ladderStepMeters: null,
-    minLadderMeters: null,
-    maxLadderMeters: null,
-    progressionIndex: 2,
     workBaseReps: 6,
     workBaseRepMeters: 800,
     workBaseMiles: null,
@@ -141,21 +128,16 @@ export const SEED_CATALOGUE_ROWS: CatalogueSeedRow[] = [
     name: "Long Run",
     workoutType: "LongRun",
     description: null,
-    intendedPhase: ["base", "build", "peak", "taper"],
-    isQuality: false,
-    isLongRunQuality: false,
-    isMP: false,
-    isLadder: false,
+    workSegmentsJson: null,
+    warmupFraction: null,
+    workFraction: null,
+    cooldownFraction: null,
     paceAnchor: PACE_ANCHOR_CURRENT_BUILDUP,
     mpFraction: null,
     mpTotalMiles: null,
     mpPaceOffsetSecPerMile: null,
     mpBlockPosition: null,
     mpBlockProgression: "flat",
-    ladderStepMeters: null,
-    minLadderMeters: null,
-    maxLadderMeters: null,
-    progressionIndex: 1,
     workBaseReps: null,
     workBaseRepMeters: null,
     workBaseMiles: null,
@@ -171,24 +153,20 @@ export const SEED_CATALOGUE_ROWS: CatalogueSeedRow[] = [
   },
   {
     name: "Long Run Quality",
+    runSubType: "mp-block",
     workoutType: "LongRun",
     description:
-      "Easy first; final block at imprinted goal race pace. mpFraction scales with plan ladder index.",
-    intendedPhase: ["build", "peak"],
-    isQuality: true,
-    isLongRunQuality: true,
-    isMP: true,
-    isLadder: false,
+      "Easy first; final block at imprinted goal race pace. mpFraction scales with plan cycle index.",
+    workSegmentsJson: null,
+    warmupFraction: null,
+    workFraction: null,
+    cooldownFraction: null,
     paceAnchor: PACE_ANCHOR_MP_SIMULATION,
     mpFraction: 0.4,
     mpTotalMiles: null,
     mpPaceOffsetSecPerMile: null,
     mpBlockPosition: "BACK_HALF",
     mpBlockProgression: "flat",
-    ladderStepMeters: null,
-    minLadderMeters: null,
-    maxLadderMeters: null,
-    progressionIndex: 2,
     workBaseReps: null,
     workBaseRepMeters: null,
     workBaseMiles: null,
@@ -201,27 +179,23 @@ export const SEED_CATALOGUE_ROWS: CatalogueSeedRow[] = [
     workBasePaceOffsetSecPerMile: null,
     recoveryPaceOffsetSecPerMile: null,
     notes:
-      "Easy first; final block at imprinted goal race pace. mpFraction scales with plan ladder index.",
+      "Easy first; final block at imprinted goal race pace. mpFraction scales with plan cycle index.",
   },
   {
     name: "Marathon Test",
     workoutType: "LongRun",
+    runSubType: "marathon-test",
     description: "Peak long run with larger goal-pace block.",
-    intendedPhase: ["peak"],
-    isQuality: true,
-    isLongRunQuality: true,
-    isMP: true,
-    isLadder: false,
+    workSegmentsJson: null,
+    warmupFraction: null,
+    workFraction: null,
+    cooldownFraction: null,
     paceAnchor: PACE_ANCHOR_MP_SIMULATION,
     mpFraction: 0.55,
     mpTotalMiles: null,
     mpPaceOffsetSecPerMile: null,
     mpBlockPosition: "BACK_HALF",
     mpBlockProgression: "flat",
-    ladderStepMeters: null,
-    minLadderMeters: null,
-    maxLadderMeters: null,
-    progressionIndex: 3,
     workBaseReps: null,
     workBaseRepMeters: null,
     workBaseMiles: null,
@@ -239,21 +213,16 @@ export const SEED_CATALOGUE_ROWS: CatalogueSeedRow[] = [
     name: "Easy Run",
     workoutType: "Easy",
     description: null,
-    intendedPhase: ["base", "build", "peak", "taper"],
-    isQuality: false,
-    isLongRunQuality: false,
-    isMP: false,
-    isLadder: false,
+    workSegmentsJson: null,
+    warmupFraction: null,
+    workFraction: null,
+    cooldownFraction: null,
     paceAnchor: PACE_ANCHOR_CURRENT_BUILDUP,
     mpFraction: null,
     mpTotalMiles: null,
     mpPaceOffsetSecPerMile: null,
     mpBlockPosition: null,
     mpBlockProgression: "flat",
-    ladderStepMeters: null,
-    minLadderMeters: null,
-    maxLadderMeters: null,
-    progressionIndex: 1,
     workBaseReps: null,
     workBaseRepMeters: null,
     workBaseMiles: null,

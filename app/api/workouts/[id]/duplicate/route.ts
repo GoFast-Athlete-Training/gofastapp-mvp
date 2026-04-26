@@ -108,7 +108,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
             nOffset: null,
             weekNumber: null,
             dayAssigned: null,
-            planLadderIndex: null,
+            planCycleIndex: null,
             garminWorkoutId: null,
             garminScheduleId: null,
             matchedActivityId: null,

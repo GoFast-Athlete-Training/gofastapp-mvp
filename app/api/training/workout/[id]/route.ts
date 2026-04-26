@@ -10,7 +10,7 @@ import {
 } from "@/lib/training/algo-workout-segments";
 import { buildPlanWorkoutApiSegments } from "@/lib/training/workout-segment-generator";
 import type { ApiSegment } from "@/lib/workout-generator/templates";
-import { ladderIndexFromScheduleForDay } from "@/lib/training/schedule-parser";
+import { cycleIndexFromScheduleForDay } from "@/lib/training/schedule-parser";
 import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 import { newEntityId } from "@/lib/training/new-entity-id";
 import { metersToMiles } from "@/lib/pace-utils";
@@ -35,19 +35,19 @@ function scheduleStringForPlanWeek(
   return typeof s === "string" ? s : null;
 }
 
-/** Plan-frozen ladder for I/T; omit return → legacy Garmin-completion rotation. */
-function resolvedPlanLadderIndexForWorkout(params: {
-  planLadderIndex: number | null;
+/** Plan-frozen cycle index for I/T/LR(mp); omit return → legacy Garmin-completion rotation. */
+function resolvedPlanCycleIndexForWorkout(params: {
+  planCycleIndex: number | null;
   weekNumber: number | null;
   dayAssigned: string | null;
   workoutType: WorkoutType;
   planWeeks: unknown;
 }): number | undefined {
   if (
-    params.planLadderIndex != null &&
-    Number.isFinite(params.planLadderIndex)
+    params.planCycleIndex != null &&
+    Number.isFinite(params.planCycleIndex)
   ) {
-    return params.planLadderIndex;
+    return params.planCycleIndex;
   }
   if (
     params.workoutType !== "Intervals" &&
@@ -64,7 +64,7 @@ function resolvedPlanLadderIndexForWorkout(params: {
     params.weekNumber
   );
   if (!schedule) return undefined;
-  const idx = ladderIndexFromScheduleForDay({
+  const idx = cycleIndexFromScheduleForDay({
     schedule,
     dayAssigned: params.dayAssigned,
     workoutType: params.workoutType,
@@ -155,8 +155,8 @@ export async function GET(request: NextRequest, context: Ctx) {
 
         let apiSegs: ApiSegment[] | null = null;
 
-        const planLadderIndex = resolvedPlanLadderIndexForWorkout({
-          planLadderIndex: workout.planLadderIndex ?? null,
+        const planCycleIndex = resolvedPlanCycleIndexForWorkout({
+          planCycleIndex: workout.planCycleIndex ?? null,
           weekNumber: workout.weekNumber ?? null,
           dayAssigned: workout.dayAssigned ?? null,
           workoutType: workout.workoutType,
@@ -170,7 +170,7 @@ export async function GET(request: NextRequest, context: Ctx) {
             workoutDate: workout.date ?? null,
             scheduleTotalMiles: scheduleMiles,
             anchorSecondsPerMile,
-            planLadderIndex,
+            planCycleIndex,
           });
         } else if (workout.workoutType === "Tempo") {
           apiSegs = await buildTempoApiSegments({
@@ -179,7 +179,7 @@ export async function GET(request: NextRequest, context: Ctx) {
             workoutDate: workout.date ?? null,
             scheduleTotalMiles: scheduleMiles,
             anchorSecondsPerMile,
-            planLadderIndex,
+            planCycleIndex,
           });
         } else if (
           workout.workoutType === "Easy" ||
@@ -202,7 +202,7 @@ export async function GET(request: NextRequest, context: Ctx) {
             goalRacePace: workout.training_plans?.goalRacePace ?? null,
             goalRaceTime: workout.training_plans?.goalRaceTime ?? null,
             raceDistanceMiles,
-            planLadderIndex: workout.planLadderIndex ?? null,
+            planCycleIndex: workout.planCycleIndex ?? null,
           });
         }
 

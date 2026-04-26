@@ -22,7 +22,6 @@
     "db:verify-schema": "tsx scripts/verify-schema.ts",
     "db:populate-bidirectional-ids": "tsx scripts/populate-bidirectional-run-club-ids.ts",
     "db:seed-demo-races": "tsx scripts/seed-demo-races.ts",
-    "db:seed-catalogue": "tsx scripts/seed-catalogue.ts",
     "smoke:fivek-pace": "tsx scripts/smoke-fivek-pace.ts",
     "smoke:garmin-minimal": "tsx scripts/garmin-minimal-workout-smoke.ts",
     "db:migrate-pace-targets": "tsx scripts/migrate-legacy-pace-targets.ts",

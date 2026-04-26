@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { newEntityId } from "@/lib/training/new-entity-id";
 import { generateCatalogueSlug } from "@/lib/training/catalogue-slug";
 import { SEED_CATALOGUE_ROWS } from "@/lib/training/catalogue-seed-rows";
@@ -21,22 +22,21 @@ export async function runCatalogueSeed(prisma: PrismaClient): Promise<{
     const slug = row.slug ?? generateCatalogueSlug(row.name);
     const data = {
       slug,
+      runSubType: row.runSubType ?? null,
       description: row.description,
-      intendedPhase: row.intendedPhase,
-      isQuality: row.isQuality,
-      isLongRunQuality: row.isLongRunQuality,
-      isMP: row.isMP,
-      isLadder: row.isLadder,
+      workSegmentsJson:
+        row.workSegmentsJson === null
+          ? Prisma.JsonNull
+          : (row.workSegmentsJson as Prisma.InputJsonValue),
+      warmupFraction: row.warmupFraction,
+      workFraction: row.workFraction,
+      cooldownFraction: row.cooldownFraction,
       paceAnchor: row.paceAnchor,
       mpFraction: row.mpFraction,
       mpTotalMiles: row.mpTotalMiles,
       mpPaceOffsetSecPerMile: row.mpPaceOffsetSecPerMile,
       mpBlockPosition: row.mpBlockPosition,
       mpBlockProgression: row.mpBlockProgression,
-      ladderStepMeters: row.ladderStepMeters,
-      minLadderMeters: row.minLadderMeters,
-      maxLadderMeters: row.maxLadderMeters,
-      progressionIndex: row.progressionIndex,
       workBaseReps: row.workBaseReps,
       workBaseRepMeters: row.workBaseRepMeters,
       workBaseMiles: row.workBaseMiles,

@@ -2,7 +2,7 @@
  * Parse / build compact schedule strings on planWeeks, e.g. "M:5E W:6T Su:14LR"
  * Day abbrev: M, Tu, W, Th, F, Sa, Su
  * Type suffix: E Easy, T Tempo, I Intervals, L or LR LongRun (canonical write uses LR)
- * Optional ladder marker for I/T: "-i0" .. "-i3" (plan-frozen step), e.g. "W:5I-i2"
+ * Optional cycle marker for I/T: "-i0" .. "-i3" (plan-frozen 0–3 slot), e.g. "W:5I-i2"
  */
 
 import type { WorkoutType } from "@prisma/client";
@@ -15,7 +15,7 @@ export type ScheduleToken = {
   typeLetter: string;
   workoutType: WorkoutType;
   /** Present for Intervals/Tempo when token includes -iN; legacy strings omit → treat as 0 */
-  ladderIndex?: number;
+  cycleIndex?: number;
 };
 
 const DAY_NAME_TO_ABBR: Record<string, string> = {
@@ -135,26 +135,26 @@ export function parseScheduleString(schedule: string): ScheduleToken[] {
     if (!match) {
       throw new Error(`Invalid schedule token: "${part}" (expected e.g. M:5E or W:5I-i0)`);
     }
-    const [, dayAbbr, milesStr, typeSuffix, ladderStr] = match;
+    const [, dayAbbr, milesStr, typeSuffix, cycleStr] = match;
     const workoutType = suffixToWorkoutType(typeSuffix);
-    const ladderIndex =
-      ladderStr != null && ladderStr !== ""
-        ? Math.min(3, Math.max(0, parseInt(ladderStr, 10)))
+    const cycleIndex =
+      cycleStr != null && cycleStr !== ""
+        ? Math.min(3, Math.max(0, parseInt(cycleStr, 10)))
         : undefined;
     tokens.push({
       dayAbbr,
       miles: parseFloat(milesStr),
       typeLetter: typeLetterFromWorkoutType(workoutType),
       workoutType,
-      ...(ladderIndex !== undefined ? { ladderIndex } : {}),
+      ...(cycleIndex !== undefined ? { cycleIndex } : {}),
     });
   }
 
   return tokens;
 }
 
-/** Resolve plan-frozen ladder index from a week's schedule string for legacy rows missing planLadderIndex. */
-export function ladderIndexFromScheduleForDay(params: {
+/** Resolve plan-frozen cycle index from a week's schedule string for legacy rows missing planCycleIndex. */
+export function cycleIndexFromScheduleForDay(params: {
   schedule: string;
   dayAssigned: string;
   workoutType: WorkoutType;
@@ -166,7 +166,7 @@ export function ladderIndexFromScheduleForDay(params: {
       (t) => t.dayAbbr === abbr && t.workoutType === params.workoutType
     );
     if (!hit) return null;
-    return hit.ladderIndex ?? 0;
+    return hit.cycleIndex ?? 0;
   } catch {
     return null;
   }

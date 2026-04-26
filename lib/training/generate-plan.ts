@@ -1,14 +1,15 @@
 /**
- * Marathon-style week builder. Pipeline per calendar week (Mon-Sun, UTC):
+ * Marathon-style week builder (Mon–Sun, UTC). Plan generate pipeline inside `generatePlanWorkoutRows`:
  *
- * 1. Race day - anchor end of plan; race week (`nOffset === 0`) is race-only; day-before-race
- *    is hard-blocked for any workout.
- * 2. Taper - `nOffsetFromWeekAnchor` sets phase and taper-shaped long-run miles (skip LR at `nOffset === -1`).
- * 3. Weekly miles = athlete `weeklyMileageTarget` (clamped). Quality miles use preset `qualityFraction` (0–0.5; API uses percent 0–50);
- *    long run from ladder; easy = remainder. Tempo/interval slots use `isQuality` Tempo/Intervals rows; long run uses phase + `isLongRunQuality` + rotation.
- * 4. Placement - LR on Sat/Sun prefs; quality on user `preferredQualityDays` or preset DOWs; easy on leftovers.
+ * 1. **Total weeks** — `input.totalWeeks` (caller: `calendarTrainingWeekCount` from start → race).
+ * 2. **Long-run block count (cycles for LRE)** — `longRunBlockCountFromTotalWeeks(weeks)` = ceil(weeks/4); used inside `generateLongRunSchedule`. Each week is still one row; blocks drive taper/pre-peak placement.
+ * 3. **Weekly volume** — `weeklyMileageTarget` + preset `minWeeklyMiles` / quality / easy splits; long-run miles come from the engine, not from `longRunMilesForOffset` (Build/peak/taper *phase* still uses the latter in other utilities).
+ * 4. **Preferred days** — `input.preferredDays` (Mon–7); quality days from `preferredQualityDays` or preset DOWs.
+ * 5. **Long-run day of week** — `normalizeLongRunOurDow(preferredLongRunDow, longRunDefaultDow)`.
+ * 6. **Call long-run engine** — `generateLongRunSchedule(longRunConfigFromPlanGen(weekCount, preset))` → per-week `distance` array.
+ * 7. **Per calendar week** — assign tempo/interval/long/easy to DOWs using that schedule + placement rules. `catalogueWorkoutId` stays null here; catalogue links are applied at materialization.
  *
- * Partial week 1: skip tempo/interval; LR only if preferred Sat/Sun fall in-window; easy on prefs.
+ * Race week (`nOffset === 0`) is race-only; day-before-race is blocked. Partial week 1: skip tempo/interval; LR only if Sat/Sun fall in-range; easy on prefs. Taper long-run pattern comes from the engine for the last block.
  */
 
 import type { WorkoutType } from "@prisma/client";
@@ -18,19 +19,11 @@ import {
   formatMilesForScheduleToken,
   workoutTypeToScheduleSuffix,
 } from "@/lib/training/schedule-parser";
-import {
-  calendarTrainingWeekCount,
-  mondayUtcOfWeekContaining,
-  ymdFromDate,
-} from "@/lib/training/plan-utils";
+import { mondayUtcOfWeekContaining, ymdFromDate } from "@/lib/training/plan-utils";
 import { formatPlannedWorkoutTitle } from "@/lib/training/workout-display-title";
 import { defaultTaperLongRunsForWeeks } from "@/lib/training/preset-volume-helpers";
 import { PACE_ANCHOR_MP_SIMULATION } from "@/lib/training/goal-pace-calculator";
-import {
-  generateLongRunSchedule,
-  longRunConfigFromPlanGen,
-} from "@/lib/training/long-run-engine";
-import { pickLongRunCatalogueBySlug } from "@/lib/training/long-run-rotation-service";
+import { generateLongRunSchedule, longRunConfigFromPlanGen } from "@/lib/training/long-run-engine";
 
 const DAY_NAMES = [
   "Monday",
@@ -52,8 +45,8 @@ export interface PlanGenConfig {
   /** Ordered taper long-run miles; index 0 = furthest from race. Length should match taperWeeks. */
   taperLongRuns?: number[];
   baseStartMiles?: number;
-  ladderStep?: number;
-  ladderCycleLen?: number;
+  cycleStep?: number;
+  cycleLen?: number;
   peakEntryMiles?: number;
   peakLongRunMiles?: number;
   cutbackWeekModulo?: number;
@@ -65,7 +58,7 @@ export interface PlanGenConfig {
   minWeeklyMiles?: number;
   qualityFraction?: number;
   qualitySessions?: number;
-  /** @deprecated Ignored: long-run catalogue row is chosen via phase + isLongRunQuality on catalogue entries. */
+  /** @deprecated Ignored: long-run catalogue row is chosen by 4-position slug (`long-run-static` / progressive / mp). */
   qualityOnLongRun?: boolean;
   minLongMiles?: number;
   minEasyPerDayMiles?: number;
@@ -92,8 +85,8 @@ export function longRunMilesForOffset(nOffset: number, cfg?: PlanGenConfig): num
   const peakLongRun = cfg?.peakLongRunMiles ?? 22;
   const peakEntry = cfg?.peakEntryMiles ?? 18;
   const baseStart = cfg?.baseStartMiles ?? 8;
-  const ladderStep = cfg?.ladderStep ?? 2;
-  const ladderCycleLen = Math.max(1, cfg?.ladderCycleLen ?? 4);
+  const cycleStep = cfg?.cycleStep ?? 2;
+  const cycleLen = Math.max(1, cfg?.cycleLen ?? 4);
 
   let taperLongRuns = cfg?.taperLongRuns;
   if (!taperLongRuns || taperLongRuns.length === 0) {
@@ -125,12 +118,12 @@ export function longRunMilesForOffset(nOffset: number, cfg?: PlanGenConfig): num
     return Math.round(Math.min(peakLongRun, Math.max(0, miles)));
   }
 
-  // Base/build: repeating ladder stepping up toward peakEntry
+  // Base/build: repeating cycle stepping up toward peakEntry
   const weeksIntoBuild = Math.abs(nOffset) - taperWeeks - peakWeeks - 1;
-  const cyclePos = weeksIntoBuild % ladderCycleLen;
-  const cycleNum = Math.floor(weeksIntoBuild / ladderCycleLen);
-  const cyclePeak = peakEntry - (cycleNum + 1) * ladderStep;
-  const miles = cyclePeak - (ladderCycleLen - 1 - cyclePos) * ladderStep;
+  const cyclePos = weeksIntoBuild % cycleLen;
+  const cycleNum = Math.floor(weeksIntoBuild / cycleLen);
+  const cyclePeak = peakEntry - (cycleNum + 1) * cycleStep;
+  const miles = cyclePeak - (cycleLen - 1 - cyclePos) * cycleStep;
   return Math.max(baseStart, Math.round(miles));
 }
 
@@ -227,65 +220,10 @@ export function cataloguePhaseFallbackForWeek(
   return phaseForCatalogue(nOffset);
 }
 
-/** Minimal catalogue projection for plan generation. */
-export interface CatalogueWorkoutRow {
-  id: string;
-  isQuality: boolean;
-  isLongRunQuality: boolean;
-  workoutType: WorkoutType;
-  intendedPhase: string[];
-  progressionIndex: number | null;
-  /** Stable id for long-run rotation (e.g. long-run-static) */
-  slug?: string | null;
-}
-
-function cataloguePhaseApplies(phases: string[], weekPhase: string): boolean {
-  const w = weekPhase.trim().toLowerCase();
-  return phases.some((p) => String(p).trim().toLowerCase() === w);
-}
-
-function cmpProgressionThenId(a: CatalogueWorkoutRow, b: CatalogueWorkoutRow): number {
-  const d = (a.progressionIndex ?? 0) - (b.progressionIndex ?? 0);
-  if (d !== 0) return d;
-  return a.id.localeCompare(b.id);
-}
-
-/**
- * Picks the catalogue row for the weekly long run: phase-scoped LongRun entries,
- * base → regular shelf (isLongRunQuality false), build/peak/taper → quality shelf with nOffset rotation.
- */
-export function pickLongRunCatalogueId(params: {
-  phase: string;
-  nOffset: number;
-  catalogue: CatalogueWorkoutRow[];
-}): string | null {
-  const { phase, nOffset, catalogue } = params;
-  const pool = catalogue.filter(
-    (w) => w.workoutType === "LongRun" && cataloguePhaseApplies(w.intendedPhase, phase)
-  );
-  if (pool.length === 0) return null;
-
-  const shelfRegular = pool.filter((w) => !w.isLongRunQuality).sort(cmpProgressionThenId);
-  const shelfQuality = pool.filter((w) => w.isLongRunQuality).sort(cmpProgressionThenId);
-
-  const preferQuality = phase !== "base";
-  const chosen =
-    preferQuality && shelfQuality.length > 0
-      ? shelfQuality
-      : shelfRegular.length > 0
-        ? shelfRegular
-        : shelfQuality;
-
-  if (chosen.length === 0) return null;
-  if (chosen.length === 1) return chosen[0].id;
-
-  const rot = Math.abs(nOffset) % chosen.length;
-  return chosen[rot]?.id ?? null;
-}
-
 export interface GeneratePlanInput {
   planId: string;
   athleteId: string;
+  /** Must match `calendarTrainingWeekCount(planStartDate, raceDate)`; drives LRE block count and the week loop. */
   totalWeeks: number;
   planStartDate: Date;
   raceDate: Date;
@@ -300,8 +238,6 @@ export interface GeneratePlanInput {
   preferredQualityDays?: number[];
   /** Optional persisted config; omit to use hardcoded defaults for backward compatibility. */
   config?: PlanGenConfig;
-  /** Workout catalogue rows for quality/easy assignment (optional). */
-  catalogueWorkouts?: CatalogueWorkoutRow[];
 }
 
 export interface GeneratedPlanWorkoutRow {
@@ -317,7 +253,7 @@ export interface GeneratedPlanWorkoutRow {
   dayAssigned: string;
   catalogueWorkoutId: string | null;
   /** Intervals/Tempo: set in phase B via assignRotationalIdentifiers */
-  planLadderIndex: number | null;
+  planCycleIndex: number | null;
 }
 
 type DayKind = "tempo" | "interval" | "long" | "easy";
@@ -405,16 +341,6 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
       ? [...input.preferredDays].sort((a, b) => a - b)
       : [1, 2, 3, 4, 5, 6];
 
-  const cat = input.catalogueWorkouts ?? [];
-  const qualitySessionCandidates = cat
-    .filter(
-      (w) =>
-        w.isQuality &&
-        (w.workoutType === "Tempo" || w.workoutType === "Intervals")
-    )
-    .sort(cmpProgressionThenId);
-  const easyCat = cat.filter((w) => !w.isQuality && w.workoutType === "Easy");
-
   const raceUtc = utcDateOnly(input.raceDate);
   const planStart = utcDateOnly(input.planStartDate);
   const raceOurDow = ourDowFromUtcDate(raceUtc);
@@ -435,11 +361,11 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
   }
 
   const firstMonday = mondayUtcOfWeekContaining(planStart);
-  const weekCount = calendarTrainingWeekCount(planStart, raceUtc);
+  const weekCount = input.totalWeeks;
   const longRunSchedule = generateLongRunSchedule(
     longRunConfigFromPlanGen(weekCount, {
       baseStartMiles: cfg?.baseStartMiles,
-      ladderStep: cfg?.ladderStep,
+      cycleStep: cfg?.cycleStep,
       minLongMiles: cfg?.minLongMiles,
       peakLongRunMiles: cfg?.peakLongRunMiles,
       cutbackFraction: cfg?.cutbackFraction,
@@ -482,13 +408,13 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
           weekNumber,
           dayAssigned: DAY_NAMES[raceOurDow - 1],
           catalogueWorkoutId: null,
-          planLadderIndex: null,
+          planCycleIndex: null,
         });
       }
       continue;
     }
 
-    // 1) Long run — miles from `generateLongRunSchedule`; catalogue via slug (long-run-rotation) or legacy phase pick
+    // 1) Long run — miles from `generateLongRunSchedule`; catalogue via slug (see `long-run-engine` LR_SLUGS)
     const weekIndex0 = weekNumber - 1;
     const lrFromSchedule = longRunSchedule[weekIndex0];
     const longMiRaw = lrFromSchedule?.distance ?? 0;
@@ -502,20 +428,6 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
     const easyMi = Math.max(0, weeklyMi - longMi - qualityMiTotal);
     const perSession =
       qualitySessions > 0 ? Math.max(1, Math.round(qualityMiTotal / qualitySessions)) : 0;
-
-    const slugRow =
-      lrFromSchedule && cat.length > 0
-        ? pickLongRunCatalogueBySlug(
-            lrFromSchedule.cyclePos,
-            cat.map((w) => ({
-              id: w.id,
-              workoutType: w.workoutType,
-              slug: w.slug ?? null,
-            }))
-          )
-        : null;
-    const lrCatId =
-      slugRow?.id ?? pickLongRunCatalogueId({ phase, nOffset, catalogue: cat });
 
     const assignment = new Map<number, AssignEntry>();
 
@@ -567,7 +479,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
     const longEntry: AssignEntry = {
       kind: "long",
       miles: longMi,
-      catalogueWorkoutId: lrCatId,
+      catalogueWorkoutId: null,
     };
     if (skipLongOnLongRunDay) {
       absorbLongIntoEasy = longMi;
@@ -590,29 +502,12 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
       }
     }
 
-    // 2) Tempo / interval quality slots
+    // 2) Tempo / interval quality slots (catalogue links at materialization)
     if (!partialWeek1 && qualitySessions > 0 && perSession > 0) {
       for (let slot = 0; slot < qualitySessions; slot++) {
         const idealDow = slot === 0 ? qualityDow1 : qualityDow2;
-        const pick =
-          qualitySessionCandidates.length > 0
-            ? qualitySessionCandidates[
-                (weekNumber - 1 + slot) % qualitySessionCandidates.length
-              ]
-            : null;
         const fallbackKind: DayKind = slot === 0 ? "tempo" : "interval";
-        const wtype = pick?.workoutType;
-        let kind: DayKind = fallbackKind;
-        if (wtype === "Intervals") kind = "interval";
-        else if (wtype === "Tempo") kind = "tempo";
-        const entry: AssignEntry = pick
-          ? {
-              kind,
-              miles: perSession,
-              catalogueWorkoutId: pick.id,
-              workoutTypeOverride: wtype,
-            }
-          : { kind: fallbackKind, miles: perSession };
+        const entry: AssignEntry = { kind: fallbackKind, miles: perSession };
         if (!tryPlaceQualityEntry(idealDow, entry, false)) {
           extraEasyFromSkippedQuality += perSession;
         }
@@ -631,7 +526,6 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
 
     let easyBudget = easyMi + absorbLongIntoEasy + extraEasyFromSkippedQuality;
 
-    let easyCatIdx = 0;
     if (easyBudget > 0 && easyDays.length > 0) {
       const base = Math.floor((easyBudget / easyDays.length) * 10) / 10;
       for (let i = 0; i < easyDays.length; i++) {
@@ -642,13 +536,9 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
         if (m < 0.25) continue;
         const d = easyDays[i];
         if (assignment.has(d)) continue;
-        const ec =
-          easyCat.length > 0 ? easyCat[easyCatIdx++ % easyCat.length] : null;
         assignment.set(d, {
           kind: "easy",
           miles: m,
-          catalogueWorkoutId: ec?.id ?? null,
-          workoutTypeOverride: ec ? "Easy" : undefined,
         });
       }
       const lastEasy = easyDays[easyDays.length - 1];
@@ -702,7 +592,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
         weekNumber,
         dayAssigned: DAY_NAMES[ourDow - 1],
         catalogueWorkoutId: ent.catalogueWorkoutId ?? null,
-        planLadderIndex: null,
+        planCycleIndex: null,
       });
     }
 
@@ -727,7 +617,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
         weekNumber,
         dayAssigned: DAY_NAMES[raceOurDow - 1],
         catalogueWorkoutId: null,
-        planLadderIndex: null,
+        planCycleIndex: null,
       });
     }
   }
@@ -735,10 +625,10 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
   return out;
 }
 
-const LADDER_ROTATION_TYPES = ["Intervals", "Tempo"] as const;
+const CYCLE_ROTATION_TYPES = ["Intervals", "Tempo"] as const;
 
 /**
- * Phase B: freeze ladder step 0–3 from ordinal position in plan (per type), not completion.
+ * Phase B: freeze cycle index 0–3 from ordinal position in plan (per type), not completion.
  * mpSimulation long runs get a separate rotation for embedded MP fraction scaling.
  * Call after generatePlanWorkoutRows.
  */
@@ -747,7 +637,7 @@ export function assignRotationalIdentifiers(
   catalogueById?: Map<string, { paceAnchor: string }>
 ): void {
   const indexed = rows.map((r, idx) => ({ r, idx }));
-  for (const wt of LADDER_ROTATION_TYPES) {
+  for (const wt of CYCLE_ROTATION_TYPES) {
     const subset = indexed
       .filter((x) => x.r.workoutType === wt)
       .sort((a, b) => {
@@ -757,7 +647,7 @@ export function assignRotationalIdentifiers(
         return a.idx - b.idx;
       });
     subset.forEach((x, ord) => {
-      x.r.planLadderIndex = ord % 4;
+      x.r.planCycleIndex = ord % 4;
     });
   }
 
@@ -776,12 +666,12 @@ export function assignRotationalIdentifiers(
       return a.idx - b.idx;
     });
   mpLongSubset.forEach((x, ord) => {
-    x.r.planLadderIndex = ord % 4;
+    x.r.planCycleIndex = ord % 4;
   });
 
   for (const r of rows) {
-    const isIt = LADDER_ROTATION_TYPES.includes(
-      r.workoutType as (typeof LADDER_ROTATION_TYPES)[number]
+    const isIt = CYCLE_ROTATION_TYPES.includes(
+      r.workoutType as (typeof CYCLE_ROTATION_TYPES)[number]
     );
     const isMpLong =
       r.workoutType === "LongRun" &&
@@ -789,7 +679,7 @@ export function assignRotationalIdentifiers(
       catalogueById?.get(r.catalogueWorkoutId)?.paceAnchor ===
         PACE_ANCHOR_MP_SIMULATION;
     if (!isIt && !isMpLong) {
-      r.planLadderIndex = null;
+      r.planCycleIndex = null;
     }
   }
 }
@@ -824,8 +714,8 @@ export function planWeeksSnapshotFromGeneratedRows(
       const milesStr = formatMilesForScheduleToken(mi);
       const suf = workoutTypeToScheduleSuffix(r.workoutType);
       let token = `${abbr}:${milesStr}${suf}`;
-      if (r.planLadderIndex != null) {
-        token += `-i${r.planLadderIndex}`;
+      if (r.planCycleIndex != null) {
+        token += `-i${r.planCycleIndex}`;
       }
       return token;
     });

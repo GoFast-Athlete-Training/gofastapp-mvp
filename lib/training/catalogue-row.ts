@@ -1,4 +1,4 @@
-import type { WorkoutType } from "@prisma/client";
+import type { Prisma, WorkoutType } from "@prisma/client";
 
 const WORKOUT_TYPES: WorkoutType[] = [
   "Easy",
@@ -15,61 +15,68 @@ export function parseWorkoutType(raw: unknown): WorkoutType | null {
   return WORKOUT_TYPES.includes(t as WorkoutType) ? (t as WorkoutType) : null;
 }
 
-/** Accept string[] or comma-separated string from CSV import */
-export function parseIntendedPhase(raw: unknown): string[] {
-  if (Array.isArray(raw)) {
-    return raw
-      .map((x) => String(x).trim().toLowerCase())
-      .filter(Boolean);
-  }
-  if (typeof raw === "string") {
-    return raw
-      .split(/[,|]/)
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean);
-  }
-  return [];
-}
-
 const PACE_ANCHORS = new Set(["currentBuildup", "mpSimulation"]);
 const MP_BLOCK_POSITIONS = new Set(["BACK_HALF", "FRONT_HALF", "EVEN"]);
 const MP_BLOCK_PROGRESSIONS = new Set(["flat", "progressive"]);
 
+function parseWorkSegmentsJson(
+  body: Record<string, unknown>
+): { ok: true; value: Prisma.InputJsonValue | null } | { ok: false; error: string } {
+  if (!Object.prototype.hasOwnProperty.call(body, "workSegmentsJson")) {
+    return { ok: true, value: null };
+  }
+  const raw = body.workSegmentsJson;
+  if (raw === null || raw === undefined || raw === "") {
+    return { ok: true, value: null };
+  }
+  if (Array.isArray(raw)) {
+    return { ok: true, value: raw as Prisma.InputJsonValue };
+  }
+  if (typeof raw === "string") {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return { ok: false, error: "workSegmentsJson must be a JSON array" };
+      }
+      return { ok: true, value: parsed as Prisma.InputJsonValue };
+    } catch {
+      return { ok: false, error: "workSegmentsJson must be valid JSON" };
+    }
+  }
+  return { ok: false, error: "workSegmentsJson must be an array, JSON string, or null" };
+}
+
 export type CatalogueRowInput = {
   name: string;
+  runSubType: string | null;
   description: string | null;
   workoutType: WorkoutType;
-  intendedPhase: string[];
-  isQuality: boolean;
-  isLongRunQuality: boolean;
-  isLadder: boolean;
+  workSegmentsJson: Prisma.InputJsonValue | null;
+  warmupFraction: number | null;
+  workFraction: number | null;
+  cooldownFraction: number | null;
   paceAnchor: string;
   mpFraction: number | null;
   mpBlockPosition: string | null;
   mpBlockProgression: string;
-  ladderStepMeters: number | null;
-  minLadderMeters: number | null;
-  maxLadderMeters: number | null;
-  progressionIndex: number | null;
-  workBaseReps?: number | null;
-  workBaseRepMeters?: number | null;
-  recoveryDistanceMeters?: number | null;
-  warmupMiles?: number | null;
-  warmupPaceOffsetSecPerMile?: number | null;
-  cooldownMiles?: number | null;
-  cooldownPaceOffsetSecPerMile?: number | null;
-  workBaseMiles?: number | null;
-  workPaceOffsetSecPerMile?: number | null;
-  workBasePaceOffsetSecPerMile?: number | null;
-  recoveryPaceOffsetSecPerMile?: number | null;
-  isMP: boolean;
-  mpTotalMiles?: number | null;
-  mpPaceOffsetSecPerMile?: number | null;
-  intendedHeartRateZone?: string | null;
-  intendedHRBpmLow?: number | null;
-  intendedHRBpmHigh?: number | null;
-  notes?: string | null;
-  /** Lowercase kebab-case. Omitted in payload = leave existing value on update. */
+  workBaseReps: number | null;
+  workBaseRepMeters: number | null;
+  recoveryDistanceMeters: number | null;
+  warmupMiles: number | null;
+  warmupPaceOffsetSecPerMile: number | null;
+  cooldownMiles: number | null;
+  cooldownPaceOffsetSecPerMile: number | null;
+  workBaseMiles: number | null;
+  workPaceOffsetSecPerMile: number | null;
+  workBasePaceOffsetSecPerMile: number | null;
+  recoveryPaceOffsetSecPerMile: number | null;
+  mpTotalMiles: number | null;
+  mpPaceOffsetSecPerMile: number | null;
+  intendedHeartRateZone: string | null;
+  intendedHRBpmLow: number | null;
+  intendedHRBpmHigh: number | null;
+  notes: string | null;
+  /** Omitted in payload = leave existing value on update. */
   slug?: string | null;
 };
 
@@ -83,12 +90,14 @@ function pickNum(body: Record<string, unknown>, keys: string[]): number | null {
   return null;
 }
 
-function pickBool(body: Record<string, unknown>, keys: string[]): boolean {
-  for (const k of keys) {
-    const v = body[k];
-    if (v === true || v === "true" || v === "1" || v === 1) return true;
-  }
-  return false;
+/** null = absent/empty, NaN = invalid */
+function optFraction0to1(body: Record<string, unknown>, key: string): number | null {
+  if (!Object.prototype.hasOwnProperty.call(body, key)) return null;
+  const v = body[key];
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0 || n > 1) return Number.NaN;
+  return n;
 }
 
 export function bodyToCatalogueRow(body: Record<string, unknown>): {
@@ -102,26 +111,12 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
   if (!wt) {
     return {
       ok: false,
-      error: "workoutType must be Easy, Tempo, Intervals, LongRun, Race, or SpeedDuration",
+      error: "workoutType must be Easy, Tempo, Intervals, LongRun, or Race (legacy: SpeedDuration → Tempo)",
     };
   }
 
-  let progressionIndex: number | null = null;
-  if (
-    body.progressionIndex !== null &&
-    body.progressionIndex !== undefined &&
-    body.progressionIndex !== ""
-  ) {
-    const pi = Number(body.progressionIndex);
-    if (!Number.isFinite(pi)) {
-      return { ok: false, error: "progressionIndex must be a number or empty" };
-    }
-    progressionIndex = Math.round(pi);
-  }
-
-  const isQuality = pickBool(body, ["isQuality"]);
-  const isLongRunQuality = pickBool(body, ["isLongRunQuality"]);
-  const isLadder = pickBool(body, ["isLadder", "isLadderCapable"]);
+  const wj = parseWorkSegmentsJson(body);
+  if (!wj.ok) return wj;
 
   let paceAnchor = "currentBuildup";
   if (typeof body.paceAnchor === "string" && body.paceAnchor.trim()) {
@@ -159,11 +154,6 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
     mpBlockPosition = pos;
   }
 
-  const intendedPhase = parseIntendedPhase(body.intendedPhase);
-  if (intendedPhase.length === 0) {
-    return { ok: false, error: "intendedPhase must have at least one phase (e.g. base,build)" };
-  }
-
   let slug: string | null | undefined = undefined;
   if (Object.prototype.hasOwnProperty.call(body, "slug")) {
     if (body.slug === null || body.slug === undefined || body.slug === "") {
@@ -189,6 +179,13 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
     return Number.isFinite(n) ? n : null;
   };
 
+  const warmupF = optFraction0to1(body, "warmupFraction");
+  const workF = optFraction0to1(body, "workFraction");
+  const cooldownF = optFraction0to1(body, "cooldownFraction");
+  if (Number.isNaN(warmupF!) || Number.isNaN(workF!) || Number.isNaN(cooldownF!)) {
+    return { ok: false, error: "warmupFraction, workFraction, cooldownFraction must be between 0 and 1" };
+  }
+
   let mpFraction: number | null = null;
   if (body.mpFraction !== null && body.mpFraction !== undefined && body.mpFraction !== "") {
     const mf = Number(body.mpFraction);
@@ -198,38 +195,41 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
     mpFraction = mf;
   }
 
-  const workBaseRepsRaw = pickNum(body, ["workBaseReps", "reps"]);
-  const workBaseRepMetersRaw = pickNum(body, ["workBaseRepMeters", "repDistanceMeters"]);
   const workPaceOffsetRaw = pickNum(body, ["workPaceOffsetSecPerMile", "overallPaceOffsetSecPerMile"]);
   const workBasePaceRaw = pickNum(body, ["workBasePaceOffsetSecPerMile", "repPaceOffsetSecPerMile"]);
 
-  let isMP = pickBool(body, ["isMP"]);
-  if (!isMP && isLongRunQuality) isMP = true;
+  let runSubType: string | null = null;
+  if (typeof body.runSubType === "string" && body.runSubType.trim()) {
+    runSubType = body.runSubType.trim();
+  } else if (body.runSubType === null) {
+    runSubType = null;
+  } else if (body.runSubType !== undefined) {
+    return { ok: false, error: "runSubType must be a string or null" };
+  }
 
   return {
     ok: true,
     data: {
       name,
+      runSubType,
       description:
         typeof body.description === "string" ? body.description.trim() || null : null,
       workoutType: wt,
-      intendedPhase,
-      isQuality,
-      isLongRunQuality,
-      isLadder,
+      workSegmentsJson: wj.value,
+      warmupFraction: warmupF,
+      workFraction: workF,
+      cooldownFraction: cooldownF,
       paceAnchor,
       mpFraction,
       mpBlockPosition,
       mpBlockProgression,
-      ladderStepMeters:
-        num("ladderStepMeters") != null ? Math.round(num("ladderStepMeters")!) : null,
-      minLadderMeters:
-        num("minLadderMeters") != null ? Math.round(num("minLadderMeters")!) : null,
-      maxLadderMeters:
-        num("maxLadderMeters") != null ? Math.round(num("maxLadderMeters")!) : null,
-      progressionIndex,
-      workBaseReps: workBaseRepsRaw != null ? Math.round(workBaseRepsRaw) : null,
-      workBaseRepMeters: workBaseRepMetersRaw != null ? Math.round(workBaseRepMetersRaw) : null,
+      workBaseReps: pickNum(body, ["workBaseReps", "reps"]) != null
+        ? Math.round(pickNum(body, ["workBaseReps", "reps"])!)
+        : null,
+      workBaseRepMeters:
+        pickNum(body, ["workBaseRepMeters", "repDistanceMeters"]) != null
+          ? Math.round(pickNum(body, ["workBaseRepMeters", "repDistanceMeters"])!)
+          : null,
       recoveryDistanceMeters:
         num("recoveryDistanceMeters") != null
           ? Math.round(num("recoveryDistanceMeters")!)
@@ -253,7 +253,6 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
         num("recoveryPaceOffsetSecPerMile") != null
           ? Math.round(num("recoveryPaceOffsetSecPerMile")!)
           : null,
-      isMP,
       mpTotalMiles: num("mpTotalMiles"),
       mpPaceOffsetSecPerMile:
         num("mpPaceOffsetSecPerMile") != null

@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { bodyToCatalogueRow } from "@/lib/training/catalogue-row";
@@ -28,21 +29,21 @@ export async function PUT(request: NextRequest, ctx: RouteCtx) {
       where: { id },
       data: {
         name: d.name,
+        runSubType: d.runSubType,
         ...(d.slug !== undefined ? { slug: d.slug } : {}),
         description: d.description,
         workoutType: d.workoutType,
-        intendedPhase: d.intendedPhase,
-        isQuality: d.isQuality,
-        isLongRunQuality: d.isLongRunQuality,
-        isLadder: d.isLadder,
+        workSegmentsJson:
+          d.workSegmentsJson === null
+            ? Prisma.JsonNull
+            : (d.workSegmentsJson as Prisma.InputJsonValue),
+        warmupFraction: d.warmupFraction,
+        workFraction: d.workFraction,
+        cooldownFraction: d.cooldownFraction,
         paceAnchor: d.paceAnchor,
         mpFraction: d.mpFraction,
         mpBlockPosition: d.mpBlockPosition,
         mpBlockProgression: d.mpBlockProgression,
-        ladderStepMeters: d.ladderStepMeters,
-        minLadderMeters: d.minLadderMeters,
-        maxLadderMeters: d.maxLadderMeters,
-        progressionIndex: d.progressionIndex,
         workBaseReps: d.workBaseReps,
         workBaseRepMeters: d.workBaseRepMeters,
         recoveryDistanceMeters: d.recoveryDistanceMeters,
@@ -54,7 +55,6 @@ export async function PUT(request: NextRequest, ctx: RouteCtx) {
         workPaceOffsetSecPerMile: d.workPaceOffsetSecPerMile,
         workBasePaceOffsetSecPerMile: d.workBasePaceOffsetSecPerMile,
         recoveryPaceOffsetSecPerMile: d.recoveryPaceOffsetSecPerMile,
-        isMP: d.isMP,
         mpTotalMiles: d.mpTotalMiles,
         mpPaceOffsetSecPerMile: d.mpPaceOffsetSecPerMile,
         intendedHeartRateZone: d.intendedHeartRateZone,

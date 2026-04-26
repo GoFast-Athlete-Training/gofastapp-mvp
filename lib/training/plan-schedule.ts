@@ -19,7 +19,7 @@ import {
 } from "./plan-utils";
 import { nOffsetFromWeekAnchor, phaseForCatalogue } from "./generate-plan";
 import { formatPlannedWorkoutTitle } from "./workout-display-title";
-import { titleFromLadderIndex } from "./algo-workout-segments";
+import { titleFromCycleIndex } from "./algo-workout-segments";
 
 export type WeekBounds = { weekStart: Date; weekEnd: Date };
 
@@ -79,7 +79,7 @@ export type PlanScheduleDay = {
   workoutType: WorkoutType;
   weekNumber: number;
   dayAssigned: string;
-  planLadderIndex: number | null;
+  planCycleIndex: number | null;
   nOffset: number | null;
   phase: string;
   estimatedDistanceInMeters: number;
@@ -164,11 +164,11 @@ export function planScheduleDaysForWeek(params: {
       const ourDow = dayAbbrToOurDow(token.dayAbbr);
       const date = dateForDayInWeek(planStartDate, scheduleWeekNum, ourDow);
       const estMeters = milesToMeters(token.miles);
-      const planLadderIndex =
+      const planCycleIndex =
         token.workoutType === "Intervals" ||
         token.workoutType === "Tempo" ||
         token.workoutType === "LongRun"
-          ? (token.ladderIndex ?? null)
+          ? (token.cycleIndex ?? null)
           : null;
 
       const isRaceDay =
@@ -189,9 +189,9 @@ export function planScheduleDaysForWeek(params: {
         token.workoutType === "Intervals" ||
         token.workoutType === "Tempo"
       ) {
-        title = titleFromLadderIndex(
+        title = titleFromCycleIndex(
           token.workoutType,
-          token.ladderIndex ?? 0
+          token.cycleIndex ?? 0
         )!;
       } else {
         title = formatPlannedWorkoutTitle(token.workoutType, estMeters);
@@ -207,7 +207,7 @@ export function planScheduleDaysForWeek(params: {
         workoutType: isRaceDay ? "Race" : token.workoutType,
         weekNumber: displayWeekNum,
         dayAssigned: dayAbbrToDayName(token.dayAbbr),
-        planLadderIndex,
+        planCycleIndex,
         nOffset: nForRow,
         phase: phaseForCatalogue(phaseOffset),
         estimatedDistanceInMeters: estMeters,

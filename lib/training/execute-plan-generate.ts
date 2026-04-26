@@ -1,6 +1,14 @@
 /**
  * One-shot plan generate: writes `planWeeks` + plan scalars only (no `workouts` rows).
- * Loads training_plan_preset boltons when presetId is set; falls back to hardcoded defaults.
+ * Loads `training_plan_preset` boltons when `presetId` is set; falls back to hardcoded defaults.
+ *
+ * Orchestration (see also `lib/training/generate-plan.ts` + `lib/training/long-run-engine.ts`):
+ * 1. Load plan, race, optional preset; build `PlanGenConfig`.
+ * 2. **Total weeks** — `calendarTrainingWeekCount(plan start → race)`.
+ * 3. **Weekly miles** — clamped target (`weeklyMileageTarget`, `minWeeklyMiles` cap 100).
+ * 4. **Preferred days** — plan `preferredDays`, else athlete `trainingPreferences`, else Mon–Sat.
+ * 5. **Long-run day** — passed as `preferredLongRunDow` into `generatePlanWorkoutRows` (with preset `longRunDefaultDow` fallback there).
+ * 6. **Long-run engine** — `longRunConfigFromPlanGen` + `generateLongRunSchedule` (miles/rotation on the week). Catalogue IDs are set at materialization, not here.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -47,7 +55,7 @@ export async function executePlanGenerate(params: {
   }
   const race = planRow.race_registry;
 
-  const [prefs, rawPreset, catalogueWorkouts] = await Promise.all([
+  const [prefs, rawPreset] = await Promise.all([
     prisma.trainingPreferences.findUnique({ where: { athleteId } }),
     plan.presetId
       ? prisma.training_plan_preset.findUnique({
@@ -58,18 +66,6 @@ export async function executePlanGenerate(params: {
           },
         })
       : Promise.resolve(null),
-    prisma.workout_catalogue.findMany({
-      select: {
-        id: true,
-        isQuality: true,
-        isLongRunQuality: true,
-        workoutType: true,
-        intendedPhase: true,
-        progressionIndex: true,
-        paceAnchor: true,
-        slug: true,
-      },
-    }),
   ]);
 
   const config: PlanGenConfig | undefined =
@@ -111,13 +107,9 @@ export async function executePlanGenerate(params: {
     raceDistanceMiles,
     preferredLongRunDow: plan.preferredLongRunDow,
     preferredQualityDays: plan.preferredQualityDays,
-    catalogueWorkouts,
     config,
   });
-  const catalogueById = new Map(
-    catalogueWorkouts.map((c) => [c.id, { paceAnchor: c.paceAnchor }])
-  );
-  assignRotationalIdentifiers(drafts, catalogueById);
+  assignRotationalIdentifiers(drafts);
 
   const syncedFiveKPace =
     params.athleteFiveKPace?.trim() ||

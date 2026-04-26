@@ -995,10 +995,10 @@ model preset_volume_constraints {
   peakWeeks              Int   @default(4)
   /// Ordered taper long-run miles; length should match taperWeeks. Index 0 = furthest from race.
   taperLongRuns          Json
-  /// Build/base repeating ladder: floor miles, step size, rungs per cycle, first peak-week long run.
+  /// Build/base: floor miles, distance step per 4-week block, weeks per long-run cycle, first peak long run.
   baseStartMiles         Float @default(8)
-  ladderStep             Float @default(2)
-  ladderCycleLen         Int   @default(4)
+  cycleStep                Float @default(2)
+  cycleLen                 Int   @default(4)
   peakEntryMiles         Float @default(18)
   peakLongRunMiles       Int   @default(22)
   cutbackWeekModulo      Int   @default(3)
@@ -1084,7 +1084,7 @@ model training_plans {
 }
 
 
-/// Coach-curated prescriptions: segment-mirrored fields (warmup / work base / ladder variant / cooldown).
+/// Coach-curated prescriptions: segment-mirrored fields (warmup / work base / cooldown).
 /// Pace offsets are sec/mile vs current 5K fitness unless paceAnchor is mpSimulation.
 model workout_catalogue {
   id                           String      @id @default(cuid())
@@ -1101,18 +1101,6 @@ model workout_catalogue {
   warmupFraction               Float?
   workFraction                 Float?
   cooldownFraction             Float?
-  /// True when this catalogue entry is used for quality slots during plan generation (legacy plan gen).
-  isQuality                    Boolean     @default(false)
-  /// Long-run shelf: false = easy/regular long; true = MP-sim / quality long (legacy plan gen).
-  isLongRunQuality             Boolean     @default(false)
-  /// Pyramid / ladder work variant: max→min by step, then back up (e.g. Up and Over).
-  isLadder                     Boolean     @default(false)
-  /// Distance step between ladder rungs (meters). E.g. 200 with max 800, min 200.
-  ladderStepMeters             Int?
-  minLadderMeters              Int?
-  maxLadderMeters              Int?
-  intendedPhase                String[]
-  progressionIndex             Int?
   /// Fixed-rep work (Intervals): number of reps.
   workBaseReps                 Int?
   /// Fixed-rep work: meters per rep (e.g. 800).
@@ -1126,7 +1114,7 @@ model workout_catalogue {
   workBaseMiles                Float?
   /// Pace offset for easy / long-easy / tempo sustained block (sec/mi vs 5K anchor).
   workPaceOffsetSecPerMile     Int?
-  /// Pace offset for each work rep or ladder rung (sec/mi vs 5K anchor).
+  /// Pace offset for each work rep (sec/mi vs 5K anchor).
   workBasePaceOffsetSecPerMile Int?
   recoveryPaceOffsetSecPerMile Int?
   paceAnchor                   String      @default("currentBuildup")
@@ -1134,8 +1122,6 @@ model workout_catalogue {
   mpFraction                   Float?
   mpBlockPosition              String?
   mpBlockProgression           String      @default("flat")
-  /// Long run includes a goal-pace or MP-style block (explicit miles in mpTotalMiles when set).
-  isMP                         Boolean     @default(false)
   mpTotalMiles                 Float?
   /// Pace offset for the MP block (sec/mi vs 5K anchor).
   mpPaceOffsetSecPerMile       Int?
@@ -1148,7 +1134,7 @@ model workout_catalogue {
   workouts                     workouts[]
 
   @@unique([name, workoutType])
-  @@index([workoutType, progressionIndex])
+  @@index([workoutType])
 }
 
 model workouts {
@@ -1171,8 +1157,8 @@ model workouts {
   weekNumber                Int?
   /// Assigned weekday name e.g. "Monday"; null for standalone
   dayAssigned               String?
-  /// Intervals/Tempo: ladder step 0–3 fixed at plan generation (ordinal % 4); aligns with planWeeks token -iN
-  planLadderIndex           Int?
+  /// Intervals/Tempo: cycle position 0–3 fixed at plan generation (ordinal % 4); aligns with planWeeks token -iN
+  planCycleIndex            Int?
   /// Garmin Training API workout id after push-to-garmin (links activity → planned workout)
   garminWorkoutId           Int?
   /// Garmin Training API schedule id (calendar placement for this workout)

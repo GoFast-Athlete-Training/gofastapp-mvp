@@ -1,9 +1,44 @@
+import type { WorkoutType } from "@prisma/client";
 import { defaultTaperLongRunsForWeeks } from "@/lib/training/preset-volume-helpers";
 
 /**
  * Long-run engine: 4 positions per week block — static, progressive, MP, static (cutback).
  * Distances are forward-counting from plan start. Last block can be taper; second-to-last pre-peak.
+ * Each week entry includes `catalogueSlug` for deterministic catalogue row lookup (`pickLongRunCatalogueBySlug`).
  */
+
+export const LR_SLUGS = {
+  static: "long-run-static",
+  progressive: "long-run-progressive",
+  mp: "long-run-mp",
+} as const;
+
+export type CatalogueRowWithSlug = {
+  id: string;
+  workoutType: WorkoutType;
+  slug: string | null;
+};
+
+function slugForCyclePos(cyclePos: number): string | null {
+  if (cyclePos === 0 || cyclePos === 3) return LR_SLUGS.static;
+  if (cyclePos === 1) return LR_SLUGS.progressive;
+  if (cyclePos === 2) return LR_SLUGS.mp;
+  return null;
+}
+
+/**
+ * Picks a long-run catalogue row by `slug` for the 4-position rotation. Returns null if missing.
+ */
+export function pickLongRunCatalogueBySlug(
+  cyclePos: number,
+  rows: readonly CatalogueRowWithSlug[]
+): CatalogueRowWithSlug | null {
+  const target = slugForCyclePos(cyclePos);
+  if (!target) return null;
+  return (
+    rows.find((w) => w.workoutType === "LongRun" && w.slug === target) ?? null
+  );
+}
 
 export interface LongRunServiceConfig {
   totalWeeks: number;
@@ -25,10 +60,21 @@ export interface LongRunEntry {
   isTaper: boolean;
   /** Planned long run distance in miles for this week (0 = no long run that week) */
   distance: number;
+  /** Canonical catalogue `slug` for this position (e.g. long-run-mp for cyclePos 2). */
+  catalogueSlug: string | null;
 }
 
 function roundMi(n: number): number {
   return Math.max(0, Math.round(n * 10) / 10);
+}
+
+/**
+ * How many 4-week blocks the long-run engine allocates for a plan length.
+ * `numSlots` in `generateLongRunSchedule` (last block = taper, second-to-last = pre-peak when slots ≥ 3).
+ */
+export function longRunBlockCountFromTotalWeeks(totalWeeks: number): number {
+  const w = Math.max(1, Math.floor(totalWeeks));
+  return Math.max(1, Math.ceil(w / 4));
 }
 
 function buildTaperMiles4(longRunMax: number, override?: number[] | null): [number, number, number, number] {
@@ -74,7 +120,7 @@ export function generateLongRunSchedule(cfg: LongRunServiceConfig): LongRunEntry
   } = cfg;
 
   const w = Math.max(1, Math.floor(totalWeeks));
-  const numSlots = Math.max(1, Math.ceil(w / 4));
+  const numSlots = longRunBlockCountFromTotalWeeks(w);
   const out: LongRunEntry[] = [];
 
   const taperMiles4 = buildTaperMiles4(
@@ -89,6 +135,7 @@ export function generateLongRunSchedule(cfg: LongRunServiceConfig): LongRunEntry
     const cyclePos = weekIndex % 4;
     const isTaper = numSlots >= 2 && cycleNum === numSlots - 1;
     const isPrePeak = numSlots >= 3 && cycleNum === numSlots - 2;
+    const catalogueSlug = slugForCyclePos(cyclePos);
 
     let distance = 0;
 
@@ -132,6 +179,7 @@ export function generateLongRunSchedule(cfg: LongRunServiceConfig): LongRunEntry
       isPrePeak,
       isTaper,
       distance,
+      catalogueSlug,
     });
   }
 
@@ -145,7 +193,7 @@ export function longRunConfigFromPlanGen(
   totalWeeks: number,
   cfg?: {
     baseStartMiles?: number;
-    ladderStep?: number;
+    cycleStep?: number;
     minLongMiles?: number;
     peakLongRunMiles?: number;
     cutbackFraction?: number | null;
@@ -155,7 +203,7 @@ export function longRunConfigFromPlanGen(
   return {
     totalWeeks,
     startBase: cfg?.baseStartMiles ?? 12,
-    step: cfg?.ladderStep ?? 2,
+    step: cfg?.cycleStep ?? 2,
     longRunMin: cfg?.minLongMiles ?? 8,
     longRunMax: cfg?.peakLongRunMiles ?? 22,
     cutbackFraction:

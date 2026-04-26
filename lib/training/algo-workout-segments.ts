@@ -1,7 +1,7 @@
 /**
  * Deterministic Interval + Tempo segment builders.
- * Plan workouts: pass planLadderIndex (0–3) from planWeeks / workouts.planLadderIndex.
- * Legacy: omit planLadderIndex to use prior completed workouts (matchedActivityId).
+ * Plan workouts: pass planCycleIndex (0–3) from planWeeks / workouts.planCycleIndex.
+ * Legacy: omit planCycleIndex to use prior completed workouts (matchedActivityId).
  */
 
 import type { WorkoutType } from "@prisma/client";
@@ -14,13 +14,13 @@ import type { ApiSegment } from "@/lib/workout-generator/templates";
 
 const METERS_PER_MILE = 1609.34;
 const INTERVAL_TOTAL_WORK_MILES = 4;
-const LADDER_MAX_I = 3;
+const CYCLE_MAX_I = 3;
 
-export function titleFromLadderIndex(
+export function titleFromCycleIndex(
   workoutType: WorkoutType,
-  ladderIndex: number
+  cycleIndex: number
 ): string | null {
-  const i = ((ladderIndex % 4) + 4) % 4;
+  const i = ((cycleIndex % 4) + 4) % 4;
   if (workoutType === "Intervals") {
     const labels = ["1600m Repeats", "800m Repeats", "400m Repeats", "200m Repeats"];
     return labels[i];
@@ -49,12 +49,12 @@ export function resolvePaceStringForWorkout(
 }
 
 function intervalWorkMeters(i: number): number {
-  const clamped = Math.min(Math.max(i, 0), LADDER_MAX_I);
+  const clamped = Math.min(Math.max(i, 0), CYCLE_MAX_I);
   return 1600 / Math.pow(2, clamped);
 }
 
 function intervalRecoveryMeters(i: number): number {
-  const clamped = Math.min(Math.max(i, 0), LADDER_MAX_I);
+  const clamped = Math.min(Math.max(i, 0), CYCLE_MAX_I);
   return 400 / Math.pow(2, clamped);
 }
 
@@ -87,8 +87,8 @@ async function priorCompletedCount(params: {
   }).length;
 }
 
-export function ladderIndexFromCompletedCount(completedBefore: number): number {
-  return completedBefore % (LADDER_MAX_I + 1);
+export function cycleIndexFromCompletedCount(completedBefore: number): number {
+  return completedBefore % (CYCLE_MAX_I + 1);
 }
 
 function round2(n: number): number {
@@ -101,16 +101,16 @@ export async function buildIntervalApiSegments(params: {
   workoutDate: Date | null;
   scheduleTotalMiles: number;
   anchorSecondsPerMile: number;
-  /** Plan-frozen step; if set, skips completion-based ladder */
-  planLadderIndex?: number | null;
+  /** Plan-frozen 0–3 slot; if set, skips completion-based rotation */
+  planCycleIndex?: number | null;
 }): Promise<ApiSegment[]> {
   const paces = getTrainingPaces(params.anchorSecondsPerMile);
   let i: number | undefined;
   if (
-    params.planLadderIndex != null &&
-    Number.isFinite(params.planLadderIndex)
+    params.planCycleIndex != null &&
+    Number.isFinite(params.planCycleIndex)
   ) {
-    i = Math.min(LADDER_MAX_I, Math.max(0, Math.floor(params.planLadderIndex)));
+    i = Math.min(CYCLE_MAX_I, Math.max(0, Math.floor(params.planCycleIndex)));
   } else {
     const completed = await priorCompletedCount({
       athleteId: params.athleteId,
@@ -118,7 +118,7 @@ export async function buildIntervalApiSegments(params: {
       workoutId: params.workoutId,
       workoutDate: params.workoutDate,
     });
-    i = ladderIndexFromCompletedCount(completed);
+    i = cycleIndexFromCompletedCount(completed);
   }
   const wM = intervalWorkMeters(i);
   const rM = intervalRecoveryMeters(i);
@@ -175,16 +175,16 @@ export async function buildTempoApiSegments(params: {
   workoutDate: Date | null;
   scheduleTotalMiles: number;
   anchorSecondsPerMile: number;
-  planLadderIndex?: number | null;
+  planCycleIndex?: number | null;
 }): Promise<ApiSegment[]> {
   const paces = getTrainingPaces(params.anchorSecondsPerMile);
   let j: number;
   if (
-    params.planLadderIndex != null &&
-    Number.isFinite(params.planLadderIndex)
+    params.planCycleIndex != null &&
+    Number.isFinite(params.planCycleIndex)
   ) {
     j =
-      ((Math.floor(params.planLadderIndex) % TEMPO_WORK_MILES.length) +
+      ((Math.floor(params.planCycleIndex) % TEMPO_WORK_MILES.length) +
         TEMPO_WORK_MILES.length) %
       TEMPO_WORK_MILES.length;
   } else {

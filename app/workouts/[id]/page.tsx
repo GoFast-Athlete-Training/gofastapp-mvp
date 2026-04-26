@@ -99,9 +99,8 @@ interface MatchedActivitySummary {
 interface WorkoutCatalogue {
   id: string;
   name: string;
+  slug?: string | null;
   workoutType: string;
-  intendedPhase: string[];
-  progressionIndex: number;
   workBaseReps: number | null;
   workBaseRepMeters: number | null;
   recoveryDistanceMeters: number | null;
@@ -261,10 +260,7 @@ function CataloguePrescriptionCard({
 
   const meta = (
     <div className="text-xs text-gray-500 mt-3 space-y-1">
-      <p>
-        Phases: {catalogue.intendedPhase?.join(", ") || "—"} · Progression #
-        {catalogue.progressionIndex}
-      </p>
+      <p>Slug: {catalogue.slug?.trim() || "—"}</p>
       {catalogue.intendedHeartRateZone && (
         <p>Heart rate: {catalogue.intendedHeartRateZone}</p>
       )}

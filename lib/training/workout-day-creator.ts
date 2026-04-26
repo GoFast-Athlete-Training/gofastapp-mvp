@@ -109,7 +109,7 @@ export async function findOrCreateWorkoutForPlanDay(params: {
     goalRacePace: plan.goalRacePace ?? null,
     goalRaceTime: plan.goalRaceTime ?? null,
     raceDistanceMiles,
-    planLadderIndex: scheduled.planLadderIndex ?? null,
+    planCycleIndex: scheduled.planCycleIndex ?? null,
   });
 
   const workoutId = await prisma.$transaction(async (tx) => {
@@ -125,7 +125,7 @@ export async function findOrCreateWorkoutForPlanDay(params: {
         weekNumber: scheduled.weekNumber,
         dayAssigned: scheduled.dayAssigned,
         nOffset: scheduled.nOffset,
-        planLadderIndex: scheduled.planLadderIndex,
+        planCycleIndex: scheduled.planCycleIndex,
         updatedAt: new Date(),
       },
     });

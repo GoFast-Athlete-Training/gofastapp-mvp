@@ -27,7 +27,7 @@ export async function syncWorkoutToPlanWeeks(workoutId: string): Promise<void> {
       dayAssigned: true,
       workoutType: true,
       estimatedDistanceInMeters: true,
-      planLadderIndex: true,
+      planCycleIndex: true,
     },
   });
 
@@ -58,8 +58,8 @@ export async function syncWorkoutToPlanWeeks(workoutId: string): Promise<void> {
   const suffix = workoutTypeToScheduleSuffix(workout.workoutType);
 
   let newToken = `${dayAbbr}:${milesStr}${suffix}`;
-  if (workout.planLadderIndex != null) {
-    newToken += `-i${workout.planLadderIndex}`;
+  if (workout.planCycleIndex != null) {
+    newToken += `-i${workout.planCycleIndex}`;
   }
 
   const tokens = weekEntry.schedule.split(" ");

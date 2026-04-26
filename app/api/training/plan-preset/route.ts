@@ -87,9 +87,8 @@ export async function POST(request: NextRequest) {
             taperLongRuns,
             baseStartMiles:
               typeof vol.baseStartMiles === "number" ? vol.baseStartMiles : 8,
-            ladderStep: typeof vol.ladderStep === "number" ? vol.ladderStep : 2,
-            ladderCycleLen:
-              typeof vol.ladderCycleLen === "number" ? vol.ladderCycleLen : 4,
+            cycleStep: typeof vol.cycleStep === "number" ? vol.cycleStep : 2,
+            cycleLen: typeof vol.cycleLen === "number" ? vol.cycleLen : 4,
             peakEntryMiles:
               typeof vol.peakEntryMiles === "number" ? vol.peakEntryMiles : 18,
             peakLongRunMiles:

@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { newEntityId } from "@/lib/training/new-entity-id";
@@ -30,22 +31,8 @@ export async function POST(request: NextRequest) {
     const parsedRows: CatalogueRowInput[] = [];
     const errors: { index: number; error: string }[] = [];
 
-    const explicitIsQualityFlags: boolean[] = [];
-    const explicitIsLongRunQualityFlags: boolean[] = [];
-    const explicitIsLadderFlags: boolean[] = [];
-
     for (let i = 0; i < body.items!.length; i++) {
       const row = body.items![i] as Record<string, unknown>;
-      explicitIsQualityFlags.push(
-        Object.prototype.hasOwnProperty.call(row, "isQuality")
-      );
-      explicitIsLongRunQualityFlags.push(
-        Object.prototype.hasOwnProperty.call(row, "isLongRunQuality")
-      );
-      explicitIsLadderFlags.push(
-        Object.prototype.hasOwnProperty.call(row, "isLadder") ||
-          Object.prototype.hasOwnProperty.call(row, "isLadderCapable")
-      );
       const parsed = bodyToCatalogueRow(row);
       if (!parsed.ok) {
         errors.push({ index: i, error: parsed.error });
@@ -81,11 +68,7 @@ export async function POST(request: NextRequest) {
 
     await prisma.$transaction(async (tx) => {
       const now = new Date();
-      for (let idx = 0; idx < parsedRows.length; idx++) {
-        const d = parsedRows[idx];
-        const explicitIsQuality = explicitIsQualityFlags[idx];
-        const explicitIsLongRunQuality = explicitIsLongRunQualityFlags[idx];
-        const explicitIsLadder = explicitIsLadderFlags[idx];
+      for (const d of parsedRows) {
         const existing = await tx.workout_catalogue.findUnique({
           where: {
             name_workoutType: { name: d.name, workoutType: d.workoutType },
@@ -94,15 +77,18 @@ export async function POST(request: NextRequest) {
         if (existing) {
           const updateData: Record<string, unknown> = {
             description: d.description,
-            intendedPhase: d.intendedPhase,
+            runSubType: d.runSubType,
+            workSegmentsJson:
+              d.workSegmentsJson === null
+                ? Prisma.JsonNull
+                : (d.workSegmentsJson as Prisma.InputJsonValue),
+            warmupFraction: d.warmupFraction,
+            workFraction: d.workFraction,
+            cooldownFraction: d.cooldownFraction,
             paceAnchor: d.paceAnchor,
             mpFraction: d.mpFraction,
             mpBlockPosition: d.mpBlockPosition,
             mpBlockProgression: d.mpBlockProgression,
-            ladderStepMeters: d.ladderStepMeters,
-            minLadderMeters: d.minLadderMeters,
-            maxLadderMeters: d.maxLadderMeters,
-            progressionIndex: d.progressionIndex,
             workBaseReps: d.workBaseReps,
             workBaseRepMeters: d.workBaseRepMeters,
             recoveryDistanceMeters: d.recoveryDistanceMeters,
@@ -114,7 +100,6 @@ export async function POST(request: NextRequest) {
             workPaceOffsetSecPerMile: d.workPaceOffsetSecPerMile,
             workBasePaceOffsetSecPerMile: d.workBasePaceOffsetSecPerMile,
             recoveryPaceOffsetSecPerMile: d.recoveryPaceOffsetSecPerMile,
-            isMP: d.isMP,
             mpTotalMiles: d.mpTotalMiles,
             mpPaceOffsetSecPerMile: d.mpPaceOffsetSecPerMile,
             intendedHeartRateZone: d.intendedHeartRateZone,
@@ -123,15 +108,6 @@ export async function POST(request: NextRequest) {
             notes: d.notes,
             updatedAt: now,
           };
-          if (explicitIsQuality) {
-            updateData.isQuality = d.isQuality;
-          }
-          if (explicitIsLongRunQuality) {
-            updateData.isLongRunQuality = d.isLongRunQuality;
-          }
-          if (explicitIsLadder) {
-            updateData.isLadder = d.isLadder;
-          }
           if (d.slug !== undefined) {
             updateData.slug = d.slug;
           }
@@ -145,21 +121,21 @@ export async function POST(request: NextRequest) {
             data: {
               id: newEntityId(),
               name: d.name,
+              runSubType: d.runSubType,
               slug: d.slug ?? generateCatalogueSlug(d.name),
               description: d.description,
               workoutType: d.workoutType,
-              intendedPhase: d.intendedPhase,
-              isQuality: explicitIsQuality ? d.isQuality : false,
-              isLongRunQuality: explicitIsLongRunQuality ? d.isLongRunQuality : false,
-              isLadder: explicitIsLadder ? d.isLadder : false,
+              workSegmentsJson:
+                d.workSegmentsJson === null
+                  ? Prisma.JsonNull
+                  : (d.workSegmentsJson as Prisma.InputJsonValue),
+              warmupFraction: d.warmupFraction,
+              workFraction: d.workFraction,
+              cooldownFraction: d.cooldownFraction,
               paceAnchor: d.paceAnchor,
               mpFraction: d.mpFraction,
               mpBlockPosition: d.mpBlockPosition,
               mpBlockProgression: d.mpBlockProgression,
-              ladderStepMeters: d.ladderStepMeters,
-              minLadderMeters: d.minLadderMeters,
-              maxLadderMeters: d.maxLadderMeters,
-              progressionIndex: d.progressionIndex,
               workBaseReps: d.workBaseReps,
               workBaseRepMeters: d.workBaseRepMeters,
               recoveryDistanceMeters: d.recoveryDistanceMeters,
@@ -171,7 +147,6 @@ export async function POST(request: NextRequest) {
               workPaceOffsetSecPerMile: d.workPaceOffsetSecPerMile,
               workBasePaceOffsetSecPerMile: d.workBasePaceOffsetSecPerMile,
               recoveryPaceOffsetSecPerMile: d.recoveryPaceOffsetSecPerMile,
-              isMP: d.isMP,
               mpTotalMiles: d.mpTotalMiles,
               mpPaceOffsetSecPerMile: d.mpPaceOffsetSecPerMile,
               intendedHeartRateZone: d.intendedHeartRateZone,
