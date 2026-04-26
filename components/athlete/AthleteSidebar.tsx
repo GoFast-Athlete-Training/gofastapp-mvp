@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
-import { Home, LayoutDashboard, MapPin, Trophy, User } from "lucide-react";
+import { Bike, Home, LayoutDashboard, MapPin, Trophy, User } from "lucide-react";
 
 type NavItem = {
   label: string;
@@ -25,6 +25,10 @@ function trainingHubMatch(p: string | null): boolean {
   );
 }
 
+function triWorkMatch(p: string | null): boolean {
+  return !!p && p.startsWith("/training/tri-work");
+}
+
 const navItems: NavItem[] = [
   { label: "Home", href: "/athlete-home", icon: Home },
   {
@@ -32,6 +36,12 @@ const navItems: NavItem[] = [
     href: "/training",
     icon: LayoutDashboard,
     match: trainingHubMatch,
+  },
+  {
+    label: "TriWork",
+    href: "/training/tri-work",
+    icon: Bike,
+    match: triWorkMatch,
   },
   {
     label: "Run",

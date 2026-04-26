@@ -89,7 +89,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
   return NextResponse.json({ success: true, triWorkout: updated });
 }
 
-export async function DELETE(_request: NextRequest, ctx: Ctx) {
+export async function DELETE(request: NextRequest, ctx: Ctx) {
   const resolved = await resolveTrainingSubjectAthleteId(request);
   if (!resolved.ok) return resolved.response;
 
