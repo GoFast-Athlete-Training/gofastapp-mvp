@@ -12,19 +12,29 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   if (!resolved.ok) return resolved.response;
 
   const { id } = await ctx.params;
-  const row = await prisma.bike_workout.findFirst({
-    where: { id, athleteId: resolved.athleteId },
-    include: {
-      steps: { orderBy: { stepOrder: "asc" } },
-      tri_workout_leg: { select: { id: true, triWorkoutId: true, legOrder: true } },
-    },
-  });
+  const [row, athlete] = await Promise.all([
+    prisma.bike_workout.findFirst({
+      where: { id, athleteId: resolved.athleteId },
+      include: {
+        steps: { orderBy: { stepOrder: "asc" } },
+        tri_workout_leg: { select: { id: true, triWorkoutId: true, legOrder: true } },
+      },
+    }),
+    prisma.athlete.findUnique({
+      where: { id: resolved.athleteId },
+      select: { ftpWatts: true },
+    }),
+  ]);
 
   if (!row) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ success: true, bikeWorkout: row });
+  return NextResponse.json({
+    success: true,
+    bikeWorkout: row,
+    athleteFtpWatts: athlete?.ftpWatts ?? null,
+  });
 }
 
 export async function PATCH(request: NextRequest, ctx: Ctx) {

@@ -209,7 +209,7 @@ export function planScheduleDaysForWeek(params: {
         dayAssigned: dayAbbrToDayName(token.dayAbbr),
         planCycleIndex,
         nOffset: nForRow,
-        phase: phaseForCatalogue(phaseOffset),
+        phase: phaseForCatalogue(phaseOffset, 4),
         estimatedDistanceInMeters: estMeters,
       });
     }

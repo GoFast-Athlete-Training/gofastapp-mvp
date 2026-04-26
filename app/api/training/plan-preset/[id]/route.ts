@@ -3,7 +3,6 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
-import { normalizeTaperLongRuns } from "@/lib/training/preset-volume-helpers";
 import {
   parseBoltonQualityToFraction,
   serializePlanPresetForApi,
@@ -22,6 +21,18 @@ export async function GET(
     include: {
       volumeConstraints: true,
       workoutConfig: true,
+      runTypeConfig: {
+        include: {
+          positions: {
+            orderBy: { cyclePosition: "asc" },
+            include: {
+              workout_catalogue: {
+                select: { id: true, name: true, workoutType: true, slug: true },
+              },
+            },
+          },
+        },
+      },
     },
   });
   if (!preset) {
@@ -63,23 +74,14 @@ export async function PATCH(
     }
 
     const volKeys = [
-      "taperWeeks",
-      "peakWeeks",
-      "taperLongRuns",
-      "baseStartMiles",
-      "cycleStep",
       "cycleLen",
-      "peakEntryMiles",
-      "peakLongRunMiles",
       "cutbackWeekModulo",
       "weeklyMileageMultiplier",
-      "taperMileageReduction",
       "longRunCapFraction",
       "minWeeklyMiles",
       "minLongMiles",
       "minEasyPerDayMiles",
       "minEasyWeekMiles",
-      "cutbackFraction",
       "cyclePeakPool",
       "cyclePoolBuildCoef",
       "cyclePoolTaperCoef",
@@ -91,24 +93,16 @@ export async function PATCH(
         const v = (vol as Record<string, unknown>)[k];
         if (k === "cyclePeakPool") {
           if (v === null || v === "" || (typeof v === "number" && !Number.isFinite(v))) {
-            volumeData.cyclePeakPool = null;
-          } else if (typeof v === "number") {
+            if (existing.volumeConstraints?.cyclePeakPool != null) {
+              volumeData.cyclePeakPool = existing.volumeConstraints.cyclePeakPool;
+            }
+          } else if (typeof v === "number" && v > 0) {
             volumeData.cyclePeakPool = v;
           }
         } else if (v != null) {
           (volumeData as Record<string, unknown>)[k] = v;
         }
       }
-    }
-    if ("taperWeeks" in volumeData || "taperLongRuns" in volumeData) {
-      const tw =
-        typeof volumeData.taperWeeks === "number"
-          ? volumeData.taperWeeks
-          : existing.volumeConstraints?.taperWeeks ?? 3;
-      volumeData.taperLongRuns = normalizeTaperLongRuns(
-        tw,
-        volumeData.taperLongRuns ?? existing.volumeConstraints?.taperLongRuns
-      );
     }
 
     const workoutData: Record<string, unknown> = {};
@@ -139,6 +133,27 @@ export async function PATCH(
     else if (typeof body.description === "string") presetData.description = body.description.trim() || null;
     if (typeof body.slug === "string") presetData.slug = body.slug.trim().toLowerCase();
 
+    if ("runTypeConfigId" in body) {
+      const v = (body as Record<string, unknown>).runTypeConfigId;
+      if (v === null || v === "") {
+        (presetData as { runTypeConfigId?: null }).runTypeConfigId = null;
+      } else if (typeof v === "string") {
+        const cfg = await prisma.run_type_config.findUnique({ where: { id: v } });
+        if (!cfg) {
+          return NextResponse.json(
+            { success: false, error: "runTypeConfigId is not a valid run type config" },
+            { status: 400 }
+          );
+        }
+        (presetData as { runTypeConfigId?: string }).runTypeConfigId = v;
+      } else {
+        return NextResponse.json(
+          { success: false, error: "runTypeConfigId must be a string, null, or empty" },
+          { status: 400 }
+        );
+      }
+    }
+
     const updated = await prisma.training_plan_preset.update({
       where: { id },
       data: {
@@ -161,6 +176,18 @@ export async function PATCH(
       include: {
         volumeConstraints: true,
         workoutConfig: true,
+        runTypeConfig: {
+          include: {
+            positions: {
+              orderBy: { cyclePosition: "asc" },
+              include: {
+                workout_catalogue: {
+                  select: { id: true, name: true, workoutType: true, slug: true },
+                },
+              },
+            },
+          },
+        },
       },
     });
 

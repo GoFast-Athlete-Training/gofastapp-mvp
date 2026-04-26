@@ -3,7 +3,6 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
-import { normalizeTaperLongRuns } from "@/lib/training/preset-volume-helpers";
 import {
   parseBoltonQualityToFraction,
   serializePlanPresetForApi,
@@ -27,6 +26,7 @@ export async function GET(request: NextRequest) {
     include: {
       volumeConstraints: true,
       workoutConfig: true,
+      runTypeConfig: { select: { id: true, name: true, description: true } },
     },
   });
   return NextResponse.json({
@@ -69,8 +69,32 @@ export async function POST(request: NextRequest) {
     const wkRec = wk as Record<string, unknown>;
     const qualityFraction = parseBoltonQualityToFraction(wkRec) ?? 0.22;
 
-    const taperWeeks = typeof vol.taperWeeks === "number" ? vol.taperWeeks : 3;
-    const taperLongRuns = normalizeTaperLongRuns(taperWeeks, vol.taperLongRuns);
+    const cyclePeak =
+      typeof vol.cyclePeakPool === "number" && Number.isFinite(vol.cyclePeakPool) && vol.cyclePeakPool > 0
+        ? vol.cyclePeakPool
+        : 88;
+
+    let runTypeConfigId: string | null | undefined = undefined;
+    if ("runTypeConfigId" in body) {
+      const r = (body as Record<string, unknown>).runTypeConfigId;
+      if (r === null || r === "") {
+        runTypeConfigId = null;
+      } else if (typeof r === "string") {
+        const cfg = await prisma.run_type_config.findUnique({ where: { id: r } });
+        if (!cfg) {
+          return NextResponse.json(
+            { success: false, error: "runTypeConfigId is not a valid run type config" },
+            { status: 400 }
+          );
+        }
+        runTypeConfigId = r;
+      } else {
+        return NextResponse.json(
+          { success: false, error: "runTypeConfigId must be a string, null, or empty" },
+          { status: 400 }
+        );
+      }
+    }
 
     const preset = await prisma.training_plan_preset.create({
       data: {
@@ -80,29 +104,16 @@ export async function POST(request: NextRequest) {
           typeof description === "string" && description.trim()
             ? description.trim()
             : null,
+        ...(runTypeConfigId !== undefined ? { runTypeConfigId } : {}),
         volumeConstraints: {
           create: {
-            taperWeeks,
-            peakWeeks: typeof vol.peakWeeks === "number" ? vol.peakWeeks : 4,
-            taperLongRuns,
-            baseStartMiles:
-              typeof vol.baseStartMiles === "number" ? vol.baseStartMiles : 8,
-            cycleStep: typeof vol.cycleStep === "number" ? vol.cycleStep : 2,
             cycleLen: typeof vol.cycleLen === "number" ? vol.cycleLen : 4,
-            peakEntryMiles:
-              typeof vol.peakEntryMiles === "number" ? vol.peakEntryMiles : 18,
-            peakLongRunMiles:
-              typeof vol.peakLongRunMiles === "number" ? vol.peakLongRunMiles : 22,
             cutbackWeekModulo:
               typeof vol.cutbackWeekModulo === "number" ? vol.cutbackWeekModulo : 3,
             weeklyMileageMultiplier:
               typeof vol.weeklyMileageMultiplier === "number"
                 ? vol.weeklyMileageMultiplier
                 : 2.5,
-            taperMileageReduction:
-              typeof vol.taperMileageReduction === "number"
-                ? vol.taperMileageReduction
-                : 0.75,
             longRunCapFraction:
               typeof vol.longRunCapFraction === "number" ? vol.longRunCapFraction : 0.4,
             minWeeklyMiles: typeof vol.minWeeklyMiles === "number" ? vol.minWeeklyMiles : 40,
@@ -111,10 +122,7 @@ export async function POST(request: NextRequest) {
               typeof vol.minEasyPerDayMiles === "number" ? vol.minEasyPerDayMiles : 3,
             minEasyWeekMiles:
               typeof vol.minEasyWeekMiles === "number" ? vol.minEasyWeekMiles : 4,
-            cyclePeakPool:
-              typeof vol.cyclePeakPool === "number" && Number.isFinite(vol.cyclePeakPool)
-                ? vol.cyclePeakPool
-                : null,
+            cyclePeakPool: cyclePeak,
             cyclePoolBuildCoef:
               typeof vol.cyclePoolBuildCoef === "number" && Number.isFinite(vol.cyclePoolBuildCoef)
                 ? vol.cyclePoolBuildCoef
@@ -144,6 +152,18 @@ export async function POST(request: NextRequest) {
       include: {
         volumeConstraints: true,
         workoutConfig: true,
+        runTypeConfig: {
+          include: {
+            positions: {
+              orderBy: { cyclePosition: "asc" },
+              include: {
+                workout_catalogue: {
+                  select: { id: true, name: true, workoutType: true, slug: true },
+                },
+              },
+            },
+          },
+        },
       },
     });
 

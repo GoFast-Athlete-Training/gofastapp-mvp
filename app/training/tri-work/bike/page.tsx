@@ -27,6 +27,7 @@ export default function TriWorkBikeListPage() {
   const [rows, setRows] = useState<BikeRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pushingId, setPushingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -66,6 +67,27 @@ export default function TriWorkBikeListPage() {
       setError(ax.response?.data?.details || ax.response?.data?.error || "Push failed");
     } finally {
       setPushingId(null);
+    }
+  }
+
+  async function deleteWorkout(id: string, title: string) {
+    if (!window.confirm(`Delete “${title}”? This cannot be undone.`)) return;
+    setDeletingId(id);
+    setError(null);
+    try {
+      await api.delete(`/bike-workouts/${id}`);
+      await load();
+    } catch (e: unknown) {
+      const ax = e as { response?: { status?: number; data?: { error?: string } } };
+      const status = ax.response?.status;
+      const msg =
+        ax.response?.data?.error ||
+        (status === 409
+          ? "Remove this workout from its tri session before deleting."
+          : "Delete failed");
+      setError(msg);
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -113,14 +135,30 @@ export default function TriWorkBikeListPage() {
                     {w.garminWorkoutId != null ? ` · Garmin #${w.garminWorkoutId}` : ""}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  disabled={pushingId === w.id || !(w.steps?.length)}
-                  onClick={() => void pushGarmin(w.id)}
-                  className="text-sm font-medium text-orange-600 hover:text-orange-700 disabled:opacity-50"
-                >
-                  {pushingId === w.id ? "Pushing…" : "Push to Garmin"}
-                </button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Link
+                    href={`/training/tri-work/bike/${w.id}`}
+                    className="text-sm font-medium text-gray-700 hover:text-gray-900"
+                  >
+                    Edit
+                  </Link>
+                  <button
+                    type="button"
+                    disabled={pushingId === w.id || !(w.steps?.length)}
+                    onClick={() => void pushGarmin(w.id)}
+                    className="text-sm font-medium text-orange-600 hover:text-orange-700 disabled:opacity-50"
+                  >
+                    {pushingId === w.id ? "Pushing…" : "Push to Garmin"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={deletingId === w.id}
+                    onClick={() => void deleteWorkout(w.id, w.title)}
+                    className="text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
+                  >
+                    {deletingId === w.id ? "Deleting…" : "Delete"}
+                  </button>
+                </div>
               </li>
             );
           })}

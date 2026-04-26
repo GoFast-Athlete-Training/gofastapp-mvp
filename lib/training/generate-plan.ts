@@ -2,12 +2,15 @@
  * Marathon-style week builder (Mon–Sun, UTC). Plan generate pipeline inside `generatePlanWorkoutRows`:
  *
  * 1. **Total weeks** — `input.totalWeeks` (caller: `calendarTrainingWeekCount` from start → race).
- * 2. **Long-run block count (cycles for LRE)** — `longRunBlockCountFromTotalWeeks(weeks)` = ceil(weeks/4); used inside `generateLongRunSchedule`. Each week is still one row; blocks drive taper/pre-peak placement.
- * 3. **Weekly volume** — `weeklyMileageTarget` + preset `minWeeklyMiles` / quality / easy splits; long-run miles come from the engine, not from `longRunMilesForOffset` (Build/peak/taper *phase* still uses the latter in other utilities).
- * 4. **Preferred days** — `input.preferredDays` (Mon–7); quality days from `preferredQualityDays` or preset DOWs.
+ * 2. **Long-run block count (cycles for LRE)** — `longRunBlockCountFromTotalWeeks(weeks)` = ceil(weeks/4); used inside `generateLongRunSchedule`. Each week is still one row; last block = taper, second-to-last = pre-peak.
+ * 3. **Weekly volume** — `weeklyMileageTarget` + `minWeeklyMiles` / quality / easy splits; long-run miles come from the engine. Catalogue phase labels use `cycleLen`-sized blocks from race day (`phaseForCatalogue`).
+ * 4. **Preferred days** — `input.preferredDays` (Mon–7); quality days from `preferredQualityDays` or DOWs from the resolved input.
  * 5. **Long-run day of week** — `normalizeLongRunOurDow(preferredLongRunDow, longRunDefaultDow)`.
- * 6. **Call long-run engine** — `generateLongRunSchedule(longRunConfigFromPlanGen(weekCount, preset))` → per-week `distance` array.
- * 7. **Per calendar week** — assign tempo/interval/long/easy to DOWs using that schedule + placement rules. `catalogueWorkoutId` stays null here; catalogue links are applied at materialization.
+ * 6. **Call long-run engine** — `generateLongRunSchedule(longRunConfigFromPlanGen(weekCount, { minLongMiles, cyclePeakPool }))` → per-week `distance` array.
+ * 7. **Per calendar week** — assign tempo/interval/long/easy to DOWs. `catalogueWorkoutId` is null; hydration lives in `generate-plan-from-configs`.
+ *
+ * **Config-free module:** all tuning (`PlanGenConfig`) is resolved by callers, typically
+ * `generatePlanFromConfigs` in `generate-plan-from-configs.ts` — do not add optional config bags here.
  *
  * Race week (`nOffset === 0`) is race-only; day-before-race is blocked. Partial week 1: skip tempo/interval; LR only if Sat/Sun fall in-range; easy on prefs. Taper long-run pattern comes from the engine for the last block.
  */
@@ -21,7 +24,6 @@ import {
 } from "@/lib/training/schedule-parser";
 import { mondayUtcOfWeekContaining, ymdFromDate } from "@/lib/training/plan-utils";
 import { formatPlannedWorkoutTitle } from "@/lib/training/workout-display-title";
-import { defaultTaperLongRunsForWeeks } from "@/lib/training/preset-volume-helpers";
 import { PACE_ANCHOR_MP_SIMULATION } from "@/lib/training/goal-pace-calculator";
 import { generateLongRunSchedule, longRunConfigFromPlanGen } from "@/lib/training/long-run-engine";
 
@@ -36,95 +38,19 @@ const DAY_NAMES = [
 ] as const;
 
 /**
- * Subset of preset volume + workout boltons merged for the generator.
- * Omitted fields fall back to hardcoded defaults when no preset is linked.
+ * Phases are contiguous `cycleLen`-week blocks from the race backward (last block = taper, prior = peak, then build, then base).
+ * `nOffset`: 0 = race week; negative = weeks before race.
+ * @param cycleLen e.g. 4 — must match the resolved `cycleLen` passed into `GeneratePlanInput` when building rows.
  */
-export interface PlanGenConfig {
-  taperWeeks?: number;
-  peakWeeks?: number;
-  /** Ordered taper long-run miles; index 0 = furthest from race. Length should match taperWeeks. */
-  taperLongRuns?: number[];
-  baseStartMiles?: number;
-  cycleStep?: number;
-  cycleLen?: number;
-  peakEntryMiles?: number;
-  peakLongRunMiles?: number;
-  cutbackWeekModulo?: number;
-  weeklyMileageMultiplier?: number;
-  taperMileageReduction?: number;
-  longRunCapFraction?: number;
-  /** Long-run cutback (week 4 of block) as fraction of push miles; default 0.65 in long-run engine. */
-  cutbackFraction?: number;
-  minWeeklyMiles?: number;
-  qualityFraction?: number;
-  qualitySessions?: number;
-  /** @deprecated Ignored: long-run catalogue row is chosen by 4-position slug (`long-run-static` / progressive / mp). */
-  qualityOnLongRun?: boolean;
-  minLongMiles?: number;
-  minEasyPerDayMiles?: number;
-  minEasyWeekMiles?: number;
-  minTempoMiles?: number;
-  minIntervalMiles?: number;
-  tempoIdealDow?: number;
-  intervalIdealDow?: number;
-  longRunDefaultDow?: number;
-}
-
-export function phaseForCatalogue(nOffset: number, cfg?: PlanGenConfig): string {
-  const taperWeeks = cfg?.taperWeeks ?? 3;
-  const peakWeeks = cfg?.peakWeeks ?? 4;
-  if (nOffset >= -taperWeeks) return "taper";
-  if (nOffset >= -(taperWeeks + peakWeeks)) return "peak";
-  if (nOffset >= -(taperWeeks + peakWeeks + 7)) return "build";
+export function phaseForCatalogue(nOffset: number, cycleLen: number): string {
+  const L = Math.max(1, Math.floor(Math.abs(cycleLen)));
+  if (nOffset === 0) return "taper";
+  if (nOffset > 0) return "base";
+  const w = -nOffset;
+  if (w <= L) return "taper";
+  if (w <= 2 * L) return "peak";
+  if (w <= 3 * L) return "build";
   return "base";
-}
-
-export function longRunMilesForOffset(nOffset: number, cfg?: PlanGenConfig): number {
-  const taperWeeks = cfg?.taperWeeks ?? 3;
-  const peakWeeks = cfg?.peakWeeks ?? 4;
-  const peakLongRun = cfg?.peakLongRunMiles ?? 22;
-  const peakEntry = cfg?.peakEntryMiles ?? 18;
-  const baseStart = cfg?.baseStartMiles ?? 8;
-  const cycleStep = cfg?.cycleStep ?? 2;
-  const cycleLen = Math.max(1, cfg?.cycleLen ?? 4);
-
-  let taperLongRuns = cfg?.taperLongRuns;
-  if (!taperLongRuns || taperLongRuns.length === 0) {
-    taperLongRuns = defaultTaperLongRunsForWeeks(taperWeeks);
-  }
-  while (taperLongRuns.length < taperWeeks) {
-    taperLongRuns = [...taperLongRuns, taperLongRuns[taperLongRuns.length - 1] ?? 0];
-  }
-  taperLongRuns = taperLongRuns.slice(0, taperWeeks);
-
-  // Race week: no scheduled long run in this model (race is separate row).
-  if (nOffset === 0) {
-    return 0;
-  }
-
-  // Taper weeks: nOffset in [-taperWeeks, -1]
-  if (nOffset >= -taperWeeks && nOffset < 0) {
-    const idx = taperWeeks + nOffset;
-    const v = taperLongRuns[idx];
-    return typeof v === "number" && Number.isFinite(v) ? Math.max(0, v) : 0;
-  }
-
-  // Peak weeks: ramp from peakEntry to peakLongRun
-  if (nOffset >= -(taperWeeks + peakWeeks)) {
-    const peakPos = Math.abs(nOffset) - taperWeeks - 1;
-    const denom = Math.max(1, peakWeeks - 1);
-    const rampStep = (peakLongRun - peakEntry) / denom;
-    const miles = peakEntry + peakPos * rampStep;
-    return Math.round(Math.min(peakLongRun, Math.max(0, miles)));
-  }
-
-  // Base/build: repeating cycle stepping up toward peakEntry
-  const weeksIntoBuild = Math.abs(nOffset) - taperWeeks - peakWeeks - 1;
-  const cyclePos = weeksIntoBuild % cycleLen;
-  const cycleNum = Math.floor(weeksIntoBuild / cycleLen);
-  const cyclePeak = peakEntry - (cycleNum + 1) * cycleStep;
-  const miles = cyclePeak - (cycleLen - 1 - cyclePos) * cycleStep;
-  return Math.max(baseStart, Math.round(miles));
 }
 
 function utcDateOnly(d: Date): Date {
@@ -148,17 +74,12 @@ function milesToMeters(miles: number): number {
   return miles * 1609.34;
 }
 
-/** Fallback DOW values used when no config is provided. */
-const DEFAULT_TEMPO_IDEAL_OUR_DOW = 2;
-const DEFAULT_INTERVAL_IDEAL_OUR_DOW = 4;
-const DEFAULT_LONG_RUN_OUR_DOW = 6;
-
 function circularDistOurDow(a: number, b: number): number {
   const d = Math.abs(a - b);
   return Math.min(d, 7 - d);
 }
 
-function normalizeLongRunOurDow(pref: number | null | undefined, defaultDow: number = DEFAULT_LONG_RUN_OUR_DOW): number {
+function normalizeLongRunOurDow(pref: number | null | undefined, defaultDow: number): number {
   if (pref === 6 || pref === 7) return pref;
   return defaultDow === 7 ? 7 : 6;
 }
@@ -208,7 +129,8 @@ export function nOffsetFromWeekAnchor(weekAnchor: Date, raceUtc: Date): number {
 export function cataloguePhaseFallbackForWeek(
   planStartRaw: Date | string,
   raceRaw: Date | string,
-  weekNumber: number
+  weekNumber: number,
+  cycleLen: number = 4
 ): string {
   const planStart = utcDateOnly(
     typeof planStartRaw === "string" ? new Date(planStartRaw) : planStartRaw
@@ -217,9 +139,13 @@ export function cataloguePhaseFallbackForWeek(
   const firstMonday = mondayUtcOfWeekContaining(planStart);
   const weekAnchor = addDaysUtc(firstMonday, (weekNumber - 1) * 7);
   const nOffset = nOffsetFromWeekAnchor(weekAnchor, raceUtc);
-  return phaseForCatalogue(nOffset);
+  return phaseForCatalogue(nOffset, cycleLen);
 }
 
+/**
+ * All numeric / rotation fields are pre-resolved. Callers should use
+ * `generatePlanFromConfigs` in `generate-plan-from-configs.ts` to merge `PlanGenConfig` + defaults.
+ */
 export interface GeneratePlanInput {
   planId: string;
   athleteId: string;
@@ -228,16 +154,28 @@ export interface GeneratePlanInput {
   planStartDate: Date;
   raceDate: Date;
   weeklyMileageTarget: number;
-  minWeeklyMiles?: number;
+  /** Effective weekly floor (miles) after preset merge. */
+  minWeeklyMiles: number;
+  /** Contiguous L-week base/peak/bundle blocks; drives `phase` labels. */
+  cycleLen: number;
+  tempoIdealDow: number;
+  intervalIdealDow: number;
+  longRunDefaultDow: number;
+  minTempoMiles: number;
+  minIntervalMiles: number;
+  minLongMiles: number;
+  minEasyPerDayMiles: number;
+  qualityFraction: number;
+  qualitySessions: number;
+  /** Scales LRE long-run cap; omit or null for default engine behavior. */
+  cyclePeakPool?: number | null;
   preferredDays: number[];
   raceName: string;
   raceDistanceMiles: number;
-  /** Preferred long-run day: 6=Sat, 7=Sun (default 6). */
+  /** Preferred long-run day: 6=Sat, 7=Sun. */
   preferredLongRunDow?: number | null;
-  /** User-selected quality session DOWs (1–7); max 2. Empty = use preset tempo/interval DOWs. */
+  /** User-selected quality session DOWs (1–7); max 2. Empty = use tempoIdealDow / intervalIdealDow. */
   preferredQualityDays?: number[];
-  /** Optional persisted config; omit to use hardcoded defaults for backward compatibility. */
-  config?: PlanGenConfig;
 }
 
 export interface GeneratedPlanWorkoutRow {
@@ -324,17 +262,16 @@ function trimEasyAssignmentsToWeeklyTotal(params: {
 }
 
 export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlanWorkoutRow[] {
-  const cfg = input.config;
-  const minWeekly = cfg?.minWeeklyMiles ?? input.minWeeklyMiles ?? 40;
-  const tempoIdealDow = cfg?.tempoIdealDow ?? DEFAULT_TEMPO_IDEAL_OUR_DOW;
-  const intervalIdealDow = cfg?.intervalIdealDow ?? DEFAULT_INTERVAL_IDEAL_OUR_DOW;
-  const longRunDefaultDow = cfg?.longRunDefaultDow ?? DEFAULT_LONG_RUN_OUR_DOW;
-  const minTempoMi = cfg?.minTempoMiles ?? 3;
-  const minIntervalMi = cfg?.minIntervalMiles ?? 3;
-  const minLongMi = cfg?.minLongMiles ?? 8;
-  const minEasyPerDay = cfg?.minEasyPerDayMiles ?? 3;
-  const qualityFraction = cfg?.qualityFraction ?? 0.22;
-  const qualitySessions = Math.min(2, Math.max(0, cfg?.qualitySessions ?? 1));
+  const minWeekly = input.minWeeklyMiles;
+  const tempoIdealDow = input.tempoIdealDow;
+  const intervalIdealDow = input.intervalIdealDow;
+  const longRunDefaultDow = input.longRunDefaultDow;
+  const minTempoMi = input.minTempoMiles;
+  const minIntervalMi = input.minIntervalMiles;
+  const minLongMi = input.minLongMiles;
+  const minEasyPerDay = input.minEasyPerDayMiles;
+  const qualityFraction = input.qualityFraction;
+  const qualitySessions = Math.min(2, Math.max(0, input.qualitySessions));
 
   const preferred =
     input.preferredDays.length > 0
@@ -364,12 +301,8 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
   const weekCount = input.totalWeeks;
   const longRunSchedule = generateLongRunSchedule(
     longRunConfigFromPlanGen(weekCount, {
-      baseStartMiles: cfg?.baseStartMiles,
-      cycleStep: cfg?.cycleStep,
-      minLongMiles: cfg?.minLongMiles,
-      peakLongRunMiles: cfg?.peakLongRunMiles,
-      cutbackFraction: cfg?.cutbackFraction,
-      taperLongRuns: cfg?.taperLongRuns,
+      minLongMiles: minLongMi,
+      cyclePeakPool: input.cyclePeakPool,
     })
   );
 
@@ -382,7 +315,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
 
     const weekEnd = addDaysUtc(weekAnchor, 6);
     const nOffset = nOffsetFromWeekAnchor(weekAnchor, raceUtc);
-    const phase = phaseForCatalogue(nOffset, cfg);
+    const phase = phaseForCatalogue(nOffset, input.cycleLen);
 
     const blockedDates = new Set<string>();
     blockedDates.add(ymdFromDate(addDaysUtc(raceUtc, -1)));
@@ -611,7 +544,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
         athleteId: input.athleteId,
         planId: input.planId,
         date: utcDateOnly(raceUtc),
-        phase: phaseForCatalogue(0, cfg),
+        phase: phaseForCatalogue(0, input.cycleLen),
         estimatedDistanceInMeters: milesToMeters(input.raceDistanceMiles),
         nOffset: 0,
         weekNumber,

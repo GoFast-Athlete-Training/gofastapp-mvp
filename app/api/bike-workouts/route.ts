@@ -57,16 +57,26 @@ export async function GET(request: NextRequest) {
   const resolved = await resolveTrainingSubjectAthleteId(request);
   if (!resolved.ok) return resolved.response;
 
-  const rows = await prisma.bike_workout.findMany({
-    where: { athleteId: resolved.athleteId },
-    orderBy: [{ date: "desc" }, { updatedAt: "desc" }],
-    include: {
-      steps: { orderBy: { stepOrder: "asc" } },
-      tri_workout_leg: { select: { id: true, triWorkoutId: true, legOrder: true } },
-    },
-  });
+  const [rows, athlete] = await Promise.all([
+    prisma.bike_workout.findMany({
+      where: { athleteId: resolved.athleteId },
+      orderBy: [{ date: "desc" }, { updatedAt: "desc" }],
+      include: {
+        steps: { orderBy: { stepOrder: "asc" } },
+        tri_workout_leg: { select: { id: true, triWorkoutId: true, legOrder: true } },
+      },
+    }),
+    prisma.athlete.findUnique({
+      where: { id: resolved.athleteId },
+      select: { ftpWatts: true },
+    }),
+  ]);
 
-  return NextResponse.json({ success: true, bikeWorkouts: rows });
+  return NextResponse.json({
+    success: true,
+    bikeWorkouts: rows,
+    athleteFtpWatts: athlete?.ftpWatts ?? null,
+  });
 }
 
 /**

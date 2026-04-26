@@ -989,38 +989,28 @@ model training_plan_preset {
 
   volumeConstraints preset_volume_constraints?
   workoutConfig     preset_workout_config?
-  runTypeConfigs    run_type_config[]
-  training_plans    training_plans[]
+  /// Optional shared rotation: cycle positions → catalogue (many presets can use the same config).
+  runTypeConfigId String?
+  runTypeConfig   run_type_config? @relation(fields: [runTypeConfigId], references: [id], onDelete: SetNull)
+  training_plans  training_plans[]
 }
 
-/// Volume / taper / mileage bolton for a preset.
+/// Volume constraints: weekly floors/caps, cycle length, and cycle-pool anchors (taper/peak are cycles, not separate phase counts).
 model preset_volume_constraints {
   id        String @id @default(cuid())
   presetId  String @unique
   training_plan_preset training_plan_preset @relation(fields: [presetId], references: [id], onDelete: Cascade)
 
-  taperWeeks             Int   @default(3)
-  peakWeeks              Int   @default(4)
-  /// Ordered taper long-run miles; length should match taperWeeks. Index 0 = furthest from race.
-  taperLongRuns          Json
-  /// Build/base: floor miles, distance step per 4-week block, weeks per long-run cycle, first peak long run.
-  baseStartMiles         Float @default(8)
-  cycleStep                Float @default(2)
   cycleLen                 Int   @default(4)
-  peakEntryMiles         Float @default(18)
-  peakLongRunMiles       Int   @default(22)
   cutbackWeekModulo      Int   @default(3)
   weeklyMileageMultiplier Float @default(2.5)
-  taperMileageReduction   Float @default(0.75)
   longRunCapFraction      Float @default(0.4)
   minWeeklyMiles          Int   @default(40)
   minLongMiles            Float @default(8)
   minEasyPerDayMiles      Float @default(3)
   minEasyWeekMiles        Float @default(4)
-  /// Long-run cutback week distance as a fraction of the push (dynamic) miles; default 0.65
-  cutbackFraction         Float?
   /// Total long-run pool miles in the peak training cycle (N-1; before taper pool).
-  cyclePeakPool         Float?
+  cyclePeakPool         Float
   /// Multiplier applied backward through build cycles (each prior pool = next / this).
   cyclePoolBuildCoef    Float  @default(1.12)
   /// Multiplier from peak to taper pool (N pool = (N-1) * this).
@@ -1049,17 +1039,31 @@ model preset_workout_config {
   updatedAt DateTime @updatedAt
 }
 
-/// Per-cycle position → catalogue mapping for slot-based long-run / quality planning (bolton on preset).
+/// Standalone named rotation: maps cycle positions to catalogue rows; many presets can reference one.
 model run_type_config {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  positions   run_type_config_position[]
+  usedByPresets training_plan_preset[]
+
+  @@index([name])
+}
+
+/// One slot in a rotation: long run / quality variant at this cycle index.
+model run_type_config_position {
   id        String @id @default(cuid())
-  presetId  String
-  training_plan_preset training_plan_preset @relation(fields: [presetId], references: [id], onDelete: Cascade)
+  runTypeConfigId String
+  run_type_config run_type_config @relation(fields: [runTypeConfigId], references: [id], onDelete: Cascade)
 
   /// Position within the repeating cycle (0-based).
   cyclePosition      Int
   /// Coach-defined label (e.g. "Cutback long run").
   name               String
-  /// Fraction of cycle pool for this slot; positions for a preset should sum to ~1.0.
+  /// Fraction of cycle pool for this slot; positions for a config should sum to ~1.0.
   distributionWeight Float  @default(0.25)
   catalogueWorkoutId String?
   workout_catalogue  workout_catalogue? @relation(fields: [catalogueWorkoutId], references: [id], onDelete: SetNull)
@@ -1067,8 +1071,8 @@ model run_type_config {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([presetId, cyclePosition])
-  @@index([presetId])
+  @@unique([runTypeConfigId, cyclePosition])
+  @@index([runTypeConfigId])
 }
 
 model training_plans {
@@ -1168,7 +1172,7 @@ model workout_catalogue {
   createdAt                    DateTime    @default(now())
   updatedAt                    DateTime    @updatedAt
   workouts                     workouts[]
-  runTypeConfigs               run_type_config[]
+  run_type_config_positions   run_type_config_position[]
 
   @@unique([name, workoutType])
   @@index([workoutType])

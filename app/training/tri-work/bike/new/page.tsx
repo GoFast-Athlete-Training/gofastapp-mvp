@@ -1,87 +1,58 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import api from "@/lib/api";
-
-type StepDraft = {
-  title: string;
-  intensity: string;
-  durationMinutes: string;
-  powerWattsLow: string;
-  powerWattsHigh: string;
-};
-
-const emptyStep = (): StepDraft => ({
-  title: "Interval",
-  intensity: "ACTIVE",
-  durationMinutes: "10",
-  powerWattsLow: "200",
-  powerWattsHigh: "230",
-});
+import {
+  BikeStepEditor,
+  buildBikeStepsApiPayload,
+  defaultNewBikeSteps,
+  type BikeStepDraft,
+} from "@/components/training/BikeStepEditor";
 
 export default function NewBikeWorkoutPage() {
   const router = useRouter();
   const [title, setTitle] = useState("Bike workout");
   const [date, setDate] = useState("");
-  const [steps, setSteps] = useState<StepDraft[]>([
-    {
-      title: "Warmup",
-      intensity: "WARMUP",
-      durationMinutes: "10",
-      powerWattsLow: "120",
-      powerWattsHigh: "150",
-    },
-    emptyStep(),
-    {
-      title: "Cooldown",
-      intensity: "COOLDOWN",
-      durationMinutes: "10",
-      powerWattsLow: "100",
-      powerWattsHigh: "130",
-    },
-  ]);
+  const [steps, setSteps] = useState<BikeStepDraft[]>(defaultNewBikeSteps);
+  const [ftpWatts, setFtpWatts] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  function updateStep(i: number, patch: Partial<StepDraft>) {
-    setSteps((prev) => prev.map((s, j) => (j === i ? { ...s, ...patch } : s)));
-  }
+  const loadFtp = useCallback(async () => {
+    try {
+      await new Promise<void>((resolve) => {
+        const u = auth.currentUser;
+        if (u) {
+          resolve();
+          return;
+        }
+        const unsub = onAuthStateChanged(auth, () => {
+          unsub();
+          resolve();
+        });
+      });
+      const res = await api.get("/bike-workouts");
+      const ftp = (res.data as { athleteFtpWatts?: number | null })?.athleteFtpWatts;
+      setFtpWatts(ftp ?? null);
+    } catch {
+      setFtpWatts(null);
+    }
+  }, []);
 
-  function addStep() {
-    setSteps((prev) => [...prev, emptyStep()]);
-  }
-
-  function removeStep(i: number) {
-    setSteps((prev) => (prev.length <= 1 ? prev : prev.filter((_, j) => j !== i)));
-  }
+  useEffect(() => {
+    void loadFtp();
+  }, [loadFtp]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setSaving(true);
     try {
-      const bodySteps = steps.map((s, idx) => {
-        const min = parseFloat(s.durationMinutes);
-        if (!Number.isFinite(min) || min <= 0) {
-          throw new Error(`Step ${idx + 1}: duration must be a positive number (minutes)`);
-        }
-        const low = parseInt(s.powerWattsLow, 10);
-        const high = parseInt(s.powerWattsHigh, 10);
-        if (!Number.isFinite(low) || !Number.isFinite(high)) {
-          throw new Error(`Step ${idx + 1}: power must be watts (integers)`);
-        }
-        return {
-          stepOrder: idx + 1,
-          title: s.title.trim() || `Step ${idx + 1}`,
-          intensity: s.intensity.trim() || "ACTIVE",
-          durationType: "TIME",
-          durationSeconds: Math.round(min * 60),
-          powerWattsLow: low,
-          powerWattsHigh: high,
-        };
-      });
+      const bodySteps = buildBikeStepsApiPayload(steps);
 
       const payload: Record<string, unknown> = {
         title: title.trim(),
@@ -89,6 +60,9 @@ export default function NewBikeWorkoutPage() {
       };
       if (date.trim()) {
         payload.date = date.trim();
+      }
+      if (ftpWatts != null && ftpWatts > 0) {
+        payload.ftpWattsSnapshot = ftpWatts;
       }
 
       const res = await api.post("/bike-workouts", payload);
@@ -139,73 +113,7 @@ export default function NewBikeWorkoutPage() {
           />
         </div>
 
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-900">Steps (time + power)</p>
-            <button
-              type="button"
-              onClick={addStep}
-              className="text-sm font-medium text-orange-600 hover:text-orange-700"
-            >
-              Add step
-            </button>
-          </div>
-          {steps.map((s, i) => (
-            <div key={i} className="rounded-lg border border-gray-200 p-3 space-y-2 bg-gray-50/80">
-              <div className="flex flex-wrap gap-2 items-end">
-                <div className="flex-1 min-w-[120px]">
-                  <label className="text-xs text-gray-500">Title</label>
-                  <input
-                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
-                    value={s.title}
-                    onChange={(e) => updateStep(i, { title: e.target.value })}
-                  />
-                </div>
-                <div className="w-28">
-                  <label className="text-xs text-gray-500">Intensity</label>
-                  <input
-                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
-                    value={s.intensity}
-                    onChange={(e) => updateStep(i, { intensity: e.target.value })}
-                  />
-                </div>
-                <div className="w-24">
-                  <label className="text-xs text-gray-500">Minutes</label>
-                  <input
-                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
-                    value={s.durationMinutes}
-                    onChange={(e) => updateStep(i, { durationMinutes: e.target.value })}
-                  />
-                </div>
-                <div className="w-24">
-                  <label className="text-xs text-gray-500">W low</label>
-                  <input
-                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
-                    value={s.powerWattsLow}
-                    onChange={(e) => updateStep(i, { powerWattsLow: e.target.value })}
-                  />
-                </div>
-                <div className="w-24">
-                  <label className="text-xs text-gray-500">W high</label>
-                  <input
-                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
-                    value={s.powerWattsHigh}
-                    onChange={(e) => updateStep(i, { powerWattsHigh: e.target.value })}
-                  />
-                </div>
-                {steps.length > 1 ? (
-                  <button
-                    type="button"
-                    onClick={() => removeStep(i)}
-                    className="text-xs text-red-600 hover:underline pb-1"
-                  >
-                    Remove
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          ))}
-        </div>
+        <BikeStepEditor steps={steps} onChangeSteps={setSteps} ftpWatts={ftpWatts} />
 
         <div className="flex gap-3">
           <button

@@ -6,31 +6,18 @@ export function presetBoltonsToPlanGenConfig(
   volume: preset_volume_constraints,
   workout: preset_workout_config
 ): PlanGenConfig {
-  const taperRuns = Array.isArray(volume.taperLongRuns)
-    ? (volume.taperLongRuns as unknown[]).map((x) => Number(x))
-    : undefined;
-
   return {
-    taperWeeks: volume.taperWeeks,
-    peakWeeks: volume.peakWeeks,
-    taperLongRuns: taperRuns?.every((n) => Number.isFinite(n)) ? taperRuns : undefined,
-    baseStartMiles: volume.baseStartMiles,
-    cycleStep: volume.cycleStep,
     cycleLen: volume.cycleLen,
-    peakEntryMiles: volume.peakEntryMiles,
-    peakLongRunMiles: volume.peakLongRunMiles,
     cutbackWeekModulo: volume.cutbackWeekModulo,
     weeklyMileageMultiplier: volume.weeklyMileageMultiplier,
-    taperMileageReduction: volume.taperMileageReduction,
     longRunCapFraction: volume.longRunCapFraction,
-    cutbackFraction:
-      volume.cutbackFraction != null && Number.isFinite(Number(volume.cutbackFraction))
-        ? Number(volume.cutbackFraction)
-        : undefined,
     minWeeklyMiles: volume.minWeeklyMiles,
     minLongMiles: volume.minLongMiles,
     minEasyPerDayMiles: volume.minEasyPerDayMiles,
     minEasyWeekMiles: volume.minEasyWeekMiles,
+    cyclePeakPool: volume.cyclePeakPool,
+    cyclePoolBuildCoef: volume.cyclePoolBuildCoef,
+    cyclePoolTaperCoef: volume.cyclePoolTaperCoef,
     qualityFraction: workout.qualityFraction,
     qualitySessions: workout.qualitySessions,
     qualityOnLongRun: workout.qualityOnLongRun,

@@ -186,30 +186,29 @@ export function generateLongRunSchedule(cfg: LongRunServiceConfig): LongRunEntry
   return out;
 }
 
+/** Maps peak-cycle pool (sum of long-run miles in the peak block) to a long-run cap for the step engine. */
+function longRunMaxFromCyclePeakPool(cyclePeakPool: number | undefined | null): number {
+  if (cyclePeakPool != null && Number.isFinite(cyclePeakPool) && Number(cyclePeakPool) > 0) {
+    return Math.max(8, Math.round(Number(cyclePeakPool) * 0.28 * 10) / 10);
+  }
+  return 22;
+}
+
 /**
  * Merges preset / generator defaults into `LongRunServiceConfig` for a plan.
+ * `cyclePeakPool` anchors max distance; internal taper still uses the last 4-week block in the LRE.
  */
 export function longRunConfigFromPlanGen(
   totalWeeks: number,
-  cfg?: {
-    baseStartMiles?: number;
-    cycleStep?: number;
-    minLongMiles?: number;
-    peakLongRunMiles?: number;
-    cutbackFraction?: number | null;
-    taperLongRuns?: number[];
-  }
+  cfg?: { minLongMiles?: number; cyclePeakPool?: number | null }
 ): LongRunServiceConfig {
+  const minL = cfg?.minLongMiles ?? 8;
+  const startBase = Math.max(8, minL);
   return {
     totalWeeks,
-    startBase: cfg?.baseStartMiles ?? 12,
-    step: cfg?.cycleStep ?? 2,
-    longRunMin: cfg?.minLongMiles ?? 8,
-    longRunMax: cfg?.peakLongRunMiles ?? 22,
-    cutbackFraction:
-      cfg?.cutbackFraction != null && Number.isFinite(cfg.cutbackFraction)
-        ? cfg.cutbackFraction
-        : undefined,
-    taperLongRuns: cfg?.taperLongRuns,
+    startBase,
+    step: 2,
+    longRunMin: minL,
+    longRunMax: longRunMaxFromCyclePeakPool(cfg?.cyclePeakPool),
   };
 }
