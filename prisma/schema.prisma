@@ -95,6 +95,7 @@ model Athlete {
   tri_workouts            tri_workout[]
   athlete_goals           AthleteGoal[]
   athlete_race_signups    athlete_race_signups[]
+  athlete_race_results    athlete_race_results[]
   race_memberships        race_memberships[]
   race_messages           race_messages[]
   race_announcements      race_announcements[]
@@ -245,6 +246,7 @@ model athlete_activities {
   matched_workout  workouts?         @relation("WorkoutMatchedActivity")
   matched_bike_workout bike_workout? @relation("BikeWorkoutMatchedActivity")
   city_run_activity_links city_run_activity_links[]
+  athlete_race_result athlete_race_results?
 
   @@index([athleteId, ingestionStatus])
 }
@@ -391,6 +393,7 @@ model race_registry {
   race_trainer_groups      race_trainer_groups[]
   athlete_goals            AthleteGoal[]
   athlete_race_signups     athlete_race_signups[]
+  athlete_race_results     athlete_race_results[]
   race_memberships         race_memberships[]
   race_messages            race_messages[]
   race_announcements       race_announcements[]
@@ -449,6 +452,7 @@ model AthleteGoal {
   race_registry    race_registry? @relation(fields: [raceRegistryId], references: [id], onDelete: SetNull)
   training_plans   training_plans[]
   athlete_race_signups athlete_race_signups[]
+  athlete_race_results athlete_race_results[]
 
   @@index([athleteId])
   @@index([athleteId, status])
@@ -470,11 +474,64 @@ model athlete_race_signups {
   Athlete        Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   race_registry  race_registry  @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
   athlete_goal   AthleteGoal?   @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  athlete_race_result athlete_race_results?
 
   @@unique([athleteId, raceRegistryId])
   @@index([athleteId])
   @@index([raceRegistryId])
   @@map("athlete_race_signups")
+}
+
+/// Persisted finish data for a race (manual or linked Garmin activity).
+model athlete_race_results {
+  id                     String   @id @default(cuid())
+  athleteId              String
+  raceRegistryId         String
+  signupId               String?  @unique
+  goalId                 String?  @unique
+  /// Primary display time — chip or net when that is the official "finish" (string "H:MM:SS" or "MM:SS").
+  officialFinishTime     String?
+  chipTime               String?
+  gunTime                String?
+  /// Net finish in seconds (for goal / PR analysis).
+  finishTimeSeconds      Int?
+  /// Goal time in seconds (snapshot from AthleteGoal.goalTime at log time).
+  goalTimeSeconds        Int?
+  /// finishTimeSeconds - goalTimeSeconds; negative = beat goal (faster).
+  goalTimeDeltaSeconds   Int?
+  goalAchieved           Boolean  @default(false)
+  prAchieved             Boolean  @default(false)
+  /// Prior best for same distance (seconds) when PR was set.
+  previousPrSeconds      Int?
+  /// When the race was run (defaults from registry or goal).
+  raceDate               DateTime?
+  /// Snapshot: Marathon, 5K, etc.
+  distanceLabel          String?
+  reflection             String?  @db.Text
+  howFeltRating          Int?
+  actualDistanceMeters     Float?
+  actualAvgPaceSecPerMile  Int?
+  overallPlace           Int?
+  ageGroupPlace          Int?
+  divisionPlace          Int?
+  source                 String   @default("manual")
+  /// Optional link to a synced `athlete_activities` row (e.g. Garmin).
+  garminActivityId       String?  @unique
+  notes                  String?  @db.Text
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  Athlete              Athlete            @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  race_registry        race_registry      @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
+  athlete_race_signup  athlete_race_signups? @relation(fields: [signupId], references: [id], onDelete: SetNull)
+  athlete_goal         AthleteGoal?        @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  athlete_activity     athlete_activities?  @relation(fields: [garminActivityId], references: [id], onDelete: SetNull)
+
+  @@unique([athleteId, raceRegistryId])
+  @@index([athleteId])
+  @@index([raceRegistryId])
+  @@index([goalId])
+  @@map("athlete_race_results")
 }
 
 /// Join a race registry → access race chatter and container features (mirrors run_crew_memberships).
@@ -1001,14 +1058,10 @@ model preset_volume_constraints {
   presetId  String @unique
   training_plan_preset training_plan_preset @relation(fields: [presetId], references: [id], onDelete: Cascade)
 
-  cycleLen                 Int   @default(4)
-  cutbackWeekModulo      Int   @default(3)
-  weeklyMileageMultiplier Float @default(2.5)
-  longRunCapFraction      Float @default(0.4)
-  minWeeklyMiles          Int   @default(40)
-  minLongMiles            Float @default(8)
-  minEasyPerDayMiles      Float @default(3)
-  minEasyWeekMiles        Float @default(4)
+  cycleLen            Int   @default(4)
+  minWeeklyMiles      Int   @default(40)
+  minLongMiles        Float @default(8)
+  minEasyPerDayMiles  Float @default(3)
   /// Total long-run pool miles in the peak training cycle (N-1; before taper pool).
   cyclePeakPool         Float
   /// Multiplier applied backward through build cycles (each prior pool = next / this).

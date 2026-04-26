@@ -108,20 +108,10 @@ export async function POST(request: NextRequest) {
         volumeConstraints: {
           create: {
             cycleLen: typeof vol.cycleLen === "number" ? vol.cycleLen : 4,
-            cutbackWeekModulo:
-              typeof vol.cutbackWeekModulo === "number" ? vol.cutbackWeekModulo : 3,
-            weeklyMileageMultiplier:
-              typeof vol.weeklyMileageMultiplier === "number"
-                ? vol.weeklyMileageMultiplier
-                : 2.5,
-            longRunCapFraction:
-              typeof vol.longRunCapFraction === "number" ? vol.longRunCapFraction : 0.4,
             minWeeklyMiles: typeof vol.minWeeklyMiles === "number" ? vol.minWeeklyMiles : 40,
             minLongMiles: typeof vol.minLongMiles === "number" ? vol.minLongMiles : 8,
             minEasyPerDayMiles:
               typeof vol.minEasyPerDayMiles === "number" ? vol.minEasyPerDayMiles : 3,
-            minEasyWeekMiles:
-              typeof vol.minEasyWeekMiles === "number" ? vol.minEasyWeekMiles : 4,
             cyclePeakPool: cyclePeak,
             cyclePoolBuildCoef:
               typeof vol.cyclePoolBuildCoef === "number" && Number.isFinite(vol.cyclePoolBuildCoef)

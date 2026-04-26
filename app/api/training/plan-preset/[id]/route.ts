@@ -75,13 +75,9 @@ export async function PATCH(
 
     const volKeys = [
       "cycleLen",
-      "cutbackWeekModulo",
-      "weeklyMileageMultiplier",
-      "longRunCapFraction",
       "minWeeklyMiles",
       "minLongMiles",
       "minEasyPerDayMiles",
-      "minEasyWeekMiles",
       "cyclePeakPool",
       "cyclePoolBuildCoef",
       "cyclePoolTaperCoef",

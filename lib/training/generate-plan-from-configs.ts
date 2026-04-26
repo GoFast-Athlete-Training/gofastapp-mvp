@@ -17,9 +17,6 @@ import {
 /** Subset of preset volume + workout boltons merged for the generator. */
 export interface PlanGenConfig {
   cycleLen?: number;
-  cutbackWeekModulo?: number;
-  weeklyMileageMultiplier?: number;
-  longRunCapFraction?: number;
   minWeeklyMiles?: number;
   /** Total long-run pool miles in the peak training block; scales the long-run engine cap. */
   cyclePeakPool?: number;
@@ -31,7 +28,6 @@ export interface PlanGenConfig {
   qualityOnLongRun?: boolean;
   minLongMiles?: number;
   minEasyPerDayMiles?: number;
-  minEasyWeekMiles?: number;
   minTempoMiles?: number;
   minIntervalMiles?: number;
   tempoIdealDow?: number;

@@ -8,13 +8,9 @@ export function presetBoltonsToPlanGenConfig(
 ): PlanGenConfig {
   return {
     cycleLen: volume.cycleLen,
-    cutbackWeekModulo: volume.cutbackWeekModulo,
-    weeklyMileageMultiplier: volume.weeklyMileageMultiplier,
-    longRunCapFraction: volume.longRunCapFraction,
     minWeeklyMiles: volume.minWeeklyMiles,
     minLongMiles: volume.minLongMiles,
     minEasyPerDayMiles: volume.minEasyPerDayMiles,
-    minEasyWeekMiles: volume.minEasyWeekMiles,
     cyclePeakPool: volume.cyclePeakPool,
     cyclePoolBuildCoef: volume.cyclePoolBuildCoef,
     cyclePoolTaperCoef: volume.cyclePoolTaperCoef,
