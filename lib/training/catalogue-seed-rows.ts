@@ -6,6 +6,8 @@ import {
 
 export type CatalogueSeedRow = {
   name: string;
+  /** Optional; defaults to kebab-case from `name` at seed time. */
+  slug?: string | null;
   workoutType: WorkoutType;
   description: string | null;
   intendedPhase: string[];

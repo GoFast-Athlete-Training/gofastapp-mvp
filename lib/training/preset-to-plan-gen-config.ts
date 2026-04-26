@@ -23,6 +23,10 @@ export function presetBoltonsToPlanGenConfig(
     weeklyMileageMultiplier: volume.weeklyMileageMultiplier,
     taperMileageReduction: volume.taperMileageReduction,
     longRunCapFraction: volume.longRunCapFraction,
+    cutbackFraction:
+      volume.cutbackFraction != null && Number.isFinite(Number(volume.cutbackFraction))
+        ? Number(volume.cutbackFraction)
+        : undefined,
     minWeeklyMiles: volume.minWeeklyMiles,
     minLongMiles: volume.minLongMiles,
     minEasyPerDayMiles: volume.minEasyPerDayMiles,

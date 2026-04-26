@@ -69,6 +69,8 @@ export type CatalogueRowInput = {
   intendedHRBpmLow?: number | null;
   intendedHRBpmHigh?: number | null;
   notes?: string | null;
+  /** Lowercase kebab-case. Omitted in payload = leave existing value on update. */
+  slug?: string | null;
 };
 
 function pickNum(body: Record<string, unknown>, keys: string[]): number | null {
@@ -162,6 +164,24 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
     return { ok: false, error: "intendedPhase must have at least one phase (e.g. base,build)" };
   }
 
+  let slug: string | null | undefined = undefined;
+  if (Object.prototype.hasOwnProperty.call(body, "slug")) {
+    if (body.slug === null || body.slug === undefined || body.slug === "") {
+      slug = null;
+    } else if (typeof body.slug === "string") {
+      const s = body.slug.trim().toLowerCase();
+      if (s.length === 0) {
+        slug = null;
+      } else if (!/^[a-z0-9-]+$/.test(s)) {
+        return { ok: false, error: "slug must be lowercase kebab-case (a-z, 0-9, hyphens)" };
+      } else {
+        slug = s;
+      }
+    } else {
+      return { ok: false, error: "slug must be a string, null, or empty" };
+    }
+  }
+
   const num = (k: string) => {
     const v = body[k];
     if (v === null || v === undefined || v === "") return null;
@@ -248,6 +268,7 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
       intendedHRBpmHigh:
         num("intendedHRBpmHigh") != null ? Math.round(num("intendedHRBpmHigh")!) : null,
       notes: typeof body.notes === "string" ? body.notes.trim() || null : null,
+      ...(slug !== undefined ? { slug } : {}),
     },
   };
 }

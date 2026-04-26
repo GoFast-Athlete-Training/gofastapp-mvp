@@ -8,6 +8,7 @@ import {
   bodyToCatalogueRow,
   type CatalogueRowInput,
 } from "@/lib/training/catalogue-row";
+import { generateCatalogueSlug } from "@/lib/training/catalogue-slug";
 
 /**
  * POST body: { items: Record<string, unknown>[] }
@@ -131,6 +132,9 @@ export async function POST(request: NextRequest) {
           if (explicitIsLadder) {
             updateData.isLadder = d.isLadder;
           }
+          if (d.slug !== undefined) {
+            updateData.slug = d.slug;
+          }
           await tx.workout_catalogue.update({
             where: { id: existing.id },
             data: updateData as object,
@@ -141,6 +145,7 @@ export async function POST(request: NextRequest) {
             data: {
               id: newEntityId(),
               name: d.name,
+              slug: d.slug ?? generateCatalogueSlug(d.name),
               description: d.description,
               workoutType: d.workoutType,
               intendedPhase: d.intendedPhase,

@@ -28,6 +28,7 @@ export async function PUT(request: NextRequest, ctx: RouteCtx) {
       where: { id },
       data: {
         name: d.name,
+        ...(d.slug !== undefined ? { slug: d.slug } : {}),
         description: d.description,
         workoutType: d.workoutType,
         intendedPhase: d.intendedPhase,

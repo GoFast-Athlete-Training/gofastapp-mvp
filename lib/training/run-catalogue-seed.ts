@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { newEntityId } from "@/lib/training/new-entity-id";
+import { generateCatalogueSlug } from "@/lib/training/catalogue-slug";
 import { SEED_CATALOGUE_ROWS } from "@/lib/training/catalogue-seed-rows";
 
 export async function runCatalogueSeed(prisma: PrismaClient): Promise<{
@@ -17,7 +18,9 @@ export async function runCatalogueSeed(prisma: PrismaClient): Promise<{
       },
     });
 
+    const slug = row.slug ?? generateCatalogueSlug(row.name);
     const data = {
+      slug,
       description: row.description,
       intendedPhase: row.intendedPhase,
       isQuality: row.isQuality,

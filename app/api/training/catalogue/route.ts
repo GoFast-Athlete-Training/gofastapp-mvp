@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { newEntityId } from "@/lib/training/new-entity-id";
 import { bodyToCatalogueRow } from "@/lib/training/catalogue-row";
+import { generateCatalogueSlug } from "@/lib/training/catalogue-slug";
 
 export async function GET(request: NextRequest) {
   const authErr = await assertStaffBearerAuth(request);
@@ -41,6 +42,7 @@ export async function POST(request: NextRequest) {
       data: {
         id: newEntityId(),
         name: d.name,
+        slug: d.slug ?? generateCatalogueSlug(d.name),
         description: d.description,
         workoutType: d.workoutType,
         intendedPhase: d.intendedPhase,

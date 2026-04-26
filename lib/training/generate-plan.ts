@@ -26,6 +26,11 @@ import {
 import { formatPlannedWorkoutTitle } from "@/lib/training/workout-display-title";
 import { defaultTaperLongRunsForWeeks } from "@/lib/training/preset-volume-helpers";
 import { PACE_ANCHOR_MP_SIMULATION } from "@/lib/training/goal-pace-calculator";
+import {
+  generateLongRunSchedule,
+  longRunConfigFromPlanGen,
+} from "@/lib/training/long-run-engine";
+import { pickLongRunCatalogueBySlug } from "@/lib/training/long-run-rotation-service";
 
 const DAY_NAMES = [
   "Monday",
@@ -55,6 +60,8 @@ export interface PlanGenConfig {
   weeklyMileageMultiplier?: number;
   taperMileageReduction?: number;
   longRunCapFraction?: number;
+  /** Long-run cutback (week 4 of block) as fraction of push miles; default 0.65 in long-run engine. */
+  cutbackFraction?: number;
   minWeeklyMiles?: number;
   qualityFraction?: number;
   qualitySessions?: number;
@@ -228,6 +235,8 @@ export interface CatalogueWorkoutRow {
   workoutType: WorkoutType;
   intendedPhase: string[];
   progressionIndex: number | null;
+  /** Stable id for long-run rotation (e.g. long-run-static) */
+  slug?: string | null;
 }
 
 function cataloguePhaseApplies(phases: string[], weekPhase: string): boolean {
@@ -427,6 +436,16 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
 
   const firstMonday = mondayUtcOfWeekContaining(planStart);
   const weekCount = calendarTrainingWeekCount(planStart, raceUtc);
+  const longRunSchedule = generateLongRunSchedule(
+    longRunConfigFromPlanGen(weekCount, {
+      baseStartMiles: cfg?.baseStartMiles,
+      ladderStep: cfg?.ladderStep,
+      minLongMiles: cfg?.minLongMiles,
+      peakLongRunMiles: cfg?.peakLongRunMiles,
+      cutbackFraction: cfg?.cutbackFraction,
+      taperLongRuns: cfg?.taperLongRuns,
+    })
+  );
 
   let weekNumber = 0;
   for (;;) {
@@ -469,7 +488,10 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
       continue;
     }
 
-    const longMiRaw = longRunMilesForOffset(nOffset, cfg);
+    // 1) Long run — miles from `generateLongRunSchedule`; catalogue via slug (long-run-rotation) or legacy phase pick
+    const weekIndex0 = weekNumber - 1;
+    const lrFromSchedule = longRunSchedule[weekIndex0];
+    const longMiRaw = lrFromSchedule?.distance ?? 0;
     const weeklyMi = Math.max(minWeekly, Math.min(100, input.weeklyMileageTarget));
     const qualityMiTotal =
       qualitySessions > 0 ? Math.round(weeklyMi * qualityFraction) : 0;
@@ -481,7 +503,19 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
     const perSession =
       qualitySessions > 0 ? Math.max(1, Math.round(qualityMiTotal / qualitySessions)) : 0;
 
-    const lrCatId = pickLongRunCatalogueId({ phase, nOffset, catalogue: cat });
+    const slugRow =
+      lrFromSchedule && cat.length > 0
+        ? pickLongRunCatalogueBySlug(
+            lrFromSchedule.cyclePos,
+            cat.map((w) => ({
+              id: w.id,
+              workoutType: w.workoutType,
+              slug: w.slug ?? null,
+            }))
+          )
+        : null;
+    const lrCatId =
+      slugRow?.id ?? pickLongRunCatalogueId({ phase, nOffset, catalogue: cat });
 
     const assignment = new Map<number, AssignEntry>();
 
@@ -556,6 +590,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
       }
     }
 
+    // 2) Tempo / interval quality slots
     if (!partialWeek1 && qualitySessions > 0 && perSession > 0) {
       for (let slot = 0; slot < qualitySessions; slot++) {
         const idealDow = slot === 0 ? qualityDow1 : qualityDow2;
@@ -584,6 +619,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
       }
     }
 
+    // 3) Easy days — fill remaining preferred days
     const usedForQuality = new Set(assignment.keys());
     const easyDayList = preferred.filter(
       (d) =>

@@ -67,6 +67,7 @@ export async function executePlanGenerate(params: {
         intendedPhase: true,
         progressionIndex: true,
         paceAnchor: true,
+        slug: true,
       },
     }),
   ]);

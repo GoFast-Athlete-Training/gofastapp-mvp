@@ -1009,6 +1009,8 @@ model preset_volume_constraints {
   minLongMiles            Float @default(8)
   minEasyPerDayMiles      Float @default(3)
   minEasyWeekMiles        Float @default(4)
+  /// Long-run cutback week distance as a fraction of the push (dynamic) miles; default 0.65
+  cutbackFraction         Float?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1087,6 +1089,8 @@ model training_plans {
 model workout_catalogue {
   id                           String      @id @default(cuid())
   name                         String
+  /// URL-safe id for rotation services (e.g. long-run-static). Unique when set; generated from name in UI.
+  slug                         String?     @unique
   description                  String?
   workoutType                  WorkoutType
   /// True when this catalogue entry is used for quality slots during plan generation (legacy plan gen).
