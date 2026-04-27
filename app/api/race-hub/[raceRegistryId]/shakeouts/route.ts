@@ -40,10 +40,7 @@ export async function GET(
       },
       orderBy: { date: "asc" },
       include: {
-        city_run_rsvps: {
-          where: { athleteId: auth.athlete.id },
-          take: 1,
-        },
+        city_run_rsvps: true,
         runClub: { select: { id: true, name: true, slug: true } },
       },
     });
@@ -65,7 +62,8 @@ export async function GET(
       workflowStatus: r.workflowStatus,
       gorunPath: `/gorun/${r.id}`,
       runClub: r.runClub,
-      myRsvp: r.city_run_rsvps[0] ?? null,
+      rsvpCount: r.city_run_rsvps.filter((rv) => rv.status === "going").length,
+      myRsvp: r.city_run_rsvps.find((rv) => rv.athleteId === auth.athlete.id) ?? null,
     }));
 
     return NextResponse.json({ success: true, shakeouts });

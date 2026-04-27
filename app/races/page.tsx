@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/firebase";
 import api from "@/lib/api";
-import { Calendar, MapPin, Search, ExternalLink } from "lucide-react";
+import { Calendar, MapPin, Search, ExternalLink, ChevronDown } from "lucide-react";
 import {
   countdownLabel,
   formatRaceListDate,
@@ -13,6 +13,10 @@ import {
 } from "@/lib/races-display";
 
 const BOSTON_TAG = "boston-qualifier";
+
+const COMPANY_APP_ORIGIN = (
+  process.env.NEXT_PUBLIC_COMPANY_APP_URL || "https://gofasthq.gofastcrushgoals.com"
+).replace(/\/$/, "");
 
 type CatalogRace = {
   id: string;
@@ -47,6 +51,9 @@ export default function RacesBrowsePage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [loadingCatalog, setLoadingCatalog] = useState(true);
+  const [pastCatalog, setPastCatalog] = useState<CatalogRace[]>([]);
+  const [loadingPast, setLoadingPast] = useState(true);
+  const [pastOpen, setPastOpen] = useState(false);
   const [submittingRaceId, setSubmittingRaceId] = useState<string | null>(null);
   const addIntentHandled = useRef(false);
 
@@ -88,6 +95,27 @@ export default function RacesBrowsePage() {
     }
   }, [debouncedSearch, cityFilter, bostonOnly, dateFrom, dateTo]);
 
+  const loadPast = useCallback(async () => {
+    setLoadingPast(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("pastWindow", "true");
+      if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
+      if (cityFilter.trim()) params.set("city", cityFilter.trim());
+      if (bostonOnly) params.set("bostonQualifier", "true");
+
+      const { data } = await api.get<{ success?: boolean; race_registry?: CatalogRace[] }>(
+        `/race/search?${params.toString()}`
+      );
+      setPastCatalog(data.race_registry ?? []);
+    } catch (e) {
+      console.error(e);
+      setPastCatalog([]);
+    } finally {
+      setLoadingPast(false);
+    }
+  }, [debouncedSearch, cityFilter, bostonOnly]);
+
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchQuery), 400);
     return () => clearTimeout(t);
@@ -100,6 +128,10 @@ export default function RacesBrowsePage() {
   useEffect(() => {
     loadCatalog();
   }, [loadCatalog]);
+
+  useEffect(() => {
+    loadPast();
+  }, [loadPast]);
 
   const onAddToCalendar = useCallback(async (raceId: string) => {
     setSubmittingRaceId(raceId);
@@ -119,6 +151,123 @@ export default function RacesBrowsePage() {
       setSubmittingRaceId(null);
     }
   }, []);
+
+  const renderCatalogCard = (race: CatalogRace, variant: "upcoming" | "past") => {
+    const signedUp = signedRaceIds.has(race.id);
+    const busy = submittingRaceId === race.id;
+    const bq = race.tags?.includes(BOSTON_TAG);
+    const startLabel = formatStartTime(race.startTime ?? null);
+    const isPast = variant === "past";
+    return (
+      <li
+        key={`${variant}-${race.id}`}
+        className={`rounded-xl border p-5 shadow-sm flex flex-col overflow-hidden ${
+          isPast ? "border-gray-100 bg-gray-50/80 opacity-90" : "border-gray-200 bg-white"
+        }`}
+      >
+        <div className="flex gap-4">
+          {race.logoUrl ? (
+            <div className="shrink-0 w-16 h-16 rounded-lg bg-gray-100 overflow-hidden border border-gray-100">
+              <img
+                src={race.logoUrl}
+                alt=""
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            </div>
+          ) : (
+            <div className="shrink-0 w-16 h-16 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-400">
+              <Calendar className="w-7 h-7" />
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-semibold text-gray-900 text-lg leading-snug">{race.name}</h3>
+              {bq ? (
+                <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-100">
+                  BQ
+                </span>
+              ) : null}
+            </div>
+            <dl className="mt-2 space-y-1.5 text-sm text-gray-600">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+                <span>{formatRaceListDate(race.raceDate)}</span>
+                {startLabel ? (
+                  <>
+                    <span className="text-gray-400">·</span>
+                    <span>{startLabel}</span>
+                  </>
+                ) : null}
+                <span className="text-gray-400">·</span>
+                <span className="text-orange-600 font-medium text-xs">
+                  {countdownLabel(race.raceDate)}
+                </span>
+              </div>
+              {(race.city || race.state) && (
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
+                  <span>{[race.city, race.state].filter(Boolean).join(", ")}</span>
+                </div>
+              )}
+              <div>
+                {race.distanceLabel?.trim() ||
+                  (race.distanceMeters != null
+                    ? `${(race.distanceMeters / 1609.344).toFixed(1)} mi`
+                    : "—")}
+              </div>
+            </dl>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {isPast ? (
+            <a
+              href={`${COMPANY_APP_ORIGIN}/dashboard/races`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:underline"
+            >
+              Copy for next year (Company)
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          ) : null}
+          {signedUp ? (
+            <>
+              <Link
+                href={`/race-hub/${race.id}?join=1`}
+                className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-4 py-2"
+              >
+                Race Hub →
+              </Link>
+              <span className="inline-flex items-center rounded-full bg-green-50 text-green-800 text-xs font-medium px-3 py-1">
+                On my calendar
+              </span>
+            </>
+          ) : (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onAddToCalendar(race.id)}
+              className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white text-sm font-medium px-4 py-2"
+            >
+              {busy ? "Saving…" : "Add to my race calendar"}
+            </button>
+          )}
+          {race.registrationUrl ? (
+            <a
+              href={race.registrationUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm text-orange-600 font-medium hover:underline"
+            >
+              Register
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          ) : null}
+        </div>
+      </li>
+    );
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(
@@ -233,112 +382,43 @@ export default function RacesBrowsePage() {
           </p>
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2">
-            {catalog.map((race) => {
-              const signedUp = signedRaceIds.has(race.id);
-              const busy = submittingRaceId === race.id;
-              const bq = race.tags?.includes(BOSTON_TAG);
-              const startLabel = formatStartTime(race.startTime ?? null);
-              return (
-                <li
-                  key={race.id}
-                  className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm flex flex-col overflow-hidden"
-                >
-                  <div className="flex gap-4">
-                    {race.logoUrl ? (
-                      <div className="shrink-0 w-16 h-16 rounded-lg bg-gray-100 overflow-hidden border border-gray-100">
-                        <img
-                          src={race.logoUrl}
-                          alt=""
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      </div>
-                    ) : (
-                      <div className="shrink-0 w-16 h-16 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-400">
-                        <Calendar className="w-7 h-7" />
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-semibold text-gray-900 text-lg leading-snug">
-                          {race.name}
-                        </h3>
-                        {bq ? (
-                          <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-100">
-                            BQ
-                          </span>
-                        ) : null}
-                      </div>
-                      <dl className="mt-2 space-y-1.5 text-sm text-gray-600">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
-                          <span>{formatRaceListDate(race.raceDate)}</span>
-                          {startLabel ? (
-                            <>
-                              <span className="text-gray-400">·</span>
-                              <span>{startLabel}</span>
-                            </>
-                          ) : null}
-                          <span className="text-gray-400">·</span>
-                          <span className="text-orange-600 font-medium text-xs">
-                            {countdownLabel(race.raceDate)}
-                          </span>
-                        </div>
-                        {(race.city || race.state) && (
-                          <div className="flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
-                            <span>{[race.city, race.state].filter(Boolean).join(", ")}</span>
-                          </div>
-                        )}
-                        <div>
-                          {race.distanceLabel?.trim() ||
-                            (race.distanceMeters != null
-                              ? `${(race.distanceMeters / 1609.344).toFixed(1)} mi`
-                              : "—")}
-                        </div>
-                      </dl>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
-                    {signedUp ? (
-                      <>
-                        <Link
-                          href={`/race-hub/${race.id}?join=1`}
-                          className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-4 py-2"
-                        >
-                          Race Hub →
-                        </Link>
-                        <span className="inline-flex items-center rounded-full bg-green-50 text-green-800 text-xs font-medium px-3 py-1">
-                          On my calendar
-                        </span>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => onAddToCalendar(race.id)}
-                        className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white text-sm font-medium px-4 py-2"
-                      >
-                        {busy ? "Saving…" : "Add to my race calendar"}
-                      </button>
-                    )}
-                    {race.registrationUrl ? (
-                      <a
-                        href={race.registrationUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-sm text-orange-600 font-medium hover:underline"
-                      >
-                        Register
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    ) : null}
-                  </div>
-                </li>
-              );
-            })}
+            {catalog.map((race) => renderCatalogCard(race, "upcoming"))}
           </ul>
         )}
+
+        <div className="mt-10 border-t border-gray-200 pt-8">
+          <button
+            type="button"
+            onClick={() => setPastOpen((o) => !o)}
+            className="flex w-full items-center justify-between gap-3 rounded-lg text-left"
+          >
+            <span>
+              <span className="text-lg font-semibold text-gray-900">Past races</span>
+              <span className="ml-2 text-sm font-normal text-gray-500">
+                (last 90 days, before today
+                {loadingPast ? " — loading…" : ` — ${pastCatalog.length} shown`})
+              </span>
+            </span>
+            <ChevronDown
+              className={`h-5 w-5 shrink-0 text-gray-500 transition-transform ${pastOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+          {pastOpen && (
+            <div className="mt-4">
+              {loadingPast ? (
+                <p className="text-gray-500 text-sm">Loading past races…</p>
+              ) : pastCatalog.length === 0 ? (
+                <p className="text-gray-600 text-sm">
+                  No past races in the last 90 days match your name, city, or Boston filter.
+                </p>
+              ) : (
+                <ul className="grid gap-4 sm:grid-cols-2">
+                  {pastCatalog.map((race) => renderCatalogCard(race, "past"))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );
