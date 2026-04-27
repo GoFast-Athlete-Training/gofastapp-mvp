@@ -14,7 +14,6 @@ export function presetBoltonsToPlanGenConfig(
     baseMiles: volume.baseMiles,
     peakMiles: volume.peakMiles,
     taperMiles: volume.taperMiles,
-    buildCoef: volume.buildCoef,
     maxWeeklyMiles: volume.maxWeeklyMiles,
     qualitySessions: workout.qualitySessions,
     tempoIdealDow: workout.tempoIdealDow,

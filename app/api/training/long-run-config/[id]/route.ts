@@ -55,9 +55,9 @@ export async function GET(
       const { poolMilesByCycle, nCycles } = generateCyclePoolTotals({
         totalWeeks,
         cycleLen: v.cycleLen,
+        baseMiles: v.baseMiles,
         peakMiles: v.peakMiles,
         taperMiles: v.taperMiles,
-        buildCoef: v.buildCoef,
       });
       const posRows = item.positions.map((p) => ({
         cyclePosition: p.cyclePosition,

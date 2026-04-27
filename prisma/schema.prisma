@@ -1073,8 +1073,6 @@ model preset_volume_constraints {
   peakMiles  Float
   /// Long-run pool in the taper block (last training cycle / race build-down).
   taperMiles Float
-  /// Per-cycle growth multiplier; persisted at save (typically (peakMiles/baseMiles)^(1/steps) from staff UI).
-  buildCoef  Float  @default(1.12)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

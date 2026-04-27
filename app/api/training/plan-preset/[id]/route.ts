@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { serializePlanPresetForApi } from "@/lib/training/quality-percent";
-import { computeBuildCoef } from "@/lib/training/cycle-pool";
 
 const presetInclude = {
   volumeConstraints: true,
@@ -106,8 +105,6 @@ export async function PATCH(
       "baseMiles",
       "peakMiles",
       "taperMiles",
-      "buildCoef",
-      "buildCoefSteps",
     ] as const;
     const volumeData: Record<string, unknown> = {};
     const vol = body.volume && typeof body.volume === "object" ? body.volume : body;
@@ -122,31 +119,12 @@ export async function PATCH(
           } else if (typeof v === "number" && Number.isFinite(v)) {
             volumeData.maxWeeklyMiles = Math.max(1, Math.round(v));
           }
-        } else if (k === "buildCoefSteps") {
-          /* only used to recompute buildCoef — not a DB column */
         } else {
           const v = volRec[k];
           if (v != null) {
             volumeData[k] = v;
           }
         }
-      }
-    }
-
-    if (existing.volumeConstraints) {
-      const cur = existing.volumeConstraints;
-      const nextBase = volumeData.baseMiles != null ? Number(volumeData.baseMiles) : cur.baseMiles;
-      const nextPeak = volumeData.peakMiles != null ? Number(volumeData.peakMiles) : cur.peakMiles;
-      const hadStep =
-        typeof volRec.buildCoefSteps === "number" && volRec.buildCoefSteps > 0
-          ? Math.floor(volRec.buildCoefSteps)
-          : null;
-      const shouldRecomputeBuild =
-        (volumeData.baseMiles != null || volumeData.peakMiles != null || hadStep != null) &&
-        volumeData.buildCoef == null;
-      if (shouldRecomputeBuild) {
-        const steps = hadStep ?? 2;
-        volumeData.buildCoef = computeBuildCoef(nextBase, nextPeak, steps);
       }
     }
 
@@ -202,8 +180,6 @@ export async function PATCH(
         }
       }
     }
-
-    delete volumeData.buildCoefSteps;
 
     const updated = await prisma.training_plan_preset.update({
       where: { id },

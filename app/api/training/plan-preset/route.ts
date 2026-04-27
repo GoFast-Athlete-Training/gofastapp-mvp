@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { serializePlanPresetForApi } from "@/lib/training/quality-percent";
-import { computeBuildCoef } from "@/lib/training/cycle-pool";
 
 function slugifyPresetTitle(title: string): string {
   const s = title
@@ -120,15 +119,6 @@ export async function POST(request: NextRequest) {
     const defaultBase = peakMiles / (1.12 * 1.12);
     const baseMiles = numPositive(vol.baseMiles, defaultBase);
     const taperMiles = numPositive(vol.taperMiles, peakMiles * 0.85);
-    const buildCoefSteps =
-      typeof vol.buildCoefSteps === "number" && vol.buildCoefSteps > 0
-        ? Math.floor(vol.buildCoefSteps)
-        : 2;
-    const buildCoef =
-      typeof vol.buildCoef === "number" && Number.isFinite(vol.buildCoef) && vol.buildCoef > 0
-        ? vol.buildCoef
-        : computeBuildCoef(baseMiles, peakMiles, buildCoefSteps);
-
     let maxWeeklyMiles: number | null | undefined = undefined;
     if ("maxWeeklyMiles" in vol) {
       if (vol.maxWeeklyMiles === null || vol.maxWeeklyMiles === "") {
@@ -136,6 +126,8 @@ export async function POST(request: NextRequest) {
       } else if (typeof vol.maxWeeklyMiles === "number" && Number.isFinite(vol.maxWeeklyMiles)) {
         maxWeeklyMiles = Math.max(1, Math.round(vol.maxWeeklyMiles));
       }
+    } else {
+      maxWeeklyMiles = 70;
     }
 
     async function resolveConfigId(
@@ -205,7 +197,6 @@ export async function POST(request: NextRequest) {
             baseMiles,
             peakMiles,
             taperMiles,
-            buildCoef,
           },
         },
         workoutConfig: {

@@ -1,7 +1,7 @@
 /**
- * Cycle-pool: per–training-cycle long-run "pool" miles from explicit peak/taper anchors
- * and a stored build coefficient (geometric build toward peak), split across
- * long_run_config positions by distribution weights.
+ * Cycle-pool: per–training-cycle long-run "pool" miles from explicit base/peak/taper anchors.
+ * The per-cycle growth factor is derived at runtime from the athlete's total weeks so it adapts
+ * to any plan length. Split across long_run_config positions by distribution weights.
  */
 
 function round1(n: number): number {
@@ -11,18 +11,18 @@ function round1(n: number): number {
 export type GenerateCyclePoolTotalsInput = {
   totalWeeks: number;
   cycleLen?: number;
+  /** Long-run pool in the first block (index 0). Used with peak to derive the per-step multiplier. */
+  baseMiles: number;
   /** Long-run pool in the peak block (cycle N-1, 0-based: index N-2 in pool array for N cycles). */
   peakMiles: number;
   /** Long-run pool in the taper block (last cycle N). */
   taperMiles: number;
-  /** Per-cycle growth when walking backward from peak (pool[i] = pool[i+1] / buildCoef). */
-  buildCoef: number;
   /** 1-based keys: override multiplier for step from pool index `key-1` to `key-2` (see loop). */
   multiplierOverrides?: Record<number, number>;
 };
 
 /**
- * @param numBuildSteps — number of build steps (multiplications) from `baseMiles` to `peakMiles` used for UI: peak ≈ base * buildCoef^numBuildSteps
+ * @param numBuildSteps — number of multiplications from `baseMiles` to `peakMiles`: peak ≈ base * buildCoef^numBuildSteps
  */
 export function computeBuildCoef(
   baseMiles: number,
@@ -39,6 +39,23 @@ export function computeBuildCoef(
 }
 
 /**
+ * Per-cycle growth factor for the given plan length, derived from base and peak anchors.
+ * Uses N = ceil(totalWeeks / cycleLen) and buildSteps = max(1, N - 2) (steps from first pool to peak).
+ */
+export function deriveBuildCoefForPlanLength(
+  baseMiles: number,
+  peakMiles: number,
+  totalWeeks: number,
+  cycleLen: number
+): number {
+  const cLen = Math.max(1, Math.floor(cycleLen) || 4);
+  const w = Math.max(1, Math.floor(totalWeeks));
+  const nCycles = Math.max(1, Math.ceil(w / cLen));
+  const buildSteps = Math.max(1, nCycles - 2);
+  return computeBuildCoef(baseMiles, peakMiles, buildSteps);
+}
+
+/**
  * 1-based cycle indices 1..N. pool[N-1] = peak, pool[N] = taper; backward fill through build.
  */
 export function generateCyclePoolTotals(
@@ -48,7 +65,7 @@ export function generateCyclePoolTotals(
   /** one entry per training cycle, index 0 = cycle 1 */
   poolMilesByCycle: number[];
 } {
-  const { totalWeeks, peakMiles, taperMiles, buildCoef, multiplierOverrides = {} } = input;
+  const { totalWeeks, peakMiles, taperMiles, baseMiles, multiplierOverrides = {} } = input;
   const cycleLen = Math.max(1, input.cycleLen ?? 4);
   const w = Math.max(1, Math.floor(totalWeeks));
   const N = Math.max(1, Math.ceil(w / cycleLen));
@@ -57,8 +74,10 @@ export function generateCyclePoolTotals(
   if (!Number.isFinite(peak) || peak < 0) {
     return { nCycles: N, poolMilesByCycle: Array(N).fill(0) };
   }
-  const b = Number.isFinite(buildCoef) && buildCoef > 0 ? buildCoef : 1.12;
+
+  const b = deriveBuildCoefForPlanLength(baseMiles, peakMiles, w, cycleLen);
   const taperPool = Number.isFinite(tap) && tap >= 0 ? tap : peak * 0.85;
+  const coef = Number.isFinite(b) && b > 0 ? b : 1.12;
 
   if (N === 1) {
     return { nCycles: 1, poolMilesByCycle: [round1(peak)] };
@@ -69,9 +88,9 @@ export function generateCyclePoolTotals(
   value[N] = taperPool;
 
   for (let i = N - 2; i >= 1; i--) {
-    const m = multiplierOverrides[i + 1] ?? b;
-    const coef = Number.isFinite(m) && m > 0 ? m : b;
-    value[i] = value[i + 1] / coef;
+    const m = multiplierOverrides[i + 1] ?? coef;
+    const c = Number.isFinite(m) && m > 0 ? m : coef;
+    value[i] = value[i + 1] / c;
   }
 
   const poolMilesByCycle = new Array(N);

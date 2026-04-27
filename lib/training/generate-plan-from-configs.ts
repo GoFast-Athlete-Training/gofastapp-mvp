@@ -22,7 +22,6 @@ export interface PlanGenConfig {
   peakMiles?: number;
   baseMiles?: number;
   taperMiles?: number;
-  buildCoef?: number;
   maxWeeklyMiles?: number | null;
   /** Not stored on presets; merge uses `DEFAULT_QUALITY_FRACTION` when unset. */
   qualityFraction?: number;
