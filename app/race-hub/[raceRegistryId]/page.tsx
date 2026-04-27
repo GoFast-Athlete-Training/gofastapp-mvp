@@ -429,6 +429,22 @@ function RaceHubPageInner() {
     );
   }
 
+  if (error === "no_join_path") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Add this race from GoFast</h2>
+          <p className="text-gray-600 mb-4">
+            The race hub is for runners who added this event to their GoFast calendar. Open Browse races to add it.
+          </p>
+          <Link href="/races" className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg">
+            My Races
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (error === "error" || !race) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -458,7 +474,6 @@ function RaceHubPageInner() {
       })
     : null;
 
-  const notMember = !myMembership;
   const raceDateYmdForSheet = race.raceDate ? String(race.raceDate).slice(0, 10) : "";
 
   const copyInviteLink = async () => {
@@ -538,23 +553,7 @@ function RaceHubPageInner() {
         </div>
       </header>
 
-      {notMember ? (
-        <main className="max-w-lg mx-auto px-4 py-12 text-center">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Join the Race Hub</h2>
-          <p className="text-gray-600 mb-6">
-            Chat with other runners, plan shakeouts and meetups, and see race announcements — all in one place.
-          </p>
-          <button
-            type="button"
-            onClick={() => void handleJoin()}
-            disabled={joinBusy}
-            className="w-full sm:w-auto px-6 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold disabled:opacity-50"
-          >
-            {joinBusy ? "Joining…" : "I'm in"}
-          </button>
-        </main>
-      ) : (
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
             {/* Left: announcements + race chatter */}
             <div className="lg:col-span-6 space-y-6 min-w-0 order-1">
@@ -1058,7 +1057,6 @@ function RaceHubPageInner() {
             </aside>
           </div>
         </main>
-      )}
 
       {myMembership && race && raceDateYmdForSheet ? (
         <LogRaceResultSheet
