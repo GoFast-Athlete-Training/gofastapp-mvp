@@ -21,6 +21,7 @@ type PublicRace = {
   city: string | null;
   state: string | null;
   distanceLabel: string | null;
+  registrationUrl: string | null;
 };
 
 /**
@@ -35,6 +36,7 @@ export default function RaceHubJoinFrontDoorPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showJoinConfirmation, setShowJoinConfirmation] = useState(false);
+  const [registrationNudge, setRegistrationNudge] = useState(false);
   const [joining, setJoining] = useState(false);
   /** Re-render when Firebase auth changes (button label). */
   const [firebaseUser, setFirebaseUser] = useState(() => auth.currentUser);
@@ -153,13 +155,18 @@ export default function RaceHubJoinFrontDoorPage() {
 
     setJoining(true);
     try {
-      await api.post(`/race-hub/${race.id}/join`, {});
+      await api.post("/race-signups", { raceRegistryId: race.id });
       localStorage.removeItem(RACE_HUB_JOIN_INTENT_KEY);
       localStorage.removeItem(RACE_HUB_JOIN_INTENT_SLUG_KEY);
-      router.replace(`/race-hub/${race.id}`);
+      if (race.registrationUrl?.trim()) {
+        setRegistrationNudge(true);
+      } else {
+        router.replace(`/race-hub/${race.id}`);
+      }
     } catch (err) {
-      console.error("Race hub join:", err);
-      alert("Failed to join race hub. Please try again.");
+      console.error("Race signup:", err);
+      alert("Couldn't add this race. Please try again.");
+    } finally {
       setJoining(false);
     }
   };
@@ -168,6 +175,12 @@ export default function RaceHubJoinFrontDoorPage() {
     localStorage.removeItem(RACE_HUB_JOIN_INTENT_KEY);
     localStorage.removeItem(RACE_HUB_JOIN_INTENT_SLUG_KEY);
     setShowJoinConfirmation(false);
+    setRegistrationNudge(false);
+  };
+
+  const goToRaceHub = () => {
+    if (!race) return;
+    router.replace(`/race-hub/${race.id}`);
   };
 
   if (loading) {
@@ -222,15 +235,49 @@ export default function RaceHubJoinFrontDoorPage() {
     : null;
   const locationText = [race.city, race.state].filter(Boolean).join(", ") || null;
 
+  if (showJoinConfirmation && firebaseUser && registrationNudge && race.registrationUrl?.trim()) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full px-6">
+          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">You&apos;re in for {race.name}</h2>
+              <p className="text-gray-600 mb-2 text-left text-sm">
+                We added this race to your GoFast calendar. Have you registered with the race yet?
+                Use the official link when you&apos;re ready — it helps support what we do.
+              </p>
+              <a
+                href={race.registrationUrl.trim()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mb-4 inline-flex w-full items-center justify-center rounded-xl border-2 border-orange-500 bg-white px-6 py-3 text-lg font-semibold text-orange-600 transition hover:bg-orange-50"
+              >
+                Open official registration
+              </a>
+              <button
+                type="button"
+                onClick={() => goToRaceHub()}
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold text-lg transition shadow-lg"
+              >
+                Continue to Race Hub
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (showJoinConfirmation && firebaseUser) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50 flex items-center justify-center p-4">
         <div className="max-w-md w-full px-6">
           <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">You&apos;re back</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Add this race on GoFast?</h2>
               <p className="text-gray-600 mb-6 text-lg">
-                Join <strong>{race.name}</strong> Race Hub — chat, meetups, and announcements?
+                Join <strong>{race.name}</strong> in the app: race calendar, community hub, and training context — all
+                in one place.
               </p>
               <div className="flex flex-col gap-3">
                 <button
@@ -239,7 +286,7 @@ export default function RaceHubJoinFrontDoorPage() {
                   disabled={joining}
                   className="w-full bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold text-lg transition shadow-lg disabled:opacity-50"
                 >
-                  {joining ? "Joining…" : "Let's go"}
+                  {joining ? "Adding…" : "Yes, I'm running it"}
                 </button>
                 <button
                   type="button"
@@ -297,7 +344,7 @@ export default function RaceHubJoinFrontDoorPage() {
               onClick={handleJoinClick}
               className="w-full bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold text-lg transition shadow-lg"
             >
-              {firebaseUser ? "Join Race Hub" : "Sign up to join"}
+              {firebaseUser ? "I&apos;m running this race" : "Sign up to join"}
             </button>
           </div>
         </div>

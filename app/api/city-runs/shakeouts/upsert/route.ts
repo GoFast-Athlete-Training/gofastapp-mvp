@@ -203,9 +203,45 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    /**
+     * Company `replaceRaceRunEvents` recreates `race_run_event` rows with new IDs on every save.
+     * Dedupe keys include that id (`shk-{regId}-{companyEventId}-w{i}`), so old `city_runs` ghosts
+     * would never match `findFirst` and would accumulate. After each successful upsert batch,
+     * delete shakeout rows for this registry whose key is not in the current batch.
+     */
+    let pruned = 0;
+    for (const reg of registries) {
+      const prefix = `shk-${reg.id}-`;
+      const keysForReg = results
+        .filter((r) => r.dedupeKey.startsWith(prefix))
+        .map((r) => r.dedupeKey);
+
+      if (keysForReg.length > 0) {
+        const del = await prisma.city_runs.deleteMany({
+          where: {
+            raceRegistryId: reg.id,
+            AND: [
+              { shakeoutDedupeKey: { not: null } },
+              { shakeoutDedupeKey: { notIn: keysForReg } },
+            ],
+          },
+        });
+        pruned += del.count;
+      } else {
+        const del = await prisma.city_runs.deleteMany({
+          where: {
+            raceRegistryId: reg.id,
+            shakeoutDedupeKey: { not: null },
+          },
+        });
+        pruned += del.count;
+      }
+    }
+
     const response = NextResponse.json({
       success: true,
       synced,
+      pruned,
       results,
     });
     Object.entries(corsHeaders).forEach(([k, v]) => response.headers.set(k, v));
