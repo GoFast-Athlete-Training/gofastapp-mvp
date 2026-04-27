@@ -19,6 +19,7 @@ type PublicRace = {
   city: string | null;
   state: string | null;
   distanceLabel: string | null;
+  registrationUrl: string | null;
 };
 
 /**
@@ -36,6 +37,7 @@ export default function RaceHubJoinConfirmPage() {
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [registrationNudge, setRegistrationNudge] = useState(false);
 
   const frontDoorPath = `/join/race/${encodeURIComponent(slug.trim())}`;
 
@@ -124,17 +126,27 @@ export default function RaceHubJoinConfirmPage() {
     setJoinError(null);
 
     try {
-      await api.post(`/race-hub/${race.id}/join`, {});
+      await api.post("/race-signups", { raceRegistryId: race.id });
 
       localStorage.removeItem(RACE_HUB_JOIN_INTENT_KEY);
       localStorage.removeItem(RACE_HUB_JOIN_INTENT_SLUG_KEY);
 
-      router.replace(`/race-hub/${race.id}`);
+      if (race.registrationUrl?.trim()) {
+        setRegistrationNudge(true);
+      } else {
+        router.replace(`/race-hub/${race.id}`);
+      }
     } catch (err) {
-      console.error("Race hub confirm join:", err);
-      setJoinError("Failed to join race hub. Please try again.");
+      console.error("Race signup confirm:", err);
+      setJoinError("Failed to add this race. Please try again.");
+    } finally {
       setJoining(false);
     }
+  };
+
+  const goToRaceHub = () => {
+    if (!race) return;
+    router.replace(`/race-hub/${race.id}`);
   };
 
   const handleNotNow = () => {
@@ -208,6 +220,39 @@ export default function RaceHubJoinConfirmPage() {
     );
   }
 
+  if (registrationNudge && race.registrationUrl?.trim()) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full px-6">
+          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">You&apos;re in for {race.name}</h2>
+              <p className="text-gray-600 mb-2 text-left text-sm">
+                We added this race to your GoFast calendar. Have you registered with the race yet? Use the official
+                link when you&apos;re ready — it helps support what we do.
+              </p>
+              <a
+                href={race.registrationUrl.trim()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mb-4 inline-flex w-full items-center justify-center rounded-xl border-2 border-orange-500 bg-white px-6 py-3 text-lg font-semibold text-orange-600 transition hover:bg-orange-50"
+              >
+                Open official registration
+              </a>
+              <button
+                type="button"
+                onClick={() => goToRaceHub()}
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold text-lg transition shadow-lg"
+              >
+                Continue to Race Hub
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
@@ -221,7 +266,7 @@ export default function RaceHubJoinConfirmPage() {
 
             <h1 className="text-2xl font-bold text-gray-900 mb-2">You&apos;re all set!</h1>
             <p className="text-gray-600">
-              Confirm to join <strong>{race.name}</strong> Race Hub.
+              Add <strong>{race.name}</strong> to your GoFast calendar and open the race hub.
             </p>
           </div>
 
@@ -236,7 +281,7 @@ export default function RaceHubJoinConfirmPage() {
               disabled={joining || !isAuthenticated}
               className="w-full bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold text-lg transition shadow-lg disabled:opacity-50"
             >
-              {joining ? "Joining…" : "Let's go"}
+              {joining ? "Adding…" : "Yes, I'm running it"}
             </button>
 
             <button

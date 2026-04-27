@@ -26,6 +26,7 @@ type PublicRace = {
   city: string | null;
   state: string | null;
   distanceLabel: string | null;
+  registrationUrl: string | null;
 };
 
 /**

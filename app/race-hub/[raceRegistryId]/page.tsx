@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { isAxiosError } from "axios";
 import { onAuthStateChanged } from "firebase/auth";
@@ -163,10 +163,14 @@ function memberInitials(a: MembershipRow["Athlete"]): string {
   return "?";
 }
 
+type HubGateResult = {
+  canAccessHub: boolean;
+  loadedRace: RaceSummary | null;
+};
+
 function RaceHubPageInner() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const raceRegistryId = params.raceRegistryId as string;
 
   const [race, setRace] = useState<RaceSummary | null>(null);
@@ -176,8 +180,8 @@ function RaceHubPageInner() {
   const [shakeouts, setShakeouts] = useState<ShakeoutRunRow[]>([]);
   const [myMembership, setMyMembership] = useState<MembershipRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [joinRedirecting, setJoinRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [joinBusy, setJoinBusy] = useState(false);
   const [announceTitle, setAnnounceTitle] = useState("");
   const [announceBody, setAnnounceBody] = useState("");
   const [postingAnnounce, setPostingAnnounce] = useState(false);
@@ -190,29 +194,30 @@ function RaceHubPageInner() {
   const [logSheetOpen, setLogSheetOpen] = useState(false);
 
   const athleteId = LocalStorageAPI.getAthleteId();
-  const joinRequested = searchParams.get("join") === "1";
   const isAdmin = myMembership?.role === "ADMIN";
 
-  const loadHubData = useCallback(async (): Promise<{ isMember: boolean }> => {
+  const loadHubData = useCallback(async (): Promise<HubGateResult> => {
     const id = raceRegistryId?.trim();
     if (!id) {
       setRace(null);
-      return { isMember: false };
+      return { canAccessHub: false, loadedRace: null };
     }
 
     const me = LocalStorageAPI.getAthleteId();
+    let loadedRace: RaceSummary | null = null;
 
     try {
       const raceRes = await api.get(`/race-registry/${encodeURIComponent(id)}`);
       if (raceRes.data?.race) {
-        setRace(raceRes.data.race as RaceSummary);
+        loadedRace = raceRes.data.race as RaceSummary;
+        setRace(loadedRace);
       } else {
         setRace(null);
       }
     } catch {
       setRace(null);
       setError("error");
-      return { isMember: false };
+      return { canAccessHub: false, loadedRace: null };
     }
 
     try {
@@ -222,50 +227,71 @@ function RaceHubPageInner() {
       const mine = me ? list.find((m) => m.athleteId === me) || null : null;
       setMyMembership(mine);
 
-      if (mine) {
-        const [aRes, eRes, shRes, rrRes, goalsRes, signupsRes] = await Promise.all([
-          api.get(`/race-hub/${encodeURIComponent(id)}/announcements`),
-          api.get(`/race-hub/${encodeURIComponent(id)}/events`),
-          api.get(`/race-hub/${encodeURIComponent(id)}/shakeouts`),
-          api
-            .get("/race-results", { params: { raceRegistryId: id } })
-            .catch(() => ({ data: { results: [] as unknown[] } })),
-          api.get("/goals?status=ACTIVE").catch(() => ({ data: { goals: [] } })),
-          api.get("/race-signups").catch(() => ({ data: { signups: [] } })),
-        ]);
-        setAnnouncements((aRes.data?.announcements as AnnouncementRow[]) || []);
-        setEvents((eRes.data?.events as RaceEventRow[]) || []);
-        setShakeouts((shRes.data?.shakeouts as ShakeoutRunRow[]) || []);
-        const results = rrRes.data?.results;
-        if (Array.isArray(results) && results[0] && typeof results[0].id === "string") {
-          const r = results[0] as MyRaceResultRow;
-          setMyRaceResult({
-            id: r.id,
-            officialFinishTime: r.officialFinishTime ?? null,
-            source: typeof r.source === "string" ? r.source : "manual",
-            actualAvgPaceSecPerMile: r.actualAvgPaceSecPerMile ?? null,
-            overallPlace: r.overallPlace ?? null,
-            ageGroupPlace: r.ageGroupPlace ?? null,
-          });
-        } else {
-          setMyRaceResult(null);
-        }
-        const goals = (goalsRes.data?.goals as { id: string; raceRegistryId?: string | null; race_registry?: { id: string } }[] | undefined) ?? [];
-        const goalMatch = goals.find(
-          (g) => g.raceRegistryId === id || g.race_registry?.id === id
-        );
-        setHubGoalId(goalMatch?.id ?? null);
-        const signups = (signupsRes.data?.signups as { id: string; raceRegistryId: string }[] | undefined) ?? [];
-        setHubSignupId(signups.find((s) => s.raceRegistryId === id)?.id ?? null);
-      } else {
+      if (!mine) {
         setAnnouncements([]);
         setEvents([]);
         setShakeouts([]);
         setMyRaceResult(null);
         setHubGoalId(null);
         setHubSignupId(null);
+        return { canAccessHub: false, loadedRace };
       }
-      return { isMember: Boolean(mine) };
+
+      const signupsRes = await api.get("/race-signups");
+      const signups =
+        (signupsRes.data?.signups as { id: string; raceRegistryId: string }[] | undefined) ?? [];
+      const signupRow = signups.find((s) => s.raceRegistryId === id);
+      const hasSignup = Boolean(signupRow);
+      setHubSignupId(signupRow?.id ?? null);
+
+      const memberIsAdmin = mine.role === "ADMIN";
+      const canAccessHub = memberIsAdmin || hasSignup;
+
+      if (!canAccessHub) {
+        setAnnouncements([]);
+        setEvents([]);
+        setShakeouts([]);
+        setMyRaceResult(null);
+        setHubGoalId(null);
+        return { canAccessHub: false, loadedRace };
+      }
+
+      const [aRes, eRes, shRes, rrRes, goalsRes] = await Promise.all([
+        api.get(`/race-hub/${encodeURIComponent(id)}/announcements`),
+        api.get(`/race-hub/${encodeURIComponent(id)}/events`),
+        api.get(`/race-hub/${encodeURIComponent(id)}/shakeouts`),
+        api
+          .get("/race-results", { params: { raceRegistryId: id } })
+          .catch(() => ({ data: { results: [] as unknown[] } })),
+        api.get("/goals?status=ACTIVE").catch(() => ({ data: { goals: [] } })),
+      ]);
+      setAnnouncements((aRes.data?.announcements as AnnouncementRow[]) || []);
+      setEvents((eRes.data?.events as RaceEventRow[]) || []);
+      setShakeouts((shRes.data?.shakeouts as ShakeoutRunRow[]) || []);
+      const results = rrRes.data?.results;
+      if (Array.isArray(results) && results[0] && typeof results[0].id === "string") {
+        const r = results[0] as MyRaceResultRow;
+        setMyRaceResult({
+          id: r.id,
+          officialFinishTime: r.officialFinishTime ?? null,
+          source: typeof r.source === "string" ? r.source : "manual",
+          actualAvgPaceSecPerMile: r.actualAvgPaceSecPerMile ?? null,
+          overallPlace: r.overallPlace ?? null,
+          ageGroupPlace: r.ageGroupPlace ?? null,
+        });
+      } else {
+        setMyRaceResult(null);
+      }
+      const goals =
+        (goalsRes.data?.goals as
+          | { id: string; raceRegistryId?: string | null; race_registry?: { id: string } }[]
+          | undefined) ?? [];
+      const goalMatch = goals.find(
+        (g) => g.raceRegistryId === id || g.race_registry?.id === id
+      );
+      setHubGoalId(goalMatch?.id ?? null);
+
+      return { canAccessHub: true, loadedRace };
     } catch (e: unknown) {
       if (isAxiosError(e) && (e.response?.status === 403 || e.response?.status === 401)) {
         setMemberships([]);
@@ -276,7 +302,7 @@ function RaceHubPageInner() {
         setMyRaceResult(null);
         setHubGoalId(null);
         setHubSignupId(null);
-        return { isMember: false };
+        return { canAccessHub: false, loadedRace };
       }
       throw e;
     }
@@ -302,25 +328,24 @@ function RaceHubPageInner() {
       try {
         setLoading(true);
         setError(null);
-        let { isMember } = await loadHubData();
+        const gate = await loadHubData();
         if (cancelled) return;
 
-        if (joinRequested && !isMember) {
-          setJoinBusy(true);
-          await api.post(`/race-hub/${encodeURIComponent(raceRegistryId.trim())}/join`);
-          router.replace(`/race-hub/${encodeURIComponent(raceRegistryId.trim())}`);
-          const again = await loadHubData();
-          isMember = again.isMember;
-        }
-        if (!isMember) {
-          setError(null);
+        if (!gate.canAccessHub) {
+          const slug = gate.loadedRace?.slug?.trim();
+          if (slug) {
+            setJoinRedirecting(true);
+            router.replace(`/join/race/${encodeURIComponent(slug)}`);
+            return;
+          }
+          setError("no_join_path");
+          return;
         }
       } catch (e: unknown) {
         console.error("Race hub load:", e);
         setError("error");
       } finally {
         if (!cancelled) {
-          setJoinBusy(false);
           setLoading(false);
         }
       }
@@ -330,20 +355,7 @@ function RaceHubPageInner() {
       cancelled = true;
       unsub();
     };
-  }, [raceRegistryId, joinRequested, router, loadHubData]);
-
-  const handleJoin = async () => {
-    if (!raceRegistryId) return;
-    setJoinBusy(true);
-    try {
-      await api.post(`/race-hub/${encodeURIComponent(raceRegistryId.trim())}/join`);
-      await loadHubData();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setJoinBusy(false);
-    }
-  };
+  }, [raceRegistryId, router, loadHubData]);
 
   const postAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -392,12 +404,12 @@ function RaceHubPageInner() {
     }
   };
 
-  if (loading || joinBusy) {
+  if (loading || joinRedirecting) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4" />
-          <p className="text-gray-600">{joinBusy ? "Joining race hub…" : "Loading…"}</p>
+          <p className="text-gray-600">{joinRedirecting ? "Redirecting to join…" : "Loading…"}</p>
         </div>
       </div>
     );
