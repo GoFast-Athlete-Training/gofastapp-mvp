@@ -25,9 +25,6 @@ export interface PlanGenConfig {
   maxWeeklyMiles?: number | null;
   /** Not stored on presets; merge uses `DEFAULT_QUALITY_FRACTION` when unset. */
   qualityFraction?: number;
-  qualitySessions?: number;
-  minLongMiles?: number;
-  minEasyPerDayMiles?: number;
   minTempoMiles?: number;
   minIntervalMiles?: number;
   tempoIdealDow?: number;
@@ -100,10 +97,10 @@ export function mergePlanConfigToGenerateInput(
     longRunDefaultDow: c?.longRunDefaultDow ?? DEFAULT_LONG_DOW,
     minTempoMiles: c?.minTempoMiles ?? DEFAULT_MIN_TEMPO,
     minIntervalMiles: c?.minIntervalMiles ?? DEFAULT_MIN_INTERVAL,
-    minLongMiles: c?.minLongMiles ?? DEFAULT_MIN_LONG,
-    minEasyPerDayMiles: c?.minEasyPerDayMiles ?? DEFAULT_MIN_EASY_DAY,
+    minLongMiles: DEFAULT_MIN_LONG,
+    minEasyPerDayMiles: DEFAULT_MIN_EASY_DAY,
     qualityFraction: c?.qualityFraction ?? DEFAULT_QUALITY_FRACTION,
-    qualitySessions: c?.qualitySessions ?? DEFAULT_QUALITY_SESSIONS,
+    qualitySessions: DEFAULT_QUALITY_SESSIONS,
     peakMiles: c?.peakMiles,
     preferredDays: base.preferredDays,
     raceName: base.raceName,

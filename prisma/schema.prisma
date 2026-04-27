@@ -1063,8 +1063,6 @@ model preset_volume_constraints {
 
   cycleLen            Int   @default(4)
   minWeeklyMiles      Int   @default(40)
-  minLongMiles        Float @default(8)
-  minEasyPerDayMiles  Float @default(3)
   /// Optional cap on weekly volume (miles); generator may scale down to respect this.
   maxWeeklyMiles      Int?
   /// Long-run pool aggregate (sum over long runs in that block) in the first/main base block.
@@ -1084,8 +1082,6 @@ model preset_workout_config {
   presetId String @unique
   training_plan_preset training_plan_preset @relation(fields: [presetId], references: [id], onDelete: Cascade)
 
-  /// Number of quality slots per week (0–2).
-  qualitySessions  Int     @default(1)
   tempoIdealDow      Int   @default(2)
   intervalIdealDow   Int   @default(4)
   longRunDefaultDow  Int   @default(6)

@@ -14,11 +14,8 @@ function slugifyPresetTitle(title: string): string {
   return s || "preset";
 }
 
-function numPositive(v: unknown, fallback: number): number {
-  if (typeof v === "number" && Number.isFinite(v) && v > 0) {
-    return v;
-  }
-  return fallback;
+function isDow1to7(n: number): boolean {
+  return Number.isInteger(n) && n >= 1 && n <= 7;
 }
 
 const presetInclude = {
@@ -115,19 +112,37 @@ export async function POST(request: NextRequest) {
     const wk = workout && typeof workout === "object" ? workout : {};
     const wkRec = wk as Record<string, unknown>;
 
-    const peakMiles = numPositive(vol.peakMiles, 88);
-    const defaultBase = peakMiles / (1.12 * 1.12);
-    const baseMiles = numPositive(vol.baseMiles, defaultBase);
-    const taperMiles = numPositive(vol.taperMiles, peakMiles * 0.85);
-    let maxWeeklyMiles: number | null | undefined = undefined;
+    const needPositive = (v: unknown): number | null => {
+      if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
+      return null;
+    };
+    const peakMiles = needPositive(vol.peakMiles);
+    const baseMiles = needPositive(vol.baseMiles);
+    const taperMiles = needPositive(vol.taperMiles);
+    const minWeeklyMiles = needPositive(vol.minWeeklyMiles);
+    if (peakMiles == null || baseMiles == null || taperMiles == null || minWeeklyMiles == null) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "volume.minWeeklyMiles, baseMiles, peakMiles, and taperMiles are required and must be positive numbers",
+        },
+        { status: 400 }
+      );
+    }
+
+    let maxWeeklyMiles: number | null = null;
     if ("maxWeeklyMiles" in vol) {
       if (vol.maxWeeklyMiles === null || vol.maxWeeklyMiles === "") {
         maxWeeklyMiles = null;
       } else if (typeof vol.maxWeeklyMiles === "number" && Number.isFinite(vol.maxWeeklyMiles)) {
         maxWeeklyMiles = Math.max(1, Math.round(vol.maxWeeklyMiles));
+      } else {
+        return NextResponse.json(
+          { success: false, error: "volume.maxWeeklyMiles must be a positive number, null, or omitted" },
+          { status: 400 }
+        );
       }
-    } else {
-      maxWeeklyMiles = 70;
     }
 
     async function resolveConfigId(
@@ -145,6 +160,22 @@ export async function POST(request: NextRequest) {
         throw new Error(`${key} is not a valid config`);
       }
       return r;
+    }
+
+    const tD = wkRec.tempoIdealDow;
+    const iD = wkRec.intervalIdealDow;
+    const lD = wkRec.longRunDefaultDow;
+    const tNum = typeof tD === "number" && isDow1to7(tD) ? tD : null;
+    const iNum = typeof iD === "number" && isDow1to7(iD) ? iD : null;
+    const lNum = typeof lD === "number" && isDow1to7(lD) ? lD : null;
+    if (tNum == null || iNum == null || lNum == null) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "workout.tempoIdealDow, intervalIdealDow, and longRunDefaultDow are required (1–7)",
+        },
+        { status: 400 }
+      );
     }
 
     let longRunConfigId: string | null | undefined;
@@ -189,10 +220,7 @@ export async function POST(request: NextRequest) {
         volumeConstraints: {
           create: {
             cycleLen: typeof vol.cycleLen === "number" ? vol.cycleLen : 4,
-            minWeeklyMiles: typeof vol.minWeeklyMiles === "number" ? vol.minWeeklyMiles : 40,
-            minLongMiles: typeof vol.minLongMiles === "number" ? vol.minLongMiles : 8,
-            minEasyPerDayMiles:
-              typeof vol.minEasyPerDayMiles === "number" ? vol.minEasyPerDayMiles : 3,
+            minWeeklyMiles,
             maxWeeklyMiles: maxWeeklyMiles ?? null,
             baseMiles,
             peakMiles,
@@ -201,15 +229,9 @@ export async function POST(request: NextRequest) {
         },
         workoutConfig: {
           create: {
-            qualitySessions:
-              typeof wkRec.qualitySessions === "number" && Number.isFinite(wkRec.qualitySessions)
-                ? Math.min(2, Math.max(0, Math.round(wkRec.qualitySessions)))
-                : 1,
-            tempoIdealDow: typeof wkRec.tempoIdealDow === "number" ? wkRec.tempoIdealDow : 2,
-            intervalIdealDow:
-              typeof wkRec.intervalIdealDow === "number" ? wkRec.intervalIdealDow : 4,
-            longRunDefaultDow:
-              typeof wkRec.longRunDefaultDow === "number" ? wkRec.longRunDefaultDow : 6,
+            tempoIdealDow: tNum,
+            intervalIdealDow: iNum,
+            longRunDefaultDow: lNum,
           },
         },
       },

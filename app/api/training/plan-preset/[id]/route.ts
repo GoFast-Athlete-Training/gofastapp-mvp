@@ -99,8 +99,6 @@ export async function PATCH(
     const volKeys = [
       "cycleLen",
       "minWeeklyMiles",
-      "minLongMiles",
-      "minEasyPerDayMiles",
       "maxWeeklyMiles",
       "baseMiles",
       "peakMiles",
@@ -130,12 +128,7 @@ export async function PATCH(
 
     const workoutData: Record<string, unknown> = {};
     const wk = body.workout && typeof body.workout === "object" ? body.workout : {};
-    const wkRest = [
-      "qualitySessions",
-      "tempoIdealDow",
-      "intervalIdealDow",
-      "longRunDefaultDow",
-    ] as const;
+    const wkRest = ["tempoIdealDow", "intervalIdealDow", "longRunDefaultDow"] as const;
     for (const k of wkRest) {
       if (k in wk && (wk as Record<string, unknown>)[k] != null) {
         workoutData[k] = (wk as Record<string, unknown>)[k];

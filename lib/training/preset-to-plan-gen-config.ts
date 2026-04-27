@@ -9,13 +9,10 @@ export function presetBoltonsToPlanGenConfig(
   return {
     cycleLen: volume.cycleLen,
     minWeeklyMiles: volume.minWeeklyMiles,
-    minLongMiles: volume.minLongMiles,
-    minEasyPerDayMiles: volume.minEasyPerDayMiles,
     baseMiles: volume.baseMiles,
     peakMiles: volume.peakMiles,
     taperMiles: volume.taperMiles,
     maxWeeklyMiles: volume.maxWeeklyMiles,
-    qualitySessions: workout.qualitySessions,
     tempoIdealDow: workout.tempoIdealDow,
     intervalIdealDow: workout.intervalIdealDow,
     longRunDefaultDow: workout.longRunDefaultDow,
