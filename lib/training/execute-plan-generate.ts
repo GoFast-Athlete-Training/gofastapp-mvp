@@ -78,6 +78,7 @@ export async function executePlanGenerate(params: {
 
   const runTypeConfigs = rawPreset?.runTypeConfig?.positions?.length
     ? runTypeConfigPositionsToInputs(
+        rawPreset.runTypeConfig.workoutType,
         rawPreset.runTypeConfig.positions.map((p) => ({
           cyclePosition: p.cyclePosition,
           catalogueWorkoutId: p.catalogueWorkoutId,

@@ -10,8 +10,8 @@ function round1(n: number): number {
 export type GenerateCyclePoolTotalsInput = {
   totalWeeks: number;
   cycleLen?: number;
-  /** Miles in the peak block (1-based cycle N-1). */
-  cyclePeakPool: number;
+  /** Miles in the long-run peak block (1-based cycle N-1). */
+  longRunPeakPool: number;
   buildCoef: number;
   taperCoef: number;
   /** 1-based keys: multiplier used when walking from cycle `key` to `key-1` (see loop). */
@@ -26,11 +26,11 @@ export function generateCyclePoolTotals(input: GenerateCyclePoolTotalsInput): {
   /** one entry per training cycle, index 0 = cycle 1 */
   poolMilesByCycle: number[];
 } {
-  const { totalWeeks, cyclePeakPool, buildCoef, taperCoef, multiplierOverrides = {} } = input;
+  const { totalWeeks, longRunPeakPool, buildCoef, taperCoef, multiplierOverrides = {} } = input;
   const cycleLen = Math.max(1, input.cycleLen ?? 4);
   const w = Math.max(1, Math.floor(totalWeeks));
   const N = Math.max(1, Math.ceil(w / cycleLen));
-  const peak = Number(cyclePeakPool);
+  const peak = Number(longRunPeakPool);
   if (!Number.isFinite(peak) || peak < 0) {
     return { nCycles: N, poolMilesByCycle: Array(N).fill(0) };
   }
@@ -62,7 +62,8 @@ export function generateCyclePoolTotals(input: GenerateCyclePoolTotalsInput): {
 
 export type RunTypeWeightRow = {
   cyclePosition: number;
-  name: string;
+  /** Optional label; if omitted, consumers may use catalogue name or a slot index. */
+  name?: string;
   distributionWeight: number;
   catalogueWorkoutId?: string | null;
 };
@@ -95,7 +96,7 @@ export function distributePoolToPositions(
   if (wsum <= 0) {
     return rows.map((r) => ({
       cyclePosition: r.cyclePosition,
-      name: r.name,
+      name: r.name?.trim() || `Slot ${r.cyclePosition}`,
       miles: 0,
       distributionWeight: r.distributionWeight,
       catalogueWorkoutId: r.catalogueWorkoutId ?? null,
@@ -106,7 +107,7 @@ export function distributePoolToPositions(
     const share = w / wsum;
     return {
       cyclePosition: r.cyclePosition,
-      name: r.name,
+      name: r.name?.trim() || `Slot ${r.cyclePosition}`,
       miles: round1(pool * share),
       distributionWeight: r.distributionWeight,
       catalogueWorkoutId: r.catalogueWorkoutId ?? null,

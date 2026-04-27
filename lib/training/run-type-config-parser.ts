@@ -7,7 +7,6 @@ export const runTypeCatalogueSelect = {
 
 export type RunTypePositionInput = {
   cyclePosition: number;
-  name: string;
   distributionWeight: number;
   catalogueWorkoutId: string | null;
 };
@@ -33,10 +32,6 @@ export function parseRunTypePositionsBody(
       return { ok: false, error: `Duplicate cyclePosition ${cp}` };
     }
     seen.add(cp);
-    const name = typeof item.name === "string" ? item.name.trim() : "";
-    if (!name) {
-      return { ok: false, error: `name is required (index ${i})` };
-    }
     const dw = item.distributionWeight;
     if (typeof dw !== "number" || !Number.isFinite(dw) || dw < 0) {
       return { ok: false, error: `distributionWeight must be a non-negative number (index ${i})` };
@@ -51,7 +46,7 @@ export function parseRunTypePositionsBody(
         return { ok: false, error: `catalogueWorkoutId must be a string or null (index ${i})` };
       }
     }
-    rows.push({ cyclePosition: cp, name, distributionWeight: dw, catalogueWorkoutId });
+    rows.push({ cyclePosition: cp, distributionWeight: dw, catalogueWorkoutId });
   }
   const sum = rows.reduce((a, r) => a + r.distributionWeight, 0);
   if (sum <= 0 || !Number.isFinite(sum)) {

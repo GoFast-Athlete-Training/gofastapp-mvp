@@ -19,13 +19,16 @@ export interface PlanGenConfig {
   cycleLen?: number;
   minWeeklyMiles?: number;
   /** Total long-run pool miles in the peak training block; scales the long-run engine cap. */
-  cyclePeakPool?: number;
+  longRunPeakPool?: number;
+  /** Weekly volume mix (0–100); easy share is implicit (remainder). Reserved for future generator use. */
+  longRunWeekPct?: number;
+  tempoWeekPct?: number;
+  intervalsWeekPct?: number;
   cyclePoolBuildCoef?: number;
   cyclePoolTaperCoef?: number;
+  /** Not stored on presets; merge uses `DEFAULT_QUALITY_FRACTION` when unset. */
   qualityFraction?: number;
   qualitySessions?: number;
-  /** @deprecated Ignored for scheduling; long-run row choice uses rotation. */
-  qualityOnLongRun?: boolean;
   minLongMiles?: number;
   minEasyPerDayMiles?: number;
   minTempoMiles?: number;
@@ -104,7 +107,7 @@ export function mergePlanConfigToGenerateInput(
     minEasyPerDayMiles: c?.minEasyPerDayMiles ?? DEFAULT_MIN_EASY_DAY,
     qualityFraction: c?.qualityFraction ?? DEFAULT_QUALITY_FRACTION,
     qualitySessions: c?.qualitySessions ?? DEFAULT_QUALITY_SESSIONS,
-    cyclePeakPool: c?.cyclePeakPool,
+    longRunPeakPool: c?.longRunPeakPool,
     preferredDays: base.preferredDays,
     raceName: base.raceName,
     raceDistanceMiles: base.raceDistanceMiles,
@@ -114,10 +117,11 @@ export function mergePlanConfigToGenerateInput(
 }
 
 /**
- * `run_type_config` in the DB is a single shared rotation. Tempo and Intervals
- * use the same cycle positions; hydrate both.
+ * Maps one `run_type_config` row (and its positions) to generator rotation input.
+ * Catalogue hydration uses the config’s `workoutType`.
  */
 export function runTypeConfigPositionsToInputs(
+  workoutType: WorkoutType,
   positions: Array<{
     cyclePosition: number;
     catalogueWorkoutId: string | null;
@@ -130,10 +134,7 @@ export function runTypeConfigPositionsToInputs(
     catalogueWorkoutId: p.catalogueWorkoutId,
     distributionWeight: p.distributionWeight,
   }));
-  return [
-    { workoutType: "Tempo" as const, positions: pos },
-    { workoutType: "Intervals" as const, positions: pos },
-  ];
+  return [{ workoutType, positions: pos }];
 }
 
 function hydrateCatalogueFromRunTypeConfigs(

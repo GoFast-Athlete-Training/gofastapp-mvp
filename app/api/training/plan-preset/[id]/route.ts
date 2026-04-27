@@ -3,10 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
-import {
-  parseBoltonQualityToFraction,
-  serializePlanPresetForApi,
-} from "@/lib/training/quality-percent";
+import { serializePlanPresetForApi } from "@/lib/training/quality-percent";
 
 export async function GET(
   request: NextRequest,
@@ -38,7 +35,7 @@ export async function GET(
   if (!preset) {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json({ success: true, preset });
+  return NextResponse.json({ success: true, preset: serializePlanPresetForApi(preset) });
 }
 
 export async function PATCH(
@@ -78,36 +75,37 @@ export async function PATCH(
       "minWeeklyMiles",
       "minLongMiles",
       "minEasyPerDayMiles",
-      "cyclePeakPool",
+      "longRunWeekPct",
+      "tempoWeekPct",
+      "intervalsWeekPct",
       "cyclePoolBuildCoef",
       "cyclePoolTaperCoef",
     ] as const;
     const volumeData: Record<string, unknown> = {};
     const vol = body.volume && typeof body.volume === "object" ? body.volume : body;
+    const volRec = vol as Record<string, unknown>;
+    if ("longRunPeakPool" in volRec || "cyclePeakPool" in volRec) {
+      const v =
+        volRec.longRunPeakPool !== undefined ? volRec.longRunPeakPool : volRec.cyclePeakPool;
+      if (v === null || v === "" || (typeof v === "number" && !Number.isFinite(v))) {
+        if (existing.volumeConstraints?.longRunPeakPool != null) {
+          volumeData.longRunPeakPool = existing.volumeConstraints.longRunPeakPool;
+        }
+      } else if (typeof v === "number" && v > 0) {
+        volumeData.longRunPeakPool = v;
+      }
+    }
     for (const k of volKeys) {
       if (k in vol) {
-        const v = (vol as Record<string, unknown>)[k];
-        if (k === "cyclePeakPool") {
-          if (v === null || v === "" || (typeof v === "number" && !Number.isFinite(v))) {
-            if (existing.volumeConstraints?.cyclePeakPool != null) {
-              volumeData.cyclePeakPool = existing.volumeConstraints.cyclePeakPool;
-            }
-          } else if (typeof v === "number" && v > 0) {
-            volumeData.cyclePeakPool = v;
-          }
-        } else if (v != null) {
-          (volumeData as Record<string, unknown>)[k] = v;
+        const v = volRec[k];
+        if (v != null) {
+          volumeData[k] = v;
         }
       }
     }
 
     const workoutData: Record<string, unknown> = {};
     const wk = body.workout && typeof body.workout === "object" ? body.workout : {};
-    const wkRec = wk as Record<string, unknown>;
-    if ("qualityPercent" in wkRec || "qualityFraction" in wkRec) {
-      const q = parseBoltonQualityToFraction(wkRec);
-      if (q != null) workoutData.qualityFraction = q;
-    }
     const wkRest = [
       "qualitySessions",
       "tempoIdealDow",
@@ -118,9 +116,6 @@ export async function PATCH(
       if (k in wk && (wk as Record<string, unknown>)[k] != null) {
         workoutData[k] = (wk as Record<string, unknown>)[k];
       }
-    }
-    if ("qualityOnLongRun" in wk && typeof wk.qualityOnLongRun === "boolean") {
-      workoutData.qualityOnLongRun = wk.qualityOnLongRun;
     }
 
     const presetData: Record<string, unknown> = {};

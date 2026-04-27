@@ -4,6 +4,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { runTypeCatalogueSelect } from "@/lib/training/run-type-config-parser";
+import { WorkoutType } from "@prisma/client";
+
+const VALID_WORKOUT_TYPE = new Set<string>(Object.values(WorkoutType));
+
+function parseWorkoutType(v: unknown): WorkoutType | null {
+  if (typeof v === "string" && VALID_WORKOUT_TYPE.has(v)) {
+    return v as WorkoutType;
+  }
+  return null;
+}
 
 const includeBlock = {
   positions: {
@@ -50,13 +60,17 @@ export async function PATCH(
   } catch {
     return NextResponse.json({ success: false, error: "Invalid JSON" }, { status: 400 });
   }
-  const data: { name?: string; description?: string | null; updatedAt: Date } = {
+  const data: { name?: string; description?: string | null; workoutType?: WorkoutType; updatedAt: Date } = {
     updatedAt: new Date(),
   };
   const hasName = "name" in body;
   const hasDesc = "description" in body;
-  if (!hasName && !hasDesc) {
-    return NextResponse.json({ success: false, error: "Expected name and/or description" }, { status: 400 });
+  const hasWorkoutType = "workoutType" in body;
+  if (!hasName && !hasDesc && !hasWorkoutType) {
+    return NextResponse.json(
+      { success: false, error: "Expected name, description, and/or workoutType" },
+      { status: 400 }
+    );
   }
   if (hasName) {
     if (typeof body.name !== "string" || !body.name.trim()) {
@@ -72,6 +86,13 @@ export async function PATCH(
     } else {
       return NextResponse.json({ success: false, error: "description must be a string or null" }, { status: 400 });
     }
+  }
+  if (hasWorkoutType) {
+    const w = parseWorkoutType(body.workoutType);
+    if (w == null) {
+      return NextResponse.json({ success: false, error: "Invalid workoutType" }, { status: 400 });
+    }
+    data.workoutType = w;
   }
 
   const item = await prisma.run_type_config.update({

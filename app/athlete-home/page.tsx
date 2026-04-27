@@ -13,12 +13,17 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import TopNav from '@/components/shared/TopNav';
 import AthleteSidebar from '@/components/athlete/AthleteSidebar';
+import LogRaceResultSheet from '@/components/races/LogRaceResultSheet';
+import RaceCompleteModal, {
+  isRaceCongratsDismissed,
+} from '@/components/athlete/RaceCompleteModal';
+import type { RaceCompleteAnalysis } from '@/components/athlete/RaceCompleteModal';
 import Image from 'next/image';
 import api from '@/lib/api';
 import Link from 'next/link';
@@ -224,6 +229,21 @@ type LastLoggedWorkoutStrip = {
   paceDeltaSecPerMile: number | null;
 };
 
+function pickPrimaryGoal(
+  goals: { status?: string; targetByDate?: string }[]
+): (typeof goals)[0] | null {
+  if (!Array.isArray(goals) || goals.length === 0) return null;
+  const active = goals.filter((g) => g.status === 'ACTIVE');
+  if (active.length > 0) return active[0] ?? null;
+  const comp = goals
+    .filter((g) => g.status === 'COMPLETED')
+    .sort(
+      (a, b) =>
+        new Date(b.targetByDate as string).getTime() - new Date(a.targetByDate as string).getTime()
+    );
+  return comp[0] ?? null;
+}
+
 const CITY_RECAP_DISMISS_STORAGE_KEY = 'athleteHomeDismissedCityRecapRunIds';
 
 function readDismissedCityRecapRunIdsFromStorage(): Set<string> {
@@ -266,6 +286,16 @@ export default function AthleteHomePage() {
   } | null>(null);
   const [todayPlanDay, setTodayPlanDay] = useState<PlanDayCard | null>(null);
   const [raceSignups, setRaceSignups] = useState<RaceSignupWithRegistry[]>([]);
+  const [primaryRaceResult, setPrimaryRaceResult] = useState<{
+    id: string;
+    officialFinishTime: string | null;
+    source: string;
+    prAchieved?: boolean;
+    goalAchieved?: boolean;
+    analysis: RaceCompleteAnalysis | null;
+  } | null>(null);
+  const [logResultOpen, setLogResultOpen] = useState(false);
+  const [raceCompleteModalOpen, setRaceCompleteModalOpen] = useState(false);
   const [myPastRuns, setMyPastRuns] = useState<GoingRunRow[]>([]);
   const [dismissedRecapRunIds, setDismissedRecapRunIds] = useState<Set<string>>(
     () => readDismissedCityRecapRunIdsFromStorage()
@@ -302,7 +332,7 @@ export default function AthleteHomePage() {
 
     const [goalsRes, upcomingRes, paceRes, goingRes, lastRunRes, raceSignupsRes, pastRunsRes] =
       await Promise.allSettled([
-        api.get('/goals?status=ACTIVE'),
+        api.get('/goals?status=ALL'),
         api.get('/training/upcoming'),
         api.get(`/athlete/${athleteId}/pace-notifications`),
         api.get('/me/my-going-runs'),
@@ -311,11 +341,47 @@ export default function AthleteHomePage() {
         api.get('/me/my-past-runs'),
       ]);
 
+    let pickedPrimary: any = null;
     if (goalsRes.status === 'fulfilled') {
       const goals = goalsRes.value.data?.goals ?? [];
-      setPrimaryGoal(goals[0] ?? null);
+      pickedPrimary = pickPrimaryGoal(goals);
+      setPrimaryGoal(pickedPrimary);
     } else {
       console.warn('athlete-home: goals fetch failed', goalsRes.reason);
+      setPrimaryGoal(null);
+    }
+
+    if (pickedPrimary?.id) {
+      try {
+        const rr = await api.get('/race-results', { params: { goalId: pickedPrimary.id } });
+        const r = rr.data?.result as
+          | {
+              id: string;
+              officialFinishTime?: string | null;
+              source?: string;
+              prAchieved?: boolean;
+              goalAchieved?: boolean;
+            }
+          | null
+          | undefined;
+        const an = rr.data?.analysis as RaceCompleteAnalysis | null | undefined;
+        if (r && typeof r.id === 'string') {
+          setPrimaryRaceResult({
+            id: r.id,
+            officialFinishTime: typeof r.officialFinishTime === 'string' ? r.officialFinishTime : null,
+            source: typeof r.source === 'string' ? r.source : 'manual',
+            prAchieved: r.prAchieved,
+            goalAchieved: r.goalAchieved,
+            analysis: an ?? null,
+          });
+        } else {
+          setPrimaryRaceResult(null);
+        }
+      } catch {
+        setPrimaryRaceResult(null);
+      }
+    } else {
+      setPrimaryRaceResult(null);
     }
 
     if (upcomingRes.status === 'fulfilled') {
@@ -447,6 +513,78 @@ export default function AthleteHomePage() {
     loadHome();
   }, [loadHome]);
 
+  const refreshPrimaryRaceResult = useCallback(() => {
+    if (!primaryGoal?.id) {
+      setPrimaryRaceResult(null);
+      return;
+    }
+    void api
+      .get('/race-results', { params: { goalId: primaryGoal.id } })
+      .then((r) => {
+        const res = r.data?.result as
+          | {
+              id: string;
+              officialFinishTime?: string | null;
+              source?: string;
+              prAchieved?: boolean;
+              goalAchieved?: boolean;
+            }
+          | null
+          | undefined;
+        const an = r.data?.analysis as RaceCompleteAnalysis | null | undefined;
+        if (res && typeof res.id === 'string') {
+          setPrimaryRaceResult({
+            id: res.id,
+            officialFinishTime:
+              typeof res.officialFinishTime === 'string' ? res.officialFinishTime : null,
+            source: typeof res.source === 'string' ? res.source : 'manual',
+            prAchieved: res.prAchieved,
+            goalAchieved: res.goalAchieved,
+            analysis: an ?? null,
+          });
+        } else {
+          setPrimaryRaceResult(null);
+        }
+      })
+      .catch(() => setPrimaryRaceResult(null));
+  }, [primaryGoal]);
+
+  useEffect(() => {
+    void refreshPrimaryRaceResult();
+  }, [refreshPrimaryRaceResult]);
+
+  const goalIsCompleteForModal =
+    primaryGoal != null &&
+    (primaryGoal.status === 'COMPLETED' ||
+      (primaryGoal.targetByDate != null &&
+        new Date(primaryGoal.targetByDate).getTime() < Date.now() - 24 * 60 * 60 * 1000));
+
+  useEffect(() => {
+    if (loading) return;
+    if (!primaryGoal?.id) {
+      setRaceCompleteModalOpen(false);
+      return;
+    }
+    if (!goalIsCompleteForModal) {
+      setRaceCompleteModalOpen(false);
+      return;
+    }
+    if (primaryRaceResult?.officialFinishTime) {
+      setRaceCompleteModalOpen(false);
+      return;
+    }
+    if (isRaceCongratsDismissed(primaryGoal.id)) {
+      setRaceCompleteModalOpen(false);
+      return;
+    }
+    setRaceCompleteModalOpen(true);
+  }, [
+    loading,
+    primaryGoal?.id,
+    goalIsCompleteForModal,
+    primaryRaceResult?.officialFinishTime,
+  ]);
+
   useEffect(() => {
     const unsub = auth.onAuthStateChanged((user) => {
       if (!user) {
@@ -566,11 +704,19 @@ export default function AthleteHomePage() {
         )
       : null;
 
-  /** After race day (calendar + 24h), treat as complete for UI — not stuck on "Race day" forever */
-  const goalIsComplete =
-    primaryGoal != null &&
-    primaryGoal.targetByDate != null &&
-    new Date(primaryGoal.targetByDate).getTime() < Date.now() - 24 * 60 * 60 * 1000;
+  const primaryRaceRegistryId =
+    primaryGoal?.race_registry?.id ??
+    (typeof primaryGoal?.raceRegistryId === 'string' ? primaryGoal.raceRegistryId : null);
+  const primarySignupIdForGoalRace =
+    primaryRaceRegistryId != null
+      ? raceSignups.find((s) => s.race_registry.id === primaryRaceRegistryId)?.id ?? null
+      : null;
+  const primaryRaceYmdForSheet =
+    primaryGoal?.race_registry?.raceDate != null
+      ? ymdFromDate(new Date(primaryGoal.race_registry.raceDate))
+      : primaryGoal?.targetByDate != null
+        ? ymdFromDate(new Date(primaryGoal.targetByDate))
+        : '';
 
   const nextTraining =
     upcomingSessions.find((s: { isPlanSession?: boolean }) => s.isPlanSession) ??
@@ -611,7 +757,7 @@ export default function AthleteHomePage() {
       : null;
 
   const showTrainingAtGlance =
-    !goalIsComplete &&
+    !goalIsCompleteForModal &&
     (Boolean(activePlanSummary?.hasSchedule) || Boolean(primaryGoal));
 
   const goalDistanceNorm = normalizeGoalDistanceLabel(primaryGoal?.distance);
@@ -676,7 +822,7 @@ export default function AthleteHomePage() {
     'block rounded-xl border-2 border-sky-200 bg-sky-50/70 p-5 shadow-sm hover:border-sky-300 hover:shadow-md transition-all h-full';
   const cardTraining =
     'block rounded-xl border-2 border-emerald-200 bg-emerald-50/80 p-5 shadow-sm hover:border-emerald-300 hover:shadow-md transition-all h-full';
-  const findRunColSpanLg = showTrainingAtGlance || !goalIsComplete ? 'lg:col-span-2' : 'lg:col-span-5';
+  const findRunColSpanLg = showTrainingAtGlance || !goalIsCompleteForModal ? 'lg:col-span-2' : 'lg:col-span-5';
 
   const lastRunDayLabelHome = lastLoggedWorkout
     ? homeLastRunDayLabel(lastLoggedWorkout.activityStartTime, lastLoggedWorkout.date)
@@ -966,7 +1112,7 @@ export default function AthleteHomePage() {
               </div>
 
               <div className="lg:col-span-2">
-                {primaryGoal && goalIsComplete ? (
+                {primaryGoal && goalIsCompleteForModal ? (
                   <div className="rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm h-full flex flex-col">
                     <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Race in the books</p>
                     <div className="mt-2 flex gap-3 items-start">
@@ -984,15 +1130,48 @@ export default function AthleteHomePage() {
                             {raceCityState}
                           </p>
                         ) : null}
-                        <p className="text-sm text-gray-700 mt-3 leading-relaxed">
-                          Nice work. When you&apos;re ready, set your next goal so training and the home
-                          view stay in sync.
-                        </p>
+                        {primaryRaceResult?.officialFinishTime ? (
+                          <>
+                            {primaryRaceResult.analysis ? (
+                              <>
+                                <p className="text-base font-bold text-gray-900 mt-2">
+                                  {primaryRaceResult.analysis.headline}
+                                </p>
+                                <p className="text-sm text-gray-700 mt-1 leading-relaxed">
+                                  {primaryRaceResult.analysis.subText}
+                                </p>
+                              </>
+                            ) : (
+                              <p className="text-sm text-gray-700 mt-3 leading-relaxed">
+                                When you&apos;re ready, set your next goal so training and the home view
+                                stay in sync.
+                              </p>
+                            )}
+                            <p className="text-sm text-emerald-900 font-medium mt-2 tabular-nums">
+                              Finish: {primaryRaceResult.officialFinishTime}
+                              {primaryRaceResult.source === 'garmin' ? ' · from Garmin' : ''}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-sm text-gray-700 mt-3 leading-relaxed">
+                            Nice work. Log your finish time for goal vs. actual and PR detection — or
+                            set your next goal when you&apos;re ready.
+                          </p>
+                        )}
                       </div>
                     </div>
+                    {primaryRaceRegistryId && primaryRaceYmdForSheet ? (
+                      <button
+                        type="button"
+                        onClick={() => setLogResultOpen(true)}
+                        className="mt-3 inline-flex justify-center rounded-xl border-2 border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 w-full"
+                      >
+                        {primaryRaceResult ? 'Update your result' : 'Log your result'}
+                      </button>
+                    ) : null}
                     <Link
                       href="/profile#goal"
-                      className="mt-4 inline-flex justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 w-full"
+                      className="mt-3 inline-flex justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 w-full"
                     >
                       Set your next goal →
                     </Link>
@@ -1164,7 +1343,7 @@ export default function AthleteHomePage() {
                     </Link>
                   </div>
                 </div>
-              ) : !goalIsComplete ? (
+              ) : !goalIsCompleteForModal ? (
                 <div
                   className={`${cardTraining} lg:col-span-3 cursor-default hover:border-emerald-200 hover:shadow-sm`}
                 >
@@ -1369,6 +1548,33 @@ export default function AthleteHomePage() {
           </div>
         </main>
       </div>
+      {primaryRaceRegistryId && primaryRaceYmdForSheet && primaryGoal ? (
+        <LogRaceResultSheet
+          open={logResultOpen}
+          onClose={() => setLogResultOpen(false)}
+          raceRegistryId={primaryRaceRegistryId}
+          raceName={String(primaryGoal.race_registry?.name || 'Your race')}
+          raceDateYmd={primaryRaceYmdForSheet}
+          goalId={primaryGoal.id}
+          signupId={primarySignupIdForGoalRace}
+          onSaved={() => {
+            void refreshPrimaryRaceResult();
+            void loadHome();
+          }}
+        />
+      ) : null}
+      {primaryGoal?.id && goalIsCompleteForModal && raceName ? (
+        <RaceCompleteModal
+          open={raceCompleteModalOpen}
+          onClose={() => setRaceCompleteModalOpen(false)}
+          goalId={primaryGoal.id}
+          raceName={String(raceName)}
+          onComplete={() => {
+            void refreshPrimaryRaceResult();
+            void loadHome();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

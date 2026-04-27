@@ -3,10 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
-import {
-  parseBoltonQualityToFraction,
-  serializePlanPresetForApi,
-} from "@/lib/training/quality-percent";
+import { serializePlanPresetForApi } from "@/lib/training/quality-percent";
 
 function slugifyPresetTitle(title: string): string {
   const s = title
@@ -15,6 +12,25 @@ function slugifyPresetTitle(title: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return s || "preset";
+}
+
+function numInRange(
+  v: unknown,
+  def: number,
+  opts: { min: number; max: number }
+): number {
+  if (typeof v === "number" && Number.isFinite(v)) {
+    return Math.min(opts.max, Math.max(opts.min, v));
+  }
+  return def;
+}
+
+function peakFromVolume(vol: Record<string, unknown>): number {
+  const raw = vol.longRunPeakPool ?? vol.cyclePeakPool;
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
+    return raw;
+  }
+  return 88;
 }
 
 export async function GET(request: NextRequest) {
@@ -26,7 +42,7 @@ export async function GET(request: NextRequest) {
     include: {
       volumeConstraints: true,
       workoutConfig: true,
-      runTypeConfig: { select: { id: true, name: true, description: true } },
+      runTypeConfig: { select: { id: true, name: true, description: true, workoutType: true } },
     },
   });
   return NextResponse.json({
@@ -64,15 +80,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const vol = volume && typeof volume === "object" ? volume : {};
+    const vol = (volume && typeof volume === "object" ? volume : {}) as Record<string, unknown>;
     const wk = workout && typeof workout === "object" ? workout : {};
     const wkRec = wk as Record<string, unknown>;
-    const qualityFraction = parseBoltonQualityToFraction(wkRec) ?? 0.22;
 
-    const cyclePeak =
-      typeof vol.cyclePeakPool === "number" && Number.isFinite(vol.cyclePeakPool) && vol.cyclePeakPool > 0
-        ? vol.cyclePeakPool
-        : 88;
+    const longRunPeak = peakFromVolume(vol);
+    const longRunWeekPct = numInRange(vol.longRunWeekPct, 25, { min: 0, max: 100 });
+    const tempoWeekPct = numInRange(vol.tempoWeekPct, 10, { min: 0, max: 100 });
+    const intervalsWeekPct = numInRange(vol.intervalsWeekPct, 7, { min: 0, max: 100 });
 
     let runTypeConfigId: string | null | undefined = undefined;
     if ("runTypeConfigId" in body) {
@@ -112,7 +127,10 @@ export async function POST(request: NextRequest) {
             minLongMiles: typeof vol.minLongMiles === "number" ? vol.minLongMiles : 8,
             minEasyPerDayMiles:
               typeof vol.minEasyPerDayMiles === "number" ? vol.minEasyPerDayMiles : 3,
-            cyclePeakPool: cyclePeak,
+            longRunWeekPct,
+            tempoWeekPct,
+            intervalsWeekPct,
+            longRunPeakPool: longRunPeak,
             cyclePoolBuildCoef:
               typeof vol.cyclePoolBuildCoef === "number" && Number.isFinite(vol.cyclePoolBuildCoef)
                 ? vol.cyclePoolBuildCoef
@@ -125,17 +143,15 @@ export async function POST(request: NextRequest) {
         },
         workoutConfig: {
           create: {
-            qualityFraction,
             qualitySessions:
-              typeof wk.qualitySessions === "number" && Number.isFinite(wk.qualitySessions)
-                ? Math.min(2, Math.max(0, Math.round(wk.qualitySessions)))
+              typeof wkRec.qualitySessions === "number" && Number.isFinite(wkRec.qualitySessions)
+                ? Math.min(2, Math.max(0, Math.round(wkRec.qualitySessions)))
                 : 1,
-            qualityOnLongRun: wk.qualityOnLongRun === true,
-            tempoIdealDow: typeof wk.tempoIdealDow === "number" ? wk.tempoIdealDow : 2,
+            tempoIdealDow: typeof wkRec.tempoIdealDow === "number" ? wkRec.tempoIdealDow : 2,
             intervalIdealDow:
-              typeof wk.intervalIdealDow === "number" ? wk.intervalIdealDow : 4,
+              typeof wkRec.intervalIdealDow === "number" ? wkRec.intervalIdealDow : 4,
             longRunDefaultDow:
-              typeof wk.longRunDefaultDow === "number" ? wk.longRunDefaultDow : 6,
+              typeof wkRec.longRunDefaultDow === "number" ? wkRec.longRunDefaultDow : 6,
           },
         },
       },

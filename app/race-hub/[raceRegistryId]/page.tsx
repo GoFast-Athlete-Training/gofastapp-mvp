@@ -18,6 +18,7 @@ import {
   getPublicCoursePageUrl,
   getPublicRacePageUrl,
 } from "@/lib/public-race-url";
+import LogRaceResultSheet from "@/components/races/LogRaceResultSheet";
 import {
   Calendar,
   ChevronDown,
@@ -121,6 +122,22 @@ type ShakeoutRunRow = {
   myRsvp: { status: string } | null;
 };
 
+type MyRaceResultRow = {
+  id: string;
+  officialFinishTime: string | null;
+  source: string;
+  actualAvgPaceSecPerMile: number | null;
+  overallPlace: number | null;
+  ageGroupPlace: number | null;
+};
+
+function formatSecPerMileForHub(sec: number | null | undefined): string {
+  if (sec == null || sec <= 0) return "—";
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s.toString().padStart(2, "0")}/mi`;
+}
+
 function mapRaceRoleToCrewRole(
   role: string
 ): "member" | "manager" | "admin" {
@@ -159,6 +176,10 @@ function RaceHubPageInner() {
   const [showAnnounceForm, setShowAnnounceForm] = useState(false);
   const [runnersExpanded, setRunnersExpanded] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [myRaceResult, setMyRaceResult] = useState<MyRaceResultRow | null>(null);
+  const [hubGoalId, setHubGoalId] = useState<string | null>(null);
+  const [hubSignupId, setHubSignupId] = useState<string | null>(null);
+  const [logSheetOpen, setLogSheetOpen] = useState(false);
 
   const athleteId = LocalStorageAPI.getAthleteId();
   const joinRequested = searchParams.get("join") === "1";
@@ -194,18 +215,47 @@ function RaceHubPageInner() {
       setMyMembership(mine);
 
       if (mine) {
-        const [aRes, eRes, shRes] = await Promise.all([
+        const [aRes, eRes, shRes, rrRes, goalsRes, signupsRes] = await Promise.all([
           api.get(`/race-hub/${encodeURIComponent(id)}/announcements`),
           api.get(`/race-hub/${encodeURIComponent(id)}/events`),
           api.get(`/race-hub/${encodeURIComponent(id)}/shakeouts`),
+          api
+            .get("/race-results", { params: { raceRegistryId: id } })
+            .catch(() => ({ data: { results: [] as unknown[] } })),
+          api.get("/goals?status=ACTIVE").catch(() => ({ data: { goals: [] } })),
+          api.get("/race-signups").catch(() => ({ data: { signups: [] } })),
         ]);
         setAnnouncements((aRes.data?.announcements as AnnouncementRow[]) || []);
         setEvents((eRes.data?.events as RaceEventRow[]) || []);
         setShakeouts((shRes.data?.shakeouts as ShakeoutRunRow[]) || []);
+        const results = rrRes.data?.results;
+        if (Array.isArray(results) && results[0] && typeof results[0].id === "string") {
+          const r = results[0] as MyRaceResultRow;
+          setMyRaceResult({
+            id: r.id,
+            officialFinishTime: r.officialFinishTime ?? null,
+            source: typeof r.source === "string" ? r.source : "manual",
+            actualAvgPaceSecPerMile: r.actualAvgPaceSecPerMile ?? null,
+            overallPlace: r.overallPlace ?? null,
+            ageGroupPlace: r.ageGroupPlace ?? null,
+          });
+        } else {
+          setMyRaceResult(null);
+        }
+        const goals = (goalsRes.data?.goals as { id: string; raceRegistryId?: string | null; race_registry?: { id: string } }[] | undefined) ?? [];
+        const goalMatch = goals.find(
+          (g) => g.raceRegistryId === id || g.race_registry?.id === id
+        );
+        setHubGoalId(goalMatch?.id ?? null);
+        const signups = (signupsRes.data?.signups as { id: string; raceRegistryId: string }[] | undefined) ?? [];
+        setHubSignupId(signups.find((s) => s.raceRegistryId === id)?.id ?? null);
       } else {
         setAnnouncements([]);
         setEvents([]);
         setShakeouts([]);
+        setMyRaceResult(null);
+        setHubGoalId(null);
+        setHubSignupId(null);
       }
       return { isMember: Boolean(mine) };
     } catch (e: unknown) {
@@ -215,6 +265,9 @@ function RaceHubPageInner() {
         setAnnouncements([]);
         setEvents([]);
         setShakeouts([]);
+        setMyRaceResult(null);
+        setHubGoalId(null);
+        setHubSignupId(null);
         return { isMember: false };
       }
       throw e;
@@ -386,6 +439,7 @@ function RaceHubPageInner() {
     : null;
 
   const notMember = !myMembership;
+  const raceDateYmdForSheet = race.raceDate ? String(race.raceDate).slice(0, 10) : "";
 
   const copyInviteLink = async () => {
     const s = race.slug?.trim();
@@ -578,6 +632,59 @@ function RaceHubPageInner() {
 
             {/* Right: race info, course, group runs, who's here */}
             <aside className="lg:col-span-6 space-y-6 min-w-0 order-2">
+              <section className="bg-gradient-to-br from-emerald-50 to-white rounded-2xl border border-emerald-200 shadow-sm p-4 sm:p-6">
+                <h2 className="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-amber-500" />
+                  My result
+                </h2>
+                <p className="text-sm text-gray-600 mb-3">
+                  Log or update your finish time for this race. It stays on your profile and home,
+                  not posted to the group feed.
+                </p>
+                {myRaceResult ? (
+                  <div className="space-y-2 text-sm">
+                    {myRaceResult.officialFinishTime ? (
+                      <p className="text-emerald-900">
+                        <span className="font-semibold">Time:</span>{" "}
+                        <span className="tabular-nums font-medium">{myRaceResult.officialFinishTime}</span>
+                        {myRaceResult.source === "garmin" ? (
+                          <span className="text-gray-500 font-normal"> · from Garmin</span>
+                        ) : null}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-700">Result on file (open below to add times).</p>
+                    )}
+                    {myRaceResult.overallPlace != null ? (
+                      <p className="text-gray-800">
+                        <span className="font-semibold text-gray-700">Overall:</span>{" "}
+                        {myRaceResult.overallPlace}
+                        {myRaceResult.ageGroupPlace != null
+                          ? ` · AG ${myRaceResult.ageGroupPlace}`
+                          : null}
+                      </p>
+                    ) : null}
+                    {myRaceResult.actualAvgPaceSecPerMile != null ? (
+                      <p className="text-gray-800">
+                        <span className="font-semibold text-gray-700">Pace:</span>{" "}
+                        {formatSecPerMileForHub(myRaceResult.actualAvgPaceSecPerMile)}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-700">
+                    No result logged yet. Add your time after race day, even if your watch
+                    didn&apos;t upload a file.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setLogSheetOpen(true)}
+                  className="mt-4 w-full inline-flex justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                >
+                  {myRaceResult ? "Update result" : "Log your result"}
+                </button>
+              </section>
+
               <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6">
                 <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                   <Info className="w-5 h-5 text-orange-600" />
@@ -863,6 +970,19 @@ function RaceHubPageInner() {
           </div>
         </main>
       )}
+
+      {myMembership && race && raceDateYmdForSheet ? (
+        <LogRaceResultSheet
+          open={logSheetOpen}
+          onClose={() => setLogSheetOpen(false)}
+          raceRegistryId={race.id}
+          raceName={race.name}
+          raceDateYmd={raceDateYmdForSheet}
+          goalId={hubGoalId}
+          signupId={hubSignupId}
+          onSaved={() => void loadHubData()}
+        />
+      ) : null}
     </div>
   );
 }

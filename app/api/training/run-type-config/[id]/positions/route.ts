@@ -62,7 +62,6 @@ export async function PUT(
             id: newEntityId(),
             runTypeConfigId,
             cyclePosition: row.cyclePosition,
-            name: row.name,
             distributionWeight: row.distributionWeight,
             catalogueWorkoutId: row.catalogueWorkoutId,
             updatedAt: now,

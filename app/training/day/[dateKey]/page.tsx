@@ -8,7 +8,13 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
-import { addDaysUtc, formatPlanDateDisplay, localYmd, utcDateOnly } from "@/lib/training/plan-utils";
+import {
+  addDaysUtc,
+  formatPlanDateDisplay,
+  localYmd,
+  utcDateOnly,
+  ymdFromDate,
+} from "@/lib/training/plan-utils";
 import {
   fetchTrainingPlanDetail,
   fetchTrainingWorkoutDetail,
@@ -20,6 +26,7 @@ import {
   type PreviewWorkout,
 } from "@/lib/training/workout-preview-payload";
 import { stashWorkoutDayNav } from "@/lib/training/workout-day-nav";
+import LogRaceResultSheet from "@/components/races/LogRaceResultSheet";
 
 type PlanDetail = {
   id: string;
@@ -27,6 +34,15 @@ type PlanDetail = {
   totalWeeks: number;
   startDate: string;
   planWeeks: unknown;
+  raceId?: string | null;
+  race_registry?: {
+    id: string;
+    name: string;
+    raceDate: string;
+    distanceMeters: number | null;
+    distanceLabel: string | null;
+  } | null;
+  athlete_goal?: { id: string } | null;
 };
 
 function hasSchedule(p: PlanDetail): boolean {
@@ -81,6 +97,11 @@ export default function TrainingPlanDayPreviewPage() {
   const [openingWorkout, setOpeningWorkout] = useState(false);
   /** e.g. navigate to /workouts/[id] failed — does not mean the day is unscheduled */
   const [openWorkoutError, setOpenWorkoutError] = useState<string | null>(null);
+  const [raceResultRow, setRaceResultRow] = useState<{
+    id: string;
+    officialFinishTime: string | null;
+  } | null>(null);
+  const [logRaceOpen, setLogRaceOpen] = useState(false);
 
   const previewBackPath = useMemo(() => {
     const qs = searchParams.toString();
@@ -144,21 +165,43 @@ export default function TrainingPlanDayPreviewPage() {
       }
 
       setPlanDetail(plan);
+      setRaceResultRow(null);
 
       setWorkoutLoading(true);
       try {
         const wid = await resolveWorkoutForPlanDay(plan.id, dateKey, token);
         setWorkoutId(wid);
         setWorkoutError(null);
+        let raceDayPayload: ReturnType<typeof pickWorkoutPayload> | null = null;
         try {
           const { workout: rawW } = await fetchTrainingWorkoutDetail(wid, token);
-          setWorkout(pickWorkoutPayload(rawW));
+          raceDayPayload = pickWorkoutPayload(rawW);
+          setWorkout(raceDayPayload);
           setWorkoutDetailError(null);
         } catch (e) {
           setWorkout(null);
           setWorkoutDetailError(
             e instanceof Error ? e.message : "Could not load workout detail"
           );
+        }
+
+        const regId = (plan as PlanDetail).race_registry?.id;
+        if (regId && raceDayPayload?.workoutType === "Race") {
+          try {
+            const rr = await fetch(
+              `/api/race-results?raceRegistryId=${encodeURIComponent(regId)}`,
+              { headers: athleteBearerFetchHeaders(token) }
+            );
+            const rrJson = (await rr.json()) as { results?: { id: string; officialFinishTime: string | null }[] };
+            if (rr.ok && Array.isArray(rrJson.results) && rrJson.results[0]) {
+              setRaceResultRow({
+                id: rrJson.results[0].id,
+                officialFinishTime: rrJson.results[0].officialFinishTime ?? null,
+              });
+            }
+          } catch {
+            setRaceResultRow(null);
+          }
         }
       } catch (e) {
         setWorkoutId(null);
@@ -207,6 +250,18 @@ export default function TrainingPlanDayPreviewPage() {
       ? workout.weekNumber
       : "—";
   const isToday = dateKey != null && dateKey === localYmd(new Date());
+  const isPastPlanDay = dateKey != null && dateKey < localYmd(new Date());
+  const planRace = planDetail?.race_registry;
+  const showRaceResultCta = Boolean(
+    isRaceDay && isPastPlanDay && planRace?.id
+  );
+  const planRaceYmd = planRace?.raceDate
+    ? ymdFromDate(
+        /^\d{4}-\d{2}-\d{2}$/.test(String(planRace.raceDate).slice(0, 10))
+          ? new Date(`${String(planRace.raceDate).slice(0, 10)}T12:00:00Z`)
+          : new Date(planRace.raceDate)
+      )
+    : dateKey ?? "";
   const canOpenWorkout = workoutId != null;
 
   async function handleDoThisWorkout() {
@@ -360,6 +415,28 @@ export default function TrainingPlanDayPreviewPage() {
                   Customize this workout
                 </Link>
               )}
+
+              {showRaceResultCta && planRace ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/90 px-3 py-3 space-y-2">
+                  {raceResultRow?.officialFinishTime ? (
+                    <p className="text-sm font-medium text-emerald-900 tabular-nums">
+                      Your logged time: {raceResultRow.officialFinishTime}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-800">
+                      Log your official finish time — even if your watch didn&apos;t record this as a
+                      race.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setLogRaceOpen(true)}
+                    className="inline-flex rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                  >
+                    {raceResultRow ? "Update result" : "Log your result"}
+                  </button>
+                </div>
+              ) : null}
             </div>
 
             <div className="border-t border-gray-100 px-5 py-4 space-y-3 bg-gray-50/60">
@@ -401,6 +478,21 @@ export default function TrainingPlanDayPreviewPage() {
           </div>
         )}
       </div>
+      {showRaceResultCta && planRace ? (
+        <LogRaceResultSheet
+          open={logRaceOpen}
+          onClose={() => setLogRaceOpen(false)}
+          raceRegistryId={planRace.id}
+          raceName={planRace.name}
+          raceDateYmd={planRaceYmd}
+          goalId={planDetail?.athlete_goal?.id ?? null}
+          signupId={null}
+          onSaved={() => {
+            void load();
+            setLogRaceOpen(false);
+          }}
+        />
+      ) : null}
     </AthleteAppShell>
   );
 }
