@@ -6,7 +6,7 @@
  * 3. **Weekly volume** — `weeklyMileageTarget` + `minWeeklyMiles` / quality / easy splits; long-run miles come from the engine. Catalogue phase labels use `cycleLen`-sized blocks from race day (`phaseForCatalogue`).
  * 4. **Preferred days** — `input.preferredDays` (Mon–7); quality days from `preferredQualityDays` or DOWs from the resolved input.
  * 5. **Long-run day of week** — `normalizeLongRunOurDow(preferredLongRunDow, longRunDefaultDow)`.
- * 6. **Call long-run engine** — `generateLongRunSchedule(longRunConfigFromPlanGen(weekCount, { minLongMiles, longRunPeakPool }))` → per-week `distance` array.
+ * 6. **Call long-run engine** — `generateLongRunSchedule(longRunConfigFromPlanGen(weekCount, { minLongMiles, peakMiles }))` → per-week `distance` array.
  * 7. **Per calendar week** — assign tempo/interval/long/easy to DOWs. `catalogueWorkoutId` is null; hydration lives in `generate-plan-from-configs`.
  *
  * **Config-free module:** all tuning (`PlanGenConfig`) is resolved by callers, typically
@@ -167,8 +167,8 @@ export interface GeneratePlanInput {
   minEasyPerDayMiles: number;
   qualityFraction: number;
   qualitySessions: number;
-  /** Scales LRE long-run cap; omit or null for default engine behavior. */
-  longRunPeakPool?: number | null;
+  /** Peak block long-run pool (miles); scales LRE long-run cap; omit or null for default engine behavior. */
+  peakMiles?: number | null;
   preferredDays: number[];
   raceName: string;
   raceDistanceMiles: number;
@@ -302,7 +302,7 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
   const longRunSchedule = generateLongRunSchedule(
     longRunConfigFromPlanGen(weekCount, {
       minLongMiles: minLongMi,
-      longRunPeakPool: input.longRunPeakPool,
+      peakMiles: input.peakMiles,
     })
   );
 

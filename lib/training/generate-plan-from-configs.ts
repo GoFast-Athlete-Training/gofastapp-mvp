@@ -18,14 +18,12 @@ import {
 export interface PlanGenConfig {
   cycleLen?: number;
   minWeeklyMiles?: number;
-  /** Total long-run pool miles in the peak training block; scales the long-run engine cap. */
-  longRunPeakPool?: number;
-  /** Weekly volume mix (0–100); easy share is implicit (remainder). Reserved for future generator use. */
-  longRunWeekPct?: number;
-  tempoWeekPct?: number;
-  intervalsWeekPct?: number;
-  cyclePoolBuildCoef?: number;
-  cyclePoolTaperCoef?: number;
+  /** Peak block long-run pool miles; scales the long-run engine cap. */
+  peakMiles?: number;
+  baseMiles?: number;
+  taperMiles?: number;
+  buildCoef?: number;
+  maxWeeklyMiles?: number | null;
   /** Not stored on presets; merge uses `DEFAULT_QUALITY_FRACTION` when unset. */
   qualityFraction?: number;
   qualitySessions?: number;
@@ -107,7 +105,7 @@ export function mergePlanConfigToGenerateInput(
     minEasyPerDayMiles: c?.minEasyPerDayMiles ?? DEFAULT_MIN_EASY_DAY,
     qualityFraction: c?.qualityFraction ?? DEFAULT_QUALITY_FRACTION,
     qualitySessions: c?.qualitySessions ?? DEFAULT_QUALITY_SESSIONS,
-    longRunPeakPool: c?.longRunPeakPool,
+    peakMiles: c?.peakMiles,
     preferredDays: base.preferredDays,
     raceName: base.raceName,
     raceDistanceMiles: base.raceDistanceMiles,
@@ -117,8 +115,8 @@ export function mergePlanConfigToGenerateInput(
 }
 
 /**
- * Maps one `run_type_config` row (and its positions) to generator rotation input.
- * Catalogue hydration uses the config’s `workoutType`.
+ * Maps one rotation config (and its positions) to generator rotation input.
+ * Catalogue hydration uses the given `workoutType`.
  */
 export function runTypeConfigPositionsToInputs(
   workoutType: WorkoutType,

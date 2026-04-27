@@ -1,16 +1,18 @@
 /**
  * One-shot plan generate: writes `planWeeks` + plan scalars only (no `workouts` rows).
- * Loads `training_plan_preset` boltons + optional `runTypeConfig` when `presetId` is set.
+ * Loads `training_plan_preset` boltons + optional long/intervals/tempo configs when `presetId` is set.
  *
  * Config resolution and catalogue rotation live in `generatePlanFromConfigs`;
  * the pure week builder is `generatePlanWorkoutRows` in `generate-plan.ts`.
  */
 
+import { WorkoutType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   generatePlanFromConfigs,
   type PlanGenConfig,
   runTypeConfigPositionsToInputs,
+  type RunTypeConfigInput,
 } from "@/lib/training/generate-plan-from-configs";
 import { planWeeksSnapshotFromGeneratedRows } from "@/lib/training/generate-plan";
 import { presetBoltonsToPlanGenConfig } from "@/lib/training/preset-to-plan-gen-config";
@@ -18,6 +20,87 @@ import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
 import { Prisma } from "@prisma/client";
 import { metersToMiles } from "@/lib/pace-utils";
 import { goalRacePaceDisplayString } from "@/lib/training/goal-pace-calculator";
+
+const positionsInclude = {
+  orderBy: { cyclePosition: "asc" as const },
+  include: {
+    workout_catalogue: {
+      select: { id: true, name: true, workoutType: true, slug: true },
+    },
+  },
+} as const;
+
+function mapPositionRow(p: {
+  cyclePosition: number;
+  catalogueWorkoutId: string | null;
+  distributionWeight: number;
+}) {
+  return {
+    cyclePosition: p.cyclePosition,
+    catalogueWorkoutId: p.catalogueWorkoutId,
+    distributionWeight: p.distributionWeight,
+  };
+}
+
+function runTypeInputsFromPreset(preset: {
+  longRunConfig: {
+    positions: {
+      cyclePosition: number;
+      catalogueWorkoutId: string | null;
+      distributionWeight: number;
+    }[];
+  } | null;
+  intervalsConfig: {
+    positions: {
+      cyclePosition: number;
+      catalogueWorkoutId: string | null;
+      distributionWeight: number;
+    }[];
+  } | null;
+  tempoConfig: {
+    positions: {
+      cyclePosition: number;
+      catalogueWorkoutId: string | null;
+      distributionWeight: number;
+    }[];
+  } | null;
+}): RunTypeConfigInput[] {
+  const out: RunTypeConfigInput[] = [];
+  if (preset.longRunConfig?.positions?.length) {
+    out.push(
+      ...runTypeConfigPositionsToInputs(WorkoutType.LongRun, preset.longRunConfig.positions.map(mapPositionRow))
+    );
+  }
+  if (preset.intervalsConfig?.positions?.length) {
+    out.push(
+      ...runTypeConfigPositionsToInputs(WorkoutType.Intervals, preset.intervalsConfig.positions.map(mapPositionRow))
+    );
+  }
+  if (preset.tempoConfig?.positions?.length) {
+    out.push(
+      ...runTypeConfigPositionsToInputs(WorkoutType.Tempo, preset.tempoConfig.positions.map(mapPositionRow))
+    );
+  }
+  return out;
+}
+
+function catalogueIdsFromPreset(preset: {
+  longRunConfig: { positions: { catalogueWorkoutId: string | null }[] } | null;
+  intervalsConfig: { positions: { catalogueWorkoutId: string | null }[] } | null;
+  tempoConfig: { positions: { catalogueWorkoutId: string | null }[] } | null;
+}): string[] {
+  const ids: string[] = [];
+  for (const p of preset.longRunConfig?.positions ?? []) {
+    if (p.catalogueWorkoutId) ids.push(p.catalogueWorkoutId);
+  }
+  for (const p of preset.intervalsConfig?.positions ?? []) {
+    if (p.catalogueWorkoutId) ids.push(p.catalogueWorkoutId);
+  }
+  for (const p of preset.tempoConfig?.positions ?? []) {
+    if (p.catalogueWorkoutId) ids.push(p.catalogueWorkoutId);
+  }
+  return [...new Set(ids)];
+}
 
 export async function executePlanGenerate(params: {
   athleteId: string;
@@ -58,11 +141,9 @@ export async function executePlanGenerate(params: {
           include: {
             volumeConstraints: true,
             workoutConfig: true,
-            runTypeConfig: {
-              include: {
-                positions: { orderBy: { cyclePosition: "asc" } },
-              },
-            },
+            longRunConfig: { include: { positions: positionsInclude } },
+            intervalsConfig: { include: { positions: positionsInclude } },
+            tempoConfig: { include: { positions: positionsInclude } },
           },
         })
       : Promise.resolve(null),
@@ -76,24 +157,16 @@ export async function executePlanGenerate(params: {
         )
       : undefined;
 
-  const runTypeConfigs = rawPreset?.runTypeConfig?.positions?.length
-    ? runTypeConfigPositionsToInputs(
-        rawPreset.runTypeConfig.workoutType,
-        rawPreset.runTypeConfig.positions.map((p) => ({
-          cyclePosition: p.cyclePosition,
-          catalogueWorkoutId: p.catalogueWorkoutId,
-          distributionWeight: p.distributionWeight,
-        }))
-      )
-    : undefined;
+  const runTypeConfigs =
+    rawPreset != null
+      ? runTypeInputsFromPreset({
+          longRunConfig: rawPreset.longRunConfig,
+          intervalsConfig: rawPreset.intervalsConfig,
+          tempoConfig: rawPreset.tempoConfig,
+        })
+      : undefined;
 
-  const catalogueIds = [
-    ...new Set(
-      (rawPreset?.runTypeConfig?.positions ?? [])
-        .map((p) => p.catalogueWorkoutId)
-        .filter((x): x is string => x != null && x.length > 0)
-    ),
-  ];
+  const catalogueIds = rawPreset != null ? catalogueIdsFromPreset(rawPreset) : [];
   const catalogueRows =
     catalogueIds.length > 0
       ? await prisma.workout_catalogue.findMany({
@@ -106,6 +179,10 @@ export async function executePlanGenerate(params: {
   );
 
   let weeklyMileageTarget = params.weeklyMileageTarget;
+  const cap = planConfig?.maxWeeklyMiles;
+  if (cap != null && Number.isFinite(cap) && cap > 0) {
+    weeklyMileageTarget = Math.min(weeklyMileageTarget, cap);
+  }
   weeklyMileageTarget = Math.max(
     params.minWeeklyMiles,
     Math.min(100, weeklyMileageTarget)
@@ -138,7 +215,7 @@ export async function executePlanGenerate(params: {
       preferredLongRunDow: plan.preferredLongRunDow,
       preferredQualityDays: plan.preferredQualityDays,
       planConfig,
-      runTypeConfigs,
+      runTypeConfigs: runTypeConfigs && runTypeConfigs.length > 0 ? runTypeConfigs : undefined,
     },
     cataloguePaceById.size > 0
       ? { cataloguePaceById }

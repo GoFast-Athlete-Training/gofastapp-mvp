@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { serializePlanPresetForApi } from "@/lib/training/quality-percent";
+import { computeBuildCoef } from "@/lib/training/cycle-pool";
 
 function slugifyPresetTitle(title: string): string {
   const s = title
@@ -14,24 +15,53 @@ function slugifyPresetTitle(title: string): string {
   return s || "preset";
 }
 
-function numInRange(
-  v: unknown,
-  def: number,
-  opts: { min: number; max: number }
-): number {
-  if (typeof v === "number" && Number.isFinite(v)) {
-    return Math.min(opts.max, Math.max(opts.min, v));
+function numPositive(v: unknown, fallback: number): number {
+  if (typeof v === "number" && Number.isFinite(v) && v > 0) {
+    return v;
   }
-  return def;
+  return fallback;
 }
 
-function peakFromVolume(vol: Record<string, unknown>): number {
-  const raw = vol.longRunPeakPool ?? vol.cyclePeakPool;
-  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
-    return raw;
-  }
-  return 88;
-}
+const presetInclude = {
+  volumeConstraints: true,
+  workoutConfig: true,
+  longRunConfig: {
+    include: {
+      positions: {
+        orderBy: { cyclePosition: "asc" as const },
+        include: {
+          workout_catalogue: {
+            select: { id: true, name: true, workoutType: true, slug: true },
+          },
+        },
+      },
+    },
+  },
+  intervalsConfig: {
+    include: {
+      positions: {
+        orderBy: { cyclePosition: "asc" as const },
+        include: {
+          workout_catalogue: {
+            select: { id: true, name: true, workoutType: true, slug: true },
+          },
+        },
+      },
+    },
+  },
+  tempoConfig: {
+    include: {
+      positions: {
+        orderBy: { cyclePosition: "asc" as const },
+        include: {
+          workout_catalogue: {
+            select: { id: true, name: true, workoutType: true, slug: true },
+          },
+        },
+      },
+    },
+  },
+} as const;
 
 export async function GET(request: NextRequest) {
   const authErr = await assertStaffBearerAuth(request);
@@ -42,7 +72,9 @@ export async function GET(request: NextRequest) {
     include: {
       volumeConstraints: true,
       workoutConfig: true,
-      runTypeConfig: { select: { id: true, name: true, description: true, workoutType: true } },
+      longRunConfig: { select: { id: true, name: true, description: true } },
+      intervalsConfig: { select: { id: true, name: true, description: true } },
+      tempoConfig: { select: { id: true, name: true, description: true } },
     },
   });
   return NextResponse.json({
@@ -84,31 +116,59 @@ export async function POST(request: NextRequest) {
     const wk = workout && typeof workout === "object" ? workout : {};
     const wkRec = wk as Record<string, unknown>;
 
-    const longRunPeak = peakFromVolume(vol);
-    const longRunWeekPct = numInRange(vol.longRunWeekPct, 25, { min: 0, max: 100 });
-    const tempoWeekPct = numInRange(vol.tempoWeekPct, 10, { min: 0, max: 100 });
-    const intervalsWeekPct = numInRange(vol.intervalsWeekPct, 7, { min: 0, max: 100 });
+    const peakMiles = numPositive(vol.peakMiles, 88);
+    const defaultBase = peakMiles / (1.12 * 1.12);
+    const baseMiles = numPositive(vol.baseMiles, defaultBase);
+    const taperMiles = numPositive(vol.taperMiles, peakMiles * 0.85);
+    const buildCoefSteps =
+      typeof vol.buildCoefSteps === "number" && vol.buildCoefSteps > 0
+        ? Math.floor(vol.buildCoefSteps)
+        : 2;
+    const buildCoef =
+      typeof vol.buildCoef === "number" && Number.isFinite(vol.buildCoef) && vol.buildCoef > 0
+        ? vol.buildCoef
+        : computeBuildCoef(baseMiles, peakMiles, buildCoefSteps);
 
-    let runTypeConfigId: string | null | undefined = undefined;
-    if ("runTypeConfigId" in body) {
-      const r = (body as Record<string, unknown>).runTypeConfigId;
-      if (r === null || r === "") {
-        runTypeConfigId = null;
-      } else if (typeof r === "string") {
-        const cfg = await prisma.run_type_config.findUnique({ where: { id: r } });
-        if (!cfg) {
-          return NextResponse.json(
-            { success: false, error: "runTypeConfigId is not a valid run type config" },
-            { status: 400 }
-          );
-        }
-        runTypeConfigId = r;
-      } else {
-        return NextResponse.json(
-          { success: false, error: "runTypeConfigId must be a string, null, or empty" },
-          { status: 400 }
-        );
+    let maxWeeklyMiles: number | null | undefined = undefined;
+    if ("maxWeeklyMiles" in vol) {
+      if (vol.maxWeeklyMiles === null || vol.maxWeeklyMiles === "") {
+        maxWeeklyMiles = null;
+      } else if (typeof vol.maxWeeklyMiles === "number" && Number.isFinite(vol.maxWeeklyMiles)) {
+        maxWeeklyMiles = Math.max(1, Math.round(vol.maxWeeklyMiles));
       }
+    }
+
+    async function resolveConfigId(
+      key: "longRunConfigId" | "intervalsConfigId" | "tempoConfigId",
+      find: (id: string) => Promise<{ id: string } | null>
+    ): Promise<string | null | undefined> {
+      if (!(key in body)) return undefined;
+      const r = (body as Record<string, unknown>)[key];
+      if (r === null || r === "") return null;
+      if (typeof r !== "string") {
+        throw new Error(`${key} must be a string, null, or empty`);
+      }
+      const row = await find(r);
+      if (!row) {
+        throw new Error(`${key} is not a valid config`);
+      }
+      return r;
+    }
+
+    let longRunConfigId: string | null | undefined;
+    let intervalsConfigId: string | null | undefined;
+    let tempoConfigId: string | null | undefined;
+    try {
+      longRunConfigId = await resolveConfigId("longRunConfigId", (id) =>
+        prisma.long_run_config.findUnique({ where: { id } })
+      );
+      intervalsConfigId = await resolveConfigId("intervalsConfigId", (id) =>
+        prisma.intervals_config.findUnique({ where: { id } })
+      );
+      tempoConfigId = await resolveConfigId("tempoConfigId", (id) => prisma.tempo_config.findUnique({ where: { id } }));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Invalid config id";
+      return NextResponse.json({ success: false, error: msg }, { status: 400 });
     }
 
     const preset = await prisma.training_plan_preset.create({
@@ -119,7 +179,21 @@ export async function POST(request: NextRequest) {
           typeof description === "string" && description.trim()
             ? description.trim()
             : null,
-        ...(runTypeConfigId !== undefined ? { runTypeConfigId } : {}),
+        ...(longRunConfigId !== undefined
+          ? longRunConfigId
+            ? { longRunConfig: { connect: { id: longRunConfigId } } }
+            : {}
+          : {}),
+        ...(intervalsConfigId !== undefined
+          ? intervalsConfigId
+            ? { intervalsConfig: { connect: { id: intervalsConfigId } } }
+            : {}
+          : {}),
+        ...(tempoConfigId !== undefined
+          ? tempoConfigId
+            ? { tempoConfig: { connect: { id: tempoConfigId } } }
+            : {}
+          : {}),
         volumeConstraints: {
           create: {
             cycleLen: typeof vol.cycleLen === "number" ? vol.cycleLen : 4,
@@ -127,18 +201,11 @@ export async function POST(request: NextRequest) {
             minLongMiles: typeof vol.minLongMiles === "number" ? vol.minLongMiles : 8,
             minEasyPerDayMiles:
               typeof vol.minEasyPerDayMiles === "number" ? vol.minEasyPerDayMiles : 3,
-            longRunWeekPct,
-            tempoWeekPct,
-            intervalsWeekPct,
-            longRunPeakPool: longRunPeak,
-            cyclePoolBuildCoef:
-              typeof vol.cyclePoolBuildCoef === "number" && Number.isFinite(vol.cyclePoolBuildCoef)
-                ? vol.cyclePoolBuildCoef
-                : 1.12,
-            cyclePoolTaperCoef:
-              typeof vol.cyclePoolTaperCoef === "number" && Number.isFinite(vol.cyclePoolTaperCoef)
-                ? vol.cyclePoolTaperCoef
-                : 0.85,
+            maxWeeklyMiles: maxWeeklyMiles ?? null,
+            baseMiles,
+            peakMiles,
+            taperMiles,
+            buildCoef,
           },
         },
         workoutConfig: {
@@ -155,22 +222,7 @@ export async function POST(request: NextRequest) {
           },
         },
       },
-      include: {
-        volumeConstraints: true,
-        workoutConfig: true,
-        runTypeConfig: {
-          include: {
-            positions: {
-              orderBy: { cyclePosition: "asc" },
-              include: {
-                workout_catalogue: {
-                  select: { id: true, name: true, workoutType: true, slug: true },
-                },
-              },
-            },
-          },
-        },
-      },
+      include: presetInclude,
     });
 
     return NextResponse.json(

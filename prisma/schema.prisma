@@ -1046,9 +1046,12 @@ model training_plan_preset {
 
   volumeConstraints preset_volume_constraints?
   workoutConfig     preset_workout_config?
-  /// Optional shared rotation: cycle positions → catalogue (many presets can use the same config).
-  runTypeConfigId String?
-  runTypeConfig   run_type_config? @relation(fields: [runTypeConfigId], references: [id], onDelete: SetNull)
+  longRunConfigId   String?
+  longRunConfig     long_run_config?   @relation(fields: [longRunConfigId], references: [id], onDelete: SetNull)
+  intervalsConfigId String?
+  intervalsConfig   intervals_config?  @relation(fields: [intervalsConfigId], references: [id], onDelete: SetNull)
+  tempoConfigId     String?
+  tempoConfig       tempo_config?      @relation(fields: [tempoConfigId], references: [id], onDelete: SetNull)
   training_plans  training_plans[]
 }
 
@@ -1062,18 +1065,16 @@ model preset_volume_constraints {
   minWeeklyMiles      Int   @default(40)
   minLongMiles        Float @default(8)
   minEasyPerDayMiles  Float @default(3)
-  /// Share of weekly volume for long run (0–100). Remaining = tempo + intervals + easy.
-  longRunWeekPct   Float @default(25)
-  /// Share of weekly volume for tempo (0–100).
-  tempoWeekPct     Float @default(10)
-  /// Share of weekly volume for intervals (0–100).
-  intervalsWeekPct Float @default(7)
-  /// Total long-run pool miles in the peak training cycle (N-1; before taper pool).
-  longRunPeakPool        Float
-  /// Multiplier applied backward through build cycles (each prior pool = next / this).
-  cyclePoolBuildCoef    Float  @default(1.12)
-  /// Multiplier from peak to taper pool (N pool = (N-1) * this).
-  cyclePoolTaperCoef   Float  @default(0.85)
+  /// Optional cap on weekly volume (miles); generator may scale down to respect this.
+  maxWeeklyMiles      Int?
+  /// Long-run pool aggregate (sum over long runs in that block) in the first/main base block.
+  baseMiles  Float
+  /// Long-run pool in the peak block (one cycle before taper block).
+  peakMiles  Float
+  /// Long-run pool in the taper block (last training cycle / race build-down).
+  taperMiles Float
+  /// Per-cycle growth multiplier; persisted at save (typically (peakMiles/baseMiles)^(1/steps) from staff UI).
+  buildCoef  Float  @default(1.12)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1095,32 +1096,27 @@ model preset_workout_config {
   updatedAt DateTime @updatedAt
 }
 
-/// Standalone named rotation: maps cycle positions to catalogue rows; many presets can reference one.
-model run_type_config {
+/// Long-run rotation: cycle positions map to catalogue; many presets can share one.
+model long_run_config {
   id          String   @id @default(cuid())
   name        String
   description String?
-  /// Which `WorkoutType` this rotation applies to; catalogue is filtered to this type in staff UI.
-  workoutType WorkoutType @default(LongRun)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  positions   run_type_config_position[]
+  positions     long_run_config_position[]
   usedByPresets training_plan_preset[]
 
   @@index([name])
-  @@index([workoutType])
 }
 
-/// One slot in a rotation: long run / quality variant at this cycle index.
-model run_type_config_position {
-  id        String @id @default(cuid())
-  runTypeConfigId String
-  run_type_config run_type_config @relation(fields: [runTypeConfigId], references: [id], onDelete: Cascade)
+/// One long-run slot in the repeating cycle.
+model long_run_config_position {
+  id              String         @id @default(cuid())
+  longRunConfigId String
+  long_run_config long_run_config @relation(fields: [longRunConfigId], references: [id], onDelete: Cascade)
 
-  /// Position within the repeating cycle (0-based).
   cyclePosition      Int
-  /// Fraction of cycle pool for this slot; positions for a config should sum to ~1.0.
   distributionWeight Float  @default(0.25)
   catalogueWorkoutId String?
   workout_catalogue  workout_catalogue? @relation(fields: [catalogueWorkoutId], references: [id], onDelete: SetNull)
@@ -1128,8 +1124,70 @@ model run_type_config_position {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([runTypeConfigId, cyclePosition])
-  @@index([runTypeConfigId])
+  @@unique([longRunConfigId, cyclePosition])
+  @@index([longRunConfigId])
+}
+
+/// Intervals rotation only (cycle math / variance); not used for long-run pool miles.
+model intervals_config {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  positions     intervals_config_position[]
+  usedByPresets training_plan_preset[]
+
+  @@index([name])
+}
+
+model intervals_config_position {
+  id                String           @id @default(cuid())
+  intervalsConfigId String
+  intervals_config  intervals_config @relation(fields: [intervalsConfigId], references: [id], onDelete: Cascade)
+
+  cyclePosition      Int
+  distributionWeight Float  @default(0.25)
+  catalogueWorkoutId String?
+  workout_catalogue  workout_catalogue? @relation(fields: [catalogueWorkoutId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([intervalsConfigId, cyclePosition])
+  @@index([intervalsConfigId])
+}
+
+/// Tempo rotation only; not used for long-run pool miles.
+model tempo_config {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  positions     tempo_config_position[]
+  usedByPresets training_plan_preset[]
+
+  @@index([name])
+}
+
+model tempo_config_position {
+  id                String         @id @default(cuid())
+  tempoConfigId     String
+  tempo_config      tempo_config     @relation(fields: [tempoConfigId], references: [id], onDelete: Cascade)
+
+  cyclePosition      Int
+  distributionWeight Float  @default(0.25)
+  catalogueWorkoutId String?
+  workout_catalogue  workout_catalogue? @relation(fields: [catalogueWorkoutId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tempoConfigId, cyclePosition])
+  @@index([tempoConfigId])
 }
 
 model training_plans {
@@ -1228,8 +1286,10 @@ model workout_catalogue {
   notes                        String?
   createdAt                    DateTime    @default(now())
   updatedAt                    DateTime    @updatedAt
-  workouts                     workouts[]
-  run_type_config_positions   run_type_config_position[]
+  workouts                    workouts[]
+  long_run_config_positions  long_run_config_position[]
+  intervals_config_positions  intervals_config_position[]
+  tempo_config_positions      tempo_config_position[]
 
   @@unique([name, workoutType])
   @@index([workoutType])

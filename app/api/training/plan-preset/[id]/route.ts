@@ -4,6 +4,48 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { serializePlanPresetForApi } from "@/lib/training/quality-percent";
+import { computeBuildCoef } from "@/lib/training/cycle-pool";
+
+const presetInclude = {
+  volumeConstraints: true,
+  workoutConfig: true,
+  longRunConfig: {
+    include: {
+      positions: {
+        orderBy: { cyclePosition: "asc" as const },
+        include: {
+          workout_catalogue: {
+            select: { id: true, name: true, workoutType: true, slug: true },
+          },
+        },
+      },
+    },
+  },
+  intervalsConfig: {
+    include: {
+      positions: {
+        orderBy: { cyclePosition: "asc" as const },
+        include: {
+          workout_catalogue: {
+            select: { id: true, name: true, workoutType: true, slug: true },
+          },
+        },
+      },
+    },
+  },
+  tempoConfig: {
+    include: {
+      positions: {
+        orderBy: { cyclePosition: "asc" as const },
+        include: {
+          workout_catalogue: {
+            select: { id: true, name: true, workoutType: true, slug: true },
+          },
+        },
+      },
+    },
+  },
+} as const;
 
 export async function GET(
   request: NextRequest,
@@ -15,22 +57,7 @@ export async function GET(
   const { id } = await params;
   const preset = await prisma.training_plan_preset.findUnique({
     where: { id },
-    include: {
-      volumeConstraints: true,
-      workoutConfig: true,
-      runTypeConfig: {
-        include: {
-          positions: {
-            orderBy: { cyclePosition: "asc" },
-            include: {
-              workout_catalogue: {
-                select: { id: true, name: true, workoutType: true, slug: true },
-              },
-            },
-          },
-        },
-      },
-    },
+    include: presetInclude,
   });
   if (!preset) {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
@@ -75,32 +102,51 @@ export async function PATCH(
       "minWeeklyMiles",
       "minLongMiles",
       "minEasyPerDayMiles",
-      "longRunWeekPct",
-      "tempoWeekPct",
-      "intervalsWeekPct",
-      "cyclePoolBuildCoef",
-      "cyclePoolTaperCoef",
+      "maxWeeklyMiles",
+      "baseMiles",
+      "peakMiles",
+      "taperMiles",
+      "buildCoef",
+      "buildCoefSteps",
     ] as const;
     const volumeData: Record<string, unknown> = {};
     const vol = body.volume && typeof body.volume === "object" ? body.volume : body;
     const volRec = vol as Record<string, unknown>;
-    if ("longRunPeakPool" in volRec || "cyclePeakPool" in volRec) {
-      const v =
-        volRec.longRunPeakPool !== undefined ? volRec.longRunPeakPool : volRec.cyclePeakPool;
-      if (v === null || v === "" || (typeof v === "number" && !Number.isFinite(v))) {
-        if (existing.volumeConstraints?.longRunPeakPool != null) {
-          volumeData.longRunPeakPool = existing.volumeConstraints.longRunPeakPool;
-        }
-      } else if (typeof v === "number" && v > 0) {
-        volumeData.longRunPeakPool = v;
-      }
-    }
+
     for (const k of volKeys) {
       if (k in vol) {
-        const v = volRec[k];
-        if (v != null) {
-          volumeData[k] = v;
+        if (k === "maxWeeklyMiles") {
+          const v = volRec.maxWeeklyMiles;
+          if (v === null || v === "") {
+            volumeData.maxWeeklyMiles = null;
+          } else if (typeof v === "number" && Number.isFinite(v)) {
+            volumeData.maxWeeklyMiles = Math.max(1, Math.round(v));
+          }
+        } else if (k === "buildCoefSteps") {
+          /* only used to recompute buildCoef — not a DB column */
+        } else {
+          const v = volRec[k];
+          if (v != null) {
+            volumeData[k] = v;
+          }
         }
+      }
+    }
+
+    if (existing.volumeConstraints) {
+      const cur = existing.volumeConstraints;
+      const nextBase = volumeData.baseMiles != null ? Number(volumeData.baseMiles) : cur.baseMiles;
+      const nextPeak = volumeData.peakMiles != null ? Number(volumeData.peakMiles) : cur.peakMiles;
+      const hadStep =
+        typeof volRec.buildCoefSteps === "number" && volRec.buildCoefSteps > 0
+          ? Math.floor(volRec.buildCoefSteps)
+          : null;
+      const shouldRecomputeBuild =
+        (volumeData.baseMiles != null || volumeData.peakMiles != null || hadStep != null) &&
+        volumeData.buildCoef == null;
+      if (shouldRecomputeBuild) {
+        const steps = hadStep ?? 2;
+        volumeData.buildCoef = computeBuildCoef(nextBase, nextPeak, steps);
       }
     }
 
@@ -124,26 +170,40 @@ export async function PATCH(
     else if (typeof body.description === "string") presetData.description = body.description.trim() || null;
     if (typeof body.slug === "string") presetData.slug = body.slug.trim().toLowerCase();
 
-    if ("runTypeConfigId" in body) {
-      const v = (body as Record<string, unknown>).runTypeConfigId;
-      if (v === null || v === "") {
-        (presetData as { runTypeConfigId?: null }).runTypeConfigId = null;
-      } else if (typeof v === "string") {
-        const cfg = await prisma.run_type_config.findUnique({ where: { id: v } });
-        if (!cfg) {
+    type ConnectKey = "longRunConfig" | "intervalsConfig" | "tempoConfig";
+    const connectFields: { bodyKey: string; rel: ConnectKey; find: (x: string) => Promise<{ id: string } | null> }[] = [
+      { bodyKey: "longRunConfigId", rel: "longRunConfig", find: (x) => prisma.long_run_config.findUnique({ where: { id: x } }) },
+      {
+        bodyKey: "intervalsConfigId",
+        rel: "intervalsConfig",
+        find: (x) => prisma.intervals_config.findUnique({ where: { id: x } }),
+      },
+      { bodyKey: "tempoConfigId", rel: "tempoConfig", find: (x) => prisma.tempo_config.findUnique({ where: { id: x } }) },
+    ];
+    for (const { bodyKey, rel, find } of connectFields) {
+      if (bodyKey in body) {
+        const v = (body as Record<string, unknown>)[bodyKey];
+        if (v === null || v === "") {
+          presetData[rel] = { disconnect: true };
+        } else if (typeof v === "string") {
+          const row = await find(v);
+          if (!row) {
+            return NextResponse.json(
+              { success: false, error: `${bodyKey} is not a valid config` },
+              { status: 400 }
+            );
+          }
+          presetData[rel] = { connect: { id: v } };
+        } else {
           return NextResponse.json(
-            { success: false, error: "runTypeConfigId is not a valid run type config" },
+            { success: false, error: `${bodyKey} must be a string, null, or empty` },
             { status: 400 }
           );
         }
-        (presetData as { runTypeConfigId?: string }).runTypeConfigId = v;
-      } else {
-        return NextResponse.json(
-          { success: false, error: "runTypeConfigId must be a string, null, or empty" },
-          { status: 400 }
-        );
       }
     }
+
+    delete volumeData.buildCoefSteps;
 
     const updated = await prisma.training_plan_preset.update({
       where: { id },
@@ -164,22 +224,7 @@ export async function PATCH(
             }
           : {}),
       },
-      include: {
-        volumeConstraints: true,
-        workoutConfig: true,
-        runTypeConfig: {
-          include: {
-            positions: {
-              orderBy: { cyclePosition: "asc" },
-              include: {
-                workout_catalogue: {
-                  select: { id: true, name: true, workoutType: true, slug: true },
-                },
-              },
-            },
-          },
-        },
-      },
+      include: presetInclude,
     });
 
     return NextResponse.json({ success: true, preset: serializePlanPresetForApi(updated) });

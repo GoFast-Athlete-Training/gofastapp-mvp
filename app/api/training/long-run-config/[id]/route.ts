@@ -4,16 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { runTypeCatalogueSelect } from "@/lib/training/run-type-config-parser";
-import { WorkoutType } from "@prisma/client";
-
-const VALID_WORKOUT_TYPE = new Set<string>(Object.values(WorkoutType));
-
-function parseWorkoutType(v: unknown): WorkoutType | null {
-  if (typeof v === "string" && VALID_WORKOUT_TYPE.has(v)) {
-    return v as WorkoutType;
-  }
-  return null;
-}
+import { distributePoolToPositions, generateCyclePoolTotals } from "@/lib/training/cycle-pool";
 
 const includeBlock = {
   positions: {
@@ -24,13 +15,13 @@ const includeBlock = {
 } as const;
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authErr = await assertStaffBearerAuth(_request);
+  const authErr = await assertStaffBearerAuth(request);
   if (authErr) return authErr;
   const { id } = await params;
-  const item = await prisma.run_type_config.findUnique({
+  const item = await prisma.long_run_config.findUnique({
     where: { id },
     include: {
       ...includeBlock,
@@ -40,7 +31,52 @@ export async function GET(
   if (!item) {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json({ success: true, item });
+
+  const presetId = request.nextUrl.searchParams.get("presetId");
+  const weeksParam = request.nextUrl.searchParams.get("weeks");
+  const totalWeeks =
+    weeksParam && Number.isFinite(Number(weeksParam)) && Number(weeksParam) > 0
+      ? Math.floor(Number(weeksParam))
+      : 16;
+
+  let slotMilesByPhase: {
+    base: ReturnType<typeof distributePoolToPositions>;
+    peak: ReturnType<typeof distributePoolToPositions>;
+    taper: ReturnType<typeof distributePoolToPositions>;
+  } | null = null;
+
+  if (presetId) {
+    const preset = await prisma.training_plan_preset.findFirst({
+      where: { id: presetId, longRunConfigId: id },
+      include: { volumeConstraints: true },
+    });
+    if (preset?.volumeConstraints && item.positions.length > 0) {
+      const v = preset.volumeConstraints;
+      const { poolMilesByCycle, nCycles } = generateCyclePoolTotals({
+        totalWeeks,
+        cycleLen: v.cycleLen,
+        peakMiles: v.peakMiles,
+        taperMiles: v.taperMiles,
+        buildCoef: v.buildCoef,
+      });
+      const posRows = item.positions.map((p) => ({
+        cyclePosition: p.cyclePosition,
+        distributionWeight: p.distributionWeight,
+        catalogueWorkoutId: p.catalogueWorkoutId,
+        name: p.workout_catalogue?.name ?? undefined,
+      }));
+      const basePool = poolMilesByCycle[0] ?? 0;
+      const peakPool = nCycles >= 2 ? (poolMilesByCycle[nCycles - 2] ?? 0) : basePool;
+      const taperPool = nCycles >= 1 ? (poolMilesByCycle[nCycles - 1] ?? 0) : 0;
+      slotMilesByPhase = {
+        base: distributePoolToPositions(basePool, posRows),
+        peak: distributePoolToPositions(peakPool, posRows),
+        taper: distributePoolToPositions(taperPool, posRows),
+      };
+    }
+  }
+
+  return NextResponse.json({ success: true, item, slotMilesByPhase });
 }
 
 export async function PATCH(
@@ -50,7 +86,7 @@ export async function PATCH(
   const authErr = await assertStaffBearerAuth(request);
   if (authErr) return authErr;
   const { id } = await params;
-  const existing = await prisma.run_type_config.findUnique({ where: { id } });
+  const existing = await prisma.long_run_config.findUnique({ where: { id } });
   if (!existing) {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
@@ -60,15 +96,14 @@ export async function PATCH(
   } catch {
     return NextResponse.json({ success: false, error: "Invalid JSON" }, { status: 400 });
   }
-  const data: { name?: string; description?: string | null; workoutType?: WorkoutType; updatedAt: Date } = {
+  const data: { name?: string; description?: string | null; updatedAt: Date } = {
     updatedAt: new Date(),
   };
   const hasName = "name" in body;
   const hasDesc = "description" in body;
-  const hasWorkoutType = "workoutType" in body;
-  if (!hasName && !hasDesc && !hasWorkoutType) {
+  if (!hasName && !hasDesc) {
     return NextResponse.json(
-      { success: false, error: "Expected name, description, and/or workoutType" },
+      { success: false, error: "Expected name and/or description" },
       { status: 400 }
     );
   }
@@ -87,15 +122,8 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: "description must be a string or null" }, { status: 400 });
     }
   }
-  if (hasWorkoutType) {
-    const w = parseWorkoutType(body.workoutType);
-    if (w == null) {
-      return NextResponse.json({ success: false, error: "Invalid workoutType" }, { status: 400 });
-    }
-    data.workoutType = w;
-  }
 
-  const item = await prisma.run_type_config.update({
+  const item = await prisma.long_run_config.update({
     where: { id },
     data,
     include: { ...includeBlock, usedByPresets: { select: { id: true, title: true, slug: true } } },
@@ -110,10 +138,10 @@ export async function DELETE(
   const authErr = await assertStaffBearerAuth(_request);
   if (authErr) return authErr;
   const { id } = await params;
-  const ex = await prisma.run_type_config.findUnique({ where: { id } });
+  const ex = await prisma.long_run_config.findUnique({ where: { id } });
   if (!ex) {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
-  await prisma.run_type_config.delete({ where: { id } });
+  await prisma.long_run_config.delete({ where: { id } });
   return NextResponse.json({ success: true });
 }

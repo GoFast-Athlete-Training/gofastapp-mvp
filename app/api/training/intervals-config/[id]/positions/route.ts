@@ -16,8 +16,8 @@ export async function PUT(
   const authErr = await assertStaffBearerAuth(request);
   if (authErr) return authErr;
 
-  const { id: runTypeConfigId } = await params;
-  const parent = await prisma.run_type_config.findUnique({ where: { id: runTypeConfigId } });
+  const { id: intervalsConfigId } = await params;
+  const parent = await prisma.intervals_config.findUnique({ where: { id: intervalsConfigId } });
   if (!parent) {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
@@ -55,12 +55,12 @@ export async function PUT(
   const now = new Date();
   try {
     await prisma.$transaction(async (tx) => {
-      await tx.run_type_config_position.deleteMany({ where: { runTypeConfigId } });
+      await tx.intervals_config_position.deleteMany({ where: { intervalsConfigId } });
       for (const row of parsed.rows) {
-        await tx.run_type_config_position.create({
+        await tx.intervals_config_position.create({
           data: {
             id: newEntityId(),
-            runTypeConfigId,
+            intervalsConfigId,
             cyclePosition: row.cyclePosition,
             distributionWeight: row.distributionWeight,
             catalogueWorkoutId: row.catalogueWorkoutId,
@@ -71,12 +71,12 @@ export async function PUT(
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Server error";
-    console.error("PUT run-type-config/positions", e);
+    console.error("PUT intervals-config/positions", e);
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 
-  const items = await prisma.run_type_config_position.findMany({
-    where: { runTypeConfigId },
+  const items = await prisma.intervals_config_position.findMany({
+    where: { intervalsConfigId },
     include: { workout_catalogue: { select: runTypeCatalogueSelect } },
     orderBy: { cyclePosition: "asc" },
   });
