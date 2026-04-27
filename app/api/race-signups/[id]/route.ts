@@ -112,6 +112,15 @@ export async function DELETE(
 
     await prisma.athlete_race_signups.delete({ where: { id } });
 
+    // Revoke hub membership that was granted by this signup (MEMBER only; ADMIN unchanged)
+    await prisma.race_memberships.deleteMany({
+      where: {
+        athleteId: athlete!.id,
+        raceId: existing.raceRegistryId,
+        role: "MEMBER",
+      },
+    });
+
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
     console.error("DELETE /api/race-signups/[id]:", err);
