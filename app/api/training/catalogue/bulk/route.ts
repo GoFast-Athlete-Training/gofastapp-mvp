@@ -78,10 +78,10 @@ export async function POST(request: NextRequest) {
           const updateData: Record<string, unknown> = {
             description: d.description,
             runSubType: d.runSubType,
-            workSegmentsJson:
-              d.workSegmentsJson === null
+            segmentPaceDist:
+              d.segmentPaceDist === null
                 ? Prisma.JsonNull
-                : (d.workSegmentsJson as Prisma.InputJsonValue),
+                : (d.segmentPaceDist as Prisma.InputJsonValue),
             warmupFraction: d.warmupFraction,
             workFraction: d.workFraction,
             cooldownFraction: d.cooldownFraction,
@@ -125,10 +125,10 @@ export async function POST(request: NextRequest) {
               slug: d.slug ?? generateCatalogueSlug(d.name),
               description: d.description,
               workoutType: d.workoutType,
-              workSegmentsJson:
-                d.workSegmentsJson === null
+              segmentPaceDist:
+                d.segmentPaceDist === null
                   ? Prisma.JsonNull
-                  : (d.workSegmentsJson as Prisma.InputJsonValue),
+                  : (d.segmentPaceDist as Prisma.InputJsonValue),
               warmupFraction: d.warmupFraction,
               workFraction: d.workFraction,
               cooldownFraction: d.cooldownFraction,

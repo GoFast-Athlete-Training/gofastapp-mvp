@@ -19,31 +19,60 @@ const PACE_ANCHORS = new Set(["currentBuildup", "mpSimulation"]);
 const MP_BLOCK_POSITIONS = new Set(["BACK_HALF", "FRONT_HALF", "EVEN"]);
 const MP_BLOCK_PROGRESSIONS = new Set(["flat", "progressive"]);
 
-function parseWorkSegmentsJson(
+/** Lists of segments, or blockRepeat objects ({ layout, segments, repeatCount, ... }). */
+function isValidSegmentPaceDistParsed(v: unknown): boolean {
+  if (Array.isArray(v)) return true;
+  if (v == null || typeof v !== "object" || Array.isArray(v)) return false;
+  const o = v as Record<string, unknown>;
+  if (o.layout !== "blockRepeat") return false;
+  return Array.isArray(o.segments) && o.segments.length > 0;
+}
+
+/**
+ * Accepts `segmentPaceDist` (preferred), or legacy `segmentPatternJson` / `workSegmentsJson` on API bodies.
+ */
+function parseSegmentPaceDist(
   body: Record<string, unknown>
 ): { ok: true; value: Prisma.InputJsonValue | null } | { ok: false; error: string } {
-  if (!Object.prototype.hasOwnProperty.call(body, "workSegmentsJson")) {
+  const hasPd = Object.prototype.hasOwnProperty.call(body, "segmentPaceDist");
+  const hasPat = Object.prototype.hasOwnProperty.call(body, "segmentPatternJson");
+  const hasLegacy = Object.prototype.hasOwnProperty.call(body, "workSegmentsJson");
+  if (!hasPd && !hasPat && !hasLegacy) {
     return { ok: true, value: null };
   }
-  const raw = body.workSegmentsJson;
+  const raw = hasPd ? body.segmentPaceDist : hasPat ? body.segmentPatternJson : body.workSegmentsJson;
   if (raw === null || raw === undefined || raw === "") {
     return { ok: true, value: null };
   }
   if (Array.isArray(raw)) {
     return { ok: true, value: raw as Prisma.InputJsonValue };
   }
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    if (!isValidSegmentPaceDistParsed(raw)) {
+      return {
+        ok: false,
+        error:
+          "segmentPaceDist object must be blockRepeat: { layout: \"blockRepeat\", segments: [...], repeatCount, ... }",
+      };
+    }
+    return { ok: true, value: raw as Prisma.InputJsonValue };
+  }
   if (typeof raw === "string") {
     try {
       const parsed: unknown = JSON.parse(raw);
-      if (!Array.isArray(parsed)) {
-        return { ok: false, error: "workSegmentsJson must be a JSON array" };
+      if (!isValidSegmentPaceDistParsed(parsed)) {
+        return {
+          ok: false,
+          error:
+            "segmentPaceDist must be a JSON array or blockRepeat object ({ layout, segments, repeatCount })",
+        };
       }
       return { ok: true, value: parsed as Prisma.InputJsonValue };
     } catch {
-      return { ok: false, error: "workSegmentsJson must be valid JSON" };
+      return { ok: false, error: "segmentPaceDist must be valid JSON" };
     }
   }
-  return { ok: false, error: "workSegmentsJson must be an array, JSON string, or null" };
+  return { ok: false, error: "segmentPaceDist must be an array, blockRepeat object, JSON string, or null" };
 }
 
 export type CatalogueRowInput = {
@@ -51,7 +80,7 @@ export type CatalogueRowInput = {
   runSubType: string | null;
   description: string | null;
   workoutType: WorkoutType;
-  workSegmentsJson: Prisma.InputJsonValue | null;
+  segmentPaceDist: Prisma.InputJsonValue | null;
   warmupFraction: number | null;
   workFraction: number | null;
   cooldownFraction: number | null;
@@ -115,7 +144,7 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
     };
   }
 
-  const wj = parseWorkSegmentsJson(body);
+  const wj = parseSegmentPaceDist(body);
   if (!wj.ok) return wj;
 
   let paceAnchor = "currentBuildup";
@@ -215,7 +244,7 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
       description:
         typeof body.description === "string" ? body.description.trim() || null : null,
       workoutType: wt,
-      workSegmentsJson: wj.value,
+      segmentPaceDist: wj.value,
       warmupFraction: warmupF,
       workFraction: workF,
       cooldownFraction: cooldownF,

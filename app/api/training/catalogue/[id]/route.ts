@@ -33,10 +33,10 @@ export async function PUT(request: NextRequest, ctx: RouteCtx) {
         ...(d.slug !== undefined ? { slug: d.slug } : {}),
         description: d.description,
         workoutType: d.workoutType,
-        workSegmentsJson:
-          d.workSegmentsJson === null
+        segmentPaceDist:
+          d.segmentPaceDist === null
             ? Prisma.JsonNull
-            : (d.workSegmentsJson as Prisma.InputJsonValue),
+            : (d.segmentPaceDist as Prisma.InputJsonValue),
         warmupFraction: d.warmupFraction,
         workFraction: d.workFraction,
         cooldownFraction: d.cooldownFraction,

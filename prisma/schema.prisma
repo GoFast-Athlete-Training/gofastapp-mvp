@@ -1244,8 +1244,8 @@ model workout_catalogue {
   slug                         String?     @unique
   description                  String?
   workoutType                  WorkoutType
-  /// Multi-segment work: [{ "miles": 3, "paceOffsetSecPerMile": 30 }, ...] — with `runSubType` + service rules.
-  workSegmentsJson             Json?
+  /// JSON: per-segment pace + distance (mile ladders, block-repeat, interval ladders, etc.)
+  segmentPaceDist              Json?
   /// Long-run MP-simulation: shares of total scheduled distance (0–1 each; remainder can be unallocated easy)
   warmupFraction               Float?
   workFraction                 Float?

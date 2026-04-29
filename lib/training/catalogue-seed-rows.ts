@@ -10,7 +10,7 @@ export type CatalogueSeedRow = {
   runSubType?: string | null;
   workoutType: WorkoutType;
   description: string | null;
-  workSegmentsJson: Prisma.InputJsonValue | null;
+  segmentPaceDist: Prisma.InputJsonValue | null;
   warmupFraction: number | null;
   workFraction: number | null;
   cooldownFraction: number | null;
@@ -41,7 +41,7 @@ export const SEED_CATALOGUE_ROWS: CatalogueSeedRow[] = [
     runSubType: "pyramid",
     workoutType: "Intervals",
     description: "Pyramid ladder: 200–800–200 m reps at interval pace.",
-    workSegmentsJson: [
+    segmentPaceDist: [
       { distanceMeters: 200, paceOffsetSecPerMile: -30 },
       { distanceMeters: 400, paceOffsetSecPerMile: -30 },
       { distanceMeters: 800, paceOffsetSecPerMile: -30 },
@@ -68,13 +68,13 @@ export const SEED_CATALOGUE_ROWS: CatalogueSeedRow[] = [
     workPaceOffsetSecPerMile: null,
     workBasePaceOffsetSecPerMile: -30,
     recoveryPaceOffsetSecPerMile: null,
-    notes: "Pyramid ladder via workSegmentsJson.",
+    notes: "Pyramid ladder via segmentPaceDist.",
   },
   {
     name: "Tempo",
     workoutType: "Tempo",
     description: null,
-    workSegmentsJson: null,
+    segmentPaceDist: null,
     warmupFraction: null,
     workFraction: null,
     cooldownFraction: null,
@@ -101,7 +101,7 @@ export const SEED_CATALOGUE_ROWS: CatalogueSeedRow[] = [
     name: "Interval",
     workoutType: "Intervals",
     description: null,
-    workSegmentsJson: null,
+    segmentPaceDist: null,
     warmupFraction: null,
     workFraction: null,
     cooldownFraction: null,
@@ -128,7 +128,7 @@ export const SEED_CATALOGUE_ROWS: CatalogueSeedRow[] = [
     name: "Long Run",
     workoutType: "LongRun",
     description: null,
-    workSegmentsJson: null,
+    segmentPaceDist: null,
     warmupFraction: null,
     workFraction: null,
     cooldownFraction: null,
@@ -157,7 +157,7 @@ export const SEED_CATALOGUE_ROWS: CatalogueSeedRow[] = [
     workoutType: "LongRun",
     description:
       "Easy first; final block at imprinted goal race pace. mpFraction scales with plan cycle index.",
-    workSegmentsJson: null,
+    segmentPaceDist: null,
     warmupFraction: null,
     workFraction: null,
     cooldownFraction: null,
@@ -186,7 +186,7 @@ export const SEED_CATALOGUE_ROWS: CatalogueSeedRow[] = [
     workoutType: "LongRun",
     runSubType: "marathon-test",
     description: "Peak long run with larger goal-pace block.",
-    workSegmentsJson: null,
+    segmentPaceDist: null,
     warmupFraction: null,
     workFraction: null,
     cooldownFraction: null,
@@ -213,7 +213,7 @@ export const SEED_CATALOGUE_ROWS: CatalogueSeedRow[] = [
     name: "Easy Run",
     workoutType: "Easy",
     description: null,
-    workSegmentsJson: null,
+    segmentPaceDist: null,
     warmupFraction: null,
     workFraction: null,
     cooldownFraction: null,

@@ -24,10 +24,10 @@ export async function runCatalogueSeed(prisma: PrismaClient): Promise<{
       slug,
       runSubType: row.runSubType ?? null,
       description: row.description,
-      workSegmentsJson:
-        row.workSegmentsJson === null
+      segmentPaceDist:
+        row.segmentPaceDist === null
           ? Prisma.JsonNull
-          : (row.workSegmentsJson as Prisma.InputJsonValue),
+          : (row.segmentPaceDist as Prisma.InputJsonValue),
       warmupFraction: row.warmupFraction,
       workFraction: row.workFraction,
       cooldownFraction: row.cooldownFraction,

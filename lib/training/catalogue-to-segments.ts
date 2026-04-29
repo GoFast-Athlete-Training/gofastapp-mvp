@@ -89,7 +89,7 @@ function isIntervalWorkSegmentList(
 
 /**
  * Intervals — repeat a fixed sequence as one block (Over/Under): no recovery between segments inside the block;
- * optional timed jog between whole cycles. Stored as an object (not a plain array) in workSegmentsJson.
+ * optional timed jog between whole cycles. Stored as an object (not a plain array) in segmentPaceDist.
  *
  * ```json
  * {
@@ -124,6 +124,51 @@ function parseIntervalBlockRepeatPayload(v: unknown): IntervalBlockRepeatPayload
     if (!Number.isFinite(dm) || dm <= 0 || !Number.isFinite(off)) return null;
     parsedSegs.push({
       distanceMeters: Math.round(dm),
+      paceOffsetSecPerMile: Math.round(off),
+    });
+  }
+  const rc = Number(o.repeatCount);
+  const repeatCount =
+    Number.isFinite(rc) && rc >= 1 ? Math.min(99, Math.round(rc)) : 1;
+  let recoveryBetweenCyclesSeconds: number | undefined;
+  if (Object.prototype.hasOwnProperty.call(o, "recoveryBetweenCyclesSeconds")) {
+    const rs = Number(o.recoveryBetweenCyclesSeconds);
+    if (Number.isFinite(rs) && rs > 0) recoveryBetweenCyclesSeconds = Math.round(rs);
+  }
+  return {
+    layout: "blockRepeat",
+    segments: parsedSegs,
+    repeatCount,
+    recoveryBetweenCyclesSeconds,
+  };
+}
+
+/**
+ * Tempo — repeat a mile-based sequence with optional timed jog between whole cycles.
+ * Same envelope as intervals blockRepeat; segments use `miles` instead of `distanceMeters`.
+ */
+type TempoBlockRepeatPayload = {
+  layout: "blockRepeat";
+  segments: Array<{ miles: number; paceOffsetSecPerMile: number }>;
+  repeatCount: number;
+  recoveryBetweenCyclesSeconds?: number;
+};
+
+function parseTempoBlockRepeatPayload(v: unknown): TempoBlockRepeatPayload | null {
+  if (v == null || typeof v !== "object" || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  if (o.layout !== "blockRepeat") return null;
+  const segments = o.segments;
+  if (!Array.isArray(segments) || segments.length === 0) return null;
+  const parsedSegs: TempoBlockRepeatPayload["segments"] = [];
+  for (const row of segments) {
+    if (row == null || typeof row !== "object" || Array.isArray(row)) return null;
+    const r = row as { miles?: unknown; paceOffsetSecPerMile?: unknown };
+    const mi = Number(r.miles);
+    const off = Number(r.paceOffsetSecPerMile);
+    if (!Number.isFinite(mi) || mi <= 0 || !Number.isFinite(off)) return null;
+    parsedSegs.push({
+      miles: round(mi, 4),
       paceOffsetSecPerMile: Math.round(off),
     });
   }
@@ -258,7 +303,7 @@ export function catalogueEntryToApiSegments(params: {
       racePaceSecPerMile: racePaceSecondsPerMile,
     });
 
-    const wj = entry.workSegmentsJson;
+    const wj = entry.segmentPaceDist;
     if (isMilesWorkSegmentList(wj)) {
       const warmupM = entry.warmupMiles != null && entry.warmupMiles > 0 ? round(entry.warmupMiles, 2) : 0;
       const cooldownM =
@@ -454,7 +499,81 @@ export function catalogueEntryToApiSegments(params: {
   }
 
   if (type === "Tempo") {
-    const tj = entry.workSegmentsJson;
+    const tj = entry.segmentPaceDist;
+    const tempoBlockRepeat = parseTempoBlockRepeatPayload(tj);
+    if (tempoBlockRepeat) {
+      const warmupM =
+        entry.warmupMiles != null && entry.warmupMiles > 0 ? round(entry.warmupMiles, 2) : 0;
+      const cooldownM =
+        entry.cooldownMiles != null && entry.cooldownMiles > 0 ? round(entry.cooldownMiles, 2) : 0;
+      const easyP = secPerMile(
+        anchorSecondsPerMile,
+        entry.warmupPaceOffsetSecPerMile,
+        paces.easy
+      );
+      const recPace = secPerMile(
+        anchorSecondsPerMile,
+        entry.recoveryPaceOffsetSecPerMile,
+        paces.recovery
+      );
+      const repeatCount = Math.max(1, tempoBlockRepeat.repeatCount);
+      const recSec = tempoBlockRepeat.recoveryBetweenCyclesSeconds;
+      const recMinutes =
+        recSec != null && recSec > 0 ? round(recSec / 60, 4) : null;
+
+      let order = 1;
+      const out: ApiSegment[] = [];
+      if (warmupM > 0) {
+        out.push({
+          stepOrder: order++,
+          title: "Warmup",
+          durationType: "DISTANCE",
+          durationValue: warmupM,
+          targets: [paceTargetFromSecondsPerMile(easyP)],
+        });
+      }
+      for (let c = 0; c < repeatCount; c++) {
+        for (const seg of tempoBlockRepeat.segments) {
+          const tp = secPerMile(
+            anchorSecondsPerMile,
+            seg.paceOffsetSecPerMile,
+            paces.tempo
+          );
+          out.push({
+            stepOrder: order++,
+            title: "Tempo",
+            durationType: "DISTANCE",
+            durationValue: seg.miles,
+            targets: [paceTargetFromSecondsPerMile(tp)],
+          });
+        }
+        if (c < repeatCount - 1 && recMinutes != null && recMinutes > 0) {
+          out.push({
+            stepOrder: order++,
+            title: "Recovery",
+            durationType: "TIME",
+            durationValue: recMinutes,
+            targets: [paceTargetFromSecondsPerMile(recPace)],
+          });
+        }
+      }
+      if (cooldownM > 0) {
+        const cp = secPerMile(
+          anchorSecondsPerMile,
+          entry.cooldownPaceOffsetSecPerMile,
+          paces.easy
+        );
+        out.push({
+          stepOrder: order++,
+          title: "Cooldown",
+          durationType: "DISTANCE",
+          durationValue: cooldownM,
+          targets: [paceTargetFromSecondsPerMile(cp)],
+        });
+      }
+      if (out.length > 0) return out;
+    }
+
     if (isMilesWorkSegmentList(tj)) {
       const warmupM = entry.warmupMiles != null && entry.warmupMiles > 0 ? round(entry.warmupMiles, 2) : 0;
       const cooldownM =
@@ -536,7 +655,7 @@ export function catalogueEntryToApiSegments(params: {
   }
 
   if (type === "Intervals") {
-    const ij = entry.workSegmentsJson;
+    const ij = entry.segmentPaceDist;
     const blockRepeat = parseIntervalBlockRepeatPayload(ij);
     if (blockRepeat) {
       const warmupM = entry.warmupMiles ?? round(totalMiles * 0.15, 2);
