@@ -10,6 +10,10 @@ import {
   paceTargetFromSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
 import { isMpSimulationAnchor } from "@/lib/training/goal-pace-calculator";
+import {
+  betweenRepRecoveryForMaterialization,
+  type CatalogueBetweenRepRecovery,
+} from "@/lib/training/catalogue-interval-recovery";
 
 function round(n: number, d: number): number {
   const f = 10 ** d;
@@ -28,6 +32,33 @@ function secPerMile(
 function targetsOrOpen(paceSecPerMile: number | null): Pick<ApiSegment, "targets"> | object {
   if (paceSecPerMile == null) return {};
   return { targets: [paceTargetFromSecondsPerMile(paceSecPerMile)] };
+}
+
+function appendBetweenRepRecoveryStep(
+  out: ApiSegment[],
+  stepOrder: number,
+  rec: CatalogueBetweenRepRecovery,
+  recPace: number | null
+): number {
+  if (rec.kind === "none") return stepOrder;
+  if (rec.kind === "time") {
+    out.push({
+      stepOrder,
+      title: "Recovery",
+      durationType: "TIME",
+      durationValue: rec.durationValueMinutes,
+      ...targetsOrOpen(recPace),
+    });
+    return stepOrder + 1;
+  }
+  out.push({
+    stepOrder,
+    title: "Recovery",
+    durationType: "DISTANCE",
+    durationValue: rec.durationValueMiles,
+    ...targetsOrOpen(recPace),
+  });
+  return stepOrder + 1;
 }
 
 /** Scale peak mpFraction by plan cycle position (0–3 → 25%–100% of peak). */
@@ -671,7 +702,10 @@ export function catalogueEntryToApiSegments(params: {
     }
 
     if (isIntervalWorkSegmentList(ij)) {
-      const recMiles = (entry.recoveryDistanceMeters ?? 400) / 1609.34;
+      const flatRepRecovery = betweenRepRecoveryForMaterialization({
+        recoveryDurationSeconds: entry.recoveryDurationSeconds,
+        recoveryDistanceMeters: entry.recoveryDistanceMeters,
+      });
       const warmupM = entry.warmupMiles ?? round(totalMiles * 0.15, 2);
       const cooldownM = entry.cooldownMiles ?? round(totalMiles * 0.15, 2);
       const recPace = secPerMile(anchorSecondsPerMile, entry.recoveryPaceOffsetSecPerMile);
@@ -697,13 +731,7 @@ export function catalogueEntryToApiSegments(params: {
       }
       for (let i = 0; i < flat.length; i++) {
         if (i > 0) {
-          out.push({
-            stepOrder: order++,
-            title: "Recovery",
-            durationType: "DISTANCE",
-            durationValue: round(recMiles, 3),
-            ...targetsOrOpen(recPace),
-          });
+          order = appendBetweenRepRecoveryStep(out, order, flatRepRecovery, recPace);
         }
         const intP = secPerMile(anchorSecondsPerMile, flat[i]!.off);
         out.push({
@@ -743,7 +771,10 @@ export function catalogueEntryToApiSegments(params: {
 
   const reps = entry.workBaseReps ?? 6;
   const repMiles = (entry.workBaseRepMeters ?? 800) / 1609.34;
-  const recMiles = (entry.recoveryDistanceMeters ?? 400) / 1609.34;
+  const legacyRepRecovery = betweenRepRecoveryForMaterialization({
+    recoveryDurationSeconds: entry.recoveryDurationSeconds,
+    recoveryDistanceMeters: entry.recoveryDistanceMeters,
+  });
   const warmupM = entry.warmupMiles ?? round(totalMiles * 0.15, 2);
   const cooldownM = entry.cooldownMiles ?? round(totalMiles * 0.15, 2);
   const intPace = secPerMile(anchorSecondsPerMile, entry.workBasePaceOffsetSecPerMile);
@@ -769,13 +800,7 @@ export function catalogueEntryToApiSegments(params: {
       durationValue: round(repMiles, 3),
       ...targetsOrOpen(intPace),
     });
-    out.push({
-      stepOrder: order++,
-      title: "Recovery",
-      durationType: "DISTANCE",
-      durationValue: round(recMiles, 3),
-      ...targetsOrOpen(recPace),
-    });
+    order = appendBetweenRepRecoveryStep(out, order, legacyRepRecovery, recPace);
   }
   if (cooldownM > 0) {
     const cp = secPerMile(anchorSecondsPerMile, entry.cooldownPaceOffsetSecPerMile);

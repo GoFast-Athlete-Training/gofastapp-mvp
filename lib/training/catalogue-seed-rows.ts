@@ -24,6 +24,7 @@ export type CatalogueSeedRow = {
   workBaseRepMeters: number | null;
   workBaseMiles: number | null;
   recoveryDistanceMeters: number | null;
+  recoveryDurationSeconds?: number | null;
   warmupMiles: number | null;
   warmupPaceOffsetSecPerMile: number | null;
   cooldownMiles: number | null;

@@ -1255,6 +1255,8 @@ model workout_catalogue {
   /// Fixed-rep work: meters per rep (e.g. 800).
   workBaseRepMeters            Int?
   recoveryDistanceMeters       Int?
+  /// Timed jog between reps (flat ladder / legacy repeats). Seconds; when positive, overrides distance-based recovery when materializing.
+  recoveryDurationSeconds      Int?
   warmupMiles                  Float?
   warmupPaceOffsetSecPerMile   Int?
   cooldownMiles                Float?

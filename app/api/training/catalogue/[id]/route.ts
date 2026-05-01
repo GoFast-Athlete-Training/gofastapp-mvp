@@ -47,6 +47,7 @@ export async function PUT(request: NextRequest, ctx: RouteCtx) {
         workBaseReps: d.workBaseReps,
         workBaseRepMeters: d.workBaseRepMeters,
         recoveryDistanceMeters: d.recoveryDistanceMeters,
+        recoveryDurationSeconds: d.recoveryDurationSeconds,
         warmupMiles: d.warmupMiles,
         warmupPaceOffsetSecPerMile: d.warmupPaceOffsetSecPerMile,
         cooldownMiles: d.cooldownMiles,

@@ -91,6 +91,7 @@ export type CatalogueRowInput = {
   workBaseReps: number | null;
   workBaseRepMeters: number | null;
   recoveryDistanceMeters: number | null;
+  recoveryDurationSeconds: number | null;
   warmupMiles: number | null;
   warmupPaceOffsetSecPerMile: number | null;
   cooldownMiles: number | null;
@@ -263,6 +264,11 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
         num("recoveryDistanceMeters") != null
           ? Math.round(num("recoveryDistanceMeters")!)
           : null,
+      recoveryDurationSeconds:
+        (() => {
+          const v = pickNum(body, ["recoveryDurationSeconds", "recoveryBetweenRepsSeconds"]);
+          return v != null ? Math.round(v) : null;
+        })(),
       warmupMiles: num("warmupMiles"),
       warmupPaceOffsetSecPerMile:
         num("warmupPaceOffsetSecPerMile") != null

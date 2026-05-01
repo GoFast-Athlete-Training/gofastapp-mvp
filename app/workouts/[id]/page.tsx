@@ -34,6 +34,7 @@ import {
   storedPaceSecondsKmToSecondsPerMile,
   workoutTargetTypeLabel,
 } from "@/lib/workout-generator/pace-calculator";
+import { describeBetweenRepRecovery } from "@/lib/training/catalogue-interval-recovery";
 import { PaceMiSplitEditor } from "@/components/workout/PaceMiSplitEditor";
 import { parseSplitPaceToSecPerMile, secPerMileToSplitStrings } from "@/lib/workout/pace-mi-split";
 import { readWorkoutDayNav } from "@/lib/training/workout-day-nav";
@@ -104,6 +105,7 @@ interface WorkoutCatalogue {
   workBaseReps: number | null;
   workBaseRepMeters: number | null;
   recoveryDistanceMeters: number | null;
+  recoveryDurationSeconds: number | null;
   warmupMiles: number | null;
   cooldownMiles: number | null;
   workBasePaceOffsetSecPerMile: number | null;
@@ -271,7 +273,10 @@ function CataloguePrescriptionCard({
   if (catalogue.workoutType === "Intervals") {
     const reps = catalogue.workBaseReps ?? 6;
     const repM = catalogue.workBaseRepMeters ?? 800;
-    const recM = catalogue.recoveryDistanceMeters ?? 400;
+    const recoveryLabel = describeBetweenRepRecovery({
+      recoveryDurationSeconds: catalogue.recoveryDurationSeconds ?? null,
+      recoveryDistanceMeters: catalogue.recoveryDistanceMeters ?? null,
+    });
     const intSec = paceSecFromAnchor(anchor, catalogue.workBasePaceOffsetSecPerMile, p.interval);
     const recSec = paceSecFromAnchor(anchor, catalogue.recoveryPaceOffsetSecPerMile, p.recovery);
     return (
@@ -296,7 +301,7 @@ function CataloguePrescriptionCard({
               <tr className="border-t border-sky-100">
                 <td className="p-2">Main set</td>
                 <td className="p-2">
-                  {reps} × {repM}m hard, {recM}m recovery
+                  {reps} × {repM}m hard, {recoveryLabel}
                 </td>
                 <td className="p-2">
                   {formatPaceMinPerMileFromSec(intSec)} /{" "}

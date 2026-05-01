@@ -41,6 +41,7 @@ export async function runCatalogueSeed(prisma: PrismaClient): Promise<{
       workBaseRepMeters: row.workBaseRepMeters,
       workBaseMiles: row.workBaseMiles,
       recoveryDistanceMeters: row.recoveryDistanceMeters,
+      recoveryDurationSeconds: row.recoveryDurationSeconds ?? null,
       warmupMiles: row.warmupMiles,
       warmupPaceOffsetSecPerMile: row.warmupPaceOffsetSecPerMile,
       cooldownMiles: row.cooldownMiles,
