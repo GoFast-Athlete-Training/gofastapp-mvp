@@ -131,6 +131,25 @@ export default function ProfilePage() {
   const phoneNumber = athleteProfile.phoneNumber as string | undefined;
   const email = athleteProfile.email as string | undefined;
   const fiveKPace = athleteProfile.fiveKPace as string | undefined;
+  const garminConnected = !!athleteProfile.garmin_connected;
+  const garminSleepRaw = athleteProfile.garmin_user_sleep;
+
+  const secToDurationLabel = (sec: unknown): string | null => {
+    if (typeof sec !== 'number' || !Number.isFinite(sec) || sec < 0) return null;
+    const totalMin = Math.round(sec / 60);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if (h <= 0) return `${m}m`;
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  };
+
+  const garminSleep =
+    garminSleepRaw !== null &&
+    garminSleepRaw !== undefined &&
+    typeof garminSleepRaw === 'object' &&
+    !Array.isArray(garminSleepRaw)
+      ? (garminSleepRaw as Record<string, unknown>)
+      : null;
 
   const calculateAge = (b: string | Date | null | undefined) => {
     if (!b) return null;
@@ -313,6 +332,60 @@ export default function ProfilePage() {
             </p>
           )}
         </section>
+
+        {garminConnected && garminSleep ? (
+          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <h2 className="text-lg font-bold text-gray-900">Sleep</h2>
+              <span className="flex items-center gap-1.5 text-xs font-normal text-gray-500 ml-auto">
+                <img
+                  src="/Garmin_Connect_app_1024x1024-02.png"
+                  alt="Garmin Connect"
+                  width={16}
+                  height={16}
+                  className="w-4 h-4 rounded shrink-0"
+                />
+                Garmin Connect
+              </span>
+            </div>
+            {typeof garminSleep.calendarDate === 'string' ? (
+              <p className="text-sm text-gray-600 mb-3">
+                Night of{' '}
+                <span className="font-semibold text-gray-900">
+                  {new Date(`${garminSleep.calendarDate}T12:00:00`).toLocaleDateString(undefined, {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </span>
+              </p>
+            ) : null}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
+              {[
+                { label: 'Total', key: 'durationInSeconds' },
+                { label: 'Deep', key: 'deepSleepDurationInSeconds' },
+                { label: 'Light', key: 'lightSleepDurationInSeconds' },
+                { label: 'REM', key: 'remSleepInSeconds' },
+                { label: 'Awake', key: 'awakeDurationInSeconds' },
+              ].map(({ label, key }) => {
+                const v = secToDurationLabel(garminSleep[key]);
+                return (
+                  <div
+                    key={key}
+                    className="rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-2"
+                  >
+                    <p className="text-xs text-gray-500">{label}</p>
+                    <p className="font-semibold text-gray-900">{v ?? '—'}</p>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-500 mt-3">
+              Sleep stages from your synced Garmin device. Connect or manage Garmin in Settings.
+            </p>
+          </section>
+        ) : null}
 
         {/* Account (private) */}
         <section className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 p-6">
