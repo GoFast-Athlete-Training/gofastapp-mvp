@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { parseOptionalWorkoutDate } from "@/lib/training/workout-date-parse";
 import { ymdFromDate } from "@/lib/training/plan-utils";
+import { segmentSnapshotDocumentFromDbRows } from "@/lib/training/workout-segment-snapshot";
 
 export const dynamic = "force-dynamic";
 
@@ -231,6 +232,28 @@ export async function POST(request: NextRequest) {
         segments: true,
       },
     });
+
+    if (workout.segments?.length) {
+      const rows = [...workout.segments].sort((a, b) => a.stepOrder - b.stepOrder);
+      await prisma.workouts.update({
+        where: { id: workout.id },
+        data: {
+          segmentSnapshotJson: segmentSnapshotDocumentFromDbRows(
+            rows.map((r) => ({
+              stepOrder: r.stepOrder,
+              title: r.title,
+              durationType: r.durationType,
+              durationValue: r.durationValue,
+              targets: r.targets,
+              repeatCount: r.repeatCount,
+              notes: r.notes,
+              paceTargetEncodingVersion: r.paceTargetEncodingVersion,
+            })),
+            "standalone_workout_post"
+          ),
+        },
+      });
+    }
 
     return NextResponse.json({ workout });
   } catch (error: any) {

@@ -8,6 +8,7 @@ import { utcDateOnly } from "./plan-utils";
 import { buildPlanWorkoutApiSegments } from "./workout-segment-generator";
 import { planScheduleDayForDateKey } from "./plan-schedule";
 import { metersToMiles } from "@/lib/pace-utils";
+import { segmentSnapshotDocumentFromApiSegments } from "./workout-segment-snapshot";
 
 function utcDayBounds(d: Date): { gte: Date; lte: Date } {
   const x = utcDateOnly(d);
@@ -145,6 +146,15 @@ export async function findOrCreateWorkoutForPlanDay(params: {
         })
       );
       await tx.workout_segments.createMany({ data: segmentRows });
+      await tx.workouts.update({
+        where: { id: w.id },
+        data: {
+          segmentSnapshotJson: segmentSnapshotDocumentFromApiSegments(
+            apiSegs,
+            "plan_day_materialize"
+          ),
+        },
+      });
     }
 
     return w.id;

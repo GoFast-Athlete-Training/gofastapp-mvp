@@ -15,6 +15,7 @@ import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculat
 import { newEntityId } from "@/lib/training/new-entity-id";
 import { metersToMiles } from "@/lib/pace-utils";
 import type { Prisma, WorkoutType } from "@prisma/client";
+import { segmentSnapshotDocumentFromApiSegments } from "@/lib/training/workout-segment-snapshot";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -221,6 +222,15 @@ export async function GET(request: NextRequest, context: Ctx) {
               updatedAt: new Date(),
             }));
           await prisma.workout_segments.createMany({ data: segmentRows });
+          await prisma.workouts.update({
+            where: { id: workoutId },
+            data: {
+              segmentSnapshotJson: segmentSnapshotDocumentFromApiSegments(
+                apiSegs,
+                "api_lazy_segments"
+              ),
+            },
+          });
           const reloaded = await loadWorkout();
           if (!reloaded) {
             return NextResponse.json(

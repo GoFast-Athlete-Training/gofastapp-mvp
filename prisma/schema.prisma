@@ -1341,6 +1341,14 @@ model workouts {
   /// Formula: actualAvgPaceSecPerMile − catalogue rep offset.
   creditedFiveKPaceSecPerMile   Int?
   evaluationEligibleFlag          Boolean             @default(false)
+  /// Frozen prescription segments at last materialize/send (segments table remains FK source for edits).
+  segmentSnapshotJson               Json?
+  /// Normalized copy of ingest summary payload (`athlete_activities.summaryData`).
+  completedActivitySummaryJson      Json?
+  /// Full detail payload when hydrated (`athlete_activities.detailData`).
+  completedActivityDetailJson         Json?
+  /// Computed readiness / delta summaries (product reads; optional).
+  analysisJson                      Json?
   /// Public share path slug for /mytrainingruns/[slug] (e.g. acole842719); set when athlete creates a join link
   slug                      String?             @unique
   createdAt                 DateTime            @default(now())

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { newEntityId } from "@/lib/training/new-entity-id";
 import { Prisma } from "@prisma/client";
+import { segmentSnapshotDocumentFromDbRows } from "@/lib/training/workout-segment-snapshot";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -128,6 +129,24 @@ export async function PUT(request: NextRequest, ctx: Ctx) {
           notes: seg.notes,
           paceTargetEncodingVersion: 2,
         })),
+      });
+      await tx.workouts.update({
+        where: { id: workoutId },
+        data: {
+          segmentSnapshotJson: segmentSnapshotDocumentFromDbRows(
+            normalized.map((seg, index) => ({
+              stepOrder: seg.stepOrder ?? index + 1,
+              title: seg.title,
+              durationType: seg.durationType === "TIME" ? "TIME" : "DISTANCE",
+              durationValue: seg.durationValue,
+              targets: seg.targets,
+              repeatCount: seg.repeatCount,
+              notes: seg.notes,
+              paceTargetEncodingVersion: 2,
+            })),
+            "segments_put"
+          ),
+        },
       });
     });
 

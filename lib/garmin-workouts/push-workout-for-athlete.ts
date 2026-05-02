@@ -7,6 +7,7 @@ import {
 import { GarminNotConnectedError, requireGarminTokenFresh } from "@/lib/domain-garmin";
 import { dateForDayInWeek, dayNameToOurDow } from "@/lib/training/schedule-parser";
 import { ymdFromDate } from "@/lib/training/plan-utils";
+import { segmentSnapshotDocumentFromDbRows } from "@/lib/training/workout-segment-snapshot";
 
 export type PushWorkoutForAthleteResult =
   | {
@@ -147,7 +148,23 @@ export async function pushWorkoutToGarminForAthlete(
 
     await prisma.workouts.update({
       where: { id: workout.id },
-      data: { garminWorkoutId, garminScheduleId },
+      data: {
+        garminWorkoutId,
+        garminScheduleId,
+        segmentSnapshotJson: segmentSnapshotDocumentFromDbRows(
+          [...workout.segments].sort((a, b) => a.stepOrder - b.stepOrder).map((seg) => ({
+            stepOrder: seg.stepOrder,
+            title: seg.title,
+            durationType: seg.durationType,
+            durationValue: seg.durationValue,
+            targets: seg.targets,
+            repeatCount: seg.repeatCount,
+            notes: seg.notes,
+            paceTargetEncodingVersion: seg.paceTargetEncodingVersion,
+          })),
+          "garmin_push"
+        ),
+      },
     });
 
     return { ok: true, garminWorkoutId, garminScheduleId, scheduledDate };

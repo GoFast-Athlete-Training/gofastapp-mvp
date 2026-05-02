@@ -259,6 +259,10 @@ export async function tryMatchActivityToTrainingWorkout(
     where: { id: candidate.id },
     data: {
       matchedActivityId: activity.id,
+      completedActivitySummaryJson:
+        summaryBlob != null && typeof summaryBlob === "object"
+          ? (summaryBlob as object)
+          : undefined,
       actualDistanceMeters: distanceMeters,
       actualAvgPaceSecPerMile: paceSecPerMile,
       actualAverageHeartRate: activity.averageHeartRate,

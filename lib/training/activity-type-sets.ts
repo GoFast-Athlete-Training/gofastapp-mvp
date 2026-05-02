@@ -33,3 +33,18 @@ export function isCyclingActivityType(activityType: string | null | undefined): 
   if (!activityType) return false;
   return CYCLING_ACTIVITY_TYPES.has(activityType.toUpperCase());
 }
+
+/** Pool / open-water swim activity types from Garmin summaries. */
+export const SWIMMING_ACTIVITY_TYPES = new Set(
+  [
+    "LAP_SWIMMING",
+    "POOL_SWIMMING",
+    "OPEN_WATER_SWIMMING",
+    "SWIMMING",
+  ].map((s) => s.toUpperCase())
+);
+
+export function isSwimmingActivityType(activityType: string | null | undefined): boolean {
+  if (!activityType) return false;
+  return SWIMMING_ACTIVITY_TYPES.has(activityType.toUpperCase());
+}

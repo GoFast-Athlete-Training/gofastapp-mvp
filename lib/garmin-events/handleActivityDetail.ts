@@ -72,6 +72,18 @@ export async function handleActivityDetail(
           } catch (lapErr) {
             console.warn("lap pipeline (detailData → workout):", lapErr);
           }
+          try {
+            if (row.detailData != null && typeof row.detailData === "object") {
+              await prisma.workouts.updateMany({
+                where: { matchedActivityId: row.id },
+                data: {
+                  completedActivityDetailJson: row.detailData as object,
+                },
+              });
+            }
+          } catch (detailSnapErr) {
+            console.warn("workout detail snapshot:", detailSnapErr);
+          }
         }
         processed++;
       } else {

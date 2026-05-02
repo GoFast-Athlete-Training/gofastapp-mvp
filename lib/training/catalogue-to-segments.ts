@@ -385,13 +385,59 @@ export function catalogueEntryToApiSegments(params: {
     const wf0 = entry.warmupFraction;
     const wkf0 = entry.workFraction;
     const cf0 = entry.cooldownFraction;
+    const legacyMpFractionSimulation =
+      isMpSimulationAnchor(entry.paceAnchor) &&
+      ((wf0 != null && wf0 > 0) ||
+        (wkf0 != null && wkf0 > 0) ||
+        (cf0 != null && cf0 > 0)) &&
+      entry.warmupMiles == null &&
+      entry.cooldownMiles == null;
+
+    const mpSimulationBookendsAuthored =
+      entry.warmupMiles != null || entry.cooldownMiles != null;
+
+    // MVP1: fixed warmup/cooldown miles authored on the catalogue row; marathon-pace block =
+    // remainder of scheduled long run. Explicit bookends prevent silently changing legacy mpFraction/mpBlock prescriptions.
     if (
       isMpSimulationAnchor(entry.paceAnchor) &&
-      (wf0 != null ||
-        wkf0 != null ||
-        cf0 != null) &&
-      ((wf0 != null && wf0 > 0) || (wkf0 != null && wkf0 > 0) || (cf0 != null && cf0 > 0))
+      !legacyMpFractionSimulation &&
+      mpSimulationBookendsAuthored
     ) {
+      const warmupM = round(Math.max(0, Number(entry.warmupMiles ?? 0)), 2);
+      const cooldownM = round(Math.max(0, Number(entry.cooldownMiles ?? 0)), 2);
+      const remainder = round(totalMiles - warmupM - cooldownM, 2);
+      const mpBlock = round(Math.min(Math.max(0.05, remainder), Math.max(0.05, totalMiles)), 2);
+      let order = 1;
+      const out: ApiSegment[] = [];
+      if (warmupM > 0.05) {
+        out.push({
+          stepOrder: order++,
+          title: "Warmup",
+          durationType: "DISTANCE",
+          durationValue: warmupM,
+          ...targetsOrOpen(easyP),
+        });
+      }
+      out.push({
+        stepOrder: order++,
+        title: "Goal marathon pace",
+        durationType: "DISTANCE",
+        durationValue: mpBlock,
+        targets: [paceTargetFromSecondsPerMile(mpP)],
+      });
+      if (cooldownM > 0.05) {
+        out.push({
+          stepOrder: order++,
+          title: "Cooldown",
+          durationType: "DISTANCE",
+          durationValue: cooldownM,
+          ...targetsOrOpen(easyP),
+        });
+      }
+      if (out.length > 0) return out;
+    }
+
+    if (legacyMpFractionSimulation) {
       const wf = Math.max(0, wf0 ?? 0);
       const wfk = Math.max(0, wkf0 ?? 0);
       const cf = Math.max(0, cf0 ?? 0);

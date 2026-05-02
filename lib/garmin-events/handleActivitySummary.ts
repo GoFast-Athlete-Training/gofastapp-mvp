@@ -8,6 +8,7 @@ import { getAthleteByGarminUserId } from '../domain-garmin';
 import { activityExists } from './dedupe';
 import { normalizeActivityFields } from './normalizeActivityFields';
 import { tryMatchActivityToTrainingWorkout } from '../training/match-activity-to-workout';
+import { promoteUnmatchedRunningActivityToWorkout } from '../training/promote-activity-to-workout';
 import { tryMatchActivityToBikeWorkout } from '../training/match-activity-to-bike-workout';
 import { isCyclingActivityType } from '../training/activity-type-sets';
 
@@ -118,8 +119,15 @@ export async function handleActivitySummary(
           await tryMatchActivityToBikeWorkout(created.id);
         } else {
           await tryMatchActivityToTrainingWorkout(created.id);
+          const ingestRow = await prisma.athlete_activities.findUnique({
+            where: { id: created.id },
+            select: { ingestionStatus: true },
+          });
+          if (ingestRow?.ingestionStatus === "UNMATCHED") {
+            await promoteUnmatchedRunningActivityToWorkout(created.id);
+          }
         }
-        console.log('✅ match attempt complete', {
+        console.log("✅ match attempt complete", {
           id: created.id,
           sourceActivityId,
         });
