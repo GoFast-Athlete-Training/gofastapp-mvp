@@ -62,6 +62,7 @@ export async function PUT(request: NextRequest, ctx: RouteCtx) {
         intendedHRBpmLow: d.intendedHRBpmLow,
         intendedHRBpmHigh: d.intendedHRBpmHigh,
         notes: d.notes,
+        ...(d.trainingIntent !== undefined ? { trainingIntent: d.trainingIntent } : {}),
         updatedAt: now,
       },
     });

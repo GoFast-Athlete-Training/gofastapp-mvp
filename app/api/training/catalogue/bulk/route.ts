@@ -109,6 +109,9 @@ export async function POST(request: NextRequest) {
             notes: d.notes,
             updatedAt: now,
           };
+          if (d.trainingIntent !== undefined) {
+            updateData.trainingIntent = d.trainingIntent;
+          }
           if (d.slug !== undefined) {
             updateData.slug = d.slug;
           }
@@ -155,6 +158,9 @@ export async function POST(request: NextRequest) {
               intendedHRBpmLow: d.intendedHRBpmLow,
               intendedHRBpmHigh: d.intendedHRBpmHigh,
               notes: d.notes,
+              ...(d.trainingIntent !== undefined
+                ? { trainingIntent: d.trainingIntent }
+                : {}),
               updatedAt: now,
             },
           });

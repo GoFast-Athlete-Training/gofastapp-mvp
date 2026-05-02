@@ -15,6 +15,43 @@ export function parseWorkoutType(raw: unknown): WorkoutType | null {
   return WORKOUT_TYPES.includes(t as WorkoutType) ? (t as WorkoutType) : null;
 }
 
+/** Valid training intent codes for optional multi-select on catalogue rows. */
+export const TRAINING_INTENT_CODES = [
+  "THRESHOLD",
+  "VO2_MAX",
+  "SPEED",
+  "ENDURANCE",
+  "PACE_CONTROL",
+  "PACE_VARIATION",
+  "FATIGUE_RESISTANCE",
+  "RACE_SIMULATION",
+] as const;
+
+const TRAINING_INTENT_SET = new Set<string>(TRAINING_INTENT_CODES as unknown as string[]);
+
+function parseTrainingIntentBody(body: Record<string, unknown>): string[] | undefined {
+  if (!Object.prototype.hasOwnProperty.call(body, "trainingIntent")) return undefined;
+  const raw = body.trainingIntent;
+  if (raw === null || raw === undefined || raw === "") return [];
+  const uniq = new Set<string>();
+  if (Array.isArray(raw)) {
+    for (const v of raw) {
+      if (typeof v !== "string") continue;
+      const t = v.trim();
+      if (TRAINING_INTENT_SET.has(t)) uniq.add(t);
+    }
+    return [...uniq];
+  }
+  if (typeof raw === "string") {
+    for (const part of raw.split(",")) {
+      const t = part.trim();
+      if (TRAINING_INTENT_SET.has(t)) uniq.add(t);
+    }
+    return [...uniq];
+  }
+  return [];
+}
+
 const PACE_ANCHORS = new Set(["currentBuildup", "mpSimulation"]);
 const MP_BLOCK_POSITIONS = new Set(["BACK_HALF", "FRONT_HALF", "EVEN"]);
 const MP_BLOCK_PROGRESSIONS = new Set(["flat", "progressive"]);
@@ -106,6 +143,8 @@ export type CatalogueRowInput = {
   intendedHRBpmLow: number | null;
   intendedHRBpmHigh: number | null;
   notes: string | null;
+  /** Omit from bulk row = leave existing trainingIntent on update (undefined). */
+  trainingIntent?: string[];
   /** Omitted in payload = leave existing value on update. */
   slug?: string | null;
 };
@@ -237,6 +276,8 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
     return { ok: false, error: "runSubType must be a string or null" };
   }
 
+  const trainingIntent = parseTrainingIntentBody(body);
+
   return {
     ok: true,
     data: {
@@ -302,6 +343,7 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
       intendedHRBpmHigh:
         num("intendedHRBpmHigh") != null ? Math.round(num("intendedHRBpmHigh")!) : null,
       notes: typeof body.notes === "string" ? body.notes.trim() || null : null,
+      ...(trainingIntent !== undefined ? { trainingIntent } : {}),
       ...(slug !== undefined ? { slug } : {}),
     },
   };

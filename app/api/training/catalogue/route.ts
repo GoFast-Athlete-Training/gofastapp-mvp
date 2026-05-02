@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
         intendedHRBpmLow: d.intendedHRBpmLow,
         intendedHRBpmHigh: d.intendedHRBpmHigh,
         notes: d.notes,
+        ...(d.trainingIntent !== undefined ? { trainingIntent: d.trainingIntent } : {}),
         updatedAt: now,
       },
     });

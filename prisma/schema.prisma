@@ -1280,6 +1280,8 @@ model workout_catalogue {
   intendedHRBpmLow             Int?
   intendedHRBpmHigh            Int?
   notes                        String?
+  /// Optional multi-select tags (e.g. THRESHOLD, VO2_MAX) for coaching context downstream.
+  trainingIntent               String[]    @default([])
   createdAt                    DateTime    @default(now())
   updatedAt                    DateTime    @updatedAt
   workouts                    workouts[]
