@@ -124,6 +124,8 @@ export async function POST(request: NextRequest, ctx: Ctx) {
             targetPaceSecPerMile: null,
             hrDeltaBpm: null,
             creditedFiveKPaceSecPerMile: null,
+            creditedThresholdPaceSecPerMile: null,
+            creditedAerobicCeilingBpm: null,
             evaluationEligibleFlag: false,
             segments:
               source.segments.length > 0

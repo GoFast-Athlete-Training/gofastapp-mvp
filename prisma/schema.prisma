@@ -65,6 +65,10 @@ model Athlete {
   strava_refresh_token    String?
   strava_expires_at       Int?
   fiveKPace               String?
+  /// Tempo-derived sustained pace (formatted like fiveKPace); updated from successful Tempo completions only.
+  thresholdPace           String?
+  /// Estimated upper heart rate (bpm) for truly easy aerobic work; updated conservatively from Easy/LongRun completions.
+  aerobicCeilingBpm       Int?
   /// Functional threshold power (watts) — bike workout intensity anchor.
   ftpWatts                Int?
   weeklyMileage           Int?
@@ -1340,6 +1344,10 @@ model workouts {
   /// For quality workouts (Tempo/Intervals): implied 5K pace when paceDeltaSecPerMile >= 0.
   /// Formula: actualAvgPaceSecPerMile − catalogue rep offset.
   creditedFiveKPaceSecPerMile   Int?
+  /// Successful Tempo: actual avg pace (sec/mi) used as threshold evidence when paceDelta >= 0.
+  creditedThresholdPaceSecPerMile Int?
+  /// Qualifying Easy/LongRun: average HR (bpm) used as aerobic-ceiling evidence when pace was not too fast vs target.
+  creditedAerobicCeilingBpm       Int?
   evaluationEligibleFlag          Boolean             @default(false)
   /// Frozen prescription segments at last materialize/send (segments table remains FK source for edits).
   segmentSnapshotJson               Json?

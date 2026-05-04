@@ -10,12 +10,116 @@ import {
   RUN_MILES_PER_BIKE_MILE,
   swimMetersToRunEquivalentMiles,
 } from "@/lib/training/cross-training-volume-equivalents";
+import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 
 const MS_PER_DAY = 86400000;
 const DEFAULT_WINDOW_DAYS = 28;
+/** Sec/mi headroom from goal MP above threshold; at or below this feels "on the redline." */
+export const THRESHOLD_HEADROOM_COMFORT_SEC = 15;
 
 function roundMi(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+function paceSecSafe(raw: string | null | undefined): number | null {
+  const t = raw?.trim();
+  if (!t) return null;
+  try {
+    const s = parsePaceToSecondsPerMile(t);
+    return Number.isFinite(s) ? Math.round(s) : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatPaceMinSec(secPerMile: number): string {
+  const r = Math.round(secPerMile);
+  const m = Math.floor(r / 60);
+  const s = r % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+/**
+ * Pure deltas + readiness copy for 5K → threshold → goal MP (sec/mi: lower = faster).
+ * Used by gap analysis and by verification scripts (no DB).
+ */
+export function paceAnchorReadinessNarratives(input: {
+  athleteFiveKPaceSecPerMile: number | null;
+  athleteThresholdPaceSecPerMile: number | null;
+  goalRacePaceSecPerMile: number | null;
+}): {
+  thresholdVsFiveKSec: number | null;
+  goalRaceVsThresholdSec: number | null;
+  fiveKAnchorStaleVsThreshold: boolean;
+  goalPaceTooCloseToThreshold: boolean;
+  narratives: string[];
+} {
+  const fk = input.athleteFiveKPaceSecPerMile;
+  const thr = input.athleteThresholdPaceSecPerMile;
+  const gr = input.goalRacePaceSecPerMile;
+
+  let thresholdVsFiveKSec: number | null = null;
+  if (fk != null && thr != null) {
+    thresholdVsFiveKSec = Math.round(thr - fk);
+  }
+
+  let goalRaceVsThresholdSec: number | null = null;
+  if (gr != null && thr != null) {
+    goalRaceVsThresholdSec = Math.round(gr - thr);
+  }
+
+  const fiveKAnchorStaleVsThreshold =
+    fk != null && thr != null && thr <= fk;
+
+  const goalPaceTooCloseToThreshold =
+    goalRaceVsThresholdSec != null &&
+    goalRaceVsThresholdSec <= THRESHOLD_HEADROOM_COMFORT_SEC;
+
+  const narratives: string[] = [];
+
+  if (fiveKAnchorStaleVsThreshold) {
+    narratives.push(
+      "5K anchor looks stale; speed anchor should be rechecked or lowered."
+    );
+  }
+
+  if (thr == null && fk != null && gr != null) {
+    narratives.push(
+      "Complete tempo workouts on target to establish threshold pace between your 5K speed and marathon goal."
+    );
+  }
+
+  if (thr != null && gr != null && goalRaceVsThresholdSec != null) {
+    if (goalRaceVsThresholdSec >= THRESHOLD_HEADROOM_COMFORT_SEC) {
+      narratives.push(
+        `Your tempo work suggests threshold pace around ${formatPaceMinSec(thr)}/mi. Goal marathon pace is ${formatPaceMinSec(gr)}/mi, giving about ${goalRaceVsThresholdSec} sec/mi of threshold headroom — goal pace sits below redline.`
+      );
+    } else {
+      narratives.push(
+        "Goal pace is too close to threshold — limited headroom versus redline."
+      );
+    }
+  }
+
+  return {
+    thresholdVsFiveKSec,
+    goalRaceVsThresholdSec,
+    fiveKAnchorStaleVsThreshold,
+    goalPaceTooCloseToThreshold,
+    narratives,
+  };
+}
+
+/** Readiness copy when athlete has an aerobic ceiling estimate (no DB). */
+export function aerobicCeilingGapLines(
+  aerobicCeilingBpm: number | null | undefined
+): string[] {
+  if (aerobicCeilingBpm == null || !Number.isFinite(aerobicCeilingBpm)) return [];
+  const b = Math.round(Number(aerobicCeilingBpm));
+  if (b < 60 || b > 230) return [];
+  return [
+    `Easy/long-run aerobic ceiling is estimated around ${b} bpm; sustained averages above that often drift out of easy aerobic work.`,
+  ];
 }
 
 function milesFromWorkout(w: { actualDistanceMeters: number | null }): number {
@@ -44,6 +148,14 @@ export async function computeRaceLoadGapAnalysis(params: {
   estimatedMpCapacityMiles: number;
   mpSegmentMilesEstimate: number;
   mpLoadPctOfRun: number | null;
+  athleteFiveKPaceSecPerMile: number | null;
+  athleteThresholdPaceSecPerMile: number | null;
+  goalRacePaceSecPerMile: number | null;
+  thresholdVsFiveKSec: number | null;
+  goalRaceVsThresholdSec: number | null;
+  fiveKAnchorStaleVsThreshold: boolean;
+  goalPaceTooCloseToThreshold: boolean;
+  athleteAerobicCeilingBpm: number | null;
   gapLines: string[];
 }> {
   const windowDays =
@@ -53,15 +165,15 @@ export async function computeRaceLoadGapAnalysis(params: {
   const end = new Date();
   const start = new Date(end.getTime() - windowDays * MS_PER_DAY);
 
-  const plan = await prisma.training_plans.findFirst({
-    where: { id: params.planId, athleteId: params.athleteId },
-    select: { id: true },
-  });
-  if (!plan) {
-    throw new Error("Plan not found");
-  }
-
-  const [workouts, bikeRows, swimActivities] = await Promise.all([
+  const [plan, athleteRow, workouts, bikeRows, swimActivities] = await Promise.all([
+    prisma.training_plans.findFirst({
+      where: { id: params.planId, athleteId: params.athleteId },
+      select: { id: true, goalRacePace: true },
+    }),
+    prisma.athlete.findUnique({
+      where: { id: params.athleteId },
+      select: { fiveKPace: true, thresholdPace: true, aerobicCeilingBpm: true },
+    }),
     prisma.workouts.findMany({
       where: {
         athleteId: params.athleteId,
@@ -100,6 +212,31 @@ export async function computeRaceLoadGapAnalysis(params: {
       select: { activityType: true, distance: true },
     }),
   ]);
+
+  if (!plan) {
+    throw new Error("Plan not found");
+  }
+
+  const athleteFiveKPaceSecPerMile = paceSecSafe(athleteRow?.fiveKPace);
+  const athleteThresholdPaceSecPerMile = paceSecSafe(athleteRow?.thresholdPace);
+  const athleteAerobicCeilingBpm =
+    athleteRow?.aerobicCeilingBpm != null &&
+    Number.isFinite(athleteRow.aerobicCeilingBpm)
+      ? Math.round(athleteRow.aerobicCeilingBpm)
+      : null;
+  const goalRacePaceSecPerMile = paceSecSafe(plan.goalRacePace);
+
+  const {
+    thresholdVsFiveKSec,
+    goalRaceVsThresholdSec,
+    fiveKAnchorStaleVsThreshold,
+    goalPaceTooCloseToThreshold,
+    narratives: paceAnchorNarratives,
+  } = paceAnchorReadinessNarratives({
+    athleteFiveKPaceSecPerMile,
+    athleteThresholdPaceSecPerMile,
+    goalRacePaceSecPerMile,
+  });
 
   let actualRunMiles = 0;
   let mpSegmentMilesEstimate = 0;
@@ -163,6 +300,12 @@ export async function computeRaceLoadGapAnalysis(params: {
       `Conservative aerobic equivalents for context only: ~${actualBikeEquivalentRunMiles} run-mi from bike (${RUN_MILES_PER_BIKE_MILE}× per bike mi) and ~${actualSwimEquivalentRunMiles} run-mi from swim (${RUN_MILES_PER_100M_SWIM}× per 100 m). Combined with runs: ~${actualAerobicEquivalentMiles} “aerobic equivalent” mi — not a substitute for run durability.`
     );
   }
+  for (const line of paceAnchorNarratives) {
+    gapLines.push(line);
+  }
+  for (const line of aerobicCeilingGapLines(athleteAerobicCeilingBpm)) {
+    gapLines.push(line);
+  }
   gapLines.push(
     `Goal-pace / “marathon pace” segment distance (when lap data lines up) is about ${mpSegmentMilesEstimate} mi in that window.`
   );
@@ -190,6 +333,14 @@ export async function computeRaceLoadGapAnalysis(params: {
     estimatedMpCapacityMiles,
     mpSegmentMilesEstimate,
     mpLoadPctOfRun,
+    athleteFiveKPaceSecPerMile,
+    athleteThresholdPaceSecPerMile,
+    goalRacePaceSecPerMile,
+    thresholdVsFiveKSec,
+    goalRaceVsThresholdSec,
+    fiveKAnchorStaleVsThreshold,
+    goalPaceTooCloseToThreshold,
+    athleteAerobicCeilingBpm,
     gapLines,
   };
 }

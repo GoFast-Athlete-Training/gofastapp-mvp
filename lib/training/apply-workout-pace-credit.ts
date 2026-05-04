@@ -1,5 +1,6 @@
 /**
- * Per-workout 5K pace credit after a matched quality run (Tempo/Intervals) with paceDelta >= 0.
+ * Per-workout 5K pace credit after a matched quality Intervals run with paceDelta >= 0.
+ * Tempo completions update threshold via apply-threshold-pace-credit.
  * Writes pace_adjustment_log for in-app notification when the profile pace actually moves.
  */
 
