@@ -15,20 +15,7 @@ export function parseWorkoutType(raw: unknown): WorkoutType | null {
   return WORKOUT_TYPES.includes(t as WorkoutType) ? (t as WorkoutType) : null;
 }
 
-/** Valid training intent codes for optional multi-select on catalogue rows. */
-export const TRAINING_INTENT_CODES = [
-  "THRESHOLD",
-  "VO2_MAX",
-  "SPEED",
-  "ENDURANCE",
-  "PACE_CONTROL",
-  "PACE_VARIATION",
-  "FATIGUE_RESISTANCE",
-  "RACE_SIMULATION",
-] as const;
-
-const TRAINING_INTENT_SET = new Set<string>(TRAINING_INTENT_CODES as unknown as string[]);
-
+/** Free-form purpose sentences (AI, manual entry, CSV); trimmed and deduped. */
 function parseTrainingIntentBody(body: Record<string, unknown>): string[] | undefined {
   if (!Object.prototype.hasOwnProperty.call(body, "trainingIntent")) return undefined;
   const raw = body.trainingIntent;
@@ -38,15 +25,13 @@ function parseTrainingIntentBody(body: Record<string, unknown>): string[] | unde
     for (const v of raw) {
       if (typeof v !== "string") continue;
       const t = v.trim();
-      if (TRAINING_INTENT_SET.has(t)) uniq.add(t);
+      if (t) uniq.add(t);
     }
     return [...uniq];
   }
   if (typeof raw === "string") {
-    for (const part of raw.split(",")) {
-      const t = part.trim();
-      if (TRAINING_INTENT_SET.has(t)) uniq.add(t);
-    }
+    const t = raw.trim();
+    if (t) uniq.add(t);
     return [...uniq];
   }
   return [];
@@ -143,7 +128,7 @@ export type CatalogueRowInput = {
   intendedHRBpmLow: number | null;
   intendedHRBpmHigh: number | null;
   notes: string | null;
-  /** Omit from bulk row = leave existing trainingIntent on update (undefined). */
+  /** Free-form purpose sentences; omit from bulk row = leave existing on update (undefined). */
   trainingIntent?: string[];
   /** Omitted in payload = leave existing value on update. */
   slug?: string | null;
