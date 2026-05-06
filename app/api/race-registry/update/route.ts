@@ -315,6 +315,10 @@ export async function POST(request: NextRequest) {
     }
     const charityUrlExtra = readOptionalTrimmedString(racePayload, "charityUrl");
     const officialWebsiteUrl = readOptionalTrimmedString(racePayload, "raceUrl");
+    const registrationOpenDate = readOptionalDateTime(
+      racePayload,
+      "registrationOpenDate"
+    );
     const registrationCloseDate = readOptionalDateTime(
       racePayload,
       "registrationDeadline"
@@ -376,6 +380,9 @@ export async function POST(request: NextRequest) {
       ...(charityUrlExtra !== undefined ? { charityUrl: charityUrlExtra } : {}),
       ...(officialWebsiteUrl !== undefined
         ? { officialWebsiteUrl }
+        : {}),
+      ...(registrationOpenDate !== undefined
+        ? { registrationOpenDate }
         : {}),
       ...(registrationCloseDate !== undefined
         ? { registrationCloseDate }
