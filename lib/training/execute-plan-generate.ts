@@ -1,6 +1,8 @@
 /**
  * One-shot plan generate: writes `planWeeks` + plan scalars only (no `workouts` rows).
- * Loads `training_plan_preset` boltons + optional long/intervals/tempo configs when `presetId` is set.
+ * Loads `training_plan_preset`: boltons (volumeConstraints, workoutConfig) plus long/intervals/tempo
+ * rotation configs. When `plan.presetId` is null, the oldest preset in the DB is used (MVP single-preset).
+ * Future: prefer `findUnique({ where: { slug } })` when multiple presets exist.
  *
  * Config resolution and catalogue rotation live in `generatePlanFromConfigs`;
  * the pure week builder is `generatePlanWorkoutRows` in `generate-plan.ts`.
@@ -28,6 +30,14 @@ const positionsInclude = {
       select: { id: true, name: true, workoutType: true, slug: true },
     },
   },
+} as const;
+
+const trainingPlanPresetInclude = {
+  volumeConstraints: true,
+  workoutConfig: true,
+  longRunConfig: { include: { positions: positionsInclude } },
+  intervalsConfig: { include: { positions: positionsInclude } },
+  tempoConfig: { include: { positions: positionsInclude } },
 } as const;
 
 function mapPositionRow(p: {
@@ -138,15 +148,12 @@ export async function executePlanGenerate(params: {
     plan.presetId
       ? prisma.training_plan_preset.findUnique({
           where: { id: plan.presetId },
-          include: {
-            volumeConstraints: true,
-            workoutConfig: true,
-            longRunConfig: { include: { positions: positionsInclude } },
-            intervalsConfig: { include: { positions: positionsInclude } },
-            tempoConfig: { include: { positions: positionsInclude } },
-          },
+          include: trainingPlanPresetInclude,
         })
-      : Promise.resolve(null),
+      : prisma.training_plan_preset.findFirst({
+          orderBy: { createdAt: "asc" },
+          include: trainingPlanPresetInclude,
+        }),
   ]);
 
   const planConfig: PlanGenConfig | undefined =

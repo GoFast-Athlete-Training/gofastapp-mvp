@@ -72,7 +72,7 @@ const DEFAULT_MIN_INTERVAL = 3;
 const DEFAULT_MIN_LONG = 8;
 const DEFAULT_MIN_EASY_DAY = 3;
 const DEFAULT_QUALITY_FRACTION = 0.22;
-const DEFAULT_QUALITY_SESSIONS = 1;
+const DEFAULT_QUALITY_SESSIONS = 2;
 
 /**
  * Merges optional `PlanGenConfig` and caller floors into a single `GeneratePlanInput`

@@ -394,7 +394,7 @@ export default function TrainingSetupPlanPage({
         return;
       }
 
-      const genRes = await fetch("/api/training-plan/generate", {
+      const genRes = await fetch("/api/training/plan/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

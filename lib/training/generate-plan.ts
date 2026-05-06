@@ -38,6 +38,12 @@ const DAY_NAMES = [
 ] as const;
 
 /**
+ * Internal cap on scheduled miles per tempo/interval session so weekly quality budget
+ * does not assume catalogue workouts larger than typical prescriptions. Not part of preset DB config.
+ */
+const CATALOGUE_QUALITY_SESSION_ESTIMATE_MI = 6;
+
+/**
  * Phases are contiguous `cycleLen`-week blocks from the race backward (last block = taper, prior = peak, then build, then base).
  * `nOffset`: 0 = race week; negative = weeks before race.
  * @param cycleLen e.g. 4 — must match the resolved `cycleLen` passed into `GeneratePlanInput` when building rows.
@@ -352,15 +358,24 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
     const lrFromSchedule = longRunSchedule[weekIndex0];
     const longMiRaw = lrFromSchedule?.distance ?? 0;
     const weeklyMi = Math.max(minWeekly, Math.min(100, input.weeklyMileageTarget));
-    const qualityMiTotal =
-      qualitySessions > 0 ? Math.round(weeklyMi * qualityFraction) : 0;
+
+    // Compute per-session raw budget from quality fraction, then cap each slot independently.
+    // Reclaimed miles from capping flow back into easy via the adjusted qualityMiTotal.
+    const perSessionRaw =
+      qualitySessions > 0
+        ? Math.max(1, Math.round((weeklyMi * qualityFraction) / qualitySessions))
+        : 0;
+    const slot0Miles =
+      qualitySessions >= 1 ? Math.min(perSessionRaw, CATALOGUE_QUALITY_SESSION_ESTIMATE_MI) : 0;
+    const slot1Miles =
+      qualitySessions >= 2 ? Math.min(perSessionRaw, CATALOGUE_QUALITY_SESSION_ESTIMATE_MI) : 0;
+    const qualityMiTotal = slot0Miles + slot1Miles;
+
     let longMi = longMiRaw;
     if (longMi + qualityMiTotal > weeklyMi) {
       longMi = Math.max(minLongMi, weeklyMi - qualityMiTotal);
     }
     const easyMi = Math.max(0, weeklyMi - longMi - qualityMiTotal);
-    const perSession =
-      qualitySessions > 0 ? Math.max(1, Math.round(qualityMiTotal / qualitySessions)) : 0;
 
     const assignment = new Map<number, AssignEntry>();
 
@@ -436,13 +451,15 @@ export function generatePlanWorkoutRows(input: GeneratePlanInput): GeneratedPlan
     }
 
     // 2) Tempo / interval quality slots (catalogue links at materialization)
-    if (!partialWeek1 && qualitySessions > 0 && perSession > 0) {
+    if (!partialWeek1 && qualitySessions > 0) {
       for (let slot = 0; slot < qualitySessions; slot++) {
+        const slotMiles = slot === 0 ? slot0Miles : slot1Miles;
+        if (slotMiles <= 0) continue;
         const idealDow = slot === 0 ? qualityDow1 : qualityDow2;
         const fallbackKind: DayKind = slot === 0 ? "tempo" : "interval";
-        const entry: AssignEntry = { kind: fallbackKind, miles: perSession };
+        const entry: AssignEntry = { kind: fallbackKind, miles: slotMiles };
         if (!tryPlaceQualityEntry(idealDow, entry, false)) {
-          extraEasyFromSkippedQuality += perSession;
+          extraEasyFromSkippedQuality += slotMiles;
         }
       }
     }

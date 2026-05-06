@@ -1,7 +1,7 @@
 /**
  * Conceptual split: **generate** vs **read/hydrate** (no extra API fields — naming is for engineers only).
  *
- * - **Generate** — `POST /api/training/plan/generate` (or `/api/training-plan/generate`) with
+ * - **Generate** — `POST /api/training/plan/generate` with
  *   `trainingPlanId` = `training_plans.id`, scoped by bearer `athleteId`. Writes **`planWeeks` + plan
  *   scalars only** (not `workouts` rows).
  * - **Week preview** — `GET /api/training/plan/week?planId=&weekNumber=` reads `planWeeks` and merges
