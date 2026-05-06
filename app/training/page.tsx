@@ -46,6 +46,7 @@ type PlanDetailHub = {
   planWeeks: unknown;
   currentFiveKPace?: string | null;
   _count?: { planned_workouts: number };
+  raceId?: string | null;
   race_registry: { name: string; raceDate?: string } | null;
 };
 
@@ -166,8 +167,15 @@ export default function TrainingHubPage() {
     id: string;
     name: string;
     raceName: string | null;
+    raceId: string | null;
   } | null>(null);
   const [archivingPastPlan, setArchivingPastPlan] = useState(false);
+  /** Whether the athlete has logged a result + reflection for the finished race. */
+  const [pastRaceResultStatus, setPastRaceResultStatus] = useState<{
+    hasResult: boolean;
+    hasReflection: boolean;
+    resultId: string | null;
+  } | null>(null);
 
   const paceDisplay = useMemo(() => {
     if (!planDetail) return null;
@@ -193,6 +201,7 @@ export default function TrainingHubPage() {
     setHubError(null);
     setPlanDetail(null);
     setPastRacePlan(null);
+    setPastRaceResultStatus(null);
     setWeekDays([]);
     setWeekPerformance(null);
     try {
@@ -220,9 +229,26 @@ export default function TrainingHubPage() {
           id: plan.id,
           name: plan.name,
           raceName: plan.race_registry?.name ?? null,
+          raceId: plan.raceId ?? null,
         });
         setWeekDays([]);
         setWeekPerformance(null);
+        // Probe whether the athlete already logged a result + reflection
+        if (plan.raceId) {
+          fetch(`/api/race-results?raceRegistryId=${encodeURIComponent(plan.raceId)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+            .then((r) => r.json() as Promise<{ results?: Array<{ id: string; officialFinishTime?: string | null; reflection?: string | null }> }>)
+            .then(({ results }) => {
+              const first = results?.[0] ?? null;
+              setPastRaceResultStatus({
+                hasResult: Boolean(first?.officialFinishTime),
+                hasReflection: Boolean(first?.reflection),
+                resultId: first ? first.id : null,
+              });
+            })
+            .catch(() => {/* non-critical */});
+        }
         return;
       }
 
@@ -412,14 +438,24 @@ export default function TrainingHubPage() {
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
         <TrainingSubNavMobile active={activeSubNav} onNavigate={handleSubNav} />
         <div className="mb-6 lg:mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Training</h1>
-          <p className="text-gray-600 text-sm sm:text-base">
-            Your week at a glance, recent runs, and tools. Use{" "}
-            <Link href="/workouts" className="font-semibold text-orange-600 hover:text-orange-700">
-              Workouts
-            </Link>{" "}
-            to log standalone sessions or open the full run log.
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Training</h1>
+              <p className="text-gray-600 text-sm sm:text-base">
+                Your week at a glance, recent runs, and tools. Use{" "}
+                <Link href="/workouts" className="font-semibold text-orange-600 hover:text-orange-700">
+                  Workouts
+                </Link>{" "}
+                to log standalone sessions or open the full run log.
+              </p>
+            </div>
+            <Link
+              href="/training/past-plans"
+              className="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-sm hover:border-gray-300 hover:text-gray-900"
+            >
+              Past plans
+            </Link>
+          </div>
         </div>
 
         {loading && (
@@ -452,15 +488,38 @@ export default function TrainingHubPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800 mb-1">
               Race complete
             </p>
-            <h2 className="text-2xl font-bold text-gray-900 mb-1">
-              You did it.
-            </h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-1">You did it.</h2>
             {pastRacePlan.raceName && (
               <p className="text-base text-gray-700 mb-4">{pastRacePlan.raceName}</p>
             )}
-            <p className="text-sm text-gray-600 mb-6">
+            <p className="text-sm text-gray-600 mb-5">
               Your race is done. Archive this plan and pick your next goal when you&apos;re ready.
             </p>
+
+            {/* Callouts: missing result or reflection */}
+            {pastRaceResultStatus && (!pastRaceResultStatus.hasResult || !pastRaceResultStatus.hasReflection) && pastRacePlan.raceId && (
+              <div className="mb-5 space-y-2">
+                {!pastRaceResultStatus.hasResult && (
+                  <Link
+                    href={`/race-hub/${pastRacePlan.raceId}#log-result`}
+                    className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800 hover:bg-amber-100"
+                  >
+                    <span className="text-base">🏅</span>
+                    Log your finish time
+                  </Link>
+                )}
+                {pastRaceResultStatus.hasResult && !pastRaceResultStatus.hasReflection && (
+                  <Link
+                    href={`/race-hub/${pastRacePlan.raceId}#reflection`}
+                    className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-800 hover:bg-blue-100"
+                  >
+                    <span className="text-base">✍️</span>
+                    Add a race reflection
+                  </Link>
+                )}
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-3">
               <Link
                 href="/training-setup"
