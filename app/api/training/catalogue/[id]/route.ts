@@ -8,6 +8,31 @@ import { bodyToCatalogueRow } from "@/lib/training/catalogue-row";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
+export async function GET(request: NextRequest, ctx: RouteCtx) {
+  const authErr = await assertStaffBearerAuth(request);
+  if (authErr) return authErr;
+
+  const { id } = await ctx.params;
+  if (!id) {
+    return NextResponse.json({ success: false, error: "Missing id" }, { status: 400 });
+  }
+
+  try {
+    const item = await prisma.workout_catalogue.findUnique({ where: { id } });
+    if (!item) {
+      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+    }
+    return NextResponse.json({ success: true, item });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Server error";
+    console.error("GET /api/training/catalogue/[id]", e);
+    return NextResponse.json(
+      { success: false, error: "Server error", details: msg },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PUT(request: NextRequest, ctx: RouteCtx) {
   const authErr = await assertStaffBearerAuth(request);
   if (authErr) return authErr;
