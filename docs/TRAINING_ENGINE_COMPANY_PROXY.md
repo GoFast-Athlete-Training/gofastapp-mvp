@@ -29,6 +29,6 @@ The product app verifies the JWT and requires both headers (`lib/training/traini
 - `POST /api/rulesets/cluster` (OpenAI clustering; needs `OPENAI_API_KEY` on product)
 - `GET|POST /api/training/catalogue` (workout catalogue CRUD)
 - `PUT|DELETE /api/training/catalogue/[id]`
-- `POST /api/training/catalogue/bulk` (body `{ items: [...] }`, upsert by `name` + `workoutType`)
+- `POST /api/training/catalogue/bulk` — body `{ items: [...] }`. Each item mirrors writable `workout_catalogue` fields; **`name`** and **`workoutType`** required; other keys optional / `null`. Upsert by `(name, workoutType)`.
 
 Plan generation for athletes uses `lib/training/prompt-resolver.ts` (no Company hop).

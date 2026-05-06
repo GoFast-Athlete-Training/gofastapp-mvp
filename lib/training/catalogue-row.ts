@@ -38,9 +38,66 @@ function parseTrainingIntentBody(body: Record<string, unknown>): string[] | unde
   return [];
 }
 
-const PACE_ANCHORS = new Set(["currentBuildup", "mpSimulation"]);
 const MP_BLOCK_POSITIONS = new Set(["BACK_HALF", "FRONT_HALF", "EVEN"]);
 const MP_BLOCK_PROGRESSIONS = new Set(["flat", "progressive"]);
+
+/**
+ * Bulk / CSV-friendly pace anchor: matches DB default when omitted.
+ * Accepts canonical tokens plus common spreadsheet variants (case/spacing insensitive).
+ */
+export function normalizePaceAnchorInput(raw: unknown): {
+  ok: true;
+  value: "currentBuildup" | "mpSimulation";
+} | { ok: false; error: string } {
+  if (raw === null || raw === undefined) {
+    return { ok: true, value: "currentBuildup" };
+  }
+  if (typeof raw !== "string") {
+    return {
+      ok: false,
+      error:
+        "paceAnchor must be a string or omitted (use currentBuildup or mpSimulation)",
+    };
+  }
+  const t = raw.trim();
+  if (!t) return { ok: true, value: "currentBuildup" };
+
+  if (t === "currentBuildup" || t === "mpSimulation") {
+    return { ok: true, value: t };
+  }
+
+  const k = t.toLowerCase().replace(/[\s_-]/g, "");
+
+  const currentAliases = new Set([
+    "currentbuildup",
+    "5k",
+    "fivek",
+    "vs5k",
+    "fitness",
+    "buildup",
+    "current",
+    "currentfitness",
+  ]);
+  const mpAliases = new Set([
+    "mpsimulation",
+    "mp",
+    "marathon",
+    "goalrace",
+    "marathonpace",
+    "marathonpacesimulation",
+    "mppacesimulation",
+    "racegoal",
+  ]);
+
+  if (currentAliases.has(k)) return { ok: true, value: "currentBuildup" };
+  if (mpAliases.has(k)) return { ok: true, value: "mpSimulation" };
+
+  return {
+    ok: false,
+    error:
+      "paceAnchor must be currentBuildup or mpSimulation (CSV aliases: 5k, fitness, mp, marathon, …)",
+  };
+}
 
 /** Lists of segments, or blockRepeat objects ({ layout, segments, repeatCount, ... }). */
 function isValidSegmentPaceDistParsed(v: unknown): boolean {
@@ -173,17 +230,9 @@ export function bodyToCatalogueRow(body: Record<string, unknown>): {
   const wj = parseSegmentPaceDist(body);
   if (!wj.ok) return wj;
 
-  let paceAnchor = "currentBuildup";
-  if (typeof body.paceAnchor === "string" && body.paceAnchor.trim()) {
-    const pa = body.paceAnchor.trim();
-    if (!PACE_ANCHORS.has(pa)) {
-      return {
-        ok: false,
-        error: "paceAnchor must be currentBuildup or mpSimulation",
-      };
-    }
-    paceAnchor = pa;
-  }
+  const paceParsed = normalizePaceAnchorInput(body.paceAnchor);
+  if (!paceParsed.ok) return paceParsed;
+  const paceAnchor = paceParsed.value;
 
   let mpBlockProgression = "flat";
   if (typeof body.mpBlockProgression === "string" && body.mpBlockProgression.trim()) {

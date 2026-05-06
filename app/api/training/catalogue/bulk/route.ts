@@ -12,8 +12,15 @@ import {
 import { generateCatalogueSlug } from "@/lib/training/catalogue-slug";
 
 /**
- * POST body: { items: Record<string, unknown>[] }
- * Upserts each row by unique (name, workoutType).
+ * POST body: `{ items: Record<string, unknown>[] }`
+ *
+ * Each element is parsed like a single catalogue upsert: shape matches writable
+ * `workout_catalogue` columns (see Prisma). Required per row: **`name`**, **`workoutType`**.
+ * Everything else is optional — omit or send `null` for DB nulls. Defaults match Prisma:
+ * `paceAnchor` → `currentBuildup`, `mpBlockProgression` → `flat`. Legacy JSON keys
+ * (`segmentPatternJson`, `workSegmentsJson`) are accepted where documented in `bodyToCatalogueRow`.
+ *
+ * Upserts by unique `(name, workoutType)`.
  */
 export async function POST(request: NextRequest) {
   const authErr = await assertStaffBearerAuth(request);
