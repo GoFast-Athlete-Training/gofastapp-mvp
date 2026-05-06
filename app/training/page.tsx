@@ -49,6 +49,16 @@ type PlanDetailHub = {
   race_registry: { name: string; raceDate?: string } | null;
 };
 
+/** Race calendar day is fully before today (UTC) — show reset hub, not training dashboard. */
+function isRaceCalendarBeforeToday(raceDateYmd: string | undefined | null): boolean {
+  if (!raceDateYmd || typeof raceDateYmd !== "string") return false;
+  const t = Date.parse(raceDateYmd);
+  if (!Number.isFinite(t)) return false;
+  const raceDay = utcDateOnly(new Date(t));
+  const today = utcDateOnly(new Date());
+  return raceDay.getTime() < today.getTime();
+}
+
 function hasSchedule(p: PlanDetailHub): boolean {
   return Array.isArray(p.planWeeks) && (p.planWeeks as unknown[]).length > 0;
 }
@@ -151,6 +161,13 @@ export default function TrainingHubPage() {
   const [selectedDayKey, setSelectedDayKey] = useState<string>("");
   const [lastWorkout, setLastWorkout] = useState<LastWorkoutStrip | null>(null);
   const [fallbackActivity, setFallbackActivity] = useState<FallbackActivityStrip | null>(null);
+  /** Active plan in DB is past race day — prompt next goal instead of full schedule UI. */
+  const [pastRacePlan, setPastRacePlan] = useState<{
+    id: string;
+    name: string;
+    raceName: string | null;
+  } | null>(null);
+  const [archivingPastPlan, setArchivingPastPlan] = useState(false);
 
   const paceDisplay = useMemo(() => {
     if (!planDetail) return null;
@@ -175,6 +192,7 @@ export default function TrainingHubPage() {
     setLoading(true);
     setHubError(null);
     setPlanDetail(null);
+    setPastRacePlan(null);
     setWeekDays([]);
     setWeekPerformance(null);
     try {
@@ -194,8 +212,21 @@ export default function TrainingHubPage() {
         token
       );
       const plan = raw as PlanDetailHub;
-      setPlanDetail(plan);
       setAthleteFiveKPace(athPace);
+
+      if (isRaceCalendarBeforeToday(plan.race_registry?.raceDate)) {
+        setPlanDetail(null);
+        setPastRacePlan({
+          id: plan.id,
+          name: plan.name,
+          raceName: plan.race_registry?.name ?? null,
+        });
+        setWeekDays([]);
+        setWeekPerformance(null);
+        return;
+      }
+
+      setPlanDetail(plan);
       if (hasSchedule(plan)) {
         const wn = currentTrainingWeekNumber(
           plan.startDate,
@@ -325,6 +356,36 @@ export default function TrainingHubPage() {
     }
   }
 
+  async function archivePastPlan() {
+    if (!pastRacePlan) return;
+    if (
+      !window.confirm(
+        "Archive this finished plan? It won’t show as your active training plan. Your workouts stay in your log."
+      )
+    ) {
+      return;
+    }
+    setArchivingPastPlan(true);
+    try {
+      const u = auth.currentUser;
+      if (!u) return;
+      const token = await u.getIdToken();
+      const res = await fetch(`/api/training-plan/${pastRacePlan.id}`, {
+        method: "PATCH",
+        headers: {
+          ...athleteBearerFetchHeaders(token),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ lifecycleStatus: "ARCHIVED" }),
+      });
+      if (res.ok) {
+        await loadHub();
+      }
+    } finally {
+      setArchivingPastPlan(false);
+    }
+  }
+
   const showDashboard = !!planDetail && hasSchedule(planDetail);
   const showIncompletePlan = !!planDetail && !hasSchedule(planDetail);
 
@@ -371,7 +432,7 @@ export default function TrainingHubPage() {
           </p>
         )}
 
-        {authReady && !loading && !planDetail && (
+        {authReady && !loading && !planDetail && !pastRacePlan && (
           <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm mb-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">No active plan yet</h2>
             <p className="text-sm text-gray-600 mb-6">
@@ -383,6 +444,39 @@ export default function TrainingHubPage() {
             >
               Start or connect a plan
             </Link>
+          </div>
+        )}
+
+        {authReady && !loading && pastRacePlan && (
+          <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/80 p-8 shadow-sm mb-8">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800 mb-1">
+              Race complete
+            </p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-1">
+              You did it.
+            </h2>
+            {pastRacePlan.raceName && (
+              <p className="text-base text-gray-700 mb-4">{pastRacePlan.raceName}</p>
+            )}
+            <p className="text-sm text-gray-600 mb-6">
+              Your race is done. Archive this plan and pick your next goal when you&apos;re ready.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/training-setup"
+                className="inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+              >
+                Set next goal
+              </Link>
+              <button
+                type="button"
+                disabled={archivingPastPlan}
+                onClick={() => void archivePastPlan()}
+                className="inline-flex justify-center rounded-xl border-2 border-emerald-600 bg-white px-5 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50"
+              >
+                {archivingPastPlan ? "Archiving…" : "Archive plan"}
+              </button>
+            </div>
           </div>
         )}
 
