@@ -12,6 +12,7 @@ export function parseWorkoutType(raw: unknown): WorkoutType | null {
   if (typeof raw !== "string") return null;
   const t = raw.trim();
   if (t === "SpeedDuration") return "Tempo";
+  if (t === "Interval") return "Intervals";
   return WORKOUT_TYPES.includes(t as WorkoutType) ? (t as WorkoutType) : null;
 }
 
