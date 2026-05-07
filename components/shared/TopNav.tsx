@@ -46,7 +46,7 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
         <div className="flex items-center justify-between">
           {/* Left: Logo */}
           <div className="flex items-center gap-3">
-            <Link href="/my-runcrews" className="flex items-center gap-3">
+            <Link href="/athlete-home" className="flex items-center gap-3">
               <img src="/logo.jpg" alt="GoFast" className="w-8 h-8 rounded-full" />
               <span className="text-xl font-bold text-gray-900 hidden sm:inline">GoFast</span>
             </Link>

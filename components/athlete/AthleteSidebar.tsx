@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
-import { Bike, Home, LayoutDashboard, MapPin, Trophy, User } from "lucide-react";
+import { Bike, Home, LayoutDashboard, MapPin, Trophy, User, Users } from "lucide-react";
 
 type NavItem = {
   label: string;
@@ -20,8 +20,16 @@ function trainingHubMatch(p: string | null): boolean {
     p.startsWith("/workouts") ||
     p.startsWith("/journal") ||
     p.startsWith("/ask-coach") ||
-    p.startsWith("/my-runcrews") ||
     p.startsWith("/build-a-run")
+  );
+}
+
+function runCrewHubMatch(p: string | null): boolean {
+  if (!p) return false;
+  return (
+    p === "/my-runcrews" ||
+    p.startsWith("/runcrew-discovery") ||
+    p.startsWith("/runcrew/")
   );
 }
 
@@ -48,6 +56,12 @@ const navItems: NavItem[] = [
     href: "/gorun",
     icon: MapPin,
     match: (p) => !!p && (p === "/gorun" || p.startsWith("/gorun/")),
+  },
+  {
+    label: "Run crews",
+    href: "/my-runcrews",
+    icon: Users,
+    match: runCrewHubMatch,
   },
   { label: "Races", href: "/races", icon: Trophy },
   {

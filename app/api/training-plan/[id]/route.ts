@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { totalWeeksFromDates, ymdFromDate } from "@/lib/training/plan-utils";
 import { TrainingPlanLifecycle } from "@prisma/client";
-import { archiveOtherActivePlans } from "@/lib/training/plan-lifecycle";
+import { archiveOtherActivePlans, cascadeLinkedGoalAfterPlanArchived } from "@/lib/training/plan-lifecycle";
 import { normalizePreferredQualityDays } from "@/lib/training/preferred-quality-days";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -249,6 +249,10 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         _count: { select: { planned_workouts: true } },
       },
     });
+
+    if (body.lifecycleStatus === TrainingPlanLifecycle.ARCHIVED) {
+      await cascadeLinkedGoalAfterPlanArchived(id, auth.athlete.id);
+    }
 
     const athleteRow = await prisma.athlete.findUnique({
       where: { id: auth.athlete.id },

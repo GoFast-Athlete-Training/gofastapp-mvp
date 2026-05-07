@@ -8,6 +8,7 @@ import { auth } from "@/lib/firebase";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
+import { utcDateOnly } from "@/lib/training/plan-utils";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 
 type RaceRegistryLite = {
@@ -44,8 +45,20 @@ function goalRaceReady(g: GoalRow): boolean {
   return !!g.raceRegistryId && !!g.race_registry;
 }
 
+/** Race calendar (UTC date-only) is strictly before today — matches training hub “past race” logic. */
+function raceRegistryDateIsBeforeToday(iso: string): boolean {
+  const t = Date.parse(iso.includes("T") ? iso : `${iso}T12:00:00Z`);
+  if (!Number.isFinite(t)) return false;
+  const raceDay = utcDateOnly(new Date(t));
+  const today = utcDateOnly(new Date());
+  return raceDay.getTime() < today.getTime();
+}
+
 function isQualifyingGoal(g: GoalRow): boolean {
-  return g.status === "ACTIVE" && goalRaceReady(g) && goalTimeReady(g);
+  if (g.status !== "ACTIVE" || !goalRaceReady(g) || !goalTimeReady(g)) return false;
+  const rd = g.race_registry?.raceDate;
+  if (!rd || raceRegistryDateIsBeforeToday(rd)) return false;
+  return true;
 }
 
 type ActivePlanLite = {
@@ -117,6 +130,19 @@ export default function TrainingSetupClient() {
   const [replaceBlockPlan, setReplaceBlockPlan] = useState<ActivePlanLite | null>(null);
 
   const qualifyingGoals = useMemo(() => goals.filter(isQualifyingGoal), [goals]);
+
+  const pastRaceGoals = useMemo(
+    () =>
+      goals.filter(
+        (g) =>
+          g.status === "ACTIVE" &&
+          goalRaceReady(g) &&
+          goalTimeReady(g) &&
+          !!g.race_registry?.raceDate &&
+          raceRegistryDateIsBeforeToday(g.race_registry.raceDate)
+      ),
+    [goals]
+  );
 
   const incompleteRaceNeedsTime = useMemo(
     () =>
@@ -411,8 +437,8 @@ export default function TrainingSetupClient() {
                     You already have an active plan for this goal
                   </p>
                   <p className="mb-3 text-amber-900/90">
-                    Open it to keep your schedule, or replace it with a new plan (the current one
-                    will be archived).
+                    Open it to keep your schedule, or start a fresh plan — your current training will
+                    be saved to history.
                   </p>
                   <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     <button
@@ -430,7 +456,7 @@ export default function TrainingSetupClient() {
                       onClick={() => void createPlan({ forceReplace: true })}
                       className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                     >
-                      Replace with new plan
+                      Start fresh with this goal
                     </button>
                   </div>
                 </div>
@@ -549,9 +575,52 @@ export default function TrainingSetupClient() {
                 Continue to plan
               </Link>
               <p className="mt-3 text-xs text-emerald-800/80">
-                Use the goals below only if you want a different goal. Creating another plan for the
-                same goal will ask before replacing this one.
+                Pick a goal below if you&apos;re aiming at a different race. Starting another plan for
+                the same goal saves your current plan first — we&apos;ll confirm before swapping.
               </p>
+            </div>
+          )}
+
+          {!loadingOrientation && pastRaceGoals.length > 0 && (
+            <div className="mb-6 space-y-3">
+              <h2 className="text-sm font-semibold text-gray-800">Past race</h2>
+              <ul className="space-y-3">
+                {pastRaceGoals.map((g) => (
+                  <li
+                    key={g.id}
+                    className="rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                      Complete
+                    </p>
+                    <div className="mb-1 font-medium text-gray-900">{g.race_registry?.name ?? "Race"}</div>
+                    <div className="text-xs text-gray-600 mb-3">
+                      {g.race_registry
+                        ? `${formatRaceWhen(g.race_registry.raceDate)} · Goal time ${g.goalTime}`
+                        : g.goalTime}
+                    </div>
+                    <p className="text-sm text-gray-700 mb-3">
+                      That race date has passed. Log your result or browse for your next one.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {g.raceRegistryId ? (
+                        <Link
+                          href={`/race-hub/${g.raceRegistryId}`}
+                          className="inline-flex justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                        >
+                          Log your result
+                        </Link>
+                      ) : null}
+                      <Link
+                        href="/races"
+                        className="inline-flex justify-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+                      >
+                        Find your next race
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 
@@ -650,6 +719,7 @@ export default function TrainingSetupClient() {
 
           {!loadingOrientation &&
             qualifyingGoals.length === 0 &&
+            pastRaceGoals.length === 0 &&
             signups.length === 0 &&
             !incompleteRaceNeedsTime &&
             !activeNeedsRace && (

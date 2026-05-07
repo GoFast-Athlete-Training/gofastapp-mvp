@@ -169,7 +169,6 @@ export default function TrainingHubPage() {
     raceName: string | null;
     raceId: string | null;
   } | null>(null);
-  const [archivingPastPlan, setArchivingPastPlan] = useState(false);
   /** Whether the athlete has logged a result + reflection for the finished race. */
   const [pastRaceResultStatus, setPastRaceResultStatus] = useState<{
     hasResult: boolean;
@@ -382,36 +381,6 @@ export default function TrainingHubPage() {
     }
   }
 
-  async function archivePastPlan() {
-    if (!pastRacePlan) return;
-    if (
-      !window.confirm(
-        "Archive this finished plan? It won’t show as your active training plan. Your workouts stay in your log."
-      )
-    ) {
-      return;
-    }
-    setArchivingPastPlan(true);
-    try {
-      const u = auth.currentUser;
-      if (!u) return;
-      const token = await u.getIdToken();
-      const res = await fetch(`/api/training-plan/${pastRacePlan.id}`, {
-        method: "PATCH",
-        headers: {
-          ...athleteBearerFetchHeaders(token),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ lifecycleStatus: "ARCHIVED" }),
-      });
-      if (res.ok) {
-        await loadHub();
-      }
-    } finally {
-      setArchivingPastPlan(false);
-    }
-  }
-
   const showDashboard = !!planDetail && hasSchedule(planDetail);
   const showIncompletePlan = !!planDetail && !hasSchedule(planDetail);
 
@@ -493,7 +462,8 @@ export default function TrainingHubPage() {
               <p className="text-base text-gray-700 mb-4">{pastRacePlan.raceName}</p>
             )}
             <p className="text-sm text-gray-600 mb-5">
-              Your race is done. Archive this plan and pick your next goal when you&apos;re ready.
+              You put in the work. Your training history is saved — review it or pick your next race
+              whenever you&apos;re ready.
             </p>
 
             {/* Callouts: missing result or reflection */}
@@ -522,19 +492,17 @@ export default function TrainingHubPage() {
 
             <div className="flex flex-wrap gap-3">
               <Link
-                href="/training-setup"
+                href="/races"
                 className="inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
               >
-                Set next goal
+                Find your next race
               </Link>
-              <button
-                type="button"
-                disabled={archivingPastPlan}
-                onClick={() => void archivePastPlan()}
-                className="inline-flex justify-center rounded-xl border-2 border-emerald-600 bg-white px-5 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50"
+              <Link
+                href={`/training-setup/${pastRacePlan.id}`}
+                className="inline-flex justify-center rounded-xl border-2 border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
               >
-                {archivingPastPlan ? "Archiving…" : "Archive plan"}
-              </button>
+                Analyze your plan
+              </Link>
             </div>
           </div>
         )}
