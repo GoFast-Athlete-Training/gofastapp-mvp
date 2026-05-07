@@ -1,3 +1,6 @@
+/** Colon-separated race clock for manual entry: 45:20 or 3:45:30 */
+export const FINISH_TIME_PATTERN = /^\d{1,2}:\d{2}(:\d{2})?$/;
+
 /** Format total seconds as H:MM:SS or M:SS (for display / API consistency). */
 export function formatDurationSecondsToClock(totalSec: number): string {
   if (!Number.isFinite(totalSec) || totalSec < 0) return "";

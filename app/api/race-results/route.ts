@@ -8,8 +8,31 @@ import {
   createRaceResult,
   getRaceResultByGoalId,
   listRaceResultsByRegistry,
+  normalizeRacePhotoUrls,
   saveRaceResultExtended,
 } from "@/lib/race-result-service";
+
+function pickOptionalString(
+  body: Record<string, unknown>,
+  key: string
+): string | null | undefined {
+  if (!(key in body)) return undefined;
+  const v = body[key];
+  if (v === null) return null;
+  if (typeof v === "string") return v;
+  return undefined;
+}
+
+function pickOptionalNumber(
+  body: Record<string, unknown>,
+  key: string
+): number | null | undefined {
+  if (!(key in body)) return undefined;
+  const v = body[key];
+  if (v === null) return null;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  return undefined;
+}
 
 export async function GET(request: NextRequest) {
   const auth = await requireAthleteFromBearer(request);
@@ -29,11 +52,7 @@ export async function GET(request: NextRequest) {
           include: { race_registry: { select: { name: true } } },
         });
         if (g) {
-          analysis = analyzeRaceResult(
-            result,
-            g,
-            g.race_registry?.name ?? "Your race"
-          );
+          analysis = analyzeRaceResult(result, g, g.race_registry?.name ?? "Your race");
         }
       }
       return NextResponse.json({ result, analysis });
@@ -79,23 +98,16 @@ export async function POST(request: NextRequest) {
         raceRegistryId,
         goalId,
         signupId: typeof body.signupId === "string" ? body.signupId : null,
-        officialFinishTime:
-          typeof body.officialFinishTime === "string" ? body.officialFinishTime : null,
-        chipTime: typeof body.chipTime === "string" ? body.chipTime : null,
-        gunTime: typeof body.gunTime === "string" ? body.gunTime : null,
-        garminActivityId:
-          typeof body.garminActivityId === "string" ? body.garminActivityId : null,
-        notes: typeof body.notes === "string" ? body.notes : null,
-        overallPlace:
-          typeof body.overallPlace === "number" && Number.isFinite(body.overallPlace)
-            ? body.overallPlace
-            : null,
-        ageGroupPlace:
-          typeof body.ageGroupPlace === "number" && Number.isFinite(body.ageGroupPlace)
-            ? body.ageGroupPlace
-            : null,
-        howFeltRating: typeof body.howFeltRating === "number" ? body.howFeltRating : null,
-        reflection: typeof body.reflection === "string" ? body.reflection : null,
+        officialFinishTime: pickOptionalString(body, "officialFinishTime"),
+        chipTime: pickOptionalString(body, "chipTime"),
+        gunTime: pickOptionalString(body, "gunTime"),
+        garminActivityId: pickOptionalString(body, "garminActivityId"),
+        notes: pickOptionalString(body, "notes"),
+        overallPlace: pickOptionalNumber(body, "overallPlace"),
+        ageGroupPlace: pickOptionalNumber(body, "ageGroupPlace"),
+        howFeltRating: pickOptionalNumber(body, "howFeltRating"),
+        reflection: pickOptionalString(body, "reflection"),
+        racePhotoUrls: normalizeRacePhotoUrls(body.racePhotoUrls),
       });
       return NextResponse.json({
         result: out.result,
@@ -114,6 +126,7 @@ export async function POST(request: NextRequest) {
         howFeltRating: typeof body.howFeltRating === "number" ? body.howFeltRating : null,
         notes: typeof body.notes === "string" ? body.notes : null,
         reflection: typeof body.reflection === "string" ? body.reflection : null,
+        racePhotoUrls: body.racePhotoUrls,
       });
       return NextResponse.json({
         result: out.result,
@@ -125,11 +138,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "raceRegistryId or goalId is required" }, { status: 400 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown";
-    if (
+    const client400 =
       msg.includes("not found") ||
       msg.includes("Link this goal") ||
-      msg.includes("does not match")
-    ) {
+      msg.includes("does not match") ||
+      msg.includes("Invalid race time") ||
+      msg.includes("Enter a finish time") ||
+      msg.includes("finish time instead") ||
+      msg.includes("Activity not found") ||
+      msg.includes("does not belong") ||
+      msg.includes("no duration");
+    if (client400) {
       return NextResponse.json({ error: msg }, { status: 400 });
     }
     console.error("POST /api/race-results:", err);

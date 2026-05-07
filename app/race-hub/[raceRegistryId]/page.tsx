@@ -19,6 +19,7 @@ import {
   getPublicRacePageUrl,
 } from "@/lib/public-race-url";
 import LogRaceResultSheet from "@/components/races/LogRaceResultSheet";
+import RaceHubRaceReflectionSection from "@/components/races/RaceHubRaceReflectionSection";
 import {
   Calendar,
   ChevronDown,
@@ -137,6 +138,8 @@ type MyRaceResultRow = {
   actualAvgPaceSecPerMile: number | null;
   overallPlace: number | null;
   ageGroupPlace: number | null;
+  reflection: string | null;
+  racePhotoUrls: string[];
 };
 
 function formatSecPerMileForHub(sec: number | null | undefined): string {
@@ -270,7 +273,13 @@ function RaceHubPageInner() {
       setShakeouts((shRes.data?.shakeouts as ShakeoutRunRow[]) || []);
       const results = rrRes.data?.results;
       if (Array.isArray(results) && results[0] && typeof results[0].id === "string") {
-        const r = results[0] as MyRaceResultRow;
+        const r = results[0] as MyRaceResultRow & {
+          reflection?: unknown;
+          racePhotoUrls?: unknown;
+        };
+        const photoUrls = Array.isArray(r.racePhotoUrls)
+          ? r.racePhotoUrls.filter((u): u is string => typeof u === "string")
+          : [];
         setMyRaceResult({
           id: r.id,
           officialFinishTime: r.officialFinishTime ?? null,
@@ -278,6 +287,8 @@ function RaceHubPageInner() {
           actualAvgPaceSecPerMile: r.actualAvgPaceSecPerMile ?? null,
           overallPlace: r.overallPlace ?? null,
           ageGroupPlace: r.ageGroupPlace ?? null,
+          reflection: typeof r.reflection === "string" ? r.reflection : null,
+          racePhotoUrls: photoUrls,
         });
       } else {
         setMyRaceResult(null);
@@ -356,6 +367,18 @@ function RaceHubPageInner() {
       unsub();
     };
   }, [raceRegistryId, router, loadHubData]);
+
+  useEffect(() => {
+    if (loading || joinRedirecting || !myRaceResult?.id) return;
+    if (typeof window === "undefined") return;
+    if (window.location.hash !== "#reflection") return;
+    window.requestAnimationFrame(() => {
+      document.getElementById("reflection")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }, [loading, joinRedirecting, myRaceResult?.id]);
 
   const postAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -703,6 +726,16 @@ function RaceHubPageInner() {
                   {myRaceResult ? "Update result" : "Log your result"}
                 </button>
               </section>
+
+              {myRaceResult ? (
+                <RaceHubRaceReflectionSection
+                  raceName={race.name}
+                  resultId={myRaceResult.id}
+                  reflection={myRaceResult.reflection}
+                  racePhotoUrls={myRaceResult.racePhotoUrls}
+                  onUpdated={() => void loadHubData()}
+                />
+              ) : null}
 
               <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6">
                 <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">

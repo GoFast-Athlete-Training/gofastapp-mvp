@@ -512,6 +512,8 @@ model athlete_race_results {
   /// Snapshot: Marathon, 5K, etc.
   distanceLabel          String?
   reflection             String?  @db.Text
+  /// Public URLs (e.g. Vercel Blob) for race-day photos; no enforced max count.
+  racePhotoUrls          String[] @default([])
   howFeltRating          Int?
   actualDistanceMeters     Float?
   actualAvgPaceSecPerMile  Int?

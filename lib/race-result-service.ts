@@ -107,6 +107,7 @@ export type CreateRaceResultInput = {
   howFeltRating?: number | null;
   notes?: string | null;
   reflection?: string | null;
+  racePhotoUrls?: unknown;
 };
 
 export type SaveRaceResultExtendedInput = {
@@ -122,7 +123,24 @@ export type SaveRaceResultExtendedInput = {
   ageGroupPlace?: number | null;
   howFeltRating?: number | null;
   reflection?: string | null;
+  racePhotoUrls?: string[] | null;
 };
+
+/** Normalize photo URL list from API input; undefined = leave unchanged in partial updates. */
+export function normalizeRacePhotoUrls(input: unknown): string[] | undefined {
+  if (input === undefined) return undefined;
+  if (input === null) return [];
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((u): u is string => typeof u === "string" && u.trim().length > 0)
+    .map((s) => s.trim());
+}
+
+function trimOrNull(v: string | null | undefined): string | null {
+  if (v == null) return null;
+  const t = String(v).trim();
+  return t.length ? t : null;
+}
 
 /**
  * Full save (LogRaceResultSheet + simple modal): upsert row, goal/PR analysis when a finish time is present.
@@ -141,7 +159,34 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
     ageGroupPlace,
     howFeltRating,
     reflection,
+    racePhotoUrls: inputRacePhotoUrls,
   } = input;
+
+  const racePhotoUrls = normalizeRacePhotoUrls(inputRacePhotoUrls);
+
+  const existingRow = await prisma.athlete_race_results.findUnique({
+    where: { athleteId_raceRegistryId: { athleteId, raceRegistryId } },
+    select: {
+      chipTime: true,
+      gunTime: true,
+      garminActivityId: true,
+      notes: true,
+      overallPlace: true,
+      ageGroupPlace: true,
+      howFeltRating: true,
+      reflection: true,
+      racePhotoUrls: true,
+    },
+  });
+
+  const mergedGarminId =
+    garminActivityId !== undefined
+      ? trimOrNull(garminActivityId)
+      : existingRow?.garminActivityId ?? null;
+
+  const chipEffective =
+    chipTime !== undefined ? trimOrNull(chipTime) : existingRow?.chipTime ?? null;
+  const gunEffective = gunTime !== undefined ? trimOrNull(gunTime) : existingRow?.gunTime ?? null;
 
   const reg = await prisma.race_registry.findFirst({
     where: { id: raceRegistryId },
@@ -166,30 +211,41 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
     throw new Error("Goal does not match this race");
   }
 
-  const displayTime =
-    (officialFinishTime && String(officialFinishTime).trim()) ||
-    (chipTime && String(chipTime).trim()) ||
-    (gunTime && String(gunTime).trim()) ||
-    "";
+  let displayTime =
+    trimOrNull(officialFinishTime) || chipEffective || gunEffective || "";
 
-  let finishTimeSeconds: number | null = null;
-  if (displayTime) {
-    try {
-      finishTimeSeconds = parseRaceTimeToSeconds(displayTime);
-    } catch {
-      finishTimeSeconds = null;
+  let timeDerivedFromGarminActivity = false;
+  if (!displayTime && mergedGarminId) {
+    const activity = await prisma.athlete_activities.findFirst({
+      where: { id: mergedGarminId, athleteId },
+      select: { id: true, duration: true },
+    });
+    if (!activity) {
+      throw new Error("Activity not found or does not belong to you");
     }
+    if (activity.duration == null || activity.duration <= 0) {
+      throw new Error("This activity has no duration; enter a finish time instead");
+    }
+    displayTime = formatSecondsAsRaceTime(activity.duration);
+    timeDerivedFromGarminActivity = true;
   }
+
+  if (!displayTime) {
+    throw new Error("Enter a finish time or link this result to a synced activity with duration");
+  }
+
+  const typedTimeEntered = Boolean(
+    trimOrNull(officialFinishTime) || chipEffective || gunEffective
+  );
+
+  const finishTimeSeconds = parseRaceTimeToSeconds(displayTime);
 
   const distKey = goal
     ? normalizeDistanceForPace(
         String(goal.distance ?? ""),
         goal.race_registry?.distanceMeters != null ? Number(goal.race_registry.distanceMeters) : null
       )
-    : normalizeDistanceForPace(
-        "",
-        reg.distanceMeters != null ? Number(reg.distanceMeters) : null
-      );
+    : normalizeDistanceForPace("", reg.distanceMeters != null ? Number(reg.distanceMeters) : null);
   const distanceLabel = distKey;
 
   let goalTimeSeconds: number | null = null;
@@ -242,10 +298,39 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
 
   const agPlace =
     ageGroupPlace != null && Number.isFinite(ageGroupPlace) ? Math.floor(ageGroupPlace) : null;
+
+  const notesEffective = notes !== undefined ? trimOrNull(notes) : existingRow?.notes ?? null;
+  const overallEffective =
+    overallPlace !== undefined
+      ? overallPlace != null && Number.isFinite(overallPlace)
+        ? overallPlace
+        : null
+      : existingRow?.overallPlace ?? null;
+  const ageGroupEffective =
+    ageGroupPlace !== undefined
+      ? agPlace != null && !Number.isNaN(agPlace)
+        ? agPlace
+        : null
+      : existingRow?.ageGroupPlace ?? null;
+  const howFeltEffective =
+    howFeltRating !== undefined
+      ? howFeltRating != null && howFeltRating >= 1 && howFeltRating <= 5
+        ? howFeltRating
+        : null
+      : existingRow?.howFeltRating ?? null;
+  const reflectionEffective =
+    reflection !== undefined ? trimOrNull(reflection) : existingRow?.reflection ?? null;
+
+  const racePhotoUrlsEffective =
+    racePhotoUrls !== undefined ? racePhotoUrls : (existingRow?.racePhotoUrls ?? []);
+
+  const source =
+    timeDerivedFromGarminActivity && !typedTimeEntered && mergedGarminId ? "garmin" : "manual";
+
   const data = {
-    officialFinishTime: displayTime || null,
-    chipTime: chipTime && String(chipTime).trim() ? String(chipTime).trim() : null,
-    gunTime: gunTime && String(gunTime).trim() ? String(gunTime).trim() : null,
+    officialFinishTime: displayTime,
+    chipTime: chipEffective,
+    gunTime: gunEffective,
     finishTimeSeconds,
     goalTimeSeconds: goal && finishTimeSeconds != null ? goalTimeSeconds : null,
     goalTimeDeltaSeconds: goal && finishTimeSeconds != null ? goalTimeDeltaSeconds : null,
@@ -254,16 +339,16 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
     previousPrSeconds:
       finishTimeSeconds != null && prAchieved && previousPrSeconds != null ? previousPrSeconds : null,
     actualAvgPaceSecPerMile: avgPace,
-    garminActivityId: garminActivityId && garminActivityId.length > 0 ? garminActivityId : null,
-    overallPlace: overallPlace != null && Number.isFinite(overallPlace) ? overallPlace : null,
-    ageGroupPlace: agPlace != null && !Number.isNaN(agPlace) ? agPlace : null,
-    howFeltRating:
-      howFeltRating != null && howFeltRating >= 1 && howFeltRating <= 5 ? howFeltRating : null,
-    notes: notes?.trim() || null,
-    reflection: reflection?.trim() || null,
+    garminActivityId: mergedGarminId,
+    overallPlace: overallEffective,
+    ageGroupPlace: ageGroupEffective,
+    howFeltRating: howFeltEffective,
+    notes: notesEffective,
+    reflection: reflectionEffective,
+    racePhotoUrls: racePhotoUrlsEffective,
     raceDate: raceDate ?? null,
     distanceLabel,
-    source: garminActivityId ? "garmin" : "manual",
+    source,
   };
 
   const resolvedGoalId = goal?.id ?? null;
@@ -313,13 +398,23 @@ export async function createRaceResult(athleteId: string, input: CreateRaceResul
   if (!String(input.officialFinishTime).trim()) {
     throw new Error("Finish time is required");
   }
+  const t = String(input.officialFinishTime).trim();
+  try {
+    parseRaceTimeToSeconds(t);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Invalid finish time format";
+    throw new Error(msg);
+  }
   return saveRaceResultExtended(athleteId, {
     raceRegistryId: g.raceRegistryId,
     goalId: input.goalId,
     officialFinishTime: input.officialFinishTime,
+    chipTime: null,
+    gunTime: null,
     howFeltRating: input.howFeltRating,
     notes: input.notes,
     reflection: input.reflection,
+    racePhotoUrls: normalizeRacePhotoUrls(input.racePhotoUrls),
   });
 }
 
@@ -342,7 +437,12 @@ export async function listRaceResultsByRegistry(athleteId: string, raceRegistryI
 export async function updateRaceResultReflection(
   athleteId: string,
   resultId: string,
-  data: { reflection?: string | null; notes?: string | null; howFeltRating?: number | null }
+  data: {
+    reflection?: string | null;
+    notes?: string | null;
+    howFeltRating?: number | null;
+    racePhotoUrls?: string[] | null;
+  }
 ) {
   const existing = await prisma.athlete_race_results.findFirst({
     where: { id: resultId, athleteId },
@@ -350,6 +450,8 @@ export async function updateRaceResultReflection(
   if (!existing) {
     throw new Error("Result not found");
   }
+  const photoList =
+    data.racePhotoUrls !== undefined ? normalizeRacePhotoUrls(data.racePhotoUrls ?? []) : undefined;
   return prisma.athlete_race_results.update({
     where: { id: resultId },
     data: {
@@ -361,6 +463,32 @@ export async function updateRaceResultReflection(
             ? data.howFeltRating
             : null
           : undefined,
+      racePhotoUrls: photoList !== undefined ? photoList : undefined,
     },
+  });
+}
+
+/** Update time, activity link, and optional fields for an existing result row. */
+export async function updateRaceResultById(athleteId: string, resultId: string, patch: Partial<SaveRaceResultExtendedInput>) {
+  const row = await prisma.athlete_race_results.findFirst({
+    where: { id: resultId, athleteId },
+  });
+  if (!row) {
+    throw new Error("Result not found");
+  }
+  return saveRaceResultExtended(athleteId, {
+    raceRegistryId: patch.raceRegistryId ?? row.raceRegistryId,
+    goalId: patch.goalId !== undefined ? patch.goalId : row.goalId,
+    signupId: patch.signupId !== undefined ? patch.signupId : row.signupId,
+    officialFinishTime: patch.officialFinishTime !== undefined ? patch.officialFinishTime : row.officialFinishTime,
+    chipTime: patch.chipTime !== undefined ? patch.chipTime : row.chipTime,
+    gunTime: patch.gunTime !== undefined ? patch.gunTime : row.gunTime,
+    garminActivityId: patch.garminActivityId !== undefined ? patch.garminActivityId : row.garminActivityId,
+    notes: patch.notes !== undefined ? patch.notes : row.notes,
+    overallPlace: patch.overallPlace !== undefined ? patch.overallPlace : row.overallPlace,
+    ageGroupPlace: patch.ageGroupPlace !== undefined ? patch.ageGroupPlace : row.ageGroupPlace,
+    howFeltRating: patch.howFeltRating !== undefined ? patch.howFeltRating : row.howFeltRating,
+    reflection: patch.reflection !== undefined ? patch.reflection : row.reflection,
+    racePhotoUrls: patch.racePhotoUrls !== undefined ? patch.racePhotoUrls : row.racePhotoUrls,
   });
 }

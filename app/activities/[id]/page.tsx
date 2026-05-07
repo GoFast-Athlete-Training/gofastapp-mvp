@@ -3,9 +3,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Activity } from "lucide-react";
+import { ArrowLeft, Activity, Flag } from "lucide-react";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
+import MarkActivityAsRaceSheet from "@/components/races/MarkActivityAsRaceSheet";
 import { auth } from "@/lib/firebase";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import { metersToMiDisplay } from "@/lib/training/workout-preview-payload";
@@ -75,6 +76,7 @@ export default function ActivityDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityPayload | null>(null);
   const [matched, setMatched] = useState<MatchedWorkoutPayload | null>(null);
+  const [markRaceOpen, setMarkRaceOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -332,6 +334,31 @@ export default function ActivityDetailPage() {
                   </div>
                 )}
 
+                <div className="rounded-xl border border-gray-200 bg-white p-5 mb-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-lg bg-violet-100 p-2 text-violet-800">
+                        <Flag className="w-5 h-5 shrink-0" aria-hidden />
+                      </div>
+                      <div>
+                        <h2 className="text-sm font-semibold text-gray-900">Race day?</h2>
+                        <p className="text-sm text-gray-600 mt-0.5">
+                          Tie this Garmin activity to a race in our catalog — we&apos;ll use the
+                          activity duration as your finish time (you can still enter an official time
+                          from the race hub).
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMarkRaceOpen(true)}
+                      className="shrink-0 inline-flex justify-center rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
+                    >
+                      Log as race
+                    </button>
+                  </div>
+                </div>
+
                 {segWithActuals.length > 0 ? (
                   <div className="rounded-2xl border border-gray-200 bg-white p-6">
                     <h2 className="text-base font-semibold text-gray-900 mb-3">
@@ -367,6 +394,18 @@ export default function ActivityDetailPage() {
           </div>
         </main>
       </div>
+
+      <MarkActivityAsRaceSheet
+        open={markRaceOpen}
+        onClose={() => setMarkRaceOpen(false)}
+        activityId={activityId}
+        durationSeconds={activity?.duration ?? null}
+        activityLabel={
+          activity?.activityName?.trim() ||
+          activity?.activityType?.replace(/_/g, " ") ||
+          "Activity"
+        }
+      />
     </div>
   );
 }

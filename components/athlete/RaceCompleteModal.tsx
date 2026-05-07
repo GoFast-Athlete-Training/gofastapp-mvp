@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Trophy, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { ImagePlus, Loader2, Trophy, X } from "lucide-react";
 import api from "@/lib/api";
+import { uploadRacePhotoFile } from "@/lib/race-result-upload";
+import { FINISH_TIME_PATTERN } from "@/lib/race-result-helpers";
 
 export type RaceCompleteAnalysis = {
   headline: string;
@@ -38,13 +40,20 @@ export function dismissRaceCongratsStorage(goalId: string) {
   }
 }
 
-type Step = "congrats" | "form" | "analysis";
+type Step = "congrats" | "form" | "analysis" | "reflect";
 
 export default function RaceCompleteModal({ open, onClose, goalId, raceName, onComplete }: Props) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<Step>("congrats");
   const [finishTime, setFinishTime] = useState("");
   const [howFelt, setHowFelt] = useState<number | null>(null);
   const [analysis, setAnalysis] = useState<RaceCompleteAnalysis | null>(null);
+  const [savedResultId, setSavedResultId] = useState<string | null>(null);
+  const [reflectionDraft, setReflectionDraft] = useState("");
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [reflectError, setReflectError] = useState<string | null>(null);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [reflectionSaving, setReflectionSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -55,6 +64,10 @@ export default function RaceCompleteModal({ open, onClose, goalId, raceName, onC
     setFinishTime("");
     setHowFelt(null);
     setAnalysis(null);
+    setSavedResultId(null);
+    setReflectionDraft("");
+    setPhotoUrls([]);
+    setReflectError(null);
     setError(null);
   };
 
@@ -76,6 +89,10 @@ export default function RaceCompleteModal({ open, onClose, goalId, raceName, onC
       setError("Add your finish time to continue");
       return;
     }
+    if (!FINISH_TIME_PATTERN.test(t)) {
+      setError("Use a clock time like 3:45:30 or 45:20 (include colons).");
+      return;
+    }
     setSaving(true);
     try {
       const res = await api.post("/race-results", {
@@ -84,7 +101,9 @@ export default function RaceCompleteModal({ open, onClose, goalId, raceName, onC
         howFeltRating: howFelt,
       });
       const a = res.data?.analysis as RaceCompleteAnalysis | undefined;
+      const rid = res.data?.result?.id;
       setAnalysis(a ?? null);
+      setSavedResultId(typeof rid === "string" ? rid : null);
       setStep("analysis");
       onComplete({ analysis: a ?? null });
     } catch (err: unknown) {
@@ -103,6 +122,59 @@ export default function RaceCompleteModal({ open, onClose, goalId, raceName, onC
     onClose();
   };
 
+  const goToReflect = () => {
+    setReflectError(null);
+    setStep("reflect");
+  };
+
+  const handleReflectPhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+    setReflectError(null);
+    setUploadBusy(true);
+    try {
+      const next: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        if (!f.type.startsWith("image/")) continue;
+        next.push(await uploadRacePhotoFile(f));
+      }
+      if (next.length) setPhotoUrls((prev) => [...prev, ...next]);
+    } catch (err: unknown) {
+      setReflectError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploadBusy(false);
+      e.target.value = "";
+    }
+  };
+
+  const removePhotoAt = (idx: number) => {
+    setPhotoUrls((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleSaveReflection = async () => {
+    if (!savedResultId) {
+      handleDone();
+      return;
+    }
+    setReflectError(null);
+    setReflectionSaving(true);
+    try {
+      await api.put(`/race-results/${savedResultId}`, {
+        reflection: reflectionDraft.trim() || null,
+        racePhotoUrls: photoUrls,
+      });
+      handleDone();
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        (err instanceof Error ? err.message : "Save failed");
+      setReflectError(String(msg));
+    } finally {
+      setReflectionSaving(false);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50"
@@ -114,7 +186,9 @@ export default function RaceCompleteModal({ open, onClose, goalId, raceName, onC
     >
       <div className="w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden">
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
-          {step === "analysis" ? (
+          {step === "reflect" ? (
+            <h2 className="text-lg font-semibold text-gray-900">Race memories</h2>
+          ) : step === "analysis" ? (
             <h2 className="text-lg font-semibold text-gray-900">How it went</h2>
           ) : step === "form" ? (
             <h2 className="text-lg font-semibold text-gray-900">Log your time</h2>
@@ -218,24 +292,121 @@ export default function RaceCompleteModal({ open, onClose, goalId, raceName, onC
             <p className="text-sm text-gray-700 leading-relaxed">{analysis.subText}</p>
             <button
               type="button"
+              onClick={goToReflect}
+              className="w-full mt-2 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+            >
+              Save a reflection & photos
+            </button>
+            <button
+              type="button"
               onClick={handleDone}
-              className="w-full mt-2 rounded-xl bg-gray-900 py-2.5 text-sm font-semibold text-white hover:bg-gray-800"
+              className="w-full rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+            >
+              Finish without
+            </button>
+          </div>
+        ) : null}
+
+        {step === "analysis" && !analysis ? (
+          <div className="px-5 py-6 space-y-3">
+            <p className="text-sm text-gray-700">Your result is saved. Head to the home card to review.</p>
+            <button
+              type="button"
+              onClick={goToReflect}
+              className="w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+            >
+              Add reflection & photos
+            </button>
+            <button
+              type="button"
+              onClick={handleDone}
+              className="w-full rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
             >
               Done
             </button>
           </div>
         ) : null}
 
-        {step === "analysis" && !analysis ? (
-          <div className="px-5 py-6">
-            <p className="text-sm text-gray-700">Your result is saved. Head to the home card to review.</p>
-            <button
-              type="button"
-              onClick={handleDone}
-              className="w-full mt-4 rounded-xl bg-gray-900 py-2.5 text-sm font-semibold text-white hover:bg-gray-800"
-            >
-              Done
-            </button>
+        {step === "reflect" ? (
+          <div className="px-5 py-4 space-y-4">
+            <p className="text-sm text-gray-600">
+              Optional — capture how <span className="font-medium text-gray-900">{raceName}</span> felt while
+              it&apos;s fresh.
+            </p>
+            {reflectError ? (
+              <p className="text-sm text-red-600" role="alert">
+                {reflectError}
+              </p>
+            ) : null}
+            <div>
+              <label htmlFor="rcm-reflect" className="text-xs font-medium text-gray-500 block">
+                Reflection
+              </label>
+              <textarea
+                id="rcm-reflect"
+                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 min-h-[100px]"
+                value={reflectionDraft}
+                onChange={(e) => setReflectionDraft(e.target.value)}
+              />
+            </div>
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="sr-only"
+                onChange={(e) => void handleReflectPhotos(e)}
+              />
+              {photoUrls.length > 0 ? (
+                <ul className="flex flex-wrap gap-2 mb-2">
+                  {photoUrls.map((url, idx) => (
+                    <li key={`${url}-${idx}`} className="relative w-16 h-16 shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- blob URLs */}
+                      <img src={url} alt="" className="w-full h-full object-cover rounded-lg border border-gray-200" />
+                      <button
+                        type="button"
+                        aria-label="Remove photo"
+                        onClick={() => removePhotoAt(idx)}
+                        className="absolute -top-1 -right-1 rounded-full bg-gray-900 text-white p-0.5 hover:bg-black"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <button
+                type="button"
+                disabled={uploadBusy || !savedResultId}
+                onClick={() => fileInputRef.current?.click()}
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {uploadBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+                {uploadBusy ? "Uploading…" : "Add race photos"}
+              </button>
+              {!savedResultId ? (
+                <p className="mt-1 text-xs text-amber-700">Missing result id — close and reopen from home.</p>
+              ) : null}
+            </div>
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                type="button"
+                disabled={reflectionSaving || !savedResultId}
+                onClick={() => void handleSaveReflection()}
+                className="w-full rounded-xl bg-gray-900 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
+              >
+                {reflectionSaving ? "Saving…" : "Save & finish"}
+              </button>
+              <button
+                type="button"
+                onClick={handleDone}
+                disabled={reflectionSaving}
+                className="w-full rounded-xl py-2.5 text-sm font-medium text-gray-500 hover:text-gray-900"
+              >
+                Skip for now
+              </button>
+            </div>
           </div>
         ) : null}
       </div>
