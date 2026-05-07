@@ -28,7 +28,6 @@ type ResultRow = {
   gunTime: string | null;
   source: string;
   reflection?: string | null;
-  notes?: string | null;
   racePhotoUrls?: string[] | null;
 };
 
@@ -48,7 +47,6 @@ export default function LogRaceResultSheet({
 
   const [finishTime, setFinishTime] = useState("");
   const [reflection, setReflection] = useState("");
-  const [notes, setNotes] = useState("");
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [photoBusy, setPhotoBusy] = useState(false);
 
@@ -56,7 +54,6 @@ export default function LogRaceResultSheet({
     setExisting(null);
     setFinishTime("");
     setReflection("");
-    setNotes("");
     setPhotoUrls([]);
   };
 
@@ -68,7 +65,6 @@ export default function LogRaceResultSheet({
       setExisting(r);
       setFinishTime(r.officialFinishTime ?? r.chipTime ?? r.gunTime ?? "");
       setReflection(r.reflection ?? "");
-      setNotes(r.notes ?? "");
       setPhotoUrls(Array.isArray(r.racePhotoUrls) ? r.racePhotoUrls : []);
     } else {
       resetEmpty();
@@ -134,7 +130,6 @@ export default function LogRaceResultSheet({
         chipTime: null,
         gunTime: null,
         reflection: reflection.trim() || null,
-        notes: notes.trim() || null,
         racePhotoUrls: photoUrls,
       });
       onSaved?.();
@@ -211,18 +206,6 @@ export default function LogRaceResultSheet({
               className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm min-h-[80px] text-gray-900"
               value={reflection}
               onChange={(e) => setReflection(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="lr-notes" className="text-xs font-medium text-gray-500 block">
-              Notes
-            </label>
-            <textarea
-              id="lr-notes"
-              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm min-h-[56px] text-gray-900"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
             />
           </div>
 

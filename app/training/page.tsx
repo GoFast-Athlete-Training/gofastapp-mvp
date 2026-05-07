@@ -37,6 +37,7 @@ import {
   paceRangeDeltaMessage,
   singleTargetPaceDeltaMessage,
 } from "@/lib/training/pace-comparison-display";
+import { getRacePhase } from "@/lib/race-calendar-phase";
 
 type PlanDetailHub = {
   id: string;
@@ -49,16 +50,6 @@ type PlanDetailHub = {
   raceId?: string | null;
   race_registry: { name: string; raceDate?: string } | null;
 };
-
-/** Race calendar day is fully before today (UTC) — show reset hub, not training dashboard. */
-function isRaceCalendarBeforeToday(raceDateYmd: string | undefined | null): boolean {
-  if (!raceDateYmd || typeof raceDateYmd !== "string") return false;
-  const t = Date.parse(raceDateYmd);
-  if (!Number.isFinite(t)) return false;
-  const raceDay = utcDateOnly(new Date(t));
-  const today = utcDateOnly(new Date());
-  return raceDay.getTime() < today.getTime();
-}
 
 function hasSchedule(p: PlanDetailHub): boolean {
   return Array.isArray(p.planWeeks) && (p.planWeeks as unknown[]).length > 0;
@@ -168,6 +159,7 @@ export default function TrainingHubPage() {
     name: string;
     raceName: string | null;
     raceId: string | null;
+    raceDate: string | null;
   } | null>(null);
   /** Whether the athlete has logged a result + reflection for the finished race. */
   const [pastRaceResultStatus, setPastRaceResultStatus] = useState<{
@@ -175,6 +167,11 @@ export default function TrainingHubPage() {
     hasReflection: boolean;
     resultId: string | null;
   } | null>(null);
+
+  const pastRacePhase = useMemo(
+    () => (pastRacePlan?.raceDate ? getRacePhase(pastRacePlan.raceDate) : null),
+    [pastRacePlan?.raceDate]
+  );
 
   const paceDisplay = useMemo(() => {
     if (!planDetail) return null;
@@ -222,13 +219,20 @@ export default function TrainingHubPage() {
       const plan = raw as PlanDetailHub;
       setAthleteFiveKPace(athPace);
 
-      if (isRaceCalendarBeforeToday(plan.race_registry?.raceDate)) {
+      const planPhase = getRacePhase(plan.race_registry?.raceDate);
+      if (planPhase !== "pre") {
         setPlanDetail(null);
         setPastRacePlan({
           id: plan.id,
           name: plan.name,
           raceName: plan.race_registry?.name ?? null,
           raceId: plan.raceId ?? null,
+          raceDate:
+            typeof plan.race_registry?.raceDate === "string"
+              ? plan.race_registry.raceDate
+              : plan.race_registry?.raceDate != null
+                ? String(plan.race_registry.raceDate)
+                : null,
         });
         setWeekDays([]);
         setWeekPerformance(null);
@@ -452,7 +456,30 @@ export default function TrainingHubPage() {
           </div>
         )}
 
-        {authReady && !loading && pastRacePlan && (
+        {authReady && !loading && pastRacePlan && pastRacePhase === "race_day" && (
+          <div className="rounded-2xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 p-8 shadow-sm mb-8">
+            <p className="text-xs font-semibold uppercase tracking-wide text-violet-800 mb-1">
+              Today is race day
+            </p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-1">Good luck!</h2>
+            {pastRacePlan.raceName && (
+              <p className="text-base text-gray-700 mb-4">{pastRacePlan.raceName}</p>
+            )}
+            <p className="text-sm text-gray-600 mb-5">
+              You&apos;ve put in the miles. Race hub has your crew — no need to log a result yet.
+            </p>
+            {pastRacePlan.raceId ? (
+              <Link
+                href={`/race-hub/${pastRacePlan.raceId}`}
+                className="inline-flex justify-center rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
+              >
+                Open race hub
+              </Link>
+            ) : null}
+          </div>
+        )}
+
+        {authReady && !loading && pastRacePlan && pastRacePhase === "post_early" && (
           <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/80 p-8 shadow-sm mb-8">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800 mb-1">
               Race complete
@@ -462,11 +489,9 @@ export default function TrainingHubPage() {
               <p className="text-base text-gray-700 mb-4">{pastRacePlan.raceName}</p>
             )}
             <p className="text-sm text-gray-600 mb-5">
-              You put in the work. Your training history is saved — review it or pick your next race
-              whenever you&apos;re ready.
+              How did it go? Log your finish time and reflection while it&apos;s fresh.
             </p>
 
-            {/* Callouts: missing result or reflection */}
             {pastRaceResultStatus && (!pastRaceResultStatus.hasResult || !pastRaceResultStatus.hasReflection) && pastRacePlan.raceId && (
               <div className="mb-5 space-y-2">
                 {!pastRaceResultStatus.hasResult && (
@@ -474,16 +499,14 @@ export default function TrainingHubPage() {
                     href={`/race-hub/${pastRacePlan.raceId}#log-result`}
                     className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800 hover:bg-amber-100"
                   >
-                    <span className="text-base">🏅</span>
                     Log your finish time
                   </Link>
                 )}
                 {pastRaceResultStatus.hasResult && !pastRaceResultStatus.hasReflection && (
                   <Link
-                    href={`/race-hub/${pastRacePlan.raceId}#reflection`}
+                    href={`/race-hub/${pastRacePlan.raceId}#log-result`}
                     className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-800 hover:bg-blue-100"
                   >
-                    <span className="text-base">✍️</span>
                     Add a race reflection
                   </Link>
                 )}
@@ -493,17 +516,71 @@ export default function TrainingHubPage() {
             <div className="flex flex-wrap gap-3">
               <Link
                 href="/races"
+                className="inline-flex justify-center rounded-xl border-2 border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+              >
+                Find your next race
+              </Link>
+              <Link
+                href={`/training-setup/${pastRacePlan.id}`}
+                className="inline-flex justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+              >
+                Analyze your plan
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {authReady && !loading && pastRacePlan && pastRacePhase === "post_cooled" && (
+          <div className="rounded-2xl border-2 border-gray-200 bg-white p-8 shadow-sm mb-8">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+              Race complete
+            </p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-1">Your training history is saved</h2>
+            {pastRacePlan.raceName && (
+              <p className="text-base text-gray-600 mb-4">{pastRacePlan.raceName}</p>
+            )}
+            <p className="text-sm text-gray-600 mb-5">
+              Ready to find the next one?
+            </p>
+
+            <div className="flex flex-wrap gap-3 items-center mb-5">
+              <Link
+                href="/races"
                 className="inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
               >
                 Find your next race
               </Link>
               <Link
                 href={`/training-setup/${pastRacePlan.id}`}
-                className="inline-flex justify-center rounded-xl border-2 border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                className="inline-flex justify-center rounded-lg text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-900"
               >
                 Analyze your plan
               </Link>
             </div>
+
+            {pastRaceResultStatus && (!pastRaceResultStatus.hasResult || !pastRaceResultStatus.hasReflection) && pastRacePlan.raceId && (
+              <div className="pt-4 border-t border-gray-100">
+                <p className="text-xs text-gray-500 mb-2">Still need to capture your race?</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                  {!pastRaceResultStatus.hasResult && (
+                    <Link
+                      href={`/race-hub/${pastRacePlan.raceId}#log-result`}
+                      className="font-medium text-emerald-700 hover:text-emerald-800"
+                    >
+                      Log result
+                    </Link>
+                  )}
+                  {pastRaceResultStatus.hasResult && !pastRaceResultStatus.hasReflection && (
+                    <Link
+                      href={`/race-hub/${pastRacePlan.raceId}#log-result`}
+                      className="font-medium text-blue-700 hover:text-blue-800"
+                    >
+                      Add reflection
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

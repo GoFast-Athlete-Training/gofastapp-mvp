@@ -8,6 +8,37 @@ export function utcDateOnly(d: Date): Date {
   return x;
 }
 
+/** Parse race_registry.raceDate (ISO or calendar string) to UTC date-only anchor. */
+function parseRaceRegistryDayUtc(iso: string): Date | null {
+  const t = Date.parse(iso.includes("T") ? iso : `${iso}T12:00:00Z`);
+  if (!Number.isFinite(t)) return null;
+  return utcDateOnly(new Date(t));
+}
+
+/** Strictly before today’s UTC calendar day (race day fully in the past). */
+export function raceCalendarBeforeTodayUtc(iso: string): boolean {
+  const raceDay = parseRaceRegistryDayUtc(iso);
+  if (!raceDay) return false;
+  const today = utcDateOnly(new Date());
+  return raceDay.getTime() < today.getTime();
+}
+
+/** Today or earlier in UTC — post-race result logging UX is appropriate. */
+export function raceCalendarOnOrBeforeTodayUtc(iso: string): boolean {
+  const raceDay = parseRaceRegistryDayUtc(iso);
+  if (!raceDay) return false;
+  const today = utcDateOnly(new Date());
+  return raceDay.getTime() <= today.getTime();
+}
+
+/** Strictly after today’s UTC calendar day — pre-race hub UX. */
+export function raceCalendarAfterTodayUtc(iso: string): boolean {
+  const raceDay = parseRaceRegistryDayUtc(iso);
+  if (!raceDay) return false;
+  const today = utcDateOnly(new Date());
+  return raceDay.getTime() > today.getTime();
+}
+
 export function addDaysUtc(d: Date, days: number): Date {
   const x = utcDateOnly(d);
   x.setUTCDate(x.getUTCDate() + days);

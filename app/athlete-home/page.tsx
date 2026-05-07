@@ -46,6 +46,7 @@ import {
   utcDateOnly,
   ymdFromDate,
 } from '@/lib/training/plan-utils';
+import { getRacePhase, raceCalendarDaysFromTodayUtc } from '@/lib/race-calendar-phase';
 import { formatPlannedWorkoutTitle } from '@/lib/training/workout-display-title';
 import { normalizeDistanceForPace } from '@/lib/pace-utils';
 
@@ -242,6 +243,16 @@ function pickPrimaryGoal(
         new Date(b.targetByDate as string).getTime() - new Date(a.targetByDate as string).getTime()
     );
   return comp[0] ?? null;
+}
+
+function raceDateToIsoString(rd: string | Date | null | undefined): string | null {
+  if (rd == null) return null;
+  if (typeof rd === 'string') return rd;
+  try {
+    return new Date(rd).toISOString();
+  } catch {
+    return null;
+  }
 }
 
 const CITY_RECAP_DISMISS_STORAGE_KEY = 'athleteHomeDismissedCityRecapRunIds';
@@ -718,6 +729,10 @@ export default function AthleteHomePage() {
         ? ymdFromDate(new Date(primaryGoal.targetByDate))
         : '';
 
+  const goalRaceIsoStr = raceDateToIsoString(primaryGoal?.race_registry?.raceDate);
+  const goalPhase = getRacePhase(goalRaceIsoStr);
+  const goalDaysUntil = raceCalendarDaysFromTodayUtc(goalRaceIsoStr);
+
   const nextTraining =
     upcomingSessions.find((s: { isPlanSession?: boolean }) => s.isPlanSession) ??
     upcomingSessions[0] ??
@@ -788,6 +803,35 @@ export default function AthleteHomePage() {
             (24 * 60 * 60 * 1000)
         )
       : null;
+
+  const signupPostEarlyNoGoal =
+    primaryGoal == null
+      ? raceSignups
+          .filter(
+            (s) => getRacePhase(raceDateToIsoString(s.race_registry.raceDate)) === 'post_early'
+          )
+          .sort(
+            (a, b) =>
+              new Date(b.race_registry.raceDate).getTime() -
+              new Date(a.race_registry.raceDate).getTime()
+          )[0]
+      : undefined;
+
+  const showGoalRaceWeekBanner =
+    Boolean(primaryGoal) &&
+    goalPhase === 'pre' &&
+    goalDaysUntil != null &&
+    goalDaysUntil >= 1 &&
+    goalDaysUntil <= 7 &&
+    primaryRaceRegistryId != null &&
+    primaryGoal?.race_registry != null;
+
+  const showSignupRaceWeekBanner =
+    !raceDaySignupForHome &&
+    !showGoalRaceWeekBanner &&
+    upcomingRaceSignupForHome != null &&
+    daysUntilUpcomingRace != null &&
+    daysUntilUpcomingRace > 0;
 
   const cityRecapRun =
     myPastRuns.find((r) => !dismissedRecapRunIds.has(r.id)) ?? null;
@@ -901,7 +945,68 @@ export default function AthleteHomePage() {
               <p className="text-gray-600 text-sm">Here&apos;s your training at a glance</p>
             </div>
 
-            {raceDaySignupForHome ? (
+            {primaryGoal &&
+            goalPhase === 'race_day' &&
+            primaryRaceRegistryId &&
+            primaryGoal.race_registry ? (
+              <div className="mb-4 rounded-2xl border-2 border-violet-400 bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-6 text-white shadow-lg">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex gap-4 min-w-0">
+                    <Trophy className="h-12 w-12 shrink-0 text-amber-200" aria-hidden />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-100">
+                        Today is race day
+                      </p>
+                      <h2 className="mt-2 text-2xl font-extrabold leading-tight">
+                        {primaryGoal.race_registry.name}
+                      </h2>
+                      {primaryGoal.race_registry.distanceLabel ? (
+                        <p className="mt-1 text-lg font-semibold text-violet-100">
+                          {primaryGoal.race_registry.distanceLabel}
+                        </p>
+                      ) : null}
+                      <p className="mt-3 text-xl font-bold text-white">
+                        Good luck
+                        {typeof athlete?.firstName === 'string' && athlete.firstName.trim()
+                          ? `, ${athlete.firstName.trim()}`
+                          : ''}
+                        !
+                      </p>
+                      {(() => {
+                        const city = primaryGoal.race_registry.city;
+                        const st = primaryGoal.race_registry.state;
+                        const loc =
+                          [city, st].filter((x) => x && String(x).trim()).join(', ') || null;
+                        const stTime = primaryGoal.race_registry.startTime?.trim();
+                        if (!loc && !stTime) return null;
+                        return (
+                          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-violet-100">
+                            {loc ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                <MapPin className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                                {loc}
+                              </span>
+                            ) : null}
+                            {stTime ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                <Timer className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                                {stTime}
+                              </span>
+                            ) : null}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                  <Link
+                    href={`/race-hub/${primaryRaceRegistryId}`}
+                    className="inline-flex shrink-0 items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-bold text-violet-700 shadow hover:bg-violet-50"
+                  >
+                    Open race hub
+                  </Link>
+                </div>
+              </div>
+            ) : !primaryGoal && raceDaySignupForHome ? (
               <div className="mb-4 rounded-2xl border-2 border-violet-400 bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-6 text-white shadow-lg">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex gap-4 min-w-0">
@@ -959,12 +1064,109 @@ export default function AthleteHomePage() {
                   </Link>
                 </div>
               </div>
-            ) : upcomingRaceSignupForHome && daysUntilUpcomingRace != null && daysUntilUpcomingRace > 0 ? (
+            ) : primaryGoal &&
+              goalPhase === 'post_early' &&
+              primaryRaceRegistryId &&
+              primaryGoal.race_registry ? (
+              <div className="mb-4 rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-5 shadow-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex gap-3 min-w-0">
+                    <Trophy className="h-10 w-10 shrink-0 text-emerald-600" aria-hidden />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-800">
+                        You just raced
+                      </p>
+                      <h2 className="mt-2 text-xl font-bold text-gray-900">
+                        {primaryGoal.race_registry.name}
+                      </h2>
+                      {primaryGoal.race_registry.distanceLabel ? (
+                        <p className="text-sm text-emerald-900/90">
+                          {primaryGoal.race_registry.distanceLabel}
+                        </p>
+                      ) : null}
+                      <p className="mt-2 text-sm text-gray-700">
+                        Log your finish time while it&apos;s fresh — it stays on your profile, not race
+                        chatter.
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    href={`/race-hub/${primaryRaceRegistryId}#log-result`}
+                    className="inline-flex shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 self-start"
+                  >
+                    Log your result
+                  </Link>
+                </div>
+              </div>
+            ) : !primaryGoal && signupPostEarlyNoGoal ? (
+              <div className="mb-4 rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-5 shadow-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex gap-3 min-w-0">
+                    <Trophy className="h-10 w-10 shrink-0 text-emerald-600" aria-hidden />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-800">
+                        You just raced
+                      </p>
+                      <h2 className="mt-2 text-xl font-bold text-gray-900">
+                        {signupPostEarlyNoGoal.race_registry.name}
+                      </h2>
+                      {signupPostEarlyNoGoal.race_registry.distanceLabel ? (
+                        <p className="text-sm text-emerald-900/90">
+                          {signupPostEarlyNoGoal.race_registry.distanceLabel}
+                        </p>
+                      ) : null}
+                      <p className="mt-2 text-sm text-gray-700">
+                        Log your finish time while it&apos;s fresh — it stays on your profile.
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    href={`/race-hub/${signupPostEarlyNoGoal.race_registry.id}#log-result`}
+                    className="inline-flex shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 self-start"
+                  >
+                    Log your result
+                  </Link>
+                </div>
+              </div>
+            ) : showGoalRaceWeekBanner &&
+              primaryGoal?.race_registry &&
+              primaryRaceRegistryId &&
+              goalDaysUntil != null ? (
               <div className="mb-4 rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-5 shadow-sm">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <p className="text-xs font-semibold uppercase tracking-wide text-violet-800">
-                      Race in {daysUntilUpcomingRace} day{daysUntilUpcomingRace === 1 ? '' : 's'}
+                      Race in {goalDaysUntil} day{goalDaysUntil === 1 ? '' : 's'}
+                    </p>
+                    <h2 className="mt-1 text-lg font-bold text-gray-900">
+                      {primaryGoal.race_registry.name}
+                    </h2>
+                    {primaryGoal.race_registry.distanceLabel ? (
+                      <p className="text-sm text-gray-600">
+                        {primaryGoal.race_registry.distanceLabel}
+                      </p>
+                    ) : null}
+                    <p className="mt-2 text-sm text-gray-700">
+                      You&apos;ve put in the work. Race week is here.
+                    </p>
+                  </div>
+                  <Link
+                    href={`/race-hub/${primaryRaceRegistryId}`}
+                    className="inline-flex shrink-0 items-center justify-center rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
+                  >
+                    Race hub
+                  </Link>
+                </div>
+              </div>
+            ) : showSignupRaceWeekBanner &&
+              upcomingRaceSignupForHome &&
+              daysUntilUpcomingRace != null ? (
+              <div className="mb-4 rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-5 shadow-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-violet-800">
+                      Race in {daysUntilUpcomingRace} day
+                      {daysUntilUpcomingRace === 1 ? '' : 's'}
                     </p>
                     <h2 className="mt-1 text-lg font-bold text-gray-900">
                       {upcomingRaceSignupForHome.race_registry.name}

@@ -8,7 +8,7 @@ import { auth } from "@/lib/firebase";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
-import { utcDateOnly } from "@/lib/training/plan-utils";
+import { raceCalendarBeforeTodayUtc } from "@/lib/training/plan-utils";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 
 type RaceRegistryLite = {
@@ -45,19 +45,10 @@ function goalRaceReady(g: GoalRow): boolean {
   return !!g.raceRegistryId && !!g.race_registry;
 }
 
-/** Race calendar (UTC date-only) is strictly before today — matches training hub “past race” logic. */
-function raceRegistryDateIsBeforeToday(iso: string): boolean {
-  const t = Date.parse(iso.includes("T") ? iso : `${iso}T12:00:00Z`);
-  if (!Number.isFinite(t)) return false;
-  const raceDay = utcDateOnly(new Date(t));
-  const today = utcDateOnly(new Date());
-  return raceDay.getTime() < today.getTime();
-}
-
 function isQualifyingGoal(g: GoalRow): boolean {
   if (g.status !== "ACTIVE" || !goalRaceReady(g) || !goalTimeReady(g)) return false;
   const rd = g.race_registry?.raceDate;
-  if (!rd || raceRegistryDateIsBeforeToday(rd)) return false;
+  if (!rd || raceCalendarBeforeTodayUtc(rd)) return false;
   return true;
 }
 
@@ -131,6 +122,16 @@ export default function TrainingSetupClient() {
 
   const qualifyingGoals = useMemo(() => goals.filter(isQualifyingGoal), [goals]);
 
+  const futureSignups = useMemo(
+    () =>
+      signups.filter(
+        (s) =>
+          !!s.race_registry?.raceDate &&
+          !raceCalendarBeforeTodayUtc(s.race_registry.raceDate)
+      ),
+    [signups]
+  );
+
   const pastRaceGoals = useMemo(
     () =>
       goals.filter(
@@ -139,7 +140,7 @@ export default function TrainingSetupClient() {
           goalRaceReady(g) &&
           goalTimeReady(g) &&
           !!g.race_registry?.raceDate &&
-          raceRegistryDateIsBeforeToday(g.race_registry.raceDate)
+          raceCalendarBeforeTodayUtc(g.race_registry.raceDate)
       ),
     [goals]
   );
@@ -653,10 +654,9 @@ export default function TrainingSetupClient() {
 
           {!loadingOrientation && qualifyingGoals.length === 0 && activeNeedsRace && (
             <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-              <p className="mb-2 font-medium">Add a race to your goal</p>
+              <p className="mb-2 font-medium">Step 1 — Add a race to your goal</p>
               <p className="mb-3 text-amber-900/90">
-                Your active goal does not have a race yet. Choose a race in Goals, then set a goal
-                time.
+                Plans are tied to a specific race in your goal — pick one in Goals.
               </p>
               <Link
                 href="/goals"
@@ -669,10 +669,9 @@ export default function TrainingSetupClient() {
 
           {!loadingOrientation && qualifyingGoals.length === 0 && incompleteRaceNeedsTime && (
             <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-              <p className="mb-2 font-medium">Finish your goal time</p>
+              <p className="mb-2 font-medium">Step 2 — Set a goal time</p>
               <p className="mb-3 text-amber-900/90">
-                You have a race on your goal, but no goal time yet. Add a time in Goals before
-                building a plan.
+                Add a finish time target in Goals so we can build your plan around it.
               </p>
               <Link
                 href="/goals"
@@ -683,32 +682,36 @@ export default function TrainingSetupClient() {
             </div>
           )}
 
-          {!loadingOrientation && qualifyingGoals.length === 0 && signups.length > 0 && (
+          {!loadingOrientation &&
+            qualifyingGoals.length === 0 &&
+            futureSignups.length > 0 && (
             <div className="mb-6">
-              <h2 className="mb-2 text-sm font-medium text-gray-800">Your race signups</h2>
+              <h2 className="mb-2 text-sm font-medium text-gray-800">Signed up · need a goal</h2>
               <p className="mb-3 text-xs text-gray-500">
-                Set a goal (race + goal time) for one of these to unlock plan setup.
+                Set a goal time for your next race — then you can generate your training plan.
               </p>
-              <ul className="space-y-2">
-                {signups.map((s) => {
+              <ul className="space-y-3">
+                {futureSignups.map((s) => {
                   const r = s.race_registry;
                   if (!r) return null;
                   return (
                     <li
                       key={s.id}
-                      className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:flex-row sm:items-center sm:justify-between"
+                      className="rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm"
                     >
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{r.name}</div>
-                        <div className="text-xs text-gray-500">
-                          {formatRaceWhen(r.raceDate)} · {r.raceType}
-                        </div>
-                      </div>
+                      <p className="text-sm text-gray-700">
+                        You&apos;re signed up for{" "}
+                        <span className="font-semibold text-gray-900">{r.name}</span>{" "}
+                        <span className="text-gray-600">
+                          ({formatRaceWhen(r.raceDate)}).
+                        </span>{" "}
+                        Set a goal time to unlock your training plan.
+                      </p>
                       <Link
                         href={`/goals?raceRegistryId=${encodeURIComponent(s.raceRegistryId)}`}
-                        className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-center text-sm font-medium text-gray-800 hover:bg-gray-50"
+                        className="mt-3 inline-flex w-full justify-center rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-orange-600 sm:w-auto"
                       >
-                        Set goal for this race
+                        Set goal
                       </Link>
                     </li>
                   );
@@ -720,19 +723,22 @@ export default function TrainingSetupClient() {
           {!loadingOrientation &&
             qualifyingGoals.length === 0 &&
             pastRaceGoals.length === 0 &&
-            signups.length === 0 &&
+            futureSignups.length === 0 &&
             !incompleteRaceNeedsTime &&
             !activeNeedsRace && (
-              <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-                <p className="mb-3">
-                  No active goal with a race and goal time yet, and no race signups. Add a race in
-                  Goals (or sign up for a race), set your goal time, then come back here.
+              <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700">
+                <h2 className="mb-2 text-lg font-semibold text-gray-900">
+                  What&apos;s your next race?
+                </h2>
+                <p className="mb-4 leading-relaxed">
+                  Training plans are built around a race goal. Browse races to find your next one,
+                  then set a goal time — we&apos;ll build the plan from there.
                 </p>
                 <Link
-                  href="/goals"
-                  className="inline-block rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
+                  href="/races"
+                  className="inline-flex w-full justify-center rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-orange-600 sm:w-auto"
                 >
-                  Go to Goals
+                  Browse races
                 </Link>
               </div>
             )}

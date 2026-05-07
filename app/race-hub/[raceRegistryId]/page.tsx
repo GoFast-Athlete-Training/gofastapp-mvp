@@ -19,12 +19,13 @@ import {
   getPublicRacePageUrl,
 } from "@/lib/public-race-url";
 import LogRaceResultSheet from "@/components/races/LogRaceResultSheet";
-import RaceHubRaceReflectionSection from "@/components/races/RaceHubRaceReflectionSection";
+import { raceCalendarAfterTodayUtc, raceCalendarOnOrBeforeTodayUtc } from "@/lib/training/plan-utils";
 import {
   Calendar,
   ChevronDown,
   ChevronRight,
   Clock,
+  Flag,
   Copy,
   ExternalLink,
   Info,
@@ -138,8 +139,6 @@ type MyRaceResultRow = {
   actualAvgPaceSecPerMile: number | null;
   overallPlace: number | null;
   ageGroupPlace: number | null;
-  reflection: string | null;
-  racePhotoUrls: string[];
 };
 
 function formatSecPerMileForHub(sec: number | null | undefined): string {
@@ -193,6 +192,9 @@ function RaceHubPageInner() {
   const [inviteCopied, setInviteCopied] = useState(false);
   const [myRaceResult, setMyRaceResult] = useState<MyRaceResultRow | null>(null);
   const [hubGoalId, setHubGoalId] = useState<string | null>(null);
+  const [hubGoalBrief, setHubGoalBrief] = useState<{ name: string; goalTime: string | null } | null>(
+    null
+  );
   const [hubSignupId, setHubSignupId] = useState<string | null>(null);
   const [logSheetOpen, setLogSheetOpen] = useState(false);
 
@@ -236,6 +238,7 @@ function RaceHubPageInner() {
         setShakeouts([]);
         setMyRaceResult(null);
         setHubGoalId(null);
+        setHubGoalBrief(null);
         setHubSignupId(null);
         return { canAccessHub: false, loadedRace };
       }
@@ -256,6 +259,7 @@ function RaceHubPageInner() {
         setShakeouts([]);
         setMyRaceResult(null);
         setHubGoalId(null);
+        setHubGoalBrief(null);
         return { canAccessHub: false, loadedRace };
       }
 
@@ -273,13 +277,7 @@ function RaceHubPageInner() {
       setShakeouts((shRes.data?.shakeouts as ShakeoutRunRow[]) || []);
       const results = rrRes.data?.results;
       if (Array.isArray(results) && results[0] && typeof results[0].id === "string") {
-        const r = results[0] as MyRaceResultRow & {
-          reflection?: unknown;
-          racePhotoUrls?: unknown;
-        };
-        const photoUrls = Array.isArray(r.racePhotoUrls)
-          ? r.racePhotoUrls.filter((u): u is string => typeof u === "string")
-          : [];
+        const r = results[0] as MyRaceResultRow;
         setMyRaceResult({
           id: r.id,
           officialFinishTime: r.officialFinishTime ?? null,
@@ -287,20 +285,40 @@ function RaceHubPageInner() {
           actualAvgPaceSecPerMile: r.actualAvgPaceSecPerMile ?? null,
           overallPlace: r.overallPlace ?? null,
           ageGroupPlace: r.ageGroupPlace ?? null,
-          reflection: typeof r.reflection === "string" ? r.reflection : null,
-          racePhotoUrls: photoUrls,
         });
       } else {
         setMyRaceResult(null);
       }
       const goals =
         (goalsRes.data?.goals as
-          | { id: string; raceRegistryId?: string | null; race_registry?: { id: string } }[]
+          | {
+              id: string;
+              name?: string | null;
+              goalTime?: string | null;
+              raceRegistryId?: string | null;
+              race_registry?: { id: string; name?: string | null };
+            }[]
           | undefined) ?? [];
       const goalMatch = goals.find(
         (g) => g.raceRegistryId === id || g.race_registry?.id === id
       );
       setHubGoalId(goalMatch?.id ?? null);
+      if (goalMatch) {
+        const rawName =
+          typeof goalMatch.name === "string" ? goalMatch.name.trim() : "";
+        const rn =
+          typeof goalMatch.race_registry?.name === "string"
+            ? goalMatch.race_registry.name.trim()
+            : "";
+        const rawTime =
+          typeof goalMatch.goalTime === "string" ? goalMatch.goalTime.trim() : "";
+        setHubGoalBrief({
+          name: rn || rawName || "Your goal",
+          goalTime: rawTime || null,
+        });
+      } else {
+        setHubGoalBrief(null);
+      }
 
       return { canAccessHub: true, loadedRace };
     } catch (e: unknown) {
@@ -312,6 +330,7 @@ function RaceHubPageInner() {
         setShakeouts([]);
         setMyRaceResult(null);
         setHubGoalId(null);
+        setHubGoalBrief(null);
         setHubSignupId(null);
         return { canAccessHub: false, loadedRace };
       }
@@ -369,16 +388,17 @@ function RaceHubPageInner() {
   }, [raceRegistryId, router, loadHubData]);
 
   useEffect(() => {
-    if (loading || joinRedirecting || !myRaceResult?.id) return;
+    if (loading || joinRedirecting || !race?.raceDate || !hubSignupId) return;
+    if (!raceCalendarOnOrBeforeTodayUtc(race.raceDate)) return;
     if (typeof window === "undefined") return;
-    if (window.location.hash !== "#reflection") return;
+    if (window.location.hash !== "#log-result") return;
     window.requestAnimationFrame(() => {
-      document.getElementById("reflection")?.scrollIntoView({
+      document.getElementById("log-result")?.scrollIntoView({
         behavior: "smooth",
         block: "start",
       });
     });
-  }, [loading, joinRedirecting, myRaceResult?.id]);
+  }, [loading, joinRedirecting, race?.raceDate, hubSignupId]);
 
   const postAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -498,6 +518,21 @@ function RaceHubPageInner() {
     : null;
 
   const raceDateYmdForSheet = race.raceDate ? String(race.raceDate).slice(0, 10) : "";
+
+  const showPostRaceResultCard =
+    Boolean(
+      hubSignupId &&
+        myMembership &&
+        race.raceDate &&
+        raceCalendarOnOrBeforeTodayUtc(race.raceDate)
+    );
+  const showPreRaceAthleteCard =
+    Boolean(
+      hubSignupId &&
+        myMembership &&
+        race.raceDate &&
+        raceCalendarAfterTodayUtc(race.raceDate)
+    );
 
   const copyInviteLink = async () => {
     const s = race.slug?.trim();
@@ -674,67 +709,117 @@ function RaceHubPageInner() {
 
             {/* Right: race info, course, group runs, who's here */}
             <aside className="lg:col-span-6 space-y-6 min-w-0 order-2">
-              <section className="bg-gradient-to-br from-emerald-50 to-white rounded-2xl border border-emerald-200 shadow-sm p-4 sm:p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-amber-500" />
-                  My result
-                </h2>
-                <p className="text-sm text-gray-600 mb-3">
-                  Log or update your finish time for this race. It stays on your profile and home,
-                  not posted to the group feed.
-                </p>
-                {myRaceResult ? (
-                  <div className="space-y-2 text-sm">
-                    {myRaceResult.officialFinishTime ? (
-                      <p className="text-emerald-900">
-                        <span className="font-semibold">Time:</span>{" "}
-                        <span className="tabular-nums font-medium">{myRaceResult.officialFinishTime}</span>
-                        {myRaceResult.source === "garmin" ? (
-                          <span className="text-gray-500 font-normal"> · from Garmin</span>
-                        ) : null}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-gray-700">Result on file (open below to add times).</p>
-                    )}
-                    {myRaceResult.overallPlace != null ? (
-                      <p className="text-gray-800">
-                        <span className="font-semibold text-gray-700">Overall:</span>{" "}
-                        {myRaceResult.overallPlace}
-                        {myRaceResult.ageGroupPlace != null
-                          ? ` · AG ${myRaceResult.ageGroupPlace}`
-                          : null}
-                      </p>
-                    ) : null}
-                    {myRaceResult.actualAvgPaceSecPerMile != null ? (
-                      <p className="text-gray-800">
-                        <span className="font-semibold text-gray-700">Pace:</span>{" "}
-                        {formatSecPerMileForHub(myRaceResult.actualAvgPaceSecPerMile)}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-700">
-                    No result logged yet. Add your time after race day, even if your watch
-                    didn&apos;t upload a file.
+              {showPreRaceAthleteCard ? (
+                <section className="bg-gradient-to-br from-orange-50 to-white rounded-2xl border border-orange-200 shadow-sm p-4 sm:p-6">
+                  <h2 className="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2">
+                    <Flag className="w-5 h-5 text-orange-600" />
+                    Your race goal
+                  </h2>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Set a finish-time goal to unlock your training plan. Updates stay on your
+                    profile—not posted to race chatter.
                   </p>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setLogSheetOpen(true)}
-                  className="mt-4 w-full inline-flex justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
-                >
-                  {myRaceResult ? "Update result" : "Log your result"}
-                </button>
-              </section>
+                  {hubGoalId && hubGoalBrief ? (
+                    <div className="space-y-2 text-sm text-gray-800">
+                      <p>
+                        <span className="font-semibold text-gray-900">{hubGoalBrief.name}</span>
+                        {hubGoalBrief.goalTime ? (
+                          <span className="text-gray-700"> · Goal {hubGoalBrief.goalTime}</span>
+                        ) : (
+                          <span className="text-gray-600"> · Add a goal time to build your plan</span>
+                        )}
+                      </p>
+                      <Link
+                        href={`/goals?raceRegistryId=${encodeURIComponent(race.id)}`}
+                        className="inline-flex w-full justify-center rounded-xl border border-orange-300 bg-white px-4 py-2.5 text-sm font-semibold text-orange-900 hover:bg-orange-50"
+                      >
+                        Update goal
+                      </Link>
+                      {hubGoalBrief.goalTime ? (
+                        <Link
+                          href={`/training-setup?goalId=${encodeURIComponent(hubGoalId)}`}
+                          className="inline-flex w-full justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
+                        >
+                          Build training plan
+                        </Link>
+                      ) : (
+                        <p className="text-xs text-center text-gray-600">
+                          Add a goal time in Goals to unlock plan setup.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm text-gray-700">
+                        What&apos;s your goal time for this race?
+                      </p>
+                      <Link
+                        href={`/goals?raceRegistryId=${encodeURIComponent(race.id)}`}
+                        className="inline-flex w-full justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
+                      >
+                        Set goal
+                      </Link>
+                    </div>
+                  )}
+                </section>
+              ) : null}
 
-              {myRaceResult ? (
-                <RaceHubRaceReflectionSection
-                  raceName={race.name}
-                  resultId={myRaceResult.id}
-                  reflection={myRaceResult.reflection}
-                  racePhotoUrls={myRaceResult.racePhotoUrls}
-                  onUpdated={() => void loadHubData()}
-                />
+              {showPostRaceResultCard ? (
+                <section
+                  id="log-result"
+                  className="bg-gradient-to-br from-emerald-50 to-white rounded-2xl border border-emerald-200 shadow-sm p-4 sm:p-6 scroll-mt-24"
+                >
+                  <h2 className="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-amber-500" />
+                    My result
+                  </h2>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Log or update your finish time for this race. It stays on your profile and home,
+                    not posted to the group feed.
+                  </p>
+                  {myRaceResult ? (
+                    <div className="space-y-2 text-sm">
+                      {myRaceResult.officialFinishTime ? (
+                        <p className="text-emerald-900">
+                          <span className="font-semibold">Time:</span>{" "}
+                          <span className="tabular-nums font-medium">{myRaceResult.officialFinishTime}</span>
+                          {myRaceResult.source === "garmin" ? (
+                            <span className="text-gray-500 font-normal"> · from Garmin</span>
+                          ) : null}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-gray-700">Result on file (open below to add times).</p>
+                      )}
+                      {myRaceResult.overallPlace != null ? (
+                        <p className="text-gray-800">
+                          <span className="font-semibold text-gray-700">Overall:</span>{" "}
+                          {myRaceResult.overallPlace}
+                          {myRaceResult.ageGroupPlace != null
+                            ? ` · AG ${myRaceResult.ageGroupPlace}`
+                            : null}
+                        </p>
+                      ) : null}
+                      {myRaceResult.actualAvgPaceSecPerMile != null ? (
+                        <p className="text-gray-800">
+                          <span className="font-semibold text-gray-700">Pace:</span>{" "}
+                          {formatSecPerMileForHub(myRaceResult.actualAvgPaceSecPerMile)}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-700">
+                      No result logged yet. Add your time after race day, even if your watch
+                      didn&apos;t upload a file.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setLogSheetOpen(true)}
+                    className="mt-4 w-full inline-flex justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                  >
+                    {myRaceResult ? "Update result" : "Log your result"}
+                  </button>
+                </section>
               ) : null}
 
               <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6">
@@ -1091,7 +1176,7 @@ function RaceHubPageInner() {
           </div>
         </main>
 
-      {myMembership && race && raceDateYmdForSheet ? (
+      {myMembership && race && raceDateYmdForSheet && showPostRaceResultCard ? (
         <LogRaceResultSheet
           open={logSheetOpen}
           onClose={() => setLogSheetOpen(false)}
