@@ -1372,10 +1372,10 @@ export default function AthleteHomePage() {
                       </button>
                     ) : null}
                     <Link
-                      href="/profile#goal"
+                      href="/races"
                       className="mt-3 inline-flex justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 w-full"
                     >
-                      Set your next goal →
+                      Find your next race →
                     </Link>
                   </div>
                 ) : primaryGoal ? (
