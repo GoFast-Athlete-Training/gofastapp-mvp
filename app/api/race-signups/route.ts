@@ -16,6 +16,7 @@ async function athleteFromRequest(request: NextRequest) {
 const raceInclude = {
   select: {
     id: true,
+    slug: true,
     name: true,
     distanceLabel: true,
     distanceMeters: true,
@@ -25,6 +26,7 @@ const raceInclude = {
     country: true,
     registrationUrl: true,
     startTime: true,
+    logoUrl: true,
   },
 } as const;
 

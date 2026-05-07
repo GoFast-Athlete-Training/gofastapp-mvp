@@ -19,13 +19,12 @@ import {
   getPublicRacePageUrl,
 } from "@/lib/public-race-url";
 import LogRaceResultSheet from "@/components/races/LogRaceResultSheet";
-import { raceCalendarAfterTodayUtc, raceCalendarOnOrBeforeTodayUtc } from "@/lib/training/plan-utils";
+import { raceCalendarOnOrBeforeTodayUtc } from "@/lib/training/plan-utils";
 import {
   Calendar,
   ChevronDown,
   ChevronRight,
   Clock,
-  Flag,
   Copy,
   ExternalLink,
   Info,
@@ -192,9 +191,7 @@ function RaceHubPageInner() {
   const [inviteCopied, setInviteCopied] = useState(false);
   const [myRaceResult, setMyRaceResult] = useState<MyRaceResultRow | null>(null);
   const [hubGoalId, setHubGoalId] = useState<string | null>(null);
-  const [hubGoalBrief, setHubGoalBrief] = useState<{ name: string; goalTime: string | null } | null>(
-    null
-  );
+  const [hubReadOnlyGoalTime, setHubReadOnlyGoalTime] = useState<string | null>(null);
   const [hubSignupId, setHubSignupId] = useState<string | null>(null);
   const [logSheetOpen, setLogSheetOpen] = useState(false);
 
@@ -238,7 +235,7 @@ function RaceHubPageInner() {
         setShakeouts([]);
         setMyRaceResult(null);
         setHubGoalId(null);
-        setHubGoalBrief(null);
+        setHubReadOnlyGoalTime(null);
         setHubSignupId(null);
         return { canAccessHub: false, loadedRace };
       }
@@ -259,7 +256,7 @@ function RaceHubPageInner() {
         setShakeouts([]);
         setMyRaceResult(null);
         setHubGoalId(null);
-        setHubGoalBrief(null);
+        setHubReadOnlyGoalTime(null);
         return { canAccessHub: false, loadedRace };
       }
 
@@ -303,22 +300,11 @@ function RaceHubPageInner() {
         (g) => g.raceRegistryId === id || g.race_registry?.id === id
       );
       setHubGoalId(goalMatch?.id ?? null);
-      if (goalMatch) {
-        const rawName =
-          typeof goalMatch.name === "string" ? goalMatch.name.trim() : "";
-        const rn =
-          typeof goalMatch.race_registry?.name === "string"
-            ? goalMatch.race_registry.name.trim()
-            : "";
-        const rawTime =
-          typeof goalMatch.goalTime === "string" ? goalMatch.goalTime.trim() : "";
-        setHubGoalBrief({
-          name: rn || rawName || "Your goal",
-          goalTime: rawTime || null,
-        });
-      } else {
-        setHubGoalBrief(null);
-      }
+      setHubReadOnlyGoalTime(
+        goalMatch && typeof goalMatch.goalTime === "string" && goalMatch.goalTime.trim()
+          ? goalMatch.goalTime.trim()
+          : null
+      );
 
       return { canAccessHub: true, loadedRace };
     } catch (e: unknown) {
@@ -330,7 +316,7 @@ function RaceHubPageInner() {
         setShakeouts([]);
         setMyRaceResult(null);
         setHubGoalId(null);
-        setHubGoalBrief(null);
+        setHubReadOnlyGoalTime(null);
         setHubSignupId(null);
         return { canAccessHub: false, loadedRace };
       }
@@ -478,10 +464,11 @@ function RaceHubPageInner() {
         <div className="max-w-md w-full bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Add this race from GoFast</h2>
           <p className="text-gray-600 mb-4">
-            The race hub is for runners who added this event to their GoFast calendar. Open Browse races to add it.
+            The race hub is for runners who added this event to their GoFast calendar. Find the race in the
+            catalog and add it to My Races.
           </p>
-          <Link href="/races" className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg">
-            My Races
+          <Link href="/races/find" className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg">
+            Find a race
           </Link>
         </div>
       </div>
@@ -526,13 +513,10 @@ function RaceHubPageInner() {
         race.raceDate &&
         raceCalendarOnOrBeforeTodayUtc(race.raceDate)
     );
-  const showPreRaceAthleteCard =
-    Boolean(
-      hubSignupId &&
-        myMembership &&
-        race.raceDate &&
-        raceCalendarAfterTodayUtc(race.raceDate)
-    );
+
+  const hubBackUrl = race.slug?.trim()
+    ? `/myrace/${encodeURIComponent(race.slug.trim())}`
+    : "/races";
 
   const copyInviteLink = async () => {
     const s = race.slug?.trim();
@@ -549,7 +533,7 @@ function RaceHubPageInner() {
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
-      <TopNav showBack backUrl="/races" backLabel="My Races" />
+      <TopNav showBack backUrl={hubBackUrl} backLabel="My race" />
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -592,6 +576,11 @@ function RaceHubPageInner() {
                   {distanceChips.length === 0 && distanceFallback ? (
                     <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
                       {distanceFallback}
+                    </span>
+                  ) : null}
+                  {hubReadOnlyGoalTime ? (
+                    <span className="inline-flex rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-900">
+                      Goal: {hubReadOnlyGoalTime}
                     </span>
                   ) : null}
                 </div>
@@ -709,61 +698,6 @@ function RaceHubPageInner() {
 
             {/* Right: race info, course, group runs, who's here */}
             <aside className="lg:col-span-6 space-y-6 min-w-0 order-2">
-              {showPreRaceAthleteCard ? (
-                <section className="bg-gradient-to-br from-orange-50 to-white rounded-2xl border border-orange-200 shadow-sm p-4 sm:p-6">
-                  <h2 className="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2">
-                    <Flag className="w-5 h-5 text-orange-600" />
-                    Your race goal
-                  </h2>
-                  <p className="text-sm text-gray-600 mb-3">
-                    Set a finish-time goal to unlock your training plan. Updates stay on your
-                    profile—not posted to race chatter.
-                  </p>
-                  {hubGoalId && hubGoalBrief ? (
-                    <div className="space-y-2 text-sm text-gray-800">
-                      <p>
-                        <span className="font-semibold text-gray-900">{hubGoalBrief.name}</span>
-                        {hubGoalBrief.goalTime ? (
-                          <span className="text-gray-700"> · Goal {hubGoalBrief.goalTime}</span>
-                        ) : (
-                          <span className="text-gray-600"> · Add a goal time to build your plan</span>
-                        )}
-                      </p>
-                      <Link
-                        href={`/goals?raceRegistryId=${encodeURIComponent(race.id)}`}
-                        className="inline-flex w-full justify-center rounded-xl border border-orange-300 bg-white px-4 py-2.5 text-sm font-semibold text-orange-900 hover:bg-orange-50"
-                      >
-                        Update goal
-                      </Link>
-                      {hubGoalBrief.goalTime ? (
-                        <Link
-                          href={`/training-setup?goalId=${encodeURIComponent(hubGoalId)}`}
-                          className="inline-flex w-full justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
-                        >
-                          Build training plan
-                        </Link>
-                      ) : (
-                        <p className="text-xs text-center text-gray-600">
-                          Add a goal time in Goals to unlock plan setup.
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <p className="text-sm text-gray-700">
-                        What&apos;s your goal time for this race?
-                      </p>
-                      <Link
-                        href={`/goals?raceRegistryId=${encodeURIComponent(race.id)}`}
-                        className="inline-flex w-full justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
-                      >
-                        Set goal
-                      </Link>
-                    </div>
-                  )}
-                </section>
-              ) : null}
-
               {showPostRaceResultCard ? (
                 <section
                   id="log-result"

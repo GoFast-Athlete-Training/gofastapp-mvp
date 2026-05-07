@@ -63,7 +63,14 @@ const navItems: NavItem[] = [
     icon: Users,
     match: runCrewHubMatch,
   },
-  { label: "Races", href: "/races", icon: Trophy },
+  {
+    label: "Races",
+    href: "/races",
+    icon: Trophy,
+    match: (p) =>
+      !!p &&
+      (p === "/races" || p.startsWith("/races/") || p.startsWith("/myrace/")),
+  },
   {
     label: "Profile",
     href: "/profile",
