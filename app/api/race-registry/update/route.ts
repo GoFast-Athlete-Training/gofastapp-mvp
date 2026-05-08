@@ -152,6 +152,17 @@ function readOptionalDateTime(
   return null;
 }
 
+/** When key absent, return undefined (do not update). */
+function readOptionalBoolean(
+  payload: IncomingRace,
+  key: string
+): boolean | undefined {
+  if (!(key in payload)) return undefined;
+  const v = payload[key];
+  if (typeof v === "boolean") return v;
+  return undefined;
+}
+
 /**
  * POST /api/race-registry/update
  * Receives race payload from GoFastCompany (prodpush). Upserts race_registry.
@@ -319,6 +330,10 @@ export async function POST(request: NextRequest) {
       racePayload,
       "registrationOpenDate"
     );
+    const registrationOpenNow = readOptionalBoolean(
+      racePayload,
+      "registrationOpenNow"
+    );
     const registrationCloseDate = readOptionalDateTime(
       racePayload,
       "registrationDeadline"
@@ -380,6 +395,9 @@ export async function POST(request: NextRequest) {
       ...(charityUrlExtra !== undefined ? { charityUrl: charityUrlExtra } : {}),
       ...(officialWebsiteUrl !== undefined
         ? { officialWebsiteUrl }
+        : {}),
+      ...(registrationOpenNow !== undefined
+        ? { registrationOpenNow }
         : {}),
       ...(registrationOpenDate !== undefined
         ? { registrationOpenDate }

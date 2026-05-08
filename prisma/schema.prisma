@@ -364,6 +364,7 @@ model race_registry {
   registrationCloseDate   DateTime?
   registrationFee         Float?
   registrationOpenDate    DateTime?
+  registrationOpenNow     Boolean                   @default(false)
   registrationUrl         String?
   resultsUrl              String?
   slug                    String?                   @unique
