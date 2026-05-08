@@ -81,6 +81,8 @@ export async function GET(request: NextRequest) {
       isPlanSession: true;
     };
     const planByDate = new Map<string, Acc>();
+    let planWeekNumber: number | null = null;
+    let planTotalWeeks: number | null = null;
 
     if (
       plan &&
@@ -97,6 +99,8 @@ export async function GET(request: NextRequest) {
         effectiveWeeks,
         now
       );
+      planWeekNumber = startWeek;
+      planTotalWeeks = effectiveWeeks;
 
       for (
         let weekNum = startWeek;
@@ -262,6 +266,8 @@ export async function GET(request: NextRequest) {
       ? {
           name: plan.name,
           hasSchedule: planWeeksArr.length > 0,
+          weekNumber: planWeekNumber,
+          totalWeeks: planTotalWeeks,
         }
       : null;
 
