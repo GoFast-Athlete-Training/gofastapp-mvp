@@ -1,33 +1,70 @@
 /**
- * One-shot plan generate: writes `planWeeks` + plan scalars only (no `workouts` rows).
- * Loads `training_plan_preset`: boltons (volumeConstraints, workoutConfig) plus long/intervals/tempo
- * rotation configs. When `plan.presetId` is null, the oldest preset in the DB is used (MVP single-preset).
- * Future: prefer `findUnique({ where: { slug } })` when multiple presets exist.
- *
- * Config resolution and catalogue rotation live in `generatePlanFromConfigs`;
- * the pure week builder is `generatePlanWorkoutRows` in `generate-plan.ts`.
+ * Orchestrator: load preset + catalogue rows, run `generatePlanFromConfigs`,
+ * persist `planWeeks` (+ plan scalars). No standalone `workouts` rows here.
  */
 
 import { WorkoutType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   generatePlanFromConfigs,
+  type CatalogueGenerationRow,
   type PlanGenConfig,
+  planWeeksSnapshotFromGeneratedRows,
   runTypeConfigPositionsToInputs,
   type RunTypeConfigInput,
 } from "@/lib/training/generate-plan-from-configs";
-import { planWeeksSnapshotFromGeneratedRows } from "@/lib/training/generate-plan";
-import { presetBoltonsToPlanGenConfig } from "@/lib/training/preset-to-plan-gen-config";
 import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
 import { Prisma } from "@prisma/client";
 import { metersToMiles } from "@/lib/pace-utils";
 import { goalRacePaceDisplayString } from "@/lib/training/goal-pace-calculator";
 
+type PresetBoltonsVolume = NonNullable<
+  Prisma.training_plan_presetGetPayload<{
+    include: { volumeConstraints: true };
+  }>["volumeConstraints"]
+>;
+type PresetBoltonsWorkout = NonNullable<
+  Prisma.training_plan_presetGetPayload<{
+    include: { workoutConfig: true };
+  }>["workoutConfig"]
+>;
+
+function presetBoltonsToPlanGenConfig(
+  volume: PresetBoltonsVolume,
+  workout: PresetBoltonsWorkout
+): PlanGenConfig {
+  return {
+    cycleLen: volume.cycleLen,
+    minWeeklyMiles: volume.minWeeklyMiles,
+    baseMiles: volume.baseMiles,
+    peakMiles: volume.peakMiles,
+    taperMiles: volume.taperMiles,
+    maxWeeklyMiles: volume.maxWeeklyMiles,
+    tempoIdealDow: workout.tempoIdealDow,
+    intervalIdealDow: workout.intervalIdealDow,
+    longRunDefaultDow: workout.longRunDefaultDow,
+  };
+}
+
+const catalogueSelectForGeneration = {
+  id: true,
+  name: true,
+  workoutType: true,
+  slug: true,
+  paceAnchor: true,
+  segmentPaceDist: true,
+  warmupMiles: true,
+  cooldownMiles: true,
+  workBaseMiles: true,
+  workBaseReps: true,
+  workBaseRepMeters: true,
+} as const;
+
 const positionsInclude = {
   orderBy: { cyclePosition: "asc" as const },
   include: {
     workout_catalogue: {
-      select: { id: true, name: true, workoutType: true, slug: true },
+      select: catalogueSelectForGeneration,
     },
   },
 } as const;
@@ -78,17 +115,26 @@ function runTypeInputsFromPreset(preset: {
   const out: RunTypeConfigInput[] = [];
   if (preset.longRunConfig?.positions?.length) {
     out.push(
-      ...runTypeConfigPositionsToInputs(WorkoutType.LongRun, preset.longRunConfig.positions.map(mapPositionRow))
+      ...runTypeConfigPositionsToInputs(
+        WorkoutType.LongRun,
+        preset.longRunConfig.positions.map(mapPositionRow)
+      )
     );
   }
   if (preset.intervalsConfig?.positions?.length) {
     out.push(
-      ...runTypeConfigPositionsToInputs(WorkoutType.Intervals, preset.intervalsConfig.positions.map(mapPositionRow))
+      ...runTypeConfigPositionsToInputs(
+        WorkoutType.Intervals,
+        preset.intervalsConfig.positions.map(mapPositionRow)
+      )
     );
   }
   if (preset.tempoConfig?.positions?.length) {
     out.push(
-      ...runTypeConfigPositionsToInputs(WorkoutType.Tempo, preset.tempoConfig.positions.map(mapPositionRow))
+      ...runTypeConfigPositionsToInputs(
+        WorkoutType.Tempo,
+        preset.tempoConfig.positions.map(mapPositionRow)
+      )
     );
   }
   return out;
@@ -159,8 +205,8 @@ export async function executePlanGenerate(params: {
   const planConfig: PlanGenConfig | undefined =
     rawPreset?.volumeConstraints && rawPreset?.workoutConfig
       ? presetBoltonsToPlanGenConfig(
-          rawPreset.volumeConstraints,
-          rawPreset.workoutConfig
+          rawPreset.volumeConstraints as PresetBoltonsVolume,
+          rawPreset.workoutConfig as PresetBoltonsWorkout
         )
       : undefined;
 
@@ -173,16 +219,20 @@ export async function executePlanGenerate(params: {
         })
       : undefined;
 
-  const catalogueIds = rawPreset != null ? catalogueIdsFromPreset(rawPreset) : [];
-  const catalogueRows =
+  const catalogueIds =
+    rawPreset != null ? catalogueIdsFromPreset(rawPreset) : [];
+  const catalogueRowsFull =
     catalogueIds.length > 0
       ? await prisma.workout_catalogue.findMany({
           where: { id: { in: catalogueIds } },
-          select: { id: true, paceAnchor: true },
+          select: catalogueSelectForGeneration,
         })
       : [];
+  const catalogueRowsById = new Map<string, CatalogueGenerationRow>(
+    catalogueRowsFull.map((r) => [r.id, r])
+  );
   const cataloguePaceById = new Map(
-    catalogueRows.map((r) => [r.id, { paceAnchor: r.paceAnchor }])
+    catalogueRowsFull.map((r) => [r.id, { paceAnchor: r.paceAnchor }])
   );
 
   let weeklyMileageTarget = params.weeklyMileageTarget;
@@ -223,6 +273,7 @@ export async function executePlanGenerate(params: {
       preferredQualityDays: plan.preferredQualityDays,
       planConfig,
       runTypeConfigs: runTypeConfigs && runTypeConfigs.length > 0 ? runTypeConfigs : undefined,
+      catalogueRowsById,
     },
     cataloguePaceById.size > 0
       ? { cataloguePaceById }

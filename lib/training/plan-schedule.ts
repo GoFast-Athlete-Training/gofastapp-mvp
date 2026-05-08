@@ -17,7 +17,7 @@ import {
   mondayUtcOfWeekContaining,
   utcDateOnly,
 } from "./plan-utils";
-import { nOffsetFromWeekAnchor, phaseForCatalogue } from "./generate-plan";
+import { nOffsetFromWeekAnchor, phaseForCatalogue } from "./plan-utils";
 import { formatPlannedWorkoutTitle } from "./workout-display-title";
 import { titleFromCycleIndex } from "./algo-workout-segments";
 

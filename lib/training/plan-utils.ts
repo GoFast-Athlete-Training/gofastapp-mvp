@@ -260,3 +260,44 @@ export function trainingWeekNumberForDateKey(
   return currentTrainingWeekNumber(planStartRaw, totalWeeks, anchor);
 }
 
+/**
+ * Phases are contiguous `cycleLen`-week blocks from the race backward.
+ * `nOffset`: 0 = race week; negative = weeks before race.
+ */
+export function phaseForCatalogue(nOffset: number, cycleLen: number): string {
+  const L = Math.max(1, Math.floor(Math.abs(cycleLen)));
+  if (nOffset === 0) return "taper";
+  if (nOffset > 0) return "base";
+  const w = -nOffset;
+  if (w <= L) return "taper";
+  if (w <= 2 * L) return "peak";
+  if (w <= 3 * L) return "build";
+  return "base";
+}
+
+export function nOffsetFromWeekAnchor(weekAnchor: Date, raceUtc: Date): number {
+  const dayDiff = Math.floor(
+    (utcDateOnly(raceUtc).getTime() - utcDateOnly(weekAnchor).getTime()) / 86400000
+  );
+  if (dayDiff < 0) return 0;
+  if (dayDiff <= 6) return 0;
+  return -Math.ceil(dayDiff / 7);
+}
+
+/** Phase key for a calendar week — matches plan generator / planWeeks display. */
+export function cataloguePhaseFallbackForWeek(
+  planStartRaw: Date | string,
+  raceRaw: Date | string,
+  weekNumber: number,
+  cycleLen: number = 4
+): string {
+  const planStart = utcDateOnly(
+    typeof planStartRaw === "string" ? new Date(planStartRaw) : planStartRaw
+  );
+  const raceUtc = utcDateOnly(typeof raceRaw === "string" ? new Date(raceRaw) : raceRaw);
+  const firstMonday = mondayUtcOfWeekContaining(planStart);
+  const weekAnchor = addDaysUtc(firstMonday, (weekNumber - 1) * 7);
+  const nOffset = nOffsetFromWeekAnchor(weekAnchor, raceUtc);
+  return phaseForCatalogue(nOffset, cycleLen);
+}
+

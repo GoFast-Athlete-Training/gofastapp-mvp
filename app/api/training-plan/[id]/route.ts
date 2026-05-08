@@ -39,6 +39,63 @@ export async function GET(request: NextRequest, context: Ctx) {
           },
         },
         _count: { select: { planned_workouts: true } },
+        training_plan_preset: {
+          include: {
+            volumeConstraints: true,
+            workoutConfig: true,
+            longRunConfig: {
+              include: {
+                positions: {
+                  orderBy: { cyclePosition: "asc" },
+                  include: {
+                    workout_catalogue: {
+                      select: {
+                        id: true,
+                        name: true,
+                        workoutType: true,
+                        slug: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            intervalsConfig: {
+              include: {
+                positions: {
+                  orderBy: { cyclePosition: "asc" },
+                  include: {
+                    workout_catalogue: {
+                      select: {
+                        id: true,
+                        name: true,
+                        workoutType: true,
+                        slug: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            tempoConfig: {
+              include: {
+                positions: {
+                  orderBy: { cyclePosition: "asc" },
+                  include: {
+                    workout_catalogue: {
+                      select: {
+                        id: true,
+                        name: true,
+                        workoutType: true,
+                        slug: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
     if (!plan) {

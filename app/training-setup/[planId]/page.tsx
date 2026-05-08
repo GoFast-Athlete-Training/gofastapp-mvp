@@ -13,7 +13,7 @@ import {
   phaseNameForWeek,
   type PhaseRange,
 } from "@/lib/training/plan-phases";
-import { cataloguePhaseFallbackForWeek } from "@/lib/training/generate-plan";
+import { cataloguePhaseFallbackForWeek } from "@/lib/training/plan-utils";
 import {
   effectiveTrainingWeekCount,
   formatCalendarWeekRangeLabel,
@@ -28,8 +28,17 @@ import {
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import { normalizePreferredQualityDays } from "@/lib/training/preferred-quality-days";
 
+type PlanPresetSummary = {
+  id: string;
+  slug: string | null;
+  title: string;
+  intervalsConfig: { positions: unknown[] } | null;
+  tempoConfig: { positions: unknown[] } | null;
+} | null;
+
 type PlanDetail = {
   id: string;
+  presetId?: string | null;
   name: string;
   totalWeeks: number;
   startDate: string;
@@ -45,6 +54,7 @@ type PlanDetail = {
     name: string;
     raceDate: string;
   } | null;
+  training_plan_preset?: PlanPresetSummary | null;
 };
 
 const DAY_OPTIONS: { value: number; label: string }[] = [
@@ -242,6 +252,34 @@ export default function TrainingSetupPlanPage({
     const fourDays = preferredCount === 4;
     return { belowEngineFloor, fewDays, fourDays };
   }, [weeklyMilesTarget, preferredCount]);
+
+  const presetGenerateWarnings = useMemo(() => {
+    if (!plan || hasSchedule) return [] as string[];
+    const msgs: string[] = [];
+    const preset = plan.training_plan_preset;
+    if (!plan.presetId || preset == null) {
+      msgs.push(
+        "This plan has no training preset linked. Generation will fall back to the oldest preset in the system — confirm your coach assigned the correct plan preset."
+      );
+    }
+    if (
+      preset != null &&
+      (preset.intervalsConfig == null || !preset.intervalsConfig.positions?.length)
+    ) {
+      msgs.push(
+        "Your preset has no interval rotation configured. Weekly plans may omit interval workouts until rotations are set up."
+      );
+    }
+    if (
+      preset != null &&
+      (preset.tempoConfig == null || !preset.tempoConfig.positions?.length)
+    ) {
+      msgs.push(
+        "Your preset has no tempo rotation configured. Weekly plans may omit tempo workouts until rotations are set up."
+      );
+    }
+    return msgs;
+  }, [plan, hasSchedule]);
 
   const currentWeekEntry = useMemo(
     () => weekEntries.find((w) => w.weekNumber === weekNumber),
@@ -483,6 +521,22 @@ export default function TrainingSetupPlanPage({
                 </p>
               </div>
 
+              {presetGenerateWarnings.length > 0 && (
+                <div
+                  className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+                  role="status"
+                >
+                  <p className="mb-2 font-medium text-amber-950">
+                    Before you build
+                  </p>
+                  <ul className="list-disc space-y-1 pl-5 text-amber-900/95">
+                    {presetGenerateWarnings.map((w, i) => (
+                      <li key={i}>{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-800">
                   How many miles do you want to do weekly?
@@ -543,7 +597,7 @@ export default function TrainingSetupPlanPage({
                     role="status"
                   >
                     Fewer than four days makes it harder to spread easy mileage,
-                    quality work, and recovery. Adding another day or two usually
+                    interval/tempo days, and recovery. Adding another day or two usually
                     feels better on the legs.
                   </p>
                 )}
@@ -553,9 +607,8 @@ export default function TrainingSetupPlanPage({
                     role="status"
                   >
                     With four sessions a week, your off days are real recovery
-                    days—we&apos;ll treat most runs as quality so something
-                    meaningful happens every time you lace up. Listen to easy
-                    days if we prescribe them.
+                    days—we aim to make each workout day count (tempo, intervals,
+                    long, or easy). Listen to easy days if we prescribe them.
                   </p>
                 )}
               </div>
@@ -565,7 +618,7 @@ export default function TrainingSetupPlanPage({
                   Long run day
                 </p>
                 <p className="mb-3 text-xs text-gray-500">
-                  Pick Saturday or Sunday for your long run. Quality sessions avoid
+                  Pick Saturday or Sunday for your long run. Interval and tempo days avoid
                   this day.
                 </p>
                 <div className="flex flex-wrap gap-3">
@@ -594,12 +647,12 @@ export default function TrainingSetupPlanPage({
 
               <div>
                 <p className="mb-2 text-sm font-medium text-gray-800">
-                  Quality session days (optional)
+                  Interval &amp; tempo days (optional)
                 </p>
                 <p className="mb-3 text-xs text-gray-500">
                   Choose up to two days from your preferred days (not your long run
-                  day). They must be at least two days apart. If you skip this, we
-                  use the preset defaults (often Tuesday and Thursday).
+                  day). Typically first pick = tempo day, second = interval day — at
+                  least two days apart. If you skip this, we use the preset defaults (often Tuesday and Thursday).
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {DAY_OPTIONS.map(({ value, label }) => {
