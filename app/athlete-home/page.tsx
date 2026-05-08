@@ -147,6 +147,7 @@ type RaceSignupWithRegistry = {
   raceRegistryId: string;
   race_registry: {
     id: string;
+    slug: string | null;
     name: string;
     distanceLabel: string | null;
     distanceMeters: number | null;
@@ -915,6 +916,24 @@ export default function AthleteHomePage() {
   const raceCityState =
     [raceCity, raceState].filter((x) => x && String(x).trim()).join(', ') || null;
 
+  // Slug-based link to the personal race page for goal management
+  const goalRaceSlug =
+    typeof primaryGoal?.race_registry?.slug === 'string' && primaryGoal.race_registry.slug.trim()
+      ? primaryGoal.race_registry.slug.trim()
+      : null;
+  const goalRaceHref = goalRaceSlug ? `/myrace/${goalRaceSlug}` : '/races';
+
+  // Primary upcoming signup (soonest future race) used when there's no goal yet
+  const primaryUpcomingSignup = !primaryGoal
+    ? raceSignups
+        .filter((s) => new Date(s.race_registry.raceDate).getTime() > Date.now())
+        .sort(
+          (a, b) =>
+            new Date(a.race_registry.raceDate).getTime() -
+            new Date(b.race_registry.raceDate).getTime()
+        )[0] ?? null
+    : null;
+
   let todayRunIcon = Footprints;
   let todayTypeLabel = 'Workout';
   let todayStoredTitleSubtitle: string | null = null;
@@ -1454,20 +1473,52 @@ export default function AthleteHomePage() {
                       </div>
                     </dl>
                     <Link
-                      href="/profile#goal"
+                      href={goalRaceHref}
                       className="mt-3 text-sm font-semibold text-orange-600 hover:text-orange-700"
                     >
-                      Manage goal →
+                      Open race page →
+                    </Link>
+                  </div>
+                ) : primaryUpcomingSignup ? (
+                  <div className="rounded-2xl border border-dashed border-orange-200 bg-orange-50/60 p-4 h-full flex flex-col justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-orange-700 mb-1">
+                        No goal set
+                      </p>
+                      <p className="text-base font-bold text-gray-900 leading-snug">
+                        {primaryUpcomingSignup.race_registry.name}
+                      </p>
+                      {primaryUpcomingSignup.race_registry.distanceLabel ? (
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {primaryUpcomingSignup.race_registry.distanceLabel}
+                        </p>
+                      ) : null}
+                      <p className="text-xs text-gray-500 mt-1">
+                        {new Date(primaryUpcomingSignup.race_registry.raceDate).toLocaleDateString(
+                          'en-US',
+                          { month: 'short', day: 'numeric', year: 'numeric' }
+                        )}
+                      </p>
+                    </div>
+                    <Link
+                      href={
+                        primaryUpcomingSignup.race_registry.slug
+                          ? `/myrace/${primaryUpcomingSignup.race_registry.slug}`
+                          : '/races'
+                      }
+                      className="mt-3 inline-flex justify-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 w-full"
+                    >
+                      Set your goal →
                     </Link>
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 p-4 h-full flex flex-col justify-center">
-                    <p className="text-sm text-gray-700">Set your race goal to anchor your plan.</p>
+                    <p className="text-sm text-gray-700">Add a race to set your goal and anchor your plan.</p>
                     <Link
-                      href="/profile#goal"
+                      href="/races/find"
                       className="mt-2 inline-flex justify-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 w-full"
                     >
-                      Set goal in profile
+                      Find a race →
                     </Link>
                   </div>
                 )}

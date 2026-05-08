@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
         race_registry: {
           select: {
             id: true,
+            slug: true,
             name: true,
             distanceLabel: true,
             distanceMeters: true,

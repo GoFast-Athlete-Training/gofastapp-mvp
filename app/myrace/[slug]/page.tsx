@@ -34,6 +34,88 @@ type GoalRow = {
   race_registry?: { id: string } | null;
 };
 
+function parseGoalTime(raw: string): string | null {
+  const trimmed = raw.trim();
+  // Accept H:MM:SS or HH:MM:SS
+  if (/^\d{1,2}:\d{2}:\d{2}$/.test(trimmed)) return trimmed;
+  return null;
+}
+
+function InlineGoalForm({
+  race,
+  goal,
+  onSaved,
+}: {
+  race: ResolvedRace;
+  goal: GoalRow | null;
+  onSaved: (updated: GoalRow) => void;
+}) {
+  const [input, setInput] = useState(goal?.goalTime?.trim() ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const parsed = parseGoalTime(input);
+    if (!parsed) {
+      setError("Enter time as H:MM:SS (e.g. 1:45:00)");
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      const payload = {
+        goalTime: parsed,
+        raceRegistryId: race.id,
+        name: race.name,
+        distance: race.distanceLabel ?? undefined,
+        targetByDate: race.raceDate,
+      };
+      let saved: GoalRow;
+      if (goal?.id) {
+        const res = await api.put<{ goal: GoalRow }>(`/goals/${goal.id}`, payload);
+        saved = res.data.goal;
+      } else {
+        const res = await api.post<{ goal: GoalRow }>("/goals", payload);
+        saved = res.data.goal;
+      }
+      onSaved(saved);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Save failed — try again";
+      setError(msg);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-3">
+      <label className="block text-xs font-semibold text-gray-600 mb-1">
+        Target finish time (H:MM:SS)
+      </label>
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="1:45:00"
+          maxLength={8}
+          className="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono text-gray-900 focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-300"
+        />
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
+        >
+          {saving ? "Saving…" : goal?.goalTime ? "Update" : "Set goal"}
+        </button>
+      </div>
+      {error ? <p className="mt-1.5 text-xs text-red-600">{error}</p> : null}
+    </form>
+  );
+}
+
 export default function MyRacePage() {
   const params = useParams();
   const router = useRouter();
@@ -45,6 +127,8 @@ export default function MyRacePage() {
   const [signup, setSignup] = useState<Signup | null>(null);
   const [goal, setGoal] = useState<GoalRow | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
+  const [makingGoal, setMakingGoal] = useState(false);
+  const [makeGoalError, setMakeGoalError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug.trim()) {
@@ -122,6 +206,25 @@ export default function MyRacePage() {
     return () => unsub();
   }, [race?.id, slug, router, loadSignupAndGoal]);
 
+  async function handleMakeGoalRace() {
+    if (!race) return;
+    setMakingGoal(true);
+    setMakeGoalError(null);
+    try {
+      const res = await api.post<{ goal: GoalRow }>("/goals", {
+        raceRegistryId: race.id,
+        name: race.name,
+        distance: race.distanceLabel ?? undefined,
+        targetByDate: race.raceDate,
+      });
+      setGoal(res.data.goal);
+    } catch (err: unknown) {
+      setMakeGoalError(err instanceof Error ? err.message : "Failed — try again");
+    } finally {
+      setMakingGoal(false);
+    }
+  }
+
   if (loadingRace) {
     return <p className="text-gray-500 text-sm">Loading race…</p>;
   }
@@ -138,7 +241,10 @@ export default function MyRacePage() {
   }
 
   const locationText = [race.city, race.state].filter(Boolean).join(", ") || null;
-  const isGoalRace = Boolean(goal && goal.raceRegistryId === race.id);
+  const isGoalRace = Boolean(
+    goal &&
+      (goal.raceRegistryId === race.id || goal.race_registry?.id === race.id)
+  );
   const hasSignup = Boolean(signup);
 
   return (
@@ -191,53 +297,58 @@ export default function MyRacePage() {
         </div>
       ) : isGoalRace ? (
         <section className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-5 shadow-sm mb-6">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-2">
+          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-1">
             <Flag className="w-5 h-5 text-orange-600" />
             Your goal
           </h2>
           {goal?.goalTime ? (
-            <p className="text-gray-800">
+            <p className="text-gray-800 text-sm">
               Target finish:{" "}
               <span className="font-mono font-semibold">{goal.goalTime}</span>
             </p>
           ) : (
-            <p className="text-gray-700 text-sm">Set a finish time to unlock your training plan.</p>
+            <p className="text-gray-600 text-sm">
+              No finish time set yet — add one to unlock pacing and your training plan.
+            </p>
           )}
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link
-              href={`/goals?raceRegistryId=${encodeURIComponent(race.id)}`}
-              className="inline-flex justify-center rounded-lg border border-orange-300 bg-white px-4 py-2 text-sm font-semibold text-orange-900 hover:bg-orange-50"
-            >
-              {goal?.goalTime ? "Update goal" : "Set goal"}
-            </Link>
-            {goal?.id && goal.goalTime ? (
+
+          <InlineGoalForm race={race} goal={goal} onSaved={setGoal} />
+
+          {goal?.id && goal.goalTime ? (
+            <div className="mt-4 pt-3 border-t border-orange-100">
               <Link
                 href={`/training-setup?goalId=${encodeURIComponent(goal.id)}`}
-                className="inline-flex justify-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+                className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
               >
-                Training plan
+                Training plan →
               </Link>
-            ) : null}
-            <Link
-              href={`/training`}
-              className="inline-flex justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
-            >
-              My training
-            </Link>
-          </div>
+              <Link
+                href="/training"
+                className="ml-3 text-sm font-medium text-gray-700 hover:text-gray-900"
+              >
+                My training
+              </Link>
+            </div>
+          ) : null}
         </section>
       ) : (
         <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm mb-6">
-          <p className="text-sm text-gray-700">
-            This race is on your calendar. It&apos;s not your active goal race — you get logistics and
-            community here; training focus follows your primary goal.
+          <p className="text-sm text-gray-700 mb-3">
+            This race is on your calendar. Make it your goal race to set a target time and build a
+            training plan around it.
           </p>
-          <Link
-            href={`/goals?raceRegistryId=${encodeURIComponent(race.id)}`}
-            className="mt-3 inline-block text-sm font-semibold text-orange-600 hover:underline"
+          <button
+            type="button"
+            onClick={handleMakeGoalRace}
+            disabled={makingGoal}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
           >
-            Make this my goal race
-          </Link>
+            <Flag className="w-4 h-4" />
+            {makingGoal ? "Setting…" : "Make this my goal race"}
+          </button>
+          {makeGoalError ? (
+            <p className="mt-2 text-xs text-red-600">{makeGoalError}</p>
+          ) : null}
         </section>
       )}
 
