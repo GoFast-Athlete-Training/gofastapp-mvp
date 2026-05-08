@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/firebase";
 import api from "@/lib/api";
-import { Calendar, MapPin, X, Users, Flag, ChevronRight } from "lucide-react";
+import { Calendar, MapPin, X, Flag, ChevronRight } from "lucide-react";
 import {
   countdownLabel,
   daysUntilRace,
   formatRaceListDate,
 } from "@/lib/races-display";
+import { InlineGoalForm } from "@/components/races/InlineGoalForm";
 
 type RaceRegistryRow = {
   id: string;
@@ -54,17 +55,6 @@ function personalRaceHref(r: RaceRegistryRow): string {
   return s ? `/myrace/${encodeURIComponent(s)}` : `/race-hub/${r.id}`;
 }
 
-function ymdLocalFromDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function ymdFromRaceIso(iso: string): string {
-  return ymdLocalFromDate(new Date(iso));
-}
-
 function bigCountdownLabel(iso: string): string {
   const d = daysUntilRace(iso);
   if (d < 0) return "Past race";
@@ -75,114 +65,79 @@ function bigCountdownLabel(iso: string): string {
   return `${w} week${w === 1 ? "" : "s"} to go`;
 }
 
-function RaceMonthsCalendar({
+/** Next 4 calendar months from today, each a compact card with race list (nice-to-have at page bottom). */
+function NextFourMonthsRaceCards({
   upcomingSignups,
 }: {
   upcomingSignups: Signup[];
 }) {
-  const now = new Date();
-  const raceByYmd = useMemo(() => {
+  const windowMonths = useMemo(() => {
+    const d0 = new Date();
+    const out: { y: number; m: number }[] = [];
+    for (let i = 0; i < 4; i++) {
+      const d = new Date(d0.getFullYear(), d0.getMonth() + i, 1);
+      out.push({ y: d.getFullYear(), m: d.getMonth() });
+    }
+    return out;
+  }, []);
+
+  const byMonth = useMemo(() => {
     const m = new Map<string, Signup[]>();
     for (const su of upcomingSignups) {
-      const key = ymdFromRaceIso(su.race_registry.raceDate);
+      const rd = new Date(su.race_registry.raceDate);
+      const key = `${rd.getFullYear()}-${rd.getMonth()}`;
       const list = m.get(key) ?? [];
       list.push(su);
       m.set(key, list);
     }
+    for (const [, list] of m) {
+      list.sort(
+        (a, b) =>
+          new Date(a.race_registry.raceDate).getTime() -
+          new Date(b.race_registry.raceDate).getTime()
+      );
+    }
     return m;
   }, [upcomingSignups]);
 
-  const months = useMemo(() => {
-    const baseY = now.getFullYear();
-    const baseM = now.getMonth();
-    const out: { y: number; m: number }[] = [{ y: baseY, m: baseM }];
-
-    const nextMonthStart = new Date(baseY, baseM + 1, 1);
-    const hasInNext = upcomingSignups.some((s) => {
-      const rd = new Date(s.race_registry.raceDate);
-      return (
-        rd.getFullYear() === nextMonthStart.getFullYear() &&
-        rd.getMonth() === nextMonthStart.getMonth()
-      );
-    });
-    if (hasInNext) {
-      out.push({
-        y: nextMonthStart.getFullYear(),
-        m: nextMonthStart.getMonth(),
-      });
-    }
-    return out;
-  }, [upcomingSignups, now.getFullYear(), now.getMonth()]);
-
-  const todayYmd = ymdLocalFromDate(now);
-
   return (
-    <div className="space-y-8">
-      {months.map(({ y, m }) => {
-        const first = new Date(y, m, 1);
-        const lastDay = new Date(y, m + 1, 0).getDate();
-        const startPad = first.getDay();
-        const label = first.toLocaleDateString("en-US", {
-          month: "long",
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+      {windowMonths.map(({ y, m }) => {
+        const key = `${y}-${m}`;
+        const races = byMonth.get(key) ?? [];
+        const label = new Date(y, m, 1).toLocaleDateString("en-US", {
+          month: "short",
           year: "numeric",
         });
-        const cells: (number | null)[] = [];
-        for (let i = 0; i < startPad; i++) cells.push(null);
-        for (let d = 1; d <= lastDay; d++) cells.push(d);
-
         return (
-          <div key={`${y}-${m}`}>
-            <h3 className="text-sm font-semibold text-gray-800 mb-3">{label}</h3>
-            <div className="grid grid-cols-7 gap-1 text-center text-xs">
-              {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
-                <div key={d} className="py-1 font-medium text-gray-500">
-                  {d}
-                </div>
-              ))}
-              {cells.map((day, idx) => {
-                if (day == null) {
-                  return <div key={`e-${idx}`} className="aspect-square min-h-[2.25rem]" />;
-                }
-                const ymd = `${y}-${String(m + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                const races = raceByYmd.get(ymd);
-                const isToday = ymd === todayYmd;
-
-                return (
-                  <div
-                    key={ymd}
-                    className={`aspect-square min-h-[2.25rem] flex flex-col items-center justify-center rounded-lg border text-sm ${
-                      isToday
-                        ? "border-orange-300 bg-orange-50 font-semibold text-orange-900"
-                        : races
-                          ? "border-violet-200 bg-violet-50/80"
-                          : "border-transparent text-gray-700"
-                    }`}
-                  >
-                    <span>{day}</span>
-                    {races && races.length > 0 ? (
-                      <div className="flex flex-col gap-0.5 mt-0.5 w-full px-0.5">
-                        {races.slice(0, 2).map((su) => (
-                          <Link
-                            key={su.id}
-                            href={personalRaceHref(su.race_registry)}
-                            title={su.race_registry.name}
-                            className="text-[10px] leading-tight font-semibold text-violet-800 hover:text-violet-950 truncate w-full flex items-center justify-center gap-0.5"
-                          >
-                            <span aria-hidden>🏁</span>
-                            <span className="truncate max-w-[4.5rem] hidden sm:inline">
-                              {su.race_registry.name}
-                            </span>
-                          </Link>
-                        ))}
-                        {races.length > 2 ? (
-                          <span className="text-[9px] text-violet-600">+{races.length - 2}</span>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
+          <div
+            key={key}
+            className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm min-h-[5.5rem] flex flex-col"
+          >
+            <p className="text-[11px] font-bold text-gray-800 uppercase tracking-wide mb-2">
+              {label}
+            </p>
+            {races.length === 0 ? (
+              <p className="text-[11px] text-gray-400 mt-auto">—</p>
+            ) : (
+              <ul className="space-y-1.5 flex-1">
+                {races.map((su) => {
+                  const dayNum = new Date(su.race_registry.raceDate).getDate();
+                  return (
+                    <li key={su.id}>
+                      <Link
+                        href={personalRaceHref(su.race_registry)}
+                        className="text-[11px] text-orange-800 hover:text-orange-950 hover:underline font-medium flex gap-1 min-w-0"
+                        title={su.race_registry.name}
+                      >
+                        <span className="text-gray-500 tabular-nums shrink-0">{dayNum}</span>
+                        <span className="truncate">{su.race_registry.name}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         );
       })}
@@ -192,27 +147,18 @@ function RaceMonthsCalendar({
 
 function SignupRaceCard({
   signup,
-  variant,
   goalSummary,
   onRemove,
   removing,
 }: {
   signup: Signup;
-  variant: "default" | "compact";
   goalSummary?: { goalTime: string | null };
   onRemove: (id: string) => void;
   removing: boolean;
 }) {
   const r = signup.race_registry;
-  const isCompact = variant === "compact";
   return (
-    <li
-      className={`rounded-xl border shadow-sm relative ${
-        isCompact
-          ? "border-gray-200 bg-white p-3"
-          : "border-orange-100 bg-white p-4"
-      }`}
-    >
+    <li className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm relative">
       <button
         type="button"
         onClick={() => onRemove(signup.id)}
@@ -222,37 +168,24 @@ function SignupRaceCard({
       >
         <X className="w-4 h-4" />
       </button>
-      <p
-        className={`font-semibold text-gray-900 pr-7 leading-snug ${isCompact ? "text-sm" : ""}`}
-      >
-        {r.name}
-      </p>
-      <p className={`font-medium text-orange-600 ${isCompact ? "text-[11px] mt-1" : "text-xs mt-2"}`}>
-        {countdownLabel(r.raceDate)}
-      </p>
+      <p className="font-semibold text-gray-900 pr-7 leading-snug text-sm">{r.name}</p>
+      <p className="font-medium text-orange-600 text-[11px] mt-1">{countdownLabel(r.raceDate)}</p>
       {goalSummary?.goalTime ? (
-        <p className={`text-gray-800 ${isCompact ? "text-xs mt-1" : "text-sm mt-1"}`}>
-          Goal:{" "}
-          <span className="font-mono font-semibold">{goalSummary.goalTime}</span>
+        <p className="text-gray-800 text-xs mt-1">
+          Goal: <span className="font-mono font-semibold">{goalSummary.goalTime}</span>
         </p>
       ) : null}
-      <p
-        className={`text-gray-500 flex items-center gap-1 ${isCompact ? "text-[11px] mt-1" : "text-xs mt-1"}`}
-      >
+      <p className="text-gray-500 flex items-center gap-1 text-[11px] mt-1">
         <Calendar className="w-3 h-3 shrink-0" />
         {formatRaceListDate(r.raceDate)}
       </p>
       {(r.city || r.state) && (
-        <p
-          className={`text-gray-500 flex items-center gap-1 ${isCompact ? "text-[11px] mt-0.5" : "text-xs mt-0.5"}`}
-        >
+        <p className="text-gray-500 flex items-center gap-1 text-[11px] mt-0.5">
           <MapPin className="w-3 h-3 shrink-0" />
           {[r.city, r.state].filter(Boolean).join(", ")}
         </p>
       )}
-      <p
-        className={`text-gray-600 ${isCompact ? "text-[11px] mt-1.5" : "text-xs mt-2"}`}
-      >
+      <p className="text-gray-600 text-[11px] mt-1.5">
         {r.distanceLabel?.trim() ||
           (r.distanceMeters != null
             ? `${(r.distanceMeters / 1609.344).toFixed(1)} mi`
@@ -260,36 +193,19 @@ function SignupRaceCard({
               ? `${r.distanceMiles} mi · ${r.raceType ?? "—"}`
               : "—")}
       </p>
-      <div
-        className={`flex flex-wrap gap-2 ${isCompact ? "mt-2.5" : "mt-3"}`}
-      >
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1">
         <Link
           href={personalRaceHref(r)}
-          className={`inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold ${
-            isCompact ? "text-xs px-2.5 py-1.5" : "text-sm px-3 py-2"
-          }`}
+          className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-2.5 py-1.5"
         >
-          My race
+          Open →
         </Link>
         <Link
           href={`/race-hub/${r.id}`}
-          className={`inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 font-medium ${
-            isCompact ? "text-xs px-2.5 py-1.5" : "text-sm px-3 py-2"
-          }`}
+          className="text-xs font-semibold text-orange-700 hover:underline"
         >
-          <Users className="w-3.5 h-3.5 text-orange-600" />
           Hub
         </Link>
-        {r.registrationUrl && !isCompact ? (
-          <a
-            href={r.registrationUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center text-xs font-medium text-orange-600 hover:underline py-2"
-          >
-            Registration
-          </a>
-        ) : null}
       </div>
     </li>
   );
@@ -368,20 +284,33 @@ export default function MyRacesPage() {
     return { upcomingSignups: up, pastSignups: past };
   }, [signups]);
 
+  const upcomingSorted = useMemo(
+    () =>
+      [...upcomingSignups].sort(
+        (a, b) =>
+          new Date(a.race_registry.raceDate).getTime() -
+          new Date(b.race_registry.raceDate).getTime()
+      ),
+    [upcomingSignups]
+  );
+
+  const goalRaceId = goals[0]?.raceRegistryId ?? goals[0]?.race_registry?.id ?? null;
+
   const { heroSignup, otherSignups } = useMemo(() => {
-    const heroRaceId = goals[0]?.raceRegistryId ?? goals[0]?.race_registry?.id ?? null;
     let hero: Signup | null = null;
-    let others: Signup[] = [];
-    if (heroRaceId) {
-      for (const s of upcomingSignups) {
-        if (s.raceRegistryId === heroRaceId) hero = s;
-        else others.push(s);
-      }
-    } else {
-      others = [...upcomingSignups];
+    if (goalRaceId) {
+      hero = upcomingSorted.find((s) => s.raceRegistryId === goalRaceId) ?? null;
     }
+    if (!hero && upcomingSorted.length > 0) {
+      hero = upcomingSorted[0] ?? null;
+    }
+    const others = upcomingSorted.filter((s) => s.id !== hero?.id);
     return { heroSignup: hero, otherSignups: others };
-  }, [upcomingSignups, goals]);
+  }, [upcomingSorted, goalRaceId]);
+
+  const goalOnCalendar = Boolean(
+    goalRaceId && upcomingSignups.some((s) => s.raceRegistryId === goalRaceId)
+  );
 
   async function onRemove(signupId: string) {
     setRemovingSignupId(signupId);
@@ -396,32 +325,100 @@ export default function MyRacesPage() {
   }
 
   const heroGoal = heroSignup ? goalByRegistryId.get(heroSignup.raceRegistryId) ?? null : null;
+  const raceForGoalForm = heroSignup
+    ? {
+        id: heroSignup.race_registry.id,
+        name: heroSignup.race_registry.name,
+        raceDate: heroSignup.race_registry.raceDate,
+        distanceLabel: heroSignup.race_registry.distanceLabel,
+      }
+    : null;
 
   return (
-    <div className="space-y-10">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Races</h1>
-        <p className="text-gray-600 text-sm mt-1 max-w-2xl">
-          Your goal race up front, calendar below, and the hub for community & shakeouts.
-        </p>
-      </div>
-
+    <div className="space-y-8">
       {loading ? (
         <p className="text-gray-500 text-sm">Loading your races…</p>
       ) : signups.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-200 bg-white/80 px-4 py-10 text-center text-sm text-gray-600">
+          <div className="flex justify-end mb-4">
+            <Link
+              href="/races/find"
+              className="text-xs font-semibold text-orange-700 hover:underline"
+            >
+              Find more races →
+            </Link>
+          </div>
           <p>No races on your calendar yet.</p>
           <Link
             href="/races/find"
             className="inline-flex items-center justify-center mt-4 rounded-lg bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
           >
-            Looking for more races
+            Add a race
             <ChevronRight className="w-4 h-4 ml-1" />
           </Link>
         </div>
       ) : (
         <>
-          {heroSignup ? (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Races</h1>
+              <p className="text-gray-600 text-sm mt-1 max-w-xl">
+                Primary race and goal first; other races as cards; glance at upcoming months below.
+              </p>
+            </div>
+            <div className="flex flex-col items-stretch sm:items-end gap-2 shrink-0 text-sm">
+              <Link
+                href="/races/find"
+                className="text-xs font-semibold text-orange-700 hover:underline sm:text-right"
+              >
+                Find more races →
+              </Link>
+              {pastSignups.length > 0 ? (
+                <details className="group rounded-lg border border-gray-200 bg-white px-2 py-1.5 sm:max-w-xs sm:text-right">
+                  <summary className="cursor-pointer list-none text-xs font-medium text-gray-600 hover:text-gray-900 [&::-webkit-details-marker]:hidden">
+                    Past races ({pastSignups.length})
+                  </summary>
+                  <ul className="mt-2 space-y-1 text-left border-t border-gray-100 pt-2 max-h-40 overflow-y-auto">
+                    {[...pastSignups]
+                      .sort(
+                        (a, b) =>
+                          new Date(b.race_registry.raceDate).getTime() -
+                          new Date(a.race_registry.raceDate).getTime()
+                      )
+                      .map((s) => (
+                        <li key={s.id} className="text-xs text-gray-700">
+                          <span className="text-gray-400 tabular-nums mr-1">
+                            {formatRaceListDate(s.race_registry.raceDate)}
+                          </span>
+                          {s.race_registry.name}
+                        </li>
+                      ))}
+                  </ul>
+                </details>
+              ) : null}
+            </div>
+          </div>
+          {goals.length > 0 && goalRaceId && !goalOnCalendar && upcomingSignups.length > 0 ? (
+            <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              Your active goal is for a race that isn&apos;t on this calendar yet.{" "}
+              <Link href="/races/find" className="font-semibold underline">
+                Add it
+              </Link>{" "}
+              or adjust your goal on the primary race below.
+            </p>
+          ) : null}
+
+          {goals.length > 0 && upcomingSignups.length === 0 ? (
+            <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              You have an active goal, but no upcoming races on your calendar.{" "}
+              <Link href="/races/find" className="font-semibold underline">
+                Find the race
+              </Link>{" "}
+              and add it.
+            </p>
+          ) : null}
+
+          {heroSignup && raceForGoalForm ? (
             <section className="rounded-3xl border-2 border-orange-200 bg-gradient-to-br from-orange-50 via-white to-amber-50/50 p-6 sm:p-8 shadow-sm">
               <div className="flex flex-col lg:flex-row lg:items-start gap-6">
                 {heroSignup.race_registry.logoUrl ? (
@@ -436,7 +433,7 @@ export default function MyRacesPage() {
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold uppercase tracking-[0.15em] text-orange-800 flex items-center gap-2">
                     <Flag className="w-4 h-4" />
-                    Primary race & goal
+                    {heroGoal?.goalTime?.trim() ? "Primary race & goal" : "Primary race"}
                   </p>
                   <h2 className="mt-2 text-2xl sm:text-3xl font-extrabold text-gray-900 leading-tight">
                     {heroSignup.race_registry.name}
@@ -464,20 +461,17 @@ export default function MyRacesPage() {
                     ) : null}
                   </div>
 
-                  <div className="mt-5 flex flex-wrap items-center gap-2">
-                    {heroGoal?.goalTime?.trim() ? (
-                      <span className="inline-flex items-center rounded-full border border-orange-200 bg-white px-3 py-1 text-sm font-mono font-semibold text-gray-900">
-                        Goal {heroGoal.goalTime.trim()}
-                      </span>
-                    ) : (
-                      <Link
-                        href={personalRaceHref(heroSignup.race_registry)}
-                        className="inline-flex items-center rounded-full border border-dashed border-orange-300 bg-white px-3 py-1 text-sm font-semibold text-orange-800 hover:bg-orange-50"
-                      >
-                        Set goal →
-                      </Link>
-                    )}
+                  <div className="mt-5">
+                    <p className="text-xs font-semibold text-gray-600 mb-1">Finish goal</p>
+                    <InlineGoalForm
+                      race={raceForGoalForm}
+                      goal={heroGoal}
+                      onSaved={() => void loadAll()}
+                      className="mt-0"
+                    />
+                  </div>
 
+                  <div className="mt-5 flex flex-wrap items-center gap-2">
                     {activePlanSummary?.hasSchedule &&
                     activePlanSummary.weekNumber != null &&
                     activePlanSummary.totalWeeks != null ? (
@@ -485,22 +479,26 @@ export default function MyRacesPage() {
                         Week {activePlanSummary.weekNumber} of {activePlanSummary.totalWeeks}
                       </span>
                     ) : (
-                      <Link
-                        href={
-                          heroGoal?.id
-                            ? `/training-setup?goalId=${encodeURIComponent(heroGoal.id)}`
-                            : "/training-setup"
-                        }
-                        className="inline-flex items-center rounded-full bg-gray-900 text-white px-3 py-1 text-xs font-bold hover:bg-gray-800"
-                      >
-                        Start a plan →
-                      </Link>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <Link
+                          href={
+                            heroGoal?.id && heroGoal.goalTime?.trim()
+                              ? `/training-setup?goalId=${encodeURIComponent(heroGoal.id)}`
+                              : "/training-setup"
+                          }
+                          className="inline-flex items-center rounded-full bg-gray-900 text-white px-3 py-1.5 text-xs font-bold hover:bg-gray-800 w-fit"
+                        >
+                          {heroGoal?.goalTime?.trim()
+                            ? "Build your training plan →"
+                            : "Set a goal time above, then build your plan →"}
+                        </Link>
+                        {!heroGoal?.goalTime?.trim() ? (
+                          <span className="text-xs text-gray-500">
+                            Plans work best once you have a target finish time.
+                          </span>
+                        ) : null}
+                      </div>
                     )}
-
-                    <span className="text-xs text-gray-500 w-full sm:w-auto sm:ml-1">
-                      Plan miles: <span className="font-medium text-gray-400">—</span>{" "}
-                      <span className="italic">(coming soon)</span>
-                    </span>
                   </div>
 
                   <div className="mt-6 flex flex-wrap gap-3">
@@ -508,26 +506,18 @@ export default function MyRacesPage() {
                       href={`/race-hub/${heroSignup.race_registry.id}`}
                       className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-5 py-3 text-sm font-bold text-white hover:bg-orange-600 shadow-sm"
                     >
-                      Visit hub
+                      Community hub →
                     </Link>
                     <Link
                       href={personalRaceHref(heroSignup.race_registry)}
                       className="inline-flex items-center justify-center rounded-xl border-2 border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-50"
                     >
-                      My race page
+                      Race details →
                     </Link>
                   </div>
                 </div>
               </div>
             </section>
-          ) : goals.length > 0 ? (
-            <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-              You have an active goal, but that race isn&apos;t on your calendar yet.{" "}
-              <Link href="/races/find" className="font-semibold underline">
-                Find the race
-              </Link>{" "}
-              and add it.
-            </p>
           ) : null}
 
           {otherSignups.length > 0 ? (
@@ -540,7 +530,9 @@ export default function MyRacesPage() {
                   <SignupRaceCard
                     key={s.id}
                     signup={s}
-                    variant="compact"
+                    goalSummary={{
+                      goalTime: goalByRegistryId.get(s.raceRegistryId)?.goalTime?.trim() || null,
+                    }}
                     onRemove={onRemove}
                     removing={removingSignupId === s.id}
                   />
@@ -550,36 +542,14 @@ export default function MyRacesPage() {
           ) : null}
 
           {upcomingSignups.length > 0 ? (
-            <section className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-gray-900 mb-1">Race calendar</h2>
-              <p className="text-xs text-gray-500 mb-5">
-                🏁 marks race day — tap to open your race page.
+            <section className="pt-6 border-t border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-700 mb-0.5">Next few months</h2>
+              <p className="text-xs text-gray-500 mb-3">
+                Quick view — tap a race to open details.
               </p>
-              <RaceMonthsCalendar upcomingSignups={upcomingSignups} />
+              <NextFourMonthsRaceCards upcomingSignups={upcomingSignups} />
             </section>
           ) : null}
-
-          {pastSignups.length > 0 ? (
-            <section className="rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                Past races
-              </p>
-              <p className="text-sm text-gray-600 mt-1">
-                {pastSignups.length} past race{pastSignups.length === 1 ? "" : "s"} —{" "}
-                {pastSignups.map((s) => s.race_registry.name).join(", ")}
-              </p>
-            </section>
-          ) : null}
-
-          <div className="pb-4">
-            <Link
-              href="/races/find"
-              className="inline-flex w-full sm:w-auto items-center justify-center rounded-xl border-2 border-orange-200 bg-white px-5 py-3 text-sm font-bold text-orange-900 hover:bg-orange-50"
-            >
-              Looking for more races
-              <ChevronRight className="w-4 h-4 ml-1" />
-            </Link>
-          </div>
         </>
       )}
     </div>

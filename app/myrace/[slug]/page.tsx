@@ -7,6 +7,7 @@ import { auth } from "@/lib/firebase";
 import api from "@/lib/api";
 import { Calendar, MapPin, Users, Flag, ChevronLeft } from "lucide-react";
 import { formatRaceListDate } from "@/lib/races-display";
+import { InlineGoalForm } from "@/components/races/InlineGoalForm";
 
 type ResolvedRace = {
   id: string;
@@ -33,88 +34,6 @@ type GoalRow = {
   raceRegistryId?: string | null;
   race_registry?: { id: string } | null;
 };
-
-function parseGoalTime(raw: string): string | null {
-  const trimmed = raw.trim();
-  // Accept H:MM:SS or HH:MM:SS
-  if (/^\d{1,2}:\d{2}:\d{2}$/.test(trimmed)) return trimmed;
-  return null;
-}
-
-function InlineGoalForm({
-  race,
-  goal,
-  onSaved,
-}: {
-  race: ResolvedRace;
-  goal: GoalRow | null;
-  onSaved: (updated: GoalRow) => void;
-}) {
-  const [input, setInput] = useState(goal?.goalTime?.trim() ?? "");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const parsed = parseGoalTime(input);
-    if (!parsed) {
-      setError("Enter time as H:MM:SS (e.g. 1:45:00)");
-      return;
-    }
-    setError(null);
-    setSaving(true);
-    try {
-      const payload = {
-        goalTime: parsed,
-        raceRegistryId: race.id,
-        name: race.name,
-        distance: race.distanceLabel ?? undefined,
-        targetByDate: race.raceDate,
-      };
-      let saved: GoalRow;
-      if (goal?.id) {
-        const res = await api.put<{ goal: GoalRow }>(`/goals/${goal.id}`, payload);
-        saved = res.data.goal;
-      } else {
-        const res = await api.post<{ goal: GoalRow }>("/goals", payload);
-        saved = res.data.goal;
-      }
-      onSaved(saved);
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Save failed — try again";
-      setError(msg);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="mt-3">
-      <label className="block text-xs font-semibold text-gray-600 mb-1">
-        Target finish time (H:MM:SS)
-      </label>
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="1:45:00"
-          maxLength={8}
-          className="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono text-gray-900 focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-300"
-        />
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
-        >
-          {saving ? "Saving…" : goal?.goalTime ? "Update" : "Set goal"}
-        </button>
-      </div>
-      {error ? <p className="mt-1.5 text-xs text-red-600">{error}</p> : null}
-    </form>
-  );
-}
 
 export default function MyRacePage() {
   const params = useParams();
@@ -301,18 +220,11 @@ export default function MyRacePage() {
             <Flag className="w-5 h-5 text-orange-600" />
             Your goal
           </h2>
-          {goal?.goalTime ? (
-            <p className="text-gray-800 text-sm">
-              Target finish:{" "}
-              <span className="font-mono font-semibold">{goal.goalTime}</span>
-            </p>
-          ) : (
-            <p className="text-gray-600 text-sm">
-              No finish time set yet — add one to unlock pacing and your training plan.
-            </p>
-          )}
+          <p className="text-gray-600 text-sm mb-2">
+            Set your target finish time here or from My Races.
+          </p>
 
-          <InlineGoalForm race={race} goal={goal} onSaved={setGoal} />
+          <InlineGoalForm race={race} goal={goal} onSaved={setGoal} className="mt-1" />
 
           {goal?.id && goal.goalTime ? (
             <div className="mt-4 pt-3 border-t border-orange-100">
