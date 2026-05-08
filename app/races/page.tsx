@@ -331,6 +331,7 @@ export default function MyRacesPage() {
         name: heroSignup.race_registry.name,
         raceDate: heroSignup.race_registry.raceDate,
         distanceLabel: heroSignup.race_registry.distanceLabel,
+        distanceMeters: heroSignup.race_registry.distanceMeters,
       }
     : null;
 
@@ -489,8 +490,8 @@ export default function MyRacesPage() {
                           className="inline-flex items-center rounded-full bg-gray-900 text-white px-3 py-1.5 text-xs font-bold hover:bg-gray-800 w-fit"
                         >
                           {heroGoal?.goalTime?.trim()
-                            ? "Build your training plan →"
-                            : "Set a goal time above, then build your plan →"}
+                            ? "Start a training plan"
+                            : "Set a goal time above, then start a training plan"}
                         </Link>
                         {!heroGoal?.goalTime?.trim() ? (
                           <span className="text-xs text-gray-500">

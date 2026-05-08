@@ -33,6 +33,7 @@ export async function GET(
         city: true,
         state: true,
         distanceLabel: true,
+        distanceMeters: true,
         registrationUrl: true,
       },
     });
@@ -52,6 +53,7 @@ export async function GET(
         city: race.city,
         state: race.state,
         distanceLabel: race.distanceLabel,
+        distanceMeters: race.distanceMeters,
         registrationUrl: race.registrationUrl,
       },
     });

@@ -18,6 +18,7 @@ type ResolvedRace = {
   city: string | null;
   state: string | null;
   distanceLabel: string | null;
+  distanceMeters: number | null;
   registrationUrl: string | null;
 };
 
@@ -232,7 +233,7 @@ export default function MyRacePage() {
                 href={`/training-setup?goalId=${encodeURIComponent(goal.id)}`}
                 className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
               >
-                Training plan →
+                Start a training plan
               </Link>
               <Link
                 href="/training"
