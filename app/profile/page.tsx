@@ -8,7 +8,6 @@ import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import Link from 'next/link';
 import MissingPaceBanner from '@/components/profile/MissingPaceBanner';
-import GoalSetter from '@/components/athlete/GoalSetter';
 
 const RUNNER_BASE =
   process.env.NEXT_PUBLIC_RUNNER_PHOTO_URL?.replace(/\/$/, '') ||
@@ -32,27 +31,28 @@ type PublicGoalPayload = {
   } | null;
 };
 
+type ActiveGoalSummary = {
+  id: string;
+  name: string | null;
+  goalTime: string | null;
+  targetByDate: string;
+  race_registry: { name: string; raceDate: string } | null;
+};
+
 export default function ProfilePage() {
   const router = useRouter();
   const [athleteProfile, setAthleteProfile] = useState<Record<string, unknown> | null>(null);
   const [publicExtras, setPublicExtras] = useState<PublicGoalPayload | null>(null);
   const [loading, setLoading] = useState(true);
-  const [goalRaceFromQuery, setGoalRaceFromQuery] = useState<string | undefined>();
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const u = new URLSearchParams(window.location.search);
-    const g = u.get('goalRace');
-    if (g) setGoalRaceFromQuery(g);
-  }, []);
+  const [activeGoalSummary, setActiveGoalSummary] = useState<ActiveGoalSummary | null>(null);
 
+  /** Legacy deep links: profile?goalRace=uuid sent users here to edit — now own the flow on /goals */
   useEffect(() => {
-    if (loading) return;
     if (typeof window === 'undefined') return;
-    if (window.location.hash !== '#goal') return;
-    requestAnimationFrame(() => {
-      document.getElementById('goal')?.scrollIntoView({ behavior: 'smooth' });
-    });
-  }, [loading]);
+    const g = new URLSearchParams(window.location.search).get('goalRace')?.trim();
+    if (!g) return;
+    router.replace(`/goals?raceRegistryId=${encodeURIComponent(g)}`);
+  }, [router]);
 
   useEffect(() => {
     const id = LocalStorageAPI.getAthleteId();
@@ -75,6 +75,23 @@ export default function ProfilePage() {
 
     return () => unsubscribe();
   }, [router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<{ goals: ActiveGoalSummary[] }>('/goals?status=ACTIVE')
+      .then((res) => {
+        if (cancelled) return;
+        const g = res.data?.goals?.[0] ?? null;
+        setActiveGoalSummary(g);
+      })
+      .catch(() => {
+        if (!cancelled) setActiveGoalSummary(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handle = typeof athleteProfile?.gofastHandle === 'string' ? athleteProfile.gofastHandle : '';
 
@@ -243,10 +260,59 @@ export default function ProfilePage() {
       </div>
 
       <section
-        id="goal"
+        id="profile-race-goal"
         className="scroll-mt-24 rounded-2xl border border-orange-100 bg-orange-50/40 p-4 sm:p-6 mb-10 shadow-sm"
       >
-        <GoalSetter initialRaceRegistryId={goalRaceFromQuery} hideBackLink />
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Your race goal</h2>
+            <p className="text-sm text-gray-600 mt-1 max-w-xl">
+              Set and update your goal on the Goal tab — here you only see a quick summary.
+            </p>
+          </div>
+          <Link
+            href="/goals"
+            className="shrink-0 inline-flex justify-center rounded-lg bg-orange-500 text-white px-4 py-2 text-sm font-semibold hover:bg-orange-600"
+          >
+            Open Goal →
+          </Link>
+        </div>
+        {activeGoalSummary ? (
+          <div className="mt-4 rounded-xl border border-orange-200/80 bg-white/90 p-4 text-sm text-gray-800">
+            <p className="font-semibold text-gray-900">
+              {activeGoalSummary.race_registry?.name?.trim() ||
+                activeGoalSummary.name?.trim() ||
+                'Active goal'}
+            </p>
+            {activeGoalSummary.goalTime ? (
+              <p className="mt-1">
+                Target time:{' '}
+                <span className="font-mono font-semibold">{activeGoalSummary.goalTime}</span>
+              </p>
+            ) : (
+              <p className="mt-1 text-gray-600">Add a finish time on the Goal page to build your plan.</p>
+            )}
+            <p className="mt-1 text-gray-600">
+              Race day:{' '}
+              {new Date(
+                activeGoalSummary.race_registry?.raceDate || activeGoalSummary.targetByDate
+              ).toLocaleDateString(undefined, {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-gray-700">
+            No active goal yet.{' '}
+            <Link href="/goals" className="font-semibold text-orange-700 hover:underline">
+              Set your race goal
+            </Link>
+            .
+          </p>
+        )}
       </section>
 
       <div className="space-y-10">
@@ -326,7 +392,7 @@ export default function ProfilePage() {
           ) : (
             <p className="text-sm text-gray-600">
               No active plan or chasing goal yet.{' '}
-              <Link href="#goal" className="font-semibold text-orange-600 hover:text-orange-700">
+              <Link href="/goals" className="font-semibold text-orange-600 hover:text-orange-700">
                 Set a goal
               </Link>
             </p>

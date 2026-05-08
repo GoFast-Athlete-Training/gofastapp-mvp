@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
-import { Bike, Home, LayoutDashboard, MapPin, Trophy, User, Users } from "lucide-react";
+import { Bike, Flag, Home, LayoutDashboard, MapPin, Trophy, User, Users } from "lucide-react";
 
 type NavItem = {
   label: string;
@@ -70,6 +70,12 @@ const navItems: NavItem[] = [
     match: (p) =>
       !!p &&
       (p === "/races" || p.startsWith("/races/") || p.startsWith("/myrace/")),
+  },
+  {
+    label: "Goal",
+    href: "/goals",
+    icon: Flag,
+    match: (p) => !!p && (p === "/goals" || p.startsWith("/goals/")),
   },
   {
     label: "Profile",
