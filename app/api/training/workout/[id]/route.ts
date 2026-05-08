@@ -10,23 +10,24 @@ import {
 } from "@/lib/training/algo-workout-segments";
 import { buildPlanWorkoutApiSegments } from "@/lib/training/workout-segment-generator";
 import type { ApiSegment } from "@/lib/workout-generator/templates";
-import { cycleIndexFromScheduleForDay } from "@/lib/training/schedule-parser";
+import { cycleIndexFromScheduleForDay, dayNameToOurDow } from "@/lib/training/schedule-parser";
 import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 import { newEntityId } from "@/lib/training/new-entity-id";
 import { metersToMiles } from "@/lib/pace-utils";
 import type { Prisma, WorkoutType } from "@prisma/client";
 import { segmentSnapshotDocumentFromApiSegments } from "@/lib/training/workout-segment-snapshot";
+import { isStructuredPlanWeek } from "@/lib/training/plan-schedule-schema";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 const METERS_PER_MILE = 1609.34;
 
 function scheduleStringForPlanWeek(
-  planWeeks: unknown,
+  planSchedule: unknown,
   weekNumber: number
 ): string | null {
-  if (!planWeeks || !Array.isArray(planWeeks)) return null;
-  const entry = planWeeks.find(
+  if (!planSchedule || !Array.isArray(planSchedule)) return null;
+  const entry = planSchedule.find(
     (w) =>
       w &&
       typeof w === "object" &&
@@ -36,13 +37,43 @@ function scheduleStringForPlanWeek(
   return typeof s === "string" ? s : null;
 }
 
+
+function planCycleIndexFromStructuredSchedule(
+  planSchedule: unknown,
+  weekNumber: number,
+  dayAssigned: string,
+  workoutType: WorkoutType
+): number | null {
+  if (!planSchedule || !Array.isArray(planSchedule)) return null;
+  const entry = planSchedule.find(
+    (w) =>
+      w &&
+      typeof w === "object" &&
+      Number((w as Record<string, unknown>).weekNumber) === weekNumber
+  );
+  if (!isStructuredPlanWeek(entry)) return null;
+  let dowOur: number;
+  try {
+    dowOur = dayNameToOurDow(dayAssigned.trim());
+  } catch {
+    return null;
+  }
+  for (const slot of entry.days) {
+    if (slot.dow !== dowOur) continue;
+    if (slot.workoutType !== workoutType) continue;
+    if (slot.planCycleIndex == null) return null;
+    return slot.planCycleIndex;
+  }
+  return null;
+}
+
 /** Plan-frozen cycle index for I/T/LR(mp); omit return → legacy Garmin-completion rotation. */
 function resolvedPlanCycleIndexForWorkout(params: {
   planCycleIndex: number | null;
   weekNumber: number | null;
   dayAssigned: string | null;
   workoutType: WorkoutType;
-  planWeeks: unknown;
+  planSchedule: unknown;
 }): number | undefined {
   if (
     params.planCycleIndex != null &&
@@ -60,8 +91,20 @@ function resolvedPlanCycleIndexForWorkout(params: {
   if (params.weekNumber == null || !params.dayAssigned?.trim()) {
     return undefined;
   }
+  const structured = planCycleIndexFromStructuredSchedule(
+    params.planSchedule,
+    params.weekNumber,
+    params.dayAssigned.trim(),
+    params.workoutType
+  );
+  if (
+    structured != null &&
+    Number.isFinite(structured)
+  ) {
+    return structured;
+  }
   const schedule = scheduleStringForPlanWeek(
-    params.planWeeks,
+    params.planSchedule,
     params.weekNumber
   );
   if (!schedule) return undefined;
@@ -103,7 +146,7 @@ export async function GET(request: NextRequest, context: Ctx) {
               goalRaceTime: true,
               goalRacePace: true,
               lifecycleStatus: true,
-              planWeeks: true,
+              planSchedule: true,
               race_registry: {
                 select: { distanceMeters: true },
               },
@@ -161,7 +204,7 @@ export async function GET(request: NextRequest, context: Ctx) {
           weekNumber: workout.weekNumber ?? null,
           dayAssigned: workout.dayAssigned ?? null,
           workoutType: workout.workoutType,
-          planWeeks: workout.training_plans?.planWeeks ?? null,
+          planSchedule: workout.training_plans?.planSchedule ?? null,
         });
 
         if (workout.workoutType === "Intervals") {
@@ -203,7 +246,7 @@ export async function GET(request: NextRequest, context: Ctx) {
             goalRacePace: workout.training_plans?.goalRacePace ?? null,
             goalRaceTime: workout.training_plans?.goalRaceTime ?? null,
             raceDistanceMiles,
-            planCycleIndex: workout.planCycleIndex ?? null,
+            planCycleIndex: planCycleIndex ?? workout.planCycleIndex ?? null,
           });
         }
 

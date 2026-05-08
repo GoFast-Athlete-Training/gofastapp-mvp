@@ -33,7 +33,7 @@ type PlanDetail = {
   name: string;
   totalWeeks: number;
   startDate: string;
-  planWeeks: unknown;
+  planSchedule: unknown;
   raceId?: string | null;
   race_registry?: {
     id: string;
@@ -46,7 +46,7 @@ type PlanDetail = {
 };
 
 function hasSchedule(p: PlanDetail): boolean {
-  return Array.isArray(p.planWeeks) && (p.planWeeks as unknown[]).length > 0;
+  return Array.isArray(p.planSchedule) && (p.planSchedule as unknown[]).length > 0;
 }
 
 function normalizeDateKey(raw: string): string | null {

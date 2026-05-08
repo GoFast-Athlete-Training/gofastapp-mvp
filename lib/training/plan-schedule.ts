@@ -1,6 +1,6 @@
 /**
- * Read-only view of the plan schedule from `training_plans.planWeeks` JSON.
- * No `workouts` table access — use for week previews.
+ * Read-only expansion of training_plans.planSchedule JSON:
+ * structured `days[]` (canonical) + legacy `{ schedule: string }` rows.
  */
 
 import type { WorkoutType } from "@prisma/client";
@@ -20,6 +20,10 @@ import {
 import { nOffsetFromWeekAnchor, phaseForCatalogue } from "./plan-utils";
 import { formatPlannedWorkoutTitle } from "./workout-display-title";
 import { titleFromCycleIndex } from "./algo-workout-segments";
+import {
+  type PlanWeekSchedule,
+  isStructuredPlanWeek,
+} from "@/lib/training/plan-schedule-schema";
 
 export type WeekBounds = { weekStart: Date; weekEnd: Date };
 
@@ -27,6 +31,21 @@ export type WeekBoundsOpts = {
   raceDate?: Date | null;
   totalWeeks?: number;
 };
+
+const OUR_DOW_TO_NAME = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+] as const;
+
+function dayAssignedFromOurDow(ourDow: number): string {
+  const n = Math.min(7, Math.max(1, ourDow));
+  return OUR_DOW_TO_NAME[n - 1]!;
+}
 
 export function weekBoundsFromPlan(
   planStartDate: Date,
@@ -72,7 +91,6 @@ function dateKeyUtc(d: Date): string {
 }
 
 export type PlanScheduleDay = {
-  /** YYYY-MM-DD UTC for matching workouts + API */
   dateKey: string;
   date: Date;
   title: string;
@@ -83,27 +101,44 @@ export type PlanScheduleDay = {
   nOffset: number | null;
   phase: string;
   estimatedDistanceInMeters: number;
+  /** Present on structured schedules */
+  catalogueWorkoutId?: string | null;
 };
 
-function scheduleEntryForWeek(
-  planWeeks: unknown,
+function rawWeek(planSchedule: unknown, weekNumber: number): unknown | null {
+  if (!planSchedule || !Array.isArray(planSchedule)) return null;
+  return (
+    planSchedule.find(
+      (w) =>
+        w &&
+        typeof w === "object" &&
+        Number((w as Record<string, unknown>).weekNumber) === weekNumber
+    ) ?? null
+  );
+}
+
+function scheduleEntryLegacy(
+  planSchedule: unknown,
   weekNumber: number
 ): { schedule: string } | null {
-  if (!planWeeks || !Array.isArray(planWeeks)) return null;
-  const entry = planWeeks.find(
-    (w) =>
-      w &&
-      typeof w === "object" &&
-      Number((w as Record<string, unknown>).weekNumber) === weekNumber
-  ) as Record<string, unknown> | undefined;
+  const entry = rawWeek(planSchedule, weekNumber) as Record<string, unknown> | null;
   if (!entry || typeof entry.schedule !== "string") return null;
   return { schedule: entry.schedule };
 }
 
-function maxWeekNumberInPlanWeeks(planWeeks: unknown): number {
-  if (!planWeeks || !Array.isArray(planWeeks)) return 1;
+function scheduleEntryStructured(
+  planSchedule: unknown,
+  weekNumber: number
+): PlanWeekSchedule | null {
+  const entry = rawWeek(planSchedule, weekNumber);
+  if (!isStructuredPlanWeek(entry)) return null;
+  return entry;
+}
+
+function maxWeekNumberInPlanSchedule(planSchedule: unknown): number {
+  if (!planSchedule || !Array.isArray(planSchedule)) return 1;
   let m = 1;
-  for (const w of planWeeks) {
+  for (const w of planSchedule) {
     if (!w || typeof w !== "object") continue;
     const n = Number((w as Record<string, unknown>).weekNumber);
     if (Number.isFinite(n)) m = Math.max(m, n);
@@ -112,32 +147,220 @@ function maxWeekNumberInPlanWeeks(planWeeks: unknown): number {
 }
 
 /**
- * Expand one week of `planWeeks` into scheduled days (intent only — no DB).
+ * Canonical name; accepts `planSchedule` or legacy `planWeeks` alias.
  */
-export function planScheduleDaysForWeek(params: {
+export function expandWeekSchedule(params: {
   planStartDate: Date;
-  planWeeks: unknown;
+  planSchedule?: unknown;
+  /** @deprecated Alias for planSchedule (older column name). */
+  planWeeks?: unknown;
   weekNumber: number;
   raceDate: Date | null;
   raceName: string | null;
   raceDistanceMiles: number | null;
-  /** Effective training week count; when omitted, uses max week index in planWeeks JSON */
+  totalWeeks?: number;
+}): PlanScheduleDay[] {
+  const planJson = params.planSchedule ?? params.planWeeks ?? null;
+
+  const structured = scheduleEntryStructured(planJson, params.weekNumber);
+  if (structured) {
+    return expandStructuredDays({ ...params, structured, planJson });
+  }
+
+  /** Legacy compact string rows */
+  return expandLegacyDays({ ...params, planJson });
+}
+
+/** @deprecated Prefer expandWeekSchedule / planSchedule param */
+export function planScheduleDaysForWeek(params: {
+  planStartDate: Date;
+  planWeeks?: unknown;
+  planSchedule?: unknown;
+  weekNumber: number;
+  raceDate: Date | null;
+  raceName: string | null;
+  raceDistanceMiles: number | null;
+  totalWeeks?: number;
+}): PlanScheduleDay[] {
+  return expandWeekSchedule({
+    planStartDate: params.planStartDate,
+    planSchedule: params.planSchedule ?? params.planWeeks,
+    weekNumber: params.weekNumber,
+    raceDate: params.raceDate,
+    raceName: params.raceName,
+    raceDistanceMiles: params.raceDistanceMiles,
+    totalWeeks: params.totalWeeks,
+  });
+}
+
+function expandStructuredDays(params: {
+  planStartDate: Date;
+  structured: PlanWeekSchedule;
+  planJson: unknown;
+  weekNumber: number;
+  raceDate: Date | null;
+  raceName: string | null;
+  raceDistanceMiles: number | null;
   totalWeeks?: number;
 }): PlanScheduleDay[] {
   const {
     planStartDate,
-    planWeeks,
+    structured,
+    planJson,
     weekNumber,
     raceDate,
     raceName,
     raceDistanceMiles,
   } = params;
 
-  const entry = scheduleEntryForWeek(planWeeks, weekNumber);
+  const resolvedTotalWeeks =
+    params.totalWeeks ?? maxWeekNumberInPlanSchedule(planJson);
+
+  const { weekStart, weekEnd } = weekBoundsFromPlan(planStartDate, weekNumber, {
+    raceDate,
+    totalWeeks: resolvedTotalWeeks,
+  });
+  const weekAnchorUtc = utcDateOnly(weekStart);
+  const raceUtc = raceDate ? utcDateOnly(raceDate) : null;
+  const weekNOffset =
+    raceUtc != null ? nOffsetFromWeekAnchor(weekAnchorUtc, raceUtc) : null;
+
+  const sortedDays = [...structured.days].sort((a, b) => a.dow - b.dow);
+  const out: PlanScheduleDay[] = [];
+
+  function pushStructuredDay(opts: {
+    ourDow: number;
+    scheduleWeekNum: number;
+    displayWeekNum: number;
+    wt: WorkoutType;
+    miles: number;
+    planCycleIndex: number | null;
+    catalogueWorkoutId?: string | null;
+  }) {
+    const date = dateForDayInWeek(
+      planStartDate,
+      opts.scheduleWeekNum,
+      opts.ourDow
+    );
+    const estMeters = milesToMeters(opts.miles);
+
+    let title: string;
+    let workoutType: WorkoutType = opts.wt;
+    let distMeters = estMeters;
+
+    if (
+      workoutType === "Race" ||
+      (raceUtc != null &&
+        utcDateOnly(date).getTime() === raceUtc.getTime() &&
+        workoutType === "LongRun")
+    ) {
+      workoutType = "Race";
+      distMeters =
+        raceDistanceMiles != null
+          ? milesToMeters(raceDistanceMiles)
+          : estMeters;
+      title = formatPlannedWorkoutTitle("LongRun", distMeters, {
+        isRace: true,
+        raceName: raceName ?? undefined,
+      });
+    } else if (workoutType === "Intervals" || workoutType === "Tempo") {
+      title =
+        titleFromCycleIndex(workoutType, opts.planCycleIndex ?? 0) ??
+        formatPlannedWorkoutTitle(workoutType, estMeters);
+    } else {
+      title = formatPlannedWorkoutTitle(workoutType, estMeters);
+    }
+
+    const isRaceRow = workoutType === "Race";
+    const phaseOffset = isRaceRow ? 0 : (weekNOffset ?? 0);
+    const nForRow = isRaceRow ? 0 : weekNOffset;
+
+    out.push({
+      dateKey: dateKeyUtc(date),
+      date,
+      title,
+      workoutType,
+      weekNumber: opts.displayWeekNum,
+      dayAssigned: dayAssignedFromOurDow(opts.ourDow),
+      planCycleIndex: opts.planCycleIndex,
+      nOffset: nForRow,
+      phase: phaseForCatalogue(phaseOffset, 4),
+      estimatedDistanceInMeters: distMeters,
+      catalogueWorkoutId: opts.catalogueWorkoutId ?? null,
+    });
+  }
+
+  for (const d of sortedDays) {
+    pushStructuredDay({
+      ourDow: d.dow,
+      scheduleWeekNum: weekNumber,
+      displayWeekNum: weekNumber,
+      wt: d.workoutType,
+      miles: d.miles,
+      planCycleIndex: d.planCycleIndex,
+      catalogueWorkoutId: d.catalogueWorkoutId,
+    });
+  }
+
+  const foldNext =
+    raceUtc != null &&
+    mondayRaceFoldsIntoPriorPlanWeek(planStartDate, raceUtc) &&
+    weekNumber === resolvedTotalWeeks;
+  if (foldNext) {
+    const next = scheduleEntryStructured(planJson, weekNumber + 1);
+    if (next) {
+      for (const d of [...next.days].sort((a, b) => a.dow - b.dow)) {
+        pushStructuredDay({
+          ourDow: d.dow,
+          scheduleWeekNum: weekNumber + 1,
+          displayWeekNum: weekNumber,
+          wt: d.workoutType,
+          miles: d.miles,
+          planCycleIndex: d.planCycleIndex,
+          catalogueWorkoutId: d.catalogueWorkoutId,
+        });
+      }
+    }
+  }
+
+  const startKey = dateKeyUtc(weekStart);
+  const endKey = dateKeyUtc(utcDateOnly(weekEnd));
+  const clipped = out.filter(
+    (d) => d.dateKey >= startKey && d.dateKey <= endKey
+  );
+  const seen = new Set<string>();
+  const deduped: PlanScheduleDay[] = [];
+  for (const d of clipped.sort((a, b) => a.dateKey.localeCompare(b.dateKey))) {
+    if (seen.has(d.dateKey)) continue;
+    seen.add(d.dateKey);
+    deduped.push(d);
+  }
+  return deduped;
+}
+
+function expandLegacyDays(params: {
+  planStartDate: Date;
+  planJson: unknown | null;
+  weekNumber: number;
+  raceDate: Date | null;
+  raceName: string | null;
+  raceDistanceMiles: number | null;
+  totalWeeks?: number;
+}): PlanScheduleDay[] {
+  const {
+    planStartDate,
+    planJson,
+    weekNumber,
+    raceDate,
+    raceName,
+    raceDistanceMiles,
+  } = params;
+
+  const entry = scheduleEntryLegacy(planJson, weekNumber);
   if (!entry) return [];
 
   const resolvedTotalWeeks =
-    params.totalWeeks ?? maxWeekNumberInPlanWeeks(planWeeks);
+    params.totalWeeks ?? maxWeekNumberInPlanSchedule(planJson);
 
   const { weekStart, weekEnd } = weekBoundsFromPlan(
     planStartDate,
@@ -222,7 +445,7 @@ export function planScheduleDaysForWeek(params: {
     mondayRaceFoldsIntoPriorPlanWeek(planStartDate, raceUtc) &&
     weekNumber === resolvedTotalWeeks;
   if (foldNext) {
-    const nextEntry = scheduleEntryForWeek(planWeeks, weekNumber + 1);
+    const nextEntry = scheduleEntryLegacy(planJson, weekNumber + 1);
     if (nextEntry) {
       const nextTokens = parseScheduleString(nextEntry.schedule);
       pushFromTokens(nextTokens, weekNumber + 1, weekNumber);
@@ -244,26 +467,24 @@ export function planScheduleDaysForWeek(params: {
   return deduped;
 }
 
-/**
- * Find the scheduled day for a calendar date, or null if off-plan.
- */
 export function planScheduleDayForDateKey(params: {
   planStartDate: Date;
-  planWeeks: unknown;
+  planSchedule?: unknown;
+  /** @deprecated */
+  planWeeks?: unknown;
   raceDate: Date | null;
   raceName: string | null;
   raceDistanceMiles: number | null;
   dateKey: string;
-  /** When set (e.g. `training_plans.totalWeeks`), caps the search. */
   maxWeekNumber?: number;
 }): PlanScheduleDay | null {
-  const wn = params.planWeeks;
-  if (!wn || !Array.isArray(wn)) return null;
+  const raw = params.planSchedule ?? params.planWeeks ?? null;
+  if (!raw || !Array.isArray(raw)) return null;
 
   let weekNumber = 1;
   const fromEntries = Math.max(
     0,
-    ...wn
+    ...raw
       .map((x) =>
         x && typeof x === "object"
           ? Number((x as Record<string, unknown>).weekNumber)
@@ -271,9 +492,7 @@ export function planScheduleDayForDateKey(params: {
       )
       .filter((n) => Number.isFinite(n))
   );
-  const raceUtcForCount = params.raceDate
-    ? utcDateOnly(params.raceDate)
-    : null;
+  const raceUtcForCount = params.raceDate ? utcDateOnly(params.raceDate) : null;
   const totalWeeksForSchedule =
     raceUtcForCount != null
       ? calendarTrainingWeekCount(params.planStartDate, raceUtcForCount)
@@ -286,9 +505,9 @@ export function planScheduleDayForDateKey(params: {
   );
 
   for (; weekNumber <= maxWeek; weekNumber++) {
-    const days = planScheduleDaysForWeek({
+    const days = expandWeekSchedule({
       planStartDate: params.planStartDate,
-      planWeeks: params.planWeeks,
+      planSchedule: raw,
       weekNumber,
       raceDate: params.raceDate,
       raceName: params.raceName,

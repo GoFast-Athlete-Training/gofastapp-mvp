@@ -21,7 +21,7 @@ export type UpcomingWorkoutRow = {
   }[];
   /** Present when a DB row exists (open day in My Training). */
   workoutId?: string | null;
-  /** From planWeeks before lazy materialization. */
+  /** From plan schedule (`planSchedule`) before lazy materialization. */
   isPlanSession?: boolean;
 };
 

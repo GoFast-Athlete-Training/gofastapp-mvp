@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { executePlanGenerate } from "@/lib/training/execute-plan-generate";
+import { ensureTrainingPlanPresetLinked } from "@/lib/training/ensure-training-plan-preset-linked";
 
 export async function planGeneratePostHandler(
   request: NextRequest
@@ -42,9 +43,9 @@ export async function planGeneratePostHandler(
     }
 
     const scheduleExists =
-      plan.planWeeks != null &&
-      Array.isArray(plan.planWeeks) &&
-      (plan.planWeeks as unknown[]).length > 0;
+      plan.planSchedule != null &&
+      Array.isArray(plan.planSchedule) &&
+      (plan.planSchedule as unknown[]).length > 0;
     if (scheduleExists) {
       return NextResponse.json(
         {
@@ -78,6 +79,21 @@ export async function planGeneratePostHandler(
       minWeeklyMiles,
       Math.min(100, weeklyMileageTarget)
     );
+
+    const presetLink = await ensureTrainingPlanPresetLinked({
+      planId: trainingPlanId,
+      athleteId: athlete.id,
+    });
+    if (!presetLink.ok) {
+      const msg =
+        presetLink.kind === "plan_not_found"
+          ? "Plan not found"
+          : "No training plan presets are configured. Your coach needs to publish a preset before plans can generate.";
+      return NextResponse.json(
+        { error: msg },
+        { status: presetLink.kind === "plan_not_found" ? 404 : 422 }
+      );
+    }
 
     const result = await executePlanGenerate({
       athleteId: athlete.id,

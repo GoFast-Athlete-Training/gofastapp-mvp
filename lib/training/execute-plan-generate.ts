@@ -1,162 +1,27 @@
 /**
- * Orchestrator: load preset + catalogue rows, run `generatePlanFromConfigs`,
- * persist `planWeeks` (+ plan scalars). No standalone `workouts` rows here.
+ * Orchestrator: load preset + catalogue rows; stub skeleton → LR → quality/easy;
+ * persists structured planSchedule (+ skeleton scalars). No workouts rows here.
  */
 
-import { WorkoutType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import {
-  generatePlanFromConfigs,
-  type CatalogueGenerationRow,
-  type PlanGenConfig,
-  planWeeksSnapshotFromGeneratedRows,
-  runTypeConfigPositionsToInputs,
-  type RunTypeConfigInput,
-} from "@/lib/training/generate-plan-from-configs";
 import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
 import { Prisma } from "@prisma/client";
 import { metersToMiles } from "@/lib/pace-utils";
 import { goalRacePaceDisplayString } from "@/lib/training/goal-pace-calculator";
-
-type PresetBoltonsVolume = NonNullable<
-  Prisma.training_plan_presetGetPayload<{
-    include: { volumeConstraints: true };
-  }>["volumeConstraints"]
->;
-type PresetBoltonsWorkout = NonNullable<
-  Prisma.training_plan_presetGetPayload<{
-    include: { workoutConfig: true };
-  }>["workoutConfig"]
->;
-
-function presetBoltonsToPlanGenConfig(
-  volume: PresetBoltonsVolume,
-  workout: PresetBoltonsWorkout
-): PlanGenConfig {
-  return {
-    cycleLen: volume.cycleLen,
-    minWeeklyMiles: volume.minWeeklyMiles,
-    baseMiles: volume.baseMiles,
-    peakMiles: volume.peakMiles,
-    taperMiles: volume.taperMiles,
-    maxWeeklyMiles: volume.maxWeeklyMiles,
-    tempoIdealDow: workout.tempoIdealDow,
-    intervalIdealDow: workout.intervalIdealDow,
-    longRunDefaultDow: workout.longRunDefaultDow,
-  };
-}
-
-const catalogueSelectForGeneration = {
-  id: true,
-  name: true,
-  workoutType: true,
-  slug: true,
-  paceAnchor: true,
-  segmentPaceDist: true,
-  warmupMiles: true,
-  cooldownMiles: true,
-  workBaseMiles: true,
-  workBaseReps: true,
-  workBaseRepMeters: true,
-} as const;
-
-const positionsInclude = {
-  orderBy: { cyclePosition: "asc" as const },
-  include: {
-    workout_catalogue: {
-      select: catalogueSelectForGeneration,
-    },
-  },
-} as const;
-
-const trainingPlanPresetInclude = {
-  volumeConstraints: true,
-  workoutConfig: true,
-  longRunConfig: { include: { positions: positionsInclude } },
-  intervalsConfig: { include: { positions: positionsInclude } },
-  tempoConfig: { include: { positions: positionsInclude } },
-} as const;
-
-function mapPositionRow(p: {
-  cyclePosition: number;
-  catalogueWorkoutId: string | null;
-  distributionWeight: number;
-}) {
-  return {
-    cyclePosition: p.cyclePosition,
-    catalogueWorkoutId: p.catalogueWorkoutId,
-    distributionWeight: p.distributionWeight,
-  };
-}
-
-function runTypeInputsFromPreset(preset: {
-  longRunConfig: {
-    positions: {
-      cyclePosition: number;
-      catalogueWorkoutId: string | null;
-      distributionWeight: number;
-    }[];
-  } | null;
-  intervalsConfig: {
-    positions: {
-      cyclePosition: number;
-      catalogueWorkoutId: string | null;
-      distributionWeight: number;
-    }[];
-  } | null;
-  tempoConfig: {
-    positions: {
-      cyclePosition: number;
-      catalogueWorkoutId: string | null;
-      distributionWeight: number;
-    }[];
-  } | null;
-}): RunTypeConfigInput[] {
-  const out: RunTypeConfigInput[] = [];
-  if (preset.longRunConfig?.positions?.length) {
-    out.push(
-      ...runTypeConfigPositionsToInputs(
-        WorkoutType.LongRun,
-        preset.longRunConfig.positions.map(mapPositionRow)
-      )
-    );
-  }
-  if (preset.intervalsConfig?.positions?.length) {
-    out.push(
-      ...runTypeConfigPositionsToInputs(
-        WorkoutType.Intervals,
-        preset.intervalsConfig.positions.map(mapPositionRow)
-      )
-    );
-  }
-  if (preset.tempoConfig?.positions?.length) {
-    out.push(
-      ...runTypeConfigPositionsToInputs(
-        WorkoutType.Tempo,
-        preset.tempoConfig.positions.map(mapPositionRow)
-      )
-    );
-  }
-  return out;
-}
-
-function catalogueIdsFromPreset(preset: {
-  longRunConfig: { positions: { catalogueWorkoutId: string | null }[] } | null;
-  intervalsConfig: { positions: { catalogueWorkoutId: string | null }[] } | null;
-  tempoConfig: { positions: { catalogueWorkoutId: string | null }[] } | null;
-}): string[] {
-  const ids: string[] = [];
-  for (const p of preset.longRunConfig?.positions ?? []) {
-    if (p.catalogueWorkoutId) ids.push(p.catalogueWorkoutId);
-  }
-  for (const p of preset.intervalsConfig?.positions ?? []) {
-    if (p.catalogueWorkoutId) ids.push(p.catalogueWorkoutId);
-  }
-  for (const p of preset.tempoConfig?.positions ?? []) {
-    if (p.catalogueWorkoutId) ids.push(p.catalogueWorkoutId);
-  }
-  return [...new Set(ids)];
-}
+import { buildPlanScheduleStub } from "@/lib/training/plan-schedule-stub";
+import { applyLongRunSchedule } from "@/lib/training/apply-long-run";
+import { applyQualityAndEasySchedule } from "@/lib/training/apply-quality-easy";
+import {
+  catalogueIdsFromPreset,
+  catalogueSelectForGeneration,
+  mapPositionRow,
+  presetBoltonsToPlanGenConfig,
+  trainingPlanPresetInclude,
+  type LoadedPresetInclude,
+  type CatalogueGenerationRowSelection,
+  type PlanGenPresetBoltonsInput,
+} from "@/lib/training/plan-generate-presets-loader";
+import type { CatalogueMileEstimateInput } from "@/lib/training/apply-quality-easy";
 
 export async function executePlanGenerate(params: {
   athleteId: string;
@@ -187,56 +52,55 @@ export async function executePlanGenerate(params: {
   if (!planRow?.race_registry) {
     throw new Error("Plan not found or has no linked race");
   }
+  if (!planRow.presetId) {
+    throw new Error(
+      "This plan has no training preset linked — re-create your plan or contact support."
+    );
+  }
+
   const race = planRow.race_registry;
 
   const [prefs, rawPreset] = await Promise.all([
     prisma.trainingPreferences.findUnique({ where: { athleteId } }),
-    plan.presetId
-      ? prisma.training_plan_preset.findUnique({
-          where: { id: plan.presetId },
-          include: trainingPlanPresetInclude,
-        })
-      : prisma.training_plan_preset.findFirst({
-          orderBy: { createdAt: "asc" },
-          include: trainingPlanPresetInclude,
-        }),
+    prisma.training_plan_preset.findUnique({
+      where: { id: planRow.presetId },
+      include: trainingPlanPresetInclude,
+    }),
   ]);
 
-  const planConfig: PlanGenConfig | undefined =
-    rawPreset?.volumeConstraints && rawPreset?.workoutConfig
-      ? presetBoltonsToPlanGenConfig(
-          rawPreset.volumeConstraints as PresetBoltonsVolume,
-          rawPreset.workoutConfig as PresetBoltonsWorkout
-        )
-      : undefined;
+  if (!rawPreset?.volumeConstraints || !rawPreset.workoutConfig) {
+    throw new Error("Preset is incomplete (volume/workout boltons missing).");
+  }
 
-  const runTypeConfigs =
-    rawPreset != null
-      ? runTypeInputsFromPreset({
-          longRunConfig: rawPreset.longRunConfig,
-          intervalsConfig: rawPreset.intervalsConfig,
-          tempoConfig: rawPreset.tempoConfig,
-        })
-      : undefined;
+  const boltonsInput: PlanGenPresetBoltonsInput = {
+    volumeConstraints: rawPreset.volumeConstraints,
+    workoutConfig: rawPreset.workoutConfig,
+  };
+  const planConfig = presetBoltonsToPlanGenConfig(boltonsInput);
+  const vol = boltonsInput.volumeConstraints;
 
-  const catalogueIds =
-    rawPreset != null ? catalogueIdsFromPreset(rawPreset) : [];
-  const catalogueRowsFull =
+  const longRunPositions =
+    rawPreset.longRunConfig?.positions.map(mapPositionRow) ?? [];
+  const intervalsPositions =
+    rawPreset.intervalsConfig?.positions.map(mapPositionRow) ?? [];
+  const tempoPositions =
+    rawPreset.tempoConfig?.positions.map(mapPositionRow) ?? [];
+
+  const catalogueIds = catalogueIdsFromPreset(rawPreset as LoadedPresetInclude);
+  const catalogueRowsFull: CatalogueGenerationRowSelection[] =
     catalogueIds.length > 0
       ? await prisma.workout_catalogue.findMany({
           where: { id: { in: catalogueIds } },
           select: catalogueSelectForGeneration,
         })
       : [];
-  const catalogueRowsById = new Map<string, CatalogueGenerationRow>(
+
+  const catalogueRowsById = new Map<string, CatalogueMileEstimateInput>(
     catalogueRowsFull.map((r) => [r.id, r])
-  );
-  const cataloguePaceById = new Map(
-    catalogueRowsFull.map((r) => [r.id, { paceAnchor: r.paceAnchor }])
   );
 
   let weeklyMileageTarget = params.weeklyMileageTarget;
-  const cap = planConfig?.maxWeeklyMiles;
+  const cap = planConfig.maxWeeklyMiles;
   if (cap != null && Number.isFinite(cap) && cap > 0) {
     weeklyMileageTarget = Math.min(weeklyMileageTarget, cap);
   }
@@ -257,38 +121,110 @@ export async function executePlanGenerate(params: {
     race.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
       ? metersToMiles(Number(race.distanceMeters))
       : 3.1;
-  const drafts = generatePlanFromConfigs(
-    {
-      planId: plan.id,
-      athleteId,
-      totalWeeks: weekCount,
-      planStartDate: plan.startDate,
-      raceDate: race.raceDate,
-      weeklyMileageTarget,
-      minWeeklyMiles: params.minWeeklyMiles,
-      preferredDays,
-      raceName: race.name,
-      raceDistanceMiles,
-      preferredLongRunDow: plan.preferredLongRunDow,
-      preferredQualityDays: plan.preferredQualityDays,
-      planConfig,
-      runTypeConfigs: runTypeConfigs && runTypeConfigs.length > 0 ? runTypeConfigs : undefined,
-      catalogueRowsById,
-    },
-    cataloguePaceById.size > 0
-      ? { cataloguePaceById }
-      : {}
-  );
+
+  function macroCycleLen(): number {
+    const cv = vol.cycleLen;
+    const c =
+      typeof cv === "number" && Number.isFinite(cv) ? Math.round(cv) : NaN;
+    if (c >= 1 && c <= 8) return c;
+    const pc = planConfig.cycleLen;
+    if (
+      typeof pc === "number" &&
+      Number.isFinite(pc) &&
+      Math.floor(pc) >= 1 &&
+      Math.floor(pc) <= 8
+    ) {
+      return Math.floor(pc);
+    }
+    return 4;
+  }
+
+  const cLen = macroCycleLen();
+
+  const skeleton = buildPlanScheduleStub({
+    planStartDate: plan.startDate,
+    raceDate: race.raceDate,
+    raceName: race.name,
+    raceDistanceMiles,
+    totalWeeks: weekCount,
+    preferredDays,
+    preferredLongRunDow: plan.preferredLongRunDow,
+    preferredQualityDays: plan.preferredQualityDays,
+    tempoIdealDow: planConfig.tempoIdealDow ?? 2,
+    intervalIdealDow: planConfig.intervalIdealDow ?? 4,
+    longRunDefaultDow: planConfig.longRunDefaultDow ?? 6,
+    peakWeeklyMilesForCap: planConfig.peakMiles ?? null,
+    longRunPositions,
+    intervalsPositions,
+    tempoPositions,
+  });
+
+  const schedule = skeleton.schedule;
+
+  const inferredBaseFallback = weeklyMileageTarget * cLen * 0.92;
+  const baseMiles =
+    vol.baseMiles != null && Number.isFinite(Number(vol.baseMiles))
+      ? Math.max(1, Number(vol.baseMiles))
+      : Math.round(inferredBaseFallback * 10) / 10;
+  let peakMiles =
+    vol.peakMiles != null && Number.isFinite(Number(vol.peakMiles))
+      ? Math.max(baseMiles, Number(vol.peakMiles))
+      : Math.max(baseMiles, weeklyMileageTarget * cLen);
+  peakMiles = Math.round(Math.max(baseMiles, peakMiles) * 10) / 10;
+  const taperMiles =
+    vol.taperMiles != null && Number.isFinite(Number(vol.taperMiles))
+      ? Math.max(1, Number(vol.taperMiles))
+      : Math.round(Math.max(baseMiles, peakMiles * 0.85) * 10) / 10;
+
+  applyLongRunSchedule({
+    planSchedule: schedule,
+    totalWeeks: weekCount,
+    cycleLen: cLen,
+    baseMiles,
+    peakMiles,
+    taperMiles,
+    longRunPositions,
+    calculatedLongRunMax: skeleton.calculatedLongRunMax,
+    minLongMi: 8,
+  });
+
+  const minPresetWeekly =
+    vol.minWeeklyMiles != null && Number.isFinite(Number(vol.minWeeklyMiles))
+      ? Number(vol.minWeeklyMiles)
+      : params.minWeeklyMiles;
+
+  applyQualityAndEasySchedule({
+    planSchedule: schedule,
+    totalWeeks: weekCount,
+    weeklyMileageTarget,
+    minWeeklyMiles: Math.max(minPresetWeekly, params.minWeeklyMiles),
+    cycleLen: cLen,
+    baseMiles,
+    peakMiles,
+    taperMiles,
+    maxWeeklyMiles:
+      vol.maxWeeklyMiles != null && Number.isFinite(Number(vol.maxWeeklyMiles))
+        ? Number(vol.maxWeeklyMiles)
+        : undefined,
+    raceDistanceMiles,
+    catalogueRowsById,
+    minEasyPerDayMiles: 3,
+    minTempoMiles: planConfig.minTempoMiles ?? 3,
+    minIntervalMiles: planConfig.minIntervalMiles ?? 3,
+  });
 
   const syncedFiveKPace =
     params.athleteFiveKPace?.trim() ||
     plan.currentFiveKPace?.trim() ||
     null;
-  const needsFiveKAnchor = drafts.some(
-    (d) =>
-      d.workoutType === "Easy" ||
-      d.workoutType === "LongRun" ||
-      d.workoutType === "Race"
+
+  const needsFiveKAnchor = schedule.some((w) =>
+    w.days.some(
+      (d) =>
+        d.workoutType === "Easy" ||
+        d.workoutType === "LongRun" ||
+        d.workoutType === "Race"
+    )
   );
   if (needsFiveKAnchor && !syncedFiveKPace) {
     throw new Error(
@@ -296,10 +232,10 @@ export async function executePlanGenerate(params: {
     );
   }
 
-  const planWeeksSnapshot = planWeeksSnapshotFromGeneratedRows(drafts, weekCount);
-
   const mergedGoalTime =
-    planRow.goalRaceTime?.trim() || planRow.athlete_goal?.goalTime?.trim() || null;
+    planRow.goalRaceTime?.trim() ||
+    planRow.athlete_goal?.goalTime?.trim() ||
+    null;
   const imprintPace =
     mergedGoalTime != null
       ? goalRacePaceDisplayString(mergedGoalTime, raceDistanceMiles)
@@ -308,8 +244,11 @@ export async function executePlanGenerate(params: {
   await prisma.training_plans.update({
     where: { id: plan.id },
     data: {
-      planWeeks: planWeeksSnapshot as unknown as Prisma.InputJsonValue,
+      planSchedule: schedule as unknown as Prisma.InputJsonValue,
       phases: Prisma.JsonNull,
+      peakWeekNumber: skeleton.peakWeekNumber,
+      taperStartWeekNumber: skeleton.taperStartWeekNumber,
+      calculatedLongRunMax: skeleton.calculatedLongRunMax,
       weeklyMileageTarget,
       totalWeeks: weekCount,
       ...(syncedFiveKPace != null ? { currentFiveKPace: syncedFiveKPace } : {}),

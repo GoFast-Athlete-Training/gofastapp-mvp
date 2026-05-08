@@ -8,16 +8,47 @@ import { phaseNameForWeek } from "@/lib/training/plan-phases";
 import { parseScheduleString } from "@/lib/training/schedule-parser";
 
 const DAY_LABELS: Record<string, string> = {
-  M: "Mon", Tu: "Tue", W: "Wed", Th: "Thu", F: "Fri", Sa: "Sat", Su: "Sun",
+  M: "Mon",
+  Tu: "Tue",
+  W: "Wed",
+  Th: "Thu",
+  F: "Fri",
+  Sa: "Sat",
+  Su: "Sun",
+};
+
+const DOW_PREVIEW: Record<number, string> = {
+  1: "Mon",
+  2: "Tue",
+  3: "Wed",
+  4: "Thu",
+  5: "Fri",
+  6: "Sat",
+  7: "Sun",
 };
 
 const WORKOUT_TYPE_LABELS: Record<WorkoutType, string> = {
   Easy: "Easy",
-  Tempo: "Quality",
-  Intervals: "Quality",
+  Tempo: "Tempo",
+  Intervals: "Intervals",
   LongRun: "Long run",
   Race: "Race",
 };
+
+export type PlanStructuredDayPreview = {
+  dow: number;
+  miles: number;
+  workoutType: WorkoutType;
+  planCycleIndex: number | null;
+};
+
+export type PlanWeekRow =
+  | { weekNumber: number; phase: string; schedule: string }
+  | {
+      weekNumber: number;
+      phase: string;
+      structuredDays: PlanStructuredDayPreview[];
+    };
 
 function renderSchedule(schedule: string): React.ReactNode {
   if (!schedule) return <span className="text-gray-400">Rest</span>;
@@ -29,16 +60,19 @@ function renderSchedule(schedule: string): React.ReactNode {
           <li
             key={i}
             className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              t.workoutType === "LongRun" || t.workoutType === "Race"
+              t.workoutType === "LongRun" ||
+              t.workoutType === "Race"
                 ? "bg-orange-100 text-orange-800"
                 : t.workoutType === "Easy"
-                ? "bg-gray-100 text-gray-700"
-                : "bg-blue-100 text-blue-800"
+                  ? "bg-gray-100 text-gray-700"
+                  : "bg-blue-100 text-blue-800"
             }`}
           >
             <span className="font-semibold">{DAY_LABELS[t.dayAbbr] ?? t.dayAbbr}</span>
             <span>{t.miles} mi</span>
-            <span className="opacity-70">· {WORKOUT_TYPE_LABELS[t.workoutType]}</span>
+            <span className="opacity-70">
+              · {WORKOUT_TYPE_LABELS[t.workoutType] ?? t.workoutType}
+            </span>
           </li>
         ))}
       </ul>
@@ -48,17 +82,51 @@ function renderSchedule(schedule: string): React.ReactNode {
   }
 }
 
-export type PlanWeekRow = {
-  weekNumber: number;
-  phase: string;
-  schedule: string;
-};
+function renderStructured(
+  days: readonly PlanStructuredDayPreview[]
+): React.ReactNode {
+  if (!days.length) return <span className="text-gray-400">Rest</span>;
+  const sorted = [...days].sort((a, b) => a.dow - b.dow);
+  return (
+    <ul className="flex flex-wrap gap-2 mt-1">
+      {sorted.map((d, i) => (
+        <li
+          key={i}
+          className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+            d.workoutType === "LongRun" || d.workoutType === "Race"
+              ? "bg-orange-100 text-orange-800"
+              : d.workoutType === "Easy"
+                ? "bg-gray-100 text-gray-700"
+                : "bg-blue-100 text-blue-800"
+          }`}
+        >
+          <span className="font-semibold">
+            {DOW_PREVIEW[d.dow] ?? `DOW${d.dow}`}
+          </span>
+          <span>{Math.round(d.miles * 100) / 100} mi</span>
+          <span className="opacity-70">
+            ·{" "}
+            {WORKOUT_TYPE_LABELS[d.workoutType] ?? d.workoutType}
+          </span>
+          {d.planCycleIndex != null &&
+            (d.workoutType === "Tempo" ||
+              d.workoutType === "Intervals" ||
+              d.workoutType === "LongRun") && (
+              <span className="opacity-60">· #{d.planCycleIndex}</span>
+            )}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 type Props = {
   open: boolean;
   onClose: () => void;
   phases: PhaseRange[];
-  planWeeks: PlanWeekRow[];
+  /** @deprecated Prefer `overviewWeeks`; kept wire-compat */
+  planWeeks?: PlanWeekRow[];
+  overviewWeeks?: PlanWeekRow[];
   onJumpToWeek?: (weekNumber: number) => void;
 };
 
@@ -67,8 +135,11 @@ export default function PhaseViewModal({
   onClose,
   phases,
   planWeeks,
+  overviewWeeks,
   onJumpToWeek,
 }: Props) {
+  const rows = overviewWeeks ?? planWeeks ?? [];
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -141,7 +212,7 @@ export default function PhaseViewModal({
               Weeks
             </p>
             <ul className="space-y-2">
-              {planWeeks.map((w) => {
+              {rows.map((w) => {
                 const label = phaseNameForWeek(phases, w.weekNumber, w.phase);
                 return (
                   <li
@@ -171,7 +242,9 @@ export default function PhaseViewModal({
                       )}
                     </div>
                     <div className="mt-1">
-                      {renderSchedule(w.schedule)}
+                      {"structuredDays" in w && w.structuredDays
+                        ? renderStructured(w.structuredDays)
+                        : renderSchedule("schedule" in w ? w.schedule : "")}
                     </div>
                   </li>
                 );

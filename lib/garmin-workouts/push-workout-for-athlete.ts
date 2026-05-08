@@ -5,7 +5,8 @@ import {
   createGarminTrainingApiForAthlete,
 } from "@/lib/garmin-workouts/garmin-training-api";
 import { GarminNotConnectedError, requireGarminTokenFresh } from "@/lib/domain-garmin";
-import { dateForDayInWeek, dayNameToOurDow } from "@/lib/training/schedule-parser";
+import { dateForDayInWeek } from "@/lib/training/plan-schedule-dates";
+import { dayNameToOurDow } from "@/lib/training/schedule-parser";
 import { ymdFromDate } from "@/lib/training/plan-utils";
 import { segmentSnapshotDocumentFromDbRows } from "@/lib/training/workout-segment-snapshot";
 

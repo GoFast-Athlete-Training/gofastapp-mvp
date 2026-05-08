@@ -588,7 +588,7 @@ function GoTrainToday() {
         const { plan } = await fetchTrainingPlanDetail(planId, token);
         const p = plan as {
           name?: string;
-          planWeeks?: unknown;
+          planSchedule?: unknown;
           startDate: string;
           totalWeeks: number;
           race_registry?: { raceDate?: string } | null;
@@ -610,7 +610,7 @@ function GoTrainToday() {
             : null;
         totalWeeks = effectiveWeeks;
         const scheduled =
-          Array.isArray(p.planWeeks) && (p.planWeeks as unknown[]).length > 0;
+          Array.isArray(p.planSchedule) && (p.planSchedule as unknown[]).length > 0;
         if (!scheduled) {
           hasActiveSchedule = false;
         } else {

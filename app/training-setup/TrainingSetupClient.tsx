@@ -57,7 +57,7 @@ type ActivePlanLite = {
   name: string;
   athleteGoalId: string | null;
   lifecycleStatus: string;
-  planWeeks: unknown;
+  planSchedule: unknown;
   _count?: { planned_workouts: number };
   race_registry: { name: string } | null;
 };
@@ -82,8 +82,12 @@ function formatRaceWhen(iso: string): string {
 function planCreateFeedbackKind(
   status: number,
   message?: string
-): "goals" | "dates" | "generic" {
+): "goals" | "dates" | "preset" | "generic" {
   const m = (message ?? "").toLowerCase();
+  if (status === 422) {
+    if (m.includes("preset")) return "preset";
+    return "generic";
+  }
   if (status === 400) {
     if (m.includes("before race") || m.includes("invalid startdate")) {
       return "dates";
@@ -112,13 +116,19 @@ export default function TrainingSetupClient() {
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [createFeedback, setCreateFeedback] = useState<
-    "goals" | "dates" | "generic" | null
+    "goals" | "dates" | "preset" | "generic" | null
   >(null);
   const [baseline5KPace, setBaseline5KPace] = useState("");
   const [baselineWeeklyMileage, setBaselineWeeklyMileage] = useState("");
   const [activePlans, setActivePlans] = useState<ActivePlanLite[]>([]);
   const [replaceGoalAcknowledged, setReplaceGoalAcknowledged] = useState(false);
   const [replaceBlockPlan, setReplaceBlockPlan] = useState<ActivePlanLite | null>(null);
+
+  /** Default prod preset hydrated for POST body — must exist before athlete can create plans. */
+  const [presetForWizard, setPresetForWizard] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
   const qualifyingGoals = useMemo(() => goals.filter(isQualifyingGoal), [goals]);
 
@@ -170,14 +180,37 @@ export default function TrainingSetupClient() {
     try {
       const token = await getToken();
       const headers = athleteBearerFetchHeaders(token);
-      const [gRes, sRes, pRes] = await Promise.all([
+      const [gRes, sRes, pRes, presetRes] = await Promise.all([
         fetch("/api/goals?status=ACTIVE", { headers }),
         fetch("/api/race-signups", { headers }),
         fetch("/api/training-plan?status=active", { headers }),
+        fetch("/api/training/plan-preset/prod", { headers }),
       ]);
       const gJson = await gRes.json();
       const sJson = await sRes.json();
       const pJson = await pRes.json();
+      let prodPreset: { id: string; title: string } | null = null;
+      if (presetRes.ok) {
+        try {
+          const pr = await presetRes.json();
+          if (
+            pr?.success === true &&
+            typeof pr?.preset?.id === "string" &&
+            pr.preset.id.trim().length > 0
+          ) {
+            prodPreset = {
+              id: pr.preset.id.trim(),
+              title:
+                typeof pr.preset.title === "string" && pr.preset.title.trim().length > 0
+                  ? pr.preset.title.trim()
+                  : "Training preset",
+            };
+          }
+        } catch {
+          prodPreset = null;
+        }
+      }
+      setPresetForWizard(prodPreset);
       if (pRes.ok && Array.isArray(pJson.plans)) {
         setActivePlans(pJson.plans as ActivePlanLite[]);
       } else {
@@ -199,6 +232,7 @@ export default function TrainingSetupClient() {
       setGoals([]);
       setSignups([]);
       setActivePlans([]);
+      setPresetForWizard(null);
     } finally {
       setLoadingOrientation(false);
     }
@@ -305,6 +339,11 @@ export default function TrainingSetupClient() {
     setReplaceBlockPlan(null);
     if (opts?.forceReplace) setReplaceGoalAcknowledged(true);
 
+    if (!presetForWizard?.id) {
+      setCreateFeedback("preset");
+      return;
+    }
+
     setCreating(true);
     setFormError(null);
     setCreateFeedback(null);
@@ -326,6 +365,7 @@ export default function TrainingSetupClient() {
               ? null
               : Number(baselineWeeklyMileage),
           syncAthleteBaseline: true,
+          ...(presetForWizard?.id ? { presetId: presetForWizard.id } : {}),
         }),
       });
       let data: { error?: string; plan?: { id: string } } = {};
@@ -353,9 +393,9 @@ export default function TrainingSetupClient() {
 
   function scheduleReady(p: ActivePlanLite): boolean {
     return (
-      p.planWeeks != null &&
-      Array.isArray(p.planWeeks) &&
-      (p.planWeeks as unknown[]).length > 0
+      p.planSchedule != null &&
+      Array.isArray(p.planSchedule) &&
+      (p.planSchedule as unknown[]).length > 0
     );
   }
 
@@ -381,12 +421,31 @@ export default function TrainingSetupClient() {
                 generate every workout. You just need a start date and baseline here.
               </p>
             </div>
-            <p className="mb-6 text-sm text-gray-600">
+            <p className="mb-2 text-sm text-gray-600">
               Goal:{" "}
               <span className="font-medium text-gray-900">{rr.name}</span> —{" "}
-              {formatRaceWhen(rr.raceDate)} ({rr.raceType}). Baseline fields update your profile
-              when you create the plan.
+              {formatRaceWhen(rr.raceDate)} ({rr.raceType}). Baseline fields update your profile when
+              you create the plan.
             </p>
+            {loadingOrientation ? (
+              <p className="mb-6 text-xs text-gray-500">
+                Checking that your training blueprint is ready…
+              </p>
+            ) : presetForWizard ? (
+              <p className="mb-6 rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-950">
+                Training blueprint:&nbsp;
+                <span className="font-semibold">{presetForWizard.title}</span>
+              </p>
+            ) : (
+              <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+                <p className="font-medium text-red-950">Training blueprint not available yet</p>
+                <p className="mt-2 leading-relaxed text-red-900/95">
+                  A coach-visible training preset hasn&apos;t been published to this environment, so plan
+                  generation can&apos;t start. Check back shortly or contact support—we&apos;ll still load your
+                  goals above.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2">
@@ -453,7 +512,7 @@ export default function TrainingSetupClient() {
                     </button>
                     <button
                       type="button"
-                      disabled={creating}
+                      disabled={creating || loadingOrientation || !presetForWizard}
                       onClick={() => void createPlan({ forceReplace: true })}
                       className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                     >
@@ -499,6 +558,33 @@ export default function TrainingSetupClient() {
                 </div>
               )}
 
+              {createFeedback === "preset" && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+                  <p className="mb-2 font-medium text-red-950">Preset not wired</p>
+                  <p className="mb-3 text-red-900/95">
+                    This app doesn&apos;t have an active training preset yet, so we can&apos;t stamp your
+                    plan with the engine blueprint. Ask your coach to publish presets, tap refresh
+                    below, then try again.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void loadOrientation()}
+                      className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800"
+                    >
+                      Refresh blueprint
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCreateFeedback(null)}
+                      className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {createFeedback === "generic" && (
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800">
                   <p className="mb-3">
@@ -517,7 +603,7 @@ export default function TrainingSetupClient() {
               <button
                 type="button"
                 onClick={() => void createPlan()}
-                disabled={creating}
+                disabled={creating || loadingOrientation || !presetForWizard}
                 className="w-full rounded-lg bg-emerald-600 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
               >
                 {creating ? "Creating…" : "Create plan"}

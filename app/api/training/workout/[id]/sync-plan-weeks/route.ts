@@ -4,8 +4,7 @@ export const dynamic = "force-dynamic";
  * POST /api/training/workout/[id]/sync-plan-weeks
  *
  * After a materialized workout row is edited (e.g. mileage or workoutType changed),
- * call this to push the change back into the parent plan's planWeeks JSON string so
- * the two stay in sync. planWeeks remains the source of truth for pre-materialized days.
+ * call this to push the change back into `training_plans.planSchedule`.
  *
  * Auth: athlete bearer token (must own the workout).
  */
@@ -13,7 +12,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { syncWorkoutToPlanWeeks } from "@/lib/training/plan-weeks-sync";
+import { syncWorkoutToPlanSchedule } from "@/lib/training/plan-schedule-sync";
 
 export async function POST(
   request: NextRequest,
@@ -39,7 +38,7 @@ export async function POST(
       );
     }
 
-    await syncWorkoutToPlanWeeks(id);
+    await syncWorkoutToPlanSchedule(id);
 
     return NextResponse.json({ success: true });
   } catch (e: unknown) {

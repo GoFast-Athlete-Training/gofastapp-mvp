@@ -1,5 +1,5 @@
 /**
- * Browser fetch helpers for plan detail + week schedule (from `planWeeks`, not workouts-first).
+ * Browser fetch helpers for plan detail + week schedule (from `planSchedule` JSON on `training_plans`, not workouts-first).
  */
 
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
@@ -41,7 +41,7 @@ export async function fetchTrainingPlanDetail(
 }
 
 /**
- * Week preview: `planWeeks` schedule + optional materialized workout ids.
+ * Week preview: `planSchedule` (structured `days[]` or legacy `schedule` string) + optional materialized workout ids.
  */
 export async function fetchPlanWeekSchedule(
   planId: string,

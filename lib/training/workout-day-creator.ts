@@ -1,5 +1,5 @@
 /**
- * Find-or-create a single `workouts` row for a plan day from `planWeeks` (lazy materialization).
+ * Find-or-create a single `workouts` row for a calendar day using `training_plans.planSchedule`.
  */
 
 import type { Prisma } from "@prisma/client";
@@ -79,7 +79,7 @@ export async function findOrCreateWorkoutForPlanDay(params: {
 
   const scheduled = planScheduleDayForDateKey({
     planStartDate: plan.startDate,
-    planWeeks: plan.planWeeks,
+    planSchedule: plan.planSchedule,
     raceDate: race?.raceDate ?? null,
     raceName: race?.name ?? null,
     raceDistanceMiles,
@@ -122,7 +122,7 @@ export async function findOrCreateWorkoutForPlanDay(params: {
         planId,
         date: scheduled.date,
         estimatedDistanceInMeters: scheduled.estimatedDistanceInMeters,
-        catalogueWorkoutId: null,
+        catalogueWorkoutId: scheduled.catalogueWorkoutId ?? null,
         weekNumber: scheduled.weekNumber,
         dayAssigned: scheduled.dayAssigned,
         nOffset: scheduled.nOffset,

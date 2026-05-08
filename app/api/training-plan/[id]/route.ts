@@ -148,9 +148,9 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     });
     const scheduleLocked =
       planWorkoutCount > 0 ||
-      (existing.planWeeks != null &&
-        Array.isArray(existing.planWeeks) &&
-        (existing.planWeeks as unknown[]).length > 0);
+      (existing.planSchedule != null &&
+        Array.isArray(existing.planSchedule) &&
+        (existing.planSchedule as unknown[]).length > 0);
 
     const body = await request.json();
     const patchKeys = Object.keys(body);

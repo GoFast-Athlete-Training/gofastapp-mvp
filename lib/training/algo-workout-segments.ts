@@ -1,6 +1,6 @@
 /**
  * Deterministic Interval + Tempo segment builders.
- * Plan workouts: pass planCycleIndex (0–3) from planWeeks / workouts.planCycleIndex.
+ * Plan workouts: pass planCycleIndex (0–3) from plan schedule slots / workouts.planCycleIndex.
  * Legacy: omit planCycleIndex to use prior completed workouts (matchedActivityId).
  */
 

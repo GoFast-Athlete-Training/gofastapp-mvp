@@ -44,7 +44,7 @@ type PlanDetailHub = {
   name: string;
   totalWeeks: number;
   startDate: string;
-  planWeeks: unknown;
+  planSchedule: unknown;
   currentFiveKPace?: string | null;
   _count?: { planned_workouts: number };
   raceId?: string | null;
@@ -52,7 +52,7 @@ type PlanDetailHub = {
 };
 
 function hasSchedule(p: PlanDetailHub): boolean {
-  return Array.isArray(p.planWeeks) && (p.planWeeks as unknown[]).length > 0;
+  return Array.isArray(p.planSchedule) && (p.planSchedule as unknown[]).length > 0;
 }
 
 function effectiveWeeksForPlanHub(p: PlanDetailHub): number {

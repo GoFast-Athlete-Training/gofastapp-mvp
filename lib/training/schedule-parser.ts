@@ -1,12 +1,11 @@
 /**
- * Parse / build compact schedule strings on planWeeks, e.g. "M:5E W:6T Su:14LR"
+ * Parse / build compact schedule strings on plan schedules, e.g. "M:5E W:6T Su:14LR"
  * Day abbrev: M, Tu, W, Th, F, Sa, Su
  * Type suffix: E Easy, T Tempo, I Intervals, L or LR LongRun (canonical write uses LR)
  * Optional cycle marker for I/T: "-i0" .. "-i3" (plan-frozen 0–3 slot), e.g. "W:5I-i2"
  */
 
 import type { WorkoutType } from "@prisma/client";
-import { addDaysUtc, mondayUtcOfWeekContaining, utcDateOnly } from "@/lib/training/plan-utils";
 
 export type ScheduleToken = {
   dayAbbr: string;
@@ -172,38 +171,4 @@ export function cycleIndexFromScheduleForDay(params: {
   }
 }
 
-/** JS getDay(): 0=Sun..6=Sat → our 1=Mon..7=Sun */
-export function ourDowToJs(our: number): number {
-  return our === 7 ? 0 : our;
-}
-
-/**
- * Calendar week = Mon–Sun (UTC). `weekMondayUtc` is that week's Monday 00:00 UTC.
- */
-export function dateOnOurDowFromWeekMonday(
-  weekMondayUtc: Date,
-  ourDow: number
-): Date {
-  const anchor = utcDateOnly(weekMondayUtc);
-  const targetJs = ourDowToJs(ourDow);
-  for (let d = 0; d < 7; d++) {
-    const candidate = addDaysUtc(anchor, d);
-    if (candidate.getUTCDay() === targetJs) {
-      return candidate;
-    }
-  }
-  throw new Error(`Could not place day ${ourDow} in calendar week`);
-}
-
-/**
- * Week N = Nth Mon–Sun block starting at the Monday of the week that contains plan start.
- */
-export function dateForDayInWeek(
-  planStartDate: Date,
-  weekNumber: number,
-  ourDow: number
-): Date {
-  const firstMonday = mondayUtcOfWeekContaining(planStartDate);
-  const weekMonday = addDaysUtc(firstMonday, (weekNumber - 1) * 7);
-  return dateOnOurDowFromWeekMonday(weekMonday, ourDow);
-}
+export { dateForDayInWeek } from "@/lib/training/plan-schedule-dates";

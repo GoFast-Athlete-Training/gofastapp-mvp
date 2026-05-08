@@ -157,6 +157,22 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "presetId not found" }, { status: 400 });
       }
       presetIdResolved = pid;
+    } else {
+      const defaultPreset = await prisma.training_plan_preset.findFirst({
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      });
+      presetIdResolved = defaultPreset?.id ?? null;
+    }
+
+    if (!presetIdResolved) {
+      return NextResponse.json(
+        {
+          error:
+            "No training plan preset is available yet. Your coach needs to configure presets before athlete plans can be created.",
+        },
+        { status: 422 }
+      );
     }
 
     const now = new Date();
@@ -190,7 +206,7 @@ export async function POST(request: NextRequest) {
           ...(imprintedGoalPace ? { goalRacePace: imprintedGoalPace } : {}),
           lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
           preferredDays,
-          ...(presetIdResolved ? { presetId: presetIdResolved } : {}),
+          presetId: presetIdResolved,
           updatedAt: now,
         },
       });
@@ -255,7 +271,7 @@ export async function GET(request: NextRequest) {
         raceId: true,
         athleteGoalId: true,
         phases: true,
-        planWeeks: true,
+        planSchedule: true,
         lifecycleStatus: true,
         currentFiveKPace: true,
         createdAt: true,

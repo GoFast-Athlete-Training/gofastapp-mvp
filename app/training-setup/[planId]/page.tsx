@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, LayoutList } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
-import PhaseViewModal from "@/components/training/PhaseViewModal";
+import PhaseViewModal, { type PlanWeekRow } from "@/components/training/PhaseViewModal";
 import {
   parsePhasesJson,
   phaseNameForWeek,
@@ -27,6 +27,7 @@ import {
 } from "@/lib/training/fetch-plan-week-client";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import { normalizePreferredQualityDays } from "@/lib/training/preferred-quality-days";
+import { isStructuredPlanWeek, type PlanDaySchedule } from "@/lib/training/plan-schedule-schema";
 
 type PlanPresetSummary = {
   id: string;
@@ -43,7 +44,7 @@ type PlanDetail = {
   totalWeeks: number;
   startDate: string;
   phases: unknown;
-  planWeeks: unknown;
+  planSchedule?: unknown;
   preferredDays: number[];
   preferredLongRunDow?: number | null;
   preferredQualityDays?: number[];
@@ -75,19 +76,27 @@ const LONG_RUN_DAY_OPTIONS: { value: number; label: string }[] = [
 /** Matches generator default floor; not user-editable. */
 const ENGINE_MIN_WEEKLY_MI = 40;
 
-function parsePlanWeekEntries(
-  planWeeks: unknown
-): { weekNumber: number; phase: string; schedule: string }[] {
-  if (!Array.isArray(planWeeks)) return [];
-  const out: { weekNumber: number; phase: string; schedule: string }[] = [];
-  for (const w of planWeeks) {
+function parsePlanWeekOverviewRows(planSchedule: unknown): PlanWeekRow[] {
+  if (!Array.isArray(planSchedule)) return [];
+  const out: PlanWeekRow[] = [];
+  for (const w of planSchedule) {
     if (!w || typeof w !== "object") continue;
     const o = w as Record<string, unknown>;
     const weekNumber = Number(o.weekNumber);
     if (!Number.isFinite(weekNumber)) continue;
-    const phase = typeof o.phase === "string" ? o.phase : String(o.phase ?? "");
-    const schedule = typeof o.schedule === "string" ? o.schedule : "";
-    out.push({ weekNumber, phase, schedule });
+    const phaseRaw = typeof o.phase === "string" ? o.phase : String(o.phase ?? "");
+    if (isStructuredPlanWeek(w)) {
+      const structuredDays = ((w.days as PlanDaySchedule[]) ?? []).map((d) => ({
+        dow: d.dow,
+        miles: typeof d.miles === "number" ? d.miles : 0,
+        workoutType: d.workoutType,
+        planCycleIndex: d.planCycleIndex ?? null,
+      }));
+      out.push({ weekNumber, phase: phaseRaw, structuredDays });
+    } else {
+      const schedule = typeof o.schedule === "string" ? o.schedule : "";
+      out.push({ weekNumber, phase: phaseRaw, schedule });
+    }
   }
   out.sort((a, b) => a.weekNumber - b.weekNumber);
   return out;
@@ -216,22 +225,23 @@ export default function TrainingSetupPlanPage({
 
   const weekEntries = useMemo(() => {
     if (!plan) return [];
-    const raw = parsePlanWeekEntries(plan.planWeeks);
+    const raw = parsePlanWeekOverviewRows(plan.planSchedule);
     const race = plan.race_registry;
     if (!race) return raw;
     return raw.map((w) => ({
       ...w,
       phase:
-        w.phase.trim() ||
-        cataloguePhaseFallbackForWeek(plan.startDate, race.raceDate, w.weekNumber),
+        w.phase.trim() !== ""
+          ? w.phase
+          : cataloguePhaseFallbackForWeek(plan.startDate, race.raceDate, w.weekNumber),
     }));
   }, [plan]);
 
-  const hasLegacyPlanWeeks = useMemo(() => {
-    if (!plan?.planWeeks) return false;
-    return Array.isArray(plan.planWeeks) && plan.planWeeks.length > 0;
-  }, [plan?.planWeeks]);
-  const hasSchedule = hasLegacyPlanWeeks;
+  const hasPlanSchedulePersisted = useMemo(() => {
+    if (!plan?.planSchedule) return false;
+    return Array.isArray(plan.planSchedule) && plan.planSchedule.length > 0;
+  }, [plan?.planSchedule]);
+  const hasSchedule = hasPlanSchedulePersisted;
 
   const showPhaseModalButton =
     phaseRanges.length > 0 || weekEntries.length > 0;
@@ -257,9 +267,13 @@ export default function TrainingSetupPlanPage({
     if (!plan || hasSchedule) return [] as string[];
     const msgs: string[] = [];
     const preset = plan.training_plan_preset;
-    if (!plan.presetId || preset == null) {
+    if (!plan.presetId) {
       msgs.push(
-        "This plan has no training preset linked. Generation will fall back to the oldest preset in the system — confirm your coach assigned the correct plan preset."
+        "This plan was created before presets were enforced. We&apos;ll attach the system's default blueprint when you generate—if generation fails with a preset error, ask your coach to publish training presets."
+      );
+    } else if (preset == null) {
+      msgs.push(
+        "This plan points at a preset that could not be loaded (it may have been removed). Try generating once; contact support if you still see preset errors."
       );
     }
     if (
@@ -852,7 +866,7 @@ export default function TrainingSetupPlanPage({
         open={phaseModalOpen}
         onClose={() => setPhaseModalOpen(false)}
         phases={phaseRanges}
-        planWeeks={weekEntries}
+        overviewWeeks={weekEntries}
         onJumpToWeek={(wn) => setWeekNumber(wn)}
       />
 

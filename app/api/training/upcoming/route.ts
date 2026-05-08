@@ -39,7 +39,7 @@ export type UpcomingSessionJson = {
 
 /**
  * GET /api/training/upcoming
- * Next scheduled sessions from planWeeks (hydrated) + standalone future workouts.
+ * Next scheduled sessions from planSchedule (hydrated) + standalone future workouts.
  * Optional: ?limit=5 (max 20)
  */
 export async function GET(request: NextRequest) {
@@ -86,7 +86,8 @@ export async function GET(request: NextRequest) {
 
     if (
       plan &&
-      plan.planWeeks != null &&
+      plan.planSchedule != null &&
+      Array.isArray(plan.planSchedule) &&
       plan.totalWeeks >= 1
     ) {
       const effectiveWeeks = effectiveTrainingWeekCount(
@@ -109,7 +110,7 @@ export async function GET(request: NextRequest) {
       ) {
         const weekDays = planScheduleDaysForWeek({
           planStartDate: plan.startDate,
-          planWeeks: plan.planWeeks,
+          planSchedule: plan.planSchedule,
           weekNumber: weekNum,
           raceDate: race?.raceDate ?? null,
           raceName: race?.name ?? null,
@@ -258,14 +259,15 @@ export async function GET(request: NextRequest) {
 
     const sessions = merged.slice(0, limit);
 
-    const planWeeksArr =
-      plan?.planWeeks != null && Array.isArray(plan.planWeeks as unknown[])
-        ? (plan.planWeeks as unknown[])
+    const planScheduleArr =
+      plan?.planSchedule != null &&
+      Array.isArray(plan.planSchedule as unknown[])
+        ? (plan.planSchedule as unknown[])
         : [];
     const activePlanSummary = plan
       ? {
           name: plan.name,
-          hasSchedule: planWeeksArr.length > 0,
+          hasSchedule: planScheduleArr.length > 0,
           weekNumber: planWeekNumber,
           totalWeeks: planTotalWeeks,
         }

@@ -284,7 +284,7 @@ export function nOffsetFromWeekAnchor(weekAnchor: Date, raceUtc: Date): number {
   return -Math.ceil(dayDiff / 7);
 }
 
-/** Phase key for a calendar week — matches plan generator / planWeeks display. */
+/** Phase key for a calendar week — matches plan generator / plan schedule display. */
 export function cataloguePhaseFallbackForWeek(
   planStartRaw: Date | string,
   raceRaw: Date | string,

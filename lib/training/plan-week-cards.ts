@@ -1,5 +1,5 @@
 /**
- * Merge `planWeeks` schedule with optional materialized `workouts` rows for one week.
+ * Merge persisted `training_plans.planSchedule` with optional materialized `workouts`.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -38,7 +38,9 @@ export async function buildPlanWeekCards(params: {
   planId: string;
   athleteId: string;
   planStartDate: Date;
-  planWeeks: unknown;
+  planSchedule?: unknown;
+  /** @deprecated use planSchedule */
+  planWeeks?: unknown;
   weekNumber: number;
   storedTotalWeeks: number;
   raceDate: Date | null;
@@ -53,7 +55,7 @@ export async function buildPlanWeekCards(params: {
 
   const scheduled = planScheduleDaysForWeek({
     planStartDate: params.planStartDate,
-    planWeeks: params.planWeeks,
+    planSchedule: params.planSchedule ?? params.planWeeks,
     weekNumber: params.weekNumber,
     raceDate: params.raceDate,
     raceName: params.raceName,

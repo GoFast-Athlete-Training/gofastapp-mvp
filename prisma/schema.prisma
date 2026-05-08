@@ -1217,8 +1217,14 @@ model training_plans {
   totalWeeks           Int
   /// Phase ranges snapshot: [{ name, startWeek, endWeek }]
   phases               Json?
-  /// Weekly schedule freeze-frame: [{ weekNumber, schedule }]; source of truth for pre-materialization edits
-  planWeeks            Json?
+  /// Canonical schedule freeze-frame: structured [{ weekNumber, days[] }] or legacy { weekNumber, schedule } strings)
+  planSchedule         Json?
+  /// Derived at generation: approximate week containing peak stimulus (pre-taper macro cycle)
+  peakWeekNumber       Int?
+  /// 1-based week index where taper macro-cycle begins (last ceil(weeks/4) block start)
+  taperStartWeekNumber Int?
+  /// Max long-run distance (mi) used when applying volume / rotation
+  calculatedLongRunMax Float?
   /// Snapshot of preferred training days 1=Mon..7=Sun
   preferredDays        Int[]                  @default([])
   /// Preferred long-run day: 6=Saturday, 7=Sunday (default 6)
@@ -1320,7 +1326,7 @@ model workouts {
   weekNumber                Int?
   /// Assigned weekday name e.g. "Monday"; null for standalone
   dayAssigned               String?
-  /// Intervals/Tempo: cycle position 0–3 fixed at plan generation (ordinal % 4); aligns with planWeeks token -iN
+  /// Intervals/Tempo: cycle position 0–3 fixed at plan generation (ordinal % 4); aligns with legacy schedule token `-iN`
   planCycleIndex            Int?
   /// Garmin Training API workout id after push-to-garmin (links activity → planned workout)
   garminWorkoutId           Int?

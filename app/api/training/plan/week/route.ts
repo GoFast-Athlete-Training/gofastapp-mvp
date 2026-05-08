@@ -10,7 +10,7 @@ import { metersToMiles } from "@/lib/pace-utils";
 
 /**
  * GET /api/training/plan/week?planId=&weekNumber=
- * Week preview from `planWeeks`, merged with materialized `workouts` when present.
+ * Week preview from `planSchedule`.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       planId: plan.id,
       athleteId: auth.athlete.id,
       planStartDate: plan.startDate,
-      planWeeks: plan.planWeeks,
+      planSchedule: plan.planSchedule,
       weekNumber,
       storedTotalWeeks: plan.totalWeeks,
       raceDate: race?.raceDate ?? null,
