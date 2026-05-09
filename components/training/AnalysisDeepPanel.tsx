@@ -11,6 +11,10 @@ import {
   singleTargetPaceDeltaMessage,
   type PaceVsTargetLabel,
 } from "@/lib/training/pace-comparison-display";
+import {
+  isRunAnalysisJsonV1,
+  type RunAnalysisJsonV1,
+} from "@/lib/training/run-analysis-types";
 
 type MatchedActivitySummary = {
   activityName?: string | null;
@@ -35,6 +39,8 @@ interface WorkoutDeep {
   training_plans?: {
     currentFiveKPace?: string | null;
   } | null;
+  /** AI coach assessment (Garmin post-sync) */
+  analysisJson?: RunAnalysisJsonV1 | unknown | null;
 }
 
 function formatSecPerMile(sec: number | null | undefined): string | null {
@@ -61,6 +67,8 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
   const [workout, setWorkout] = useState<WorkoutDeep | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [applyLoading, setApplyLoading] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,6 +94,48 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
       cancelled = true;
     };
   }, [workoutId]);
+
+  const analysis = workout?.analysisJson && isRunAnalysisJsonV1(workout.analysisJson)
+    ? workout.analysisJson
+    : null;
+
+  const hrPatternLabel = (p: RunAnalysisJsonV1["hrPattern"]) => {
+    switch (p) {
+      case "steady":
+        return "Steady aerobic";
+      case "drift_up":
+        return "HR drifted up";
+      case "drift_down":
+        return "HR eased off";
+      case "variable":
+        return "Variable effort";
+      default:
+        return null;
+    }
+  };
+
+  const applyRecommendation = async (rec: NonNullable<RunAnalysisJsonV1["recommendation"]>) => {
+    setApplyError(null);
+    setApplyLoading(true);
+    try {
+      await api.post("/me/apply-run-recommendation", {
+        workoutId,
+        field: rec.field,
+        suggestedValue: rec.suggestedValue,
+      });
+      const res = await api.get<{ workout: WorkoutDeep }>(`/training/workout/${workoutId}`);
+      const w = res.data?.workout;
+      if (w?.id) setWorkout(w);
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === "object" && "response" in e
+          ? (e as { response?: { data?: { error?: string } } }).response?.data?.error
+          : null;
+      setApplyError(msg ?? "Could not apply");
+    } finally {
+      setApplyLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -244,6 +294,55 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
           </div>
         ) : null}
       </dl>
+
+      {analysis ? (
+        <div className="mt-5 rounded-2xl border border-violet-200 bg-violet-50/50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-violet-900">Coach read</p>
+          <p className="mt-2 text-sm text-gray-800 leading-relaxed">{analysis.narrative}</p>
+          {(() => {
+            const hrLabel = hrPatternLabel(analysis.hrPattern);
+            return hrLabel ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="inline-flex rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-violet-900 ring-1 ring-violet-200">
+                  {hrLabel}
+                </span>
+              </div>
+            ) : null;
+          })()}
+          {analysis.recommendation &&
+          !analysis.recommendationAppliedAt &&
+          analysis.recommendation.field &&
+          analysis.recommendation.suggestedValue != null ? (
+            <div className="mt-4 rounded-xl border border-violet-300 bg-white/90 px-3 py-3">
+              <p className="text-sm text-gray-800">{analysis.recommendation.reason}</p>
+              <p className="mt-2 text-xs text-gray-600">
+                {analysis.recommendation.field === "aerobicCeilingBpm"
+                  ? `Suggested aerobic ceiling: ~${analysis.recommendation.suggestedValue} bpm`
+                  : `Suggested 5K pace: ~${formatSecPerMile(analysis.recommendation.suggestedValue) ?? "—"} /mi`}
+              </p>
+              {applyError ? (
+                <p className="mt-2 text-sm text-red-600" role="alert">
+                  {applyError}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                disabled={applyLoading}
+                onClick={() => void applyRecommendation(analysis.recommendation!)}
+                className="mt-3 inline-flex rounded-xl bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-60"
+              >
+                {applyLoading ? "Applying…" : "Apply to my profile"}
+              </button>
+              <p className="mt-2 text-xs text-gray-500">
+                Uses the same conservative update rules as automatic credits (capped per change).
+              </p>
+            </div>
+          ) : null}
+          {analysis.recommendationAppliedAt ? (
+            <p className="mt-3 text-sm font-medium text-emerald-800">Applied to your profile.</p>
+          ) : null}
+        </div>
+      ) : null}
 
       {workout.training_plans?.currentFiveKPace ? (
         <p className="mt-4 text-xs text-gray-500">

@@ -5,6 +5,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { RUNNING_ACTIVITY_TYPES } from "@/lib/training/activity-type-sets";
+import { applyAerobicCeilingCredit } from "@/lib/training/apply-aerobic-ceiling-credit";
 
 /** m/s → seconds per mile */
 function speedMpsToSecPerMile(mps: number | null | undefined): number | null {
@@ -82,6 +83,25 @@ export async function promoteUnmatchedRunningActivityToWorkout(
     where: { id: athleteActivityId },
     data: { ingestionStatus: "MATCHED" },
   });
+
+  if (
+    activity.averageHeartRate != null &&
+    Number.isFinite(activity.averageHeartRate) &&
+    activity.averageHeartRate >= 80 &&
+    activity.averageHeartRate <= 210
+  ) {
+    try {
+      await applyAerobicCeilingCredit({
+        athleteId: activity.athleteId,
+        creditedAerobicCeilingBpm: Math.round(activity.averageHeartRate),
+        planId: null,
+        weekNumber: null,
+        workoutId: created.id,
+      });
+    } catch (e) {
+      console.error("applyAerobicCeilingCredit after promote:", e);
+    }
+  }
 
   return { promoted: true, workoutId: created.id };
 }
