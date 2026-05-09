@@ -19,7 +19,6 @@ import {
   formatCalendarWeekRangeLabel,
   formatPlanDateDisplay,
 } from "@/lib/training/plan-utils";
-import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import {
   fetchTrainingPlanDetail,
   fetchPlanWeekSchedule,
@@ -75,6 +74,78 @@ const LONG_RUN_DAY_OPTIONS: { value: number; label: string }[] = [
 
 /** Matches generator default floor; not user-editable. */
 const ENGINE_MIN_WEEKLY_MI = 40;
+
+const MI_PER_M = 1609.34;
+
+function typeLabelForCard(workoutType: string): string {
+  switch (workoutType) {
+    case "Easy":
+      return "Easy";
+    case "Tempo":
+      return "Tempo";
+    case "Intervals":
+      return "Intervals";
+    case "LongRun":
+      return "Long run";
+    case "Race":
+      return "Race";
+    default:
+      return "Run";
+  }
+}
+
+/** Bold primary line: catalogue / custom title when present; else type label (no miles). */
+function workoutCardPrimaryName(w: PlanDayCard): string {
+  const raw = w.title.trim();
+  if (/^Race\s*—/i.test(raw)) return raw;
+  if (/\b—\s*Week\s*\d+/i.test(raw) || /\bWeek\s*\d+\s*$/i.test(raw)) {
+    return typeLabelForCard(w.workoutType);
+  }
+  if (raw.length > 0) return raw;
+  return typeLabelForCard(w.workoutType);
+}
+
+function weekTotalMilesDisplay(days: PlanDayCard[]): string {
+  const m =
+    days.reduce((s, d) => s + (d.estimatedDistanceInMeters ?? 0), 0) / MI_PER_M;
+  if (!Number.isFinite(m) || m <= 0) return "—";
+  const rounded = Math.round(m * 10) / 10;
+  return `${rounded} mi`;
+}
+
+function formatWeekCardMiles(
+  estimatedDistanceInMeters: number | null
+): string {
+  if (
+    estimatedDistanceInMeters == null ||
+    !Number.isFinite(estimatedDistanceInMeters)
+  ) {
+    return "";
+  }
+  const mi = estimatedDistanceInMeters / MI_PER_M;
+  const rounded =
+    Math.abs(mi - Math.round(mi)) < 0.06
+      ? Math.round(mi)
+      : Math.round(mi * 10) / 10;
+  return `${rounded} mi`;
+}
+
+function workoutTypeLeftBorderClass(workoutType: string): string {
+  switch (workoutType) {
+    case "Easy":
+      return "bg-green-400";
+    case "LongRun":
+      return "bg-purple-500";
+    case "Tempo":
+      return "bg-amber-400";
+    case "Intervals":
+      return "bg-orange-500";
+    case "Race":
+      return "bg-red-500";
+    default:
+      return "bg-gray-400";
+  }
+}
 
 function parsePlanWeekOverviewRows(planSchedule: unknown): PlanWeekRow[] {
   if (!Array.isArray(planSchedule)) return [];
@@ -733,9 +804,16 @@ export default function TrainingSetupPlanPage({
                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                       Week preview
                     </p>
-                    <p className="text-lg font-semibold text-gray-900 sm:text-xl">
-                      Week {weekNumber} of {effectiveTotalWeeks}
-                    </p>
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                      <p className="text-lg font-semibold text-gray-900 sm:text-xl">
+                        Week {weekNumber} of {effectiveTotalWeeks}
+                      </p>
+                      {weekDays.length > 0 && (
+                        <p className="text-sm font-medium text-gray-600 tabular-nums">
+                          {weekTotalMilesDisplay(weekDays)} total
+                        </p>
+                      )}
+                    </div>
                     {showWeekPhaseBadge && weekPhaseLabel && (
                       <span className="mt-1 inline-block rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">
                         {weekPhaseLabel}
@@ -769,32 +847,50 @@ export default function TrainingSetupPlanPage({
                   </div>
                 </div>
                 {weekDays.length > 0 ? (
-                  <div className="mt-1">
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
-                      This week
-                    </p>
-                    <ul className="space-y-2">
-                      {weekDays.map((w) => (
-                        <li
-                          key={w.dateKey}
-                          className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm"
-                        >
-                          <span className="font-medium text-gray-900">
-                            {displayWorkoutListTitle(w)}
-                          </span>
-                          <span className="text-gray-500">
-                            {w.date
-                              ? formatPlanDateDisplay(w.date, {
-                                  weekday: "short",
-                                  month: "short",
-                                  day: "numeric",
-                                })
-                              : "—"}
-                          </span>
+                  <ul className="mt-1 space-y-3">
+                    {weekDays.map((w) => {
+                      const mi = formatWeekCardMiles(
+                        w.estimatedDistanceInMeters
+                      );
+                      const subtype = `${typeLabelForCard(w.workoutType)}${
+                        mi ? ` · ${mi}` : ""
+                      }`;
+                      return (
+                        <li key={w.dateKey}>
+                          <button
+                            type="button"
+                            onClick={() => openPlanDay(w)}
+                            className="block w-full overflow-hidden rounded-xl border border-gray-100 bg-white text-left shadow-sm transition hover:border-orange-200 hover:shadow-md"
+                          >
+                            <div className="flex min-h-[4.25rem]">
+                              <div
+                                className={`w-1.5 shrink-0 ${workoutTypeLeftBorderClass(
+                                  w.workoutType
+                                )}`}
+                              />
+                              <div className="flex flex-1 flex-col px-4 py-3">
+                                <p className="text-xs text-gray-500">
+                                  {w.date
+                                    ? formatPlanDateDisplay(w.date, {
+                                        weekday: "short",
+                                        month: "short",
+                                        day: "numeric",
+                                      })
+                                    : "—"}
+                                </p>
+                                <p className="mt-0.5 text-base font-semibold leading-snug text-gray-900">
+                                  {workoutCardPrimaryName(w)}
+                                </p>
+                                <p className="mt-0.5 text-sm text-gray-500">
+                                  {subtype || "—"}
+                                </p>
+                              </div>
+                            </div>
+                          </button>
                         </li>
-                      ))}
-                    </ul>
-                  </div>
+                      );
+                    })}
+                  </ul>
                 ) : loadingWeek ? (
                   <p className="text-sm leading-relaxed text-gray-600">
                     Loading this week&apos;s sessions…
@@ -809,34 +905,6 @@ export default function TrainingSetupPlanPage({
                 )}
               </div>
             </>
-          )}
-
-          {weekDays.length > 0 && (
-            <ul className="space-y-3 mb-6">
-              {weekDays.map((w) => (
-                <li key={w.dateKey}>
-                  <button
-                    type="button"
-                    onClick={() => openPlanDay(w)}
-                    className="block w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm hover:border-orange-300 hover:shadow-md transition"
-                  >
-                    <div className="text-base font-semibold text-gray-900 leading-snug">
-                      {displayWorkoutListTitle(w)}
-                    </div>
-                    <div className="mt-2 text-sm text-gray-600">
-                      {w.date
-                        ? formatPlanDateDisplay(w.date, {
-                            weekday: "short",
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })
-                        : "Date TBD"}
-                    </div>
-                  </button>
-                </li>
-              ))}
-            </ul>
           )}
 
           {hasSchedule && !loadingWeek && weekDays.length === 0 && (
