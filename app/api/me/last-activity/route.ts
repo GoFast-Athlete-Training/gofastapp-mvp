@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 
 /** GET /api/me/last-activity — most recent synced activity by start time (chronological last run) */
 export async function GET(_request: Request) {
-  const auth = await requireAthleteFromBearer(request);
+  const auth = await requireAthleteFromBearer(_request);
   if ("error" in auth) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
