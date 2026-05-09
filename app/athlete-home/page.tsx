@@ -39,6 +39,7 @@ import {
   fetchPlanWeekSchedule,
   type PlanDayCard,
 } from '@/lib/training/fetch-plan-week-client';
+import type { WeekPerformanceSnapshot } from '@/lib/training/week-performance-types';
 import {
   currentTrainingWeekNumber,
   effectiveTrainingWeekCount,
@@ -95,6 +96,18 @@ function formatDurationMin(sec: number | null | undefined): string | null {
   return m > 0 ? `${m} min` : null;
 }
 
+/** distance in meters, duration in seconds */
+function paceSecPerMileFromActivity(
+  distanceM: number | null,
+  durationSec: number | null
+): number | null {
+  if (distanceM == null || durationSec == null) return null;
+  if (distanceM <= 0 || durationSec <= 0) return null;
+  const miles = distanceM / 1609.34;
+  if (miles <= 0) return null;
+  return durationSec / miles;
+}
+
 function homeLastRunDayLabel(activityStartTime: string | null, date: string | null): string {
   const raw = activityStartTime ?? date;
   if (!raw) return '';
@@ -107,18 +120,6 @@ function homeLastRunDayLabel(activityStartTime: string | null, date: string | nu
   } catch {
     return '';
   }
-}
-
-/** target − actual (sec/mi); positive = faster than target */
-function homeBeatTargetLine(delta: number | null | undefined): string | null {
-  if (delta != null && Number.isFinite(delta)) {
-    const n = Math.round(delta);
-    const abs = Math.abs(n);
-    if (n > 0) return `Beat target by ${abs} sec/mi`;
-    if (n < 0) return `${abs} sec/mi slower than target`;
-    return 'On target pace';
-  }
-  return null;
 }
 
 /** Title-case distance labels (marathon → Marathon, half marathon → Half Marathon). */
@@ -220,16 +221,14 @@ function projectRaceFromFiveKPace(
   };
 }
 
-type LastLoggedWorkoutStrip = {
+type LastSyncedActivityStrip = {
   id: string;
-  title: string;
-  workoutType?: string;
-  date: string | null;
-  activityStartTime: string | null;
-  actualAvgPaceSecPerMile: number | null;
-  actualDistanceMeters: number | null;
-  actualDurationSeconds: number | null;
-  paceDeltaSecPerMile: number | null;
+  activityName: string | null;
+  activityType: string | null;
+  startTime: string | null;
+  distance: number | null;
+  duration: number | null;
+  linkedWorkoutId: string | null;
 };
 
 function pickPrimaryGoal(
@@ -289,14 +288,8 @@ export default function AthleteHomePage() {
   >([]);
   const [activePlanSummary, setActivePlanSummary] = useState<ActivePlanSummary | null>(null);
   const [myGoingRuns, setMyGoingRuns] = useState<GoingRunRow[]>([]);
-  const [lastLoggedWorkout, setLastLoggedWorkout] = useState<LastLoggedWorkoutStrip | null>(null);
-  const [lastFallbackActivity, setLastFallbackActivity] = useState<{
-    id: string;
-    activityName: string | null;
-    activityType: string | null;
-    startTime: string | null;
-    distance: number | null;
-  } | null>(null);
+  const [lastSyncedActivity, setLastSyncedActivity] = useState<LastSyncedActivityStrip | null>(null);
+  const [weekPlanProgress, setWeekPlanProgress] = useState<WeekPerformanceSnapshot | null>(null);
   const [todayPlanDay, setTodayPlanDay] = useState<PlanDayCard | null>(null);
   const [raceSignups, setRaceSignups] = useState<RaceSignupWithRegistry[]>([]);
   const [primaryRaceResult, setPrimaryRaceResult] = useState<{
@@ -343,13 +336,13 @@ export default function AthleteHomePage() {
       return;
     }
 
-    const [goalsRes, upcomingRes, paceRes, goingRes, lastRunRes, raceSignupsRes, pastRunsRes] =
+    const [goalsRes, upcomingRes, paceRes, goingRes, lastActivityRes, raceSignupsRes, pastRunsRes] =
       await Promise.allSettled([
         api.get('/goals?status=ALL'),
         api.get('/training/upcoming'),
         api.get(`/athlete/${athleteId}/pace-notifications`),
         api.get('/me/my-going-runs'),
-        api.get('/me/last-logged-workout'),
+        api.get('/me/last-activity'),
         api.get('/race-signups'),
         api.get('/me/my-past-runs'),
       ]);
@@ -442,42 +435,28 @@ export default function AthleteHomePage() {
       setRaceSignups([]);
     }
 
-    if (lastRunRes.status === 'fulfilled') {
-      const data = lastRunRes.value.data as {
-        workout?: LastLoggedWorkoutStrip | null;
-        fallbackActivity?: {
-          id: string;
-          activityName?: string | null;
-          activityType?: string | null;
-          startTime?: string | null;
-          distance?: number | null;
-        } | null;
-      };
-      const w = data?.workout;
-      if (w && typeof w.id === 'string' && typeof w.title === 'string') {
-        setLastLoggedWorkout(w);
-        setLastFallbackActivity(null);
+    if (lastActivityRes.status === 'fulfilled') {
+      const act = lastActivityRes.value.data?.activity as LastSyncedActivityStrip | null | undefined;
+      if (act?.id) {
+        setLastSyncedActivity({
+          id: act.id,
+          activityName: act.activityName ?? null,
+          activityType: act.activityType ?? null,
+          startTime: act.startTime ?? null,
+          distance: act.distance ?? null,
+          duration: act.duration ?? null,
+          linkedWorkoutId:
+            typeof act.linkedWorkoutId === 'string' ? act.linkedWorkoutId : null,
+        });
       } else {
-        setLastLoggedWorkout(null);
-        const fa = data?.fallbackActivity;
-        if (fa?.id) {
-          setLastFallbackActivity({
-            id: fa.id,
-            activityName: fa.activityName ?? null,
-            activityType: fa.activityType ?? null,
-            startTime: fa.startTime ?? null,
-            distance: fa.distance ?? null,
-          });
-        } else {
-          setLastFallbackActivity(null);
-        }
+        setLastSyncedActivity(null);
       }
     } else {
-      setLastLoggedWorkout(null);
-      setLastFallbackActivity(null);
+      setLastSyncedActivity(null);
     }
 
     let todayPlan: PlanDayCard | null = null;
+    setWeekPlanProgress(null);
     const upcomingData =
       upcomingRes.status === 'fulfilled'
         ? (upcomingRes.value.data as {
@@ -505,12 +484,14 @@ export default function AthleteHomePage() {
             p.race_registry?.raceDate ? new Date(p.race_registry.raceDate) : null
           );
           const wn = currentTrainingWeekNumber(p.startDate, eff);
-          const { days } = await fetchPlanWeekSchedule(planId, wn, token);
+          const { days, weekPerformance } = await fetchPlanWeekSchedule(planId, wn, token);
+          setWeekPlanProgress(weekPerformance ?? null);
           const todayKey = localTodayKey();
           todayPlan = days.find((d) => d.dateKey === todayKey) ?? null;
         }
       } catch (e) {
         console.warn('athlete-home: today plan day fetch failed', e);
+        setWeekPlanProgress(null);
       }
     }
     setTodayPlanDay(todayPlan);
@@ -870,15 +851,15 @@ export default function AthleteHomePage() {
     'block rounded-xl border-2 border-emerald-200 bg-emerald-50/80 p-5 shadow-sm hover:border-emerald-300 hover:shadow-md transition-all h-full';
   const findRunColSpanLg = showTrainingAtGlance || !goalIsCompleteForModal ? 'lg:col-span-2' : 'lg:col-span-5';
 
-  const lastRunDayLabelHome = lastLoggedWorkout
-    ? homeLastRunDayLabel(lastLoggedWorkout.activityStartTime, lastLoggedWorkout.date)
+  const lastActivityDayLabel = lastSyncedActivity
+    ? homeLastRunDayLabel(lastSyncedActivity.startTime, null)
     : '';
-  const lastRunBeatLineHome = lastLoggedWorkout
-    ? homeBeatTargetLine(lastLoggedWorkout.paceDeltaSecPerMile)
-    : null;
-  const lastRunDurationHome = lastLoggedWorkout
-    ? formatDurationMin(lastLoggedWorkout.actualDurationSeconds)
-    : null;
+  const lastActivityPaceSec =
+    lastSyncedActivity != null
+      ? paceSecPerMileFromActivity(lastSyncedActivity.distance, lastSyncedActivity.duration)
+      : null;
+  const lastActivityDurationMin =
+    lastSyncedActivity != null ? formatDurationMin(lastSyncedActivity.duration) : null;
 
   const fiveKPaceStr =
     typeof athlete?.fiveKPace === 'string' && athlete.fiveKPace.trim()
@@ -1655,88 +1636,100 @@ export default function AthleteHomePage() {
               )}
             </div>
 
-            {lastLoggedWorkout ? (
+            {weekPlanProgress &&
+            weekPlanProgress.sessionsPlanned > 0 &&
+            activePlanSummary?.hasSchedule ? (
+              <div className="mb-6 rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3 text-sm text-gray-800">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                  This week (plan)
+                </p>
+                <p className="font-semibold text-gray-900 tabular-nums">
+                  {weekPlanProgress.sessionsCompleted} of {weekPlanProgress.sessionsPlanned}{' '}
+                  sessions logged
+                  {weekPlanProgress.qualitySessionsPlanned > 0
+                    ? ` · ${weekPlanProgress.qualitySessionsCompleted}/${weekPlanProgress.qualitySessionsPlanned} quality`
+                    : ''}
+                </p>
+                {weekPlanProgress.plannedMetersTotal > 0 ? (
+                  <p className="mt-1 tabular-nums text-gray-700">
+                    Volume: ~
+                    {(weekPlanProgress.actualMetersMatched / 1609.34).toFixed(1)} mi actual vs ~
+                    {(weekPlanProgress.plannedMetersTotal / 1609.34).toFixed(1)} mi planned
+                    {weekPlanProgress.weeklyMileageCompletionPct != null
+                      ? ` (${weekPlanProgress.weeklyMileageCompletionPct.toFixed(0)}% of planned)`
+                      : ''}
+                  </p>
+                ) : null}
+                {weekPlanProgress.longRunCompletionRatio != null ? (
+                  <p className="mt-1 text-gray-700">
+                    Long run:{' '}
+                    {weekPlanProgress.longRunCompleted
+                      ? `logged (${Math.round(weekPlanProgress.longRunCompletionRatio * 100)}% of planned)`
+                      : 'not logged yet'}
+                  </p>
+                ) : null}
+                <Link
+                  href="/training"
+                  className="mt-2 inline-block text-sm font-semibold text-orange-700 hover:text-orange-800"
+                >
+                  Open Training →
+                </Link>
+              </div>
+            ) : null}
+
+            {lastSyncedActivity ? (
               <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Your last run
-                  </p>
-                  <p className="text-sm text-gray-900 mt-1 leading-snug">
-                    <span className="font-semibold">{lastLoggedWorkout.title}</span>
-                    {lastRunDayLabelHome ? (
-                      <>
-                        {' '}
-                        · {lastRunDayLabelHome}
-                      </>
-                    ) : null}
-                    {lastLoggedWorkout.actualDistanceMeters != null &&
-                    lastLoggedWorkout.actualDistanceMeters > 0 ? (
-                      <>
-                        {' '}
-                        · {metersToMiDisplay(lastLoggedWorkout.actualDistanceMeters)}
-                      </>
-                    ) : null}
-                    {lastLoggedWorkout.actualAvgPaceSecPerMile != null ? (
-                      <>
-                        {' '}
-                        · {formatSecPerMile(lastLoggedWorkout.actualAvgPaceSecPerMile)}
-                      </>
-                    ) : null}
-                    {lastRunDurationHome ? (
-                      <>
-                        {' '}
-                        · {lastRunDurationHome}
-                      </>
-                    ) : null}
-                  </p>
-                  {lastRunBeatLineHome ? (
-                    <p className="text-sm text-gray-700 mt-1">{lastRunBeatLineHome}</p>
-                  ) : null}
-                </div>
-                <Link
-                  href={`/workouts/${lastLoggedWorkout.id}`}
-                  className="shrink-0 text-sm font-semibold text-orange-600 hover:text-orange-700"
-                >
-                  View results →
-                </Link>
-              </div>
-            ) : lastFallbackActivity ? (
-              <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50/60 p-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
-                    Latest synced activity
+                    Last synced run
                   </p>
                   <p className="text-sm text-gray-900 mt-1 leading-snug">
                     <span className="font-semibold">
-                      {lastFallbackActivity.activityName || 'Run'}
+                      {lastSyncedActivity.activityName || 'Run'}
                     </span>
-                    {lastFallbackActivity.activityType ? (
-                      <span className="text-gray-600"> · {lastFallbackActivity.activityType}</span>
+                    {lastSyncedActivity.activityType ? (
+                      <span className="text-gray-600"> · {lastSyncedActivity.activityType}</span>
                     ) : null}
-                    {lastFallbackActivity.startTime ? (
+                    {lastActivityDayLabel ? (
                       <>
                         {' '}
-                        ·{' '}
-                        {new Date(lastFallbackActivity.startTime).toLocaleDateString('en-US', {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
+                        · {lastActivityDayLabel}
                       </>
                     ) : null}
-                    {lastFallbackActivity.distance != null && lastFallbackActivity.distance > 0 ? (
-                      <> · {metersToMiDisplay(lastFallbackActivity.distance)}</>
+                    {lastSyncedActivity.distance != null && lastSyncedActivity.distance > 0 ? (
+                      <>
+                        {' '}
+                        · {metersToMiDisplay(lastSyncedActivity.distance)}
+                      </>
+                    ) : null}
+                    {lastActivityPaceSec != null && Number.isFinite(lastActivityPaceSec) ? (
+                      <>
+                        {' '}
+                        · {formatSecPerMile(Math.round(lastActivityPaceSec))}
+                      </>
+                    ) : null}
+                    {lastActivityDurationMin ? (
+                      <>
+                        {' '}
+                        · {lastActivityDurationMin}
+                      </>
                     ) : null}
                   </p>
-                  <p className="text-xs text-amber-900 mt-2">
-                    Not linked to a plan workout yet — open to match or review.
-                  </p>
+                  {!lastSyncedActivity.linkedWorkoutId ? (
+                    <p className="text-xs text-gray-600 mt-2">
+                      Not linked to a plan workout — open the activity to match when ready.
+                    </p>
+                  ) : null}
                 </div>
                 <Link
-                  href={`/activities/${lastFallbackActivity.id}`}
+                  href={
+                    lastSyncedActivity.linkedWorkoutId
+                      ? `/workouts/${lastSyncedActivity.linkedWorkoutId}`
+                      : `/activities/${lastSyncedActivity.id}`
+                  }
                   className="shrink-0 text-sm font-semibold text-orange-600 hover:text-orange-700"
                 >
-                  View activity →
+                  {lastSyncedActivity.linkedWorkoutId ? 'View workout →' : 'View activity →'}
                 </Link>
               </div>
             ) : null}

@@ -1,22 +1,20 @@
 "use client";
 
 import {
-  Activity,
   Bike,
   BookOpen,
   Calendar,
-  ClipboardList,
   Dumbbell,
   LayoutGrid,
+  List,
+  MapPin,
   MessageCircle,
   Users,
 } from "lucide-react";
 
 export const TRAINING_SECTION_IDS = {
   today: "training-section-today",
-  analysis: "training-section-analysis",
-  week: "training-section-week",
-  plan: "training-section-plan",
+  week: "training-section-this-week",
 } as const;
 
 export type TrainingSubNavKey = keyof typeof TRAINING_SECTION_IDS;
@@ -34,9 +32,7 @@ type Props = {
 
 const scrollItems: { key: TrainingSubNavKey; label: string; Icon: typeof Calendar }[] = [
   { key: "today", label: "Today", Icon: Calendar },
-  { key: "analysis", label: "Runs & analysis", Icon: Activity },
   { key: "week", label: "This week", Icon: LayoutGrid },
-  { key: "plan", label: "Plan", Icon: ClipboardList },
 ];
 
 export default function TrainingSubNav({ active, onNavigate }: Props) {
@@ -109,6 +105,33 @@ export default function TrainingSubNav({ active, onNavigate }: Props) {
           >
             <Dumbbell className="h-4 w-4 shrink-0 text-orange-600" aria-hidden />
             Build a workout
+          </a>
+        </li>
+        <li>
+          <a
+            href="/build-a-run"
+            className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <MapPin className="h-4 w-4 shrink-0 text-orange-600" aria-hidden />
+            Build a run
+          </a>
+        </li>
+        <li>
+          <a
+            href="/workouts"
+            className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <List className="h-4 w-4 shrink-0 text-orange-600" aria-hidden />
+            All workouts
+          </a>
+        </li>
+        <li>
+          <a
+            href="/training-setup"
+            className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <Calendar className="h-4 w-4 shrink-0 text-orange-600" aria-hidden />
+            Plan setup
           </a>
         </li>
         <li>
