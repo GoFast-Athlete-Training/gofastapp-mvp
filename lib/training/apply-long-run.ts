@@ -3,11 +3,9 @@
  */
 
 import type { PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";
-import { generateCyclePoolTotals } from "@/lib/training/cycle-pool";
+import { longRunCupSetter } from "@/lib/training/long-run-cup-setter";
 import type { RunTypePosition } from "@/lib/training/run-type-config-shared";
 import { weekCycleMeta } from "@/lib/training/cycle-blocks";
-
-const DEFAULT_LONG_SHARE = 0.28;
 
 export type ApplyLongRunInput = {
   planSchedule: PlanWeekSchedule[];
@@ -19,9 +17,8 @@ export type ApplyLongRunInput = {
   /** Sum of preset distributionWeights need not equal 1; we normalize inside the macro block */
   longRunPositions: readonly RunTypePosition[];
   calculatedLongRunMax: number;
+  /** Optional LR floor miles (default 0). Preset anchors + cup setter normally supply volume. */
   minLongMi?: number;
-  /** Fraction of macro weekly pool allocated to LR before weight split */
-  longRunWeeklyShare?: number;
 };
 
 function round1(n: number): number {
@@ -65,13 +62,12 @@ export function applyLongRunSchedule(input: ApplyLongRunInput): void {
     longRunPositions,
     calculatedLongRunMax,
   } = input;
-  const lrShare =
-    input.longRunWeeklyShare != null && Number.isFinite(input.longRunWeeklyShare)
-      ? Math.min(1, Math.max(0.05, input.longRunWeeklyShare))
-      : DEFAULT_LONG_SHARE;
-  const minL = Math.max(0, input.minLongMi ?? 8);
+  const minL =
+    input.minLongMi != null && Number.isFinite(input.minLongMi)
+      ? Math.max(0, input.minLongMi)
+      : 0;
   const len = Math.max(1, Math.floor(cycleLen));
-  const { poolMilesByCycle, nCycles } = generateCyclePoolTotals({
+  const { poolMilesByCycle, nCycles } = longRunCupSetter({
     totalWeeks,
     cycleLen: len,
     baseMiles,
@@ -84,9 +80,10 @@ export function applyLongRunSchedule(input: ApplyLongRunInput): void {
     const { cyclePos } = weekCycleMeta({ weekNumber: wn, totalWeeks, cycleLen: len });
     const cycleIdx = Math.min(nCycles - 1, Math.floor((wn - 1) / len));
     const macroPool = poolMilesByCycle[cycleIdx] ?? 0;
+    /** Anchor pools are LR miles for whole macro cycles; typical week share = pool / cycle weeks. */
     const macroWeekly = macroPool / len;
     const { weightNorm, catalogueWorkoutId } = weightNormRow(longRunPositions, cyclePos);
-    let lrMi = macroWeekly * lrShare * weightNorm;
+    let lrMi = macroWeekly * weightNorm;
     lrMi = Math.max(minL, Math.min(calculatedLongRunMax, lrMi));
     lrMi = round1(lrMi);
 

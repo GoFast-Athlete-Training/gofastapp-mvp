@@ -72,6 +72,11 @@ export async function executePlanGenerate(params: {
     throw new Error("Preset is incomplete (volume/workout boltons missing).");
   }
 
+  const presetLabel =
+    (typeof rawPreset.slug === "string" && rawPreset.slug.trim()) ||
+    (typeof rawPreset.title === "string" && rawPreset.title.trim()) ||
+    planRow.presetId;
+
   const boltonsInput: PlanGenPresetBoltonsInput = {
     volumeConstraints: rawPreset.volumeConstraints,
     workoutConfig: rawPreset.workoutConfig,
@@ -127,16 +132,9 @@ export async function executePlanGenerate(params: {
     const c =
       typeof cv === "number" && Number.isFinite(cv) ? Math.round(cv) : NaN;
     if (c >= 1 && c <= 8) return c;
-    const pc = planConfig.cycleLen;
-    if (
-      typeof pc === "number" &&
-      Number.isFinite(pc) &&
-      Math.floor(pc) >= 1 &&
-      Math.floor(pc) <= 8
-    ) {
-      return Math.floor(pc);
-    }
-    return 4;
+    throw new Error(
+      `Training preset "${presetLabel}" has invalid cycleLen (${String(vol.cycleLen)}). Fix volume constraints in GoFast Company.`
+    );
   }
 
   const cLen = macroCycleLen();
@@ -153,7 +151,7 @@ export async function executePlanGenerate(params: {
     tempoIdealDow: planConfig.tempoIdealDow ?? 2,
     intervalIdealDow: planConfig.intervalIdealDow ?? 4,
     longRunDefaultDow: planConfig.longRunDefaultDow ?? 6,
-    peakWeeklyMilesForCap: planConfig.peakMiles ?? null,
+    peakWeeklyMilesForCap: weeklyMileageTarget,
     longRunPositions,
     intervalsPositions,
     tempoPositions,
@@ -161,20 +159,27 @@ export async function executePlanGenerate(params: {
 
   const schedule = skeleton.schedule;
 
-  const inferredBaseFallback = weeklyMileageTarget * cLen * 0.92;
-  const baseMiles =
-    vol.baseMiles != null && Number.isFinite(Number(vol.baseMiles))
-      ? Math.max(1, Number(vol.baseMiles))
-      : Math.round(inferredBaseFallback * 10) / 10;
-  let peakMiles =
-    vol.peakMiles != null && Number.isFinite(Number(vol.peakMiles))
-      ? Math.max(baseMiles, Number(vol.peakMiles))
-      : Math.max(baseMiles, weeklyMileageTarget * cLen);
-  peakMiles = Math.round(Math.max(baseMiles, peakMiles) * 10) / 10;
-  const taperMiles =
-    vol.taperMiles != null && Number.isFinite(Number(vol.taperMiles))
-      ? Math.max(1, Number(vol.taperMiles))
-      : Math.round(Math.max(baseMiles, peakMiles * 0.85) * 10) / 10;
+  const vb = Number(vol.baseMiles);
+  const vp = Number(vol.peakMiles);
+  const vt = Number(vol.taperMiles);
+  if (!Number.isFinite(vb) || vb <= 0) {
+    throw new Error(
+      `Training preset "${presetLabel}" has invalid baseMiles. Fix volume constraints in GoFast Company.`
+    );
+  }
+  if (!Number.isFinite(vp) || vp <= 0) {
+    throw new Error(
+      `Training preset "${presetLabel}" has invalid peakMiles. Fix volume constraints in GoFast Company.`
+    );
+  }
+  if (!Number.isFinite(vt) || vt <= 0) {
+    throw new Error(
+      `Training preset "${presetLabel}" has invalid taperMiles. Fix volume constraints in GoFast Company.`
+    );
+  }
+  const baseMiles = vb;
+  const peakMiles = Math.max(baseMiles, vp);
+  const taperMiles = vt;
 
   applyLongRunSchedule({
     planSchedule: schedule,
@@ -185,19 +190,20 @@ export async function executePlanGenerate(params: {
     taperMiles,
     longRunPositions,
     calculatedLongRunMax: skeleton.calculatedLongRunMax,
-    minLongMi: 8,
   });
 
-  const minPresetWeekly =
-    vol.minWeeklyMiles != null && Number.isFinite(Number(vol.minWeeklyMiles))
-      ? Number(vol.minWeeklyMiles)
-      : params.minWeeklyMiles;
+  const minWeeklyFromPreset = Number(vol.minWeeklyMiles);
+  if (!Number.isFinite(minWeeklyFromPreset) || minWeeklyFromPreset < 1) {
+    throw new Error(
+      `Training preset "${presetLabel}" has invalid minWeeklyMiles. Fix volume constraints in GoFast Company.`
+    );
+  }
 
   applyQualityAndEasySchedule({
     planSchedule: schedule,
     totalWeeks: weekCount,
     weeklyMileageTarget,
-    minWeeklyMiles: Math.max(minPresetWeekly, params.minWeeklyMiles),
+    minWeeklyMiles: Math.max(minWeeklyFromPreset, params.minWeeklyMiles),
     cycleLen: cLen,
     baseMiles,
     peakMiles,
@@ -208,7 +214,7 @@ export async function executePlanGenerate(params: {
         : undefined,
     raceDistanceMiles,
     catalogueRowsById,
-    minEasyPerDayMiles: 3,
+    minEasyPerDayMiles: 0,
     minTempoMiles: planConfig.minTempoMiles ?? 3,
     minIntervalMiles: planConfig.minIntervalMiles ?? 3,
   });

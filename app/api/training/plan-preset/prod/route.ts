@@ -28,7 +28,15 @@ export async function GET(request: NextRequest) {
   // MVP1: single preset in DB — return it regardless of fitnessLevel value.
   const preset = await prisma.training_plan_preset.findFirst({
     orderBy: { createdAt: "asc" },
-    select: { id: true, slug: true, title: true, description: true },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      description: true,
+      volumeConstraints: {
+        select: { minWeeklyMiles: true, maxWeeklyMiles: true },
+      },
+    },
   });
 
   if (!preset) {

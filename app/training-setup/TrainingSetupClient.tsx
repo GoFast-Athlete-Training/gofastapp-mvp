@@ -62,6 +62,14 @@ type ActivePlanLite = {
   race_registry: { name: string } | null;
 };
 
+type PresetForWizard = {
+  id: string;
+  title: string;
+  description: string | null;
+  minWeeklyMiles: number;
+  maxWeeklyMiles: number | null;
+};
+
 function formatRaceWhen(iso: string): string {
   try {
     const d = new Date(iso);
@@ -125,10 +133,7 @@ export default function TrainingSetupClient() {
   const [replaceBlockPlan, setReplaceBlockPlan] = useState<ActivePlanLite | null>(null);
 
   /** Default prod preset hydrated for POST body — must exist before athlete can create plans. */
-  const [presetForWizard, setPresetForWizard] = useState<{
-    id: string;
-    title: string;
-  } | null>(null);
+  const [presetForWizard, setPresetForWizard] = useState<PresetForWizard | null>(null);
 
   const qualifyingGoals = useMemo(() => goals.filter(isQualifyingGoal), [goals]);
 
@@ -189,7 +194,7 @@ export default function TrainingSetupClient() {
       const gJson = await gRes.json();
       const sJson = await sRes.json();
       const pJson = await pRes.json();
-      let prodPreset: { id: string; title: string } | null = null;
+      let prodPreset: PresetForWizard | null = null;
       if (presetRes.ok) {
         try {
           const pr = await presetRes.json();
@@ -198,12 +203,34 @@ export default function TrainingSetupClient() {
             typeof pr?.preset?.id === "string" &&
             pr.preset.id.trim().length > 0
           ) {
+            const vc = pr?.preset?.volumeConstraints as
+              | { minWeeklyMiles?: unknown; maxWeeklyMiles?: unknown }
+              | null
+              | undefined;
+            let minWeeklyMiles = 40;
+            let maxWeeklyMiles: number | null = null;
+            if (vc && typeof vc === "object") {
+              const mn = Number(vc.minWeeklyMiles);
+              if (Number.isFinite(mn) && mn >= 1) {
+                minWeeklyMiles = Math.round(mn);
+              }
+              const mx = vc.maxWeeklyMiles;
+              if (mx != null && Number.isFinite(Number(mx)) && Number(mx) >= minWeeklyMiles) {
+                maxWeeklyMiles = Math.round(Number(mx));
+              }
+            }
             prodPreset = {
               id: pr.preset.id.trim(),
               title:
                 typeof pr.preset.title === "string" && pr.preset.title.trim().length > 0
                   ? pr.preset.title.trim()
                   : "Training preset",
+              description:
+                typeof pr.preset.description === "string" && pr.preset.description.trim().length > 0
+                  ? pr.preset.description.trim()
+                  : null,
+              minWeeklyMiles,
+              maxWeeklyMiles,
             };
           }
         } catch {
@@ -265,25 +292,35 @@ export default function TrainingSetupClient() {
   }, [ready, loadingOrientation, qualifyingGoals, goalIdFromUrl]);
 
   useEffect(() => {
-    if (!ready || !wizardGoal) return;
+    if (!ready || !wizardGoal || loadingOrientation) return;
     const id = LocalStorageAPI.getAthleteId();
     if (!id) return;
+    let cancelled = false;
     api
       .get<{ athlete?: { fiveKPace?: string | null; weeklyMileage?: number | null } }>(
         `/athlete/${id}`
       )
       .then((res) => {
+        if (cancelled) return;
         const a = res.data?.athlete;
         if (!a) return;
         setBaseline5KPace(a.fiveKPace?.trim() ?? "");
-        setBaselineWeeklyMileage(
-          a.weeklyMileage != null && Number.isFinite(Number(a.weeklyMileage))
-            ? String(a.weeklyMileage)
-            : ""
-        );
+        setBaselineWeeklyMileage((prev) => {
+          if (prev.trim() !== "") return prev;
+          if (a.weeklyMileage != null && Number.isFinite(Number(a.weeklyMileage))) {
+            return String(a.weeklyMileage);
+          }
+          if (presetForWizard) {
+            return String(presetForWizard.minWeeklyMiles);
+          }
+          return "";
+        });
       })
       .catch(() => {});
-  }, [ready, wizardGoal]);
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, wizardGoal, loadingOrientation, presetForWizard]);
 
   useEffect(() => {
     setCreateFeedback((prev) => (prev === "dates" ? null : prev));
@@ -341,6 +378,25 @@ export default function TrainingSetupClient() {
 
     if (!presetForWizard?.id) {
       setCreateFeedback("preset");
+      return;
+    }
+
+    const minW = presetForWizard.minWeeklyMiles;
+    const maxW = presetForWizard.maxWeeklyMiles;
+    const rawMw = baselineWeeklyMileage.trim();
+    const weeklyMi = rawMw === "" ? NaN : Number(rawMw);
+    if (!Number.isFinite(weeklyMi) || weeklyMi < minW) {
+      setFormError(
+        maxW != null && Number.isFinite(maxW)
+          ? `Set weekly mileage between ${minW} and ${maxW} mi for this training blueprint.`
+          : `Set weekly mileage to at least ${minW} mi for this training blueprint.`
+      );
+      return;
+    }
+    if (maxW != null && Number.isFinite(maxW) && weeklyMi > maxW) {
+      setFormError(
+        `Set weekly mileage between ${minW} and ${maxW} mi for this training blueprint.`
+      );
       return;
     }
 
@@ -409,6 +465,26 @@ export default function TrainingSetupClient() {
 
   if (wizardGoal && wizardGoal.race_registry && wizardGoal.raceRegistryId) {
     const rr = wizardGoal.race_registry;
+    const presetMinMi = presetForWizard?.minWeeklyMiles ?? 40;
+    const presetMaxMi = presetForWizard?.maxWeeklyMiles ?? null;
+    const mileageRangeHint =
+      presetForWizard &&
+      presetMaxMi != null &&
+      Number.isFinite(presetMaxMi) ? (
+      <span>
+        Use between <span className="font-semibold tabular-nums">{presetMinMi}</span> and{" "}
+        <span className="font-semibold tabular-nums">{presetMaxMi}</span> mi per week for this
+        blueprint.
+      </span>
+    ) : presetForWizard ? (
+      <span>
+        Use at least{" "}
+        <span className="font-semibold tabular-nums">{presetMinMi}</span> mi per week for this
+        blueprint
+        {presetMaxMi == null ? " (no preset max set)." : "."}
+      </span>
+    ) : null;
+
     return (
       <AthleteAppShell>
         <div className="min-h-screen bg-gray-50 px-4 py-8 sm:px-6">
@@ -417,37 +493,44 @@ export default function TrainingSetupClient() {
             <div className="mb-5 rounded-xl border border-orange-100 bg-orange-50/80 p-4 text-sm text-gray-800">
               <p className="font-medium text-gray-900">We&apos;ll build your plan for you</p>
               <p className="mt-2 leading-relaxed text-gray-700">
-                Next you&apos;ll set weekly miles, preferred training days, and we&apos;ll
-                generate every workout. You just need a start date and baseline here.
+                First pick the training blueprint your coach published, then set weekly mileage in
+                the range it requires, your 5K pace, and a start date. Baseline fields update your
+                profile when you create the plan.
               </p>
             </div>
             <p className="mb-2 text-sm text-gray-600">
               Goal:{" "}
               <span className="font-medium text-gray-900">{rr.name}</span> —{" "}
-              {formatRaceWhen(rr.raceDate)} ({rr.raceType}). Baseline fields update your profile when
-              you create the plan.
+              {formatRaceWhen(rr.raceDate)} ({rr.raceType}).
             </p>
-            {loadingOrientation ? (
-              <p className="mb-6 text-xs text-gray-500">
-                Checking that your training blueprint is ready…
-              </p>
-            ) : presetForWizard ? (
-              <p className="mb-6 rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-950">
-                Training blueprint:&nbsp;
-                <span className="font-semibold">{presetForWizard.title}</span>
-              </p>
-            ) : (
-              <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
-                <p className="font-medium text-red-950">Training blueprint not available yet</p>
-                <p className="mt-2 leading-relaxed text-red-900/95">
-                  A coach-visible training preset hasn&apos;t been published to this environment, so plan
-                  generation can&apos;t start. Check back shortly or contact support—we&apos;ll still load your
-                  goals above.
-                </p>
-              </div>
-            )}
 
             <div className="space-y-4">
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-5">
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Training blueprint
+                </p>
+                {loadingOrientation ? (
+                  <p className="text-sm text-gray-600">Checking that your blueprint is ready…</p>
+                ) : presetForWizard ? (
+                  <>
+                    <p className="text-lg font-semibold text-gray-900">{presetForWizard.title}</p>
+                    {presetForWizard.description && (
+                      <p className="mt-2 text-sm leading-relaxed text-gray-600">
+                        {presetForWizard.description}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-sm text-red-900">
+                    <p className="font-medium text-red-950">Blueprint not available</p>
+                    <p className="mt-2 leading-relaxed text-red-900/95">
+                      A coach-visible training preset hasn&apos;t been published to this environment.
+                      Check back shortly or contact support.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-700">
@@ -461,16 +544,20 @@ export default function TrainingSetupClient() {
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-700">
-                    Weekly mileage
+                    Weekly mileage (this plan)
                   </label>
                   <input
                     type="number"
-                    min={0}
+                    min={presetForWizard ? presetMinMi : 0}
+                    max={presetForWizard && presetMaxMi != null ? presetMaxMi : undefined}
                     step={1}
                     className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
                     value={baselineWeeklyMileage}
                     onChange={(e) => setBaselineWeeklyMileage(e.target.value)}
                   />
+                  {presetForWizard && (
+                    <p className="mt-1.5 text-xs text-gray-600">{mileageRangeHint}</p>
+                  )}
                 </div>
               </div>
 
