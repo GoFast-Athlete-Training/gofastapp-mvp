@@ -19,6 +19,10 @@ export type ApplyLongRunInput = {
   calculatedLongRunMax: number;
   /** Optional LR floor miles (default 0). Preset anchors + cup setter normally supply volume. */
   minLongMi?: number;
+  /** Current weekly mileage; when `< weeklyMileageTarget`, early-week long runs scale down gradually. */
+  rampFromWeeklyMiles?: number | null;
+  /** Plan weekly target (same units as rampFromWeeklyMiles), e.g. after caps in executePlanGenerate */
+  weeklyMileageTarget?: number | null;
 };
 
 function round1(n: number): number {
@@ -50,6 +54,23 @@ function weightNormRow(
   };
 }
 
+/** Per-week multiplier when athlete is building from below plan weekly mileage (long-run ramp only). */
+function longRunWeeklyRampFactor(
+  weekNumber: number,
+  totalWeeks: number,
+  rampFrom: number | null | undefined,
+  weeklyTarget: number | null | undefined
+): number {
+  const from = rampFrom != null ? Number(rampFrom) : NaN;
+  const tgt = weeklyTarget != null ? Number(weeklyTarget) : NaN;
+  if (!(Number.isFinite(from) && from > 0 && Number.isFinite(tgt) && tgt > 0)) return 1;
+  if (from >= tgt) return 1;
+  const rampWindow = Math.max(1, Math.min(4, Math.floor(totalWeeks * 0.15)));
+  if (weekNumber < 1 || weekNumber > rampWindow) return 1;
+  const effectiveMiles = from + (tgt - from) * (weekNumber / rampWindow);
+  return effectiveMiles / tgt;
+}
+
 /** Mutates LR rows in-place; fills miles + catalogue IDs when preset rows exist */
 export function applyLongRunSchedule(input: ApplyLongRunInput): void {
   const {
@@ -61,6 +82,8 @@ export function applyLongRunSchedule(input: ApplyLongRunInput): void {
     taperMiles,
     longRunPositions,
     calculatedLongRunMax,
+    rampFromWeeklyMiles,
+    weeklyMileageTarget,
   } = input;
   const minL =
     input.minLongMi != null && Number.isFinite(input.minLongMi)
@@ -84,7 +107,9 @@ export function applyLongRunSchedule(input: ApplyLongRunInput): void {
     const macroWeekly = macroPool / len;
     const { weightNorm, catalogueWorkoutId } = weightNormRow(longRunPositions, cyclePos);
     let lrMi = macroWeekly * weightNorm;
-    lrMi = Math.max(minL, Math.min(calculatedLongRunMax, lrMi));
+    lrMi = Math.min(calculatedLongRunMax, lrMi);
+    lrMi *= longRunWeeklyRampFactor(wn, totalWeeks, rampFromWeeklyMiles, weeklyMileageTarget);
+    lrMi = Math.max(minL, lrMi);
     lrMi = round1(lrMi);
 
     for (const d of week.days) {

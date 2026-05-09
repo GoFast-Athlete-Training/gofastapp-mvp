@@ -190,6 +190,8 @@ export async function executePlanGenerate(params: {
     taperMiles,
     longRunPositions,
     calculatedLongRunMax: skeleton.calculatedLongRunMax,
+    rampFromWeeklyMiles: params.athleteWeeklyMileage,
+    weeklyMileageTarget,
   });
 
   const minWeeklyFromPreset = Number(vol.minWeeklyMiles);
