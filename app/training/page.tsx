@@ -3,17 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, MessageCircle, Trash2, Users } from "lucide-react";
+import { BookOpen, MessageCircle, MoreHorizontal, Users } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import WeekStrip from "@/components/training/WeekStrip";
-import TrainingSubNav, {
-  TrainingSubNavMobile,
-  scrollToTrainingSection,
-  type TrainingSubNavKey,
-} from "@/components/training/TrainingSubNav";
 import { metersToMiDisplay } from "@/lib/training/workout-preview-payload";
 import {
   currentTrainingWeekNumber,
@@ -91,7 +86,7 @@ export default function TrainingHubPage() {
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [hubError, setHubError] = useState<string | null>(null);
-  const [activeSubNav, setActiveSubNav] = useState<TrainingSubNavKey>("today");
+  const [planMenuOpen, setPlanMenuOpen] = useState(false);
   const [selectedDayKey, setSelectedDayKey] = useState<string>("");
   /** Active plan in DB is past race day — prompt next goal instead of full schedule UI. */
   const [pastRacePlan, setPastRacePlan] = useState<{
@@ -244,11 +239,6 @@ export default function TrainingHubPage() {
     void loadHub();
   }, [authReady, loadHub]);
 
-  function handleSubNav(key: TrainingSubNavKey) {
-    setActiveSubNav(key);
-    scrollToTrainingSection(key);
-  }
-
   async function deleteActivePlan() {
     if (!planDetail) return;
     if (
@@ -283,23 +273,26 @@ export default function TrainingHubPage() {
   const focusPlanDay = weekDays.find((d) => d.dateKey === focusKey) ?? null;
   const focusIsToday = focusKey === todayKey;
 
+  const weekPlannedMiles = useMemo(() => {
+    if (!weekDays.length) return null;
+    const m = weekDays.reduce((s, d) => s + (d.estimatedDistanceInMeters ?? 0), 0);
+    if (!Number.isFinite(m) || m <= 0) return null;
+    return Math.round((m / 1609.34) * 10) / 10;
+  }, [weekDays]);
+
   return (
     <AthleteAppShell>
-      <div className="flex w-full">
-        <TrainingSubNav active={activeSubNav} onNavigate={handleSubNav} />
-        <div className="flex-1 min-w-0">
-          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
-        <TrainingSubNavMobile active={activeSubNav} onNavigate={handleSubNav} />
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
         <div className="mb-6 lg:mb-8">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Training</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Plan</h1>
               <p className="text-gray-600 text-sm sm:text-base">
-                This week and today&apos;s session. Use{" "}
-                <Link href="/workouts" className="font-semibold text-orange-600 hover:text-orange-700">
-                  Workouts
-                </Link>{" "}
-                to log standalone sessions or open the full run log.
+                Your schedule this week. Logged runs and analysis live in{" "}
+                <Link href="/performance" className="font-semibold text-orange-600 hover:text-orange-700">
+                  Performance
+                </Link>
+                .
               </p>
             </div>
             <Link
@@ -489,8 +482,8 @@ export default function TrainingHubPage() {
 
         {showDashboard && planDetail && (
           <div className="space-y-6 mb-8">
-            <div className="flex flex-col gap-3 rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <div className="min-w-0">
+            <div className="flex flex-col gap-3 rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 text-sm sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1">
                 <p className="font-semibold text-gray-900">{planDetail.name}</p>
                 <p className="text-gray-600">
                   Week {weekNumber} of {effectiveTotalWeeks}
@@ -506,34 +499,62 @@ export default function TrainingHubPage() {
                   </p>
                 ) : null}
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <Link
                   href={`/training-setup/${planDetail.id}`}
                   className="inline-flex justify-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 sm:text-sm sm:px-4 sm:py-2"
                 >
                   Plan calendar
                 </Link>
-                <Link
-                  href={`/training-setup/${planDetail.id}`}
-                  className="inline-flex justify-center rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 sm:text-sm sm:px-4 sm:py-2"
-                >
-                  Update plan
-                </Link>
-                <Link
-                  href="/workouts"
-                  className="inline-flex justify-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 sm:text-sm sm:px-4 sm:py-2"
-                >
-                  Workouts
-                </Link>
-                <button
-                  type="button"
-                  disabled={deleting}
-                  onClick={() => void deleteActivePlan()}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 sm:text-sm sm:px-4 sm:py-2"
-                >
-                  <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                  {deleting ? "Deleting…" : "Delete"}
-                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    aria-expanded={planMenuOpen}
+                    aria-haspopup="true"
+                    onClick={() => setPlanMenuOpen((o) => !o)}
+                    className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white p-2 text-gray-700 hover:bg-gray-50"
+                    title="Plan options"
+                  >
+                    <MoreHorizontal className="h-5 w-5" aria-hidden />
+                  </button>
+                  {planMenuOpen ? (
+                    <>
+                      <button
+                        type="button"
+                        aria-label="Close menu"
+                        className="fixed inset-0 z-40 cursor-default"
+                        onClick={() => setPlanMenuOpen(false)}
+                      />
+                      <div className="absolute right-0 z-50 mt-1 min-w-[11rem] rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                        <Link
+                          href={`/training-setup/${planDetail.id}`}
+                          className="block px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
+                          onClick={() => setPlanMenuOpen(false)}
+                        >
+                          Update plan
+                        </Link>
+                        <Link
+                          href="/workouts"
+                          className="block px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
+                          onClick={() => setPlanMenuOpen(false)}
+                        >
+                          Workout log
+                        </Link>
+                        <button
+                          type="button"
+                          disabled={deleting}
+                          onClick={() => {
+                            setPlanMenuOpen(false);
+                            void deleteActivePlan();
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+                        >
+                          {deleting ? "Deleting…" : "Delete plan"}
+                        </button>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
               </div>
             </div>
 
@@ -552,9 +573,13 @@ export default function TrainingHubPage() {
                     selectedDateKey={focusKey}
                     onSelectDay={(d) => {
                       setSelectedDayKey(d.dateKey);
-                      setActiveSubNav("today");
                     }}
                   />
+                  {weekPlannedMiles != null ? (
+                    <p className="mt-2 text-sm font-medium text-gray-800 tabular-nums">
+                      Planned ~{weekPlannedMiles} mi this week
+                    </p>
+                  ) : null}
                 </div>
               )}
               {!loadingWeek &&
@@ -614,6 +639,42 @@ export default function TrainingHubPage() {
               {!loadingWeek && weekDays.length === 0 && (
                 <p className="text-sm text-gray-600">No sessions this week in the schedule.</p>
               )}
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <Link
+                  href="/build-a-run"
+                  className="inline-flex justify-center rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-900 hover:bg-orange-100"
+                >
+                  Build a run
+                </Link>
+                <Link
+                  href="/gorun"
+                  className="inline-flex justify-center rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900 hover:bg-sky-100"
+                >
+                  Find a run with others
+                </Link>
+              </div>
+
+              {planDetail ? (
+                <details className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm group">
+                  <summary className="cursor-pointer font-medium text-gray-900 py-1 list-none [&::-webkit-details-marker]:hidden flex items-center gap-2">
+                    <span className="text-gray-400 group-open:rotate-90 transition inline-block">›</span>
+                    Full schedule ({effectiveTotalWeeks} weeks)
+                  </summary>
+                  <div className="pt-2 pb-1 text-gray-600 space-y-2">
+                    <p>
+                      Open the calendar to see every week, edit days, and regenerate when your goal
+                      changes.
+                    </p>
+                    <Link
+                      href={`/training-setup/${planDetail.id}`}
+                      className="inline-block font-semibold text-emerald-700 hover:text-emerald-800"
+                    >
+                      Open plan calendar →
+                    </Link>
+                  </div>
+                </details>
+              ) : null}
             </div>
 
             <div id="training-section-today" className="scroll-mt-24">
@@ -746,10 +807,10 @@ export default function TrainingHubPage() {
                       </p>
                       <div className="mt-4 flex flex-wrap gap-3">
                         <Link
-                          href="/workouts"
+                          href="/performance"
                           className="inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
                         >
-                          Workouts
+                          Performance
                         </Link>
                         <Link
                           href="/workouts/create"
@@ -801,8 +862,6 @@ export default function TrainingHubPage() {
           </div>
         )}
 
-          </div>
-        </div>
       </div>
     </AthleteAppShell>
   );

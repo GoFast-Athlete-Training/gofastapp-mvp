@@ -77,11 +77,11 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
               <Home className="h-5 w-5" />
             </Link>
 
-            {/* Workouts Icon */}
+            {/* Performance / workout log hub */}
             <Link
-              href="/workouts"
+              href="/performance"
               className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
-              title="Workouts"
+              title="Performance"
             >
               <Calendar className="h-5 w-5" />
             </Link>

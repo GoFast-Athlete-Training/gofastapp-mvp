@@ -1288,13 +1288,13 @@ export default function AthleteHomePage() {
                 ) : activePlanSummary?.hasSchedule ? (
                   <div className="rounded-xl border border-dashed border-gray-300 bg-white p-5 shadow-sm h-full flex flex-col justify-center">
                     <p className="text-sm font-medium text-gray-800">No session on your schedule today</p>
-                    <p className="text-gray-600 text-sm mt-1">Log a run or check your week in Training.</p>
+                    <p className="text-gray-600 text-sm mt-1">Log a run or check your week in Plan.</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Link
-                        href="/workouts"
+                        href="/performance"
                         className="text-sm font-semibold text-orange-600 hover:text-orange-700"
                       >
-                        Workouts →
+                        Performance →
                       </Link>
                       <Link href="/training" className="text-sm font-semibold text-gray-700 hover:text-gray-900">
                         Week view →
@@ -1561,20 +1561,20 @@ export default function AthleteHomePage() {
                           href="/training"
                           className="text-sm font-semibold text-emerald-800 mt-2 inline-block hover:underline"
                         >
-                          Training hub →
+                          Plan hub →
                         </Link>
                       </>
                     )}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm font-medium text-emerald-900">
                     <Link href="/training" className="hover:underline">
-                      Training hub
+                      Plan hub
                     </Link>
                     <Link href="/profile#goal" className="hover:underline">
                       Goal
                     </Link>
-                    <Link href="/workouts" className="hover:underline">
-                      Workouts
+                    <Link href="/performance" className="hover:underline">
+                      Performance
                     </Link>
                   </div>
                 </div>
@@ -1672,7 +1672,7 @@ export default function AthleteHomePage() {
                   href="/training"
                   className="mt-2 inline-block text-sm font-semibold text-orange-700 hover:text-orange-800"
                 >
-                  Open Training →
+                  Open Plan →
                 </Link>
               </div>
             ) : null}
@@ -1680,9 +1680,17 @@ export default function AthleteHomePage() {
             {lastSyncedActivity ? (
               <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Last synced run
-                  </p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Last synced run
+                    </p>
+                    <Link
+                      href="/performance"
+                      className="text-xs font-semibold text-orange-600 hover:text-orange-700"
+                    >
+                      See all →
+                    </Link>
+                  </div>
                   <p className="text-sm text-gray-900 mt-1 leading-snug">
                     <span className="font-semibold">
                       {lastSyncedActivity.activityName || 'Run'}

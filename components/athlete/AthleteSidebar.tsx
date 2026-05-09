@@ -2,7 +2,17 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
-import { Bike, Home, LayoutDashboard, MapPin, Trophy, User, Users } from "lucide-react";
+import {
+  Activity,
+  Bike,
+  BookOpen,
+  Home,
+  LayoutDashboard,
+  MapPin,
+  MessageCircle,
+  Trophy,
+  Users,
+} from "lucide-react";
 
 type NavItem = {
   label: string;
@@ -11,17 +21,21 @@ type NavItem = {
   match?: (pathname: string | null) => boolean;
 };
 
-function trainingHubMatch(p: string | null): boolean {
+/** Plan execution + calendar + one-off build tooling lives here */
+function planHubMatch(p: string | null): boolean {
   if (!p) return false;
   return (
     p === "/training" ||
     p.startsWith("/training-setup") ||
     p.startsWith("/training/day") ||
-    p.startsWith("/workouts") ||
-    p.startsWith("/journal") ||
-    p.startsWith("/ask-coach") ||
     p.startsWith("/build-a-run")
   );
+}
+
+/** Logged work, metrics, full workout log */
+function performanceHubMatch(p: string | null): boolean {
+  if (!p) return false;
+  return p === "/performance" || p.startsWith("/performance/") || p.startsWith("/workouts");
 }
 
 function runCrewHubMatch(p: string | null): boolean {
@@ -40,16 +54,22 @@ function triWorkMatch(p: string | null): boolean {
 const navItems: NavItem[] = [
   { label: "Home", href: "/athlete-home", icon: Home },
   {
-    label: "Train",
+    label: "Plan",
     href: "/training",
     icon: LayoutDashboard,
-    match: trainingHubMatch,
+    match: planHubMatch,
   },
   {
-    label: "TriWork",
-    href: "/training/tri-work",
-    icon: Bike,
-    match: triWorkMatch,
+    label: "Performance",
+    href: "/performance",
+    icon: Activity,
+    match: performanceHubMatch,
+  },
+  {
+    label: "AI Coach",
+    href: "/ask-coach",
+    icon: MessageCircle,
+    match: (path) => !!path && path.startsWith("/ask-coach"),
   },
   {
     label: "Run",
@@ -71,11 +91,16 @@ const navItems: NavItem[] = [
       !!p &&
       (p === "/races" || p.startsWith("/races/") || p.startsWith("/myrace/")),
   },
+];
+
+const toolItems: NavItem[] = [
+  { label: "Journal", href: "/journal", icon: BookOpen },
   {
-    label: "Profile",
-    href: "/profile",
-    icon: User,
-    match: (p) => !!p && p.startsWith("/profile"),
+    // Single-user sandbox today; future: sport mode (runner vs tri) surfaces tri tooling in-app instead of a buried link.
+    label: "TriWork",
+    href: "/training/tri-work",
+    icon: Bike,
+    match: triWorkMatch,
   },
 ];
 
@@ -118,6 +143,36 @@ export default function AthleteSidebar() {
           );
         })}
       </nav>
+
+      <div className="p-2 pt-0 border-t border-gray-100 mt-auto">
+        <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+          Tools
+        </p>
+        <ul className="space-y-1">
+          {toolItems.map((item) => {
+            const { label, href, icon: Icon, match } = item;
+            const active = match
+              ? match(pathname)
+              : pathname === href || !!pathname?.startsWith(href);
+            return (
+              <li key={href}>
+                <button
+                  type="button"
+                  onClick={() => router.push(href)}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    active
+                      ? "bg-gray-100 text-gray-900"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  <Icon className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                  <span className="text-left">{label}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </aside>
   );
 }
