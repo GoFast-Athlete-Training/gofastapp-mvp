@@ -129,6 +129,11 @@ export function localYmd(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Client "today" for matching plan `dateKey` (same as `localYmd(new Date())`). Avoids UTC-midnight day flip in US evenings. */
+export function localTodayKey(): string {
+  return localYmd(new Date());
+}
+
 /**
  * Display a plan date string without shifting the calendar day (avoids UTC midnight / local tz bugs).
  * `ymd` is `YYYY-MM-DD` or any value parseable after appending local noon.

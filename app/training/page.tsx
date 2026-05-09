@@ -22,8 +22,7 @@ import {
   effectiveTrainingWeekCount,
   formatCalendarWeekRangeLabel,
   formatPlanDateDisplay,
-  utcDateOnly,
-  ymdFromDate,
+  localTodayKey,
 } from "@/lib/training/plan-utils";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import {
@@ -271,7 +270,7 @@ export default function TrainingHubPage() {
           );
           setWeekDays(days);
           setWeekPerformance(wp);
-          setSelectedDayKey(ymdFromDate(utcDateOnly(new Date())));
+          setSelectedDayKey(localTodayKey());
         } catch (e) {
           setHubError(e instanceof Error ? e.message : "Could not load this week");
           setWeekDays([]);
@@ -388,7 +387,7 @@ export default function TrainingHubPage() {
   const showDashboard = !!planDetail && hasSchedule(planDetail);
   const showIncompletePlan = !!planDetail && !hasSchedule(planDetail);
 
-  const todayKey = ymdFromDate(utcDateOnly(new Date()));
+  const todayKey = localTodayKey();
   const focusKey = selectedDayKey || todayKey;
   const focusPlanDay = weekDays.find((d) => d.dateKey === focusKey) ?? null;
   const focusIsToday = focusKey === todayKey;

@@ -43,6 +43,7 @@ import {
   currentTrainingWeekNumber,
   effectiveTrainingWeekCount,
   formatPlanDateDisplay,
+  localTodayKey,
   utcDateOnly,
   ymdFromDate,
 } from '@/lib/training/plan-utils';
@@ -505,7 +506,7 @@ export default function AthleteHomePage() {
           );
           const wn = currentTrainingWeekNumber(p.startDate, eff);
           const { days } = await fetchPlanWeekSchedule(planId, wn, token);
-          const todayKey = ymdFromDate(utcDateOnly(new Date()));
+          const todayKey = localTodayKey();
           todayPlan = days.find((d) => d.dateKey === todayKey) ?? null;
         }
       } catch (e) {
