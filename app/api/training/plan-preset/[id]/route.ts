@@ -139,6 +139,9 @@ export async function PATCH(
     if (typeof body.title === "string") presetData.title = body.title.trim();
     if (body.description === null) presetData.description = null;
     else if (typeof body.description === "string") presetData.description = body.description.trim() || null;
+    if (body.publicDescription === null) presetData.publicDescription = null;
+    else if (typeof body.publicDescription === "string")
+      presetData.publicDescription = body.publicDescription.trim() || null;
     if (typeof body.slug === "string") presetData.slug = body.slug.trim().toLowerCase();
 
     type ConnectKey = "longRunConfig" | "intervalsConfig" | "tempoConfig";

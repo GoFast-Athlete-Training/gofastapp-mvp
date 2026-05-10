@@ -64,11 +64,32 @@ type ActivePlanLite = {
 
 type PresetForWizard = {
   id: string;
+  slug: string;
   title: string;
   description: string | null;
+  publicDescription: string | null;
   minWeeklyMiles: number;
   maxWeeklyMiles: number | null;
+  baseMiles: number;
 };
+
+function parseFiveKPaceToParts(pace: string | null | undefined): { min: string; sec: string } {
+  const t = (pace ?? "").trim();
+  const m = /^(\d+):(\d{1,2})$/.exec(t);
+  if (m) {
+    const secNum = Math.min(59, Math.max(0, parseInt(m[2], 10)));
+    return { min: m[1], sec: String(secNum).padStart(2, "0") };
+  }
+  return { min: "", sec: "" };
+}
+
+function buildFiveKPaceFromParts(minStr: string, secStr: string): string | null {
+  const min = Number(minStr);
+  const sec = Number(secStr);
+  if (!Number.isFinite(min) || !Number.isFinite(sec)) return null;
+  if (min < 2 || min > 30 || sec < 0 || sec > 59) return null;
+  return `${Math.round(min)}:${String(Math.round(sec)).padStart(2, "0")}`;
+}
 
 function formatRaceWhen(iso: string): string {
   try {
@@ -126,14 +147,17 @@ export default function TrainingSetupClient() {
   const [createFeedback, setCreateFeedback] = useState<
     "goals" | "dates" | "preset" | "generic" | null
   >(null);
-  const [baseline5KPace, setBaseline5KPace] = useState("");
+  const [paceMin, setPaceMin] = useState("");
+  const [paceSec, setPaceSec] = useState("");
   const [baselineWeeklyMileage, setBaselineWeeklyMileage] = useState("");
+  const [athleteFirstName, setAthleteFirstName] = useState<string | null>(null);
   const [activePlans, setActivePlans] = useState<ActivePlanLite[]>([]);
   const [replaceGoalAcknowledged, setReplaceGoalAcknowledged] = useState(false);
   const [replaceBlockPlan, setReplaceBlockPlan] = useState<ActivePlanLite | null>(null);
 
-  /** Default prod preset hydrated for POST body — must exist before athlete can create plans. */
-  const [presetForWizard, setPresetForWizard] = useState<PresetForWizard | null>(null);
+  /** Presets from prod API; athlete picks one before baseline step. */
+  const [prodPresets, setProdPresets] = useState<PresetForWizard[]>([]);
+  const [selectedPreset, setSelectedPreset] = useState<PresetForWizard | null>(null);
 
   const qualifyingGoals = useMemo(() => goals.filter(isQualifyingGoal), [goals]);
 
@@ -194,50 +218,69 @@ export default function TrainingSetupClient() {
       const gJson = await gRes.json();
       const sJson = await sRes.json();
       const pJson = await pRes.json();
-      let prodPreset: PresetForWizard | null = null;
+      let presetsParsed: PresetForWizard[] = [];
       if (presetRes.ok) {
         try {
           const pr = await presetRes.json();
-          if (
-            pr?.success === true &&
-            typeof pr?.preset?.id === "string" &&
-            pr.preset.id.trim().length > 0
-          ) {
-            const vc = pr?.preset?.volumeConstraints as
-              | { minWeeklyMiles?: unknown; maxWeeklyMiles?: unknown }
-              | null
-              | undefined;
-            let minWeeklyMiles = 40;
-            let maxWeeklyMiles: number | null = null;
-            if (vc && typeof vc === "object") {
-              const mn = Number(vc.minWeeklyMiles);
-              if (Number.isFinite(mn) && mn >= 1) {
-                minWeeklyMiles = Math.round(mn);
-              }
-              const mx = vc.maxWeeklyMiles;
-              if (mx != null && Number.isFinite(Number(mx)) && Number(mx) >= minWeeklyMiles) {
-                maxWeeklyMiles = Math.round(Number(mx));
-              }
-            }
-            prodPreset = {
-              id: pr.preset.id.trim(),
-              title:
-                typeof pr.preset.title === "string" && pr.preset.title.trim().length > 0
-                  ? pr.preset.title.trim()
-                  : "Training preset",
-              description:
-                typeof pr.preset.description === "string" && pr.preset.description.trim().length > 0
-                  ? pr.preset.description.trim()
-                  : null,
-              minWeeklyMiles,
-              maxWeeklyMiles,
-            };
+          if (pr?.success === true && Array.isArray(pr.presets)) {
+            presetsParsed = (pr.presets as unknown[])
+              .map((row): PresetForWizard | null => {
+                if (!row || typeof row !== "object") return null;
+                const r = row as Record<string, unknown>;
+                const id = typeof r.id === "string" ? r.id.trim() : "";
+                if (!id) return null;
+                const slug = typeof r.slug === "string" ? r.slug.trim() : "";
+                const title =
+                  typeof r.title === "string" && r.title.trim().length > 0
+                    ? r.title.trim()
+                    : "Training preset";
+                const description =
+                  typeof r.description === "string" && r.description.trim().length > 0
+                    ? r.description.trim()
+                    : null;
+                const publicDescription =
+                  typeof r.publicDescription === "string" && r.publicDescription.trim().length > 0
+                    ? r.publicDescription.trim()
+                    : null;
+                const vc = r.volumeConstraints as
+                  | {
+                      minWeeklyMiles?: unknown;
+                      maxWeeklyMiles?: unknown;
+                      baseMiles?: unknown;
+                    }
+                  | null
+                  | undefined;
+                let minWeeklyMiles = 40;
+                let maxWeeklyMiles: number | null = null;
+                let baseMiles = 40;
+                if (vc && typeof vc === "object") {
+                  const mn = Number(vc.minWeeklyMiles);
+                  if (Number.isFinite(mn) && mn >= 1) minWeeklyMiles = Math.round(mn);
+                  const mx = vc.maxWeeklyMiles;
+                  if (mx != null && Number.isFinite(Number(mx)) && Number(mx) >= minWeeklyMiles) {
+                    maxWeeklyMiles = Math.round(Number(mx));
+                  }
+                  const b = Number(vc.baseMiles);
+                  if (Number.isFinite(b) && b > 0) baseMiles = b;
+                }
+                return {
+                  id,
+                  slug,
+                  title,
+                  description,
+                  publicDescription,
+                  minWeeklyMiles,
+                  maxWeeklyMiles,
+                  baseMiles,
+                };
+              })
+              .filter((x): x is PresetForWizard => x != null);
           }
         } catch {
-          prodPreset = null;
+          presetsParsed = [];
         }
       }
-      setPresetForWizard(prodPreset);
+      setProdPresets(presetsParsed);
       if (pRes.ok && Array.isArray(pJson.plans)) {
         setActivePlans(pJson.plans as ActivePlanLite[]);
       } else {
@@ -259,7 +302,7 @@ export default function TrainingSetupClient() {
       setGoals([]);
       setSignups([]);
       setActivePlans([]);
-      setPresetForWizard(null);
+      setProdPresets([]);
     } finally {
       setLoadingOrientation(false);
     }
@@ -297,21 +340,29 @@ export default function TrainingSetupClient() {
     if (!id) return;
     let cancelled = false;
     api
-      .get<{ athlete?: { fiveKPace?: string | null; weeklyMileage?: number | null } }>(
-        `/athlete/${id}`
-      )
+      .get<{
+        athlete?: {
+          firstName?: string | null;
+          fiveKPace?: string | null;
+          weeklyMileage?: number | null;
+        };
+      }>(`/athlete/${id}`)
       .then((res) => {
         if (cancelled) return;
         const a = res.data?.athlete;
         if (!a) return;
-        setBaseline5KPace(a.fiveKPace?.trim() ?? "");
+        if (typeof a.firstName === "string" && a.firstName.trim()) {
+          setAthleteFirstName(a.firstName.trim());
+        } else {
+          setAthleteFirstName(null);
+        }
+        const parts = parseFiveKPaceToParts(a.fiveKPace);
+        setPaceMin(parts.min);
+        setPaceSec(parts.sec);
         setBaselineWeeklyMileage((prev) => {
           if (prev.trim() !== "") return prev;
           if (a.weeklyMileage != null && Number.isFinite(Number(a.weeklyMileage))) {
             return String(a.weeklyMileage);
-          }
-          if (presetForWizard) {
-            return String(presetForWizard.minWeeklyMiles);
           }
           return "";
         });
@@ -320,7 +371,7 @@ export default function TrainingSetupClient() {
     return () => {
       cancelled = true;
     };
-  }, [ready, wizardGoal, loadingOrientation, presetForWizard]);
+  }, [ready, wizardGoal, loadingOrientation]);
 
   useEffect(() => {
     setCreateFeedback((prev) => (prev === "dates" ? null : prev));
@@ -328,6 +379,7 @@ export default function TrainingSetupClient() {
 
   function beginWizardForGoal(g: GoalRow) {
     setWizardGoal(g);
+    setSelectedPreset(null);
     setFormError(null);
     setCreateFeedback(null);
     setReplaceGoalAcknowledged(false);
@@ -339,6 +391,7 @@ export default function TrainingSetupClient() {
 
   function exitWizard() {
     setWizardGoal(null);
+    setSelectedPreset(null);
     setFormError(null);
     setCreateFeedback(null);
     setReplaceGoalAcknowledged(false);
@@ -376,13 +429,13 @@ export default function TrainingSetupClient() {
     setReplaceBlockPlan(null);
     if (opts?.forceReplace) setReplaceGoalAcknowledged(true);
 
-    if (!presetForWizard?.id) {
+    if (!selectedPreset?.id) {
       setCreateFeedback("preset");
       return;
     }
 
-    const minW = presetForWizard.minWeeklyMiles;
-    const maxW = presetForWizard.maxWeeklyMiles;
+    const minW = selectedPreset.minWeeklyMiles;
+    const maxW = selectedPreset.maxWeeklyMiles;
     const rawMw = baselineWeeklyMileage.trim();
     const weeklyMi = rawMw === "" ? NaN : Number(rawMw);
     if (!Number.isFinite(weeklyMi) || weeklyMi < minW) {
@@ -397,6 +450,15 @@ export default function TrainingSetupClient() {
       setFormError(
         `Set weekly mileage between ${minW} and ${maxW} mi for this training blueprint.`
       );
+      return;
+    }
+
+    const paceEmpty = paceMin.trim() === "" && paceSec.trim() === "";
+    const fiveKPaceOut = paceEmpty
+      ? null
+      : buildFiveKPaceFromParts(paceMin.trim(), paceSec.trim());
+    if (!paceEmpty && fiveKPaceOut == null) {
+      setFormError("Enter a valid 5K pace (minutes and seconds 0–59).");
       return;
     }
 
@@ -415,13 +477,13 @@ export default function TrainingSetupClient() {
           athleteGoalId: wizardGoal.id,
           raceRegistryId: wizardGoal.raceRegistryId,
           startDate: new Date(startDate).toISOString(),
-          fiveKPace: baseline5KPace.trim() || null,
+          fiveKPace: fiveKPaceOut,
           currentWeeklyMileage:
             baselineWeeklyMileage.trim() === ""
               ? null
               : Number(baselineWeeklyMileage),
           syncAthleteBaseline: true,
-          ...(presetForWizard?.id ? { presetId: presetForWizard.id } : {}),
+          presetId: selectedPreset.id,
         }),
       });
       let data: { error?: string; plan?: { id: string } } = {};
@@ -465,249 +527,369 @@ export default function TrainingSetupClient() {
 
   if (wizardGoal && wizardGoal.race_registry && wizardGoal.raceRegistryId) {
     const rr = wizardGoal.race_registry;
-    const presetMinMi = presetForWizard?.minWeeklyMiles ?? 40;
-    const presetMaxMi = presetForWizard?.maxWeeklyMiles ?? null;
+    const presetMinMi = selectedPreset?.minWeeklyMiles ?? 40;
+    const presetMaxMi = selectedPreset?.maxWeeklyMiles ?? null;
     const mileageRangeHint =
-      presetForWizard &&
+      selectedPreset &&
       presetMaxMi != null &&
       Number.isFinite(presetMaxMi) ? (
-      <span>
-        Use between <span className="font-semibold tabular-nums">{presetMinMi}</span> and{" "}
-        <span className="font-semibold tabular-nums">{presetMaxMi}</span> mi per week for this
-        blueprint.
-      </span>
-    ) : presetForWizard ? (
-      <span>
-        Use at least{" "}
-        <span className="font-semibold tabular-nums">{presetMinMi}</span> mi per week for this
-        blueprint
-        {presetMaxMi == null ? " (no preset max set)." : "."}
-      </span>
-    ) : null;
+        <span>
+          Use between <span className="font-semibold tabular-nums">{presetMinMi}</span> and{" "}
+          <span className="font-semibold tabular-nums">{presetMaxMi}</span> mi per week for this
+          blueprint.
+        </span>
+      ) : selectedPreset ? (
+        <span>
+          Use at least{" "}
+          <span className="font-semibold tabular-nums">{presetMinMi}</span> mi per week for this
+          blueprint
+          {presetMaxMi == null ? " (no preset max set)." : "."}
+        </span>
+      ) : null;
+
+    const weeklyN = baselineWeeklyMileage.trim() === "" ? NaN : Number(baselineWeeklyMileage);
+    const baseMilesPreset = selectedPreset?.baseMiles;
+    const rampBanner =
+      selectedPreset != null &&
+      Number.isFinite(weeklyN) &&
+      Number.isFinite(baseMilesPreset) ? (
+        weeklyN < (baseMilesPreset as number) * 0.75 ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+            <p className="font-medium text-amber-950">Gradual ramp</p>
+            <p className="mt-1 text-amber-900/90">
+              Your plan will open with a gradual build — we&apos;ll ease you up to full training
+              volume over the first few weeks.
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+            <p className="font-medium text-emerald-900">Full volume from the start</p>
+            <p className="mt-1 text-emerald-900/90">
+              You&apos;re ready to run at full training volume from week one.
+            </p>
+          </div>
+        )
+      ) : null;
+
+    function onSelectPreset(p: PresetForWizard) {
+      setSelectedPreset(p);
+      setBaselineWeeklyMileage((prev) =>
+        prev.trim() === "" ? String(p.minWeeklyMiles) : prev
+      );
+      setFormError(null);
+    }
+
+    const stepChoosePreset = !selectedPreset;
 
     return (
       <AthleteAppShell>
         <div className="min-h-screen bg-gray-50 px-4 py-8 sm:px-6">
           <div className="mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white p-6 text-gray-900 shadow-sm sm:p-8">
             <h1 className="mb-2 text-2xl font-semibold tracking-tight">Plan setup</h1>
-            <div className="mb-5 rounded-xl border border-orange-100 bg-orange-50/80 p-4 text-sm text-gray-800">
-              <p className="font-medium text-gray-900">We&apos;ll build your plan for you</p>
-              <p className="mt-2 leading-relaxed text-gray-700">
-                First pick the training blueprint your coach published, then set weekly mileage in
-                the range it requires, your 5K pace, and a start date. Baseline fields update your
-                profile when you create the plan.
-              </p>
-            </div>
-            <p className="mb-2 text-sm text-gray-600">
+            <p className="mb-4 text-sm text-gray-600">
               Goal:{" "}
               <span className="font-medium text-gray-900">{rr.name}</span> —{" "}
               {formatRaceWhen(rr.raceDate)} ({rr.raceType}).
             </p>
 
-            <div className="space-y-4">
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-5">
-                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Training blueprint
-                </p>
-                {loadingOrientation ? (
-                  <p className="text-sm text-gray-600">Checking that your blueprint is ready…</p>
-                ) : presetForWizard ? (
-                  <>
-                    <p className="text-lg font-semibold text-gray-900">{presetForWizard.title}</p>
-                    {presetForWizard.description && (
-                      <p className="mt-2 text-sm leading-relaxed text-gray-600">
-                        {presetForWizard.description}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-sm text-red-900">
-                    <p className="font-medium text-red-950">Blueprint not available</p>
-                    <p className="mt-2 leading-relaxed text-red-900/95">
-                      A coach-visible training preset hasn&apos;t been published to this environment.
-                      Check back shortly or contact support.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-700">
-                    Current 5K pace
-                  </label>
-                  <input
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                    value={baseline5KPace}
-                    onChange={(e) => setBaseline5KPace(e.target.value)}
-                  />
+            {stepChoosePreset ? (
+              <>
+                <div className="mb-6 rounded-xl border border-orange-100 bg-orange-50/80 p-4 text-sm text-gray-800">
+                  <p className="text-lg font-semibold text-gray-900">
+                    Welcome back{athleteFirstName ? `, ${athleteFirstName}` : ""}
+                  </p>
+                  <p className="mt-2 font-medium text-gray-900">Pick how you want to train</p>
+                  <p className="mt-1 leading-relaxed text-gray-700">
+                    Choose a training blueprint. You can switch later if your coach adds more
+                    options.
+                  </p>
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-700">
-                    Weekly mileage (this plan)
-                  </label>
-                  <input
-                    type="number"
-                    min={presetForWizard ? presetMinMi : 0}
-                    max={presetForWizard && presetMaxMi != null ? presetMaxMi : undefined}
-                    step={1}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                    value={baselineWeeklyMileage}
-                    onChange={(e) => setBaselineWeeklyMileage(e.target.value)}
-                  />
-                  {presetForWizard && (
-                    <p className="mt-1.5 text-xs text-gray-600">{mileageRangeHint}</p>
+                <div className="space-y-4">
+                  {loadingOrientation ? (
+                    <p className="text-sm text-gray-600">Loading blueprints…</p>
+                  ) : prodPresets.length === 0 ? (
+                    <div className="text-sm text-red-900">
+                      <p className="font-medium text-red-950">Blueprint not available</p>
+                      <p className="mt-2 leading-relaxed text-red-900/95">
+                        A training preset hasn&apos;t been published to this environment yet. Check
+                        back shortly or contact support.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void loadOrientation()}
+                        className="mt-3 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : (
+                    <ul className="grid gap-3 sm:grid-cols-1">
+                      {prodPresets.map((p) => {
+                        const blurb = p.publicDescription ?? p.description;
+                        return (
+                          <li key={p.id}>
+                            <button
+                              type="button"
+                              onClick={() => onSelectPreset(p)}
+                              className="w-full rounded-xl border-2 border-gray-200 bg-gray-50 p-4 text-left transition hover:border-orange-400 hover:bg-orange-50/50 sm:p-5"
+                            >
+                              <p className="text-lg font-semibold text-gray-900">{p.title}</p>
+                              {blurb ? (
+                                <p className="mt-2 text-sm leading-relaxed text-gray-600">{blurb}</p>
+                              ) : (
+                                <p className="mt-2 text-xs text-gray-500">Tap to select this blueprint.</p>
+                              )}
+                              <p className="mt-3 text-xs font-medium text-orange-700">Select →</p>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
                   )}
                 </div>
-              </div>
+              </>
+            ) : (
+              <>
+                <div className="mb-5 rounded-xl border border-emerald-100 bg-emerald-50/80 p-4 text-sm text-gray-800">
+                  <p className="font-medium text-gray-900">Great — let&apos;s get started</p>
+                  <p className="mt-2 leading-relaxed text-gray-700">
+                    Here&apos;s your baseline for this plan. We&apos;ll save these to your profile when
+                    you create the plan.
+                  </p>
+                </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-800">
-                  Plan start date
-                </label>
-                <input
-                  type="date"
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                  value={startDate}
-                  onChange={(e) => {
-                    setStartDate(e.target.value);
+                <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-500">
+                  {selectedPreset.title}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPreset(null);
                     setFormError(null);
                   }}
-                />
-              </div>
+                  className="mb-5 text-sm font-medium text-orange-600 hover:text-orange-800"
+                >
+                  ← Change blueprint
+                </button>
 
-              {formError && <p className="text-sm text-amber-800">{formError}</p>}
-
-              {replaceBlockPlan && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-                  <p className="mb-2 font-medium text-amber-950">
-                    You already have an active plan for this goal
-                  </p>
-                  <p className="mb-3 text-amber-900/90">
-                    Open it to keep your schedule, or start a fresh plan — your current training will
-                    be saved to history.
-                  </p>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        router.push(`/training-setup/${replaceBlockPlan.id}`)
-                      }
-                      className="inline-flex justify-center rounded-lg bg-amber-500 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-amber-600"
-                    >
-                      Open existing plan
-                    </button>
-                    <button
-                      type="button"
-                      disabled={creating || loadingOrientation || !presetForWizard}
-                      onClick={() => void createPlan({ forceReplace: true })}
-                      className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Start fresh with this goal
-                    </button>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <label className="mb-1 block text-xs font-medium text-gray-700">
+                        Current 5K pace
+                      </label>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="number"
+                          min={2}
+                          max={30}
+                          placeholder="min"
+                          className="w-24 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                          value={paceMin}
+                          onChange={(e) => setPaceMin(e.target.value)}
+                        />
+                        <span className="text-gray-500">:</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={59}
+                          placeholder="sec"
+                          className="w-24 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                          value={paceSec}
+                          onChange={(e) => setPaceSec(e.target.value)}
+                        />
+                        <span className="text-sm text-gray-600">min / mile</span>
+                      </div>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="mb-1 block text-xs font-medium text-gray-700">
+                        Weekly mileage (this plan)
+                      </label>
+                      <input
+                        type="number"
+                        min={selectedPreset ? presetMinMi : 0}
+                        max={selectedPreset && presetMaxMi != null ? presetMaxMi : undefined}
+                        step={1}
+                        className="w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                        value={baselineWeeklyMileage}
+                        onChange={(e) => setBaselineWeeklyMileage(e.target.value)}
+                      />
+                      {selectedPreset && (
+                        <p className="mt-1.5 text-xs text-gray-600">{mileageRangeHint}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
 
-              {createFeedback === "goals" && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-                  <p className="mb-2 font-medium">Let&apos;s update your goal first</p>
-                  <p className="mb-3 text-amber-900/90">
-                    We couldn&apos;t start a plan from here—your goal or race may have changed, or
-                    something needs to be finished in Goals. Nothing&apos;s wrong with your account;
-                    just confirm your race and goal time, then try again.
-                  </p>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                    <Link
-                      href="/goals"
-                      className="inline-flex justify-center rounded-lg bg-amber-500 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-amber-600"
-                    >
-                      Open Goals
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => void refreshGoalsAndExitWizard()}
-                      className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
-                    >
-                      Refresh goal list
-                    </button>
+                  {rampBanner}
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-800">
+                      Plan start date
+                    </label>
+                    <input
+                      type="date"
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                      value={startDate}
+                      onChange={(e) => {
+                        setStartDate(e.target.value);
+                        setFormError(null);
+                      }}
+                    />
                   </div>
-                </div>
-              )}
 
-              {createFeedback === "dates" && (
-                <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
-                  <p className="mb-2 font-medium">Check your start date</p>
-                  <p className="text-sky-900/90">
-                    Your plan needs to start before race day. Pick an earlier date above, then tap
-                    Create plan again.
-                  </p>
-                </div>
-              )}
+                  {formError && <p className="text-sm text-amber-800">{formError}</p>}
 
-              {createFeedback === "preset" && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-                  <p className="mb-2 font-medium text-red-950">Preset not wired</p>
-                  <p className="mb-3 text-red-900/95">
-                    This app doesn&apos;t have an active training preset yet, so we can&apos;t stamp your
-                    plan with the engine blueprint. Ask your coach to publish presets, tap refresh
-                    below, then try again.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void loadOrientation()}
-                      className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800"
-                    >
-                      Refresh blueprint
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCreateFeedback(null)}
-                      className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
-              )}
+                  {replaceBlockPlan && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                      <p className="mb-2 font-medium text-amber-950">
+                        You already have an active plan for this goal
+                      </p>
+                      <p className="mb-3 text-amber-900/90">
+                        Open it to keep your schedule, or start a fresh plan — your current training
+                        will be saved to history.
+                      </p>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            router.push(`/training-setup/${replaceBlockPlan.id}`)
+                          }
+                          className="inline-flex justify-center rounded-lg bg-amber-500 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-amber-600"
+                        >
+                          Open existing plan
+                        </button>
+                        <button
+                          type="button"
+                          disabled={creating || loadingOrientation || !selectedPreset}
+                          onClick={() => void createPlan({ forceReplace: true })}
+                          className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          Start fresh with this goal
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
-              {createFeedback === "generic" && (
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800">
-                  <p className="mb-3">
-                    We couldn&apos;t create your plan just now. Please try again in a moment.
-                  </p>
+                  {createFeedback === "goals" && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                      <p className="mb-2 font-medium">Let&apos;s update your goal first</p>
+                      <p className="mb-3 text-amber-900/90">
+                        We couldn&apos;t start a plan from here—your goal or race may have changed, or
+                        something needs to be finished in Goals. Nothing&apos;s wrong with your account;
+                        just confirm your race and goal time, then try again.
+                      </p>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                        <Link
+                          href="/goals"
+                          className="inline-flex justify-center rounded-lg bg-amber-500 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-amber-600"
+                        >
+                          Open Goals
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => void refreshGoalsAndExitWizard()}
+                          className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                        >
+                          Refresh goal list
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {createFeedback === "dates" && (
+                    <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
+                      <p className="mb-2 font-medium">Check your start date</p>
+                      <p className="text-sky-900/90">
+                        Your plan needs to start before race day. Pick an earlier date above, then tap
+                        Create plan again.
+                      </p>
+                    </div>
+                  )}
+
+                  {createFeedback === "preset" && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+                      <p className="mb-2 font-medium text-red-950">Preset not wired</p>
+                      <p className="mb-3 text-red-900/95">
+                        This app doesn&apos;t have an active training preset yet, so we can&apos;t stamp your
+                        plan with the engine blueprint. Ask your coach to publish presets, tap refresh
+                        below, then try again.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void loadOrientation()}
+                          className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800"
+                        >
+                          Refresh blueprint
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCreateFeedback(null)}
+                          className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {createFeedback === "generic" && (
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800">
+                      <p className="mb-3">
+                        We couldn&apos;t create your plan just now. Please try again in a moment.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setCreateFeedback(null)}
+                        className="rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-300"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  )}
+
                   <button
                     type="button"
-                    onClick={() => setCreateFeedback(null)}
-                    className="rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-300"
+                    onClick={() => void createPlan()}
+                    disabled={creating || loadingOrientation || !selectedPreset}
+                    className="w-full rounded-lg bg-emerald-600 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
                   >
-                    Dismiss
+                    {creating ? "Creating…" : "Create plan"}
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={exitWizard}
+                    className="block w-full text-center text-sm text-gray-500 hover:text-gray-800"
+                  >
+                    Back to goal selection
+                  </button>
+
+                  <Link href="/training" className="block text-center text-sm text-gray-500 hover:text-orange-600">
+                    Exit to My Training
+                  </Link>
                 </div>
-              )}
+              </>
+            )}
 
-              <button
-                type="button"
-                onClick={() => void createPlan()}
-                disabled={creating || loadingOrientation || !presetForWizard}
-                className="w-full rounded-lg bg-emerald-600 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {creating ? "Creating…" : "Create plan"}
-              </button>
-
-              <button
-                type="button"
-                onClick={exitWizard}
-                className="block w-full text-center text-sm text-gray-500 hover:text-gray-800"
-              >
-                Back to goal selection
-              </button>
-
-              <Link href="/training" className="block text-center text-sm text-gray-500 hover:text-orange-600">
-                Exit to My Training
-              </Link>
-            </div>
+            {!stepChoosePreset ? null : (
+              <div className="mt-8 border-t border-gray-100 pt-4">
+                <button
+                  type="button"
+                  onClick={exitWizard}
+                  className="block w-full text-center text-sm text-gray-500 hover:text-gray-800"
+                >
+                  Back to goal selection
+                </button>
+                <Link
+                  href="/training"
+                  className="mt-2 block text-center text-sm text-gray-500 hover:text-orange-600"
+                >
+                  Exit to My Training
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </AthleteAppShell>

@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { slug: slugBody, title, description, volume, workout } = body;
+    const { slug: slugBody, title, description, publicDescription, volume, workout } = body;
 
     if (!title || typeof title !== "string" || !title.trim()) {
       return NextResponse.json(
@@ -201,6 +201,10 @@ export async function POST(request: NextRequest) {
         description:
           typeof description === "string" && description.trim()
             ? description.trim()
+            : null,
+        publicDescription:
+          typeof publicDescription === "string" && publicDescription.trim()
+            ? publicDescription.trim()
             : null,
         ...(longRunConfigId !== undefined
           ? longRunConfigId

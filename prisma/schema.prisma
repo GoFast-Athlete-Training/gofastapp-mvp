@@ -1047,6 +1047,8 @@ model training_plan_preset {
   slug        String  @unique
   title       String
   description String?
+  /// Shown to athletes on preset selection; internal notes stay in `description`.
+  publicDescription String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

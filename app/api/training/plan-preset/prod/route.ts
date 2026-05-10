@@ -7,14 +7,11 @@ import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 /**
  * GET /api/training/plan-preset/prod
  *
- * Athlete-facing preset selection. Returns the appropriate preset for a given
- * fitness level. MVP1: only one preset exists (elite), so `fitnessLevel` is
- * accepted but always resolves to the first preset in the DB.
+ * Athlete-facing preset list for setup. MVP1: typically one preset (elite);
+ * `fitnessLevel` is accepted for future slug/level mapping.
  *
  * Query params:
- *   fitnessLevel  string  optional — defaults to "elite"
- *
- * Future: map fitnessLevel → preset slug when multiple presets exist.
+ *   fitnessLevel  string  optional — defaults to "elite" (reserved for future)
  */
 export async function GET(request: NextRequest) {
   const auth = await requireAthleteFromBearer(request);
@@ -25,26 +22,30 @@ export async function GET(request: NextRequest) {
   const fitnessLevel =
     request.nextUrl.searchParams.get("fitnessLevel")?.trim() || "elite";
 
-  // MVP1: single preset in DB — return it regardless of fitnessLevel value.
-  const preset = await prisma.training_plan_preset.findFirst({
+  const presets = await prisma.training_plan_preset.findMany({
     orderBy: { createdAt: "asc" },
     select: {
       id: true,
       slug: true,
       title: true,
       description: true,
+      publicDescription: true,
       volumeConstraints: {
-        select: { minWeeklyMiles: true, maxWeeklyMiles: true },
+        select: {
+          minWeeklyMiles: true,
+          maxWeeklyMiles: true,
+          baseMiles: true,
+        },
       },
     },
   });
 
-  if (!preset) {
+  if (presets.length === 0) {
     return NextResponse.json(
       { success: false, error: "No plan preset configured" },
       { status: 404 }
     );
   }
 
-  return NextResponse.json({ success: true, preset, fitnessLevel });
+  return NextResponse.json({ success: true, presets, fitnessLevel });
 }

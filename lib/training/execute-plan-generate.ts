@@ -217,8 +217,8 @@ export async function executePlanGenerate(params: {
     raceDistanceMiles,
     catalogueRowsById,
     minEasyPerDayMiles: 0,
-    minTempoMiles: planConfig.minTempoMiles ?? 3,
-    minIntervalMiles: planConfig.minIntervalMiles ?? 3,
+    minTempoMiles: 3,
+    minIntervalMiles: 3,
   });
 
   const syncedFiveKPace =

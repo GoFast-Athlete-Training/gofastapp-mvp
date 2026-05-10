@@ -18,8 +18,6 @@ export type PlanGenPresetBoltonsInput = {
     tempoIdealDow?: number | null;
     intervalIdealDow?: number | null;
     longRunDefaultDow?: number | null;
-    minTempoMiles?: number | null;
-    minIntervalMiles?: number | null;
   };
 };
 
@@ -30,8 +28,6 @@ export interface PlanGenConfig {
   baseMiles?: number | null;
   taperMiles?: number | null;
   maxWeeklyMiles?: number | null;
-  minTempoMiles?: number | null;
-  minIntervalMiles?: number | null;
   tempoIdealDow?: number | null;
   intervalIdealDow?: number | null;
   longRunDefaultDow?: number | null;
@@ -49,8 +45,6 @@ export function presetBoltonsToPlanGenConfig(
     peakMiles: volume.peakMiles ?? undefined,
     taperMiles: volume.taperMiles ?? undefined,
     maxWeeklyMiles: volume.maxWeeklyMiles ?? undefined,
-    minTempoMiles: workout.minTempoMiles ?? undefined,
-    minIntervalMiles: workout.minIntervalMiles ?? undefined,
     tempoIdealDow: workout.tempoIdealDow ?? undefined,
     intervalIdealDow: workout.intervalIdealDow ?? undefined,
     longRunDefaultDow: workout.longRunDefaultDow ?? undefined,
