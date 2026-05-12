@@ -481,20 +481,22 @@ export default function TrainingHubPage() {
         )}
 
         {showDashboard && planDetail && (
-          <div className="space-y-6 mb-8">
+          <div className="space-y-4 mb-8">
+            {/* Plan header — week context + miles all in one place */}
             <div className="flex flex-col gap-3 rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 text-sm sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-gray-900">{planDetail.name}</p>
-                <p className="text-gray-600">
+                <p className="text-gray-600 tabular-nums">
                   Week {weekNumber} of {effectiveTotalWeeks}
+                  {weekPlannedMiles != null ? ` · ${weekPlannedMiles} mi` : ""}
                   {calendarRangeLabel ? ` · ${calendarRangeLabel}` : ""}
                 </p>
                 {planDetail.race_registry?.name ? (
                   <p className="text-xs text-gray-500 mt-0.5">{planDetail.race_registry.name}</p>
                 ) : null}
                 {paceDisplay ? (
-                  <p className="mt-1 text-sm text-emerald-900/90">
-                    Current 5K pace (plan):{" "}
+                  <p className="mt-1 text-xs text-emerald-900/80">
+                    5K pace:{" "}
                     <span className="font-mono tabular-nums">{paceDisplay}</span>
                   </p>
                 ) : null}
@@ -533,13 +535,6 @@ export default function TrainingHubPage() {
                         >
                           Update plan
                         </Link>
-                        <Link
-                          href="/workouts"
-                          className="block px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
-                          onClick={() => setPlanMenuOpen(false)}
-                        >
-                          Workout log
-                        </Link>
                         <button
                           type="button"
                           disabled={deleting}
@@ -558,132 +553,33 @@ export default function TrainingHubPage() {
               </div>
             </div>
 
-            <div id="training-section-this-week" className="scroll-mt-24 space-y-4">
+            {/* Week strip + day detail — adjacent so tapping a day shows instantly */}
+            <div id="training-section-this-week" className="scroll-mt-24 space-y-3">
               {loadingWeek && (
                 <p className="text-sm text-gray-500">Loading this week…</p>
               )}
               {!loadingWeek && weekDays.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-                    This week
-                  </p>
-                  <WeekStrip
-                    days={weekDays}
-                    todayKey={todayKey}
-                    selectedDateKey={focusKey}
-                    onSelectDay={(d) => {
-                      setSelectedDayKey(d.dateKey);
-                    }}
-                  />
-                  {weekPlannedMiles != null ? (
-                    <p className="mt-2 text-sm font-medium text-gray-800 tabular-nums">
-                      Planned ~{weekPlannedMiles} mi this week
-                    </p>
-                  ) : null}
-                </div>
+                <WeekStrip
+                  days={weekDays}
+                  todayKey={todayKey}
+                  selectedDateKey={focusKey}
+                  onSelectDay={(d) => {
+                    setSelectedDayKey(d.dateKey);
+                  }}
+                />
               )}
-              {!loadingWeek &&
-                weekPerformance &&
-                weekPerformance.sessionsPlanned > 0 && (
-                  <div className="rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3 text-sm text-gray-800">
-                    <p className="font-semibold text-gray-900">Week performance</p>
-                    <p className="mt-1 tabular-nums">
-                      {weekPerformance.sessionsCompleted} of{" "}
-                      {weekPerformance.sessionsPlanned} sessions logged
-                      {weekPerformance.qualitySessionsPlanned > 0
-                        ? ` · ${weekPerformance.qualitySessionsCompleted}/${weekPerformance.qualitySessionsPlanned} quality (tempo/intervals)`
-                        : ""}
-                    </p>
-                    {weekPerformance.plannedMetersTotal > 0 && (
-                      <p className="mt-1 tabular-nums text-gray-700">
-                        Volume: ~
-                        {(weekPerformance.actualMetersMatched / 1609.34).toFixed(1)} mi actual vs ~
-                        {(weekPerformance.plannedMetersTotal / 1609.34).toFixed(1)} mi planned
-                        {weekPerformance.weeklyMileageCompletionPct != null
-                          ? ` (${weekPerformance.weeklyMileageCompletionPct.toFixed(0)}% of planned)`
-                          : ""}
-                      </p>
-                    )}
-                    {weekPerformance.qualityAvgDeltaSecPerMile != null && (
-                      <p className="mt-1 text-gray-700">
-                        Quality avg vs target pace:{" "}
-                        <span className="font-mono tabular-nums">
-                          {weekPerformance.qualityAvgDeltaSecPerMile > 0 ? "+" : ""}
-                          {weekPerformance.qualityAvgDeltaSecPerMile} sec/mi
-                        </span>
-                        <span className="text-gray-500">
-                          {" "}
-                          (positive = faster than target)
-                        </span>
-                      </p>
-                    )}
-                    {weekPerformance.longRunCompletionRatio != null && (
-                      <p className="mt-1 text-gray-700">
-                        Long run:{" "}
-                        {weekPerformance.longRunCompleted
-                          ? `logged (${Math.round(weekPerformance.longRunCompletionRatio * 100)}% of planned distance)`
-                          : "not logged yet"}
-                      </p>
-                    )}
-                  </div>
-                )}
-              {!loadingWeek &&
-                weekPerformance &&
-                weekPerformance.sessionsPlanned === 0 &&
-                weekDays.length > 0 && (
-                  <p className="text-sm text-gray-600">
-                    Open a scheduled day to create workouts — then logged runs will show in week
-                    performance.
-                  </p>
-                )}
               {!loadingWeek && weekDays.length === 0 && (
                 <p className="text-sm text-gray-600">No sessions this week in the schedule.</p>
               )}
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <Link
-                  href="/build-a-run"
-                  className="inline-flex justify-center rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-900 hover:bg-orange-100"
-                >
-                  Build a run
-                </Link>
-                <Link
-                  href="/gorun"
-                  className="inline-flex justify-center rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900 hover:bg-sky-100"
-                >
-                  Find a run with others
-                </Link>
-              </div>
-
-              {planDetail ? (
-                <details className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm group">
-                  <summary className="cursor-pointer font-medium text-gray-900 py-1 list-none [&::-webkit-details-marker]:hidden flex items-center gap-2">
-                    <span className="text-gray-400 group-open:rotate-90 transition inline-block">›</span>
-                    Full schedule ({effectiveTotalWeeks} weeks)
-                  </summary>
-                  <div className="pt-2 pb-1 text-gray-600 space-y-2">
-                    <p>
-                      Open the calendar to see every week, edit days, and regenerate when your goal
-                      changes.
-                    </p>
-                    <Link
-                      href={`/training-setup/${planDetail.id}`}
-                      className="inline-block font-semibold text-emerald-700 hover:text-emerald-800"
-                    >
-                      Open plan calendar →
-                    </Link>
-                  </div>
-                </details>
-              ) : null}
-            </div>
-
-            <div id="training-section-today" className="scroll-mt-24">
+              {/* Day detail — immediately after the strip */}
               {!loadingWeek && (
                 <div
+                  id="training-section-today"
                   className={
                     focusPlanDay?.matchedActivityId
-                      ? "rounded-2xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm"
-                      : "rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-6 shadow-sm"
+                      ? "rounded-2xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm scroll-mt-24"
+                      : "rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-6 shadow-sm scroll-mt-24"
                   }
                 >
                   <p
@@ -715,7 +611,7 @@ export default function TrainingHubPage() {
                         </p>
                         <div className="mt-4 space-y-1 rounded-xl border border-emerald-100 bg-white/70 px-4 py-3 text-sm text-gray-800">
                           <p className="tabular-nums">
-                            <span className="text-gray-500">Planned: </span>
+                            <span className="text-gray-500">Scheduled: </span>
                             {planDayMilesDisplay(focusPlanDay.estimatedDistanceInMeters)}
                           </p>
                           {focusPlanDay.actualDistanceMeters != null &&
@@ -737,7 +633,7 @@ export default function TrainingHubPage() {
                             </p>
                           ) : null}
                         </div>
-                        <div className="mt-5 flex flex-wrap gap-3">
+                        <div className="mt-5 flex flex-wrap items-center gap-3">
                           {focusPlanDay.workoutId ? (
                             <Link
                               href={`/workouts/${focusPlanDay.workoutId}`}
@@ -746,20 +642,20 @@ export default function TrainingHubPage() {
                               View results
                             </Link>
                           ) : null}
-                          {focusPlanDay.workoutId ? (
-                            <Link
-                              href={`/workouts/${focusPlanDay.workoutId}`}
-                              className="inline-flex justify-center rounded-xl border-2 border-emerald-400 bg-white px-6 py-3 text-sm font-semibold text-emerald-900 hover:bg-emerald-50"
-                            >
-                              Workout detail
-                            </Link>
-                          ) : null}
                           <Link
                             href={`/training/day/${focusPlanDay.dateKey}`}
                             className="inline-flex justify-center rounded-xl px-6 py-3 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-200 hover:bg-emerald-50"
                           >
-                            Session / day
+                            Session detail
                           </Link>
+                          {focusPlanDay.workoutId ? (
+                            <Link
+                              href={`/workouts/${focusPlanDay.workoutId}/let-others-join`}
+                              className="text-sm font-medium text-sky-700 hover:text-sky-900"
+                            >
+                              Invite crew →
+                            </Link>
+                          ) : null}
                         </div>
                       </>
                     ) : (
@@ -773,11 +669,11 @@ export default function TrainingHubPage() {
                             month: "short",
                             day: "numeric",
                           })}
+                          {focusPlanDay.estimatedDistanceInMeters
+                            ? ` · ${planDayMilesDisplay(focusPlanDay.estimatedDistanceInMeters)}`
+                            : ""}
                         </p>
-                        <p className="mt-1 text-sm text-gray-600 tabular-nums">
-                          Planned: {planDayMilesDisplay(focusPlanDay.estimatedDistanceInMeters)}
-                        </p>
-                        <div className="mt-5 flex flex-wrap gap-3">
+                        <div className="mt-5 flex flex-wrap items-center gap-3">
                           <Link
                             href={`/training/day/${focusPlanDay.dateKey}`}
                             className="inline-flex justify-center rounded-xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-700"
@@ -786,10 +682,10 @@ export default function TrainingHubPage() {
                           </Link>
                           {focusPlanDay.workoutId ? (
                             <Link
-                              href={`/workouts/${focusPlanDay.workoutId}`}
-                              className="inline-flex justify-center rounded-xl border-2 border-orange-400 bg-white px-6 py-3 text-sm font-semibold text-orange-900 hover:bg-orange-50"
+                              href={`/workouts/${focusPlanDay.workoutId}/let-others-join`}
+                              className="text-sm font-medium text-sky-700 hover:text-sky-900"
                             >
-                              Workout detail
+                              Invite crew →
                             </Link>
                           ) : null}
                         </div>
@@ -825,6 +721,85 @@ export default function TrainingHubPage() {
               )}
             </div>
 
+            {/* Secondary actions — always visible, not buried */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 text-sm">
+              <Link href="/gorun" className="font-medium text-gray-600 hover:text-gray-900">
+                Find a run with others
+              </Link>
+              <span className="text-gray-300" aria-hidden>·</span>
+              <Link href="/build-a-run" className="font-medium text-gray-600 hover:text-gray-900">
+                Create a workout from scratch
+              </Link>
+              <span className="text-gray-300" aria-hidden>·</span>
+              <Link href="/workouts" className="font-medium text-gray-600 hover:text-gray-900">
+                Workout log
+              </Link>
+            </div>
+
+            {/* Week performance */}
+            {!loadingWeek &&
+              weekPerformance &&
+              weekPerformance.sessionsPlanned > 0 && (
+                <div className="rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3 text-sm text-gray-800">
+                  <p className="font-semibold text-gray-900">Week performance</p>
+                  <p className="mt-1 tabular-nums">
+                    {weekPerformance.sessionsCompleted} of{" "}
+                    {weekPerformance.sessionsPlanned} sessions logged
+                    {weekPerformance.qualitySessionsPlanned > 0
+                      ? ` · ${weekPerformance.qualitySessionsCompleted}/${weekPerformance.qualitySessionsPlanned} quality (tempo/intervals)`
+                      : ""}
+                  </p>
+                  {weekPerformance.plannedMetersTotal > 0 && (
+                    <p className="mt-1 tabular-nums text-gray-700">
+                      Volume: {(weekPerformance.actualMetersMatched / 1609.34).toFixed(1)} mi logged
+                      {" "}of {(weekPerformance.plannedMetersTotal / 1609.34).toFixed(1)} mi scheduled
+                      {weekPerformance.weeklyMileageCompletionPct != null
+                        ? ` (${weekPerformance.weeklyMileageCompletionPct.toFixed(0)}%)`
+                        : ""}
+                    </p>
+                  )}
+                  {weekPerformance.qualityAvgDeltaSecPerMile != null && (
+                    <p className="mt-1 text-gray-700">
+                      Quality avg vs target:{" "}
+                      <span className="font-mono tabular-nums">
+                        {weekPerformance.qualityAvgDeltaSecPerMile > 0 ? "+" : ""}
+                        {weekPerformance.qualityAvgDeltaSecPerMile} sec/mi
+                      </span>
+                      <span className="text-gray-500"> (positive = faster)</span>
+                    </p>
+                  )}
+                  {weekPerformance.longRunCompletionRatio != null && (
+                    <p className="mt-1 text-gray-700">
+                      Long run:{" "}
+                      {weekPerformance.longRunCompleted
+                        ? `logged (${Math.round(weekPerformance.longRunCompletionRatio * 100)}% of scheduled distance)`
+                        : "not logged yet"}
+                    </p>
+                  )}
+                </div>
+              )}
+
+            {/* Full schedule collapsible */}
+            {planDetail ? (
+              <details className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm group">
+                <summary className="cursor-pointer font-medium text-gray-900 py-1 list-none [&::-webkit-details-marker]:hidden flex items-center gap-2">
+                  <span className="text-gray-400 group-open:rotate-90 transition inline-block">›</span>
+                  Full schedule ({effectiveTotalWeeks} weeks)
+                </summary>
+                <div className="pt-2 pb-1 text-gray-600 space-y-2">
+                  <p>
+                    Open the calendar to see every week, edit days, and regenerate when your goal
+                    changes.
+                  </p>
+                  <Link
+                    href={`/training-setup/${planDetail.id}`}
+                    className="inline-block font-semibold text-emerald-700 hover:text-emerald-800"
+                  >
+                    Open plan calendar →
+                  </Link>
+                </div>
+              </details>
+            ) : null}
           </div>
         )}
 

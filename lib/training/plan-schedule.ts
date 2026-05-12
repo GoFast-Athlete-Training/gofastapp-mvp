@@ -117,6 +117,42 @@ function rawWeek(planSchedule: unknown, weekNumber: number): unknown | null {
   );
 }
 
+/** Unique catalogue workout IDs referenced in structured weeks of planSchedule. */
+export function collectCatalogueWorkoutIdsFromPlanSchedule(
+  planSchedule: unknown
+): string[] {
+  const ids = new Set<string>();
+  if (!Array.isArray(planSchedule)) return [];
+  for (const w of planSchedule) {
+    if (!isStructuredPlanWeek(w)) continue;
+    for (const d of w.days) {
+      const id = d.catalogueWorkoutId?.trim();
+      if (id) ids.add(id);
+    }
+  }
+  return [...ids];
+}
+
+/** IDs that may appear when expanding a single plan week (includes folded week N+1 on race Monday). */
+export function collectCatalogueWorkoutIdsForWeekSchedule(
+  planSchedule: unknown,
+  weekNumber: number,
+  totalWeeks: number
+): string[] {
+  const ids = new Set<string>();
+  function scan(wn: number) {
+    const entry = rawWeek(planSchedule, wn);
+    if (!isStructuredPlanWeek(entry)) return;
+    for (const d of entry.days) {
+      const id = d.catalogueWorkoutId?.trim();
+      if (id) ids.add(id);
+    }
+  }
+  scan(weekNumber);
+  if (weekNumber === totalWeeks) scan(weekNumber + 1);
+  return [...ids];
+}
+
 function scheduleEntryLegacy(
   planSchedule: unknown,
   weekNumber: number
@@ -159,12 +195,25 @@ export function expandWeekSchedule(params: {
   raceName: string | null;
   raceDistanceMiles: number | null;
   totalWeeks?: number;
+  /** When set, Tempo/Intervals card titles use catalogue names for linked IDs. */
+  catalogueTitleById?: Readonly<Record<string, string>>;
 }): PlanScheduleDay[] {
   const planJson = params.planSchedule ?? params.planWeeks ?? null;
+  const catalogueTitleById = params.catalogueTitleById;
 
   const structured = scheduleEntryStructured(planJson, params.weekNumber);
   if (structured) {
-    return expandStructuredDays({ ...params, structured, planJson });
+    return expandStructuredDays({
+      planStartDate: params.planStartDate,
+      structured,
+      planJson,
+      weekNumber: params.weekNumber,
+      raceDate: params.raceDate,
+      raceName: params.raceName,
+      raceDistanceMiles: params.raceDistanceMiles,
+      totalWeeks: params.totalWeeks,
+      catalogueTitleById,
+    });
   }
 
   /** Legacy compact string rows */
@@ -181,6 +230,7 @@ export function planScheduleDaysForWeek(params: {
   raceName: string | null;
   raceDistanceMiles: number | null;
   totalWeeks?: number;
+  catalogueTitleById?: Readonly<Record<string, string>>;
 }): PlanScheduleDay[] {
   return expandWeekSchedule({
     planStartDate: params.planStartDate,
@@ -190,6 +240,7 @@ export function planScheduleDaysForWeek(params: {
     raceName: params.raceName,
     raceDistanceMiles: params.raceDistanceMiles,
     totalWeeks: params.totalWeeks,
+    catalogueTitleById: params.catalogueTitleById,
   });
 }
 
@@ -202,6 +253,7 @@ function expandStructuredDays(params: {
   raceName: string | null;
   raceDistanceMiles: number | null;
   totalWeeks?: number;
+  catalogueTitleById?: Readonly<Record<string, string>>;
 }): PlanScheduleDay[] {
   const {
     planStartDate,
@@ -264,9 +316,15 @@ function expandStructuredDays(params: {
         raceName: raceName ?? undefined,
       });
     } else if (workoutType === "Intervals" || workoutType === "Tempo") {
-      title =
-        titleFromCycleIndex(workoutType, opts.planCycleIndex ?? 0) ??
-        formatPlannedWorkoutTitle(workoutType, estMeters);
+      const cid = opts.catalogueWorkoutId?.trim();
+      const catTitle =
+        cid && params.catalogueTitleById?.[cid]?.trim()
+          ? params.catalogueTitleById[cid]!.trim()
+          : null;
+      title = catTitle
+        ? catTitle
+        : titleFromCycleIndex(workoutType, opts.planCycleIndex ?? 0) ??
+          formatPlannedWorkoutTitle(workoutType, estMeters);
     } else {
       title = formatPlannedWorkoutTitle(workoutType, estMeters);
     }
@@ -477,6 +535,7 @@ export function planScheduleDayForDateKey(params: {
   raceDistanceMiles: number | null;
   dateKey: string;
   maxWeekNumber?: number;
+  catalogueTitleById?: Readonly<Record<string, string>>;
 }): PlanScheduleDay | null {
   const raw = params.planSchedule ?? params.planWeeks ?? null;
   if (!raw || !Array.isArray(raw)) return null;
@@ -513,6 +572,7 @@ export function planScheduleDayForDateKey(params: {
       raceName: params.raceName,
       raceDistanceMiles: params.raceDistanceMiles,
       totalWeeks: totalWeeksForSchedule,
+      catalogueTitleById: params.catalogueTitleById,
     });
     const hit = days.find((d) => d.dateKey === params.dateKey);
     if (hit) return hit;

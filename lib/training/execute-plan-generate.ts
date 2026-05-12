@@ -95,6 +95,23 @@ export async function executePlanGenerate(params: {
   const tempoPositions =
     rawPreset.tempoConfig?.positions.map(mapPositionRow) ?? [];
 
+  function qualityRotationInvalid(
+    positions: readonly { catalogueWorkoutId: string | null }[]
+  ): boolean {
+    if (positions.length === 0) return true;
+    return !positions.some((p) => p.catalogueWorkoutId?.trim());
+  }
+  if (qualityRotationInvalid(intervalsPositions)) {
+    throw new Error(
+      `Training preset "${presetLabel}" has no interval rotation or every slot is missing a catalogue workout. Fix the intervals config in GoFast Company.`
+    );
+  }
+  if (qualityRotationInvalid(tempoPositions)) {
+    throw new Error(
+      `Training preset "${presetLabel}" has no tempo rotation or every slot is missing a catalogue workout. Fix the tempo config in GoFast Company.`
+    );
+  }
+
   const catalogueIds = catalogueIdsFromPreset(rawPreset as LoadedPresetInclude);
   const catalogueRowsFull: CatalogueGenerationRowSelection[] =
     catalogueIds.length > 0

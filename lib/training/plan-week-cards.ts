@@ -4,7 +4,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { effectiveTrainingWeekCount, utcDateOnly } from "./plan-utils";
-import { planScheduleDaysForWeek, weekBoundsFromPlan } from "./plan-schedule";
+import { planScheduleDaysForWeek, weekBoundsFromPlan, collectCatalogueWorkoutIdsForWeekSchedule } from "./plan-schedule";
 
 export type PlanDayCard = {
   /** Present once the athlete has opened this day (lazy materialization). */
@@ -53,14 +53,32 @@ export async function buildPlanWeekCards(params: {
     params.raceDate
   );
 
+  const rawSchedule = params.planSchedule ?? params.planWeeks;
+  const catIds = collectCatalogueWorkoutIdsForWeekSchedule(
+    rawSchedule,
+    params.weekNumber,
+    effectiveWeeks
+  );
+  let catalogueTitleById: Record<string, string> = {};
+  if (catIds.length > 0) {
+    const rows = await prisma.workout_catalogue.findMany({
+      where: { id: { in: catIds } },
+      select: { id: true, name: true },
+    });
+    for (const r of rows) {
+      catalogueTitleById[r.id] = r.name;
+    }
+  }
+
   const scheduled = planScheduleDaysForWeek({
     planStartDate: params.planStartDate,
-    planSchedule: params.planSchedule ?? params.planWeeks,
+    planSchedule: rawSchedule,
     weekNumber: params.weekNumber,
     raceDate: params.raceDate,
     raceName: params.raceName,
     raceDistanceMiles: params.raceDistanceMiles,
     totalWeeks: effectiveWeeks,
+    catalogueTitleById,
   });
 
   const { weekStart, weekEnd } = weekBoundsFromPlan(

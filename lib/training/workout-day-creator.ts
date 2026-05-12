@@ -6,7 +6,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { utcDateOnly } from "./plan-utils";
 import { buildPlanWorkoutApiSegments } from "./workout-segment-generator";
-import { planScheduleDayForDateKey } from "./plan-schedule";
+import { planScheduleDayForDateKey, collectCatalogueWorkoutIdsFromPlanSchedule } from "./plan-schedule";
 import { metersToMiles } from "@/lib/pace-utils";
 import { segmentSnapshotDocumentFromApiSegments } from "./workout-segment-snapshot";
 
@@ -77,6 +77,18 @@ export async function findOrCreateWorkoutForPlanDay(params: {
       ? metersToMiles(Number(race.distanceMeters))
       : null;
 
+  const catIds = collectCatalogueWorkoutIdsFromPlanSchedule(plan.planSchedule);
+  let catalogueTitleById: Record<string, string> = {};
+  if (catIds.length > 0) {
+    const catRows = await prisma.workout_catalogue.findMany({
+      where: { id: { in: catIds } },
+      select: { id: true, name: true },
+    });
+    for (const r of catRows) {
+      catalogueTitleById[r.id] = r.name;
+    }
+  }
+
   const scheduled = planScheduleDayForDateKey({
     planStartDate: plan.startDate,
     planSchedule: plan.planSchedule,
@@ -85,6 +97,7 @@ export async function findOrCreateWorkoutForPlanDay(params: {
     raceDistanceMiles,
     dateKey,
     maxWeekNumber: plan.totalWeeks,
+    catalogueTitleById,
   });
 
   if (!scheduled) {

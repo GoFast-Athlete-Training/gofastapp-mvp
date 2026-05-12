@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { planScheduleDaysForWeek } from "@/lib/training/plan-schedule";
+import { planScheduleDaysForWeek, collectCatalogueWorkoutIdsFromPlanSchedule } from "@/lib/training/plan-schedule";
 import {
   currentTrainingWeekNumber,
   effectiveTrainingWeekCount,
@@ -103,6 +103,18 @@ export async function GET(request: NextRequest) {
       planWeekNumber = startWeek;
       planTotalWeeks = effectiveWeeks;
 
+      const allCatIds = collectCatalogueWorkoutIdsFromPlanSchedule(plan.planSchedule);
+      let catalogueTitleById: Record<string, string> = {};
+      if (allCatIds.length > 0) {
+        const catRows = await prisma.workout_catalogue.findMany({
+          where: { id: { in: allCatIds } },
+          select: { id: true, name: true },
+        });
+        for (const r of catRows) {
+          catalogueTitleById[r.id] = r.name;
+        }
+      }
+
       for (
         let weekNum = startWeek;
         weekNum <= effectiveWeeks;
@@ -120,6 +132,7 @@ export async function GET(request: NextRequest) {
               ? metersToMiles(Number(race.distanceMeters))
               : null,
           totalWeeks: effectiveWeeks,
+          catalogueTitleById,
         });
 
         for (const d of weekDays) {
