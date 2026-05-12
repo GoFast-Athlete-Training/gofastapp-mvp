@@ -216,9 +216,6 @@ export async function executePlanGenerate(params: {
     peakMiles,
     taperMiles,
     longRunPositions,
-    calculatedLongRunMax: placement.calculatedLongRunMax,
-    rampFromWeeklyMiles: params.athleteWeeklyMileage,
-    weeklyMileageTarget,
   });
 
   const cupResult = longRunCupSetter({
