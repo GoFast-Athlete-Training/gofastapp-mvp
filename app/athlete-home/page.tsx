@@ -23,6 +23,8 @@ import LogRaceResultSheet from '@/components/races/LogRaceResultSheet';
 import RaceCompleteModal, {
   isRaceCongratsDismissed,
 } from '@/components/athlete/RaceCompleteModal';
+import { PaceContextCard } from '@/components/athlete/PaceContextCard';
+import { SignupRaceDayBeforeBanner } from '@/components/races/RaceDayBanner';
 import type { RaceCompleteAnalysis } from '@/components/athlete/RaceCompleteModal';
 import Image from 'next/image';
 import api from '@/lib/api';
@@ -809,12 +811,11 @@ export default function AthleteHomePage() {
     primaryRaceRegistryId != null &&
     primaryGoal?.race_registry != null;
 
-  const showSignupRaceWeekBanner =
+  const showSignupDayBeforeBanner =
     !raceDaySignupForHome &&
     !showGoalRaceWeekBanner &&
     upcomingRaceSignupForHome != null &&
-    daysUntilUpcomingRace != null &&
-    daysUntilUpcomingRace > 0;
+    daysUntilUpcomingRace === 1;
 
   const cityRecapRun =
     myPastRuns.find((r) => !dismissedRecapRunIds.has(r.id)) ?? null;
@@ -967,7 +968,7 @@ export default function AthleteHomePage() {
                         </p>
                       ) : null}
                       <p className="mt-3 text-xl font-bold text-white">
-                        Good luck
+                        Go crush it
                         {typeof athlete?.firstName === 'string' && athlete.firstName.trim()
                           ? `, ${athlete.firstName.trim()}`
                           : ''}
@@ -1025,7 +1026,7 @@ export default function AthleteHomePage() {
                         </p>
                       ) : null}
                       <p className="mt-3 text-xl font-bold text-white">
-                        Go get it
+                        Go crush it
                         {typeof athlete?.firstName === 'string' && athlete.firstName.trim()
                           ? `, ${athlete.firstName.trim()}`
                           : ''}
@@ -1159,37 +1160,15 @@ export default function AthleteHomePage() {
                   </Link>
                 </div>
               </div>
-            ) : showSignupRaceWeekBanner &&
-              upcomingRaceSignupForHome &&
-              daysUntilUpcomingRace != null ? (
-              <div className="mb-4 rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-5 shadow-sm">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-violet-800">
-                      Race in {daysUntilUpcomingRace} day
-                      {daysUntilUpcomingRace === 1 ? '' : 's'}
-                    </p>
-                    <h2 className="mt-1 text-lg font-bold text-gray-900">
-                      {upcomingRaceSignupForHome.race_registry.name}
-                    </h2>
-                    {upcomingRaceSignupForHome.race_registry.distanceLabel ? (
-                      <p className="text-sm text-gray-600">
-                        {upcomingRaceSignupForHome.race_registry.distanceLabel}
-                      </p>
-                    ) : null}
-                    <p className="mt-2 text-sm text-gray-700">
-                      You&apos;ve put in the work. Race week is here.
-                    </p>
-                  </div>
-                  <Link
-                    href={`/race-hub/${upcomingRaceSignupForHome.race_registry.id}`}
-                    className="inline-flex shrink-0 items-center justify-center rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
-                  >
-                    Race hub
-                  </Link>
-                </div>
-              </div>
+            ) : showSignupDayBeforeBanner && upcomingRaceSignupForHome ? (
+              <SignupRaceDayBeforeBanner
+                raceRegistryId={upcomingRaceSignupForHome.race_registry.id}
+                raceName={upcomingRaceSignupForHome.race_registry.name}
+                distanceLabel={upcomingRaceSignupForHome.race_registry.distanceLabel}
+                slug={upcomingRaceSignupForHome.race_registry.slug}
+              />
             ) : null}
+
 
             {cityRecapRun ? (
               <div className="mb-4 rounded-2xl border-2 border-amber-400/80 bg-gradient-to-br from-amber-50 to-orange-50/90 p-4 sm:p-5 shadow-sm">
@@ -1739,6 +1718,28 @@ export default function AthleteHomePage() {
                 >
                   {lastSyncedActivity.linkedWorkoutId ? 'View workout →' : 'View activity →'}
                 </Link>
+              </div>
+            ) : null}
+
+            {lastSyncedActivity?.distance != null &&
+            lastSyncedActivity.distance > 0 &&
+            lastSyncedActivity.duration != null &&
+            lastSyncedActivity.duration > 0 ? (
+              <div className="mb-6">
+                <PaceContextCard
+                  variant="embedded"
+                  fromActivity={{
+                    distanceMeters: lastSyncedActivity.distance,
+                    durationSeconds: lastSyncedActivity.duration,
+                  }}
+                  goalPace5KSecPerMile={
+                    typeof primaryGoal?.goalPace5K === 'number' ? primaryGoal.goalPace5K : null
+                  }
+                  goalTimeLabel={
+                    typeof primaryGoal?.goalTime === 'string' ? primaryGoal.goalTime : null
+                  }
+                  title="Latest run vs your goal"
+                />
               </div>
             ) : null}
 

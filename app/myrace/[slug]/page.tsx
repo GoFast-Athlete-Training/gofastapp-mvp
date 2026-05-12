@@ -7,7 +7,7 @@ import { auth } from "@/lib/firebase";
 import api from "@/lib/api";
 import { Calendar, MapPin, Users, Flag, ChevronLeft } from "lucide-react";
 import { formatRaceListDate } from "@/lib/races-display";
-import { InlineGoalForm } from "@/components/races/InlineGoalForm";
+import { RacePlanSection } from "@/components/races/RacePlanSection";
 
 type ResolvedRace = {
   id: string;
@@ -32,6 +32,7 @@ type GoalRow = {
   name?: string | null;
   goalTime?: string | null;
   goalRacePace?: number | null;
+  goalPace5K?: number | null;
   raceRegistryId?: string | null;
   race_registry?: { id: string } | null;
 };
@@ -217,16 +218,11 @@ export default function MyRacePage() {
         </div>
       ) : isGoalRace ? (
         <section className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-5 shadow-sm mb-6">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-1">
-            <Flag className="w-5 h-5 text-orange-600" />
-            Your goal
-          </h2>
-          <p className="text-gray-600 text-sm mb-2">
-            Set your target finish time here or from My Races.
-          </p>
-
-          <InlineGoalForm race={race} goal={goal} onSaved={setGoal} className="mt-1" />
-
+          <RacePlanSection
+            race={race}
+            goal={goal}
+            onGoalSaved={setGoal}
+          />
           {goal?.id && goal.goalTime ? (
             <div className="mt-4 pt-3 border-t border-orange-100">
               <Link

@@ -21,6 +21,8 @@ export type RaceForGoal = {
 export type InlineGoalRow = {
   id: string;
   goalTime?: string | null;
+  goalRacePace?: number | null;
+  goalPace5K?: number | null;
   raceRegistryId?: string | null;
   race_registry?: { id: string } | null;
 };
