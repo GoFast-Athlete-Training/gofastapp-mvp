@@ -227,9 +227,11 @@ export default function TrainingSetupPlanPage({
       setPreferredDaysLocal([]);
     }
     const fromPlan =
-      plan.weeklyMileageTarget ?? plan.currentWeeklyMileage ?? null;
-    if (fromPlan != null && Number.isFinite(Number(fromPlan))) {
-      setWeeklyMilesTarget(String(Math.round(Number(fromPlan))));
+      plan.weeklyMileageTarget != null && Number.isFinite(Number(plan.weeklyMileageTarget))
+        ? Math.round(Number(plan.weeklyMileageTarget))
+        : null;
+    if (fromPlan != null) {
+      setWeeklyMilesTarget(String(fromPlan));
     } else {
       setWeeklyMilesTarget("50");
     }
@@ -253,7 +255,6 @@ export default function TrainingSetupPlanPage({
     plan?.preferredLongRunDow,
     plan?.preferredQualityDays,
     plan?.weeklyMileageTarget,
-    plan?.currentWeeklyMileage,
   ]);
 
   useEffect(() => {
@@ -596,13 +597,14 @@ export default function TrainingSetupPlanPage({
             <div className="mb-6 space-y-6">
               <div className="rounded-xl border border-orange-100 bg-orange-50/80 p-4 text-sm text-gray-800">
                 <p className="font-medium text-gray-900">
-                  We&apos;ll build your plan for you
+                  Choose your training preferences
                 </p>
                 <p className="mt-2 leading-relaxed text-gray-700">
                   Tell us roughly how many miles you want in a typical week and
-                  which days you like to run. We use that to size the plan. Each
-                  week won&apos;t match that number exactly—long-run weeks, taper,
-                  and recovery will move weekly volume up and down.
+                  which days you like to run. We use that to size the plan before we
+                  generate your schedule. Each week won&apos;t match that number
+                  exactly—long-run weeks, taper, and recovery will move weekly volume
+                  up and down.
                 </p>
               </div>
 
@@ -612,7 +614,7 @@ export default function TrainingSetupPlanPage({
                   role="status"
                 >
                   <p className="mb-2 font-medium text-amber-950">
-                    Before you build
+                    Before you continue
                   </p>
                   <ul className="list-disc space-y-1 pl-5 text-amber-900/95">
                     {presetGenerateWarnings.map((w, i) => (
@@ -773,7 +775,9 @@ export default function TrainingSetupPlanPage({
                 disabled={generating}
                 className="w-full rounded-lg bg-orange-500 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-orange-600 disabled:opacity-50"
               >
-                {generating ? "Building your plan…" : "Build my plan"}
+                {generating
+                  ? "Saving preferences & generating schedule…"
+                  : "Save preferences & generate schedule"}
               </button>
             </div>
           )}

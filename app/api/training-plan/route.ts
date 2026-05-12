@@ -215,10 +215,8 @@ export async function POST(request: NextRequest) {
           startDate,
           totalWeeks,
           currentWeeklyMileage: weeklyResolved,
-          weeklyMileageTarget:
-            weeklyResolved != null && Number.isFinite(Number(weeklyResolved))
-              ? Math.max(25, Math.min(100, Math.round(Number(weeklyResolved))))
-              : null,
+          /// Set on the preferences screen after plan creation — not the wizard baseline.
+          weeklyMileageTarget: null,
           currentFiveKPace: fiveKPaceResolved,
           goalRaceTime: gt,
           ...(imprintedGoalPace ? { goalRacePace: imprintedGoalPace } : {}),
