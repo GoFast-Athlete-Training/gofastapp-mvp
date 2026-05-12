@@ -72,10 +72,7 @@ export async function planGeneratePostHandler(
     let weeklyMileageTarget =
       typeof rawTarget === "number" && Number.isFinite(rawTarget)
         ? Math.round(rawTarget)
-        : plan.weeklyMileageTarget ??
-          prefs?.weeklyMileageTarget ??
-          athlete.weeklyMileage ??
-          45;
+        : plan.weeklyMileageTarget ?? prefs?.weeklyMileageTarget ?? 45;
 
     weeklyMileageTarget = Math.max(
       minWeeklyMiles,

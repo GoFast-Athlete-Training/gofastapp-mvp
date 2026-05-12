@@ -125,7 +125,12 @@ export async function executePlanGenerate(params: {
     catalogueRowsFull.map((r) => [r.id, r])
   );
 
-  let weeklyMileageTarget = params.weeklyMileageTarget;
+  /** Athlete preference (persisted on the plan). Preset max caps generation only. */
+  const requestedWeeklyMileageTarget = Math.max(
+    params.minWeeklyMiles,
+    Math.min(100, params.weeklyMileageTarget)
+  );
+  let weeklyMileageTarget = requestedWeeklyMileageTarget;
   const cap = planConfig.maxWeeklyMiles;
   if (cap != null && Number.isFinite(cap) && cap > 0) {
     weeklyMileageTarget = Math.min(weeklyMileageTarget, cap);
@@ -303,7 +308,7 @@ export async function executePlanGenerate(params: {
       taperStartWeekNumber: placement.taperStartWeekNumber,
       calculatedLongRunMax: placement.calculatedLongRunMax,
       cyclePoolData: cyclePoolData as unknown as Prisma.InputJsonValue,
-      weeklyMileageTarget,
+      weeklyMileageTarget: requestedWeeklyMileageTarget,
       totalWeeks: weekCount,
       ...(syncedFiveKPace != null ? { currentFiveKPace: syncedFiveKPace } : {}),
       ...(mergedGoalTime ? { goalRaceTime: mergedGoalTime } : {}),

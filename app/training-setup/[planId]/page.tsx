@@ -34,6 +34,11 @@ type PlanPresetSummary = {
   title: string;
   intervalsConfig: { positions: unknown[] } | null;
   tempoConfig: { positions: unknown[] } | null;
+  volumeConstraints?: {
+    baseMiles?: number | null;
+    minWeeklyMiles?: number | null;
+    maxWeeklyMiles?: number | null;
+  } | null;
 } | null;
 
 type CyclePoolData = {
@@ -102,6 +107,32 @@ const LONG_RUN_DAY_OPTIONS: { value: number; label: string }[] = [
 
 /** Matches generator default floor; not user-editable. */
 const ENGINE_MIN_WEEKLY_MI = 40;
+
+const MI_TARGET_FALLBACK = "50";
+
+/** When the plan has no saved target yet, seed from preset base miles (clamped), not preset max. */
+function defaultWeeklyTargetFromPreset(preset: NonNullable<PlanPresetSummary>): string {
+  const vc = preset.volumeConstraints;
+  if (!vc || typeof vc !== "object") return MI_TARGET_FALLBACK;
+  const baseRaw = vc.baseMiles;
+  const base =
+    baseRaw != null && Number.isFinite(Number(baseRaw))
+      ? Math.round(Number(baseRaw))
+      : null;
+  const minRaw = vc.minWeeklyMiles;
+  const vmin =
+    minRaw != null && Number.isFinite(Number(minRaw))
+      ? Math.round(Number(minRaw))
+      : ENGINE_MIN_WEEKLY_MI;
+  const maxRaw = vc.maxWeeklyMiles;
+  const vmax =
+    maxRaw != null && Number.isFinite(Number(maxRaw)) ? Math.round(Number(maxRaw)) : null;
+  let n = base ?? 50;
+  n = Math.max(vmin, n);
+  if (vmax != null) n = Math.min(vmax, n);
+  n = Math.max(25, Math.min(100, n));
+  return String(n);
+}
 
 const MI_PER_M = 1609.34;
 
@@ -216,7 +247,7 @@ export default function TrainingSetupPlanPage({
   const [weekNumber, setWeekNumber] = useState(1);
   const [phaseModalOpen, setPhaseModalOpen] = useState(false);
   const [preferredDaysLocal, setPreferredDaysLocal] = useState<number[]>([]);
-  const [weeklyMilesTarget, setWeeklyMilesTarget] = useState("50");
+  const [weeklyMilesTarget, setWeeklyMilesTarget] = useState(MI_TARGET_FALLBACK);
   const [preferredLongRunDowLocal, setPreferredLongRunDowLocal] = useState(6);
   const [preferredTempoDowLocal, setPreferredTempoDowLocal] = useState<number | null>(null);
   const [preferredIntervalDowLocal, setPreferredIntervalDowLocal] = useState<number | null>(
@@ -263,8 +294,10 @@ export default function TrainingSetupPlanPage({
         : null;
     if (fromPlan != null) {
       setWeeklyMilesTarget(String(fromPlan));
+    } else if (plan.training_plan_preset) {
+      setWeeklyMilesTarget(defaultWeeklyTargetFromPreset(plan.training_plan_preset));
     } else {
-      setWeeklyMilesTarget("50");
+      setWeeklyMilesTarget(MI_TARGET_FALLBACK);
     }
     const pld = plan.preferredLongRunDow;
     if (pld === 6 || pld === 7) {
@@ -296,6 +329,7 @@ export default function TrainingSetupPlanPage({
     plan?.preferredIntervalDow,
     plan?.preferredQualityDays,
     plan?.weeklyMileageTarget,
+    plan?.training_plan_preset,
   ]);
 
   useEffect(() => {
