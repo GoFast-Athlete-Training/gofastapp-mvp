@@ -286,7 +286,7 @@ export default function TrainingHubPage() {
         <div className="mb-6 lg:mb-8">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Plan</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Train</h1>
               <p className="text-gray-600 text-sm sm:text-base">
                 Your schedule this week. Logged runs and analysis live in{" "}
                 <Link href="/performance" className="font-semibold text-orange-600 hover:text-orange-700">
