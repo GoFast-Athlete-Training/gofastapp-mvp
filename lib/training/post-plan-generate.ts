@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { executePlanGenerate } from "@/lib/training/execute-plan-generate";
@@ -47,13 +48,14 @@ export async function planGeneratePostHandler(
       Array.isArray(plan.planSchedule) &&
       (plan.planSchedule as unknown[]).length > 0;
     if (scheduleExists) {
-      return NextResponse.json(
-        {
-          error:
-            "Plan already has a generated schedule; delete the plan or clear schedule to regenerate.",
+      await prisma.training_plans.update({
+        where: { id: trainingPlanId },
+        data: {
+          planSchedule: Prisma.JsonNull,
+          cyclePoolData: Prisma.JsonNull,
+          updatedAt: new Date(),
         },
-        { status: 400 }
-      );
+      });
     }
 
     const prefs = await prisma.trainingPreferences.findUnique({
