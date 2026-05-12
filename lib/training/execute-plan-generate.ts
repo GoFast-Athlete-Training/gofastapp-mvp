@@ -1,6 +1,6 @@
 /**
- * Orchestrator: load preset + catalogue rows; stub skeleton → LR → quality/easy;
- * persists structured planSchedule (+ skeleton scalars). No workouts rows here.
+ * Orchestrator: load preset + catalogue rows; assign workout days → long run → tempo → interval → easy;
+ * persists structured planSchedule (+ skeleton scalars). No workout rows here.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -8,9 +8,11 @@ import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
 import { Prisma } from "@prisma/client";
 import { metersToMiles } from "@/lib/pace-utils";
 import { goalRacePaceDisplayString } from "@/lib/training/goal-pace-calculator";
-import { buildPlanScheduleStub } from "@/lib/training/plan-schedule-stub";
+import { assignWorkoutDays } from "@/lib/training/assign-workout-days";
 import { applyLongRunSchedule } from "@/lib/training/apply-long-run";
-import { applyQualityAndEasySchedule } from "@/lib/training/apply-quality-easy";
+import { applyTempoSchedule } from "@/lib/training/apply-tempo";
+import { applyIntervalSchedule } from "@/lib/training/apply-interval";
+import { distributeEasyMiles } from "@/lib/training/distribute-easy";
 import {
   catalogueIdsFromPreset,
   catalogueSelectForGeneration,
@@ -21,7 +23,7 @@ import {
   type CatalogueGenerationRowSelection,
   type PlanGenPresetBoltonsInput,
 } from "@/lib/training/plan-generate-presets-loader";
-import type { CatalogueMileEstimateInput } from "@/lib/training/apply-quality-easy";
+import type { CatalogueMileEstimateInput } from "@/lib/training/catalogue-mile-estimate";
 
 export async function executePlanGenerate(params: {
   athleteId: string;
@@ -33,7 +35,8 @@ export async function executePlanGenerate(params: {
     startDate: Date;
     preferredDays: number[];
     preferredLongRunDow: number | null;
-    preferredQualityDays?: number[];
+    preferredTempoDow?: number | null;
+    preferredIntervalDow?: number | null;
     currentFiveKPace: string | null;
     weeklyMileageTarget: number | null;
   };
@@ -139,7 +142,7 @@ export async function executePlanGenerate(params: {
 
   const cLen = macroCycleLen();
 
-  const skeleton = buildPlanScheduleStub({
+  const placement = assignWorkoutDays({
     planStartDate: plan.startDate,
     raceDate: race.raceDate,
     raceName: race.name,
@@ -147,7 +150,8 @@ export async function executePlanGenerate(params: {
     totalWeeks: weekCount,
     preferredDays,
     preferredLongRunDow: plan.preferredLongRunDow,
-    preferredQualityDays: plan.preferredQualityDays,
+    preferredTempoDow: plan.preferredTempoDow ?? null,
+    preferredIntervalDow: plan.preferredIntervalDow ?? null,
     tempoIdealDow: planConfig.tempoIdealDow ?? 2,
     intervalIdealDow: planConfig.intervalIdealDow ?? 4,
     longRunDefaultDow: planConfig.longRunDefaultDow ?? 6,
@@ -157,7 +161,7 @@ export async function executePlanGenerate(params: {
     tempoPositions,
   });
 
-  const schedule = skeleton.schedule;
+  const schedule = placement.schedule;
 
   const vb = Number(vol.baseMiles);
   const vp = Number(vol.peakMiles);
@@ -189,7 +193,7 @@ export async function executePlanGenerate(params: {
     peakMiles,
     taperMiles,
     longRunPositions,
-    calculatedLongRunMax: skeleton.calculatedLongRunMax,
+    calculatedLongRunMax: placement.calculatedLongRunMax,
     rampFromWeeklyMiles: params.athleteWeeklyMileage,
     weeklyMileageTarget,
   });
@@ -201,7 +205,9 @@ export async function executePlanGenerate(params: {
     );
   }
 
-  applyQualityAndEasySchedule({
+  applyTempoSchedule({ planSchedule: schedule, catalogueRowsById });
+  applyIntervalSchedule({ planSchedule: schedule, catalogueRowsById });
+  distributeEasyMiles({
     planSchedule: schedule,
     totalWeeks: weekCount,
     weeklyMileageTarget,
@@ -215,7 +221,6 @@ export async function executePlanGenerate(params: {
         ? Number(vol.maxWeeklyMiles)
         : undefined,
     raceDistanceMiles,
-    catalogueRowsById,
     minEasyPerDayMiles: 0,
     minTempoMiles: 3,
     minIntervalMiles: 3,
@@ -254,9 +259,9 @@ export async function executePlanGenerate(params: {
     data: {
       planSchedule: schedule as unknown as Prisma.InputJsonValue,
       phases: Prisma.JsonNull,
-      peakWeekNumber: skeleton.peakWeekNumber,
-      taperStartWeekNumber: skeleton.taperStartWeekNumber,
-      calculatedLongRunMax: skeleton.calculatedLongRunMax,
+      peakWeekNumber: placement.peakWeekNumber,
+      taperStartWeekNumber: placement.taperStartWeekNumber,
+      calculatedLongRunMax: placement.calculatedLongRunMax,
       weeklyMileageTarget,
       totalWeeks: weekCount,
       ...(syncedFiveKPace != null ? { currentFiveKPace: syncedFiveKPace } : {}),

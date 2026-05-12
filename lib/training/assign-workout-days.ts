@@ -1,5 +1,6 @@
 /**
- * Service 1: build typed week skeleton — correct DOWs + workout assignment, miles deferred.
+ * Pass 1: assign workout types to each training day (DOW placement).
+ * Miles stay at 0 until long-run and quality/easy passes.
  */
 
 import type { WorkoutType } from "@prisma/client";
@@ -21,7 +22,7 @@ import {
 } from "@/lib/training/cycle-blocks";
 import type { RunTypePosition } from "@/lib/training/run-type-config-shared";
 
-export type StubPlacementInput = {
+export type WorkoutDayInput = {
   planStartDate: Date;
   raceDate: Date;
   raceName: string;
@@ -29,7 +30,8 @@ export type StubPlacementInput = {
   totalWeeks: number;
   preferredDays: number[];
   preferredLongRunDow?: number | null;
-  preferredQualityDays?: number[];
+  preferredTempoDow?: number | null;
+  preferredIntervalDow?: number | null;
   tempoIdealDow: number;
   intervalIdealDow: number;
   longRunDefaultDow: number;
@@ -117,9 +119,9 @@ function catalogueIdForRotation(
 }
 
 /**
- * Skeleton schedule: miles are 0; services 2–3 populate.
+ * Weeks with typed days; miles filled by apply-long-run, apply-tempo, apply-interval, distribute-easy.
  */
-export function buildPlanScheduleStub(input: StubPlacementInput): {
+export function assignWorkoutDays(input: WorkoutDayInput): {
   schedule: PlanWeekSchedule[];
   peakWeekNumber: number | null;
   taperStartWeekNumber: number;
@@ -133,11 +135,13 @@ export function buildPlanScheduleStub(input: StubPlacementInput): {
   const raceOurDow = ourDowFromUtcDate(raceUtc);
   const longRunIdeal = normalizeLongRunOurDow(input.preferredLongRunDow, input.longRunDefaultDow);
 
-  const qd = (input.preferredQualityDays ?? []).filter((d) => d >= 1 && d <= 7).filter((d) => d !== longRunIdeal);
-  let tempoDow1 = input.tempoIdealDow;
-  let intervalDow2 = input.intervalIdealDow;
-  if (qd.length >= 1) tempoDow1 = qd[0]!;
-  if (qd.length >= 2) intervalDow2 = qd[1]!;
+  let tempoDow1 = input.preferredTempoDow ?? input.tempoIdealDow;
+  let intervalDow2 = input.preferredIntervalDow ?? input.intervalIdealDow;
+  if (tempoDow1 === longRunIdeal) tempoDow1 = input.tempoIdealDow;
+  if (intervalDow2 === longRunIdeal) intervalDow2 = input.intervalIdealDow;
+  if (tempoDow1 === intervalDow2) {
+    intervalDow2 = input.intervalIdealDow;
+  }
 
   const taperStartWeekNumber = taperStartWeekNumberFromTotal(input.totalWeeks);
   const peakWeekNumber =

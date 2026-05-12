@@ -6,7 +6,7 @@ import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { totalWeeksFromDates, ymdFromDate } from "@/lib/training/plan-utils";
 import { TrainingPlanLifecycle } from "@prisma/client";
 import { archiveOtherActivePlans, cascadeLinkedGoalAfterPlanArchived } from "@/lib/training/plan-lifecycle";
-import { normalizePreferredQualityDays } from "@/lib/training/preferred-quality-days";
+import { validatePreferredTempoInterval } from "@/lib/training/preferred-tempo-interval";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -182,6 +182,8 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         existing.preferredLongRunDow === 6 || existing.preferredLongRunDow === 7
           ? existing.preferredLongRunDow
           : null;
+      let finalTempo = existing.preferredTempoDow ?? null;
+      let finalInterval = existing.preferredIntervalDow ?? null;
 
       if (typeof body.name === "string") data.name = body.name.trim();
       if (body.startDate != null) {
@@ -249,23 +251,56 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         }
       }
 
-      const shouldNormalizeQuality =
-        Array.isArray(body.preferredQualityDays) ||
-        Array.isArray(body.preferredDays) ||
-        "preferredLongRunDow" in body;
-      if (shouldNormalizeQuality) {
-        const rawQuality = Array.isArray(body.preferredQualityDays)
-          ? body.preferredQualityDays
-          : (existing.preferredQualityDays ?? []);
-        const norm = normalizePreferredQualityDays(
-          rawQuality,
-          nextPreferredDays,
-          nextLongRun
-        );
-        if (!norm.ok) {
-          return NextResponse.json({ error: norm.error }, { status: 400 });
+      if ("preferredTempoDow" in body) {
+        const v = body.preferredTempoDow;
+        if (v === null || v === "") {
+          data.preferredTempoDow = null;
+          finalTempo = null;
+        } else {
+          const n = Number(v);
+          if (!Number.isFinite(n) || n < 1 || n > 7) {
+            return NextResponse.json(
+              { error: "preferredTempoDow must be an integer from 1 (Mon) to 7 (Sun), or null" },
+              { status: 400 }
+            );
+          }
+          finalTempo = Math.round(n);
+          data.preferredTempoDow = finalTempo;
         }
-        data.preferredQualityDays = norm.value;
+      }
+      if ("preferredIntervalDow" in body) {
+        const v = body.preferredIntervalDow;
+        if (v === null || v === "") {
+          data.preferredIntervalDow = null;
+          finalInterval = null;
+        } else {
+          const n = Number(v);
+          if (!Number.isFinite(n) || n < 1 || n > 7) {
+            return NextResponse.json(
+              { error: "preferredIntervalDow must be an integer from 1 (Mon) to 7 (Sun), or null" },
+              { status: 400 }
+            );
+          }
+          finalInterval = Math.round(n);
+          data.preferredIntervalDow = finalInterval;
+        }
+      }
+
+      const prefsTouched =
+        Array.isArray(body.preferredDays) ||
+        "preferredLongRunDow" in body ||
+        "preferredTempoDow" in body ||
+        "preferredIntervalDow" in body;
+      if (prefsTouched) {
+        const chk = validatePreferredTempoInterval({
+          preferredTempoDow: finalTempo,
+          preferredIntervalDow: finalInterval,
+          preferredLongRunDow: nextLongRun,
+          preferredDays: nextPreferredDays,
+        });
+        if (!chk.ok) {
+          return NextResponse.json({ error: chk.error }, { status: 400 });
+        }
       }
     }
 

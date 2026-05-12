@@ -25,7 +25,7 @@ import {
   type PlanDayCard,
 } from "@/lib/training/fetch-plan-week-client";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
-import { normalizePreferredQualityDays } from "@/lib/training/preferred-quality-days";
+import { validatePreferredTempoInterval } from "@/lib/training/preferred-tempo-interval";
 import { isStructuredPlanWeek, type PlanDaySchedule } from "@/lib/training/plan-schedule-schema";
 
 type PlanPresetSummary = {
@@ -46,6 +46,9 @@ type PlanDetail = {
   planSchedule?: unknown;
   preferredDays: number[];
   preferredLongRunDow?: number | null;
+  preferredTempoDow?: number | null;
+  preferredIntervalDow?: number | null;
+  /** Legacy; used only to hydrate UI when new columns are empty */
   preferredQualityDays?: number[];
   weeklyMileageTarget?: number | null;
   currentWeeklyMileage?: number | null;
@@ -190,9 +193,10 @@ export default function TrainingSetupPlanPage({
   const [preferredDaysLocal, setPreferredDaysLocal] = useState<number[]>([]);
   const [weeklyMilesTarget, setWeeklyMilesTarget] = useState("50");
   const [preferredLongRunDowLocal, setPreferredLongRunDowLocal] = useState(6);
-  const [preferredQualityDaysLocal, setPreferredQualityDaysLocal] = useState<
-    number[]
-  >([]);
+  const [preferredTempoDowLocal, setPreferredTempoDowLocal] = useState<number | null>(null);
+  const [preferredIntervalDowLocal, setPreferredIntervalDowLocal] = useState<number | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
   async function getToken() {
@@ -241,18 +245,28 @@ export default function TrainingSetupPlanPage({
     } else {
       setPreferredLongRunDowLocal(6);
     }
-    const pqd = plan.preferredQualityDays;
-    if (Array.isArray(pqd) && pqd.length > 0) {
-      setPreferredQualityDaysLocal(
-        [...pqd].filter((n) => n >= 1 && n <= 7).sort((a, b) => a - b)
-      );
-    } else {
-      setPreferredQualityDaysLocal([]);
+    let tempo = plan.preferredTempoDow ?? null;
+    let interval = plan.preferredIntervalDow ?? null;
+    if (
+      tempo == null &&
+      interval == null &&
+      Array.isArray(plan.preferredQualityDays) &&
+      plan.preferredQualityDays.length > 0
+    ) {
+      const q = [...plan.preferredQualityDays]
+        .filter((n) => n >= 1 && n <= 7)
+        .sort((a, b) => a - b);
+      if (q.length >= 1) tempo = q[0]!;
+      if (q.length >= 2) interval = q[1]!;
     }
+    setPreferredTempoDowLocal(tempo);
+    setPreferredIntervalDowLocal(interval);
   }, [
     plan?.id,
     plan?.preferredDays,
     plan?.preferredLongRunDow,
+    plan?.preferredTempoDow,
+    plan?.preferredIntervalDow,
     plan?.preferredQualityDays,
     plan?.weeklyMileageTarget,
   ]);
@@ -443,32 +457,9 @@ export default function TrainingSetupPlanPage({
       } else {
         next = [...prev, d].sort((a, b) => a - b);
       }
-      setPreferredQualityDaysLocal((q) =>
-        q.filter((x) => next.includes(x) && x !== preferredLongRunDowLocal)
-      );
+      setPreferredTempoDowLocal((t) => (t != null && !next.includes(t) ? null : t));
+      setPreferredIntervalDowLocal((i) => (i != null && !next.includes(i) ? null : i));
       return next;
-    });
-  }
-
-  function toggleQualityDay(d: number) {
-    if (!preferredDaysLocal.includes(d) || d === preferredLongRunDowLocal) {
-      return;
-    }
-    setPreferredQualityDaysLocal((prev) => {
-      const next = prev.includes(d)
-        ? prev.filter((x) => x !== d)
-        : [...prev, d].sort((a, b) => a - b);
-      const norm = normalizePreferredQualityDays(
-        next,
-        preferredDaysLocal,
-        preferredLongRunDowLocal
-      );
-      if (!norm.ok) {
-        setError(norm.error);
-        return prev;
-      }
-      setError(null);
-      return norm.value;
     });
   }
 
@@ -489,13 +480,14 @@ export default function TrainingSetupPlanPage({
       }
       targetMiles = Math.max(25, Math.min(100, targetMiles));
 
-      const qNorm = normalizePreferredQualityDays(
-        preferredQualityDaysLocal,
-        normalized,
-        preferredLongRunDowLocal
-      );
-      if (!qNorm.ok) {
-        setError(qNorm.error);
+      const prefCheck = validatePreferredTempoInterval({
+        preferredTempoDow: preferredTempoDowLocal,
+        preferredIntervalDow: preferredIntervalDowLocal,
+        preferredLongRunDow: preferredLongRunDowLocal,
+        preferredDays: normalized,
+      });
+      if (!prefCheck.ok) {
+        setError(prefCheck.error);
         return;
       }
 
@@ -509,7 +501,8 @@ export default function TrainingSetupPlanPage({
           preferredDays: normalized,
           weeklyMileageTarget: targetMiles,
           preferredLongRunDow: preferredLongRunDowLocal,
-          preferredQualityDays: qNorm.value,
+          preferredTempoDow: preferredTempoDowLocal,
+          preferredIntervalDow: preferredIntervalDowLocal,
         }),
       });
       const patchData = await patchRes.json();
@@ -721,9 +714,8 @@ export default function TrainingSetupPlanPage({
                         checked={preferredLongRunDowLocal === value}
                         onChange={() => {
                           setPreferredLongRunDowLocal(value);
-                          setPreferredQualityDaysLocal((q) =>
-                            q.filter((d) => d !== value)
-                          );
+                          setPreferredTempoDowLocal((t) => (t === value ? null : t));
+                          setPreferredIntervalDowLocal((i) => (i === value ? null : i));
                         }}
                       />
                       {label}
@@ -733,34 +725,104 @@ export default function TrainingSetupPlanPage({
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium text-gray-800">
-                  Interval &amp; tempo days (optional)
-                </p>
+                <p className="mb-2 text-sm font-medium text-gray-800">Tempo day</p>
                 <p className="mb-3 text-xs text-gray-500">
-                  Choose up to two days from your preferred days (not your long run
-                  day). Typically first pick = tempo day, second = interval day — at
-                  least two days apart. If you skip this, we use the preset defaults (often Tuesday and Thursday).
+                  Pick a day for your tempo workout (from your preferred days, not your long run).
+                  If you skip this, we use the preset default (often Tuesday).
                 </p>
                 <div className="flex flex-wrap gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50">
+                    <input
+                      type="radio"
+                      name="preferredTempoDow"
+                      className="border-gray-300 text-orange-600 focus:ring-orange-500"
+                      checked={preferredTempoDowLocal === null}
+                      onChange={() => {
+                        setPreferredTempoDowLocal(null);
+                        setError(null);
+                      }}
+                    />
+                    No preference
+                  </label>
                   {DAY_OPTIONS.map(({ value, label }) => {
-                    const inPrefs = preferredDaysLocal.includes(value);
-                    const isLr = value === preferredLongRunDowLocal;
-                    const disabled = !inPrefs || isLr;
+                    const ok =
+                      preferredDaysLocal.includes(value) &&
+                      value !== preferredLongRunDowLocal &&
+                      value !== preferredIntervalDowLocal;
                     return (
                       <label
-                        key={value}
+                        key={`tempo-${value}`}
                         className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2.5 text-sm ${
-                          disabled
-                            ? "cursor-not-allowed border-gray-100 bg-gray-100 text-gray-400"
-                            : "cursor-pointer border-gray-200 bg-gray-50 has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50"
+                          ok
+                            ? "cursor-pointer border-gray-200 bg-gray-50 has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50"
+                            : "cursor-not-allowed border-gray-100 bg-gray-100 text-gray-400"
                         }`}
                       >
                         <input
-                          type="checkbox"
-                          className="rounded border-gray-300 text-orange-600 focus:ring-orange-500 disabled:opacity-40"
-                          checked={preferredQualityDaysLocal.includes(value)}
-                          disabled={disabled}
-                          onChange={() => toggleQualityDay(value)}
+                          type="radio"
+                          name="preferredTempoDow"
+                          className="border-gray-300 text-orange-600 focus:ring-orange-500 disabled:opacity-40"
+                          checked={preferredTempoDowLocal === value}
+                          disabled={!ok}
+                          onChange={() => {
+                            setPreferredTempoDowLocal(value);
+                            setPreferredIntervalDowLocal((i) => (i === value ? null : i));
+                            setError(null);
+                          }}
+                        />
+                        {label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-sm font-medium text-gray-800">Interval day</p>
+                <p className="mb-3 text-xs text-gray-500">
+                  Pick a day for intervals (from your preferred days, not your long run).
+                  If you skip this, we use the preset default (often Thursday). When both tempo and
+                  interval are set, they must be at least two weekdays apart.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50">
+                    <input
+                      type="radio"
+                      name="preferredIntervalDow"
+                      className="border-gray-300 text-orange-600 focus:ring-orange-500"
+                      checked={preferredIntervalDowLocal === null}
+                      onChange={() => {
+                        setPreferredIntervalDowLocal(null);
+                        setError(null);
+                      }}
+                    />
+                    No preference
+                  </label>
+                  {DAY_OPTIONS.map(({ value, label }) => {
+                    const ok =
+                      preferredDaysLocal.includes(value) &&
+                      value !== preferredLongRunDowLocal &&
+                      value !== preferredTempoDowLocal;
+                    return (
+                      <label
+                        key={`interval-${value}`}
+                        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2.5 text-sm ${
+                          ok
+                            ? "cursor-pointer border-gray-200 bg-gray-50 has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50"
+                            : "cursor-not-allowed border-gray-100 bg-gray-100 text-gray-400"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="preferredIntervalDow"
+                          className="border-gray-300 text-orange-600 focus:ring-orange-500 disabled:opacity-40"
+                          checked={preferredIntervalDowLocal === value}
+                          disabled={!ok}
+                          onChange={() => {
+                            setPreferredIntervalDowLocal(value);
+                            setPreferredTempoDowLocal((t) => (t === value ? null : t));
+                            setError(null);
+                          }}
                         />
                         {label}
                       </label>

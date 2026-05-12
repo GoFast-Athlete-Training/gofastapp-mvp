@@ -1235,6 +1235,10 @@ model training_plans {
   preferredLongRunDow  Int?
   /// User-selected DOWs for quality sessions (1=Mon..7=Sun), max 2 entries
   preferredQualityDays Int[]                  @default([])
+  /// Athlete tempo day (1=Mon..7=Sun); null = preset default at generation.
+  preferredTempoDow    Int?
+  /// Athlete interval day (1=Mon..7=Sun); null = preset default at generation.
+  preferredIntervalDow Int?
   createdAt            DateTime               @default(now())
   updatedAt            DateTime
   planned_workouts     workouts[]
