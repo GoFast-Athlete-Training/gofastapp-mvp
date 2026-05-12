@@ -13,6 +13,7 @@ import { applyLongRunSchedule } from "@/lib/training/apply-long-run";
 import { applyTempoSchedule } from "@/lib/training/apply-tempo";
 import { applyIntervalSchedule } from "@/lib/training/apply-interval";
 import { distributeEasyMiles } from "@/lib/training/distribute-easy";
+import { longRunCupSetter } from "@/lib/training/long-run-cup-setter";
 import {
   catalogueIdsFromPreset,
   catalogueSelectForGeneration,
@@ -198,6 +199,28 @@ export async function executePlanGenerate(params: {
     weeklyMileageTarget,
   });
 
+  const cupResult = longRunCupSetter({
+    totalWeeks: weekCount,
+    cycleLen: cLen,
+    baseMiles,
+    peakMiles,
+    taperMiles,
+  });
+
+  const cyclePoolData = {
+    nCycles: cupResult.nCycles,
+    cycleLen: cLen,
+    poolMilesByCycle: cupResult.poolMilesByCycle,
+    baseMiles,
+    peakMiles,
+    taperMiles,
+    positionCounts: {
+      longRun: longRunPositions.length,
+      intervals: intervalsPositions.length,
+      tempo: tempoPositions.length,
+    },
+  };
+
   const minWeeklyFromPreset = Number(vol.minWeeklyMiles);
   if (!Number.isFinite(minWeeklyFromPreset) || minWeeklyFromPreset < 1) {
     throw new Error(
@@ -262,6 +285,7 @@ export async function executePlanGenerate(params: {
       peakWeekNumber: placement.peakWeekNumber,
       taperStartWeekNumber: placement.taperStartWeekNumber,
       calculatedLongRunMax: placement.calculatedLongRunMax,
+      cyclePoolData: cyclePoolData as unknown as Prisma.InputJsonValue,
       weeklyMileageTarget,
       totalWeeks: weekCount,
       ...(syncedFiveKPace != null ? { currentFiveKPace: syncedFiveKPace } : {}),

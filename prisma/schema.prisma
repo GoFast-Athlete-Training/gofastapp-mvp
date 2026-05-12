@@ -1229,6 +1229,8 @@ model training_plans {
   taperStartWeekNumber Int?
   /// Max long-run distance (mi) used when applying volume / rotation
   calculatedLongRunMax Float?
+  /// Cycle pool snapshot from last generation: { nCycles, cycleLen, poolMilesByCycle, baseMiles, peakMiles, taperMiles, positionCounts }
+  cyclePoolData        Json?
   /// Snapshot of preferred training days 1=Mon..7=Sun
   preferredDays        Int[]                  @default([])
   /// Preferred long-run day: 6=Saturday, 7=Sunday (default 6)

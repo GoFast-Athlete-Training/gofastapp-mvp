@@ -103,10 +103,9 @@ export function applyLongRunSchedule(input: ApplyLongRunInput): void {
     const { cyclePos } = weekCycleMeta({ weekNumber: wn, totalWeeks, cycleLen: len });
     const cycleIdx = Math.min(nCycles - 1, Math.floor((wn - 1) / len));
     const macroPool = poolMilesByCycle[cycleIdx] ?? 0;
-    /** Anchor pools are LR miles for whole macro cycles; typical week share = pool / cycle weeks. */
-    const macroWeekly = macroPool / len;
     const { weightNorm, catalogueWorkoutId } = weightNormRow(longRunPositions, cyclePos);
-    let lrMi = macroWeekly * weightNorm;
+    // Weights are fractional shares of the cycle pool total — apply directly, not to an average week.
+    let lrMi = macroPool * weightNorm;
     lrMi = Math.min(calculatedLongRunMax, lrMi);
     lrMi *= longRunWeeklyRampFactor(wn, totalWeeks, rampFromWeeklyMiles, weeklyMileageTarget);
     lrMi = Math.max(minL, lrMi);

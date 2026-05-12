@@ -36,6 +36,31 @@ type PlanPresetSummary = {
   tempoConfig: { positions: unknown[] } | null;
 } | null;
 
+type CyclePoolData = {
+  nCycles: number;
+  cycleLen: number;
+  poolMilesByCycle: number[];
+  baseMiles: number;
+  peakMiles: number;
+  taperMiles: number;
+  positionCounts: { longRun: number; intervals: number; tempo: number };
+} | null;
+
+type LongRunRow = { weekNumber: number; miles: number; catalogueWorkoutId: string | null };
+type QualityRow = {
+  weekNumber: number;
+  dow: number;
+  miles: number;
+  catalogueWorkoutId: string | null;
+};
+
+type ScheduleSummary = {
+  cyclePoolData: CyclePoolData;
+  longRunByWeek: LongRunRow[];
+  intervalsByWeek: QualityRow[];
+  temposByWeek: QualityRow[];
+};
+
 type PlanDetail = {
   id: string;
   presetId?: string | null;
@@ -197,6 +222,8 @@ export default function TrainingSetupPlanPage({
   const [preferredIntervalDowLocal, setPreferredIntervalDowLocal] = useState<number | null>(
     null
   );
+  const [generationStep, setGenerationStep] = useState<"preferences" | "preview">("preferences");
+  const [scheduleSummary, setScheduleSummary] = useState<ScheduleSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
   async function getToken() {
@@ -529,6 +556,20 @@ export default function TrainingSetupPlanPage({
         return;
       }
       await loadPlan();
+      // Fetch the schedule summary and show the preview step
+      try {
+        const summaryRes = await fetch(
+          `/api/training/plan/schedule-summary?planId=${encodeURIComponent(planId)}`,
+          { headers: athleteBearerFetchHeaders(token) }
+        );
+        if (summaryRes.ok) {
+          const summaryData = await summaryRes.json();
+          setScheduleSummary(summaryData as ScheduleSummary);
+        }
+      } catch {
+        // summary is non-critical — skip on error
+      }
+      setGenerationStep("preview");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generation failed");
     } finally {
@@ -844,7 +885,145 @@ export default function TrainingSetupPlanPage({
             </div>
           )}
 
-          {hasSchedule && (
+          {hasSchedule && generationStep === "preview" && (
+            <div className="mb-6 space-y-6">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <p className="font-semibold text-emerald-900">Plan generated!</p>
+                <p className="mt-1 text-sm text-emerald-800">
+                  Review the long run engine output below, then head to your plan.
+                </p>
+              </div>
+
+              {scheduleSummary?.cyclePoolData && (
+                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                  <p className="mb-2 text-sm font-semibold text-gray-900">
+                    Long-run pool by cycle
+                  </p>
+                  <p className="mb-3 text-xs text-gray-500">
+                    Base {scheduleSummary.cyclePoolData.baseMiles} mi → Peak{" "}
+                    {scheduleSummary.cyclePoolData.peakMiles} mi → Taper{" "}
+                    {scheduleSummary.cyclePoolData.taperMiles} mi ·{" "}
+                    {scheduleSummary.cyclePoolData.cycleLen}-week cycles ·{" "}
+                    {scheduleSummary.cyclePoolData.nCycles} cycles
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {scheduleSummary.cyclePoolData.poolMilesByCycle.map((mi, i) => (
+                      <div
+                        key={i}
+                        className="flex flex-col items-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-center"
+                      >
+                        <span className="text-xs text-gray-500">C{i + 1}</span>
+                        <span className="text-sm font-semibold text-gray-900">{mi} mi</span>
+                      </div>
+                    ))}
+                  </div>
+                  {scheduleSummary.cyclePoolData.positionCounts.longRun === 0 && (
+                    <p className="mt-3 text-xs font-medium text-red-600">
+                      ⚠ Long run config has 0 positions — catalogue workouts not linked
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {scheduleSummary && scheduleSummary.longRunByWeek.length > 0 && (
+                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                  <p className="mb-3 text-sm font-semibold text-gray-900">Long run by week</p>
+                  <div className="max-h-64 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100 text-xs text-gray-500">
+                          <th className="pb-1 text-left">Week</th>
+                          <th className="pb-1 text-right">Miles</th>
+                          <th className="pb-1 text-right pr-1">Catalogue</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {scheduleSummary.longRunByWeek.map((row) => (
+                          <tr
+                            key={row.weekNumber}
+                            className={`border-b border-gray-50 ${row.miles < 8 ? "bg-amber-50" : ""}`}
+                          >
+                            <td className="py-1 text-gray-700">Wk {row.weekNumber}</td>
+                            <td className={`py-1 text-right font-medium ${row.miles < 8 ? "text-amber-700" : "text-gray-900"}`}>
+                              {row.miles}
+                            </td>
+                            <td className="py-1 text-right pr-1">
+                              {row.catalogueWorkoutId ? (
+                                <span className="truncate text-xs text-gray-400 font-mono">
+                                  {row.catalogueWorkoutId.slice(0, 8)}…
+                                </span>
+                              ) : (
+                                <span className="text-xs font-medium text-red-500">⚠ none</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {scheduleSummary && scheduleSummary.intervalsByWeek.length > 0 && (
+                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                  <p className="mb-3 text-sm font-semibold text-gray-900">Intervals by week</p>
+                  <div className="max-h-48 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100 text-xs text-gray-500">
+                          <th className="pb-1 text-left">Week</th>
+                          <th className="pb-1 text-right">Miles</th>
+                          <th className="pb-1 text-right pr-1">Catalogue</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {scheduleSummary.intervalsByWeek.map((row, i) => (
+                          <tr key={i} className="border-b border-gray-50">
+                            <td className="py-1 text-gray-700">Wk {row.weekNumber}</td>
+                            <td className="py-1 text-right font-medium text-gray-900">{row.miles}</td>
+                            <td className="py-1 text-right pr-1">
+                              {row.catalogueWorkoutId ? (
+                                <span className="truncate text-xs text-gray-400 font-mono">
+                                  {row.catalogueWorkoutId.slice(0, 8)}…
+                                </span>
+                              ) : (
+                                <span className="text-xs font-medium text-red-500">⚠ none</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {scheduleSummary.cyclePoolData?.positionCounts.intervals === 0 && (
+                    <p className="mt-2 text-xs font-medium text-red-600">
+                      ⚠ Intervals config has 0 positions
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-3 pt-2">
+                <button
+                  onClick={() => router.push(`/training`)}
+                  className="rounded-xl bg-orange-500 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-600"
+                >
+                  Looks good — go to plan →
+                </button>
+                <button
+                  onClick={() => {
+                    setGenerationStep("preferences");
+                    setScheduleSummary(null);
+                  }}
+                  className="rounded-xl border border-gray-200 bg-white px-6 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Regenerate
+                </button>
+              </div>
+            </div>
+          )}
+
+          {hasSchedule && generationStep !== "preview" && (
             <>
               <p className="mb-4 text-base text-gray-700">
                 Your schedule is ready. Step through weeks below and open each
