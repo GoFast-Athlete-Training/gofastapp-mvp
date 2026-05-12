@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { serializePlanPresetForApi } from "@/lib/training/quality-percent";
+import { parseTargetDistanceLabelFromBody } from "@/lib/training/preset-distance-match";
 
 const presetInclude = {
   volumeConstraints: true,
@@ -143,6 +144,14 @@ export async function PATCH(
     else if (typeof body.publicDescription === "string")
       presetData.publicDescription = body.publicDescription.trim() || null;
     if (typeof body.slug === "string") presetData.slug = body.slug.trim().toLowerCase();
+
+    const tdl = parseTargetDistanceLabelFromBody(body as Record<string, unknown>);
+    if (!tdl.ok) {
+      return NextResponse.json({ success: false, error: tdl.error }, { status: 400 });
+    }
+    if (tdl.value !== undefined) {
+      presetData.targetDistanceLabel = tdl.value;
+    }
 
     type ConnectKey = "longRunConfig" | "intervalsConfig" | "tempoConfig";
     const connectFields: { bodyKey: string; rel: ConnectKey; find: (x: string) => Promise<{ id: string } | null> }[] = [

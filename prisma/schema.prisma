@@ -1049,6 +1049,8 @@ model training_plan_preset {
   description String?
   /// Shown to athletes on preset selection; internal notes stay in `description`.
   publicDescription String?
+  /// Canonical distance label (e.g. "Marathon") from COMMON_RACE_DISTANCE_PRESETS; null = any distance.
+  targetDistanceLabel String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

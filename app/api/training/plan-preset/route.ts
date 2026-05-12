@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { serializePlanPresetForApi } from "@/lib/training/quality-percent";
+import { parseTargetDistanceLabelFromBody } from "@/lib/training/preset-distance-match";
 
 function slugifyPresetTitle(title: string): string {
   const s = title
@@ -194,6 +195,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: msg }, { status: 400 });
     }
 
+    const tdl = parseTargetDistanceLabelFromBody(body as Record<string, unknown>);
+    if (!tdl.ok) {
+      return NextResponse.json({ success: false, error: tdl.error }, { status: 400 });
+    }
+
     const preset = await prisma.training_plan_preset.create({
       data: {
         slug,
@@ -206,6 +212,7 @@ export async function POST(request: NextRequest) {
           typeof publicDescription === "string" && publicDescription.trim()
             ? publicDescription.trim()
             : null,
+        ...(tdl.value !== undefined ? { targetDistanceLabel: tdl.value } : {}),
         ...(longRunConfigId !== undefined
           ? longRunConfigId
             ? { longRunConfig: { connect: { id: longRunConfigId } } }

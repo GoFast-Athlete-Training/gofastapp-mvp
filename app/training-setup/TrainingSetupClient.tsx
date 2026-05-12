@@ -9,14 +9,18 @@ import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import { raceCalendarBeforeTodayUtc } from "@/lib/training/plan-utils";
+import {
+  presetMatchesDistance,
+  snapDistanceLabelFromMeters,
+} from "@/lib/training/preset-distance-match";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 
 type RaceRegistryLite = {
   id: string;
   name: string;
   raceDate: string;
-  raceType: string;
-  distanceMiles: number;
+  distanceMeters?: number | null;
+  distanceLabel?: string | null;
   city?: string | null;
   state?: string | null;
 };
@@ -68,6 +72,7 @@ type PresetForWizard = {
   title: string;
   description: string | null;
   publicDescription: string | null;
+  targetDistanceLabel: string | null;
   minWeeklyMiles: number;
   maxWeeklyMiles: number | null;
   baseMiles: number;
@@ -105,6 +110,19 @@ function formatRaceWhen(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+/** Shown after race date on plan setup (never empty parens — old UI used missing `raceType`). */
+function raceDistanceDisplayForGoal(rr: RaceRegistryLite): string | null {
+  const dl = rr.distanceLabel?.trim();
+  if (dl) return dl;
+  const snapped = snapDistanceLabelFromMeters(rr.distanceMeters);
+  if (snapped) return snapped;
+  const dm = rr.distanceMeters;
+  if (dm != null && Number.isFinite(Number(dm))) {
+    return `${Math.round(Number(dm))} m`;
+  }
+  return null;
 }
 
 /** Map API failures to safe UX (avoid surfacing raw 400 strings). */
@@ -160,6 +178,15 @@ export default function TrainingSetupClient() {
   const [selectedPreset, setSelectedPreset] = useState<PresetForWizard | null>(null);
 
   const qualifyingGoals = useMemo(() => goals.filter(isQualifyingGoal), [goals]);
+
+  /** Presets compatible with the current wizard goal race distance (or all if distance unknown). */
+  const presetsForWizardGoal = useMemo(() => {
+    const dm = wizardGoal?.race_registry?.distanceMeters;
+    if (dm == null || !Number.isFinite(Number(dm))) {
+      return prodPresets;
+    }
+    return prodPresets.filter((p) => presetMatchesDistance(p.targetDistanceLabel, Number(dm)));
+  }, [prodPresets, wizardGoal?.race_registry?.distanceMeters, wizardGoal?.id]);
 
   const futureSignups = useMemo(
     () =>
@@ -242,6 +269,10 @@ export default function TrainingSetupClient() {
                   typeof r.publicDescription === "string" && r.publicDescription.trim().length > 0
                     ? r.publicDescription.trim()
                     : null;
+                const targetDistanceLabel =
+                  typeof r.targetDistanceLabel === "string" && r.targetDistanceLabel.trim().length > 0
+                    ? r.targetDistanceLabel.trim()
+                    : null;
                 const vc = r.volumeConstraints as
                   | {
                       minWeeklyMiles?: unknown;
@@ -269,6 +300,7 @@ export default function TrainingSetupClient() {
                   title,
                   description,
                   publicDescription,
+                  targetDistanceLabel,
                   minWeeklyMiles,
                   maxWeeklyMiles,
                   baseMiles,
@@ -434,23 +466,13 @@ export default function TrainingSetupClient() {
       return;
     }
 
-    const minW = selectedPreset.minWeeklyMiles;
-    const maxW = selectedPreset.maxWeeklyMiles;
     const rawMw = baselineWeeklyMileage.trim();
-    const weeklyMi = rawMw === "" ? NaN : Number(rawMw);
-    if (!Number.isFinite(weeklyMi) || weeklyMi < minW) {
-      setFormError(
-        maxW != null && Number.isFinite(maxW)
-          ? `Set weekly mileage between ${minW} and ${maxW} mi for this training blueprint.`
-          : `Set weekly mileage to at least ${minW} mi for this training blueprint.`
-      );
-      return;
-    }
-    if (maxW != null && Number.isFinite(maxW) && weeklyMi > maxW) {
-      setFormError(
-        `Set weekly mileage between ${minW} and ${maxW} mi for this training blueprint.`
-      );
-      return;
+    if (rawMw !== "") {
+      const weeklyMi = Number(rawMw);
+      if (!Number.isFinite(weeklyMi) || weeklyMi <= 0) {
+        setFormError("Enter your current weekly miles as a positive number, or leave it blank.");
+        return;
+      }
     }
 
     const paceEmpty = paceMin.trim() === "" && paceSec.trim() === "";
@@ -527,45 +549,29 @@ export default function TrainingSetupClient() {
 
   if (wizardGoal && wizardGoal.race_registry && wizardGoal.raceRegistryId) {
     const rr = wizardGoal.race_registry;
-    const presetMinMi = selectedPreset?.minWeeklyMiles ?? 40;
-    const presetMaxMi = selectedPreset?.maxWeeklyMiles ?? null;
-    const mileageRangeHint =
-      selectedPreset &&
-      presetMaxMi != null &&
-      Number.isFinite(presetMaxMi) ? (
-        <span>
-          Use between <span className="font-semibold tabular-nums">{presetMinMi}</span> and{" "}
-          <span className="font-semibold tabular-nums">{presetMaxMi}</span> mi per week for this
-          blueprint.
-        </span>
-      ) : selectedPreset ? (
-        <span>
-          Use at least{" "}
-          <span className="font-semibold tabular-nums">{presetMinMi}</span> mi per week for this
-          blueprint
-          {presetMaxMi == null ? " (no preset max set)." : "."}
-        </span>
-      ) : null;
+    const goalDistanceLine = raceDistanceDisplayForGoal(rr);
 
     const weeklyN = baselineWeeklyMileage.trim() === "" ? NaN : Number(baselineWeeklyMileage);
     const baseMilesPreset = selectedPreset?.baseMiles;
     const rampBanner =
       selectedPreset != null &&
       Number.isFinite(weeklyN) &&
+      weeklyN > 0 &&
       Number.isFinite(baseMilesPreset) ? (
         weeklyN < (baseMilesPreset as number) * 0.75 ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-            <p className="font-medium text-amber-950">Gradual ramp</p>
+            <p className="font-medium text-amber-950">We&apos;ll build you up</p>
             <p className="mt-1 text-amber-900/90">
-              Your plan will open with a gradual build — we&apos;ll ease you up to full training
-              volume over the first few weeks.
+              Your plan starts with a gradual increase in volume to get you to your full training
+              load without overloading.
             </p>
           </div>
         ) : (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
-            <p className="font-medium text-emerald-900">Full volume from the start</p>
+            <p className="font-medium text-emerald-900">You&apos;re ready for this plan</p>
             <p className="mt-1 text-emerald-900/90">
-              You&apos;re ready to run at full training volume from week one.
+              Your current mileage puts you right in range. Your plan starts at full training
+              volume from week one.
             </p>
           </div>
         )
@@ -573,9 +579,6 @@ export default function TrainingSetupClient() {
 
     function onSelectPreset(p: PresetForWizard) {
       setSelectedPreset(p);
-      setBaselineWeeklyMileage((prev) =>
-        prev.trim() === "" ? String(p.minWeeklyMiles) : prev
-      );
       setFormError(null);
     }
 
@@ -589,7 +592,8 @@ export default function TrainingSetupClient() {
             <p className="mb-4 text-sm text-gray-600">
               Goal:{" "}
               <span className="font-medium text-gray-900">{rr.name}</span> —{" "}
-              {formatRaceWhen(rr.raceDate)} ({rr.raceType}).
+              {formatRaceWhen(rr.raceDate)}
+              {goalDistanceLine ? ` · ${goalDistanceLine}` : ""}.
             </p>
 
             {stepChoosePreset ? (
@@ -600,19 +604,19 @@ export default function TrainingSetupClient() {
                   </p>
                   <p className="mt-2 font-medium text-gray-900">Pick how you want to train</p>
                   <p className="mt-1 leading-relaxed text-gray-700">
-                    Choose a training blueprint. You can switch later if your coach adds more
-                    options.
+                    Pick your training level below. We&apos;re in beta — Elite is ready now, with more
+                    levels coming soon.
                   </p>
                 </div>
                 <div className="space-y-4">
                   {loadingOrientation ? (
-                    <p className="text-sm text-gray-600">Loading blueprints…</p>
+                    <p className="text-sm text-gray-600">Loading your training level…</p>
                   ) : prodPresets.length === 0 ? (
                     <div className="text-sm text-red-900">
-                      <p className="font-medium text-red-950">Blueprint not available</p>
+                      <p className="font-medium text-red-950">Training level not available</p>
                       <p className="mt-2 leading-relaxed text-red-900/95">
-                        A training preset hasn&apos;t been published to this environment yet. Check
-                        back shortly or contact support.
+                        No training levels are set up in this environment yet. Check back shortly or
+                        contact support.
                       </p>
                       <button
                         type="button"
@@ -622,9 +626,17 @@ export default function TrainingSetupClient() {
                         Retry
                       </button>
                     </div>
+                  ) : presetsForWizardGoal.length === 0 ? (
+                    <div className="text-sm text-amber-950">
+                      <p className="font-medium text-amber-950">No level for this race distance</p>
+                      <p className="mt-2 leading-relaxed text-amber-900/95">
+                        There isn&apos;t a training level for this goal&apos;s distance yet. Try another race
+                        or contact support.
+                      </p>
+                    </div>
                   ) : (
                     <ul className="grid gap-3 sm:grid-cols-1">
-                      {prodPresets.map((p) => {
+                      {presetsForWizardGoal.map((p) => {
                         const blurb = p.publicDescription ?? p.description;
                         return (
                           <li key={p.id}>
@@ -637,9 +649,8 @@ export default function TrainingSetupClient() {
                               {blurb ? (
                                 <p className="mt-2 text-sm leading-relaxed text-gray-600">{blurb}</p>
                               ) : (
-                                <p className="mt-2 text-xs text-gray-500">Tap to select this blueprint.</p>
+                                <p className="mt-2 text-xs text-gray-500">Tap anywhere on this card to continue.</p>
                               )}
-                              <p className="mt-3 text-xs font-medium text-orange-700">Select →</p>
                             </button>
                           </li>
                         );
@@ -651,10 +662,9 @@ export default function TrainingSetupClient() {
             ) : (
               <>
                 <div className="mb-5 rounded-xl border border-emerald-100 bg-emerald-50/80 p-4 text-sm text-gray-800">
-                  <p className="font-medium text-gray-900">Great — let&apos;s get started</p>
+                  <p className="font-medium text-gray-900">Tell us your current fitness level</p>
                   <p className="mt-2 leading-relaxed text-gray-700">
-                    Here&apos;s your baseline for this plan. We&apos;ll save these to your profile when
-                    you create the plan.
+                    We use these to set the right starting point. We&apos;ll save them to your profile.
                   </p>
                 </div>
 
@@ -670,14 +680,14 @@ export default function TrainingSetupClient() {
                   }}
                   className="mb-5 text-sm font-medium text-orange-600 hover:text-orange-800"
                 >
-                  ← Change blueprint
+                  ← Change level
                 </button>
 
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2">
                     <div className="sm:col-span-2">
                       <label className="mb-1 block text-xs font-medium text-gray-700">
-                        Current 5K pace
+                        What&apos;s your current 5K pace?
                       </label>
                       <div className="flex flex-wrap items-center gap-2">
                         <input
@@ -704,20 +714,20 @@ export default function TrainingSetupClient() {
                     </div>
                     <div className="sm:col-span-2">
                       <label className="mb-1 block text-xs font-medium text-gray-700">
-                        Weekly mileage (this plan)
+                        How many miles per week are you running right now?
                       </label>
                       <input
                         type="number"
-                        min={selectedPreset ? presetMinMi : 0}
-                        max={selectedPreset && presetMaxMi != null ? presetMaxMi : undefined}
+                        min={0}
                         step={1}
                         className="w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
                         value={baselineWeeklyMileage}
                         onChange={(e) => setBaselineWeeklyMileage(e.target.value)}
                       />
-                      {selectedPreset && (
-                        <p className="mt-1.5 text-xs text-gray-600">{mileageRangeHint}</p>
-                      )}
+                      <p className="mt-1.5 text-xs text-gray-600">
+                        This is your baseline today — not your goal. You&apos;ll set target weekly
+                        mileage on the next step.
+                      </p>
                     </div>
                   </div>
 
@@ -809,11 +819,10 @@ export default function TrainingSetupClient() {
 
                   {createFeedback === "preset" && (
                     <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-                      <p className="mb-2 font-medium text-red-950">Preset not wired</p>
+                      <p className="mb-2 font-medium text-red-950">Training level not available</p>
                       <p className="mb-3 text-red-900/95">
-                        This app doesn&apos;t have an active training preset yet, so we can&apos;t stamp your
-                        plan with the engine blueprint. Ask your coach to publish presets, tap refresh
-                        below, then try again.
+                        We couldn&apos;t load a training level for your account. Tap retry, or contact
+                        support.
                       </p>
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -821,7 +830,7 @@ export default function TrainingSetupClient() {
                           onClick={() => void loadOrientation()}
                           className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800"
                         >
-                          Refresh blueprint
+                          Retry
                         </button>
                         <button
                           type="button"

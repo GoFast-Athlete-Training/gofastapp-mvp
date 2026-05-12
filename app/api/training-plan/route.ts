@@ -8,6 +8,10 @@ import { totalWeeksFromDates } from "@/lib/training/plan-utils";
 import { TrainingPlanLifecycle } from "@prisma/client";
 import { goalRacePaceDisplayString } from "@/lib/training/goal-pace-calculator";
 import { metersToMiles } from "@/lib/pace-utils";
+import {
+  presetMatchesDistance,
+  snapDistanceLabelFromMeters,
+} from "@/lib/training/preset-distance-match";
 
 /**
  * POST /api/training-plan
@@ -147,22 +151,36 @@ export async function POST(request: NextRequest) {
         : `Training — ${race.name}`;
 
     let presetIdResolved: string | null = null;
+    const raceMeters = race.distanceMeters;
+
     if (bodyPresetId != null && bodyPresetId !== "") {
       const pid = String(bodyPresetId).trim();
-      const exists = await prisma.training_plan_preset.findUnique({
+      const preset = await prisma.training_plan_preset.findUnique({
         where: { id: pid },
-        select: { id: true },
+        select: { id: true, targetDistanceLabel: true },
       });
-      if (!exists) {
+      if (!preset) {
         return NextResponse.json({ error: "presetId not found" }, { status: 400 });
       }
-      presetIdResolved = pid;
+      if (!presetMatchesDistance(preset.targetDistanceLabel, raceMeters)) {
+        const raceLabel = snapDistanceLabelFromMeters(raceMeters);
+        return NextResponse.json(
+          {
+            error: `This training level is built for a ${preset.targetDistanceLabel ?? "specific distance"}. Your goal race${raceLabel ? ` (${raceLabel})` : ""} does not match.`,
+          },
+          { status: 422 }
+        );
+      }
+      presetIdResolved = preset.id;
     } else {
-      const defaultPreset = await prisma.training_plan_preset.findFirst({
+      const presets = await prisma.training_plan_preset.findMany({
         orderBy: { createdAt: "asc" },
-        select: { id: true },
+        select: { id: true, targetDistanceLabel: true },
       });
-      presetIdResolved = defaultPreset?.id ?? null;
+      const compatible = presets.filter((p) =>
+        presetMatchesDistance(p.targetDistanceLabel, raceMeters)
+      );
+      presetIdResolved = compatible[0]?.id ?? null;
     }
 
     if (!presetIdResolved) {
