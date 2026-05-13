@@ -812,7 +812,7 @@ export default function TrainingSetupClient() {
                       <p className="mb-2 font-medium">Check your start date</p>
                       <p className="text-sky-900/90">
                         Your plan needs to start before race day. Pick an earlier date above, then tap
-                        Create plan again.
+                        Choose preferences again.
                       </p>
                     </div>
                   )}
@@ -864,7 +864,7 @@ export default function TrainingSetupClient() {
                     disabled={creating || loadingOrientation || !selectedPreset}
                     className="w-full rounded-lg bg-emerald-600 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
                   >
-                    {creating ? "Creating…" : "Create plan"}
+                    {creating ? "Continuing…" : "Choose preferences"}
                   </button>
 
                   <button
