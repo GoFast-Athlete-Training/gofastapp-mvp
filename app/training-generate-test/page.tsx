@@ -22,22 +22,17 @@ type PresetCheckResponse = {
   planName: string;
   storedPresetId: string | null;
   resolvedPresetId: string;
-  presetWasAutoLinked: boolean;
   presetSlug: string;
   presetTitle: string;
-  volumeConstraints: {
-    baseMiles: number | null;
-    peakMiles: number | null;
-    taperMiles: number | null;
-    cycleLen: number | null;
-    minWeeklyMiles: number | null;
-    maxWeeklyMiles: number | null;
-  } | null;
-  workoutConfig: {
-    tempoIdealDow: number | null;
-    intervalIdealDow: number | null;
-    longRunDefaultDow: number | null;
-  } | null;
+  cycleLen: number | null;
+  minWeeklyMiles: number | null;
+  maxWeeklyMiles: number | null;
+  baseMiles: number | null;
+  peakMiles: number | null;
+  taperMiles: number | null;
+  tempoIdealDow: number | null;
+  intervalIdealDow: number | null;
+  longRunDefaultDow: number | null;
   positions: {
     longRun: {
       cyclePosition: number;
@@ -328,18 +323,13 @@ export default function TrainingGenerateTestPage() {
         {result && (
           <div className="mt-8 space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/40 p-5">
             <h2 className="text-lg font-semibold text-gray-900">What the service reads from the DB</h2>
-            {result.presetWasAutoLinked && (
-              <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                This plan had no preset on the row; we linked the default preset (same as generate would).
-              </p>
-            )}
             <p className="text-sm text-gray-800">
               <span className="font-medium">Plan:</span> {result.planName}
             </p>
             <p className="text-sm text-gray-800">
               <span className="font-medium">Preset on plan row:</span>{" "}
               {result.storedPresetId ?? (
-                <span className="text-amber-800">null (would auto-link)</span>
+                <span className="text-amber-800">null — coach must assign a blueprint</span>
               )}
             </p>
             <p className="text-sm text-gray-800">
@@ -350,32 +340,26 @@ export default function TrainingGenerateTestPage() {
               <span className="text-gray-500">({result.presetSlug})</span>
             </p>
 
-            {result.volumeConstraints && (
-              <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
-                <p className="font-semibold text-gray-900">Volume constraints</p>
-                <p className="mt-2 text-gray-800">
-                  Base {result.volumeConstraints.baseMiles ?? "—"} mi → Peak{" "}
-                  {result.volumeConstraints.peakMiles ?? "—"} mi → Taper{" "}
-                  {result.volumeConstraints.taperMiles ?? "—"} mi · cycle length{" "}
-                  {result.volumeConstraints.cycleLen ?? "—"} weeks
-                </p>
-                <p className="mt-1 text-gray-700">
-                  Min weekly {result.volumeConstraints.minWeeklyMiles ?? "—"} mi · Max weekly{" "}
-                  {result.volumeConstraints.maxWeeklyMiles ?? "— (none)"} mi
-                </p>
-              </div>
-            )}
+            <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
+              <p className="font-semibold text-gray-900">Volume & long-run cycle</p>
+              <p className="mt-2 text-gray-800">
+                Base {result.baseMiles ?? "—"} mi → Peak {result.peakMiles ?? "—"} mi → Taper{" "}
+                {result.taperMiles ?? "—"} mi · long-run cycle {result.cycleLen ?? "—"} weeks (
+                {result.cycleLen ?? "—"} long runs before the rotation repeats)
+              </p>
+              <p className="mt-1 text-gray-700">
+                Min weekly {result.minWeeklyMiles ?? "—"} mi · Max weekly {result.maxWeeklyMiles ?? "— (none)"}{" "}
+                mi
+              </p>
+            </div>
 
-            {result.workoutConfig && (
-              <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
-                <p className="font-semibold text-gray-900">Workout config (ideal DOW)</p>
-                <p className="mt-2 text-gray-800">
-                  Tempo {dowLabel(result.workoutConfig.tempoIdealDow)} · Intervals{" "}
-                  {dowLabel(result.workoutConfig.intervalIdealDow)} · Long run{" "}
-                  {dowLabel(result.workoutConfig.longRunDefaultDow)}
-                </p>
-              </div>
-            )}
+            <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
+              <p className="font-semibold text-gray-900">Ideal DOW</p>
+              <p className="mt-2 text-gray-800">
+                Tempo {dowLabel(result.tempoIdealDow)} · Intervals {dowLabel(result.intervalIdealDow)} · Long
+                run {dowLabel(result.longRunDefaultDow)}
+              </p>
+            </div>
 
             <PositionBlock label="Long run positions" rows={result.positions.longRun} />
             <PositionBlock label="Intervals positions" rows={result.positions.intervals} />

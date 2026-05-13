@@ -1,5 +1,5 @@
 /**
- * Derives per–macro-cycle long-run POOL totals (preset_volume_constraints anchors)
+ * Derives per–macro-cycle long-run POOL totals (preset long-run pool anchors)
  * spanning the athlete's `totalWeeks × cycleLen` layout.
  *
  * Geometric cup: peak cycle index derives from total cycles N (~65% through), not a

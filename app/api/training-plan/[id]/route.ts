@@ -41,8 +41,6 @@ export async function GET(request: NextRequest, context: Ctx) {
         _count: { select: { planned_workouts: true } },
         training_plan_preset: {
           include: {
-            volumeConstraints: true,
-            workoutConfig: true,
             longRunConfig: {
               include: {
                 positions: {

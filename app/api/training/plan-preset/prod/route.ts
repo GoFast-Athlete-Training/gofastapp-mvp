@@ -39,13 +39,9 @@ export async function GET(request: NextRequest) {
       description: true,
       publicDescription: true,
       targetDistanceLabel: true,
-      volumeConstraints: {
-        select: {
-          minWeeklyMiles: true,
-          maxWeeklyMiles: true,
-          baseMiles: true,
-        },
-      },
+      minWeeklyMiles: true,
+      maxWeeklyMiles: true,
+      baseMiles: true,
     },
   });
 

@@ -44,12 +44,7 @@ export async function GET(
           distance: true,
         },
       },
-      training_plan_preset: {
-        include: {
-          volumeConstraints: true,
-          workoutConfig: true,
-        },
-      },
+      training_plan_preset: true,
       _count: { select: { planned_workouts: true } },
     },
   });

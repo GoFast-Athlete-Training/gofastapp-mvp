@@ -18,11 +18,10 @@ import {
   catalogueIdsFromPreset,
   catalogueSelectForGeneration,
   mapPositionRow,
-  presetBoltonsToPlanGenConfig,
+  presetToPlanGenConfig,
   trainingPlanPresetInclude,
   type LoadedPresetInclude,
   type CatalogueGenerationRowSelection,
-  type PlanGenPresetBoltonsInput,
 } from "@/lib/training/plan-generate-presets-loader";
 import type { CatalogueMileEstimateInput } from "@/lib/training/catalogue-mile-estimate";
 
@@ -72,8 +71,14 @@ export async function executePlanGenerate(params: {
     }),
   ]);
 
-  if (!rawPreset?.volumeConstraints || !rawPreset.workoutConfig) {
-    throw new Error("Preset is incomplete (volume/workout boltons missing).");
+  if (
+    rawPreset == null ||
+    rawPreset.baseMiles == null ||
+    rawPreset.peakMiles == null ||
+    rawPreset.taperMiles == null ||
+    rawPreset.minWeeklyMiles == null
+  ) {
+    throw new Error("Preset is incomplete (volume fields missing).");
   }
 
   const presetLabel =
@@ -81,12 +86,8 @@ export async function executePlanGenerate(params: {
     (typeof rawPreset.title === "string" && rawPreset.title.trim()) ||
     planRow.presetId;
 
-  const boltonsInput: PlanGenPresetBoltonsInput = {
-    volumeConstraints: rawPreset.volumeConstraints,
-    workoutConfig: rawPreset.workoutConfig,
-  };
-  const planConfig = presetBoltonsToPlanGenConfig(boltonsInput);
-  const vol = boltonsInput.volumeConstraints;
+  const planConfig = presetToPlanGenConfig(rawPreset);
+  const vol = rawPreset;
 
   const longRunPositions =
     rawPreset.longRunConfig?.positions.map(mapPositionRow) ?? [];
@@ -159,7 +160,7 @@ export async function executePlanGenerate(params: {
       typeof cv === "number" && Number.isFinite(cv) ? Math.round(cv) : NaN;
     if (c >= 1 && c <= 8) return c;
     throw new Error(
-      `Training preset "${presetLabel}" has invalid cycleLen (${String(vol.cycleLen)}). Fix volume constraints in GoFast Company.`
+      `Training preset "${presetLabel}" has invalid long-run cycle length (${String(vol.cycleLen)}): use 1–8 weeks per long-run rotation block in GoFast Company.`
     );
   }
 
@@ -192,17 +193,17 @@ export async function executePlanGenerate(params: {
   const vt = Number(vol.taperMiles);
   if (!Number.isFinite(vb) || vb <= 0) {
     throw new Error(
-      `Training preset "${presetLabel}" has invalid baseMiles. Fix volume constraints in GoFast Company.`
+      `Training preset "${presetLabel}" has invalid baseMiles. Fix this preset in GoFast Company.`
     );
   }
   if (!Number.isFinite(vp) || vp <= 0) {
     throw new Error(
-      `Training preset "${presetLabel}" has invalid peakMiles. Fix volume constraints in GoFast Company.`
+      `Training preset "${presetLabel}" has invalid peakMiles. Fix this preset in GoFast Company.`
     );
   }
   if (!Number.isFinite(vt) || vt <= 0) {
     throw new Error(
-      `Training preset "${presetLabel}" has invalid taperMiles. Fix volume constraints in GoFast Company.`
+      `Training preset "${presetLabel}" has invalid taperMiles. Fix this preset in GoFast Company.`
     );
   }
   const baseMiles = vb;
@@ -244,7 +245,7 @@ export async function executePlanGenerate(params: {
   const minWeeklyFromPreset = Number(vol.minWeeklyMiles);
   if (!Number.isFinite(minWeeklyFromPreset) || minWeeklyFromPreset < 1) {
     throw new Error(
-      `Training preset "${presetLabel}" has invalid minWeeklyMiles. Fix volume constraints in GoFast Company.`
+      `Training preset "${presetLabel}" has invalid minWeeklyMiles. Fix this preset in GoFast Company.`
     );
   }
 

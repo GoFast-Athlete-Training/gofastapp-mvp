@@ -1,15 +1,13 @@
 import { prisma } from "@/lib/prisma";
 
-/** Oldest seeded preset wins (Coach / migration order). */
-const defaultPresetOrder = { createdAt: "asc" as const };
-
 export type EnsurePlanPresetOutcome =
   | { ok: true; presetId: string }
-  | { ok: false; kind: "plan_not_found" | "no_system_preset" };
+  | { ok: false; kind: "plan_not_found" | "preset_not_assigned" };
 
 /**
- * Guarantee `training_plans.presetId` is populated before generator runs:
- * heals legacy rows and matches POST `/api/training-plan` default resolution.
+ * Preset linkage is explicit: coaches assign `training_plans.presetId` (Company) or
+ * athletes choose a published blueprint at plan creation (`POST /api/training-plan` with presetId).
+ * This helper does not invent or persist a default preset.
  */
 export async function ensureTrainingPlanPresetLinked(params: {
   planId: string;
@@ -20,17 +18,6 @@ export async function ensureTrainingPlanPresetLinked(params: {
     select: { presetId: true },
   });
   if (!plan) return { ok: false, kind: "plan_not_found" };
-  if (plan.presetId) return { ok: true, presetId: plan.presetId };
-
-  const preset = await prisma.training_plan_preset.findFirst({
-    orderBy: defaultPresetOrder,
-    select: { id: true },
-  });
-  if (!preset) return { ok: false, kind: "no_system_preset" };
-
-  await prisma.training_plans.update({
-    where: { id: params.planId },
-    data: { presetId: preset.id, updatedAt: new Date() },
-  });
-  return { ok: true, presetId: preset.id };
+  if (!plan.presetId) return { ok: false, kind: "preset_not_assigned" };
+  return { ok: true, presetId: plan.presetId };
 }

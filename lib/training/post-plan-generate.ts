@@ -87,7 +87,7 @@ export async function planGeneratePostHandler(
       const msg =
         presetLink.kind === "plan_not_found"
           ? "Plan not found"
-          : "No training plan presets are configured. Your coach needs to publish a preset before plans can generate.";
+          : "This plan has no training preset. Your coach must assign a blueprint in GoFast Company, or re-create the plan after picking one in training setup.";
       return NextResponse.json(
         { error: msg },
         { status: presetLink.kind === "plan_not_found" ? 404 : 422 }

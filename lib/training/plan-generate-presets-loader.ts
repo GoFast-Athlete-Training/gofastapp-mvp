@@ -2,24 +2,8 @@
  * Shared Prisma preset payload → generator boltons mapping.
  */
 
-import { WorkoutType, Prisma } from "@prisma/client";
+import { WorkoutType, Prisma, type training_plan_preset } from "@prisma/client";
 import { runTypeConfigPositionsToInputs, type RunTypeConfigInput } from "@/lib/training/run-type-config-shared";
-
-export type PlanGenPresetBoltonsInput = {
-  volumeConstraints: {
-    cycleLen?: number | null;
-    minWeeklyMiles?: number | null;
-    baseMiles?: number | null;
-    peakMiles?: number | null;
-    taperMiles?: number | null;
-    maxWeeklyMiles?: number | null;
-  };
-  workoutConfig: {
-    tempoIdealDow?: number | null;
-    intervalIdealDow?: number | null;
-    longRunDefaultDow?: number | null;
-  };
-};
 
 export interface PlanGenConfig {
   cycleLen?: number | null;
@@ -33,21 +17,30 @@ export interface PlanGenConfig {
   longRunDefaultDow?: number | null;
 }
 
-export function presetBoltonsToPlanGenConfig(
-  preset: PlanGenPresetBoltonsInput
+export function presetToPlanGenConfig(
+  preset: Pick<
+    training_plan_preset,
+    | "cycleLen"
+    | "minWeeklyMiles"
+    | "maxWeeklyMiles"
+    | "baseMiles"
+    | "peakMiles"
+    | "taperMiles"
+    | "tempoIdealDow"
+    | "intervalIdealDow"
+    | "longRunDefaultDow"
+  >
 ): PlanGenConfig {
-  const volume = preset.volumeConstraints;
-  const workout = preset.workoutConfig;
   return {
-    cycleLen: volume.cycleLen ?? undefined,
-    minWeeklyMiles: volume.minWeeklyMiles ?? undefined,
-    baseMiles: volume.baseMiles ?? undefined,
-    peakMiles: volume.peakMiles ?? undefined,
-    taperMiles: volume.taperMiles ?? undefined,
-    maxWeeklyMiles: volume.maxWeeklyMiles ?? undefined,
-    tempoIdealDow: workout.tempoIdealDow ?? undefined,
-    intervalIdealDow: workout.intervalIdealDow ?? undefined,
-    longRunDefaultDow: workout.longRunDefaultDow ?? undefined,
+    cycleLen: preset.cycleLen,
+    minWeeklyMiles: preset.minWeeklyMiles,
+    baseMiles: preset.baseMiles,
+    peakMiles: preset.peakMiles,
+    taperMiles: preset.taperMiles,
+    maxWeeklyMiles: preset.maxWeeklyMiles,
+    tempoIdealDow: preset.tempoIdealDow,
+    intervalIdealDow: preset.intervalIdealDow,
+    longRunDefaultDow: preset.longRunDefaultDow,
   };
 }
 
@@ -75,8 +68,6 @@ export const positionsInclude = {
 } as const;
 
 export const trainingPlanPresetInclude = {
-  volumeConstraints: true,
-  workoutConfig: true,
   longRunConfig: { include: { positions: positionsInclude } },
   intervalsConfig: { include: { positions: positionsInclude } },
   tempoConfig: { include: { positions: positionsInclude } },

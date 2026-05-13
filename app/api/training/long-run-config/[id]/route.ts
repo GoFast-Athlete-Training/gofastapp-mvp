@@ -48,10 +48,15 @@ export async function GET(
   if (presetId) {
     const preset = await prisma.training_plan_preset.findFirst({
       where: { id: presetId, longRunConfigId: id },
-      include: { volumeConstraints: true },
     });
-    if (preset?.volumeConstraints && item.positions.length > 0) {
-      const v = preset.volumeConstraints;
+    if (
+      preset &&
+      item.positions.length > 0 &&
+      preset.baseMiles != null &&
+      preset.peakMiles != null &&
+      preset.taperMiles != null
+    ) {
+      const v = preset;
       const { poolMilesByCycle, nCycles } = generateCyclePoolTotals({
         totalWeeks,
         cycleLen: v.cycleLen,

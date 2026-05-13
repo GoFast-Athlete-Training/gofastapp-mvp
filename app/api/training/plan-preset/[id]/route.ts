@@ -6,9 +6,11 @@ import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { serializePlanPresetForApi } from "@/lib/training/quality-percent";
 import { parseTargetDistanceLabelFromBody } from "@/lib/training/preset-distance-match";
 
+function isDow1to7(n: number): boolean {
+  return Number.isInteger(n) && n >= 1 && n <= 7;
+}
+
 const presetInclude = {
-  volumeConstraints: true,
-  workoutConfig: true,
   longRunConfig: {
     include: {
       positions: {
@@ -79,7 +81,6 @@ export async function PATCH(
 
     const existing = await prisma.training_plan_preset.findUnique({
       where: { id },
-      include: { volumeConstraints: true, workoutConfig: true },
     });
     if (!existing) {
       return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
@@ -105,34 +106,40 @@ export async function PATCH(
       "peakMiles",
       "taperMiles",
     ] as const;
-    const volumeData: Record<string, unknown> = {};
-    const vol = body.volume && typeof body.volume === "object" ? body.volume : body;
-    const volRec = vol as Record<string, unknown>;
+    const scalarData: Record<string, unknown> = {};
+    const bodyRec = body as Record<string, unknown>;
 
     for (const k of volKeys) {
-      if (k in vol) {
+      if (k in body) {
         if (k === "maxWeeklyMiles") {
-          const v = volRec.maxWeeklyMiles;
+          const v = bodyRec.maxWeeklyMiles;
           if (v === null || v === "") {
-            volumeData.maxWeeklyMiles = null;
+            scalarData.maxWeeklyMiles = null;
           } else if (typeof v === "number" && Number.isFinite(v)) {
-            volumeData.maxWeeklyMiles = Math.max(1, Math.round(v));
+            scalarData.maxWeeklyMiles = Math.max(1, Math.round(v));
+          }
+        } else if (k === "cycleLen") {
+          const v = bodyRec.cycleLen;
+          if (typeof v === "number" && Number.isFinite(v)) {
+            const r = Math.round(v);
+            if (r >= 1 && r <= 8) scalarData.cycleLen = r;
           }
         } else {
-          const v = volRec[k];
+          const v = bodyRec[k];
           if (v != null) {
-            volumeData[k] = v;
+            scalarData[k] = v;
           }
         }
       }
     }
 
-    const workoutData: Record<string, unknown> = {};
-    const wk = body.workout && typeof body.workout === "object" ? body.workout : {};
-    const wkRest = ["tempoIdealDow", "intervalIdealDow", "longRunDefaultDow"] as const;
-    for (const k of wkRest) {
-      if (k in wk && (wk as Record<string, unknown>)[k] != null) {
-        workoutData[k] = (wk as Record<string, unknown>)[k];
+    const dowKeys = ["tempoIdealDow", "intervalIdealDow", "longRunDefaultDow"] as const;
+    for (const k of dowKeys) {
+      if (k in body && bodyRec[k] != null) {
+        const n = bodyRec[k];
+        if (typeof n === "number" && isDow1to7(n)) {
+          scalarData[k] = n;
+        }
       }
     }
 
@@ -190,21 +197,8 @@ export async function PATCH(
       where: { id },
       data: {
         ...presetData,
-        ...(existing.volumeConstraints && Object.keys(volumeData).length > 0
-          ? {
-              volumeConstraints: {
-                update: volumeData as object,
-              },
-            }
-          : {}),
-        ...(existing.workoutConfig && Object.keys(workoutData).length > 0
-          ? {
-              workoutConfig: {
-                update: workoutData as object,
-              },
-            }
-          : {}),
-      },
+        ...scalarData,
+      } as object,
       include: presetInclude,
     });
 

@@ -150,48 +150,35 @@ export async function POST(request: NextRequest) {
         ? name.trim()
         : `Training — ${race.name}`;
 
-    let presetIdResolved: string | null = null;
-    const raceMeters = race.distanceMeters;
-
-    if (bodyPresetId != null && bodyPresetId !== "") {
-      const pid = String(bodyPresetId).trim();
-      const preset = await prisma.training_plan_preset.findUnique({
-        where: { id: pid },
-        select: { id: true, targetDistanceLabel: true },
-      });
-      if (!preset) {
-        return NextResponse.json({ error: "presetId not found" }, { status: 400 });
-      }
-      if (!presetMatchesDistance(preset.targetDistanceLabel, raceMeters)) {
-        const raceLabel = snapDistanceLabelFromMeters(raceMeters);
-        return NextResponse.json(
-          {
-            error: `This training level is built for a ${preset.targetDistanceLabel ?? "specific distance"}. Your goal race${raceLabel ? ` (${raceLabel})` : ""} does not match.`,
-          },
-          { status: 422 }
-        );
-      }
-      presetIdResolved = preset.id;
-    } else {
-      const presets = await prisma.training_plan_preset.findMany({
-        orderBy: { createdAt: "asc" },
-        select: { id: true, targetDistanceLabel: true },
-      });
-      const compatible = presets.filter((p) =>
-        presetMatchesDistance(p.targetDistanceLabel, raceMeters)
-      );
-      presetIdResolved = compatible[0]?.id ?? null;
-    }
-
-    if (!presetIdResolved) {
+    if (bodyPresetId == null || bodyPresetId === "") {
       return NextResponse.json(
         {
           error:
-            "No training plan preset is available yet. Your coach needs to configure presets before athlete plans can be created.",
+            "presetId is required — pick a training blueprint in setup (your coach publishes these in GoFast Company).",
+        },
+        { status: 400 }
+      );
+    }
+
+    const pid = String(bodyPresetId).trim();
+    const preset = await prisma.training_plan_preset.findUnique({
+      where: { id: pid },
+      select: { id: true, targetDistanceLabel: true },
+    });
+    if (!preset) {
+      return NextResponse.json({ error: "presetId not found" }, { status: 400 });
+    }
+    const raceMeters = race.distanceMeters;
+    if (!presetMatchesDistance(preset.targetDistanceLabel, raceMeters)) {
+      const raceLabel = snapDistanceLabelFromMeters(raceMeters);
+      return NextResponse.json(
+        {
+          error: `This training level is built for a ${preset.targetDistanceLabel ?? "specific distance"}. Your goal race${raceLabel ? ` (${raceLabel})` : ""} does not match.`,
         },
         { status: 422 }
       );
     }
+    const presetIdResolved = preset.id;
 
     const now = new Date();
     const plan = await prisma.$transaction(async (tx) => {

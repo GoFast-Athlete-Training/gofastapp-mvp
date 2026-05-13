@@ -394,7 +394,7 @@ export default function TrainingSetupPlanPage({
     const preset = plan.training_plan_preset;
     if (!plan.presetId) {
       msgs.push(
-        "This plan was created before presets were enforced. We&apos;ll attach the system's default blueprint when you generate—if generation fails with a preset error, ask your coach to publish training presets."
+        "This plan has no training preset assigned. Ask your coach to pick a blueprint for this plan in GoFast Company, or archive it and create a new plan from training setup (choose a published level there)."
       );
     } else if (preset == null) {
       msgs.push(
@@ -915,8 +915,8 @@ export default function TrainingSetupPlanPage({
                     Base {scheduleSummary.cyclePoolData.baseMiles} mi → Peak{" "}
                     {scheduleSummary.cyclePoolData.peakMiles} mi → Taper{" "}
                     {scheduleSummary.cyclePoolData.taperMiles} mi ·{" "}
-                    {scheduleSummary.cyclePoolData.cycleLen}-week cycles ·{" "}
-                    {scheduleSummary.cyclePoolData.nCycles} cycles
+                    {scheduleSummary.cyclePoolData.cycleLen}-week long-run block (one LR/week, rotation repeats every{" "}
+                    {scheduleSummary.cyclePoolData.cycleLen} weeks) · {scheduleSummary.cyclePoolData.nCycles} blocks
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {scheduleSummary.cyclePoolData.poolMilesByCycle.map((mi, i) => (

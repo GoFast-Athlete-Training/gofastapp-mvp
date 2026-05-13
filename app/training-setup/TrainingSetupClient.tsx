@@ -273,27 +273,19 @@ export default function TrainingSetupClient() {
                   typeof r.targetDistanceLabel === "string" && r.targetDistanceLabel.trim().length > 0
                     ? r.targetDistanceLabel.trim()
                     : null;
-                const vc = r.volumeConstraints as
-                  | {
-                      minWeeklyMiles?: unknown;
-                      maxWeeklyMiles?: unknown;
-                      baseMiles?: unknown;
-                    }
-                  | null
-                  | undefined;
+                const minWeeklyMilesRaw = Number(r.minWeeklyMiles);
+                const maxRaw = r.maxWeeklyMiles;
+                const baseRaw = Number(r.baseMiles);
                 let minWeeklyMiles = 40;
                 let maxWeeklyMiles: number | null = null;
                 let baseMiles = 40;
-                if (vc && typeof vc === "object") {
-                  const mn = Number(vc.minWeeklyMiles);
-                  if (Number.isFinite(mn) && mn >= 1) minWeeklyMiles = Math.round(mn);
-                  const mx = vc.maxWeeklyMiles;
-                  if (mx != null && Number.isFinite(Number(mx)) && Number(mx) >= minWeeklyMiles) {
-                    maxWeeklyMiles = Math.round(Number(mx));
-                  }
-                  const b = Number(vc.baseMiles);
-                  if (Number.isFinite(b) && b > 0) baseMiles = b;
+                if (Number.isFinite(minWeeklyMilesRaw) && minWeeklyMilesRaw >= 1) {
+                  minWeeklyMiles = Math.round(minWeeklyMilesRaw);
                 }
+                if (maxRaw != null && Number.isFinite(Number(maxRaw)) && Number(maxRaw) >= minWeeklyMiles) {
+                  maxWeeklyMiles = Math.round(Number(maxRaw));
+                }
+                if (Number.isFinite(baseRaw) && baseRaw > 0) baseMiles = baseRaw;
                 return {
                   id,
                   slug,

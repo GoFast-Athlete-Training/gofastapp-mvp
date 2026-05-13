@@ -20,8 +20,6 @@ function isDow1to7(n: number): boolean {
 }
 
 const presetInclude = {
-  volumeConstraints: true,
-  workoutConfig: true,
   longRunConfig: {
     include: {
       positions: {
@@ -67,8 +65,6 @@ export async function GET(request: NextRequest) {
   const presets = await prisma.training_plan_preset.findMany({
     orderBy: { createdAt: "asc" },
     include: {
-      volumeConstraints: true,
-      workoutConfig: true,
       longRunConfig: { select: { id: true, name: true, description: true } },
       intervalsConfig: { select: { id: true, name: true, description: true } },
       tempoConfig: { select: { id: true, name: true, description: true } },
@@ -86,7 +82,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { slug: slugBody, title, description, publicDescription, volume, workout } = body;
+    const { slug: slugBody, title, description, publicDescription } = body;
 
     if (!title || typeof title !== "string" || !title.trim()) {
       return NextResponse.json(
@@ -109,38 +105,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const vol = (volume && typeof volume === "object" ? volume : {}) as Record<string, unknown>;
-    const wk = workout && typeof workout === "object" ? workout : {};
-    const wkRec = wk as Record<string, unknown>;
-
     const needPositive = (v: unknown): number | null => {
       if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
       return null;
     };
-    const peakMiles = needPositive(vol.peakMiles);
-    const baseMiles = needPositive(vol.baseMiles);
-    const taperMiles = needPositive(vol.taperMiles);
-    const minWeeklyMiles = needPositive(vol.minWeeklyMiles);
+    const peakMiles = needPositive(body.peakMiles);
+    const baseMiles = needPositive(body.baseMiles);
+    const taperMiles = needPositive(body.taperMiles);
+    const minWeeklyMiles = needPositive(body.minWeeklyMiles);
     if (peakMiles == null || baseMiles == null || taperMiles == null || minWeeklyMiles == null) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "volume.minWeeklyMiles, baseMiles, peakMiles, and taperMiles are required and must be positive numbers",
+            "minWeeklyMiles, baseMiles, peakMiles, and taperMiles are required and must be positive numbers",
+        },
+        { status: 400 }
+      );
+    }
+
+    const cycleRaw = body.cycleLen;
+    const cycleLen =
+      typeof cycleRaw === "number" && Number.isFinite(cycleRaw) ? Math.round(cycleRaw) : null;
+    if (cycleLen == null || cycleLen < 1 || cycleLen > 8) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "cycleLen (long-run cycle: weeks per rotation block, 1 long run per week) is required and must be an integer from 1 to 8",
         },
         { status: 400 }
       );
     }
 
     let maxWeeklyMiles: number | null = null;
-    if ("maxWeeklyMiles" in vol) {
-      if (vol.maxWeeklyMiles === null || vol.maxWeeklyMiles === "") {
+    if ("maxWeeklyMiles" in body) {
+      if (body.maxWeeklyMiles === null || body.maxWeeklyMiles === "") {
         maxWeeklyMiles = null;
-      } else if (typeof vol.maxWeeklyMiles === "number" && Number.isFinite(vol.maxWeeklyMiles)) {
-        maxWeeklyMiles = Math.max(1, Math.round(vol.maxWeeklyMiles));
+      } else if (typeof body.maxWeeklyMiles === "number" && Number.isFinite(body.maxWeeklyMiles)) {
+        maxWeeklyMiles = Math.max(1, Math.round(body.maxWeeklyMiles));
       } else {
         return NextResponse.json(
-          { success: false, error: "volume.maxWeeklyMiles must be a positive number, null, or omitted" },
+          { success: false, error: "maxWeeklyMiles must be a positive number, null, or omitted" },
           { status: 400 }
         );
       }
@@ -163,9 +169,9 @@ export async function POST(request: NextRequest) {
       return r;
     }
 
-    const tD = wkRec.tempoIdealDow;
-    const iD = wkRec.intervalIdealDow;
-    const lD = wkRec.longRunDefaultDow;
+    const tD = body.tempoIdealDow;
+    const iD = body.intervalIdealDow;
+    const lD = body.longRunDefaultDow;
     const tNum = typeof tD === "number" && isDow1to7(tD) ? tD : null;
     const iNum = typeof iD === "number" && isDow1to7(iD) ? iD : null;
     const lNum = typeof lD === "number" && isDow1to7(lD) ? lD : null;
@@ -173,7 +179,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "workout.tempoIdealDow, intervalIdealDow, and longRunDefaultDow are required (1–7)",
+          error: "tempoIdealDow, intervalIdealDow, and longRunDefaultDow are required (1–7)",
         },
         { status: 400 }
       );
@@ -213,6 +219,15 @@ export async function POST(request: NextRequest) {
             ? publicDescription.trim()
             : null,
         ...(tdl.value !== undefined ? { targetDistanceLabel: tdl.value } : {}),
+        cycleLen,
+        minWeeklyMiles,
+        maxWeeklyMiles: maxWeeklyMiles ?? null,
+        baseMiles,
+        peakMiles,
+        taperMiles,
+        tempoIdealDow: tNum,
+        intervalIdealDow: iNum,
+        longRunDefaultDow: lNum,
         ...(longRunConfigId !== undefined
           ? longRunConfigId
             ? { longRunConfig: { connect: { id: longRunConfigId } } }
@@ -228,23 +243,6 @@ export async function POST(request: NextRequest) {
             ? { tempoConfig: { connect: { id: tempoConfigId } } }
             : {}
           : {}),
-        volumeConstraints: {
-          create: {
-            cycleLen: typeof vol.cycleLen === "number" ? vol.cycleLen : 4,
-            minWeeklyMiles,
-            maxWeeklyMiles: maxWeeklyMiles ?? null,
-            baseMiles,
-            peakMiles,
-            taperMiles,
-          },
-        },
-        workoutConfig: {
-          create: {
-            tempoIdealDow: tNum,
-            intervalIdealDow: iNum,
-            longRunDefaultDow: lNum,
-          },
-        },
       },
       include: presetInclude,
     });

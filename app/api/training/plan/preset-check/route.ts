@@ -3,7 +3,6 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { ensureTrainingPlanPresetLinked } from "@/lib/training/ensure-training-plan-preset-linked";
 import { trainingPlanPresetInclude } from "@/lib/training/plan-generate-presets-loader";
 
 type PositionRow = {
@@ -42,8 +41,8 @@ function mapConfigPositions(
 
 /**
  * GET /api/training/plan/preset-check?planId=
- * Read-only: same preset resolution + include as the generator. No writes except
- * ensureTrainingPlanPresetLinked may persist a missing presetId (same as generate).
+ * Read-only: returns the preset row linked on the plan (same include shape as the generator).
+ * Does not assign a preset — that must be set in Company or at plan creation.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -67,24 +66,17 @@ export async function GET(request: NextRequest) {
 
     const storedPresetId = planRow.presetId;
 
-    const presetLink = await ensureTrainingPlanPresetLinked({
-      planId,
-      athleteId: auth.athlete.id,
-    });
-    if (!presetLink.ok) {
-      const msg =
-        presetLink.kind === "plan_not_found"
-          ? "Plan not found"
-          : "No training plan presets are configured.";
+    if (!storedPresetId) {
       return NextResponse.json(
-        { error: msg },
-        { status: presetLink.kind === "plan_not_found" ? 404 : 422 }
+        {
+          error:
+            "This plan has no training preset assigned. Your coach must pick a blueprint for this plan in GoFast Company before generate.",
+        },
+        { status: 422 }
       );
     }
 
-    const resolvedPresetId = presetLink.presetId;
-    const presetWasAutoLinked =
-      storedPresetId == null && resolvedPresetId != null;
+    const resolvedPresetId = storedPresetId;
 
     const rawPreset = await prisma.training_plan_preset.findUnique({
       where: { id: resolvedPresetId },
@@ -98,34 +90,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const vol = rawPreset.volumeConstraints;
-    const wk = rawPreset.workoutConfig;
-
     return NextResponse.json({
       planId: planRow.id,
       planName: planRow.name,
       storedPresetId,
       resolvedPresetId,
-      presetWasAutoLinked,
       presetSlug: rawPreset.slug ?? "",
       presetTitle: rawPreset.title ?? "",
-      volumeConstraints: vol
-        ? {
-            baseMiles: vol.baseMiles,
-            peakMiles: vol.peakMiles,
-            taperMiles: vol.taperMiles,
-            cycleLen: vol.cycleLen,
-            minWeeklyMiles: vol.minWeeklyMiles,
-            maxWeeklyMiles: vol.maxWeeklyMiles,
-          }
-        : null,
-      workoutConfig: wk
-        ? {
-            tempoIdealDow: wk.tempoIdealDow,
-            intervalIdealDow: wk.intervalIdealDow,
-            longRunDefaultDow: wk.longRunDefaultDow,
-          }
-        : null,
+      cycleLen: rawPreset.cycleLen,
+      minWeeklyMiles: rawPreset.minWeeklyMiles,
+      maxWeeklyMiles: rawPreset.maxWeeklyMiles,
+      baseMiles: rawPreset.baseMiles,
+      peakMiles: rawPreset.peakMiles,
+      taperMiles: rawPreset.taperMiles,
+      tempoIdealDow: rawPreset.tempoIdealDow,
+      intervalIdealDow: rawPreset.intervalIdealDow,
+      longRunDefaultDow: rawPreset.longRunDefaultDow,
       positions: {
         longRun: mapConfigPositions(rawPreset.longRunConfig?.positions),
         intervals: mapConfigPositions(rawPreset.intervalsConfig?.positions),

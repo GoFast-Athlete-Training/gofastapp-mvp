@@ -1052,11 +1052,20 @@ model training_plan_preset {
   /// Canonical distance label (e.g. "Marathon") from COMMON_RACE_DISTANCE_PRESETS; null = any distance.
   targetDistanceLabel String?
 
+  /// Long-run rotation block: one long run per week for this many consecutive weeks (LR1…LRn) before the pattern repeats; drives pool stepping and placement.
+  cycleLen           Int    @default(4)
+  minWeeklyMiles     Int    @default(40)
+  maxWeeklyMiles     Int?
+  baseMiles          Float
+  peakMiles          Float
+  taperMiles         Float
+  tempoIdealDow      Int    @default(2)
+  intervalIdealDow   Int    @default(4)
+  longRunDefaultDow  Int    @default(6)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  volumeConstraints preset_volume_constraints?
-  workoutConfig     preset_workout_config?
   longRunConfigId   String?
   longRunConfig     long_run_config?   @relation(fields: [longRunConfigId], references: [id], onDelete: SetNull)
   intervalsConfigId String?
@@ -1064,41 +1073,6 @@ model training_plan_preset {
   tempoConfigId     String?
   tempoConfig       tempo_config?      @relation(fields: [tempoConfigId], references: [id], onDelete: SetNull)
   training_plans  training_plans[]
-}
-
-/// Volume constraints: weekly floors/caps, cycle length, and cycle-pool anchors (taper/peak are cycles, not separate phase counts).
-model preset_volume_constraints {
-  id        String @id @default(cuid())
-  presetId  String @unique
-  training_plan_preset training_plan_preset @relation(fields: [presetId], references: [id], onDelete: Cascade)
-
-  cycleLen            Int   @default(4)
-  minWeeklyMiles      Int   @default(40)
-  /// Optional cap on weekly volume (miles); generator may scale down to respect this.
-  maxWeeklyMiles      Int?
-  /// Long-run pool aggregate (sum over long runs in that block) in the first/main base block.
-  baseMiles  Float
-  /// Long-run pool in the peak block (one cycle before taper block).
-  peakMiles  Float
-  /// Long-run pool in the taper block (last training cycle / race build-down).
-  taperMiles Float
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-/// Quality / DOW placement bolton for a preset.
-model preset_workout_config {
-  id       String @id @default(cuid())
-  presetId String @unique
-  training_plan_preset training_plan_preset @relation(fields: [presetId], references: [id], onDelete: Cascade)
-
-  tempoIdealDow      Int   @default(2)
-  intervalIdealDow   Int   @default(4)
-  longRunDefaultDow  Int   @default(6)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 /// Long-run rotation: cycle positions map to catalogue; many presets can share one.
