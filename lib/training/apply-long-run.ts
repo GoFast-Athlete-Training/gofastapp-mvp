@@ -27,21 +27,33 @@ function sortedPos(positions: readonly RunTypePosition[]): RunTypePosition[] {
   return [...positions].sort((a, b) => a.cyclePosition - b.cyclePosition);
 }
 
-function weightNormRow(
+/**
+ * Per-week share of the macro-cycle long-run pool. Weights must renormalize over the
+ * `cycleLen` weeks in the block so that Σ (pool × norm_k) === pool (rotation can have more
+ * slots than cycleLen — previously we divided by full rotation sum and under-filled the pool).
+ */
+function weightNormInMacroBlock(
   positions: readonly RunTypePosition[],
-  cyclePos: number
+  cyclePos: number,
+  cycleLen: number
 ): { catalogueWorkoutId: string | null; weightNorm: number } {
   const rows = sortedPos(positions);
+  const len = Math.max(1, Math.floor(cycleLen));
   if (rows.length === 0) {
     return {
       catalogueWorkoutId: null,
-      weightNorm: 1,
+      weightNorm: 1 / len,
     };
   }
+  let blockWeightSum = 0;
+  for (let k = 0; k < len; k++) {
+    const row = rows[k % rows.length];
+    blockWeightSum += Math.max(0, Number(row.distributionWeight) || 0);
+  }
   const r = rows[cyclePos % rows.length];
-  const wsum = rows.reduce((s, p) => s + Math.max(0, Number(p.distributionWeight) || 0), 0);
   const wi = Math.max(0, Number(r.distributionWeight) || 0);
-  const norm = wsum > 0 ? wi / wsum : 1 / rows.length;
+  const norm =
+    blockWeightSum > 0 ? wi / blockWeightSum : 1 / len;
   return {
     catalogueWorkoutId: r.catalogueWorkoutId ?? null,
     weightNorm: norm,
@@ -73,7 +85,11 @@ export function applyLongRunSchedule(input: ApplyLongRunInput): void {
     const { cyclePos } = weekCycleMeta({ weekNumber: wn, totalWeeks, cycleLen: len });
     const cycleIdx = Math.min(nCycles - 1, Math.floor((wn - 1) / len));
     const macroPool = poolMilesByCycle[cycleIdx] ?? 0;
-    const { weightNorm, catalogueWorkoutId } = weightNormRow(longRunPositions, cyclePos);
+    const { weightNorm, catalogueWorkoutId } = weightNormInMacroBlock(
+      longRunPositions,
+      cyclePos,
+      len
+    );
     // Pool × weight IS the long run — no cap, no ramp.
     const lrMi = round1(macroPool * weightNorm);
 
