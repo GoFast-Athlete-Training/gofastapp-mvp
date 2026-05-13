@@ -1,15 +1,15 @@
 /**
- * Macro-cycle (default 4-week) layout for taper / peak-block detection — replaced long-run arithmetic engine.
+ * Macro-cycle layout for taper / peak-block detection.
+ * `cycleLen` must match the preset’s long-run rotation block (weeks).
  */
-
-const DEFAULT_CYCLE_LEN = 4;
 
 /**
- * Number of contiguous macro blocks (slots) spanning totalWeeks. Last block is taper-capable when slots ≥ 2.
+ * Number of contiguous macro blocks spanning totalWeeks.
  */
-export function longRunBlockCountFromTotalWeeks(totalWeeks: number): number {
+export function longRunBlockCountFromTotalWeeks(totalWeeks: number, cycleLen: number): number {
   const w = Math.max(1, Math.floor(totalWeeks));
-  return Math.max(1, Math.ceil(w / DEFAULT_CYCLE_LEN));
+  const len = Math.max(1, Math.floor(cycleLen));
+  return Math.max(1, Math.ceil(w / len));
 }
 
 export type WeekCycleMeta = {
@@ -17,32 +17,30 @@ export type WeekCycleMeta = {
   cycleSlot: number;
   /** 0..cycleLen-1 position inside the macro block */
   cyclePos: number;
-  /** Total macro blocks (= ceil(totalWeeks/4)) */
+  /** Total macro blocks (= ceil(totalWeeks/cycleLen)) */
   numSlots: number;
   isTaper: boolean;
   isPrePeak: boolean;
 };
 
 /**
- * Aligns calendar week indexes with the taper / pre-peak convention used historically by generateLongRunSchedule.
+ * Aligns calendar week indexes with the taper / pre-peak convention used by assign-workout-days.
  */
 export function weekCycleMeta(params: {
   weekNumber: number;
   totalWeeks: number;
-  cycleLen?: number;
+  cycleLen: number;
 }): WeekCycleMeta {
-  const cycleLen = Math.max(1, Math.floor(params.cycleLen ?? DEFAULT_CYCLE_LEN));
+  const cycleLen = Math.max(1, Math.floor(params.cycleLen));
   const totalWeeks = Math.max(1, Math.floor(params.totalWeeks));
-  const numSlots = longRunBlockCountFromTotalWeeks(totalWeeks);
+  const numSlots = longRunBlockCountFromTotalWeeks(totalWeeks, cycleLen);
   const wi = Math.max(0, params.weekNumber - 1);
   const cycleNum0 = Math.floor(wi / cycleLen);
   const cycleSlot = cycleNum0 + 1;
   const cyclePos = wi % cycleLen;
 
-  const isTaper =
-    numSlots >= 2 && cycleNum0 === numSlots - 1;
-  const isPrePeak =
-    numSlots >= 3 && cycleNum0 === numSlots - 2;
+  const isTaper = numSlots >= 2 && cycleNum0 === numSlots - 1;
+  const isPrePeak = numSlots >= 3 && cycleNum0 === numSlots - 2;
 
   return {
     cycleSlot,
@@ -54,19 +52,19 @@ export function weekCycleMeta(params: {
 }
 
 /** First calendar week index (1-based) of the taper macro block */
-export function taperStartWeekNumberFromTotal(totalWeeks: number, cycleLen = DEFAULT_CYCLE_LEN): number {
-  const numSlots = longRunBlockCountFromTotalWeeks(totalWeeks);
+export function taperStartWeekNumberFromTotal(totalWeeks: number, cycleLen: number): number {
   const len = Math.max(1, Math.floor(cycleLen));
+  const numSlots = longRunBlockCountFromTotalWeeks(totalWeeks, len);
   const taperSlot0 = numSlots - 1;
   return taperSlot0 * len + 1;
 }
 
 /** Best-effort peak week marker: midpoint of final build block immediately before taper */
-export function peakWeekNumberFromTotal(totalWeeks: number, cycleLen = DEFAULT_CYCLE_LEN): number | null {
-  const meta = weekCycleMeta({ weekNumber: 1, totalWeeks });
+export function peakWeekNumberFromTotal(totalWeeks: number, cycleLen: number): number | null {
+  const len = Math.max(1, Math.floor(cycleLen));
+  const meta = weekCycleMeta({ weekNumber: 1, totalWeeks, cycleLen: len });
   const numSlots = meta.numSlots;
   if (numSlots < 2) return null;
-  const len = Math.max(1, Math.floor(cycleLen));
   const peakSlot = numSlots - 2;
   return peakSlot >= 0 ? peakSlot * len + Math.min(len, Math.floor(len / 2) + 1) : null;
 }

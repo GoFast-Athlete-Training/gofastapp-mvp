@@ -147,9 +147,9 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
     intervalDow2 = input.intervalIdealDow;
   }
 
-  const taperStartWeekNumber = taperStartWeekNumberFromTotal(input.totalWeeks);
+  const taperStartWeekNumber = taperStartWeekNumberFromTotal(input.totalWeeks, lrCycleLen);
   const peakWeekNumber =
-    peakWeekNumberFromTotal(input.totalWeeks) ??
+    peakWeekNumberFromTotal(input.totalWeeks, lrCycleLen) ??
     Math.max(1, taperStartWeekNumber - 1);
   const calculatedLongRunMax = longRunCapMilesFromPeakWeekly(input.peakWeeklyMilesForCap);
 

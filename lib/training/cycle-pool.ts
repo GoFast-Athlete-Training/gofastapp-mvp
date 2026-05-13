@@ -48,7 +48,10 @@ export function deriveBuildCoefForPlanLength(
   totalWeeks: number,
   cycleLen: number
 ): number {
-  const cLen = Math.max(1, Math.floor(cycleLen) || 4);
+  const cLen = Math.floor(Number(cycleLen));
+  if (!Number.isFinite(cLen) || cLen < 1) {
+    throw new Error("deriveBuildCoefForPlanLength: cycleLen must be a positive integer");
+  }
   const w = Math.max(1, Math.floor(totalWeeks));
   const nCycles = Math.max(1, Math.ceil(w / cLen));
   const buildSteps = Math.max(1, nCycles - 2);

@@ -253,21 +253,14 @@ export async function executePlanGenerate(params: {
   applyIntervalSchedule({ planSchedule: schedule, catalogueRowsById });
   distributeEasyMiles({
     planSchedule: schedule,
-    totalWeeks: weekCount,
     weeklyMileageTarget,
     minWeeklyMiles: Math.max(minWeeklyFromPreset, params.minWeeklyMiles),
-    cycleLen: cLen,
-    baseMiles,
-    peakMiles,
-    taperMiles,
     maxWeeklyMiles:
       vol.maxWeeklyMiles != null && Number.isFinite(Number(vol.maxWeeklyMiles))
         ? Number(vol.maxWeeklyMiles)
         : undefined,
     raceDistanceMiles,
     minEasyPerDayMiles: 0,
-    minTempoMiles: 3,
-    minIntervalMiles: 3,
   });
 
   const syncedFiveKPace =
