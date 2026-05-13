@@ -106,6 +106,10 @@ export async function GET(request: NextRequest, context: Ctx) {
       where: { id: auth.athlete.id },
       select: { fiveKPace: true },
     });
+    const trainingPrefs = await prisma.trainingPreferences.findUnique({
+      where: { athleteId: auth.athlete.id },
+      select: { weeklyMileageTarget: true },
+    });
 
     const serialized = {
       ...plan,
@@ -121,6 +125,11 @@ export async function GET(request: NextRequest, context: Ctx) {
     return NextResponse.json({
       plan: serialized,
       athleteFiveKPace: athleteRow?.fiveKPace ?? null,
+      weeklyMileageTargetPreference:
+        trainingPrefs?.weeklyMileageTarget != null &&
+        Number.isFinite(Number(trainingPrefs.weeklyMileageTarget))
+          ? Math.round(Number(trainingPrefs.weeklyMileageTarget))
+          : null,
     });
   } catch (e: unknown) {
     console.error("GET /api/training-plan/[id]", e);

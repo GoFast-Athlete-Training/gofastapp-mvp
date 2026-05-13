@@ -25,7 +25,11 @@ export type PlanDayCard = {
 export async function fetchTrainingPlanDetail(
   planId: string,
   bearerToken: string
-): Promise<{ plan: unknown; athleteFiveKPace: string | null }> {
+): Promise<{
+  plan: unknown;
+  athleteFiveKPace: string | null;
+  weeklyMileageTargetPreference: number | null;
+}> {
   const res = await fetch(`/api/training-plan/${planId}`, {
     headers: athleteBearerFetchHeaders(bearerToken),
   });
@@ -33,11 +37,18 @@ export async function fetchTrainingPlanDetail(
     error?: string;
     plan?: unknown;
     athleteFiveKPace?: string | null;
+    weeklyMileageTargetPreference?: number | null;
   };
   if (!res.ok) {
     throw new Error(typeof data.error === "string" ? data.error : "Failed to load plan");
   }
-  return { plan: data.plan, athleteFiveKPace: data.athleteFiveKPace ?? null };
+  const pref = data.weeklyMileageTargetPreference;
+  return {
+    plan: data.plan,
+    athleteFiveKPace: data.athleteFiveKPace ?? null,
+    weeklyMileageTargetPreference:
+      typeof pref === "number" && Number.isFinite(pref) ? Math.round(pref) : null,
+  };
 }
 
 /**
