@@ -21,7 +21,7 @@ type NavItem = {
   match?: (pathname: string | null) => boolean;
 };
 
-/** Plan execution + calendar + one-off build tooling lives here */
+/** Training hub: schedule, setup, day detail, build-a-run */
 function planHubMatch(p: string | null): boolean {
   if (!p) return false;
   return (
@@ -54,7 +54,7 @@ function triWorkMatch(p: string | null): boolean {
 const navItems: NavItem[] = [
   { label: "Home", href: "/athlete-home", icon: Home },
   {
-    label: "Plan",
+    label: "Train",
     href: "/training",
     icon: LayoutDashboard,
     match: planHubMatch,
