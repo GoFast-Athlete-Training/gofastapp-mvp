@@ -36,6 +36,8 @@ export type WorkoutDayInput = {
   intervalIdealDow: number;
   longRunDefaultDow: number;
   peakWeeklyMilesForCap: number | null;
+  /** LR macro block: one long run per week for LR1..LRn; must match preset cycleLen and apply-long-run */
+  longRunCycleLen: number;
   longRunPositions: readonly RunTypePosition[];
   intervalsPositions: readonly RunTypePosition[];
   tempoPositions: readonly RunTypePosition[];
@@ -130,6 +132,8 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
   const preferred =
     input.preferredDays.length > 0 ? [...input.preferredDays].sort((a, b) => a - b) : [1, 2, 3, 4, 5, 6];
 
+  const lrCycleLen = Math.max(1, Math.floor(input.longRunCycleLen));
+
   const raceUtc = utcDateOnly(input.raceDate);
   const planStart = utcDateOnly(input.planStartDate);
   const raceOurDow = ourDowFromUtcDate(raceUtc);
@@ -164,7 +168,11 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
     const weekAnchor = addDaysUtc(firstMonday, (weekNumber - 1) * 7);
     const weekEnd = addDaysUtc(weekAnchor, 6);
     const nOffset = nOffsetFromWeekAnchor(weekAnchor, raceUtc);
-    const { cyclePos } = weekCycleMeta({ weekNumber, totalWeeks: input.totalWeeks });
+    const { cyclePos } = weekCycleMeta({
+      weekNumber,
+      totalWeeks: input.totalWeeks,
+      cycleLen: lrCycleLen,
+    });
 
     const days: PlanWeekSchedule["days"] = [];
 

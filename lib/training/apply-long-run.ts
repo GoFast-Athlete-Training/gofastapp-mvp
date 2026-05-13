@@ -1,6 +1,9 @@
 /**
  * Service 2: assign long-run miles from preset position weights × macro-cycle pool share.
  * Long runs are sacred — pool math is the answer, nothing trims it.
+ *
+ * Macro cycle = `cycleLen` consecutive calendar weeks, each with exactly one long run (LR1..LRcycleLen).
+ * The cup gives total LR miles for that block; this file splits it across those weeks.
  */
 
 import type { PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";

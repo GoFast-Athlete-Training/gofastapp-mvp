@@ -179,6 +179,7 @@ export async function executePlanGenerate(params: {
     intervalIdealDow: planConfig.intervalIdealDow ?? 4,
     longRunDefaultDow: planConfig.longRunDefaultDow ?? 6,
     peakWeeklyMilesForCap: weeklyMileageTarget,
+    longRunCycleLen: cLen,
     longRunPositions,
     intervalsPositions,
     tempoPositions,
