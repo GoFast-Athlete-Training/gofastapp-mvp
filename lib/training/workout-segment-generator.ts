@@ -47,6 +47,8 @@ export function buildPlanWorkoutApiSegments(params: {
   goalRaceTime?: string | null;
   raceDistanceMiles?: number | null;
   planCycleIndex?: number | null;
+  /** Sec/mi added to 5K anchor for Easy template/catalogue pace (plan easyRunConfig). */
+  easyPaceOffsetSecPerMile?: number | null;
 }): ApiSegment[] {
   const {
     workoutType,
@@ -57,12 +59,22 @@ export function buildPlanWorkoutApiSegments(params: {
     goalRaceTime,
     raceDistanceMiles,
     planCycleIndex,
+    easyPaceOffsetSecPerMile,
   } = params;
   if (isIntervalsOrTempo(workoutType)) {
     return [];
   }
   const anchorSecPerMile = anchorSecondsPerMileFromPlanPace(currentFiveKPace);
   const paces = getTrainingPaces(anchorSecPerMile);
+  const pacesForBuild =
+    workoutType === "Easy" &&
+    easyPaceOffsetSecPerMile != null &&
+    Number.isFinite(easyPaceOffsetSecPerMile)
+      ? {
+          ...paces,
+          easy: Math.max(1, anchorSecPerMile + easyPaceOffsetSecPerMile),
+        }
+      : paces;
   const racePaceSec = resolveRacePaceSecondsPerMileForPlan({
     goalRacePace: goalRacePace ?? null,
     goalRaceTime: goalRaceTime ?? null,
@@ -75,10 +87,12 @@ export function buildPlanWorkoutApiSegments(params: {
       anchorSecondsPerMile: anchorSecPerMile,
       racePaceSecondsPerMile: racePaceSec,
       planCycleIndex: planCycleIndex ?? null,
+      easyWorkPaceOffsetOverrideSecPerMile:
+        workoutType === "Easy" ? easyPaceOffsetSecPerMile ?? null : null,
     });
   }
   return descriptorsToApiSegments(
-    getTemplateSegments(workoutType, miles, paces),
-    paces
+    getTemplateSegments(workoutType, miles, pacesForBuild),
+    pacesForBuild
   );
 }

@@ -1072,6 +1072,8 @@ model training_plan_preset {
   intervalsConfig   intervals_config?  @relation(fields: [intervalsConfigId], references: [id], onDelete: SetNull)
   tempoConfigId     String?
   tempoConfig       tempo_config?      @relation(fields: [tempoConfigId], references: [id], onDelete: SetNull)
+  /// JSON: standardMiles, minMiles, paceOffsetSecPerMile, weeklyTargetBufferMiles (easy-day defaults / pace vs 5K anchor)
+  easyRunConfig     Json?
   training_plans  training_plans[]
 }
 
@@ -1205,6 +1207,8 @@ model training_plans {
   calculatedLongRunMax Float?
   /// Cycle pool snapshot from last generation: { nCycles, cycleLen, poolMilesByCycle, baseMiles, peakMiles, taperMiles, positionCounts }
   cyclePoolData        Json?
+  /// Snapshot from preset at last generation (easy standard miles, min trim, pace offset, weekly buffer)
+  easyRunConfig        Json?
   /// Snapshot of preferred training days 1=Mon..7=Sun
   preferredDays        Int[]                  @default([])
   /// Preferred long-run day: 6=Saturday, 7=Sunday (default 6)

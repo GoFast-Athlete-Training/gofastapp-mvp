@@ -17,6 +17,7 @@ import { metersToMiles } from "@/lib/pace-utils";
 import type { Prisma, WorkoutType } from "@prisma/client";
 import { segmentSnapshotDocumentFromApiSegments } from "@/lib/training/workout-segment-snapshot";
 import { isStructuredPlanWeek } from "@/lib/training/plan-schedule-schema";
+import { parseEasyRunConfigJson } from "@/lib/training/easy-run-config";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -147,6 +148,7 @@ export async function GET(request: NextRequest, context: Ctx) {
               goalRacePace: true,
               lifecycleStatus: true,
               planSchedule: true,
+              easyRunConfig: true,
               race_registry: {
                 select: { distanceMeters: true },
               },
@@ -235,6 +237,9 @@ export async function GET(request: NextRequest, context: Ctx) {
             dm != null && Number.isFinite(Number(dm))
               ? metersToMiles(Number(dm))
               : null;
+          const easyCfg = parseEasyRunConfigJson(
+            workout.training_plans?.easyRunConfig ?? null
+          );
           apiSegs = buildPlanWorkoutApiSegments({
             workoutType: workout.workoutType,
             miles: scheduleMiles,
@@ -247,6 +252,10 @@ export async function GET(request: NextRequest, context: Ctx) {
             goalRaceTime: workout.training_plans?.goalRaceTime ?? null,
             raceDistanceMiles,
             planCycleIndex: planCycleIndex ?? workout.planCycleIndex ?? null,
+            easyPaceOffsetSecPerMile:
+              workout.workoutType === "Easy"
+                ? easyCfg.paceOffsetSecPerMile
+                : null,
           });
         }
 

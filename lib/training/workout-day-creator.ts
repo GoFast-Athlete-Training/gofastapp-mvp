@@ -9,6 +9,7 @@ import { buildPlanWorkoutApiSegments } from "./workout-segment-generator";
 import { planScheduleDayForDateKey, collectCatalogueWorkoutIdsFromPlanSchedule } from "./plan-schedule";
 import { metersToMiles } from "@/lib/pace-utils";
 import { segmentSnapshotDocumentFromApiSegments } from "./workout-segment-snapshot";
+import { parseEasyRunConfigJson } from "./easy-run-config";
 
 function utcDayBounds(d: Date): { gte: Date; lte: Date } {
   const x = utcDateOnly(d);
@@ -115,6 +116,7 @@ export async function findOrCreateWorkoutForPlanDay(params: {
   }
 
   const miles = scheduled.estimatedDistanceInMeters / 1609.34;
+  const easyCfg = parseEasyRunConfigJson(plan.easyRunConfig ?? null);
   const apiSegs = buildPlanWorkoutApiSegments({
     workoutType: scheduled.workoutType,
     miles,
@@ -124,6 +126,10 @@ export async function findOrCreateWorkoutForPlanDay(params: {
     goalRaceTime: plan.goalRaceTime ?? null,
     raceDistanceMiles,
     planCycleIndex: scheduled.planCycleIndex ?? null,
+    easyPaceOffsetSecPerMile:
+      scheduled.workoutType === "Easy"
+        ? easyCfg.paceOffsetSecPerMile
+        : null,
   });
 
   const workoutId = await prisma.$transaction(async (tx) => {

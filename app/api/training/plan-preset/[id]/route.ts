@@ -1,10 +1,15 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { serializePlanPresetForApi } from "@/lib/training/quality-percent";
 import { parseTargetDistanceLabelFromBody } from "@/lib/training/preset-distance-match";
+import {
+  easyRunConfigToSnapshot,
+  parseEasyRunConfigJson,
+} from "@/lib/training/easy-run-config";
 
 function isDow1to7(n: number): boolean {
   return Number.isInteger(n) && n >= 1 && n <= 7;
@@ -158,6 +163,23 @@ export async function PATCH(
     }
     if (tdl.value !== undefined) {
       presetData.targetDistanceLabel = tdl.value;
+    }
+
+    if ("easyRunConfig" in body) {
+      const v = bodyRec.easyRunConfig;
+      if (v === null) {
+        presetData.easyRunConfig = Prisma.JsonNull;
+      } else if (v !== undefined) {
+        if (typeof v !== "object" || v === null || Array.isArray(v)) {
+          return NextResponse.json(
+            { success: false, error: "easyRunConfig must be an object or null" },
+            { status: 400 }
+          );
+        }
+        presetData.easyRunConfig = easyRunConfigToSnapshot(
+          parseEasyRunConfigJson(v)
+        ) as Prisma.InputJsonValue;
+      }
     }
 
     type ConnectKey = "longRunConfig" | "intervalsConfig" | "tempoConfig";

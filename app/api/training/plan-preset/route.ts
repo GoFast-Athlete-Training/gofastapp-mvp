@@ -5,6 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { serializePlanPresetForApi } from "@/lib/training/quality-percent";
 import { parseTargetDistanceLabelFromBody } from "@/lib/training/preset-distance-match";
+import {
+  easyRunConfigToSnapshot,
+  parseEasyRunConfigJson,
+} from "@/lib/training/easy-run-config";
+import { Prisma } from "@prisma/client";
 
 function slugifyPresetTitle(title: string): string {
   const s = title
@@ -206,6 +211,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: tdl.error }, { status: 400 });
     }
 
+    let easyRunConfigCreate: Prisma.InputJsonValue | typeof Prisma.JsonNull | undefined;
+    if ("easyRunConfig" in body) {
+      const v = (body as Record<string, unknown>).easyRunConfig;
+      if (v === null) {
+        easyRunConfigCreate = Prisma.JsonNull;
+      } else if (v !== undefined) {
+        if (typeof v !== "object" || v === null || Array.isArray(v)) {
+          return NextResponse.json(
+            { success: false, error: "easyRunConfig must be an object or null" },
+            { status: 400 }
+          );
+        }
+        easyRunConfigCreate = easyRunConfigToSnapshot(
+          parseEasyRunConfigJson(v)
+        ) as Prisma.InputJsonValue;
+      }
+    }
+
     const preset = await prisma.training_plan_preset.create({
       data: {
         slug,
@@ -242,6 +265,9 @@ export async function POST(request: NextRequest) {
           ? tempoConfigId
             ? { tempoConfig: { connect: { id: tempoConfigId } } }
             : {}
+          : {}),
+        ...(easyRunConfigCreate !== undefined
+          ? { easyRunConfig: easyRunConfigCreate }
           : {}),
       },
       include: presetInclude,

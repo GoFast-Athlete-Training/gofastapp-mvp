@@ -506,7 +506,7 @@ export default function TrainingHubPage() {
                   href={`/training-setup/${planDetail.id}`}
                   className="inline-flex justify-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 sm:text-sm sm:px-4 sm:py-2"
                 >
-                  Plan calendar
+                  View schedule
                 </Link>
                 <div className="relative">
                   <button

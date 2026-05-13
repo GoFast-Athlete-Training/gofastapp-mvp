@@ -15,6 +15,10 @@ import { applyIntervalSchedule } from "@/lib/training/apply-interval";
 import { distributeEasyMiles } from "@/lib/training/distribute-easy";
 import { longRunCupSetter } from "@/lib/training/long-run-cup-setter";
 import {
+  easyRunConfigToSnapshot,
+  parseEasyRunConfigJson,
+} from "@/lib/training/easy-run-config";
+import {
   catalogueIdsFromPreset,
   catalogueSelectForGeneration,
   mapPositionRow,
@@ -249,6 +253,8 @@ export async function executePlanGenerate(params: {
     );
   }
 
+  const easyRunResolved = parseEasyRunConfigJson(rawPreset.easyRunConfig);
+
   applyTempoSchedule({ planSchedule: schedule, catalogueRowsById });
   applyIntervalSchedule({ planSchedule: schedule, catalogueRowsById });
   distributeEasyMiles({
@@ -260,7 +266,8 @@ export async function executePlanGenerate(params: {
         ? Number(vol.maxWeeklyMiles)
         : undefined,
     raceDistanceMiles,
-    minEasyPerDayMiles: 0,
+    easyRunConfig: easyRunResolved,
+    typicalWeekPreferredCount: preferredDays.length,
   });
 
   const syncedFiveKPace =
@@ -300,6 +307,7 @@ export async function executePlanGenerate(params: {
       taperStartWeekNumber: placement.taperStartWeekNumber,
       calculatedLongRunMax: placement.calculatedLongRunMax,
       cyclePoolData: cyclePoolData as unknown as Prisma.InputJsonValue,
+      easyRunConfig: easyRunConfigToSnapshot(easyRunResolved) as unknown as Prisma.InputJsonValue,
       weeklyMileageTarget: requestedWeeklyMileageTarget,
       totalWeeks: weekCount,
       ...(syncedFiveKPace != null ? { currentFiveKPace: syncedFiveKPace } : {}),

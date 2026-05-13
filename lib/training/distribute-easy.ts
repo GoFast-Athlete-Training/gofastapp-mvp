@@ -1,9 +1,11 @@
 /**
- * Pass 4c: race miles, then distribute easy miles to fit athlete weekly target.
- * Long run, tempo, and interval miles are set by earlier passes and are not modified here.
+ * Pass 4c: race miles, fixed standard easy miles per slot (from preset), trim only
+ * easy down toward min when week exceeds target + buffer. Does not inflate totals
+ * to hit weekly mileage (no “fill remainder” on easy days).
  */
 
 import type { PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";
+import type { EasyRunConfigResolved } from "@/lib/training/easy-run-config";
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -15,15 +17,18 @@ export type DistributeEasyInput = {
   minWeeklyMiles: number;
   maxWeeklyMiles?: number | null;
   raceDistanceMiles: number;
-  minEasyPerDayMiles?: number;
+  easyRunConfig: EasyRunConfigResolved;
+  /** Preferred training days count (typical full week); used to scale week-1 standard miles. */
+  typicalWeekPreferredCount: number;
 };
 
 /** Mutates planSchedule in-place */
 export function distributeEasyMiles(input: DistributeEasyInput): void {
-  const minEasyPerDay =
-    input.minEasyPerDayMiles != null && Number.isFinite(input.minEasyPerDayMiles)
-      ? Math.max(0, input.minEasyPerDayMiles)
-      : 3;
+  const {
+    easyRunConfig: cfg,
+    typicalWeekPreferredCount: prefCountRaw,
+  } = input;
+  const typicalWeekPreferredCount = Math.max(1, Math.floor(prefCountRaw));
 
   for (const week of input.planSchedule) {
     let weeklyCap = Math.max(
@@ -34,6 +39,9 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
       weeklyCap = Math.min(weeklyCap, Number(input.maxWeeklyMiles));
     }
 
+    const trimThreshold =
+      Math.min(100, weeklyCap + cfg.weeklyTargetBufferMiles) + 0.05;
+
     for (const d of week.days.filter((x) => x.workoutType === "Race")) {
       d.miles = round2(Math.max(input.raceDistanceMiles, 0));
     }
@@ -43,40 +51,29 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
     }
 
     const easySlots = week.days.filter((d) => d.workoutType === "Easy");
+    if (easySlots.length === 0) continue;
+
+    const weekNum = week.weekNumber;
+    const w1Scale =
+      weekNum === 1
+        ? Math.min(1, week.days.length / typicalWeekPreferredCount)
+        : 1;
+    const milesPerEasy = round2(cfg.standardMiles * w1Scale);
+
+    for (const ep of easySlots) {
+      ep.miles = milesPerEasy > 0 ? milesPerEasy : 0;
+    }
 
     const weekSum = (): number => week.days.reduce((s, d) => s + d.miles, 0);
 
-    const easyBudget = Math.max(0, weeklyCap - weekSum());
-
-    if (easyBudget > 0 && easySlots.length > 0) {
-      const baseShare =
-        Math.floor((easyBudget / easySlots.length) * 100) / 100;
-      for (let i = 0; i < easySlots.length; i++) {
-        const ep = easySlots[i]!;
-        const m =
-          i === easySlots.length - 1
-            ? round2(easyBudget - baseShare * (easySlots.length - 1))
-            : baseShare;
-        ep.miles = m < 0.25 ? 0 : m;
-      }
-      const drift = weeklyCap - weekSum();
-      if (Math.abs(drift) > 0.05 && easySlots[easySlots.length - 1]) {
-        const last = easySlots[easySlots.length - 1]!;
-        last.miles = Math.max(minEasyPerDay, round2(last.miles + drift));
-      }
-    }
-
-    while (weekSum() > weeklyCap + 0.05) {
+    while (weekSum() > trimThreshold) {
       let hit = false;
-      for (
-        let i = easySlots.length - 1;
-        i >= 0 && weekSum() > weeklyCap + 0.05;
-        i--
-      ) {
+      for (let i = easySlots.length - 1; i >= 0 && weekSum() > trimThreshold; i--) {
         const d = easySlots[i]!;
-        const room = d.miles - minEasyPerDay;
+        const room = d.miles - cfg.minMiles;
         if (room <= 0) continue;
-        const shave = Math.min(room, weekSum() - weeklyCap);
+        const over = weekSum() - trimThreshold;
+        const shave = Math.min(room, over);
         d.miles = round2(d.miles - shave);
         hit = true;
       }

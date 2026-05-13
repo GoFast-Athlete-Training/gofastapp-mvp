@@ -290,6 +290,8 @@ export function catalogueEntryToApiSegments(params: {
   anchorSecondsPerMile: number;
   racePaceSecondsPerMile?: number | null;
   planCycleIndex?: number | null;
+  /** When set (e.g. plan easyRunConfig), overrides catalogue work pace offset for Easy type only. */
+  easyWorkPaceOffsetOverrideSecPerMile?: number | null;
 }): ApiSegment[] {
   const {
     entry,
@@ -297,13 +299,19 @@ export function catalogueEntryToApiSegments(params: {
     anchorSecondsPerMile,
     racePaceSecondsPerMile = null,
     planCycleIndex = null,
+    easyWorkPaceOffsetOverrideSecPerMile = null,
   } = params;
   const totalMiles = scheduleMiles;
 
   const type = entry.workoutType as WorkoutType;
 
   if (type === "Easy") {
-    const pace = secPerMile(anchorSecondsPerMile, entry.workPaceOffsetSecPerMile);
+    const offset =
+      easyWorkPaceOffsetOverrideSecPerMile != null &&
+      Number.isFinite(easyWorkPaceOffsetOverrideSecPerMile)
+        ? easyWorkPaceOffsetOverrideSecPerMile
+        : entry.workPaceOffsetSecPerMile;
+    const pace = secPerMile(anchorSecondsPerMile, offset);
     return [
       {
         stepOrder: 1,
