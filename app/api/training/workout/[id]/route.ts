@@ -8,6 +8,8 @@ import {
   buildTempoApiSegments,
   resolvePaceStringForWorkout,
 } from "@/lib/training/algo-workout-segments";
+import { catalogueEntryToApiSegments } from "@/lib/training/catalogue-to-segments";
+import { resolveRacePaceSecondsPerMileForPlan } from "@/lib/training/goal-pace-calculator";
 import { buildPlanWorkoutApiSegments } from "@/lib/training/workout-segment-generator";
 import type { ApiSegment } from "@/lib/workout-generator/templates";
 import { cycleIndexFromScheduleForDay, dayNameToOurDow } from "@/lib/training/schedule-parser";
@@ -121,8 +123,8 @@ function resolvedPlanCycleIndexForWorkout(params: {
 
 /**
  * GET /api/training/workout/[id]
- * Workout + segments. Lazy create when empty: I/T via algo; Easy/LongRun/Race via
- * templates + plan pace (plan path). Legacy rows may still link a catalogue entry.
+ * Workout + segments. Lazy create when empty: I/T from catalogue when linked, else
+ * algo; Easy/LongRun/Race via templates + plan pace (plan path).
  */
 export async function GET(request: NextRequest, context: Ctx) {
   try {
@@ -209,34 +211,60 @@ export async function GET(request: NextRequest, context: Ctx) {
           planSchedule: workout.training_plans?.planSchedule ?? null,
         });
 
+        const dm = workout.training_plans?.race_registry?.distanceMeters;
+        const raceDistanceMiles =
+          dm != null && Number.isFinite(Number(dm))
+            ? metersToMiles(Number(dm))
+            : null;
+        const racePaceSecondsPerMile = resolveRacePaceSecondsPerMileForPlan({
+          goalRacePace: workout.training_plans?.goalRacePace ?? null,
+          goalRaceTime: workout.training_plans?.goalRaceTime ?? null,
+          raceDistanceMiles,
+        });
+
         if (workout.workoutType === "Intervals") {
-          apiSegs = await buildIntervalApiSegments({
-            athleteId: auth.athlete.id,
-            workoutId,
-            workoutDate: workout.date ?? null,
-            scheduleTotalMiles: scheduleMiles,
-            anchorSecondsPerMile,
-            planCycleIndex,
-          });
+          if (workout.catalogueWorkoutId && workout.workout_catalogue) {
+            apiSegs = catalogueEntryToApiSegments({
+              entry: workout.workout_catalogue,
+              scheduleMiles,
+              anchorSecondsPerMile,
+              racePaceSecondsPerMile,
+              planCycleIndex: planCycleIndex ?? workout.planCycleIndex ?? null,
+            });
+          } else {
+            apiSegs = await buildIntervalApiSegments({
+              athleteId: auth.athlete.id,
+              workoutId,
+              workoutDate: workout.date ?? null,
+              scheduleTotalMiles: scheduleMiles,
+              anchorSecondsPerMile,
+              planCycleIndex,
+            });
+          }
         } else if (workout.workoutType === "Tempo") {
-          apiSegs = await buildTempoApiSegments({
-            athleteId: auth.athlete.id,
-            workoutId,
-            workoutDate: workout.date ?? null,
-            scheduleTotalMiles: scheduleMiles,
-            anchorSecondsPerMile,
-            planCycleIndex,
-          });
+          if (workout.catalogueWorkoutId && workout.workout_catalogue) {
+            apiSegs = catalogueEntryToApiSegments({
+              entry: workout.workout_catalogue,
+              scheduleMiles,
+              anchorSecondsPerMile,
+              racePaceSecondsPerMile,
+              planCycleIndex: planCycleIndex ?? workout.planCycleIndex ?? null,
+            });
+          } else {
+            apiSegs = await buildTempoApiSegments({
+              athleteId: auth.athlete.id,
+              workoutId,
+              workoutDate: workout.date ?? null,
+              scheduleTotalMiles: scheduleMiles,
+              anchorSecondsPerMile,
+              planCycleIndex,
+            });
+          }
         } else if (
           workout.workoutType === "Easy" ||
           workout.workoutType === "LongRun" ||
           workout.workoutType === "Race"
         ) {
-          const dm = workout.training_plans?.race_registry?.distanceMeters;
-          const raceDistanceMiles =
-            dm != null && Number.isFinite(Number(dm))
-              ? metersToMiles(Number(dm))
-              : null;
           const easyCfg = parseEasyRunConfigJson(
             workout.training_plans?.easyRunConfig ?? null
           );

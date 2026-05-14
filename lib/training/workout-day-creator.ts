@@ -2,7 +2,7 @@
  * Find-or-create a single `workouts` row for a calendar day using `training_plans.planSchedule`.
  */
 
-import type { Prisma } from "@prisma/client";
+import type { Prisma, workout_catalogue } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { utcDateOnly } from "./plan-utils";
 import { buildPlanWorkoutApiSegments } from "./workout-segment-generator";
@@ -105,14 +105,26 @@ export async function findOrCreateWorkoutForPlanDay(params: {
     throw new Error("No scheduled workout for this date");
   }
 
+  const needsCatalogueAnchoredIT =
+    (scheduled.workoutType === "Intervals" ||
+      scheduled.workoutType === "Tempo") &&
+    Boolean(scheduled.catalogueWorkoutId);
   const needsPace =
     scheduled.workoutType === "Easy" ||
     scheduled.workoutType === "LongRun" ||
-    scheduled.workoutType === "Race";
+    scheduled.workoutType === "Race" ||
+    needsCatalogueAnchoredIT;
   if (needsPace && !plan.currentFiveKPace?.trim()) {
     throw new Error(
       "training_plans.currentFiveKPace is missing; set 5K pace on your profile or plan."
     );
+  }
+
+  let catalogueEntryForDay: workout_catalogue | null = null;
+  if (scheduled.catalogueWorkoutId) {
+    catalogueEntryForDay = await prisma.workout_catalogue.findUnique({
+      where: { id: scheduled.catalogueWorkoutId },
+    });
   }
 
   const miles = scheduled.estimatedDistanceInMeters / 1609.34;
@@ -121,7 +133,7 @@ export async function findOrCreateWorkoutForPlanDay(params: {
     workoutType: scheduled.workoutType,
     miles,
     currentFiveKPace: plan.currentFiveKPace ?? null,
-    catalogueEntry: null,
+    catalogueEntry: catalogueEntryForDay,
     goalRacePace: plan.goalRacePace ?? null,
     goalRaceTime: plan.goalRaceTime ?? null,
     raceDistanceMiles,
