@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { adminAuth } from '@/lib/firebaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,36 +16,13 @@ export async function OPTIONS() {
 /**
  * POST /api/admin/nuclear-reset-run-clubs
  * DESTRUCTIVE: deletes all prod run_clubs, run_series, and club/series-linked city_runs.
- * Requires a valid Firebase ID token whose custom claims include `staffId` (Company staff — set when linking Firebase in Company app).
- * Body must include { "confirm": "RESET_RUN_CLUB_UNIVERSE" }.
+ *
+ * Same trust model as POST /api/run-clubs/update and /api/run-series/create: Product trusts
+ * Company-initiated writes. Only GoFastCompany should call this; it verifies company_staff
+ * before proxying. Body must include { "confirm": "RESET_RUN_CLUB_UNIVERSE" }.
  */
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
-    }
-
-    let decoded: import('firebase-admin/auth').DecodedIdToken;
-    try {
-      decoded = await adminAuth.verifyIdToken(authHeader.substring(7));
-    } catch {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401, headers: corsHeaders });
-    }
-
-    const rawStaffId = (decoded as Record<string, unknown>).staffId;
-    const staffId =
-      typeof rawStaffId === 'string' && rawStaffId.trim() !== '' ? rawStaffId.trim() : null;
-    if (!staffId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Company staff only. Sign in with a staff account (Firebase token must include staffId). Try signing out and back in.',
-        },
-        { status: 403, headers: corsHeaders }
-      );
-    }
-
     const body = (await request.json().catch(() => ({}))) as { confirm?: string };
     if (body.confirm !== 'RESET_RUN_CLUB_UNIVERSE') {
       return NextResponse.json(
