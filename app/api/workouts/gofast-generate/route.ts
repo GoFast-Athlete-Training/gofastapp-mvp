@@ -14,7 +14,7 @@ import {
   type ApiSegment,
 } from "@/lib/workout-generator/templates";
 import type { TrainingPaces } from "@/lib/workout-generator/pace-calculator";
-import { catalogueEntryToApiSegments } from "@/lib/training/catalogue-to-segments";
+import { catalogueEntryToApiSegments } from "@/lib/training/workout-segment-builder";
 
 function formatPaceFromSecondsPerMile(secPerMile: number): string {
   const m = Math.floor(secPerMile / 60);

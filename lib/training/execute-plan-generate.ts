@@ -99,6 +99,7 @@ export async function executePlanGenerate(params: {
     rawPreset.intervalsConfig?.positions.map(mapPositionRow) ?? [];
   const tempoPositions =
     rawPreset.tempoConfig?.positions.map(mapPositionRow) ?? [];
+  const easyPositions = rawPreset.easyConfig?.positions.map(mapPositionRow) ?? [];
 
   function qualityRotationInvalid(
     positions: readonly { catalogueWorkoutId: string | null }[]
@@ -188,6 +189,7 @@ export async function executePlanGenerate(params: {
     longRunPositions,
     intervalsPositions,
     tempoPositions,
+    easyPositions,
   });
 
   const schedule = placement.schedule;

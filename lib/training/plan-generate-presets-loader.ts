@@ -71,6 +71,7 @@ export const trainingPlanPresetInclude = {
   longRunConfig: { include: { positions: positionsInclude } },
   intervalsConfig: { include: { positions: positionsInclude } },
   tempoConfig: { include: { positions: positionsInclude } },
+  easyConfig: { include: { positions: positionsInclude } },
 } as const;
 
 export type LoadedPresetInclude = NonNullable<
@@ -138,6 +139,9 @@ export function catalogueIdsFromPreset(
     if (p.catalogueWorkoutId) ids.push(p.catalogueWorkoutId);
   }
   for (const p of preset.tempoConfig?.positions ?? []) {
+    if (p.catalogueWorkoutId) ids.push(p.catalogueWorkoutId);
+  }
+  for (const p of preset.easyConfig?.positions ?? []) {
     if (p.catalogueWorkoutId) ids.push(p.catalogueWorkoutId);
   }
   return [...new Set(ids)];

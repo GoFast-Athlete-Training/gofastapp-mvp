@@ -1072,6 +1072,8 @@ model training_plan_preset {
   intervalsConfig   intervals_config?  @relation(fields: [intervalsConfigId], references: [id], onDelete: SetNull)
   tempoConfigId     String?
   tempoConfig       tempo_config?      @relation(fields: [tempoConfigId], references: [id], onDelete: SetNull)
+  easyConfigId      String?
+  easyConfig        easy_config?       @relation(fields: [easyConfigId], references: [id], onDelete: SetNull)
   /// JSON: standardMiles, minMiles, paceOffsetSecPerMile, weeklyTargetBufferMiles (easy-day defaults / pace vs 5K anchor)
   easyRunConfig     Json?
   training_plans  training_plans[]
@@ -1169,6 +1171,37 @@ model tempo_config_position {
 
   @@unique([tempoConfigId, cyclePosition])
   @@index([tempoConfigId])
+}
+
+/// Easy-run rotation: cycle positions map Easy catalogue entries (pace/structure variety); miles still from distribute-easy.
+model easy_config {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  positions     easy_config_position[]
+  usedByPresets training_plan_preset[]
+
+  @@index([name])
+}
+
+model easy_config_position {
+  id             String      @id @default(cuid())
+  easyConfigId   String
+  easy_config    easy_config @relation(fields: [easyConfigId], references: [id], onDelete: Cascade)
+
+  cyclePosition      Int
+  distributionWeight Float  @default(0.25)
+  catalogueWorkoutId String?
+  workout_catalogue  workout_catalogue? @relation(fields: [catalogueWorkoutId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([easyConfigId, cyclePosition])
+  @@index([easyConfigId])
 }
 
 model training_plans {
@@ -1289,6 +1322,7 @@ model workout_catalogue {
   long_run_config_positions  long_run_config_position[]
   intervals_config_positions  intervals_config_position[]
   tempo_config_positions      tempo_config_position[]
+  easy_config_positions       easy_config_position[]
 
   @@unique([name, workoutType])
   @@index([workoutType])

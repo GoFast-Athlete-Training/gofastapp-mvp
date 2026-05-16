@@ -5,7 +5,7 @@
 
 import assert from "node:assert";
 import type { workout_catalogue } from "@prisma/client";
-import { catalogueEntryToApiSegments } from "@/lib/training/catalogue-to-segments";
+import { catalogueEntryToApiSegments } from "@/lib/training/workout-segment-builder";
 import { segmentSnapshotDocumentFromApiSegments } from "@/lib/training/workout-segment-snapshot";
 import { bikeMetersToRunEquivalentMiles, swimMetersToRunEquivalentMiles } from "@/lib/training/cross-training-volume-equivalents";
 import {

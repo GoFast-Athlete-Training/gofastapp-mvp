@@ -9,8 +9,8 @@ type Ctx = { params: Promise<{ id: string }> };
 
 /**
  * POST /api/training-plan/[id]/rematerialize-quality-segments
- * Clears materialized segments for Intervals/Tempo on this plan so the next
- * GET /api/training/workout/[id] lazy path rebuilds from catalogue (or algo fallback).
+ * Clears materialized segments for Easy / Intervals / Tempo on this plan so the next
+ * GET /api/training/workout/[id] lazy path rebuilds from catalogue.
  */
 export async function POST(request: NextRequest, context: Ctx) {
   try {
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest, context: Ctx) {
       where: {
         planId,
         athleteId: auth.athlete.id,
-        workoutType: { in: ["Intervals", "Tempo"] },
+        workoutType: { in: ["Easy", "Intervals", "Tempo"] },
       },
       select: { id: true },
     });
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest, context: Ctx) {
       return NextResponse.json({
         ok: true,
         clearedWorkoutCount: 0,
-        message: "No Intervals or Tempo workouts on this plan.",
+        message: "No Easy, Intervals, or Tempo workouts on this plan.",
       });
     }
 

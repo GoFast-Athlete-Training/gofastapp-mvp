@@ -52,6 +52,18 @@ const presetInclude = {
       },
     },
   },
+  easyConfig: {
+    include: {
+      positions: {
+        orderBy: { cyclePosition: "asc" as const },
+        include: {
+          workout_catalogue: {
+            select: { id: true, name: true, workoutType: true, slug: true },
+          },
+        },
+      },
+    },
+  },
 } as const;
 
 export async function GET(
@@ -182,15 +194,32 @@ export async function PATCH(
       }
     }
 
-    type ConnectKey = "longRunConfig" | "intervalsConfig" | "tempoConfig";
-    const connectFields: { bodyKey: string; rel: ConnectKey; find: (x: string) => Promise<{ id: string } | null> }[] = [
-      { bodyKey: "longRunConfigId", rel: "longRunConfig", find: (x) => prisma.long_run_config.findUnique({ where: { id: x } }) },
+    type ConnectKey = "longRunConfig" | "intervalsConfig" | "tempoConfig" | "easyConfig";
+    const connectFields: {
+      bodyKey: string;
+      rel: ConnectKey;
+      find: (x: string) => Promise<{ id: string } | null>;
+    }[] = [
+      {
+        bodyKey: "longRunConfigId",
+        rel: "longRunConfig",
+        find: (x) => prisma.long_run_config.findUnique({ where: { id: x } }),
+      },
       {
         bodyKey: "intervalsConfigId",
         rel: "intervalsConfig",
         find: (x) => prisma.intervals_config.findUnique({ where: { id: x } }),
       },
-      { bodyKey: "tempoConfigId", rel: "tempoConfig", find: (x) => prisma.tempo_config.findUnique({ where: { id: x } }) },
+      {
+        bodyKey: "tempoConfigId",
+        rel: "tempoConfig",
+        find: (x) => prisma.tempo_config.findUnique({ where: { id: x } }),
+      },
+      {
+        bodyKey: "easyConfigId",
+        rel: "easyConfig",
+        find: (x) => prisma.easy_config.findUnique({ where: { id: x } }),
+      },
     ];
     for (const { bodyKey, rel, find } of connectFields) {
       if (bodyKey in body) {

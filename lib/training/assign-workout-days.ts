@@ -41,6 +41,7 @@ export type WorkoutDayInput = {
   longRunPositions: readonly RunTypePosition[];
   intervalsPositions: readonly RunTypePosition[];
   tempoPositions: readonly RunTypePosition[];
+  easyPositions: readonly RunTypePosition[];
 };
 
 const HARD_SESSION_SLOTS = 2;
@@ -159,6 +160,7 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
   const out: PlanWeekSchedule[] = [];
   let tempoSessionOrdinal = 0;
   let intervalSessionOrdinal = 0;
+  let easySessionOrdinal = 0;
 
   const firstMonday = mondayUtcOfWeekContaining(planStart);
   let weekNumber = 0;
@@ -305,8 +307,25 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
     const easyDayList = preferred.filter(
       (d) => !used.has(d) && dayInPlanWindow(d) && !blockedDates.has(slotYmd(d))
     );
+    const eRotMod = Math.max(input.easyPositions.length, 1);
     for (const d of easyDayList) {
-      tryPlaceEntrySkeleton(d, { kind: "easy", catalogueWorkoutId: null, planCycleIndex: null });
+      if (input.easyPositions.length > 0) {
+        const ordBefore = easySessionOrdinal;
+        const pci = ordBefore % (eRotMod > 0 ? eRotMod : 1);
+        const posId = catalogueIdForRotation(input.easyPositions, ordBefore);
+        tryPlaceEntrySkeleton(d, {
+          kind: "easy",
+          catalogueWorkoutId: posId,
+          planCycleIndex: pci,
+        });
+        easySessionOrdinal++;
+      } else {
+        tryPlaceEntrySkeleton(d, {
+          kind: "easy",
+          catalogueWorkoutId: null,
+          planCycleIndex: null,
+        });
+      }
     }
 
     /** Map placements → typed days sorted by dow */

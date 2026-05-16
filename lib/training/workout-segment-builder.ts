@@ -1,6 +1,6 @@
 /**
- * Build workout_segments payload from a catalogue row + schedule miles + anchors.
- * Segment fields mirror workout_catalogue (warmup / work / cooldown).
+ * Workout segment builder: expand a catalogue row (+ schedule miles, 5K anchor, race pace)
+ * into Garmin-style segment steps (warmup / work / cooldown / repeats).
  */
 
 import type { workout_catalogue, WorkoutType } from "@prisma/client";

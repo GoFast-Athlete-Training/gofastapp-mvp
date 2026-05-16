@@ -31,6 +31,12 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
   const typicalWeekPreferredCount = Math.max(1, Math.floor(prefCountRaw));
 
   for (const week of input.planSchedule) {
+    const weekNum = week.weekNumber;
+    const w1Scale =
+      weekNum === 1
+        ? Math.min(1, week.days.length / typicalWeekPreferredCount)
+        : 1;
+
     let weeklyCap = Math.max(
       input.minWeeklyMiles,
       Math.min(100, input.weeklyMileageTarget)
@@ -38,6 +44,7 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
     if (input.maxWeeklyMiles != null && Number.isFinite(input.maxWeeklyMiles)) {
       weeklyCap = Math.min(weeklyCap, Number(input.maxWeeklyMiles));
     }
+    weeklyCap = round2(weeklyCap * w1Scale);
 
     const trimThreshold =
       Math.min(100, weeklyCap + cfg.weeklyTargetBufferMiles) + 0.05;
@@ -53,11 +60,6 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
     const easySlots = week.days.filter((d) => d.workoutType === "Easy");
     if (easySlots.length === 0) continue;
 
-    const weekNum = week.weekNumber;
-    const w1Scale =
-      weekNum === 1
-        ? Math.min(1, week.days.length / typicalWeekPreferredCount)
-        : 1;
     const milesPerEasy = round2(cfg.standardMiles * w1Scale);
 
     for (const ep of easySlots) {

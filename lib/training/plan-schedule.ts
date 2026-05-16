@@ -19,7 +19,6 @@ import {
 } from "./plan-utils";
 import { nOffsetFromWeekAnchor, phaseForCatalogue } from "./plan-utils";
 import { formatPlannedWorkoutTitle } from "./workout-display-title";
-import { titleFromCycleIndex } from "./algo-workout-segments";
 import {
   type PlanWeekSchedule,
   isStructuredPlanWeek,
@@ -323,8 +322,7 @@ function expandStructuredDays(params: {
           : null;
       title = catTitle
         ? catTitle
-        : titleFromCycleIndex(workoutType, opts.planCycleIndex ?? 0) ??
-          formatPlannedWorkoutTitle(workoutType, estMeters);
+        : formatPlannedWorkoutTitle(workoutType, estMeters);
     } else {
       title = formatPlannedWorkoutTitle(workoutType, estMeters);
     }
@@ -470,10 +468,10 @@ function expandLegacyDays(params: {
         token.workoutType === "Intervals" ||
         token.workoutType === "Tempo"
       ) {
-        title = titleFromCycleIndex(
+        title = formatPlannedWorkoutTitle(
           token.workoutType,
-          token.cycleIndex ?? 0
-        )!;
+          estMeters
+        );
       } else {
         title = formatPlannedWorkoutTitle(token.workoutType, estMeters);
       }

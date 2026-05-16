@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { findOrCreateWorkoutForPlanDay } from "@/lib/training/workout-day-creator";
+import { findOrCreateWorkoutForPlanDay } from "@/lib/training/plan-day-creator";
 
 /**
  * GET /api/training/workout/day?planId=&date=

@@ -2,8 +2,8 @@
  * Deterministic segment rows for plan-backed workouts: catalogue expansion or
  * template + getTrainingPaces, anchored on training_plans.currentFiveKPace only
  * (keep in sync with Athlete.fiveKPace via generate / plan-lifecycle).
- * Intervals/Tempo without a catalogue entry: callers use algo-workout-segments (lazy GET).
- * Intervals/Tempo with catalogueEntry: uses catalogue-to-segments (segmentPaceDist, reps, etc.).
+ * Intervals/Tempo without a catalogue entry: returns [] (no generic segments).
+ * With catalogueEntry: uses workout-segment-builder (segmentPaceDist, reps, etc.).
  */
 
 import type { WorkoutType, workout_catalogue } from "@prisma/client";
@@ -16,7 +16,7 @@ import {
   getTemplateSegments,
   type ApiSegment,
 } from "@/lib/workout-generator/templates";
-import { catalogueEntryToApiSegments } from "@/lib/training/catalogue-to-segments";
+import { catalogueEntryToApiSegments } from "@/lib/training/workout-segment-builder";
 import { resolveRacePaceSecondsPerMileForPlan } from "@/lib/training/goal-pace-calculator";
 
 function isIntervalsOrTempo(t: WorkoutType): boolean {

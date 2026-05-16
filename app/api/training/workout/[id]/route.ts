@@ -3,14 +3,9 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import {
-  buildIntervalApiSegments,
-  buildTempoApiSegments,
-  resolvePaceStringForWorkout,
-} from "@/lib/training/algo-workout-segments";
-import { catalogueEntryToApiSegments } from "@/lib/training/catalogue-to-segments";
+import { catalogueEntryToApiSegments } from "@/lib/training/workout-segment-builder";
 import { resolveRacePaceSecondsPerMileForPlan } from "@/lib/training/goal-pace-calculator";
-import { buildPlanWorkoutApiSegments } from "@/lib/training/workout-segment-generator";
+import { buildPlanWorkoutApiSegments } from "@/lib/training/plan-segment-builder";
 import type { ApiSegment } from "@/lib/workout-generator/templates";
 import { cycleIndexFromScheduleForDay, dayNameToOurDow } from "@/lib/training/schedule-parser";
 import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
@@ -124,8 +119,8 @@ function resolvedPlanCycleIndexForWorkout(params: {
 
 /**
  * GET /api/training/workout/[id]
- * Workout + segments. Lazy create when empty: I/T from catalogue when linked, else
- * algo; Easy/LongRun/Race via templates + plan pace (plan path).
+ * Workout + segments. Lazy create when empty: catalogue-backed workouts + 5K anchor;
+ * Intervals/Tempo require linked catalogue row.
  */
 export async function GET(request: NextRequest, context: Ctx) {
   try {
@@ -193,15 +188,15 @@ export async function GET(request: NextRequest, context: Ctx) {
       select: { fiveKPace: true },
     });
 
-    const paceStr = resolvePaceStringForWorkout(
-      workout.training_plans?.currentFiveKPace,
-      athleteFiveKRow?.fiveKPace
-    );
+    const anchorPaceStr =
+      workout.training_plans?.currentFiveKPace?.trim() ||
+      athleteFiveKRow?.fiveKPace?.trim() ||
+      null;
 
-    if (workout.segments.length === 0 && paceStr) {
+    if (workout.segments.length === 0 && anchorPaceStr) {
       try {
         const workoutId = workout.id;
-        const anchorSecondsPerMile = parsePaceToSecondsPerMile(paceStr);
+        const anchorSecondsPerMile = parsePaceToSecondsPerMile(anchorPaceStr);
         const scheduleMiles = Math.max(
           1,
           (workout.estimatedDistanceInMeters ?? 0) / METERS_PER_MILE
@@ -228,7 +223,7 @@ export async function GET(request: NextRequest, context: Ctx) {
           raceDistanceMiles,
         });
 
-        if (workout.workoutType === "Intervals") {
+        if (workout.workoutType === "Intervals" || workout.workoutType === "Tempo") {
           if (workout.catalogueWorkoutId && workout.workout_catalogue) {
             apiSegs = catalogueEntryToApiSegments({
               entry: workout.workout_catalogue,
@@ -236,34 +231,6 @@ export async function GET(request: NextRequest, context: Ctx) {
               anchorSecondsPerMile,
               racePaceSecondsPerMile,
               planCycleIndex: planCycleIndex ?? workout.planCycleIndex ?? null,
-            });
-          } else {
-            apiSegs = await buildIntervalApiSegments({
-              athleteId: auth.athlete.id,
-              workoutId,
-              workoutDate: workout.date ?? null,
-              scheduleTotalMiles: scheduleMiles,
-              anchorSecondsPerMile,
-              planCycleIndex,
-            });
-          }
-        } else if (workout.workoutType === "Tempo") {
-          if (workout.catalogueWorkoutId && workout.workout_catalogue) {
-            apiSegs = catalogueEntryToApiSegments({
-              entry: workout.workout_catalogue,
-              scheduleMiles,
-              anchorSecondsPerMile,
-              racePaceSecondsPerMile,
-              planCycleIndex: planCycleIndex ?? workout.planCycleIndex ?? null,
-            });
-          } else {
-            apiSegs = await buildTempoApiSegments({
-              athleteId: auth.athlete.id,
-              workoutId,
-              workoutDate: workout.date ?? null,
-              scheduleTotalMiles: scheduleMiles,
-              anchorSecondsPerMile,
-              planCycleIndex,
             });
           }
         } else if (
@@ -277,7 +244,7 @@ export async function GET(request: NextRequest, context: Ctx) {
           apiSegs = buildPlanWorkoutApiSegments({
             workoutType: workout.workoutType,
             miles: scheduleMiles,
-            currentFiveKPace: paceStr,
+            currentFiveKPace: anchorPaceStr,
             catalogueEntry:
               workout.catalogueWorkoutId && workout.workout_catalogue
                 ? workout.workout_catalogue

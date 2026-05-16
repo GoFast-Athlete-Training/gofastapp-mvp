@@ -5,7 +5,7 @@
 import type { Prisma, workout_catalogue } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { utcDateOnly } from "./plan-utils";
-import { buildPlanWorkoutApiSegments } from "./workout-segment-generator";
+import { buildPlanWorkoutApiSegments } from "./plan-segment-builder";
 import { planScheduleDayForDateKey, collectCatalogueWorkoutIdsFromPlanSchedule } from "./plan-schedule";
 import { metersToMiles } from "@/lib/pace-utils";
 import { segmentSnapshotDocumentFromApiSegments } from "./workout-segment-snapshot";
@@ -109,11 +109,15 @@ export async function findOrCreateWorkoutForPlanDay(params: {
     (scheduled.workoutType === "Intervals" ||
       scheduled.workoutType === "Tempo") &&
     Boolean(scheduled.catalogueWorkoutId);
+  const needsCatalogueAnchoredEasy =
+    scheduled.workoutType === "Easy" &&
+    Boolean(scheduled.catalogueWorkoutId);
   const needsPace =
     scheduled.workoutType === "Easy" ||
     scheduled.workoutType === "LongRun" ||
     scheduled.workoutType === "Race" ||
-    needsCatalogueAnchoredIT;
+    needsCatalogueAnchoredIT ||
+    needsCatalogueAnchoredEasy;
   if (needsPace && !plan.currentFiveKPace?.trim()) {
     throw new Error(
       "training_plans.currentFiveKPace is missing; set 5K pace on your profile or plan."

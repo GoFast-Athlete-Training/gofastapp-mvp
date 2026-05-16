@@ -61,6 +61,18 @@ const presetInclude = {
       },
     },
   },
+  easyConfig: {
+    include: {
+      positions: {
+        orderBy: { cyclePosition: "asc" as const },
+        include: {
+          workout_catalogue: {
+            select: { id: true, name: true, workoutType: true, slug: true },
+          },
+        },
+      },
+    },
+  },
 } as const;
 
 export async function GET(request: NextRequest) {
@@ -73,6 +85,7 @@ export async function GET(request: NextRequest) {
       longRunConfig: { select: { id: true, name: true, description: true } },
       intervalsConfig: { select: { id: true, name: true, description: true } },
       tempoConfig: { select: { id: true, name: true, description: true } },
+      easyConfig: { select: { id: true, name: true, description: true } },
     },
   });
   return NextResponse.json({
@@ -158,7 +171,11 @@ export async function POST(request: NextRequest) {
     }
 
     async function resolveConfigId(
-      key: "longRunConfigId" | "intervalsConfigId" | "tempoConfigId",
+      key:
+        | "longRunConfigId"
+        | "intervalsConfigId"
+        | "tempoConfigId"
+        | "easyConfigId",
       find: (id: string) => Promise<{ id: string } | null>
     ): Promise<string | null | undefined> {
       if (!(key in body)) return undefined;
@@ -193,6 +210,7 @@ export async function POST(request: NextRequest) {
     let longRunConfigId: string | null | undefined;
     let intervalsConfigId: string | null | undefined;
     let tempoConfigId: string | null | undefined;
+    let easyConfigId: string | null | undefined;
     try {
       longRunConfigId = await resolveConfigId("longRunConfigId", (id) =>
         prisma.long_run_config.findUnique({ where: { id } })
@@ -201,6 +219,7 @@ export async function POST(request: NextRequest) {
         prisma.intervals_config.findUnique({ where: { id } })
       );
       tempoConfigId = await resolveConfigId("tempoConfigId", (id) => prisma.tempo_config.findUnique({ where: { id } }));
+      easyConfigId = await resolveConfigId("easyConfigId", (id) => prisma.easy_config.findUnique({ where: { id } }));
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Invalid config id";
       return NextResponse.json({ success: false, error: msg }, { status: 400 });
@@ -264,6 +283,11 @@ export async function POST(request: NextRequest) {
         ...(tempoConfigId !== undefined
           ? tempoConfigId
             ? { tempoConfig: { connect: { id: tempoConfigId } } }
+            : {}
+          : {}),
+        ...(easyConfigId !== undefined
+          ? easyConfigId
+            ? { easyConfig: { connect: { id: easyConfigId } } }
             : {}
           : {}),
         ...(easyRunConfigCreate !== undefined
