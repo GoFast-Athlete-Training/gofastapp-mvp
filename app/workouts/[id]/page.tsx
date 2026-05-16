@@ -34,7 +34,6 @@ import {
   storedPaceSecondsKmToSecondsPerMile,
   workoutTargetTypeLabel,
 } from "@/lib/workout-generator/pace-calculator";
-import { describeBetweenRepRecovery } from "@/lib/training/catalogue-interval-recovery";
 import { PaceMiSplitEditor } from "@/components/workout/PaceMiSplitEditor";
 import { parseSplitPaceToSecPerMile, secPerMileToSplitStrings } from "@/lib/workout/pace-mi-split";
 import { readWorkoutDayNav } from "@/lib/training/workout-day-nav";
@@ -51,6 +50,10 @@ import {
   formatStructuredMinutesTotal,
   segmentStructureBadge,
   structuredSegmentTotals,
+  formatSegmentDuration,
+  formatSegmentDistance,
+  groupSegmentsInDisplayOrder,
+  SEGMENT_METERS_PER_MILE,
 } from "@/lib/training/segment-summary";
 import {
   displayWorkoutListTitle,
@@ -65,6 +68,18 @@ import {
   type PaceVsTargetLabel,
 } from "@/lib/training/pace-comparison-display";
 import { formatPlanDateDisplay, localYmd } from "@/lib/training/plan-utils";
+import {
+  isRunAnalysisJsonV1,
+  type RunAnalysisJsonV1,
+} from "@/lib/training/run-analysis-types";
+
+interface WorkoutSegmentLap {
+  lapIndex: number;
+  avgPaceSecPerMile: number | null;
+  avgHeartRate: number | null;
+  distanceMiles: number | null;
+  durationSeconds?: number | null;
+}
 
 interface WorkoutSegment {
   id: string;
@@ -79,11 +94,14 @@ interface WorkoutSegment {
     value?: number;
   }>;
   repeatCount?: number;
+  recoveryDurationType?: string | null;
+  recoveryDurationValue?: number | null;
   notes?: string;
   paceTargetEncodingVersion?: number;
   actualPaceSecPerMile?: number | null;
   actualDistanceMiles?: number | null;
   actualDurationSeconds?: number | null;
+  segment_laps?: WorkoutSegmentLap[];
 }
 
 interface MatchedActivitySummary {
@@ -151,6 +169,8 @@ interface Workout {
   } | null;
   slug?: string | null;
   city_runs?: Array<{ id: string; date: string; createdAt?: string }>;
+  prescriptionNarrative?: string | null;
+  analysisJson?: RunAnalysisJsonV1 | unknown | null;
 }
 
 function formatSecPerMile(sec: number | null | undefined): string | null {
@@ -208,6 +228,15 @@ function estimatedMiDisplay(meters: number | null | undefined): string | null {
   return `${Math.round(mi * 5280)} ft`;
 }
 
+/** Stored inline recovery fields between repeats (when no separate recovery segment row). */
+function inlineRecoveryBetweenRepsLabel(seg: WorkoutSegment): string | null {
+  const t = seg.recoveryDurationType?.trim().toUpperCase();
+  const v = Number(seg.recoveryDurationValue);
+  if (!t || t === "NONE" || !Number.isFinite(v) || v <= 0) return null;
+  if (t === "TIME") return `${Math.round(v)} min`;
+  return formatSegmentDistance(v);
+}
+
 function paceSecFromAnchor(
   anchor: number,
   offset: number | null | undefined,
@@ -223,14 +252,49 @@ function formatPaceMinPerMileFromSec(secPerMile: number): string {
   return `${m}:${String(s).padStart(2, "0")} /mi`;
 }
 
+function runCoachHrPatternLabel(p: RunAnalysisJsonV1["hrPattern"]): string | null {
+  switch (p) {
+    case "steady":
+      return "Steady aerobic";
+    case "drift_up":
+      return "HR drifted up";
+    case "drift_down":
+      return "HR eased off";
+    case "variable":
+      return "Variable effort";
+    default:
+      return null;
+  }
+}
+
+function cataloguePrescriptionShellClass(workoutType: string): string {
+  switch (workoutType) {
+    case "Easy":
+      return "border border-slate-200 bg-slate-50";
+    case "Tempo":
+    case "SpeedDuration":
+      return "border border-indigo-200 bg-indigo-50/50";
+    case "Intervals":
+      return "border border-sky-200 bg-sky-50/60";
+    default:
+      return "border border-orange-200 bg-orange-50/50";
+  }
+}
+
 function CataloguePrescriptionCard({
   catalogue,
+  prescriptionNarrative,
   fiveKPaceSnapshot,
   estimatedDistanceInMeters,
+  targetPaceSecPerMile,
+  targetPaceSecPerMileHigh,
 }: {
   catalogue: WorkoutCatalogue;
+  prescriptionNarrative: string | null | undefined;
   fiveKPaceSnapshot: string | null | undefined;
   estimatedDistanceInMeters: number | null | undefined;
+  targetPaceSecPerMile: number | null | undefined;
+  targetPaceSecPerMileHigh: number | null | undefined;
 }) {
   let anchor: number;
   try {
@@ -240,7 +304,7 @@ function CataloguePrescriptionCard({
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Coach prescription</h2>
           <p className="text-sm text-amber-900">
             Set your current 5K pace on your profile (and ensure your plan has a baseline) to see
-            target paces for this catalogue workout.
+            coaching notes and target paces for this workout.
           </p>
         </div>
       );
@@ -260,6 +324,28 @@ function CataloguePrescriptionCard({
       ? estimatedDistanceInMeters / 1609.34
       : null;
 
+  const workoutTargetBand =
+    formatPaceTargetRangeDisplay(targetPaceSecPerMile, targetPaceSecPerMileHigh) ??
+    (targetPaceSecPerMile != null ? formatSecPerMile(targetPaceSecPerMile) ?? null : null);
+
+  /** Fall back when structured targets not yet snapped to workout row. */
+  let inferredBand: string | null = null;
+  if (!workoutTargetBand) {
+    if (catalogue.workoutType === "Easy") {
+      const sec = paceSecFromAnchor(anchor, catalogue.workPaceOffsetSecPerMile, p.easy);
+      inferredBand = `~${formatPaceMinPerMileFromSec(sec)}`;
+    } else if (
+      catalogue.workoutType === "LongRun" ||
+      catalogue.workoutType === "Race" ||
+      (catalogue.workoutType !== "Tempo" &&
+        catalogue.workoutType !== "SpeedDuration" &&
+        catalogue.workoutType !== "Intervals")
+    ) {
+      const sec = paceSecFromAnchor(anchor, catalogue.workPaceOffsetSecPerMile, p.longRun);
+      inferredBand = `~${formatPaceMinPerMileFromSec(sec)}`;
+    }
+  }
+
   const meta = (
     <div className="text-xs text-gray-500 mt-3 space-y-1">
       <p>Slug: {catalogue.slug?.trim() || "—"}</p>
@@ -270,111 +356,70 @@ function CataloguePrescriptionCard({
     </div>
   );
 
-  if (catalogue.workoutType === "Intervals") {
-    const reps = catalogue.workBaseReps ?? 6;
-    const repM = catalogue.workBaseRepMeters ?? 800;
-    const recoveryLabel = describeBetweenRepRecovery({
-      recoveryDurationSeconds: catalogue.recoveryDurationSeconds ?? null,
-      recoveryDistanceMeters: catalogue.recoveryDistanceMeters ?? null,
-    });
-    const intSec = paceSecFromAnchor(anchor, catalogue.workBasePaceOffsetSecPerMile, p.interval);
-    const recSec = paceSecFromAnchor(anchor, catalogue.recoveryPaceOffsetSecPerMile, p.recovery);
-    return (
-      <div className="border border-sky-200 bg-sky-50/60 rounded-lg p-6 mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-1">Coach prescription</h2>
-        <p className="text-lg font-medium text-sky-900 mb-4">{catalogue.name}</p>
-        {totalMi != null && (
-          <p className="text-sm text-gray-700 mb-3">
-            Session distance (approx.): {totalMi.toFixed(1)} mi
-          </p>
-        )}
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm border border-sky-100 rounded-lg overflow-hidden">
-            <thead className="bg-sky-100/80">
-              <tr>
-                <th className="text-left p-2 font-semibold">Part</th>
-                <th className="text-left p-2 font-semibold">Structure</th>
-                <th className="text-left p-2 font-semibold">Target pace</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-t border-sky-100">
-                <td className="p-2">Main set</td>
-                <td className="p-2">
-                  {reps} × {repM}m hard, {recoveryLabel}
-                </td>
-                <td className="p-2">
-                  {formatPaceMinPerMileFromSec(intSec)} /{" "}
-                  {formatPaceMinPerMileFromSec(recSec)} recovery
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        {meta}
-      </div>
-    );
-  }
+  const shell = cataloguePrescriptionShellClass(catalogue.workoutType);
 
-  if (catalogue.workoutType === "Easy") {
-    const easySec = paceSecFromAnchor(anchor, catalogue.workPaceOffsetSecPerMile, p.easy);
-    return (
-      <div className="border border-slate-200 bg-slate-50 rounded-lg p-6 mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-1">Coach prescription</h2>
-        <p className="text-lg font-medium text-gray-900 mb-2">{catalogue.name}</p>
-        {totalMi != null && (
-          <p className="text-base text-gray-800">
-            {totalMi.toFixed(1)} mi easy · ~{formatPaceMinPerMileFromSec(easySec)}
-          </p>
-        )}
-        {totalMi == null && (
-          <p className="text-sm text-gray-600">Easy run — pace ~{formatPaceMinPerMileFromSec(easySec)}</p>
-        )}
-        {meta}
-      </div>
-    );
-  }
-
-  if (catalogue.workoutType === "Tempo" || catalogue.workoutType === "SpeedDuration") {
-    const tempoSec = paceSecFromAnchor(anchor, catalogue.workPaceOffsetSecPerMile, p.tempo);
-    const easySec = paceSecFromAnchor(anchor, catalogue.recoveryPaceOffsetSecPerMile, p.easy);
-    return (
-      <div className="border border-indigo-200 bg-indigo-50/50 rounded-lg p-6 mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-1">Coach prescription</h2>
-        <p className="text-lg font-medium text-indigo-950 mb-2">{catalogue.name}</p>
-        <ul className="text-sm text-gray-800 list-disc pl-5 space-y-1">
-          <li>Warmup / cooldown: easy ~{formatPaceMinPerMileFromSec(easySec)}</li>
-          <li>Tempo block: ~{formatPaceMinPerMileFromSec(tempoSec)}</li>
-          {totalMi != null && <li>Total scheduled distance ~{totalMi.toFixed(1)} mi</li>}
-        </ul>
-        {meta}
-      </div>
-    );
-  }
-
-  // LongRun
-  const longSec = paceSecFromAnchor(anchor, catalogue.workPaceOffsetSecPerMile, p.longRun);
-  const mpSec = paceSecFromAnchor(anchor, null, p.marathon);
-  return (
-    <div className="border border-orange-200 bg-orange-50/50 rounded-lg p-6 mb-6">
-      <h2 className="text-xl font-semibold text-gray-900 mb-1">Coach prescription</h2>
-      <p className="text-lg font-medium text-orange-950 mb-2">{catalogue.name}</p>
-      <ul className="text-sm text-gray-800 list-disc pl-5 space-y-1">
-        <li>Long segment: ~{formatPaceMinPerMileFromSec(longSec)}</li>
-        <li>Marathon-pace finish: ~{formatPaceMinPerMileFromSec(mpSec)}</li>
-        {totalMi != null && <li>Total ~{totalMi.toFixed(1)} mi</li>}
+  const structureBlock =
+    catalogue.workoutType === "SpeedDuration" || catalogue.workoutType === "Tempo" ? (
+      <ul className="text-sm text-gray-800 list-disc pl-5 space-y-1 mb-3">
+        <li>
+          Warmup / easy: ~
+          {formatPaceMinPerMileFromSec(
+            paceSecFromAnchor(anchor, catalogue.recoveryPaceOffsetSecPerMile, p.easy)
+          )}
+        </li>
+        <li>
+          Quality block: ~
+          {formatPaceMinPerMileFromSec(
+            paceSecFromAnchor(anchor, catalogue.workPaceOffsetSecPerMile, p.tempo)
+          )}
+        </li>
+        {totalMi != null && <li>Total scheduled distance ~{totalMi.toFixed(1)} mi</li>}
       </ul>
+    ) : null;
+
+  return (
+    <div className={`${shell} rounded-lg p-6 mb-6`}>
+      <h2 className="text-xl font-semibold text-gray-900 mb-1">Coach prescription</h2>
+      <p className="text-lg font-medium text-gray-900 mb-2">{catalogue.name}</p>
+      {totalMi != null && (
+        <p className="text-sm text-gray-600 mb-2">Scheduled ~{totalMi.toFixed(1)} mi</p>
+      )}
+      {structureBlock}
+      {prescriptionNarrative?.trim() ? (
+        <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+          {prescriptionNarrative.trim()}
+        </p>
+      ) : (
+        <div className="space-y-2" aria-busy="true" aria-label="Loading coaching note">
+          <div className="h-4 w-full max-w-lg rounded bg-black/5 animate-pulse" />
+          <div className="h-4 w-full max-w-md rounded bg-black/5 animate-pulse" />
+          <div className="h-4 max-w-sm w-full rounded bg-black/5 animate-pulse" />
+          <p className="text-xs text-gray-500 pt-1">Personalizing your coaching note…</p>
+        </div>
+      )}
+      {(workoutTargetBand || inferredBand) && (
+        <p className="mt-3 text-xs text-gray-600">
+          <span className="font-medium text-gray-700">Target pace (plan): </span>
+          {workoutTargetBand ?? inferredBand}
+        </p>
+      )}
       {meta}
     </div>
   );
 }
+
+type DistanceDisplayUnit = "mi" | "m";
 
 type EditableSegment = {
   clientKey: string;
   title: string;
   durationType: "DISTANCE" | "TIME";
   durationValue: string;
+  distanceDisplayUnit: DistanceDisplayUnit;
   repeatCount: string;
+  recoveryDurationType: string;
+  recoveryDurationValue: string;
+  recoveryDistanceDisplayUnit: DistanceDisplayUnit;
   /** Pace low: minutes per mile (integer string). */
   paceLowMin: string;
   /** Pace low: seconds 0–59. */
@@ -383,6 +428,49 @@ type EditableSegment = {
   paceHighSec: string;
   notes: string;
 };
+
+function toggleEditableDistanceUnit(s: EditableSegment): EditableSegment {
+  if (s.durationType !== "DISTANCE") return s;
+  const raw = parseFloat(s.durationValue);
+  if (!Number.isFinite(raw)) {
+    return { ...s, distanceDisplayUnit: s.distanceDisplayUnit === "mi" ? "m" : "mi" };
+  }
+  if (s.distanceDisplayUnit === "mi") {
+    return {
+      ...s,
+      distanceDisplayUnit: "m",
+      durationValue: String(Math.round(raw * SEGMENT_METERS_PER_MILE)),
+    };
+  }
+  return {
+    ...s,
+    distanceDisplayUnit: "mi",
+    durationValue: String(raw / SEGMENT_METERS_PER_MILE),
+  };
+}
+
+function toggleEditableRecoveryDistanceUnit(s: EditableSegment): EditableSegment {
+  const raw = parseFloat(s.recoveryDurationValue);
+  if (!Number.isFinite(raw)) {
+    return {
+      ...s,
+      recoveryDistanceDisplayUnit:
+        s.recoveryDistanceDisplayUnit === "mi" ? "m" : "mi",
+    };
+  }
+  if (s.recoveryDistanceDisplayUnit === "mi") {
+    return {
+      ...s,
+      recoveryDistanceDisplayUnit: "m",
+      recoveryDurationValue: String(Math.round(raw * SEGMENT_METERS_PER_MILE)),
+    };
+  }
+  return {
+    ...s,
+    recoveryDistanceDisplayUnit: "mi",
+    recoveryDurationValue: String(raw / SEGMENT_METERS_PER_MILE),
+  };
+}
 
 function segmentPaceEncoding(seg: WorkoutSegment) {
   return normalizePaceTargetEncodingVersion(seg.paceTargetEncodingVersion);
@@ -393,6 +481,23 @@ function newClientKey(): string {
     return globalThis.crypto.randomUUID();
   }
   return `k_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function inferDistanceDisplayUnit(
+  durationType: "DISTANCE" | "TIME",
+  milesValue: number
+): DistanceDisplayUnit {
+  if (durationType !== "DISTANCE") return "mi";
+  if (!Number.isFinite(milesValue) || milesValue <= 0) return "mi";
+  const meters = milesValue * SEGMENT_METERS_PER_MILE;
+  if (meters <= 5000) {
+    const rounded50 = Math.round(meters / 50) * 50;
+    if (rounded50 > 0) {
+      const relErr = Math.abs(meters - rounded50) / meters;
+      if (relErr <= 0.005) return "m";
+    }
+  }
+  return "mi";
 }
 
 function segmentToEditable(s: WorkoutSegment): EditableSegment {
@@ -425,13 +530,48 @@ function segmentToEditable(s: WorkoutSegment): EditableSegment {
     paceHighMin = hi.min;
     paceHighSec = hi.sec;
   }
+
+  const durType = s.durationType === "TIME" ? "TIME" : "DISTANCE";
+  const milesNum =
+    durType === "DISTANCE" && Number.isFinite(s.durationValue) ? s.durationValue : 0;
+  const distanceDisplayUnit =
+    durType === "DISTANCE" ? inferDistanceDisplayUnit("DISTANCE", milesNum) : "mi";
+  const durationValue =
+    durType === "DISTANCE" && distanceDisplayUnit === "m"
+      ? String(Math.round(milesNum * SEGMENT_METERS_PER_MILE))
+      : String(s.durationValue);
+
+  let recoveryDurationType = "";
+  let recoveryDurationValue = "";
+  let recoveryDistanceDisplayUnit: DistanceDisplayUnit = "mi";
+  const rt = (s.recoveryDurationType ?? "").trim().toUpperCase();
+  if (rt === "DISTANCE" || rt === "TIME") {
+    recoveryDurationType = rt;
+    const rv = Number(s.recoveryDurationValue);
+    if (rt === "DISTANCE" && Number.isFinite(rv) && rv > 0) {
+      recoveryDistanceDisplayUnit = inferDistanceDisplayUnit("DISTANCE", rv);
+      recoveryDurationValue =
+        recoveryDistanceDisplayUnit === "m"
+          ? String(Math.round(rv * SEGMENT_METERS_PER_MILE))
+          : String(rv);
+    } else if (rt === "TIME" && Number.isFinite(rv) && rv > 0) {
+      recoveryDurationValue = String(rv);
+    }
+  } else if (rt === "NONE") {
+    recoveryDurationType = "NONE";
+  }
+
   return {
     clientKey: s.id?.trim() ? s.id : newClientKey(),
     title: s.title,
-    durationType: s.durationType === "TIME" ? "TIME" : "DISTANCE",
-    durationValue: String(s.durationValue),
+    durationType: durType,
+    durationValue,
+    distanceDisplayUnit,
     repeatCount:
       s.repeatCount != null && Number(s.repeatCount) > 1 ? String(s.repeatCount) : "",
+    recoveryDurationType,
+    recoveryDurationValue,
+    recoveryDistanceDisplayUnit,
     paceLowMin,
     paceLowSec,
     paceHighMin,
@@ -442,10 +582,21 @@ function segmentToEditable(s: WorkoutSegment): EditableSegment {
 
 function editableSegmentsToApiPayload(segments: EditableSegment[]) {
   return segments.map((s, i) => {
-    const durationValue = parseFloat(s.durationValue);
-    if (!Number.isFinite(durationValue) || durationValue < 0) {
-      throw new Error(`Segment ${i + 1}: invalid duration`);
+    let durationValue: number;
+    if (s.durationType === "DISTANCE") {
+      const raw = parseFloat(s.durationValue);
+      if (!Number.isFinite(raw) || raw < 0) {
+        throw new Error(`Segment ${i + 1}: invalid duration`);
+      }
+      durationValue =
+        s.distanceDisplayUnit === "m" ? raw / SEGMENT_METERS_PER_MILE : raw;
+    } else {
+      durationValue = parseFloat(s.durationValue);
+      if (!Number.isFinite(durationValue) || durationValue < 0) {
+        throw new Error(`Segment ${i + 1}: invalid duration`);
+      }
     }
+
     const title = s.title.trim();
     if (!title) {
       throw new Error(`Segment ${i + 1}: title is required`);
@@ -455,6 +606,32 @@ function editableSegmentsToApiPayload(segments: EditableSegment[]) {
       const r = parseInt(s.repeatCount, 10);
       if (Number.isFinite(r) && r > 1) repeatCount = r;
     }
+
+    let recoveryDurationType: string | null = null;
+    let recoveryDurationValue: number | null = null;
+    if (repeatCount != null && repeatCount > 1) {
+      const rk = s.recoveryDurationType.trim().toUpperCase();
+      if (rk === "DISTANCE") {
+        const rv = parseFloat(s.recoveryDurationValue);
+        if (Number.isFinite(rv) && rv > 0) {
+          recoveryDurationType = "DISTANCE";
+          recoveryDurationValue =
+            s.recoveryDistanceDisplayUnit === "m"
+              ? rv / SEGMENT_METERS_PER_MILE
+              : rv;
+        }
+      } else if (rk === "TIME") {
+        const rv = parseFloat(s.recoveryDurationValue);
+        if (Number.isFinite(rv) && rv > 0) {
+          recoveryDurationType = "TIME";
+          recoveryDurationValue = rv;
+        }
+      } else if (rk === "NONE") {
+        recoveryDurationType = "NONE";
+        recoveryDurationValue = null;
+      }
+    }
+
     const lowSecMi = parseSplitPaceToSecPerMile(
       s.paceLowMin,
       s.paceLowSec,
@@ -485,6 +662,8 @@ function editableSegmentsToApiPayload(segments: EditableSegment[]) {
       repeatCount,
       notes: s.notes.trim() || null,
       targets,
+      recoveryDurationType,
+      recoveryDurationValue,
     };
   });
 }
@@ -638,10 +817,43 @@ export default function WorkoutDetailPage() {
     Record<string, boolean>
   >({});
 
+  const [coachApplyLoading, setCoachApplyLoading] = useState(false);
+  const [coachApplyError, setCoachApplyError] = useState<string | null>(null);
+
   const sortedSegments = useMemo(() => {
     if (!workout?.segments?.length) return [];
     return [...workout.segments].sort((a, b) => a.stepOrder - b.stepOrder);
   }, [workout?.segments]);
+
+  const orderedLapsFromGarmin = useMemo(() => {
+    const rows: Array<{
+      lapOrder: number;
+      lapIndex: number;
+      paceSecPerMile: number | null;
+      avgHr: number | null;
+      distanceMiles: number | null;
+    }> = [];
+    let o = 0;
+    for (const s of sortedSegments) {
+      const laps = [...(s.segment_laps ?? [])].sort((a, b) => a.lapIndex - b.lapIndex);
+      for (const lap of laps) {
+        o += 1;
+        rows.push({
+          lapOrder: o,
+          lapIndex: lap.lapIndex,
+          paceSecPerMile: lap.avgPaceSecPerMile ?? null,
+          avgHr: lap.avgHeartRate ?? null,
+          distanceMiles: lap.distanceMiles ?? null,
+        });
+      }
+    }
+    return rows;
+  }, [sortedSegments]);
+
+  const runAnalysisCoachRead = useMemo(() => {
+    if (!workout?.analysisJson || !isRunAnalysisJsonV1(workout.analysisJson)) return null;
+    return workout.analysisJson;
+  }, [workout?.analysisJson]);
 
   const simpleBackHref = useMemo(
     () => parseBackHrefParam(searchParams),
@@ -684,6 +896,49 @@ export default function WorkoutDetailPage() {
   useEffect(() => {
     fetchWorkout();
   }, [workoutId]);
+
+  useEffect(() => {
+    if (!workout?.id) return;
+    if (!workout.catalogueWorkoutId) return;
+    if (workout.workoutType === "Intervals" || workout.workoutType === "Tempo") return;
+    if (workout.prescriptionNarrative?.trim()) return;
+
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 20;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const poll = async () => {
+      if (cancelled) return;
+      attempts++;
+      try {
+        const response = await api.get<{ workout: Workout }>(`/training/workout/${workoutId}`);
+        const w = response.data?.workout;
+        if (cancelled) return;
+        if (w?.prescriptionNarrative?.trim()) {
+          setWorkout(w);
+          return;
+        }
+      } catch {
+        /* noop */
+      }
+      if (!cancelled && attempts < maxAttempts) {
+        timeoutId = setTimeout(() => void poll(), 2000);
+      }
+    };
+
+    timeoutId = setTimeout(() => void poll(), 1200);
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [
+    workout?.id,
+    workout?.catalogueWorkoutId,
+    workout?.workoutType,
+    workout?.prescriptionNarrative,
+    workoutId,
+  ]);
 
   useEffect(() => {
     if (!workout?.id) return;
@@ -822,7 +1077,11 @@ export default function WorkoutDetailPage() {
         title: "Segment",
         durationType: "DISTANCE",
         durationValue: "1",
+        distanceDisplayUnit: "mi",
         repeatCount: "",
+        recoveryDurationType: "",
+        recoveryDurationValue: "",
+        recoveryDistanceDisplayUnit: "mi",
         paceLowMin: "",
         paceLowSec: "",
         paceHighMin: "",
@@ -874,18 +1133,27 @@ export default function WorkoutDetailPage() {
   const quickEditDirty = quickOrderDirty || quickOverridesDirty || conversationalPaceDirty;
 
   const swapQuickSegment = useCallback(
-    (displayIndex: number, dir: -1 | 1) => {
-      const base = sortedSegments.map((s) => s.id);
-      const ids = quickOrderIds.length > 0 ? [...quickOrderIds] : [...base];
-      const j = displayIndex + dir;
-      if (j < 0 || j >= ids.length) return;
-      const a = ids[displayIndex]!;
-      const b = ids[j]!;
-      ids[displayIndex] = b;
-      ids[j] = a;
-      setQuickOrderIds(ids);
+    (pairIdx: number, dir: -1 | 1) => {
+      setQuickOrderIds((prevIds) => {
+        const base = sortedSegments.map((s) => s.id);
+        const ids = prevIds.length > 0 ? [...prevIds] : [...base];
+        const map = new Map(sortedSegments.map((s) => [s.id, s]));
+        const ordered = ids
+          .map((id) => map.get(id))
+          .filter((s): s is WorkoutSegment => s != null);
+        const chunks = groupSegmentsInDisplayOrder(ordered).map((g) =>
+          g.recovery ? [g.work.id, g.recovery.id] : [g.work.id]
+        );
+        const j = pairIdx + dir;
+        if (j < 0 || j >= chunks.length) return prevIds.length > 0 ? prevIds : base;
+        const nextChunks = [...chunks];
+        const tmp = nextChunks[pairIdx]!;
+        nextChunks[pairIdx] = nextChunks[j]!;
+        nextChunks[j] = tmp;
+        return nextChunks.flat();
+      });
     },
-    [sortedSegments, quickOrderIds]
+    [sortedSegments]
   );
 
   const adjustQuickRepeat = useCallback(
@@ -1024,6 +1292,32 @@ export default function WorkoutDetailPage() {
       setLoading(false);
     }
   };
+
+  const applyCoachRecommendation = useCallback(
+    async (rec: NonNullable<RunAnalysisJsonV1["recommendation"]>) => {
+      setCoachApplyError(null);
+      setCoachApplyLoading(true);
+      try {
+        await api.post("/me/apply-run-recommendation", {
+          workoutId,
+          field: rec.field,
+          suggestedValue: rec.suggestedValue,
+        });
+        const res = await api.get<{ workout: Workout }>(`/training/workout/${workoutId}`);
+        const w = res.data?.workout;
+        if (w?.id) setWorkout(w);
+      } catch (e: unknown) {
+        const msg =
+          e && typeof e === "object" && "response" in e
+            ? (e as { response?: { data?: { error?: string } } }).response?.data?.error
+            : null;
+        setCoachApplyError(msg ?? "Could not apply");
+      } finally {
+        setCoachApplyLoading(false);
+      }
+    },
+    [workoutId]
+  );
 
   const handlePushToGarmin = async () => {
     if (!workout) return;
@@ -1322,6 +1616,10 @@ export default function WorkoutDetailPage() {
 
   const scheduleLabel = formatWorkoutScheduleLong(workout.date);
   const isLogged = Boolean(workout.matchedActivityId ?? workout.matched_activity);
+  const segmentDisplayGroups = useMemo(() => {
+    const ordered = isLogged ? sortedSegments : getQuickOrderedSegments();
+    return groupSegmentsInDisplayOrder(ordered);
+  }, [isLogged, sortedSegments, getQuickOrderedSegments]);
   const showGarminHeaderCard =
     !isLogged || (isLogged && alreadyOnGarmin);
   const dayRel = dayRelativeToToday(workout.date);
@@ -1618,6 +1916,115 @@ export default function WorkoutDetailPage() {
                 </div>
               ) : null}
             </dl>
+
+            {runAnalysisCoachRead ? (
+              <div className="mt-6 rounded-2xl border border-violet-200 bg-violet-50/50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-violet-900">
+                  Coach read
+                </p>
+                <p className="mt-2 text-sm text-gray-800 leading-relaxed">
+                  {runAnalysisCoachRead.narrative}
+                </p>
+                {(() => {
+                  const hrLbl = runCoachHrPatternLabel(runAnalysisCoachRead.hrPattern);
+                  return hrLbl ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <span className="inline-flex rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-violet-900 ring-1 ring-violet-200">
+                        {hrLbl}
+                      </span>
+                    </div>
+                  ) : null;
+                })()}
+                {runAnalysisCoachRead.recommendation &&
+                !runAnalysisCoachRead.recommendationAppliedAt &&
+                runAnalysisCoachRead.recommendation.field &&
+                runAnalysisCoachRead.recommendation.suggestedValue != null ? (
+                  <div className="mt-4 rounded-xl border border-violet-300 bg-white/90 px-3 py-3">
+                    <p className="text-sm text-gray-800">{runAnalysisCoachRead.recommendation.reason}</p>
+                    <p className="mt-2 text-xs text-gray-600">
+                      {runAnalysisCoachRead.recommendation.field === "aerobicCeilingBpm"
+                        ? `Suggested aerobic ceiling: ~${runAnalysisCoachRead.recommendation.suggestedValue} bpm`
+                        : `Suggested 5K pace: ~${formatSecPerMile(runAnalysisCoachRead.recommendation.suggestedValue) ?? "—"} /mi`}
+                    </p>
+                    {coachApplyError ? (
+                      <p className="mt-2 text-sm text-red-600" role="alert">
+                        {coachApplyError}
+                      </p>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={coachApplyLoading}
+                      onClick={() => void applyCoachRecommendation(runAnalysisCoachRead.recommendation!)}
+                      className="mt-3 inline-flex rounded-xl bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-60"
+                    >
+                      {coachApplyLoading ? "Applying…" : "Apply to my profile"}
+                    </button>
+                  </div>
+                ) : null}
+                {runAnalysisCoachRead.recommendationAppliedAt ? (
+                  <p className="mt-3 text-sm font-medium text-emerald-800">Applied to your profile.</p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {orderedLapsFromGarmin.length > 0 ? (
+              <div className="mt-6">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-emerald-800 mb-2">
+                  Lap splits (from Garmin)
+                </h3>
+                <div className="overflow-x-auto rounded-xl border border-emerald-100 bg-white/90">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-emerald-100 bg-emerald-50/80 text-left text-xs uppercase tracking-wide text-gray-600">
+                        <th className="py-2 pl-3 pr-2 font-medium">Lap</th>
+                        <th className="py-2 px-2 font-medium">Pace</th>
+                        <th className="py-2 px-2 font-medium">HR</th>
+                        <th className="py-2 pl-2 pr-3 font-medium">Vs plan pace</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orderedLapsFromGarmin.map((lap) => {
+                        const lbl = paceVsTargetLabel(
+                          lap.paceSecPerMile,
+                          workout.targetPaceSecPerMile,
+                          workout.targetPaceSecPerMileHigh
+                        );
+                        const vs =
+                          lap.paceSecPerMile == null ||
+                          workout.targetPaceSecPerMile == null ||
+                          lbl === "unknown"
+                            ? "—"
+                            : lbl === "in_range"
+                              ? "In range"
+                              : lbl === "faster"
+                                ? "Faster"
+                                : "Slower";
+                        const rowTone =
+                          lbl === "unknown" || lap.paceSecPerMile == null
+                            ? ""
+                            : lbl === "in_range"
+                              ? "bg-emerald-50/60"
+                              : lbl === "faster"
+                                ? "bg-sky-50/50"
+                                : "bg-amber-50/60";
+                        return (
+                          <tr key={`${lap.lapOrder}-${lap.lapIndex}`} className={`border-t border-emerald-50 ${rowTone}`}>
+                            <td className="py-2 pl-3 pr-2 tabular-nums font-medium text-gray-900">{lap.lapOrder}</td>
+                            <td className="py-2 px-2 tabular-nums">{formatSecPerMile(lap.paceSecPerMile) ?? "—"}</td>
+                            <td className="py-2 px-2 tabular-nums">{lap.avgHr != null ? `${lap.avgHr}` : "—"}</td>
+                            <td className="py-2 pl-2 pr-3 tabular-nums text-gray-800">{vs}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-4 text-xs text-gray-500">
+                Lap splits appear here after Garmin syncs detailed splits for this activity.
+              </p>
+            )}
 
             {workout.training_plans?.currentFiveKPace ? (
               <p className="mt-4 text-xs text-gray-500">
@@ -2021,8 +2428,58 @@ export default function WorkoutDetailPage() {
                       </select>
                     </label>
                     <label className="block sm:col-span-2">
-                      <span className="text-xs font-semibold uppercase text-gray-500">
-                        {segment.durationType === "DISTANCE" ? "Miles" : "Minutes"}
+                      <span className="text-xs font-semibold uppercase text-gray-500 flex flex-wrap items-center gap-2">
+                        <span>
+                          {segment.durationType === "DISTANCE"
+                            ? segment.distanceDisplayUnit === "m"
+                              ? "Meters"
+                              : "Miles"
+                            : "Minutes"}
+                        </span>
+                        {segment.durationType === "DISTANCE" && (
+                          <span className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-white normal-case">
+                            <button
+                              type="button"
+                              className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                                segment.distanceDisplayUnit === "mi"
+                                  ? "bg-orange-100 text-orange-900"
+                                  : "text-gray-600 hover:bg-gray-50"
+                              }`}
+                              onClick={() =>
+                                segment.distanceDisplayUnit !== "mi" &&
+                                setEditSegments((prev) =>
+                                  prev.map((s) =>
+                                    s.clientKey === segment.clientKey
+                                      ? toggleEditableDistanceUnit(s)
+                                      : s
+                                  )
+                                )
+                              }
+                            >
+                              mi
+                            </button>
+                            <button
+                              type="button"
+                              className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                                segment.distanceDisplayUnit === "m"
+                                  ? "bg-orange-100 text-orange-900"
+                                  : "text-gray-600 hover:bg-gray-50"
+                              }`}
+                              onClick={() =>
+                                segment.distanceDisplayUnit !== "m" &&
+                                setEditSegments((prev) =>
+                                  prev.map((s) =>
+                                    s.clientKey === segment.clientKey
+                                      ? toggleEditableDistanceUnit(s)
+                                      : s
+                                  )
+                                )
+                              }
+                            >
+                              m
+                            </button>
+                          </span>
+                        )}
                       </span>
                       <input
                         type="text"
@@ -2098,6 +2555,134 @@ export default function WorkoutDetailPage() {
                         className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                       />
                     </label>
+                    {(() => {
+                      const r = parseInt(segment.repeatCount.trim(), 10);
+                      return Number.isFinite(r) && r > 1;
+                    })() && (
+                      <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 space-y-3 sm:col-span-3">
+                        <label className="block">
+                          <span className="text-xs font-semibold uppercase text-gray-500">
+                            Between repeats (Garmin)
+                          </span>
+                          <select
+                            value={segment.recoveryDurationType}
+                            onChange={(e) =>
+                              setEditSegments((prev) =>
+                                prev.map((s) =>
+                                  s.clientKey === segment.clientKey
+                                    ? {
+                                        ...s,
+                                        recoveryDurationType: e.target.value,
+                                        recoveryDurationValue:
+                                          e.target.value === "DISTANCE" ||
+                                          e.target.value === "TIME"
+                                            ? s.recoveryDurationValue
+                                            : "",
+                                      }
+                                    : s
+                                )
+                              )
+                            }
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                          >
+                            <option value="">Not set (use separate recovery segment)</option>
+                            <option value="NONE">No scripted recovery</option>
+                            <option value="DISTANCE">Recovery distance</option>
+                            <option value="TIME">Recovery time</option>
+                          </select>
+                        </label>
+                        {segment.recoveryDurationType === "DISTANCE" && (
+                          <label className="block">
+                            <span className="text-xs font-semibold uppercase text-gray-500 flex flex-wrap items-center gap-2">
+                              <span>
+                                {segment.recoveryDistanceDisplayUnit === "m"
+                                  ? "Recovery meters"
+                                  : "Recovery miles"}
+                              </span>
+                              <span className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-white normal-case">
+                                <button
+                                  type="button"
+                                  className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                                    segment.recoveryDistanceDisplayUnit === "mi"
+                                      ? "bg-orange-100 text-orange-900"
+                                      : "text-gray-600 hover:bg-gray-50"
+                                  }`}
+                                  onClick={() =>
+                                    segment.recoveryDistanceDisplayUnit !== "mi" &&
+                                    setEditSegments((prev) =>
+                                      prev.map((s) =>
+                                        s.clientKey === segment.clientKey
+                                          ? toggleEditableRecoveryDistanceUnit(s)
+                                          : s
+                                      )
+                                    )
+                                  }
+                                >
+                                  mi
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                                    segment.recoveryDistanceDisplayUnit === "m"
+                                      ? "bg-orange-100 text-orange-900"
+                                      : "text-gray-600 hover:bg-gray-50"
+                                  }`}
+                                  onClick={() =>
+                                    segment.recoveryDistanceDisplayUnit !== "m" &&
+                                    setEditSegments((prev) =>
+                                      prev.map((s) =>
+                                        s.clientKey === segment.clientKey
+                                          ? toggleEditableRecoveryDistanceUnit(s)
+                                          : s
+                                      )
+                                    )
+                                  }
+                                >
+                                  m
+                                </button>
+                              </span>
+                            </span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={segment.recoveryDurationValue}
+                              onChange={(e) =>
+                                setEditSegments((prev) =>
+                                  prev.map((s) =>
+                                    s.clientKey === segment.clientKey
+                                      ? { ...s, recoveryDurationValue: e.target.value }
+                                      : s
+                                  )
+                                )
+                              }
+                              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                            />
+                          </label>
+                        )}
+                        {segment.recoveryDurationType === "TIME" && (
+                          <label className="block">
+                            <span className="text-xs font-semibold uppercase text-gray-500">
+                              Recovery minutes
+                            </span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={segment.recoveryDurationValue}
+                              onChange={(e) =>
+                                setEditSegments((prev) =>
+                                  prev.map((s) =>
+                                    s.clientKey === segment.clientKey
+                                      ? { ...s, recoveryDurationValue: e.target.value }
+                                      : s
+                                  )
+                                )
+                              }
+                              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                            />
+                          </label>
+                        )}
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <span className="text-xs font-semibold uppercase text-gray-500 block mb-1">
@@ -2199,12 +2784,17 @@ export default function WorkoutDetailPage() {
             </div>
           ) : workout.segments && workout.segments.length > 0 ? (
             <div className="space-y-4">
-              {(isLogged ? sortedSegments : getQuickOrderedSegments()).map((segment, segIdx) => {
-                const displayList = isLogged ? sortedSegments : getQuickOrderedSegments();
+              {segmentDisplayGroups.map((group, pairIdx) => {
+                const segment = group.work;
+                const recoverySeg = group.recovery;
+                const displayListFlat = segmentDisplayGroups.flatMap((g) =>
+                  g.recovery ? [g.work, g.recovery] : [g.work]
+                );
+                const structIdx = displayListFlat.findIndex((s) => s.id === segment.id);
                 const structBadge = segmentStructureBadge(
                   segment.title,
-                  segIdx,
-                  displayList.length
+                  structIdx < 0 ? pairIdx : structIdx,
+                  displayListFlat.length
                 );
                 const o = segmentOverrides[segment.id];
                 const effRepeat = o?.repeatCount ?? segment.repeatCount ?? 1;
@@ -2214,7 +2804,7 @@ export default function WorkoutDetailPage() {
                 const hasPaceTarget = baseLow != null || baseHigh != null;
                 return (
                   <div
-                    key={segment.id}
+                    key={`${segment.id}:${recoverySeg?.id ?? ""}`}
                     className="border border-gray-200 rounded-lg p-4 sm:p-5 bg-gray-50"
                   >
                     <div className="mb-4">
@@ -2224,8 +2814,8 @@ export default function WorkoutDetailPage() {
                             <button
                               type="button"
                               aria-label="Move segment up"
-                              onClick={() => swapQuickSegment(segIdx, -1)}
-                              disabled={segIdx === 0}
+                              onClick={() => swapQuickSegment(pairIdx, -1)}
+                              disabled={pairIdx === 0}
                               className="p-2 rounded border border-gray-200 bg-white disabled:opacity-40 hover:bg-gray-50"
                             >
                               <ChevronUp className="w-4 h-4" />
@@ -2233,8 +2823,8 @@ export default function WorkoutDetailPage() {
                             <button
                               type="button"
                               aria-label="Move segment down"
-                              onClick={() => swapQuickSegment(segIdx, 1)}
-                              disabled={segIdx === displayList.length - 1}
+                              onClick={() => swapQuickSegment(pairIdx, 1)}
+                              disabled={pairIdx === segmentDisplayGroups.length - 1}
                               className="p-2 rounded border border-gray-200 bg-white disabled:opacity-40 hover:bg-gray-50"
                             >
                               <ChevronDown className="w-4 h-4" />
@@ -2243,7 +2833,7 @@ export default function WorkoutDetailPage() {
                         )}
                         <h3 className="font-semibold text-gray-900 text-lg flex flex-wrap items-center gap-2 min-w-0">
                           <span>
-                            {segIdx + 1}. {segment.title}
+                            {pairIdx + 1}. {segment.title}
                           </span>
                           {structBadge ? (
                             <span className="inline-flex items-center rounded-full bg-white border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-700">
@@ -2323,11 +2913,50 @@ export default function WorkoutDetailPage() {
                           Duration
                         </dt>
                         <dd className="text-base text-gray-900 font-medium">
-                          {segment.durationType === "DISTANCE"
-                            ? `${segment.durationValue} miles`
-                            : `${segment.durationValue} minutes`}
+                          {formatSegmentDuration(segment)}
                         </dd>
+                        {inlineRecoveryBetweenRepsLabel(segment) && (
+                          <p className="text-sm text-gray-600 mt-2">
+                            <span className="font-medium text-gray-700">Between repeats: </span>
+                            {inlineRecoveryBetweenRepsLabel(segment)}
+                          </p>
+                        )}
                       </div>
+
+                      {recoverySeg ? (
+                        <div className="rounded-lg border border-gray-200 bg-white/80 px-3 py-3 mt-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                            Recovery jog (between reps)
+                          </p>
+                          <p className="text-base text-gray-800 font-medium">
+                            {formatSegmentDuration(recoverySeg)}
+                          </p>
+                          {recoverySeg.targets &&
+                            recoverySeg.targets.length > 0 && (
+                              <div className="mt-3 space-y-2">
+                                <span className="text-xs font-semibold uppercase text-gray-500">
+                                  Prescribed
+                                </span>
+                                {recoverySeg.targets.map((target, ridx) => (
+                                  <div
+                                    key={ridx}
+                                    className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3 text-base"
+                                  >
+                                    <span className="text-gray-600 shrink-0 sm:min-w-[7rem]">
+                                      {workoutTargetTypeLabel(target.type || "Target")}
+                                    </span>
+                                    <span className="text-gray-900 font-medium break-words">
+                                      {formatTargetLine(
+                                        target,
+                                        segmentPaceEncoding(recoverySeg)
+                                      )}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                        </div>
+                      ) : null}
 
                       {segment.targets &&
                         segment.targets.length > 0 &&
@@ -2498,8 +3127,11 @@ export default function WorkoutDetailPage() {
           workout.workoutType !== "Tempo" && (
           <CataloguePrescriptionCard
             catalogue={workout.workout_catalogue}
+            prescriptionNarrative={workout.prescriptionNarrative}
             fiveKPaceSnapshot={workout.training_plans?.currentFiveKPace}
             estimatedDistanceInMeters={workout.estimatedDistanceInMeters ?? null}
+            targetPaceSecPerMile={workout.targetPaceSecPerMile}
+            targetPaceSecPerMileHigh={workout.targetPaceSecPerMileHigh}
           />
         )}
 

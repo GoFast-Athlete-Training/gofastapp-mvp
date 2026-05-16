@@ -120,6 +120,21 @@ export async function runRunAssessment(params: {
         actualMaxHeartRate: true,
         actualDurationSeconds: true,
         actualDistanceMeters: true,
+        segments: {
+          orderBy: { stepOrder: "asc" },
+          select: {
+            segment_laps: {
+              orderBy: { lapIndex: "asc" },
+              select: {
+                lapIndex: true,
+                avgPaceSecPerMile: true,
+                avgHeartRate: true,
+                distanceMiles: true,
+                durationSeconds: true,
+              },
+            },
+          },
+        },
         matched_activity: {
           select: { activityName: true, activityType: true },
         },
@@ -145,6 +160,29 @@ export async function runRunAssessment(params: {
   const hasPlanTargets =
     workout.targetPaceSecPerMile != null || workout.hrDeltaBpm != null;
 
+  const lapsOrdered: Array<{
+    lapOrder: number;
+    garminLapIndex: number;
+    paceSecPerMile: number | null;
+    avgHeartRate: number | null;
+    distanceMiles: number | null;
+    durationSeconds: number | null;
+  }> = [];
+  let ord = 0;
+  for (const seg of workout.segments ?? []) {
+    for (const lap of seg.segment_laps ?? []) {
+      ord += 1;
+      lapsOrdered.push({
+        lapOrder: ord,
+        garminLapIndex: lap.lapIndex,
+        paceSecPerMile: lap.avgPaceSecPerMile,
+        avgHeartRate: lap.avgHeartRate,
+        distanceMiles: lap.distanceMiles,
+        durationSeconds: lap.durationSeconds,
+      });
+    }
+  }
+
   const payload = {
     workout: {
       title: workout.title,
@@ -162,6 +200,8 @@ export async function runRunAssessment(params: {
       activityName: workout.matched_activity.activityName,
       activityType: workout.matched_activity.activityType,
     },
+    /// Per-lap snapshot when Garmin detail synced; empty otherwise.
+    laps: lapsOrdered,
     athleteBaseline: {
       fiveKPace: athlete.fiveKPace,
       thresholdPace: athlete.thresholdPace,
@@ -169,13 +209,19 @@ export async function runRunAssessment(params: {
     },
   };
 
+  const hasLapDetail = lapsOrdered.length > 0;
+
   const systemPrompt = `You are an encouraging running coach. The athlete may or may not have followed a structured plan workout — many runs are standalone easy runs from their watch.
 
-You only have activity *summary* stats (no second-by-second HR stream). Infer effort pattern cautiously from avg HR, max HR if present, pace, duration, and distance.
+You have activity *summary* stats (no second-by-second HR stream). If the user payload includes a non-empty "laps" array, these are ordered lap splits (often ~1 mile each). Use them to describe **where** pace changed (e.g. "strong through lap 8, faded lap 10–12") — cite lap numbers rather than guessing. When laps are empty or too few to infer splits, infer cautiously from summary only.
 
 Respond with ONLY a JSON object (no markdown) with this exact shape:
 {
-  "narrative": "2-5 short sentences: what this run suggests about aerobic load, whether it looks sustainable/easy, and one practical takeaway. Do not shame. If there is no plan target, judge against easy aerobic norms using the athlete baseline HR ceiling and paces.",
+  "narrative": "2-5 short sentences: what this run suggests about aerobic load, whether it looks sustainable/easy, and one practical takeaway. Do not shame. If plan targets exist, relate execution to them. ${
+    hasLapDetail
+      ? "When laps are provided in the payload, mention specific lap ranges where pace shifted versus the rest."
+      : ""
+  } If there is no plan target, judge against easy aerobic norms using the athlete baseline HR ceiling and paces.",
   "hrPattern": one of "steady","drift_up","drift_down","variable","unknown",
   "effortQuality": one of "on_target","above","below","unknown" relative to what makes sense for this session type,
   "recommendation": null OR an object with:

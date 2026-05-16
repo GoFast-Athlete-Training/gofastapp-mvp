@@ -55,7 +55,8 @@ export enum GarminTargetType {
 export enum GarminRepeatType {
   DISTANCE = "DISTANCE",
   TIME = "TIME",
-  // ... other repeat types (11 total options)
+  /** Repeat nested child steps N times (work + recovery inside one repeat block). */
+  REPEAT_UNTIL_STEPS_CMPLT = "REPEAT_UNTIL_STEPS_CMPLT",
 }
 
 // ============================================================================
@@ -89,6 +90,9 @@ export interface GarminWorkoutStep {
   repeatType?: GarminRepeatType;
   repeatValue?: number;
   skipLastRestStep?: boolean;
+
+  /** Nested steps for `WorkoutRepeatStep` (e.g. interval + recovery). */
+  steps?: GarminWorkoutStep[];
   
   // Other fields (swimming, strength, etc.)
   strokeType?: string;

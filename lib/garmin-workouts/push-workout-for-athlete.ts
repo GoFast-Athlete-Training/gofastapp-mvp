@@ -121,6 +121,9 @@ export async function pushWorkoutToGarminForAthlete(
         repeatCount: seg.repeatCount || undefined,
         notes: seg.notes || undefined,
         paceTargetEncodingVersion: seg.paceTargetEncodingVersion,
+        recoveryDurationType: seg.recoveryDurationType ?? undefined,
+        recoveryDurationValue:
+          seg.recoveryDurationValue != null ? seg.recoveryDurationValue : undefined,
       })),
     });
 

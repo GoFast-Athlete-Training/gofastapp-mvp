@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import {
   parsePaceToSecondsPerMile,
@@ -13,6 +14,7 @@ import {
   type ApiSegment,
 } from "@/lib/workout-generator/templates";
 import type { TrainingPaces } from "@/lib/workout-generator/pace-calculator";
+import { catalogueEntryToApiSegments } from "@/lib/training/catalogue-to-segments";
 
 function formatPaceFromSecondsPerMile(secPerMile: number): string {
   const m = Math.floor(secPerMile / 60);
@@ -27,6 +29,7 @@ function prescribedPaceSecPerMileForType(
 ): number {
   switch (workoutType) {
     case "Tempo":
+    case "SpeedDuration":
       return paces.tempo;
     case "LongRun":
       return paces.longRun;
@@ -51,6 +54,8 @@ function pickTotalMiles(workoutType: string): number {
       return 13.1;
     case "Tempo":
       return 6;
+    case "SpeedDuration":
+      return 6;
     case "Easy":
     default:
       return 6;
@@ -70,8 +75,8 @@ export interface GoFastGenerateNeedsPace {
 
 /**
  * POST /api/workouts/gofast-generate
- * Body: { workoutType: string }
- * Returns one workout from primary ACTIVE AthleteGoal.goalRacePace or Athlete.fiveKPace; or { needsPace: true }.
+ * Body: { workoutType?: string; totalMiles?: number; catalogueId?: string }
+ * Returns segments from a catalogue row or generic template; needs pace anchor from goal or profile 5K.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -81,27 +86,20 @@ export async function POST(request: NextRequest) {
     }
     const { athlete } = auth;
 
-    const body = (await request.json()) as { workoutType?: string; totalMiles?: number };
+    const body = (await request.json()) as {
+      workoutType?: string;
+      totalMiles?: number;
+      catalogueId?: string;
+    };
     const workoutType = body.workoutType ?? "Easy";
-    const defaultMiles = pickTotalMiles(workoutType);
-    const rawTotal = body.totalMiles;
-    const totalMiles =
-      typeof rawTotal === "number" &&
-      Number.isFinite(rawTotal) &&
-      rawTotal > 0 &&
-      rawTotal <= 500
-        ? rawTotal
-        : defaultMiles;
 
     let goalSecPerMile: number | null = null;
 
-    // 1) Primary ACTIVE AthleteGoal (goalRacePace sec/mile, with lazy backfill if needed)
     const primary = await getPrimaryGoalForWorkout(athlete.id);
     if (primary?.goalRacePace != null && primary.goalRacePace > 0) {
       goalSecPerMile = primary.goalRacePace;
     }
 
-    // 2) Fallback: Athlete.fiveKPace
     if (goalSecPerMile == null && athlete.fiveKPace?.trim()) {
       try {
         goalSecPerMile = parsePaceToSecondsPerMile(athlete.fiveKPace.trim());
@@ -122,6 +120,58 @@ export async function POST(request: NextRequest) {
     }
 
     const paces = getTrainingPaces(goalSecPerMile);
+
+    if (body.catalogueId?.trim()) {
+      const entry = await prisma.workout_catalogue.findUnique({
+        where: { id: body.catalogueId.trim() },
+      });
+      if (!entry) {
+        return NextResponse.json({ error: "Catalogue workout not found" }, { status: 404 });
+      }
+
+      const catType = String(entry.workoutType);
+      const defaultMiles = pickTotalMiles(catType);
+      const rawTotal = body.totalMiles;
+      const scheduleMiles =
+        typeof rawTotal === "number" &&
+        Number.isFinite(rawTotal) &&
+        rawTotal > 0 &&
+        rawTotal <= 500
+          ? rawTotal
+          : defaultMiles;
+
+      const segments = catalogueEntryToApiSegments({
+        entry,
+        scheduleMiles,
+        anchorSecondsPerMile: goalSecPerMile,
+        racePaceSecondsPerMile: paces.marathon,
+      });
+
+      const prescribed = prescribedPaceSecPerMileForType(catType, paces);
+      const prescribedStr = formatPaceFromSecondsPerMile(prescribed);
+      const desc =
+        typeof entry.description === "string" && entry.description.trim()
+          ? entry.description.trim()
+          : `Prescription from training catalogue. Target work pace ~${prescribedStr}.`;
+
+      const result: GoFastGenerateResponse = {
+        segments,
+        suggestedTitle: entry.name.trim() || `${catType} workout`,
+        suggestedDescription: desc,
+      };
+      return NextResponse.json(result);
+    }
+
+    const defaultMiles = pickTotalMiles(workoutType);
+    const rawTotal = body.totalMiles;
+    const totalMiles =
+      typeof rawTotal === "number" &&
+      Number.isFinite(rawTotal) &&
+      rawTotal > 0 &&
+      rawTotal <= 500
+        ? rawTotal
+        : defaultMiles;
+
     const descriptors = getTemplateSegments(workoutType, totalMiles, paces);
     const segments = descriptorsToApiSegments(descriptors, paces);
 

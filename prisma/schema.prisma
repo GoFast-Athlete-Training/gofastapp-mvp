@@ -1354,6 +1354,8 @@ model workouts {
   completedActivityDetailJson         Json?
   /// Computed readiness / delta summaries (product reads; optional).
   analysisJson                      Json?
+  /// AI-generated pre-workout coaching note (lazy, cached).
+  prescriptionNarrative             String?
   /// Public share path slug for /mytrainingruns/[slug] (e.g. acole842719); set when athlete creates a join link
   slug                      String?             @unique
   createdAt                 DateTime            @default(now())
@@ -1390,6 +1392,9 @@ model workout_segments {
   paceTargetEncodingVersion Int         @default(2)
   // Repeat capability
   repeatCount      Int?              // Repeat this segment N times (for intervals)
+  /// Between-rep recovery nested inside Garmin repeat when set (miles or minutes; NONE clears).
+  recoveryDurationType  String?      // "DISTANCE" | "TIME" | "NONE"
+  recoveryDurationValue Float?        // Miles if DISTANCE, minutes if TIME
   /// Lap-matched actuals (prescribed targets JSON is never overwritten)
   actualPaceSecPerMile   Int?
   actualDistanceMiles    Float?

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, FileText, Pencil } from "lucide-react";
 import Link from "next/link";
@@ -16,6 +16,7 @@ import {
   storedPaceSecondsKmToSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
 import { workoutDetailPathWithBackHref } from "@/lib/training/workout-nav-query";
+import { formatSegmentDistance } from "@/lib/training/segment-summary";
 
 const WORKOUT_TYPES = ["Easy", "Tempo", "LongRun", "Intervals", "Race"] as const;
 
@@ -199,11 +200,12 @@ function apiSegmentsToSlots(segments: ApiSegment[]): {
 }
 
 function slotOneLine(slot: SlotData): string {
-  const mi = slot.miles ? `${slot.miles} mi` : "";
+  const dist =
+    slot.miles > 0 ? formatSegmentDistance(slot.miles) : "";
   const low = slot.paceValueLow != null ? secPerKmToPaceDisplay(slot.paceValueLow) : "";
   const high = slot.paceValueHigh != null ? secPerKmToPaceDisplay(slot.paceValueHigh) : "";
   const pace = low && high ? (low === high ? `${low}/mi` : `${low}-${high}/mi`) : "";
-  return [mi, pace].filter(Boolean).join(" — ") || "—";
+  return [dist, pace].filter(Boolean).join(" — ") || "—";
 }
 
 function slotToPaceSplitState(slot: SlotData | null): {
@@ -240,6 +242,38 @@ type EditingTarget =
   | { kind: "cooldown" }
   | { kind: "main"; index: number };
 
+type CatalogueBrowseItem = {
+  id: string;
+  name: string;
+  description: string | null;
+  workoutType: string;
+  workBaseReps: number | null;
+  workBaseRepMeters: number | null;
+  recoveryDistanceMeters: number | null;
+  recoveryDurationSeconds: number | null;
+};
+
+function catalogueCardSubtitle(item: CatalogueBrowseItem): string {
+  if (item.workoutType === "Intervals") {
+    const reps = item.workBaseReps ?? "?";
+    const meters = item.workBaseRepMeters ?? "?";
+    const bits = [`${reps}×${meters}m`];
+    if (item.recoveryDurationSeconds != null && item.recoveryDurationSeconds > 0) {
+      bits.push(`${item.recoveryDurationSeconds}s jog`);
+    } else if (item.recoveryDistanceMeters != null && item.recoveryDistanceMeters > 0) {
+      bits.push(`${item.recoveryDistanceMeters}m jog`);
+    }
+    return bits.join(" · ");
+  }
+  const d = item.description?.trim();
+  if (d && d.length > 0) return d.length > 96 ? `${d.slice(0, 96)}…` : d;
+  return item.workoutType;
+}
+
+type GoFastGenResponse =
+  | { needsPace: true; message: string }
+  | { segments: ApiSegment[]; suggestedTitle: string; suggestedDescription: string };
+
 function CreateWorkoutPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -262,6 +296,11 @@ function CreateWorkoutPageInner() {
   const [scheduledDate, setScheduledDate] = useState("");
   /** Optional override for POST gofast-generate (same idea as Race distance presets). */
   const [templateDistanceMi, setTemplateDistanceMi] = useState("");
+  const [catalogueItems, setCatalogueItems] = useState<CatalogueBrowseItem[]>([]);
+  const [catalogueBrowseError, setCatalogueBrowseError] = useState<string | null>(null);
+  const [catalogueGeneratingId, setCatalogueGeneratingId] = useState<string | null>(null);
+  /** When set, POST /api/workouts includes catalogueWorkoutId for lazy re-materialize / attribution. */
+  const [selectedCatalogueId, setSelectedCatalogueId] = useState<string | null>(null);
   const [editingTarget, setEditingTarget] = useState<EditingTarget | null>(null);
   /** Pace low / high split fields while a slot editor is open (matches /workouts/[id]). */
   const [editingPaceLowMin, setEditingPaceLowMin] = useState("");
@@ -275,6 +314,44 @@ function CreateWorkoutPageInner() {
     (warmup?.miles ?? 0) > 0 ||
     (cooldown?.miles ?? 0) > 0 ||
     mainSegments.some((s) => s.miles > 0);
+
+  const selectedCatalogueLabel = useMemo(() => {
+    if (!selectedCatalogueId) return null;
+    const row = catalogueItems.find((i) => i.id === selectedCatalogueId);
+    return row?.name?.trim() || row?.workoutType || null;
+  }, [catalogueItems, selectedCatalogueId]);
+
+  const catalogueByType = useMemo(() => {
+    const m = new Map<string, CatalogueBrowseItem[]>();
+    for (const row of catalogueItems) {
+      const list = m.get(row.workoutType) ?? [];
+      list.push(row);
+      m.set(row.workoutType, list);
+    }
+    return [...m.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [catalogueItems]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get<{ items?: CatalogueBrowseItem[] }>(
+          "workouts/catalogue-browse"
+        );
+        if (!cancelled && Array.isArray(data?.items)) {
+          setCatalogueItems(data.items);
+          setCatalogueBrowseError(null);
+        }
+      } catch {
+        if (!cancelled) {
+          setCatalogueBrowseError("Could not load catalogue presets.");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!editingTarget) return;
@@ -333,6 +410,7 @@ function CreateWorkoutPageInner() {
     if (paceValueLow === base.paceValueLow && paceValueHigh === base.paceValueHigh) return;
 
     const next = { ...base, paceValueLow, paceValueHigh };
+    setSelectedCatalogueId(null);
     if (editingTarget.kind === "warmup") setWarmup(next);
     else if (editingTarget.kind === "cooldown") setCooldown(next);
     else {
@@ -363,6 +441,7 @@ function CreateWorkoutPageInner() {
     setEditingPaceHighMin("");
     setEditingPaceHighSec("");
     setDeriveError(null);
+    setSelectedCatalogueId(null);
   };
 
   const handleDerive = async () => {
@@ -373,6 +452,7 @@ function CreateWorkoutPageInner() {
     }
     setDeriveError(null);
     setNeedsPaceHint(null);
+    setSelectedCatalogueId(null);
     setDeriving(true);
     try {
       const tabular = tryParseTabularMilePacePaste(text);
@@ -423,9 +503,43 @@ function CreateWorkoutPageInner() {
     }
   };
 
+  const applyGoFastGenerateResult = (data: unknown): boolean => {
+    if (
+      data &&
+      typeof data === "object" &&
+      "needsPace" in data &&
+      (data as { needsPace?: boolean }).needsPace
+    ) {
+      setNeedsPaceHint(String((data as { message?: string }).message ?? ""));
+      return false;
+    }
+    if (
+      !data ||
+      typeof data !== "object" ||
+      !("segments" in data) ||
+      !Array.isArray((data as { segments?: unknown }).segments)
+    ) {
+      setDeriveError("Unexpected response from workout builder.");
+      return false;
+    }
+    const built = data as {
+      segments: ApiSegment[];
+      suggestedTitle: string;
+      suggestedDescription: string;
+    };
+    const slots = apiSegmentsToSlots(built.segments);
+    setWarmup(slots.warmup);
+    setMainSegments(slots.mainSegments);
+    setCooldown(slots.cooldown);
+    setName(built.suggestedTitle);
+    setDescription(built.suggestedDescription);
+    return true;
+  };
+
   const handleGoFastGenerate = async () => {
     setDeriveError(null);
     setNeedsPaceHint(null);
+    setSelectedCatalogueId(null);
     setGoFastGenerating(true);
     try {
       const parsedMi = parseFloat(templateDistanceMi.trim());
@@ -434,37 +548,8 @@ function CreateWorkoutPageInner() {
         payload.totalMiles = parsedMi;
       }
 
-      const { data } = await api.post<
-        | { needsPace: true; message: string }
-        | { segments: ApiSegment[]; suggestedTitle: string; suggestedDescription: string }
-      >("workouts/gofast-generate", payload);
-
-      if (data && typeof data === "object" && "needsPace" in data && data.needsPace) {
-        setNeedsPaceHint(data.message ?? "");
-        return;
-      }
-
-      if (
-        !data ||
-        typeof data !== "object" ||
-        !("segments" in data) ||
-        !Array.isArray((data as { segments?: unknown }).segments)
-      ) {
-        setDeriveError("Unexpected response from workout builder.");
-        return;
-      }
-
-      const built = data as {
-        segments: ApiSegment[];
-        suggestedTitle: string;
-        suggestedDescription: string;
-      };
-      const slots = apiSegmentsToSlots(built.segments);
-      setWarmup(slots.warmup);
-      setMainSegments(slots.mainSegments);
-      setCooldown(slots.cooldown);
-      setName(built.suggestedTitle);
-      setDescription(built.suggestedDescription);
+      const { data } = await api.post<GoFastGenResponse>("workouts/gofast-generate", payload);
+      applyGoFastGenerateResult(data);
     } catch (err: unknown) {
       let display = "Failed to build workout";
       if (err && typeof err === "object" && "response" in err) {
@@ -484,6 +569,48 @@ function CreateWorkoutPageInner() {
       setDeriveError(display);
     } finally {
       setGoFastGenerating(false);
+    }
+  };
+
+  const handleCataloguePreset = async (item: CatalogueBrowseItem) => {
+    setDeriveError(null);
+    setNeedsPaceHint(null);
+    setEditingTarget(null);
+    setEditingPaceLowMin("");
+    setEditingPaceLowSec("");
+    setEditingPaceHighMin("");
+    setEditingPaceHighSec("");
+    setCatalogueGeneratingId(item.id);
+    try {
+      const parsedMi = parseFloat(templateDistanceMi.trim());
+      const payload: { catalogueId: string; totalMiles?: number } = { catalogueId: item.id };
+      if (Number.isFinite(parsedMi) && parsedMi > 0 && parsedMi <= 500) {
+        payload.totalMiles = parsedMi;
+      }
+      const { data } = await api.post<GoFastGenResponse>("workouts/gofast-generate", payload);
+      if (applyGoFastGenerateResult(data)) {
+        setWorkoutType(item.workoutType);
+        setSelectedCatalogueId(item.id);
+      }
+    } catch (err: unknown) {
+      let display = "Failed to load preset";
+      if (err && typeof err === "object" && "response" in err) {
+        const res = (err as { response?: { status?: number; data?: unknown } }).response;
+        const status = res?.status;
+        const resData = res?.data;
+        const serverMessage =
+          typeof resData === "object" && resData !== null && "error" in resData && typeof (resData as { error?: unknown }).error === "string"
+            ? (resData as { error: string }).error
+            : typeof resData === "string"
+              ? resData.slice(0, 200) + (resData.length > 200 ? "…" : "")
+              : null;
+        if (status != null || serverMessage) {
+          display = [status != null ? `Status: ${status}` : null, serverMessage || "No details from server"].filter(Boolean).join(" — ");
+        }
+      }
+      setDeriveError(display);
+    } finally {
+      setCatalogueGeneratingId(null);
     }
   };
 
@@ -559,6 +686,7 @@ function CreateWorkoutPageInner() {
         workoutType: workoutType || "Easy",
         segments,
         ...(scheduledDate.trim() ? { date: scheduledDate.trim() } : {}),
+        ...(selectedCatalogueId ? { catalogueWorkoutId: selectedCatalogueId } : {}),
       };
 
       const response = await api.post("workouts", workoutData);
@@ -614,87 +742,139 @@ function CreateWorkoutPageInner() {
             </p>
           </div>
 
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Workout type</label>
-            <select
-              value={workoutType}
-              onChange={(e) => setWorkoutType(e.target.value)}
-              className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-            >
-              {WORKOUT_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="template-distance-mi">
-              Template distance (miles)
-            </label>
-            <input
-              id="template-distance-mi"
-              type="number"
-              step="0.1"
-              min={0.1}
-              max={500}
-              value={templateDistanceMi}
-              onChange={(e) => setTemplateDistanceMi(e.target.value)}
-              placeholder={
-                workoutType === "LongRun"
-                  ? "8 (default)"
-                  : workoutType === "Race"
-                    ? "13.1 (default)"
-                    : workoutType === "Tempo"
-                      ? "6 (default)"
-                      : workoutType === "Intervals"
-                        ? "5 (default)"
-                        : "6 (default)"
-              }
-              className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Used when you click <span className="font-medium">Build template from goal / 5K pace</span>.
-              Leave blank for the default distance for this workout type (e.g. Long Run defaults to 8 mi; Race
-              defaults to 13.1 mi). Set to 26.2 for a marathon-distance long run or race template.
-            </p>
-          </div>
-
-          <div className="mb-8 rounded-lg border border-orange-100 bg-orange-50/50 p-4">
-            <h2 className="text-lg font-semibold text-gray-900 mb-1">Or build from your pacing</h2>
+          <div className="mb-8 rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Coach catalogue presets</h2>
             <p className="text-sm text-gray-600 mb-3">
-              Uses your active goal&apos;s finish-time pace first, then your profile 5K pace. Format:{" "}
-              <span className="font-mono text-gray-800">7:30</span> or{" "}
-              <span className="font-mono text-gray-800">7:30/mile</span> (same as the pace calculator).
+              Structured prescriptions (reps and recovery match plan materialization). Zones come from your active
+              goal or profile 5K pace.
             </p>
-            <button
-              type="button"
-              onClick={handleGoFastGenerate}
-              disabled={goFastGenerating}
-              className="px-4 py-2 bg-white border-2 border-orange-300 text-orange-800 rounded-lg font-medium hover:bg-orange-50 disabled:opacity-50"
-            >
-              {goFastGenerating ? "Building…" : "Build template from goal / 5K pace"}
-            </button>
-            {needsPaceHint != null && (
-              <div className="mt-4 rounded-lg border border-orange-200 bg-white p-4 shadow-sm" role="status">
-                <p className="text-sm font-medium text-gray-900 mb-1">We need a pace first</p>
-                <p className="text-sm text-gray-600 mb-4">{needsPaceHint}</p>
-                <div className="flex flex-wrap gap-3">
-                  <Link
-                    href="/goals"
-                    className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 transition-colors"
-                  >
-                    Set goal →
-                  </Link>
-                  <Link
-                    href="/athlete-edit-profile"
-                    className="inline-flex items-center justify-center px-4 py-2 rounded-lg border-2 border-orange-200 text-orange-800 text-sm font-semibold hover:bg-orange-50 transition-colors"
-                  >
-                    Set 5K baseline (profile) →
-                  </Link>
-                </div>
+            {catalogueBrowseError != null && (
+              <p className="text-sm text-amber-800 mb-2">{catalogueBrowseError}</p>
+            )}
+            {catalogueItems.length === 0 && catalogueBrowseError == null ? (
+              <p className="text-sm text-gray-500">Loading presets…</p>
+            ) : (
+              <div className="space-y-6">
+                {catalogueByType.map(([wt, items]) => (
+                  <div key={wt}>
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">{wt}</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {items.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          disabled={catalogueGeneratingId != null}
+                          onClick={() => void handleCataloguePreset(item)}
+                          className={`text-left rounded-lg border px-3 py-2 text-sm max-w-[min(100%,280px)] transition-colors ${
+                            catalogueGeneratingId === item.id
+                              ? "border-orange-400 bg-orange-50"
+                              : "border-gray-200 bg-white hover:border-orange-300 hover:bg-orange-50/40"
+                          } disabled:opacity-50`}
+                        >
+                          <span className="font-semibold text-gray-900 block">{item.name}</span>
+                          <span className="text-xs text-gray-600 block mt-0.5">
+                            {catalogueCardSubtitle(item)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
+            <p className="mt-4 text-xs text-gray-500">
+              Optional: set template distance below before picking a preset if you want to scale warmup/cooldown
+              mileage (long-run / easy templates).
+            </p>
           </div>
+
+          <details className="mb-8 rounded-lg border border-orange-100 bg-orange-50/50 p-4">
+            <summary className="text-lg font-semibold text-gray-900 cursor-pointer">
+              Generic mileage template <span className="text-xs font-normal text-gray-500">(optional)</span>
+            </summary>
+            <div className="mt-4 space-y-4 pt-3 border-t border-orange-100">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Workout type</label>
+                <select
+                  value={workoutType}
+                  onChange={(e) => {
+                    setWorkoutType(e.target.value);
+                    setSelectedCatalogueId(null);
+                  }}
+                  className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white"
+                >
+                  {WORKOUT_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="template-distance-mi">
+                  Template distance (miles)
+                </label>
+                <input
+                  id="template-distance-mi"
+                  type="number"
+                  step="0.1"
+                  min={0.1}
+                  max={500}
+                  value={templateDistanceMi}
+                  onChange={(e) => setTemplateDistanceMi(e.target.value)}
+                  placeholder={
+                    workoutType === "LongRun"
+                      ? "8 (default)"
+                      : workoutType === "Race"
+                        ? "13.1 (default)"
+                        : workoutType === "Tempo"
+                          ? "6 (default)"
+                          : workoutType === "Intervals"
+                            ? "5 (default)"
+                            : "6 (default)"
+                  }
+                  className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Leave blank for defaults (e.g. long run 8 mi, race 13.1 mi). Applies to generic templates and
+                  optional warmup/cooldown scaling on catalogue presets.
+                </p>
+              </div>
+              <p className="text-sm text-gray-600">
+                Uses your active goal&apos;s finish-time pace first, then your profile 5K pace. Format:{" "}
+                <span className="font-mono text-gray-800">7:30</span> or{" "}
+                <span className="font-mono text-gray-800">7:30/mile</span>.
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleGoFastGenerate()}
+                disabled={goFastGenerating}
+                className="px-4 py-2 bg-white border-2 border-orange-300 text-orange-800 rounded-lg font-medium hover:bg-orange-50 disabled:opacity-50"
+              >
+                {goFastGenerating ? "Building…" : "Build template from goal / 5K pace"}
+              </button>
+              {needsPaceHint != null && (
+                <div className="rounded-lg border border-orange-200 bg-white p-4 shadow-sm" role="status">
+                  <p className="text-sm font-medium text-gray-900 mb-1">We need a pace first</p>
+                  <p className="text-sm text-gray-600 mb-4">{needsPaceHint}</p>
+                  <div className="flex flex-wrap gap-3">
+                    <Link
+                      href="/goals"
+                      className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 transition-colors"
+                    >
+                      Set goal →
+                    </Link>
+                    <Link
+                      href="/athlete-edit-profile"
+                      className="inline-flex items-center justify-center px-4 py-2 rounded-lg border-2 border-orange-200 text-orange-800 text-sm font-semibold hover:bg-orange-50 transition-colors"
+                    >
+                      Set 5K baseline (profile) →
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+          </details>
 
           {!hasSlots && (
             <div className="mb-8">
@@ -765,6 +945,16 @@ function CreateWorkoutPageInner() {
                   Optional warmup and cooldown; one or more main segments (intervals, splits, or a single
                   block).
                 </p>
+                {selectedCatalogueId != null && (
+                  <div
+                    className="mb-4 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-900"
+                    role="status"
+                  >
+                    Loaded from catalogue preset
+                    {selectedCatalogueLabel ? `: ${selectedCatalogueLabel}` : ""}. Paces will re-derive from your
+                    latest 5K pace when segments are rebuilt from the prescription.
+                  </div>
+                )}
 
                 {(
                   [
@@ -787,6 +977,7 @@ function CreateWorkoutPageInner() {
                             <button
                               type="button"
                               onClick={() => {
+                                setSelectedCatalogueId(null);
                                 if (kind === "warmup") setWarmup({ miles: 0 });
                                 else setCooldown({ miles: 0 });
                                 setEditingTarget({ kind });
@@ -834,6 +1025,7 @@ function CreateWorkoutPageInner() {
                               value={slot.miles ?? ""}
                               onChange={(e) => {
                                 const miles = parseFloat(e.target.value) || 0;
+                                setSelectedCatalogueId(null);
                                 if (kind === "warmup")
                                   setWarmup({ ...slot, miles });
                                 else setCooldown({ ...slot, miles });
@@ -872,6 +1064,7 @@ function CreateWorkoutPageInner() {
                               value={slot.hrMin ?? ""}
                               onChange={(e) => {
                                 const hrMin = parseInt(e.target.value, 10) || undefined;
+                                setSelectedCatalogueId(null);
                                 if (kind === "warmup") setWarmup({ ...slot, hrMin });
                                 else setCooldown({ ...slot, hrMin });
                               }}
@@ -885,6 +1078,7 @@ function CreateWorkoutPageInner() {
                               value={slot.hrMax ?? ""}
                               onChange={(e) => {
                                 const hrMax = parseInt(e.target.value, 10) || undefined;
+                                setSelectedCatalogueId(null);
                                 if (kind === "warmup") setWarmup({ ...slot, hrMax });
                                 else setCooldown({ ...slot, hrMax });
                               }}
@@ -902,6 +1096,7 @@ function CreateWorkoutPageInner() {
                             <button
                               type="button"
                               onClick={() => {
+                                setSelectedCatalogueId(null);
                                 if (kind === "warmup") setWarmup(null);
                                 else setCooldown(null);
                                 setEditingTarget(null);
@@ -969,6 +1164,7 @@ function CreateWorkoutPageInner() {
                               value={slot.miles ?? ""}
                               onChange={(e) => {
                                 const miles = parseFloat(e.target.value) || 0;
+                                setSelectedCatalogueId(null);
                                 setMainSegments((prev) => {
                                   const copy = [...prev];
                                   copy[index] = { ...copy[index], miles };
@@ -1009,6 +1205,7 @@ function CreateWorkoutPageInner() {
                               value={slot.hrMin ?? ""}
                               onChange={(e) => {
                                 const hrMin = parseInt(e.target.value, 10) || undefined;
+                                setSelectedCatalogueId(null);
                                 setMainSegments((prev) => {
                                   const copy = [...prev];
                                   copy[index] = { ...copy[index], hrMin };
@@ -1025,6 +1222,7 @@ function CreateWorkoutPageInner() {
                               value={slot.hrMax ?? ""}
                               onChange={(e) => {
                                 const hrMax = parseInt(e.target.value, 10) || undefined;
+                                setSelectedCatalogueId(null);
                                 setMainSegments((prev) => {
                                   const copy = [...prev];
                                   copy[index] = { ...copy[index], hrMax };
@@ -1045,6 +1243,7 @@ function CreateWorkoutPageInner() {
                             <button
                               type="button"
                               onClick={() => {
+                                setSelectedCatalogueId(null);
                                 setMainSegments((prev) => prev.filter((_, j) => j !== index));
                                 if (editingTarget?.kind === "main" && editingTarget.index === index) {
                                   setEditingTarget(null);
@@ -1076,6 +1275,7 @@ function CreateWorkoutPageInner() {
                 <button
                   type="button"
                   onClick={() => {
+                    setSelectedCatalogueId(null);
                     const nextIndex = mainSegments.length;
                     setMainSegments((prev) => [...prev, { miles: 0 }]);
                     setEditingTarget({ kind: "main", index: nextIndex });

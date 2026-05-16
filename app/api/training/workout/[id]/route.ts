@@ -20,6 +20,7 @@ import type { Prisma, WorkoutType } from "@prisma/client";
 import { segmentSnapshotDocumentFromApiSegments } from "@/lib/training/workout-segment-snapshot";
 import { isStructuredPlanWeek } from "@/lib/training/plan-schedule-schema";
 import { parseEasyRunConfigJson } from "@/lib/training/easy-run-config";
+import { maybeGeneratePrescriptionNarrative } from "@/lib/training/prescription-narrative-service";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -138,7 +139,12 @@ export async function GET(request: NextRequest, context: Ctx) {
       prisma.workouts.findFirst({
         where: { id, athleteId: auth.athlete.id },
         include: {
-          segments: { orderBy: { stepOrder: "asc" } },
+          segments: {
+            orderBy: { stepOrder: "asc" },
+            include: {
+              segment_laps: { orderBy: { lapIndex: "asc" } },
+            },
+          },
           workout_catalogue: true,
           training_plans: {
             select: {
@@ -323,6 +329,17 @@ export async function GET(request: NextRequest, context: Ctx) {
       } catch (e) {
         console.warn("GET /api/training/workout/[id] lazy segments skipped", e);
       }
+    }
+
+    const shouldEnqueuePrescription =
+      Boolean(workout.catalogueWorkoutId) &&
+      (workout.workoutType !== "Intervals" && workout.workoutType !== "Tempo") &&
+      !(typeof workout.prescriptionNarrative === "string" && workout.prescriptionNarrative.trim());
+    if (shouldEnqueuePrescription) {
+      void maybeGeneratePrescriptionNarrative({
+        workoutId: workout.id,
+        athleteId: auth.athlete.id,
+      }).catch((e) => console.warn("maybeGeneratePrescriptionNarrative:", e));
     }
 
     return NextResponse.json({ workout });

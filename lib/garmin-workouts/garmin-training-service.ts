@@ -22,6 +22,7 @@ import {
   normalizePaceTargetEncodingVersion,
   paceTargetStoredToGarminSecPerKm,
 } from "../workout-generator/pace-calculator";
+import { isPairRecovery } from "@/lib/training/segment-summary";
 
 /** Garmin running SPEED targets: meters per second (approx. 1.2–7.5 m/s). */
 const MIN_RUN_SPEED_MPS = 1.2;
@@ -118,6 +119,8 @@ export interface WorkoutSegment {
   repeatCount?: number;
   notes?: string;
   paceTargetEncodingVersion?: number;
+  recoveryDurationType?: string | null;
+  recoveryDurationValue?: number | null;
 }
 
 export interface Workout {
@@ -141,8 +144,16 @@ export function assembleGarminWorkout(workout: Workout): GarminWorkout {
   // Calculate total distance (for display)
   const totalDistanceMeters = workout.segments.reduce((sum, seg) => {
     if (seg.durationType === "DISTANCE") {
-      const segmentMeters = convertMilesToMeters(seg.durationValue);
-      return sum + segmentMeters * (seg.repeatCount || 1);
+      const reps = seg.repeatCount && seg.repeatCount > 1 ? seg.repeatCount : 1;
+      let segmentMeters = convertMilesToMeters(seg.durationValue) * reps;
+      if (seg.repeatCount && seg.repeatCount > 1 && hasInlineRecovery(seg)) {
+        const rt = seg.recoveryDurationType;
+        const rv = seg.recoveryDurationValue;
+        if (rt === "DISTANCE" && rv != null && Number(rv) > 0) {
+          segmentMeters += convertMilesToMeters(Number(rv)) * reps;
+        }
+      }
+      return sum + segmentMeters;
     }
     return sum;
   }, 0);
@@ -156,6 +167,32 @@ export function assembleGarminWorkout(workout: Workout): GarminWorkout {
   };
 }
 
+function hasInlineRecovery(segment: WorkoutSegment): boolean {
+  const t = segment.recoveryDurationType;
+  if (!t || t === "NONE") return false;
+  const v = segment.recoveryDurationValue;
+  return (
+    (t === "DISTANCE" || t === "TIME") &&
+    v != null &&
+    Number.isFinite(Number(v)) &&
+    Number(v) > 0
+  );
+}
+
+function syntheticRecoverySegment(work: WorkoutSegment): WorkoutSegment {
+  const t = work.recoveryDurationType!;
+  const v = Number(work.recoveryDurationValue);
+  return {
+    id: `${work.id}_recovery`,
+    workoutId: work.workoutId,
+    stepOrder: work.stepOrder,
+    title: "Recovery",
+    durationType: t === "TIME" ? "TIME" : "DISTANCE",
+    durationValue: v,
+    paceTargetEncodingVersion: work.paceTargetEncodingVersion,
+  };
+}
+
 /**
  * Build Garmin steps from our segments
  * Uses segment.stepOrder to match Garmin's stepOrder field
@@ -163,31 +200,49 @@ export function assembleGarminWorkout(workout: Workout): GarminWorkout {
 function buildStepsFromSegments(segments: WorkoutSegment[]): GarminWorkoutStep[] {
   const steps: GarminWorkoutStep[] = [];
   let garminStepOrder = 1;
-  
-  // Sort segments by stepOrder (from our schema)
+
   const sortedSegments = [...segments].sort((a, b) => a.stepOrder - b.stepOrder);
-  
-  for (const segment of sortedSegments) {
-    // If this segment repeats, create a repeat block
-    if (segment.repeatCount && segment.repeatCount > 1) {
-      // Add repeat step
+
+  for (let i = 0; i < sortedSegments.length; i++) {
+    const segment = sortedSegments[i]!;
+    const next = sortedSegments[i + 1];
+
+    const inlineRec = hasInlineRecovery(segment);
+    const mergedRowRec =
+      Boolean(segment.repeatCount && segment.repeatCount > 1) &&
+      Boolean(next && isPairRecovery(segment, next));
+
+    if (segment.repeatCount && segment.repeatCount > 1 && (inlineRec || mergedRowRec)) {
+      const recoverySeg = inlineRec ? syntheticRecoverySegment(segment) : next!;
+      if (!inlineRec) i++;
+
       steps.push({
         stepOrder: garminStepOrder++,
         type: "WorkoutRepeatStep",
-        repeatType: segment.durationType === "DISTANCE" 
-          ? GarminRepeatType.DISTANCE 
-          : GarminRepeatType.TIME,
+        repeatType: GarminRepeatType.REPEAT_UNTIL_STEPS_CMPLT,
+        repeatValue: segment.repeatCount,
+        steps: [buildSegmentStep(1, segment), buildSegmentStep(2, recoverySeg)],
+      });
+      continue;
+    }
+
+    if (segment.repeatCount && segment.repeatCount > 1) {
+      steps.push({
+        stepOrder: garminStepOrder++,
+        type: "WorkoutRepeatStep",
+        repeatType:
+          segment.durationType === "DISTANCE"
+            ? GarminRepeatType.DISTANCE
+            : GarminRepeatType.TIME,
         repeatValue: segment.repeatCount,
       });
-      
-      // Add the segment step (will be repeated) - use segment's stepOrder for reference
+
       steps.push(buildSegmentStep(garminStepOrder++, segment));
     } else {
-      // Regular step (no repeat) - use segment's stepOrder for reference
       steps.push(buildSegmentStep(garminStepOrder++, segment));
     }
   }
-  
+
   return steps;
 }
 

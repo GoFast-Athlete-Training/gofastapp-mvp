@@ -23,6 +23,7 @@ import {
   type PlanDayCard,
 } from "@/lib/training/fetch-plan-week-client";
 import { stashWorkoutDayNav } from "@/lib/training/workout-day-nav";
+import { formatSegmentDuration } from "@/lib/training/segment-summary";
 import {
   metersToMiDisplay,
   pickWorkoutPayload,
@@ -582,9 +583,13 @@ function WorkoutPreviewPanel({
                   {segment.repeatCount != null && segment.repeatCount > 1 ? (
                     <span>Repeat {segment.repeatCount}× · </span>
                   ) : null}
-                  {segment.durationType === "DISTANCE"
-                    ? `${segment.durationValue} miles`
-                    : `${segment.durationValue} minutes`}
+                  {formatSegmentDuration({
+                    stepOrder: segment.stepOrder,
+                    durationType: segment.durationType === "TIME" ? "TIME" : "DISTANCE",
+                    durationValue: segment.durationValue,
+                    repeatCount: segment.repeatCount ?? null,
+                    title: segment.title,
+                  })}
                 </div>
               </li>
             ))}

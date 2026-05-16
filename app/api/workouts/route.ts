@@ -186,7 +186,13 @@ export async function POST(request: NextRequest) {
       workoutType = "Easy",
       segments, // Array of segment objects
       date: dateRaw,
+      catalogueWorkoutId: rawCatalogueId,
     } = body;
+
+    const catalogueWorkoutId =
+      typeof rawCatalogueId === "string" && rawCatalogueId.trim()
+        ? rawCatalogueId.trim()
+        : null;
 
     // Same calendar convention as plan workouts + Garmin push: YYYY-MM-DD → UTC noon via parseOptionalWorkoutDate.
     // If standalone builder omits date, default to UTC “today” so schedule + Connect stay aligned.
@@ -214,6 +220,7 @@ export async function POST(request: NextRequest) {
         workoutType: workoutType as any,
         athleteId: athlete.id,
         date: scheduleDate,
+        catalogueWorkoutId,
         segments: {
           create: segments.map((seg: any, index: number) => ({
             id: `segment_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`,
@@ -225,6 +232,15 @@ export async function POST(request: NextRequest) {
             repeatCount: seg.repeatCount || null,
             notes: seg.notes || null,
             paceTargetEncodingVersion: 2,
+            recoveryDurationType:
+              typeof seg.recoveryDurationType === "string" && seg.recoveryDurationType.trim()
+                ? seg.recoveryDurationType.trim()
+                : null,
+            recoveryDurationValue:
+              seg.recoveryDurationValue != null &&
+              Number.isFinite(Number(seg.recoveryDurationValue))
+                ? Number(seg.recoveryDurationValue)
+                : null,
           })),
         },
       },
@@ -248,6 +264,8 @@ export async function POST(request: NextRequest) {
               repeatCount: r.repeatCount,
               notes: r.notes,
               paceTargetEncodingVersion: r.paceTargetEncodingVersion,
+              recoveryDurationType: r.recoveryDurationType ?? null,
+              recoveryDurationValue: r.recoveryDurationValue ?? null,
             })),
             "standalone_workout_post"
           ),

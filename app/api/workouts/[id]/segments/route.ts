@@ -17,7 +17,37 @@ type SegmentInput = {
   targets: Prisma.InputJsonValue | null;
   repeatCount: number | null;
   notes: string | null;
+  recoveryDurationType: string | null;
+  recoveryDurationValue: number | null;
 };
+
+function normalizeRecoveryFields(o: Record<string, unknown>): {
+  recoveryDurationType: string | null;
+  recoveryDurationValue: number | null;
+} {
+  const raw = o.recoveryDurationType;
+  if (raw === undefined || raw === null || raw === "") {
+    return { recoveryDurationType: null, recoveryDurationValue: null };
+  }
+  const t = typeof raw === "string" ? raw.trim().toUpperCase() : "";
+  if (t === "NONE") {
+    return { recoveryDurationType: "NONE", recoveryDurationValue: null };
+  }
+  if (t !== "DISTANCE" && t !== "TIME") {
+    return { recoveryDurationType: null, recoveryDurationValue: null };
+  }
+  const vRaw = o.recoveryDurationValue;
+  const v =
+    typeof vRaw === "number" && Number.isFinite(vRaw)
+      ? vRaw
+      : vRaw != null && vRaw !== ""
+        ? Number(vRaw)
+        : NaN;
+  if (!Number.isFinite(v) || v <= 0) {
+    return { recoveryDurationType: null, recoveryDurationValue: null };
+  }
+  return { recoveryDurationType: t, recoveryDurationValue: v };
+}
 
 function normalizeSegments(raw: unknown): SegmentInput[] | null {
   if (!Array.isArray(raw) || raw.length === 0) return null;
@@ -53,6 +83,7 @@ function normalizeSegments(raw: unknown): SegmentInput[] | null {
       o.targets === undefined || o.targets === null
         ? null
         : (o.targets as Prisma.InputJsonValue);
+    const { recoveryDurationType, recoveryDurationValue } = normalizeRecoveryFields(o);
     out.push({
       stepOrder,
       title,
@@ -61,6 +92,8 @@ function normalizeSegments(raw: unknown): SegmentInput[] | null {
       targets,
       repeatCount,
       notes,
+      recoveryDurationType,
+      recoveryDurationValue,
     });
   }
   return out;
@@ -128,6 +161,8 @@ export async function PUT(request: NextRequest, ctx: Ctx) {
           repeatCount: seg.repeatCount,
           notes: seg.notes,
           paceTargetEncodingVersion: 2,
+          recoveryDurationType: seg.recoveryDurationType,
+          recoveryDurationValue: seg.recoveryDurationValue,
         })),
       });
       await tx.workouts.update({
@@ -143,6 +178,8 @@ export async function PUT(request: NextRequest, ctx: Ctx) {
               repeatCount: seg.repeatCount,
               notes: seg.notes,
               paceTargetEncodingVersion: 2,
+              recoveryDurationType: seg.recoveryDurationType,
+              recoveryDurationValue: seg.recoveryDurationValue,
             })),
             "segments_put"
           ),

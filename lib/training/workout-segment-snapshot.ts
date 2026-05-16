@@ -11,6 +11,8 @@ export type SegmentSnapshotStep = {
   repeatCount?: number | null;
   notes?: string | null;
   paceTargetEncodingVersion: number;
+  recoveryDurationType?: string | null;
+  recoveryDurationValue?: number | null;
 };
 
 export type SegmentSnapshotDocument = {
@@ -62,6 +64,8 @@ export function segmentSnapshotDocumentFromDbRows(
     repeatCount: number | null;
     notes: string | null;
     paceTargetEncodingVersion: number;
+    recoveryDurationType?: string | null;
+    recoveryDurationValue?: number | null;
   }>,
   source: SegmentSnapshotSource
 ): Prisma.InputJsonValue {
@@ -74,6 +78,8 @@ export function segmentSnapshotDocumentFromDbRows(
     repeatCount: r.repeatCount ?? null,
     notes: r.notes ?? null,
     paceTargetEncodingVersion: r.paceTargetEncodingVersion,
+    recoveryDurationType: r.recoveryDurationType ?? null,
+    recoveryDurationValue: r.recoveryDurationValue ?? null,
   }));
   const doc: SegmentSnapshotDocument = {
     v: 1,
