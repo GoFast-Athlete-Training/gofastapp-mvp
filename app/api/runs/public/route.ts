@@ -11,6 +11,7 @@ import { getRuns } from '@/lib/domain-runs';
  * Query params:
  * - gofastCity (optional) - Filter by city slug
  * - day (optional) - Filter by day of week ("Monday", "Tuesday", etc.)
+ * - runClubSlug (optional) - Filter by RunClub slug
  * 
  * Returns:
  * {
@@ -24,9 +25,10 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const gofastCity = searchParams.get('gofastCity') || undefined;
     const day = searchParams.get('day') || undefined;
+    const runClubSlug = searchParams.get('runClubSlug') || undefined;
 
     // Get runs with filters (public-safe data only)
-    const runs = await getRuns({ gofastCity, day });
+    const runs = await getRuns({ gofastCity, day, runClubSlug });
 
     return NextResponse.json({
       success: true,
