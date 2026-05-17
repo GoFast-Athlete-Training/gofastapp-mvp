@@ -2331,8 +2331,8 @@ export default function WorkoutDetailPage() {
           </div>
           {isEditing && (
             <p className="text-sm text-gray-600 mb-3">
-              Add blocks, set repeat counts (e.g. 4×800 → 5×800), and reorder—then save. Recovery
-              between reps: add a separate segment (distance or time), for example an easy jog.
+              Add segments, change repeats, reorder, save. Recovery between reps: its own segment
+              (distance or time).
             </p>
           )}
           {editError && (
@@ -2345,10 +2345,9 @@ export default function WorkoutDetailPage() {
             workout.workoutType !== "Intervals" &&
             workout.workoutType !== "Tempo" && (
               <p className="text-sm text-gray-500 mb-4">
-                Step-by-step structure for your watch and Garmin—use{" "}
-                <span className="font-medium text-gray-700">Segment sequencer</span> below to add
-                steps or change repeats. A fuller coach prescription may appear further down the
-                page.
+                Below is what syncs to your watch. Use{" "}
+                <span className="font-medium text-gray-700">Segment sequencer</span> to edit steps or
+                repeats.
               </p>
             )}
 
@@ -2356,7 +2355,7 @@ export default function WorkoutDetailPage() {
             <div className="space-y-4">
               <label className="block max-w-xs">
                 <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Day total (planned miles, optional)
+                  Planned distance (mi)
                 </span>
                 <input
                   type="text"
