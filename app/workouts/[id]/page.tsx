@@ -219,14 +219,6 @@ function dayRelativeToToday(workoutDate: string | null | undefined): "today" | "
   return "future";
 }
 
-function estimatedMiDisplay(meters: number | null | undefined): string | null {
-  if (meters == null || !Number.isFinite(meters) || meters <= 0) return null;
-  const mi = meters / 1609.34;
-  if (mi >= 10) return `${Math.round(mi)} mi`;
-  if (mi >= 1) return `${mi.toFixed(1)} mi`;
-  return `${Math.round(mi * 5280)} ft`;
-}
-
 /** Left accent for segment cards (readability, not step numbers). */
 function segmentAccentBorderClass(title: string): string {
   const t = title.toLowerCase();
@@ -1080,6 +1072,14 @@ export default function WorkoutDetailPage() {
 
       setIsEditing(false);
       await fetchWorkout();
+      if (typeof window !== "undefined") {
+        requestAnimationFrame(() => {
+          document.getElementById("workout-garmin")?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        });
+      }
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } };
       setEditError(ax.response?.data?.error || "Failed to save changes");
@@ -1280,6 +1280,14 @@ export default function WorkoutDetailPage() {
       const w = response.data?.workout;
       if (w) setWorkout(w);
       setGarminToast("Workout steps saved.");
+      if (typeof window !== "undefined") {
+        requestAnimationFrame(() => {
+          document.getElementById("workout-garmin")?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        });
+      }
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } };
       setQuickEditError(ax.response?.data?.error || "Could not save segments");
@@ -1643,7 +1651,6 @@ export default function WorkoutDetailPage() {
   const showGarminHeaderCard =
     !isLogged || (isLogged && alreadyOnGarmin);
   const dayRel = dayRelativeToToday(workout.date);
-  const estMi = estimatedMiDisplay(workout.estimatedDistanceInMeters);
   const planName = workout.training_plans?.name?.trim();
   const weekOnPlan =
     workout.weekNumber != null &&
@@ -1787,7 +1794,7 @@ export default function WorkoutDetailPage() {
           <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm sm:text-base font-medium">
               <CheckCircle2 className="w-5 h-5 shrink-0" />
-              Workout saved. Connect Garmin below, then use Send to your watch.
+              Workout saved. Use Garmin above or below the segment editor to connect and send.
             </div>
             <button
               type="button"
@@ -2108,9 +2115,6 @@ export default function WorkoutDetailPage() {
                     Past session
                   </span>
                 ) : null}
-                <span className="inline-block px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
-                  {workout.workoutType}
-                </span>
               </div>
               <div className="flex flex-wrap items-center gap-2 mb-3">
                 <button
@@ -2136,9 +2140,6 @@ export default function WorkoutDetailPage() {
               {weekAndDateLine ? (
                 <p className="text-base text-gray-800 font-medium mb-2">{weekAndDateLine}</p>
               ) : null}
-              {estMi && !executionFraming ? (
-                <p className="text-sm text-gray-600 mb-2">About {estMi} total (planned)</p>
-              ) : null}
               <p className="text-sm text-gray-600 mb-3">
                 {planName ? planName : "Standalone run"}
               </p>
@@ -2147,159 +2148,35 @@ export default function WorkoutDetailPage() {
                   {workout.description}
                 </p>
               )}
-
-              {showGarminHeaderCard ? (
-                <div
-                  id="workout-garmin"
-                  className="mt-5 rounded-xl border-2 border-orange-200 bg-gradient-to-br from-orange-50 via-white to-amber-50/40 p-4 sm:p-5 shadow-sm scroll-mt-24 ring-1 ring-orange-100/80"
-                >
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex gap-3 min-w-0">
-                      <div
-                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-orange-600 text-white shadow-md"
-                        aria-hidden
-                      >
-                        <Watch className="w-6 h-6" strokeWidth={2} />
-                      </div>
-                      <div className="min-w-0 pt-0.5">
-                        <p className="text-xs font-bold uppercase tracking-wide text-orange-900">
-                          Garmin
-                        </p>
-                        <p className="text-base font-semibold text-gray-900">
-                          {alreadyOnGarmin ? "On your watch calendar" : "Send to your watch"}
-                        </p>
-                        <div className="mt-1.5 text-sm text-gray-700">
-                          {garminConnected === null ? (
-                            <span className="text-gray-600">Checking connection…</span>
-                          ) : !garminConnected ? (
-                            <span>
-                              <span className="font-medium text-gray-900">Not connected.</span>{" "}
-                              Link Garmin to send this workout to Garmin Connect and your device.
-                            </span>
-                          ) : alreadyOnGarmin ? (
-                            <span className="inline-flex flex-wrap items-center gap-2">
-                              <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
-                              <span>
-                                Synced
-                                {workout.garminWorkoutId != null
-                                  ? ` (workout #${workout.garminWorkoutId})`
-                                  : ""}
-                                {isLogged
-                                  ? " — tap Update if you changed the plan or it's missing on your watch."
-                                  : " — use Update if you edited the workout or need a fresh sync."}
-                              </span>
-                            </span>
-                          ) : (
-                            <span>
-                              Ready to send — appears on Garmin Connect and your watch calendar for{" "}
-                              {scheduleLabel || "this day"}.
-                            </span>
-                          )}
-                        </div>
-                        {garminConnected ? (
-                          <div className="mt-2">
-                            <Link
-                              href="/settings/garmin"
-                              className="text-sm font-medium text-orange-800 hover:text-orange-950 underline-offset-2 hover:underline"
-                            >
-                              Garmin settings
-                            </Link>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2 sm:justify-end sm:pt-1 shrink-0">
-                      {garminConnected === true && !alreadyOnGarmin && !isLogged && (
-                        <button
-                          type="button"
-                          onClick={handlePushToGarmin}
-                          disabled={pushing || copyRepushing || duplicatingWorkout}
-                          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 disabled:opacity-50 shadow-md"
-                        >
-                          {pushing ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                              Sending…
-                            </>
-                          ) : (
-                            <>
-                              <Send className="w-4 h-4" />
-                              Send to your watch
-                            </>
-                          )}
-                        </button>
-                      )}
-                      {garminConnected === true && alreadyOnGarmin && (
-                        <button
-                          type="button"
-                          onClick={handleCopyAndPushToGarmin}
-                          disabled={copyRepushing || pushing || duplicatingWorkout}
-                          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border-2 border-orange-400 bg-white text-orange-900 text-sm font-semibold hover:bg-orange-50 disabled:opacity-50 shadow-sm"
-                          title="Creates a new copy of this workout and sends it to Garmin. Use if you removed it from Garmin Connect, edited segments, or the watch didn't pick it up."
-                        >
-                          {copyRepushing ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600" />
-                              Updating…
-                            </>
-                          ) : (
-                            <>
-                              <RefreshCw className="w-4 h-4" />
-                              Update on Garmin
-                            </>
-                          )}
-                        </button>
-                      )}
-                      {!garminConnected && garminConnected !== null && !isLogged && (
-                        <button
-                          type="button"
-                          onClick={handleConnectGarmin}
-                          disabled={connectingGarmin || duplicatingWorkout}
-                          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 disabled:opacity-50 shadow-md"
-                        >
-                          {connectingGarmin ? "Connecting…" : "Connect Garmin"}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
           </div>
         </div>
 
-          {pushStatus && (
-            <div
-              className={`mt-4 p-4 rounded-lg flex items-start gap-3 ${
-                pushStatus.success
-                  ? "bg-green-50 border border-green-200"
-                  : "bg-red-50 border border-red-200"
-              }`}
-              role={pushStatus.success ? "status" : "alert"}
-            >
-              {pushStatus.success ? (
-                <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
-              ) : (
-                <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
-              )}
-              <div className="flex-1 min-w-0">
-                <p
-                  className={`font-medium ${
-                    pushStatus.success ? "text-green-800" : "text-red-800"
-                  }`}
-                >
-                  {pushStatus.message}
-                </p>
-                {pushStatus.garminWorkoutId != null && pushStatus.success && (
-                  <p className="text-sm text-green-700 mt-1">
-                    Garmin workout id: {pushStatus.garminWorkoutId}
-                    {pushStatus.garminScheduleId != null
-                      ? ` · schedule id: ${pushStatus.garminScheduleId}`
-                      : ""}
-                  </p>
-                )}
-              </div>
+        {showGarminHeaderCard ? (
+          <div className="mb-3 rounded-lg border border-orange-200/70 bg-orange-50/40 px-3 py-2.5 text-sm text-gray-800">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="min-w-0">
+                <span className="font-semibold text-orange-900">Garmin</span>
+                <span className="text-gray-600">
+                  {" "}
+                  ·{" "}
+                  {garminConnected === null
+                    ? "Checking connection…"
+                    : !garminConnected
+                      ? "Connect to send workouts to your watch."
+                      : alreadyOnGarmin
+                        ? "On your calendar — scroll down to update if you edited this workout."
+                        : `Ready for ${scheduleLabel || "this day"} — send below after you finish edits.`}
+                </span>
+              </p>
+              <a
+                href="#workout-garmin"
+                className="shrink-0 text-sm font-medium text-orange-800 hover:text-orange-950 underline-offset-2 hover:underline"
+              >
+                Jump to send ↓
+              </a>
             </div>
-          )}
+          </div>
+        ) : null}
 
         <div
           id="segment-sequencer"
@@ -3144,6 +3021,146 @@ export default function WorkoutDetailPage() {
             </div>
           )}
         </div>
+
+        {pushStatus && (
+          <div
+            className={`mb-4 p-4 rounded-lg flex items-start gap-3 ${
+              pushStatus.success
+                ? "bg-green-50 border border-green-200"
+                : "bg-red-50 border border-red-200"
+            }`}
+            role={pushStatus.success ? "status" : "alert"}
+          >
+            {pushStatus.success ? (
+              <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+            )}
+            <div className="flex-1 min-w-0">
+              <p
+                className={`font-medium ${
+                  pushStatus.success ? "text-green-800" : "text-red-800"
+                }`}
+              >
+                {pushStatus.message}
+              </p>
+              {pushStatus.garminWorkoutId != null && pushStatus.success && (
+                <p className="text-sm text-green-700 mt-1">
+                  Garmin workout id: {pushStatus.garminWorkoutId}
+                  {pushStatus.garminScheduleId != null
+                    ? ` · schedule id: ${pushStatus.garminScheduleId}`
+                    : ""}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {showGarminHeaderCard ? (
+          <div
+            id="workout-garmin"
+            className="mb-6 rounded-lg border border-gray-200 bg-white p-4 sm:p-5 scroll-mt-24 border-l-4 border-l-orange-500 shadow-sm"
+          >
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 space-y-1.5">
+                <p className="text-sm font-semibold text-gray-900 inline-flex items-center gap-2">
+                  <Watch className="w-4 h-4 text-orange-600 shrink-0" strokeWidth={2} aria-hidden />
+                  {alreadyOnGarmin ? "On your watch calendar" : "Send to your watch"}
+                </p>
+                <div className="text-sm text-gray-700">
+                  {garminConnected === null ? (
+                    <span className="text-gray-600">Checking connection…</span>
+                  ) : !garminConnected ? (
+                    <span>
+                      <span className="font-medium text-gray-900">Not connected.</span> Link Garmin
+                      to send this workout to Garmin Connect and your device.
+                    </span>
+                  ) : alreadyOnGarmin ? (
+                    <span className="inline-flex flex-wrap items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                      <span>
+                        Synced
+                        {workout.garminWorkoutId != null
+                          ? ` (workout #${workout.garminWorkoutId})`
+                          : ""}
+                        {isLogged
+                          ? " — tap Update if you changed the plan or it&apos;s missing on your watch."
+                          : " — use Update if you edited the workout or need a fresh sync."}
+                      </span>
+                    </span>
+                  ) : (
+                    <span>
+                      Appears on Garmin Connect and your watch calendar for{" "}
+                      {scheduleLabel || "this day"}.
+                    </span>
+                  )}
+                </div>
+                {garminConnected ? (
+                  <Link
+                    href="/settings/garmin"
+                    className="inline-block text-sm font-medium text-orange-800 hover:text-orange-950 underline-offset-2 hover:underline"
+                  >
+                    Garmin settings
+                  </Link>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap gap-2 sm:justify-end sm:pt-0.5 shrink-0">
+                {garminConnected === true && !alreadyOnGarmin && !isLogged && (
+                  <button
+                    type="button"
+                    onClick={handlePushToGarmin}
+                    disabled={pushing || copyRepushing || duplicatingWorkout}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 disabled:opacity-50"
+                  >
+                    {pushing ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                        Sending…
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        Send to your watch
+                      </>
+                    )}
+                  </button>
+                )}
+                {garminConnected === true && alreadyOnGarmin && (
+                  <button
+                    type="button"
+                    onClick={handleCopyAndPushToGarmin}
+                    disabled={copyRepushing || pushing || duplicatingWorkout}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-orange-300 bg-orange-50 text-orange-950 text-sm font-semibold hover:bg-orange-100 disabled:opacity-50"
+                    title="Creates a new copy of this workout and sends it to Garmin. Use if you removed it from Garmin Connect, edited segments, or the watch didn't pick it up."
+                  >
+                    {copyRepushing ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600" />
+                        Updating…
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-4 h-4" />
+                        Update on Garmin
+                      </>
+                    )}
+                  </button>
+                )}
+                {!garminConnected && garminConnected !== null && !isLogged && (
+                  <button
+                    type="button"
+                    onClick={handleConnectGarmin}
+                    disabled={connectingGarmin || duplicatingWorkout}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 disabled:opacity-50"
+                  >
+                    {connectingGarmin ? "Connecting…" : "Connect Garmin"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {workout.workout_catalogue &&
           workout.workoutType !== "Intervals" &&
           workout.workoutType !== "Tempo" && (
