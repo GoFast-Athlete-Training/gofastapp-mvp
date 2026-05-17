@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
-  Users,
   Save,
   Plus,
   Trash2,
@@ -226,6 +225,26 @@ function estimatedMiDisplay(meters: number | null | undefined): string | null {
   if (mi >= 10) return `${Math.round(mi)} mi`;
   if (mi >= 1) return `${mi.toFixed(1)} mi`;
   return `${Math.round(mi * 5280)} ft`;
+}
+
+/** Left accent for segment cards (readability, not step numbers). */
+function segmentAccentBorderClass(title: string): string {
+  const t = title.toLowerCase();
+  if (t.includes("warm")) return "border-l-gray-400";
+  if (t.includes("cool")) return "border-l-gray-400";
+  if (t.includes("recovery")) return "border-l-teal-500";
+  if (t.includes("interval") || t.includes("tempo")) return "border-l-orange-500";
+  if (
+    t.includes("race") ||
+    t.includes("marathon pace") ||
+    t.includes("goal marathon")
+  ) {
+    return "border-l-orange-600";
+  }
+  if (t.includes("long run") || t.includes("easy run") || t === "easy" || t.includes(" easy")) {
+    return "border-l-sky-500";
+  }
+  return "border-l-slate-400";
 }
 
 /** Stored inline recovery fields between repeats (when no separate recovery segment row). */
@@ -1667,6 +1686,11 @@ export default function WorkoutDetailPage() {
     structuredTotals.miles > 0 &&
     planDayMi - structuredTotals.miles >= 0.35;
 
+  const planDayMilesUseApproxTilde =
+    planDayMi != null &&
+    (structuredTotals.miles <= 0 ||
+      Math.abs(planDayMi - structuredTotals.miles) >= 0.15);
+
   const planDateKeyFromNav =
     goTrainCtx?.dateKey ??
     (simpleBackHref ? parseDateKeyFromTrainingDayPreviewPath(simpleBackHref) : null) ??
@@ -2806,7 +2830,7 @@ export default function WorkoutDetailPage() {
                 return (
                   <div
                     key={`${segment.id}:${recoverySeg?.id ?? ""}`}
-                    className="border border-gray-200 rounded-lg p-4 sm:p-5 bg-gray-50"
+                    className={`border border-gray-200 border-l-4 ${segmentAccentBorderClass(segment.title)} rounded-lg p-4 sm:p-5 bg-gray-50`}
                   >
                     <div className="mb-4">
                       <div className="flex flex-wrap items-start gap-2">
@@ -2833,9 +2857,7 @@ export default function WorkoutDetailPage() {
                           </div>
                         )}
                         <h3 className="font-semibold text-gray-900 text-lg flex flex-wrap items-center gap-2 min-w-0">
-                          <span>
-                            {pairIdx + 1}. {segment.title}
-                          </span>
+                          <span>{segment.title}</span>
                           {structBadge ? (
                             <span className="inline-flex items-center rounded-full bg-white border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-700">
                               {structBadge}
@@ -3142,7 +3164,8 @@ export default function WorkoutDetailPage() {
             <ul className="text-sm text-gray-800 space-y-1.5 list-none p-0 m-0">
               {planDayMi != null && (
                 <li>
-                  <span className="font-medium text-gray-900">Day total (plan): </span>~
+                  <span className="font-medium text-gray-900">Day total (plan): </span>
+                  {planDayMilesUseApproxTilde ? "~" : ""}
                   {planDayMi.toFixed(1)} mi
                 </li>
               )}
@@ -3161,48 +3184,6 @@ export default function WorkoutDetailPage() {
             )}
           </div>
         )}
-
-        <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50/90 px-4 py-4 mb-10">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-            Run with others
-          </p>
-          <p className="text-sm text-gray-600 mb-3">
-            Host a meetup so people can RSVP and see this session—not part of your main workout steps
-            above.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
-            {workout.city_runs && workout.city_runs.length > 0 ? (
-              <Link
-                href={`/gorun/${workout.city_runs[0].id}`}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors"
-              >
-                <Users className="w-4 h-4" />
-                Manage meetup
-              </Link>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => router.push(`/workouts/${workout.id}/let-others-join`)}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50"
-            >
-              <Users className="w-4 h-4" />
-              {workout.city_runs && workout.city_runs.length > 0
-                ? "Add another meetup"
-                : "Invite others to this workout"}
-            </button>
-          </div>
-          {workout.slug ? (
-            <p className="mt-3 text-xs text-gray-600">
-              Share:{" "}
-              <Link
-                href={`/mytrainingruns/${workout.slug}`}
-                className="text-sky-700 font-medium underline"
-              >
-                /mytrainingruns/{workout.slug}
-              </Link>
-            </p>
-          ) : null}
-        </div>
 
       </div>
         </main>

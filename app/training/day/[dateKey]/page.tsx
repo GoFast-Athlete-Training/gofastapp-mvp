@@ -506,7 +506,7 @@ export default function TrainingPlanDayPreviewPage() {
                 disabled={openingWorkout || !canOpenWorkout || workoutLoading || !!workoutError}
                 className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
               >
-                {isToday ? "Let's go — open workout" : "Do this workout"}
+                See details
               </button>
               <Link
                 href={hubBackHref}
