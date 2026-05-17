@@ -22,7 +22,11 @@ import {
 } from "@/lib/training/fetch-plan-week-client";
 import { formatSegmentDuration } from "@/lib/training/segment-summary";
 import {
-  metersToMiDisplay,
+  formatPaceTargetRangeForDisplay,
+  formatPaceTargetSingleForDisplay,
+  workoutTargetTypeLabel,
+} from "@/lib/workout-generator/pace-calculator";
+import {
   pickWorkoutPayload,
   type PreviewWorkout,
 } from "@/lib/training/workout-preview-payload";
@@ -71,6 +75,47 @@ function shiftDateKey(dateKey: string, deltaDays: number): string | null {
   } catch {
     return null;
   }
+}
+
+function formatPreviewWorkoutTypeLabel(workoutType: string, isRace: boolean): string {
+  if (isRace) return "Race";
+  const map: Record<string, string> = {
+    Easy: "Easy run",
+    LongRun: "Long run",
+    Intervals: "Intervals",
+    Tempo: "Tempo",
+    Race: "Race",
+    SpeedDuration: "Speed",
+  };
+  if (map[workoutType]) return map[workoutType]!;
+  return workoutType.replace(/([A-Z])/g, " $1").trim() || workoutType;
+}
+
+function previewSegmentTargetSummary(
+  segment: PreviewWorkout["segments"][number]
+): string | null {
+  const targets = segment.targets;
+  if (!targets?.length) return null;
+  const parts: string[] = [];
+  for (const t of targets) {
+    const type = (t.type || "").toUpperCase();
+    if (type === "PACE") {
+      if (t.valueLow != null && t.valueHigh != null) {
+        parts.push(formatPaceTargetRangeForDisplay(t.valueLow, t.valueHigh));
+      } else if (typeof t.value === "number" && Number.isFinite(t.value)) {
+        parts.push(formatPaceTargetSingleForDisplay(t.value));
+      }
+    } else if (
+      (type === "HEART_RATE" || type === "HEARTRATE") &&
+      t.valueLow != null &&
+      t.valueHigh != null
+    ) {
+      parts.push(
+        `${workoutTargetTypeLabel(t.type)} ${t.valueLow}–${t.valueHigh} bpm`
+      );
+    }
+  }
+  return parts.length ? parts.join(" · ") : null;
 }
 
 export default function TrainingPlanDayPreviewPage() {
@@ -237,8 +282,10 @@ export default function TrainingPlanDayPreviewPage() {
 
   const isRaceDay = workout?.workoutType === "Race";
   const title = workout?.title?.trim() || "Workout";
-  const typeLabel = isRaceDay ? "Race" : workout?.workoutType || "";
-  const scheduleMi = metersToMiDisplay(workout?.estimatedDistanceInMeters);
+  const typeDisplay = formatPreviewWorkoutTypeLabel(
+    workout?.workoutType ?? "",
+    isRaceDay
+  );
   const plannedDateLabel = dateKey
     ? formatPlanDateDisplay(dateKey, {
         weekday: "long",
@@ -276,18 +323,12 @@ export default function TrainingPlanDayPreviewPage() {
       const wid =
         workoutId ?? (await resolveWorkoutForPlanDay(planDetail.id, dateKey, token));
       stashWorkoutDayNav(wid, { source: "plan-preview", backPath: previewBackPath });
-      router.push(`/workouts/${wid}`);
+      router.push(`/workouts/${wid}?edit=1`);
     } catch (e) {
       setOpenWorkoutError(e instanceof Error ? e.message : "Could not open workout");
     } finally {
       setOpeningWorkout(false);
     }
-  }
-
-  const customizeHref = workoutId != null ? `/workouts/${workoutId}?edit=1` : null;
-
-  function stashPreviewNavForWorkout(wid: string) {
-    stashWorkoutDayNav(wid, { source: "plan-preview", backPath: previewBackPath });
   }
 
   return (
@@ -320,9 +361,9 @@ export default function TrainingPlanDayPreviewPage() {
         {dateKey && !loading && !error && planDetail && (
           <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
             <div className="border-b border-gray-100 px-5 py-4">
-              {isToday ? (
+              {isToday               ? (
                 <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">
-                  Here&apos;s your work for today
+                  {"Here's your work for today"}
                 </p>
               ) : (
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -341,10 +382,9 @@ export default function TrainingPlanDayPreviewPage() {
               <p className="mt-1 text-sm text-gray-600">
                 Week {weekNumberDisplay} of {planDetail.totalWeeks} · {plannedDateLabel}
               </p>
-              <p className="mt-0.5 text-xs text-gray-500">
-                {typeLabel}
-                {scheduleMi ? ` · ~${scheduleMi} planned` : null}
-              </p>
+              {workout && typeDisplay ? (
+                <p className="mt-0.5 text-xs text-gray-500">{typeDisplay}</p>
+              ) : null}
               {workout?.description?.trim() ? (
                 <p className="mt-2 text-sm text-gray-600 leading-relaxed">{workout.description}</p>
               ) : null}
@@ -377,33 +417,42 @@ export default function TrainingPlanDayPreviewPage() {
               )}
               {!workoutLoading && workout && workout.segments.length > 0 && (
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500 mb-2">
-                    Structure
-                  </p>
-                  <ol className="space-y-2">
-                    {workout.segments.map((segment) => (
-                      <li
-                        key={segment.id}
-                        className="rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-2 text-sm"
-                      >
-                        <div className="font-medium text-gray-900">
-                          {segment.stepOrder}. {segment.title}
-                        </div>
-                        <div className="mt-0.5 text-xs text-gray-600">
-                          {segment.repeatCount != null && segment.repeatCount > 1 ? (
-                            <span>Repeat {segment.repeatCount}× · </span>
+                  {workout.segments.length > 1 ? (
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500 mb-2">
+                      {"Today's plan"}
+                    </p>
+                  ) : null}
+                  <ul className="space-y-2 list-none pl-0 m-0">
+                    {workout.segments.map((segment) => {
+                      const paceLine = previewSegmentTargetSummary(segment);
+                      return (
+                        <li
+                          key={segment.id}
+                          className="rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-2 text-sm"
+                        >
+                          <div className="font-medium text-gray-900">{segment.title}</div>
+                          <div className="mt-0.5 text-xs text-gray-600">
+                            {segment.repeatCount != null && segment.repeatCount > 1 ? (
+                              <span>Repeat {segment.repeatCount}× · </span>
+                            ) : null}
+                            {formatSegmentDuration({
+                              stepOrder: segment.stepOrder,
+                              durationType:
+                                segment.durationType === "TIME" ? "TIME" : "DISTANCE",
+                              durationValue: segment.durationValue,
+                              repeatCount: segment.repeatCount ?? null,
+                              title: segment.title,
+                            })}
+                          </div>
+                          {paceLine ? (
+                            <div className="mt-1 text-xs text-gray-800 tabular-nums font-medium">
+                              {paceLine}
+                            </div>
                           ) : null}
-                          {formatSegmentDuration({
-                            stepOrder: segment.stepOrder,
-                            durationType: segment.durationType === "TIME" ? "TIME" : "DISTANCE",
-                            durationValue: segment.durationValue,
-                            repeatCount: segment.repeatCount ?? null,
-                            title: segment.title,
-                          })}
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
               )}
 
@@ -459,17 +508,6 @@ export default function TrainingPlanDayPreviewPage() {
               >
                 {isToday ? "Let's go — open workout" : "Do this workout"}
               </button>
-              {customizeHref && workoutId && (
-                <div className="text-center">
-                  <Link
-                    href={customizeHref}
-                    onClick={() => stashPreviewNavForWorkout(workoutId)}
-                    className="text-xs font-medium text-gray-600 underline-offset-2 hover:text-gray-900 hover:underline"
-                  >
-                    Edit workout
-                  </Link>
-                </div>
-              )}
               <Link
                 href={hubBackHref}
                 className="block w-full text-center rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"

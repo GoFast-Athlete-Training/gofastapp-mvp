@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { findOrCreateWorkoutForPlanDay } from "@/lib/training/plan-day-creator";
+import { materializeWorkoutForPlanDay } from "@/lib/training/workout-materializer";
 
 /**
  * GET /api/training/workout/day?planId=&date=
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { workoutId } = await findOrCreateWorkoutForPlanDay({
+    const { workoutId } = await materializeWorkoutForPlanDay({
       planId: planId.trim(),
       athleteId: auth.athlete.id,
       dateParam: date.trim(),

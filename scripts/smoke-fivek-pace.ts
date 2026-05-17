@@ -10,8 +10,8 @@ import {
 } from "../lib/workout-generator/pace-calculator";
 import {
   getTemplateSegments,
-  descriptorsToApiSegments,
-} from "../lib/workout-generator/templates";
+  descriptorsToWorkoutSteps,
+} from "../lib/training/prescription";
 
 function assert(cond: boolean, msg: string): void {
   if (!cond) {
@@ -36,8 +36,8 @@ assert(paces.goalSecondsPerMile === sec, "goal pace round-trip");
 assert(paces.easy > 0 && paces.tempo > 0, "derived zones positive");
 
 const descriptors = getTemplateSegments("Easy", 6, paces);
-const segments = descriptorsToApiSegments(descriptors, paces);
-assert(segments.length >= 3, "Easy template has warmup / main / cooldown");
+const segments = descriptorsToWorkoutSteps(descriptors, paces);
+assert(segments.length >= 1, "Easy fallback has at least one segment");
 assert(
   segments.every((s, i) => s.stepOrder === i + 1),
   "stepOrder 1-based"

@@ -10,11 +10,11 @@ import {
 import { getPrimaryGoalForWorkout } from "@/lib/goal-service";
 import {
   getTemplateSegments,
-  descriptorsToApiSegments,
-  type ApiSegment,
-} from "@/lib/workout-generator/templates";
+  descriptorsToWorkoutSteps,
+  prescribe,
+  type WorkoutStep,
+} from "@/lib/training/prescription";
 import type { TrainingPaces } from "@/lib/workout-generator/pace-calculator";
-import { catalogueEntryToApiSegments } from "@/lib/training/workout-segment-builder";
 
 function formatPaceFromSecondsPerMile(secPerMile: number): string {
   const m = Math.floor(secPerMile / 60);
@@ -63,7 +63,7 @@ function pickTotalMiles(workoutType: string): number {
 }
 
 export interface GoFastGenerateResponse {
-  segments: ApiSegment[];
+  segments: WorkoutStep[];
   suggestedTitle: string;
   suggestedDescription: string;
 }
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
           ? rawTotal
           : defaultMiles;
 
-      const segments = catalogueEntryToApiSegments({
+      const segments = prescribe({
         entry,
         scheduleMiles,
         anchorSecondsPerMile: goalSecPerMile,
@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
         : defaultMiles;
 
     const descriptors = getTemplateSegments(workoutType, totalMiles, paces);
-    const segments = descriptorsToApiSegments(descriptors, paces);
+    const segments = descriptorsToWorkoutSteps(descriptors, paces);
 
     const prescribed = prescribedPaceSecPerMileForType(workoutType, paces);
     const prescribedStr = formatPaceFromSecondsPerMile(prescribed);

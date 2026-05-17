@@ -14,6 +14,8 @@ export type PlanDaySchedule = {
   catalogueWorkoutId: string | null;
   /** Rotation slot aligned with preset position lists; null when not applicable */
   planCycleIndex: number | null;
+  /** Stamped after first materialization (structured schedules only, JSON on training_plans) */
+  workoutId?: string | null;
 };
 
 export type PlanWeekSchedule = {

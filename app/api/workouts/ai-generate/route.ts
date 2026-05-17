@@ -9,9 +9,9 @@ import {
 } from "@/lib/workout-generator/pace-calculator";
 import {
   getTemplateSegments,
-  descriptorsToApiSegments,
-  type ApiSegment,
-} from "@/lib/workout-generator/templates";
+  descriptorsToWorkoutSteps,
+  type WorkoutStep,
+} from "@/lib/training/prescription";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +27,7 @@ export interface AiGenerateRequestBody {
 }
 
 export interface AiGenerateResponse {
-  segments: ApiSegment[];
+  segments: WorkoutStep[];
   suggestedTitle: string;
   suggestedDescription: string;
 }
@@ -55,7 +55,7 @@ function paceStringToInternalValue(paceStr: string): number {
 }
 
 /**
- * Normalize OpenAI blob response to our API contract (ApiSegment[], suggestedTitle, suggestedDescription).
+ * Normalize OpenAI blob response to our API contract (WorkoutStep[], suggestedTitle, suggestedDescription).
  * Handles malformed or extra keys. If AI returns PACE targets as paceLow/paceHigh strings (M:SS/mile), converts to valueLow/valueHigh.
  */
 function normalizeOpenAIBlobResponse(parsed: unknown, sourceText: string): AiGenerateResponse {
@@ -65,7 +65,7 @@ function normalizeOpenAIBlobResponse(parsed: unknown, sourceText: string): AiGen
     : Array.isArray(obj.steps)
       ? obj.steps
       : [];
-  const segments: ApiSegment[] = rawSegments
+  const segments: WorkoutStep[] = rawSegments
     .map((s: unknown, i: number) => {
       if (!s || typeof s !== "object") return null;
       const seg = s as Record<string, unknown>;
@@ -134,9 +134,9 @@ function normalizeOpenAIBlobResponse(parsed: unknown, sourceText: string): AiGen
         durationValue,
         targets: targets.length ? targets : undefined,
         repeatCount,
-      } as ApiSegment;
+      } as WorkoutStep;
     })
-    .filter((s): s is ApiSegment => s !== null && s.durationValue > 0);
+    .filter((s): s is WorkoutStep => s !== null && s.durationValue > 0);
   const suggestedTitle =
     typeof obj.suggestedTitle === "string" && obj.suggestedTitle.trim()
       ? obj.suggestedTitle.trim()
@@ -174,9 +174,9 @@ async function refineWithOpenAI(
   workoutType: string,
   totalMiles: number,
   paces: TrainingPaces,
-  baseSegments: ApiSegment[],
+  baseSegments: WorkoutStep[],
   freeformPrompt: string
-): Promise<{ segments: ApiSegment[]; suggestedTitle: string; suggestedDescription: string }> {
+): Promise<{ segments: WorkoutStep[]; suggestedTitle: string; suggestedDescription: string }> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return {
@@ -405,7 +405,7 @@ export async function POST(request: NextRequest) {
     });
     const paces = getTrainingPaces(goalSecPerMile);
     const descriptors = getTemplateSegments(workoutType, totalMiles, paces);
-    const baseSegments = descriptorsToApiSegments(descriptors, paces);
+    const baseSegments = descriptorsToWorkoutSteps(descriptors, paces);
 
     let result: AiGenerateResponse;
     if (freeformPrompt?.trim()) {

@@ -5,7 +5,7 @@
 
 import assert from "node:assert";
 import type { workout_catalogue } from "@prisma/client";
-import { catalogueEntryToApiSegments } from "@/lib/training/workout-segment-builder";
+import { prescribe } from "@/lib/training/prescription";
 import { segmentSnapshotDocumentFromApiSegments } from "@/lib/training/workout-segment-snapshot";
 import { bikeMetersToRunEquivalentMiles, swimMetersToRunEquivalentMiles } from "@/lib/training/cross-training-volume-equivalents";
 import {
@@ -64,7 +64,7 @@ function baseLongRunMpCatalogue(
 
 function main() {
   const entry = baseLongRunMpCatalogue();
-  const segs = catalogueEntryToApiSegments({
+  const segs = prescribe({
     entry,
     scheduleMiles: 12,
     anchorSecondsPerMile: 420,

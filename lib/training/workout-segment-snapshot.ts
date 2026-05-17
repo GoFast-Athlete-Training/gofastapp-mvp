@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import type { ApiSegment } from "@/lib/workout-generator/templates";
+import type { WorkoutStep } from "@/lib/training/prescription";
 
 /** Prescription-only segment shape stored on workouts.segmentSnapshotJson (no DB lap actuals). */
 export type SegmentSnapshotStep = {
@@ -31,7 +31,7 @@ export type SegmentSnapshotSource =
 
 /** Build JSON document for workouts.segmentSnapshotJson from materialized API segments. */
 export function segmentSnapshotDocumentFromApiSegments(
-  apiSegs: ApiSegment[],
+  apiSegs: WorkoutStep[],
   source: SegmentSnapshotSource
 ): Prisma.InputJsonValue {
   const segments: SegmentSnapshotStep[] = apiSegs.map((s) => ({

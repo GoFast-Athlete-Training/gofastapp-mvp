@@ -1128,6 +1128,12 @@ export default function WorkoutDetailPage() {
     return quickOrderIds.some((id, i) => id !== defaultSegmentOrderIds[i]);
   }, [quickOrderIds, defaultSegmentOrderIds]);
 
+  const isLogged = Boolean(workout?.matchedActivityId ?? workout?.matched_activity);
+  const segmentDisplayGroups = useMemo(() => {
+    const ordered = isLogged ? sortedSegments : getQuickOrderedSegments();
+    return groupSegmentsInDisplayOrder(ordered);
+  }, [isLogged, sortedSegments, getQuickOrderedSegments]);
+
   const quickOverridesDirty = Object.keys(segmentOverrides).length > 0;
   const conversationalPaceDirty = Object.values(conversationalPaceBySegmentId).some(Boolean);
   const quickEditDirty = quickOrderDirty || quickOverridesDirty || conversationalPaceDirty;
@@ -1615,11 +1621,6 @@ export default function WorkoutDetailPage() {
     workout.garminWorkoutId != null && workout.garminWorkoutId !== undefined;
 
   const scheduleLabel = formatWorkoutScheduleLong(workout.date);
-  const isLogged = Boolean(workout.matchedActivityId ?? workout.matched_activity);
-  const segmentDisplayGroups = useMemo(() => {
-    const ordered = isLogged ? sortedSegments : getQuickOrderedSegments();
-    return groupSegmentsInDisplayOrder(ordered);
-  }, [isLogged, sortedSegments, getQuickOrderedSegments]);
   const showGarminHeaderCard =
     !isLogged || (isLogged && alreadyOnGarmin);
   const dayRel = dayRelativeToToday(workout.date);

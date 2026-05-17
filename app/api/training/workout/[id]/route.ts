@@ -3,10 +3,8 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { catalogueEntryToApiSegments } from "@/lib/training/workout-segment-builder";
+import { prescribe, type WorkoutStep } from "@/lib/training/prescription";
 import { resolveRacePaceSecondsPerMileForPlan } from "@/lib/training/goal-pace-calculator";
-import { buildPlanWorkoutApiSegments } from "@/lib/training/plan-segment-builder";
-import type { ApiSegment } from "@/lib/workout-generator/templates";
 import { cycleIndexFromScheduleForDay, dayNameToOurDow } from "@/lib/training/schedule-parser";
 import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 import { newEntityId } from "@/lib/training/new-entity-id";
@@ -202,7 +200,7 @@ export async function GET(request: NextRequest, context: Ctx) {
           (workout.estimatedDistanceInMeters ?? 0) / METERS_PER_MILE
         );
 
-        let apiSegs: ApiSegment[] | null = null;
+        let apiSegs: WorkoutStep[] | null = null;
 
         const planCycleIndex = resolvedPlanCycleIndexForWorkout({
           planCycleIndex: workout.planCycleIndex ?? null,
@@ -223,37 +221,17 @@ export async function GET(request: NextRequest, context: Ctx) {
           raceDistanceMiles,
         });
 
-        if (workout.workoutType === "Intervals" || workout.workoutType === "Tempo") {
-          if (workout.catalogueWorkoutId && workout.workout_catalogue) {
-            apiSegs = catalogueEntryToApiSegments({
-              entry: workout.workout_catalogue,
-              scheduleMiles,
-              anchorSecondsPerMile,
-              racePaceSecondsPerMile,
-              planCycleIndex: planCycleIndex ?? workout.planCycleIndex ?? null,
-            });
-          }
-        } else if (
-          workout.workoutType === "Easy" ||
-          workout.workoutType === "LongRun" ||
-          workout.workoutType === "Race"
-        ) {
+        if (workout.catalogueWorkoutId && workout.workout_catalogue) {
           const easyCfg = parseEasyRunConfigJson(
             workout.training_plans?.easyRunConfig ?? null
           );
-          apiSegs = buildPlanWorkoutApiSegments({
-            workoutType: workout.workoutType,
-            miles: scheduleMiles,
-            currentFiveKPace: anchorPaceStr,
-            catalogueEntry:
-              workout.catalogueWorkoutId && workout.workout_catalogue
-                ? workout.workout_catalogue
-                : null,
-            goalRacePace: workout.training_plans?.goalRacePace ?? null,
-            goalRaceTime: workout.training_plans?.goalRaceTime ?? null,
-            raceDistanceMiles,
+          apiSegs = prescribe({
+            entry: workout.workout_catalogue,
+            scheduleMiles,
+            anchorSecondsPerMile,
+            racePaceSecondsPerMile,
             planCycleIndex: planCycleIndex ?? workout.planCycleIndex ?? null,
-            easyPaceOffsetSecPerMile:
+            easyWorkPaceOffsetOverrideSecPerMile:
               workout.workoutType === "Easy"
                 ? easyCfg.paceOffsetSecPerMile
                 : null,

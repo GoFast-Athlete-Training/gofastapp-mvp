@@ -102,6 +102,8 @@ export type PlanScheduleDay = {
   estimatedDistanceInMeters: number;
   /** Present on structured schedules */
   catalogueWorkoutId?: string | null;
+  /** Present when structured day was already materialized to a workouts row */
+  workoutId?: string | null;
 };
 
 function rawWeek(planSchedule: unknown, weekNumber: number): unknown | null {
@@ -287,6 +289,7 @@ function expandStructuredDays(params: {
     miles: number;
     planCycleIndex: number | null;
     catalogueWorkoutId?: string | null;
+    workoutId?: string | null;
   }) {
     const date = dateForDayInWeek(
       planStartDate,
@@ -343,6 +346,7 @@ function expandStructuredDays(params: {
       phase: phaseForCatalogue(phaseOffset, 4),
       estimatedDistanceInMeters: distMeters,
       catalogueWorkoutId: opts.catalogueWorkoutId ?? null,
+      workoutId: opts.workoutId ?? null,
     });
   }
 
@@ -355,6 +359,7 @@ function expandStructuredDays(params: {
       miles: d.miles,
       planCycleIndex: d.planCycleIndex,
       catalogueWorkoutId: d.catalogueWorkoutId,
+      workoutId: d.workoutId ?? null,
     });
   }
 
@@ -374,6 +379,7 @@ function expandStructuredDays(params: {
           miles: d.miles,
           planCycleIndex: d.planCycleIndex,
           catalogueWorkoutId: d.catalogueWorkoutId,
+          workoutId: d.workoutId ?? null,
         });
       }
     }

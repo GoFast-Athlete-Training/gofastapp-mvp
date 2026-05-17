@@ -1,15 +1,24 @@
 /**
- * Find-or-create a single `workouts` row for a calendar day using `training_plans.planSchedule`.
+ * Materialize one `workouts` row (+ segments) for a plan calendar day from `planSchedule`,
+ * and stamp `workoutId` back onto the structured JSON day when applicable.
  */
 
-import type { Prisma, workout_catalogue } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { utcDateOnly } from "./plan-utils";
-import { buildPlanWorkoutApiSegments } from "./plan-segment-builder";
-import { planScheduleDayForDateKey, collectCatalogueWorkoutIdsFromPlanSchedule } from "./plan-schedule";
+import {
+  planScheduleDayForDateKey,
+  type PlanScheduleDay,
+} from "./plan-schedule";
+import { isStructuredPlanWeek } from "./plan-schedule-schema";
+import { dateForDayInWeek } from "./schedule-parser";
+import {
+  prescribe,
+  anchorSecondsPerMileFromPlanPace,
+} from "./prescription";
 import { metersToMiles } from "@/lib/pace-utils";
 import { segmentSnapshotDocumentFromApiSegments } from "./workout-segment-snapshot";
-import { parseEasyRunConfigJson } from "./easy-run-config";
+import { resolveRacePaceSecondsPerMileForPlan } from "./goal-pace-calculator";
 
 function utcDayBounds(d: Date): { gte: Date; lte: Date } {
   const x = utcDateOnly(d);
@@ -32,26 +41,54 @@ function parseDateParam(dateParam: string): Date {
   return d;
 }
 
-export async function findOrCreateWorkoutForPlanDay(params: {
+function dateKeyUtc(d: Date): string {
+  return utcDateOnly(d).toISOString().slice(0, 10);
+}
+
+function stampWorkoutIdOnStructuredPlanSchedule(params: {
+  planSchedule: unknown;
+  planStartDate: Date;
+  dateKey: string;
+  scheduled: PlanScheduleDay;
+  workoutId: string;
+  raceDate: Date | null;
+}): unknown {
+  const { planSchedule, planStartDate, dateKey, scheduled, workoutId, raceDate } =
+    params;
+  if (!Array.isArray(planSchedule)) return planSchedule;
+  const raceUtc = raceDate ? utcDateOnly(raceDate) : null;
+
+  return planSchedule.map((weekRow) => {
+    if (!isStructuredPlanWeek(weekRow)) return weekRow;
+    const wn = weekRow.weekNumber;
+    let touched = false;
+    const nextDays = weekRow.days.map((d) => {
+      const date = dateForDayInWeek(planStartDate, wn, d.dow);
+      if (dateKeyUtc(date) !== dateKey) return d;
+      const typeMatches =
+        d.workoutType === scheduled.workoutType ||
+        (scheduled.workoutType === "Race" &&
+          d.workoutType === "LongRun" &&
+          raceUtc != null &&
+          utcDateOnly(date).getTime() === raceUtc.getTime());
+      if (!typeMatches) return d;
+      touched = true;
+      return { ...d, workoutId };
+    });
+    return touched ? { ...weekRow, days: nextDays } : weekRow;
+  });
+}
+
+export async function materializeWorkoutForPlanDay(params: {
   planId: string;
   athleteId: string;
+  /** `YYYY-MM-DD` (UTC) or full ISO datetime */
   dateParam: string;
 }): Promise<{ workoutId: string }> {
   const { planId, athleteId, dateParam } = params;
-  const anchor = parseDateParam(dateParam);
+  const anchor = parseDateParam(dateParam.trim());
   const { gte, lte } = utcDayBounds(anchor);
-
-  const existing = await prisma.workouts.findFirst({
-    where: {
-      planId,
-      athleteId,
-      date: { gte, lte },
-    },
-    select: { id: true },
-  });
-  if (existing) {
-    return { workoutId: existing.id };
-  }
+  const dateKey = utcDateOnly(anchor).toISOString().slice(0, 10);
 
   const plan = await prisma.training_plans.findFirst({
     where: { id: planId, athleteId },
@@ -70,25 +107,12 @@ export async function findOrCreateWorkoutForPlanDay(params: {
     throw new Error("Plan not found");
   }
 
-  const dateKey = utcDateOnly(anchor).toISOString().slice(0, 10);
   const race = plan.race_registry;
 
   const raceDistanceMiles =
     race?.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
       ? metersToMiles(Number(race.distanceMeters))
       : null;
-
-  const catIds = collectCatalogueWorkoutIdsFromPlanSchedule(plan.planSchedule);
-  let catalogueTitleById: Record<string, string> = {};
-  if (catIds.length > 0) {
-    const catRows = await prisma.workout_catalogue.findMany({
-      where: { id: { in: catIds } },
-      select: { id: true, name: true },
-    });
-    for (const r of catRows) {
-      catalogueTitleById[r.id] = r.name;
-    }
-  }
 
   const scheduled = planScheduleDayForDateKey({
     planStartDate: plan.startDate,
@@ -98,11 +122,28 @@ export async function findOrCreateWorkoutForPlanDay(params: {
     raceDistanceMiles,
     dateKey,
     maxWeekNumber: plan.totalWeeks,
-    catalogueTitleById,
+    catalogueTitleById: {},
   });
 
   if (!scheduled) {
     throw new Error("No scheduled workout for this date");
+  }
+
+  const stampId = scheduled.workoutId?.trim();
+  if (stampId) {
+    return { workoutId: stampId };
+  }
+
+  const existing = await prisma.workouts.findFirst({
+    where: {
+      planId,
+      athleteId,
+      date: { gte, lte },
+    },
+    select: { id: true },
+  });
+  if (existing) {
+    return { workoutId: existing.id };
   }
 
   const needsCatalogueAnchoredIT =
@@ -124,7 +165,9 @@ export async function findOrCreateWorkoutForPlanDay(params: {
     );
   }
 
-  let catalogueEntryForDay: workout_catalogue | null = null;
+  let catalogueEntryForDay: Awaited<
+    ReturnType<typeof prisma.workout_catalogue.findUnique>
+  > = null;
   if (scheduled.catalogueWorkoutId) {
     catalogueEntryForDay = await prisma.workout_catalogue.findUnique({
       where: { id: scheduled.catalogueWorkoutId },
@@ -132,21 +175,30 @@ export async function findOrCreateWorkoutForPlanDay(params: {
   }
 
   const miles = scheduled.estimatedDistanceInMeters / 1609.34;
-  const easyCfg = parseEasyRunConfigJson(plan.easyRunConfig ?? null);
-  const apiSegs = buildPlanWorkoutApiSegments({
-    workoutType: scheduled.workoutType,
-    miles,
-    currentFiveKPace: plan.currentFiveKPace ?? null,
-    catalogueEntry: catalogueEntryForDay,
-    goalRacePace: plan.goalRacePace ?? null,
-    goalRaceTime: plan.goalRaceTime ?? null,
-    raceDistanceMiles,
-    planCycleIndex: scheduled.planCycleIndex ?? null,
-    easyPaceOffsetSecPerMile:
-      scheduled.workoutType === "Easy"
-        ? easyCfg.paceOffsetSecPerMile
-        : null,
-  });
+
+  let steps: ReturnType<typeof prescribe> = [];
+  if (catalogueEntryForDay && plan.currentFiveKPace?.trim()) {
+    const anchorSecPerMile = anchorSecondsPerMileFromPlanPace(
+      plan.currentFiveKPace ?? null
+    );
+    const racePaceSec = resolveRacePaceSecondsPerMileForPlan({
+      goalRacePace: plan.goalRacePace ?? null,
+      goalRaceTime: plan.goalRaceTime ?? null,
+      raceDistanceMiles,
+    });
+    steps = prescribe({
+      entry: catalogueEntryForDay,
+      scheduleMiles: miles,
+      anchorSecondsPerMile: anchorSecPerMile,
+      racePaceSecondsPerMile: racePaceSec,
+      planCycleIndex: scheduled.planCycleIndex ?? null,
+      easyWorkPaceOffsetOverrideSecPerMile: null,
+    });
+  }
+
+  const planJson = plan.planSchedule;
+  const jsonLooksStructured =
+    Array.isArray(planJson) && planJson.some((w) => isStructuredPlanWeek(w));
 
   const workoutId = await prisma.$transaction(async (tx) => {
     const w = await tx.workouts.create({
@@ -166,8 +218,8 @@ export async function findOrCreateWorkoutForPlanDay(params: {
       },
     });
 
-    if (apiSegs.length) {
-      const segmentRows: Prisma.workout_segmentsCreateManyInput[] = apiSegs.map(
+    if (steps.length) {
+      const segmentRows: Prisma.workout_segmentsCreateManyInput[] = steps.map(
         (s) => ({
           workoutId: w.id,
           stepOrder: s.stepOrder,
@@ -185,9 +237,27 @@ export async function findOrCreateWorkoutForPlanDay(params: {
         where: { id: w.id },
         data: {
           segmentSnapshotJson: segmentSnapshotDocumentFromApiSegments(
-            apiSegs,
+            steps,
             "plan_day_materialize"
           ),
+        },
+      });
+    }
+
+    if (jsonLooksStructured) {
+      const nextSchedule = stampWorkoutIdOnStructuredPlanSchedule({
+        planSchedule: planJson,
+        planStartDate: plan.startDate,
+        dateKey,
+        scheduled,
+        workoutId: w.id,
+        raceDate: race?.raceDate ?? null,
+      });
+      await tx.training_plans.update({
+        where: { id: planId },
+        data: {
+          planSchedule: nextSchedule as Prisma.InputJsonValue,
+          updatedAt: new Date(),
         },
       });
     }

@@ -1,19 +1,45 @@
 /**
- * Workout segment builder: expand a catalogue row (+ schedule miles, 5K anchor, race pace)
- * into Garmin-style segment steps (warmup / work / cooldown / repeats).
+ * Prescription: expand a catalogue row (+ schedule miles, 5K anchor, race pace)
+ * into Garmin-style workout steps. Includes optional type+miles fallback descriptors
+ * for standalone generate routes (no DB catalogue row).
  */
 
 import type { workout_catalogue, WorkoutType } from "@prisma/client";
-import type { ApiSegment } from "@/lib/workout-generator/templates";
 import {
   getTrainingPaces,
+  parsePaceToSecondsPerMile,
   paceTargetFromSecondsPerMile,
+  type PaceZone,
+  type TrainingPaces,
 } from "@/lib/workout-generator/pace-calculator";
 import { isMpSimulationAnchor } from "@/lib/training/goal-pace-calculator";
 import {
   betweenRepRecoveryForMaterialization,
   type CatalogueBetweenRepRecovery,
 } from "@/lib/training/catalogue-interval-recovery";
+
+/** One materialized segment step (matches legacy API / DB segment row shape). */
+export type WorkoutStep = {
+  stepOrder: number;
+  title: string;
+  durationType: "DISTANCE" | "TIME";
+  durationValue: number;
+  targets?: Array<{ type: string; valueLow?: number; valueHigh?: number }>;
+  repeatCount?: number;
+};
+
+/** Parses plan snapshot string (e.g. "7:30") to anchor sec/mile for zone math. */
+export function anchorSecondsPerMileFromPlanPace(
+  currentFiveKPace: string | null
+): number {
+  const raw = currentFiveKPace?.trim();
+  if (!raw) {
+    throw new Error(
+      "training_plans.currentFiveKPace is required; set it from Athlete.fiveKPace when generating or updating the plan."
+    );
+  }
+  return parsePaceToSecondsPerMile(raw);
+}
 
 function round(n: number, d: number): number {
   const f = 10 ** d;
@@ -29,13 +55,13 @@ function secPerMile(
   return Math.max(1, anchor + offset);
 }
 
-function targetsOrOpen(paceSecPerMile: number | null): Pick<ApiSegment, "targets"> | object {
+function targetsOrOpen(paceSecPerMile: number | null): Pick<WorkoutStep, "targets"> | object {
   if (paceSecPerMile == null) return {};
   return { targets: [paceTargetFromSecondsPerMile(paceSecPerMile)] };
 }
 
 function appendBetweenRepRecoveryStep(
-  out: ApiSegment[],
+  out: WorkoutStep[],
   stepOrder: number,
   rec: CatalogueBetweenRepRecovery,
   recPace: number | null
@@ -240,7 +266,7 @@ function buildSustainedQualityBlock(params: {
   totalMiles: number;
   anchorSecondsPerMile: number;
   title: string;
-}): ApiSegment[] {
+}): WorkoutStep[] {
   const { entry, totalMiles, anchorSecondsPerMile, title } = params;
   const warmupM = entry.warmupMiles ?? round(totalMiles * 0.15, 2);
   const cooldownM = entry.cooldownMiles ?? round(totalMiles * 0.15, 2);
@@ -255,7 +281,7 @@ function buildSustainedQualityBlock(params: {
   const cooldownPace = secPerMile(anchorSecondsPerMile, entry.cooldownPaceOffsetSecPerMile);
   const workPace = secPerMile(anchorSecondsPerMile, entry.workPaceOffsetSecPerMile);
   let order = 1;
-  const out: ApiSegment[] = [];
+  const out: WorkoutStep[] = [];
   if (warmupM > 0) {
     out.push({
       stepOrder: order++,
@@ -284,7 +310,7 @@ function buildSustainedQualityBlock(params: {
   return out;
 }
 
-export function catalogueEntryToApiSegments(params: {
+export function prescribe(params: {
   entry: workout_catalogue;
   scheduleMiles: number;
   anchorSecondsPerMile: number;
@@ -292,7 +318,7 @@ export function catalogueEntryToApiSegments(params: {
   planCycleIndex?: number | null;
   /** When set (e.g. plan easyRunConfig), overrides catalogue work pace offset for Easy type only. */
   easyWorkPaceOffsetOverrideSecPerMile?: number | null;
-}): ApiSegment[] {
+}): WorkoutStep[] {
   const {
     entry,
     scheduleMiles,
@@ -338,7 +364,7 @@ export function catalogueEntryToApiSegments(params: {
       const cooldownM =
         entry.cooldownMiles != null && entry.cooldownMiles > 0 ? round(entry.cooldownMiles, 2) : 0;
       let order = 1;
-      const out: ApiSegment[] = [];
+      const out: WorkoutStep[] = [];
       if (warmupM > 0) {
         const wp = secPerMile(anchorSecondsPerMile, entry.warmupPaceOffsetSecPerMile);
         out.push({
@@ -416,7 +442,7 @@ export function catalogueEntryToApiSegments(params: {
       const remainder = round(totalMiles - warmupM - cooldownM, 2);
       const mpBlock = round(Math.min(Math.max(0.05, remainder), Math.max(0.05, totalMiles)), 2);
       let order = 1;
-      const out: ApiSegment[] = [];
+      const out: WorkoutStep[] = [];
       if (warmupM > 0.05) {
         out.push({
           stepOrder: order++,
@@ -455,7 +481,7 @@ export function catalogueEntryToApiSegments(params: {
       let rem = round(totalMiles - wM - workM - cM, 2);
       if (rem < 0) rem = 0;
       let order = 1;
-      const out: ApiSegment[] = [];
+      const out: WorkoutStep[] = [];
       if (wM > 0.05) {
         out.push({
           stepOrder: order++,
@@ -526,7 +552,7 @@ export function catalogueEntryToApiSegments(params: {
 
     const pos = (entry.mpBlockPosition ?? "BACK_HALF").toUpperCase();
     let order = 1;
-    const out: ApiSegment[] = [];
+    const out: WorkoutStep[] = [];
 
     const pushEasy = (miles: number, title: string) => {
       if (miles <= 0.05) return;
@@ -582,7 +608,7 @@ export function catalogueEntryToApiSegments(params: {
         recSec != null && recSec > 0 ? round(recSec / 60, 4) : null;
 
       let order = 1;
-      const out: ApiSegment[] = [];
+      const out: WorkoutStep[] = [];
       if (warmupM > 0) {
         out.push({
           stepOrder: order++,
@@ -632,7 +658,7 @@ export function catalogueEntryToApiSegments(params: {
         entry.cooldownMiles != null && entry.cooldownMiles > 0 ? round(entry.cooldownMiles, 2) : 0;
       const easyP = secPerMile(anchorSecondsPerMile, entry.warmupPaceOffsetSecPerMile);
       let order = 1;
-      const out: ApiSegment[] = [];
+      const out: WorkoutStep[] = [];
       if (warmupM > 0) {
         out.push({
           stepOrder: order++,
@@ -711,7 +737,7 @@ export function catalogueEntryToApiSegments(params: {
         recSec != null && recSec > 0 ? round(recSec / 60, 4) : null;
 
       let order = 1;
-      const out: ApiSegment[] = [];
+      const out: WorkoutStep[] = [];
       if (warmupM > 0) {
         out.push({
           stepOrder: order++,
@@ -773,7 +799,7 @@ export function catalogueEntryToApiSegments(params: {
         }
       }
       let order = 1;
-      const out: ApiSegment[] = [];
+      const out: WorkoutStep[] = [];
       if (warmupM > 0) {
         out.push({
           stepOrder: order++,
@@ -836,7 +862,7 @@ export function catalogueEntryToApiSegments(params: {
   const easyP = secPerMile(anchorSecondsPerMile, entry.warmupPaceOffsetSecPerMile);
 
   let order = 1;
-  const out: ApiSegment[] = [];
+  const out: WorkoutStep[] = [];
   if (warmupM > 0) {
     out.push({
       stepOrder: order++,
@@ -867,4 +893,226 @@ export function catalogueEntryToApiSegments(params: {
     });
   }
   return out;
+}
+
+// --- Fallback: workout type + miles + zones (standalone generate routes; no catalogue row) ---
+
+export interface SegmentDescriptor {
+  title: string;
+  durationType: "DISTANCE" | "TIME";
+  durationValue: number;
+  paceZone: PaceZone;
+  repeatCount?: number;
+}
+
+/** 800m in miles */
+const M800_FALLBACK = 0.4971;
+/** 400m in miles */
+const M400_FALLBACK = 0.24855;
+
+function easyDescriptorList(
+  totalMiles: number,
+  _paces: TrainingPaces
+): SegmentDescriptor[] {
+  return [
+    {
+      title: "Easy Run",
+      durationType: "DISTANCE",
+      durationValue: round(totalMiles, 2),
+      paceZone: "easy",
+    },
+  ];
+}
+
+function tempoDescriptorList(
+  totalMiles: number,
+  _paces: TrainingPaces
+): SegmentDescriptor[] {
+  return [
+    {
+      title: "Warmup",
+      durationType: "DISTANCE",
+      durationValue: round(totalMiles * 0.15, 2),
+      paceZone: "easy",
+    },
+    {
+      title: "Tempo",
+      durationType: "DISTANCE",
+      durationValue: round(totalMiles * 0.7, 2),
+      paceZone: "tempo",
+    },
+    {
+      title: "Cooldown",
+      durationType: "DISTANCE",
+      durationValue: round(totalMiles * 0.15, 2),
+      paceZone: "easy",
+    },
+  ];
+}
+
+function longRunDescriptorList(
+  totalMiles: number,
+  _paces: TrainingPaces
+): SegmentDescriptor[] {
+  return [
+    {
+      title: "Long Run",
+      durationType: "DISTANCE",
+      durationValue: round(totalMiles, 2),
+      paceZone: "longRun",
+    },
+  ];
+}
+
+function raceDayDescriptorList(
+  totalMiles: number,
+  _paces: TrainingPaces
+): SegmentDescriptor[] {
+  const warmup = round(
+    Math.min(Math.max(totalMiles * 0.05, 0.5), 2),
+    2
+  );
+  const cooldown = round(
+    Math.min(Math.max(totalMiles * 0.02, 0), 1),
+    2
+  );
+  const main = round(totalMiles - warmup - cooldown, 2);
+  if (main < 0.25) {
+    return [
+      {
+        title: "Race",
+        durationType: "DISTANCE",
+        durationValue: round(totalMiles, 2),
+        paceZone: "marathon",
+      },
+    ];
+  }
+  const segs: SegmentDescriptor[] = [
+    {
+      title: "Warm-up",
+      durationType: "DISTANCE",
+      durationValue: warmup,
+      paceZone: "easy",
+    },
+    {
+      title: "Race",
+      durationType: "DISTANCE",
+      durationValue: main,
+      paceZone: "marathon",
+    },
+  ];
+  if (cooldown > 0) {
+    segs.push({
+      title: "Easy jog / walk",
+      durationType: "DISTANCE",
+      durationValue: cooldown,
+      paceZone: "easy",
+    });
+  }
+  return segs;
+}
+
+function intervalsDescriptorList(
+  totalMiles: number,
+  _paces: TrainingPaces
+): SegmentDescriptor[] {
+  const warmupMiles = round(totalMiles * 0.15, 2);
+  const cooldownMiles = round(totalMiles * 0.15, 2);
+  const numReps = 6;
+  const intervalMiles = M800_FALLBACK;
+  const recoveryMiles = M400_FALLBACK;
+  const reps: SegmentDescriptor[] = [];
+  for (let i = 0; i < numReps; i++) {
+    reps.push({
+      title: "Interval",
+      durationType: "DISTANCE",
+      durationValue: round(intervalMiles, 2),
+      paceZone: "interval",
+    });
+    reps.push({
+      title: "Recovery",
+      durationType: "DISTANCE",
+      durationValue: round(recoveryMiles, 2),
+      paceZone: "recovery",
+    });
+  }
+  return [
+    {
+      title: "Warmup",
+      durationType: "DISTANCE",
+      durationValue: warmupMiles,
+      paceZone: "easy",
+    },
+    ...reps,
+    {
+      title: "Cooldown",
+      durationType: "DISTANCE",
+      durationValue: cooldownMiles,
+      paceZone: "easy",
+    },
+  ];
+}
+
+const TEMPLATE_BY_TYPE: Record<
+  string,
+  (totalMiles: number, paces: TrainingPaces) => SegmentDescriptor[]
+> = {
+  Easy: easyDescriptorList,
+  Tempo: tempoDescriptorList,
+  LongRun: longRunDescriptorList,
+  Race: raceDayDescriptorList,
+  Intervals: intervalsDescriptorList,
+};
+
+export type FallbackWorkoutTemplateKey = keyof typeof TEMPLATE_BY_TYPE;
+
+/** Segment descriptors for a workout type + total miles (used by gofast/ai generate). */
+export function getTemplateSegments(
+  workoutType: string,
+  totalMiles: number,
+  paces: TrainingPaces
+): SegmentDescriptor[] {
+  const key = workoutType in TEMPLATE_BY_TYPE ? workoutType : "Easy";
+  const fn = TEMPLATE_BY_TYPE[key as FallbackWorkoutTemplateKey] ?? easyDescriptorList;
+  return fn(totalMiles, paces);
+}
+
+/** Convert descriptors to workout steps with pace targets (sec/km). */
+export function descriptorsToWorkoutSteps(
+  descriptors: SegmentDescriptor[],
+  paces: TrainingPaces
+): WorkoutStep[] {
+  const zoneToSecPerMile = (zone: PaceZone): number => {
+    switch (zone) {
+      case "easy":
+        return paces.easy;
+      case "longRun":
+        return paces.longRun;
+      case "marathon":
+        return paces.marathon;
+      case "tempo":
+        return paces.tempo;
+      case "interval":
+        return paces.interval;
+      case "speed":
+        return paces.speed;
+      case "recovery":
+        return paces.recovery;
+      default:
+        return paces.easy;
+    }
+  };
+
+  return descriptors.map((d, i) => {
+    const secPerMile = zoneToSecPerMile(d.paceZone);
+    const target = paceTargetFromSecondsPerMile(secPerMile);
+    return {
+      stepOrder: i + 1,
+      title: d.title,
+      durationType: d.durationType,
+      durationValue: d.durationValue,
+      targets: [target],
+      repeatCount: d.repeatCount,
+    };
+  });
 }
