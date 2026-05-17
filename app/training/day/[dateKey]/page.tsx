@@ -407,20 +407,6 @@ export default function TrainingPlanDayPreviewPage() {
                 </div>
               )}
 
-              <p className="text-xs text-gray-500 leading-relaxed">
-                When you&apos;re ready to set up this run on your watch or log it, open the full
-                workout screen.
-              </p>
-              {customizeHref && workoutId && (
-                <Link
-                  href={customizeHref}
-                  onClick={() => stashPreviewNavForWorkout(workoutId)}
-                  className="inline-flex text-sm font-semibold text-orange-700 hover:text-orange-900 underline-offset-2 hover:underline"
-                >
-                  Customize this workout
-                </Link>
-              )}
-
               {showRaceResultCta && planRace ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50/90 px-3 py-3 space-y-2">
                   {raceResultRow?.officialFinishTime ? (
@@ -471,8 +457,19 @@ export default function TrainingPlanDayPreviewPage() {
                 disabled={openingWorkout || !canOpenWorkout || workoutLoading || !!workoutError}
                 className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
               >
-                {isToday ? "Let&apos;s go — open workout" : "Do this workout"}
+                {isToday ? "Let's go — open workout" : "Do this workout"}
               </button>
+              {customizeHref && workoutId && (
+                <div className="text-center">
+                  <Link
+                    href={customizeHref}
+                    onClick={() => stashPreviewNavForWorkout(workoutId)}
+                    className="text-xs font-medium text-gray-600 underline-offset-2 hover:text-gray-900 hover:underline"
+                  >
+                    Edit workout
+                  </Link>
+                </div>
+              )}
               <Link
                 href={hubBackHref}
                 className="block w-full text-center rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
