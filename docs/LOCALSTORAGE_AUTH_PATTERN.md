@@ -14,38 +14,29 @@ This app uses **localStorage for athleteId and authorization** via Firebase toke
 
 ## Flow
 
-### 1. Welcome Page Hydration
+### 1. Welcome Page (current pattern)
 
 **File**: `app/welcome/page.tsx`
 
-The welcome page is the **only place** where athlete data is hydrated and stored:
+On Firebase auth, the welcome page calls `GET /api/athlete/me`, stores `athleteId` with `LocalStorageAPI.setAthleteId`, and routes to `/athlete-home`. On `404`, it may call `POST /api/athlete/create` before profile flows.
+
+**Key points (welcome / bootstrap)**:
+
+- Sets `athleteId` in localStorage (and may clear or set other keys as the welcome flow does today).
+- Firebase token is used for API authorization (see `lib/api.ts`).
+- **Do not** treat `/athlete/hydrate` as current.
+
+### Historical snippet (do not copy)
+
+The following referenced a legacy hydrate route and full model dump — **not** the current MVP contract:
 
 ```typescript
-// 1. Wait for Firebase auth
+// LEGACY — outdated
 onAuthStateChanged(auth, async (firebaseUser) => {
-  // 2. Call hydrate endpoint
   const response = await api.post('/athlete/hydrate');
-  
-  // 3. Store in localStorage (THIS IS THE ONLY PLACE)
-  LocalStorageAPI.setFullHydrationModel({
-    athlete,
-    weeklyActivities,
-    weeklyTotals
-  });
-  
-  // 4. Show "Let's Train" button (NO auto-redirect)
+  LocalStorageAPI.setFullHydrationModel({ ... });
 });
 ```
-
-**Key Points**:
-- ✅ Sets `athleteId` in localStorage
-- ✅ Sets full athlete object in localStorage
-- ✅ Sets RunCrew data in localStorage
-- ✅ Sets weekly activities/totals in localStorage
-- ✅ **Only happens once** - on welcome page
-- ✅ **Never cleared** - persists across page refreshes
-
-### 2. API Authorization
 
 **File**: `lib/api.ts`
 

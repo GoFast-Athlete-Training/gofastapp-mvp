@@ -11,6 +11,8 @@
 
 Both apps use the **SAME Firebase project**, which is why authentication works.
 
+**GoFast-mobile (Expo)**: Uses the **same** Firebase Auth project (`EXPO_PUBLIC_FIREBASE_*` mirrors `NEXT_PUBLIC_FIREBASE_*`). Google on native is still **Firebase** `GoogleAuthProvider` after obtaining an ID token; configure with Firebase `google-services.json` / `GoogleService-Info.plist` — not a separate GoFast Google OAuth env.
+
 ---
 
 ## 📊 Firebase Project Configuration

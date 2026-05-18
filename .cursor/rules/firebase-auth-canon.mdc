@@ -1,0 +1,11 @@
+---
+description: Firebase Auth is canonical; Google is a Firebase provider only
+alwaysApply: true
+---
+
+# Firebase Auth canon (gofastapp-mvp)
+
+- **Firebase Auth** is the only user authentication system for the athlete app. Do not introduce separate “Google client id” env vars for login; public config is `NEXT_PUBLIC_FIREBASE_*` only (see [`lib/firebase.ts`](lib/firebase.ts)).
+- **Google sign-in** is implemented with **Firebase** `GoogleAuthProvider` + `signInWithPopup` in [`lib/auth.ts`](lib/auth.ts) and signup flows — not a standalone Google OAuth integration.
+- **API auth**: Firebase ID token in `Authorization: Bearer`; athlete scoping may use `x-athlete-id` from client storage after bootstrap.
+- **Bootstrap**: resolve/create athlete via `GET /api/athlete/me` and `POST /api/athlete/create` (see signup / welcome patterns). Do not document deprecated `/athlete/hydrate` as current without marking it historical.
