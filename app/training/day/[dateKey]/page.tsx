@@ -118,6 +118,34 @@ function previewSegmentTargetSummary(
   return parts.length ? parts.join(" · ") : null;
 }
 
+function segmentHeaderClass(title: string): string {
+  const t = title.toLowerCase();
+  if (t.includes("warm") || t.includes("cool")) return "bg-gray-500 text-white";
+  if (t.includes("recovery")) return "bg-teal-600 text-white";
+  if (t.includes("tempo") || t.includes("interval")) return "bg-orange-500 text-white";
+  return "bg-gray-400 text-white";
+}
+
+function segmentRunRestTag(title: string): "RUN" | "REST" {
+  return title.toLowerCase().includes("recovery") ? "REST" : "RUN";
+}
+
+function previewSegmentDistanceLine(
+  segment: PreviewWorkout["segments"][number]
+): string {
+  const duration = formatSegmentDuration({
+    stepOrder: segment.stepOrder,
+    durationType: segment.durationType === "TIME" ? "TIME" : "DISTANCE",
+    durationValue: segment.durationValue,
+    repeatCount: segment.repeatCount ?? null,
+    title: segment.title,
+  });
+  if (segment.repeatCount != null && segment.repeatCount > 1) {
+    return `Repeat ${segment.repeatCount}× · ${duration}`;
+  }
+  return duration;
+}
+
 export default function TrainingPlanDayPreviewPage() {
   const router = useRouter();
   const params = useParams();
@@ -422,33 +450,39 @@ export default function TrainingPlanDayPreviewPage() {
                       {"Today's plan"}
                     </p>
                   ) : null}
-                  <ul className="space-y-2 list-none pl-0 m-0">
-                    {workout.segments.map((segment) => {
+                  <ul className="space-y-1.5 list-none pl-0 m-0">
+                    {workout.segments.map((segment, index) => {
                       const paceLine = previewSegmentTargetSummary(segment);
+                      const distanceLine = previewSegmentDistanceLine(segment);
+                      const runRest = segmentRunRestTag(segment.title);
                       return (
                         <li
                           key={segment.id}
-                          className="rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-2 text-sm"
+                          className="overflow-hidden rounded-lg border border-gray-100"
                         >
-                          <div className="font-medium text-gray-900">{segment.title}</div>
-                          <div className="mt-0.5 text-xs text-gray-600">
-                            {segment.repeatCount != null && segment.repeatCount > 1 ? (
-                              <span>Repeat {segment.repeatCount}× · </span>
-                            ) : null}
-                            {formatSegmentDuration({
-                              stepOrder: segment.stepOrder,
-                              durationType:
-                                segment.durationType === "TIME" ? "TIME" : "DISTANCE",
-                              durationValue: segment.durationValue,
-                              repeatCount: segment.repeatCount ?? null,
-                              title: segment.title,
-                            })}
+                          <div
+                            className={`px-3 py-1 text-xs font-semibold uppercase tracking-wide ${segmentHeaderClass(segment.title)}`}
+                          >
+                            {segment.title}
                           </div>
-                          {paceLine ? (
-                            <div className="mt-1 text-xs text-gray-800 tabular-nums font-medium">
-                              {paceLine}
+                          <div className="flex items-center gap-2.5 bg-white px-3 py-2">
+                            <span className="w-4 shrink-0 text-sm font-bold tabular-nums text-gray-400">
+                              {index + 1}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <span className="text-sm font-semibold text-gray-900">
+                                {distanceLine}
+                              </span>
+                              {paceLine ? (
+                                <span className="ml-1.5 text-xs tabular-nums text-gray-500">
+                                  {paceLine}
+                                </span>
+                              ) : null}
                             </div>
-                          ) : null}
+                            <span className="shrink-0 text-[10px] font-bold tracking-wider text-gray-400">
+                              {runRest}
+                            </span>
+                          </div>
                         </li>
                       );
                     })}
@@ -480,26 +514,6 @@ export default function TrainingPlanDayPreviewPage() {
             </div>
 
             <div className="border-t border-gray-100 px-5 py-4 space-y-3 bg-gray-50/60">
-              <div className="flex gap-2">
-                {prevDateKey && (
-                  <Link
-                    href={`/training/day/${prevDateKey}${querySuffix}`}
-                    className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
-                  >
-                    <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
-                    Previous day
-                  </Link>
-                )}
-                {nextDateKey && (
-                  <Link
-                    href={`/training/day/${nextDateKey}${querySuffix}`}
-                    className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
-                  >
-                    Next day
-                    <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
-                  </Link>
-                )}
-              </div>
               <button
                 type="button"
                 onClick={() => void handleDoThisWorkout()}
@@ -508,9 +522,29 @@ export default function TrainingPlanDayPreviewPage() {
               >
                 See details
               </button>
+              <div className="flex gap-2">
+                {prevDateKey && (
+                  <Link
+                    href={`/training/day/${prevDateKey}${querySuffix}`}
+                    className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl border border-gray-200 bg-white py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                  >
+                    <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
+                    Previous day
+                  </Link>
+                )}
+                {nextDateKey && (
+                  <Link
+                    href={`/training/day/${nextDateKey}${querySuffix}`}
+                    className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl border border-gray-200 bg-white py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                  >
+                    Next day
+                    <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+                  </Link>
+                )}
+              </div>
               <Link
                 href={hubBackHref}
-                className="block w-full text-center rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="block w-full text-center rounded-xl border border-gray-200 bg-white py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Back to plan
               </Link>
