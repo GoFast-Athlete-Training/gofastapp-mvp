@@ -68,7 +68,7 @@ function fallbackEasyRunSteps(params: {
   return [
     {
       stepOrder: 1,
-      title: "Easy Run",
+      title: "Work",
       durationType: "DISTANCE",
       durationValue: round(params.scheduleMiles, 2),
       targets: [paceTargetFromSecondsPerMile(easyPaceSecPerMile)],
@@ -192,23 +192,43 @@ export async function materializeWorkoutForPlanDay(params: {
   }
 
   const stampId = scheduled.workoutId?.trim();
+  let existing: {
+    id: string;
+    _count: { segments: number };
+  } | null = null;
+
   if (stampId) {
-    return { workoutId: stampId };
+    existing = await prisma.workouts.findFirst({
+      where: {
+        id: stampId,
+        planId,
+        athleteId,
+      },
+      select: {
+        id: true,
+        _count: { select: { segments: true } },
+      },
+    });
+    if (existing && existing._count.segments > 0) {
+      return { workoutId: existing.id };
+    }
   }
 
-  const existing = await prisma.workouts.findFirst({
-    where: {
-      planId,
-      athleteId,
-      date: { gte, lte },
-    },
-    select: {
-      id: true,
-      _count: { select: { segments: true } },
-    },
-  });
-  if (existing && existing._count.segments > 0) {
-    return { workoutId: existing.id };
+  if (!existing) {
+    existing = await prisma.workouts.findFirst({
+      where: {
+        planId,
+        athleteId,
+        date: { gte, lte },
+      },
+      select: {
+        id: true,
+        _count: { select: { segments: true } },
+      },
+    });
+    if (existing && existing._count.segments > 0) {
+      return { workoutId: existing.id };
+    }
   }
 
   const needsCatalogueAnchoredIT =
