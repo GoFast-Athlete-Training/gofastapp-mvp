@@ -648,14 +648,6 @@ export default function TrainingHubPage() {
                           >
                             Session detail
                           </Link>
-                          {focusPlanDay.workoutId ? (
-                            <Link
-                              href={`/workouts/${focusPlanDay.workoutId}/let-others-join`}
-                              className="text-sm font-medium text-sky-700 hover:text-sky-900"
-                            >
-                              Invite crew →
-                            </Link>
-                          ) : null}
                         </div>
                       </>
                     ) : (

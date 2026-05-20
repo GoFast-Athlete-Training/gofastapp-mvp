@@ -9,6 +9,8 @@ import { LocalStorageAPI } from '@/lib/localstorage';
 export default function GarminSettingsPage() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [clearingGarmin, setClearingGarmin] = useState(false);
+  const [clearGarminMessage, setClearGarminMessage] = useState<string | null>(null);
   const [athlete, setAthlete] = useState<Record<string, unknown> | null>(null);
   /** Avoid flashing "Not connected" + Connect before /athlete/:id returns. */
   const [athleteReady, setAthleteReady] = useState(false);
@@ -102,6 +104,45 @@ export default function GarminSettingsPage() {
           (error instanceof Error ? error.message : 'Unknown error')
       );
       setBusy(false);
+    }
+  };
+
+  const handleClearGarminWorkouts = async () => {
+    if (
+      !confirm(
+        'Remove all GoFast workouts from your Garmin Connect library? This clears scheduled workouts we pushed. Your completed activity history on Garmin is not deleted.'
+      )
+    ) {
+      return;
+    }
+
+    setClearingGarmin(true);
+    setClearGarminMessage(null);
+    try {
+      const { data } = await api.delete<{
+        ok?: boolean;
+        removed?: number;
+        total?: number;
+        errors?: Array<{ workoutId: string; message: string }>;
+        error?: string;
+      }>('/garmin/workouts-bulk');
+      if (!data.ok) {
+        throw new Error(data.error || 'Clear failed');
+      }
+      const errCount = data.errors?.length ?? 0;
+      setClearGarminMessage(
+        errCount > 0
+          ? `Removed ${data.removed ?? 0} of ${data.total ?? 0} workouts from Garmin (${errCount} could not be deleted on Garmin — local links cleared).`
+          : `Removed ${data.removed ?? 0} workout${(data.removed ?? 0) === 1 ? '' : 's'} from Garmin.`
+      );
+    } catch (error: unknown) {
+      const msg =
+        error && typeof error === 'object' && 'response' in error
+          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+          : undefined;
+      setClearGarminMessage(msg || (error instanceof Error ? error.message : 'Clear failed'));
+    } finally {
+      setClearingGarmin(false);
     }
   };
 
@@ -206,16 +247,31 @@ export default function GarminSettingsPage() {
               {new Date(String(athlete.garmin_connected_at)).toLocaleDateString()}
             </p>
           ) : null}
-          <div className="pt-2">
+          <div className="pt-2 space-y-3">
             {connected ? (
-              <button
-                type="button"
-                onClick={handleDisconnect}
-                disabled={busy}
-                className="w-full py-2.5 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 text-sm font-medium"
-              >
-                {busy ? 'Working…' : 'Disconnect Garmin'}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => void handleClearGarminWorkouts()}
+                  disabled={busy || clearingGarmin}
+                  className="w-full py-2.5 px-4 border border-amber-300 bg-amber-50 text-amber-950 rounded-lg hover:bg-amber-100 disabled:opacity-50 text-sm font-medium"
+                >
+                  {clearingGarmin ? 'Clearing Garmin workouts…' : 'Clear all Garmin workouts'}
+                </button>
+                {clearGarminMessage ? (
+                  <p className="text-sm text-gray-700" role="status">
+                    {clearGarminMessage}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={handleDisconnect}
+                  disabled={busy || clearingGarmin}
+                  className="w-full py-2.5 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 text-sm font-medium"
+                >
+                  {busy ? 'Working…' : 'Disconnect Garmin'}
+                </button>
+              </>
             ) : (
               <button
                 type="button"

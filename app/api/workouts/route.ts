@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
     }
 
     const standaloneOnly = searchParams.get("standalone") === "1";
+    const matchedOnly = searchParams.get("matched") === "1";
     const dateParam = searchParams.get("date");
     const dateRange =
       dateParam && dateParam.trim() ? utcDayRangeFromYmd(dateParam) : null;
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest) {
     const where = {
       athleteId: athlete.id,
       ...(standaloneOnly ? { planId: null } : {}),
+      ...(matchedOnly ? { matchedActivityId: { not: null } } : {}),
       ...(dateRange ? { date: { gte: dateRange.gte, lt: dateRange.lt } } : {}),
     };
 

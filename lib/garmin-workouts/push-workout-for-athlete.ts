@@ -100,9 +100,15 @@ export async function pushWorkoutToGarminForAthlete(
 
     const token = await requireGarminTokenFresh(athleteId);
 
+    const hasWeekPrefix = /^W\d/i.test(workout.title.trim());
+    const garminTitle =
+      !hasWeekPrefix && workout.weekNumber != null
+        ? `W${workout.weekNumber}: ${workout.title}`
+        : workout.title;
+
     const garminWorkout = assembleGarminWorkout({
       id: workout.id,
-      title: workout.title,
+      title: garminTitle,
       workoutType: workout.workoutType,
       description: workout.description || undefined,
       segments: workout.segments.map((seg) => ({

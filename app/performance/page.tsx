@@ -97,7 +97,7 @@ function PerformanceHub() {
       const [lastRunRes, activitiesRes, workoutsRes] = await Promise.all([
         fetch("/api/me/last-logged-workout", { headers: athleteBearerFetchHeaders(token) }),
         fetch("/api/activities?limit=5", { headers: athleteBearerFetchHeaders(token) }),
-        fetch(`/api/workouts?paged=1&limit=${pageSize}&offset=0`, {
+        fetch(`/api/workouts?paged=1&limit=${pageSize}&offset=0&matched=1`, {
           headers: athleteBearerFetchHeaders(token),
         }),
       ]);
@@ -150,7 +150,7 @@ function PerformanceHub() {
     try {
       const token = await u.getIdToken();
       const res = await fetch(
-        `/api/workouts?paged=1&limit=${pageSize}&offset=${workoutOffset}`,
+        `/api/workouts?paged=1&limit=${pageSize}&offset=${workoutOffset}&matched=1`,
         { headers: athleteBearerFetchHeaders(token) }
       );
       const wJson = (await res.json()) as {
@@ -231,7 +231,7 @@ function PerformanceHub() {
           <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Recent workouts
+                Completed workouts
               </h2>
               <Link
                 href="/workouts"
@@ -242,18 +242,8 @@ function PerformanceHub() {
             </div>
             {workoutRows.length === 0 ? (
               <p className="text-sm text-gray-600">
-                No saved workouts yet. Sessions you create from{" "}
-                <Link href="/training" className="font-medium text-orange-600 hover:text-orange-700">
-                  Plan
-                </Link>{" "}
-                or{" "}
-                <Link
-                  href="/build-a-run"
-                  className="font-medium text-orange-600 hover:text-orange-700"
-                >
-                  Build a run
-                </Link>{" "}
-                show up here.
+                No completed workouts yet. Sessions matched from Garmin show up here once you run a
+                scheduled workout.
               </p>
             ) : (
               <>

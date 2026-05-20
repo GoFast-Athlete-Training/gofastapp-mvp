@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { TrainingPlanLifecycle } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { pushWorkoutToGarminForAthlete } from "@/lib/garmin-workouts/push-workout-for-athlete";
+import { materializeTodayPlanWorkoutForAthlete } from "@/lib/training/materialize-todays-plan-workout";
 import { ymdFromDate } from "@/lib/training/plan-utils";
 
 export const dynamic = "force-dynamic";
@@ -8,8 +10,8 @@ export const maxDuration = 300;
 
 /**
  * GET /api/cron/auto-push-garmin
- * Pushes today's workouts (UTC calendar date on `workouts.date`) to Garmin for athletes who
- * are connected and have not been pushed yet (`garminWorkoutId` null).
+ * 1) Materialize today's plan workout into `workouts` (resolver / find-or-create).
+ * 2) Push today's plan workouts (UTC `workouts.date`) to Garmin when not yet pushed.
  * Secured with Authorization: Bearer CRON_SECRET or ?secret= (Vercel Cron uses GET).
  */
 export async function GET(request: NextRequest) {
@@ -30,10 +32,45 @@ export async function GET(request: NextRequest) {
   const end = new Date(now);
   end.setUTCHours(23, 59, 59, 999);
 
+  const todayYmd = ymdFromDate(now);
+
   try {
+    const activePlans = await prisma.training_plans.findMany({
+      where: {
+        lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+        Athlete: {
+          garmin_access_token: { not: null },
+          garmin_user_id: { not: null },
+        },
+      },
+      select: { athleteId: true },
+      take: 40,
+    });
+
+    const materializeResults: Array<{
+      athleteId: string;
+      status: string;
+      workoutId?: string;
+      message?: string;
+    }> = [];
+
+    const seenAthletes = new Set<string>();
+    for (const row of activePlans) {
+      if (seenAthletes.has(row.athleteId)) continue;
+      seenAthletes.add(row.athleteId);
+      const m = await materializeTodayPlanWorkoutForAthlete(row.athleteId, todayYmd);
+      materializeResults.push({
+        athleteId: row.athleteId,
+        status: m.status,
+        ...(m.status === "materialized" ? { workoutId: m.workoutId } : {}),
+        ...(m.status === "error" ? { message: m.message } : {}),
+      });
+    }
+
     const candidates = await prisma.workouts.findMany({
       where: {
         garminWorkoutId: null,
+        planId: { not: null },
         date: { gte: start, lte: end },
         Athlete: {
           garmin_access_token: { not: null },
@@ -86,7 +123,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      todayYmd: ymdFromDate(now),
+      todayYmd,
+      materializeResults,
       candidateCount: candidates.length,
       results,
     });
