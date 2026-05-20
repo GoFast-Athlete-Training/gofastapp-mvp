@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
   end.setUTCHours(23, 59, 59, 999);
 
   const todayYmd = ymdFromDate(now);
+  console.info("[auto-push-garmin] cron start", { todayYmd });
 
   try {
     const activePlans = await prisma.training_plans.findMany({
@@ -69,7 +70,6 @@ export async function GET(request: NextRequest) {
 
     const candidates = await prisma.workouts.findMany({
       where: {
-        garminWorkoutId: null,
         planId: { not: null },
         date: { gte: start, lte: end },
         Athlete: {

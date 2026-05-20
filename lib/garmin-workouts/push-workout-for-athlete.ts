@@ -137,7 +137,17 @@ export async function pushWorkoutToGarminForAthlete(
 
     let garminWorkoutId = workout.garminWorkoutId;
     if (garminWorkoutId != null) {
-      await client.updateWorkout(garminWorkoutId, garminWorkout);
+      try {
+        await client.updateWorkout(garminWorkoutId, garminWorkout);
+      } catch (e) {
+        // Stale id after user deleted workouts in Garmin Connect — create fresh.
+        if (e instanceof GarminApiError && e.status === 404) {
+          const result = await client.createWorkout(garminWorkout);
+          garminWorkoutId = result.workoutId;
+        } else {
+          throw e;
+        }
+      }
     } else {
       const result = await client.createWorkout(garminWorkout);
       garminWorkoutId = result.workoutId;

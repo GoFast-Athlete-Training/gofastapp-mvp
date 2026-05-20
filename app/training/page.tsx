@@ -88,6 +88,8 @@ export default function TrainingHubPage() {
   const [hubError, setHubError] = useState<string | null>(null);
   const [planMenuOpen, setPlanMenuOpen] = useState(false);
   const [selectedDayKey, setSelectedDayKey] = useState<string>("");
+  const [pushingGarmin, setPushingGarmin] = useState(false);
+  const [garminPushMessage, setGarminPushMessage] = useState<string | null>(null);
   /** Active plan in DB is past race day — prompt next goal instead of full schedule UI. */
   const [pastRacePlan, setPastRacePlan] = useState<{
     id: string;
@@ -238,6 +240,51 @@ export default function TrainingHubPage() {
     if (!authReady) return;
     void loadHub();
   }, [authReady, loadHub]);
+
+  async function handleSendTodayToGarmin() {
+    const u = auth.currentUser;
+    if (!u) return;
+    setPushingGarmin(true);
+    setGarminPushMessage(null);
+    try {
+      const token = await u.getIdToken();
+      const res = await fetch("/api/me/push-todays-plan-workout", {
+        method: "POST",
+        headers: athleteBearerFetchHeaders(token),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        scheduledDate?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || "Could not push to Garmin");
+      }
+      setGarminPushMessage(
+        data.scheduledDate
+          ? `Sent to Garmin for ${data.scheduledDate}. Sync your watch in Garmin Connect.`
+          : "Sent to Garmin. Sync your watch in Garmin Connect."
+      );
+      if (planDetail) {
+        setLoadingWeek(true);
+        try {
+          const { days, weekPerformance: wp } = await fetchPlanWeekSchedule(
+            planDetail.id,
+            weekNumber,
+            token
+          );
+          setWeekDays(days);
+          setWeekPerformance(wp);
+        } finally {
+          setLoadingWeek(false);
+        }
+      }
+    } catch (e) {
+      setGarminPushMessage(e instanceof Error ? e.message : "Push failed");
+    } finally {
+      setPushingGarmin(false);
+    }
+  }
 
   async function deleteActivePlan() {
     if (!planDetail) return;
@@ -672,6 +719,16 @@ export default function TrainingHubPage() {
                           >
                             Open session
                           </Link>
+                          {focusIsToday ? (
+                            <button
+                              type="button"
+                              disabled={pushingGarmin}
+                              onClick={() => void handleSendTodayToGarmin()}
+                              className="inline-flex justify-center rounded-xl border-2 border-sky-600 bg-sky-50 px-6 py-3 text-sm font-semibold text-sky-900 hover:bg-sky-100 disabled:opacity-50"
+                            >
+                              {pushingGarmin ? "Sending…" : "Send to Garmin"}
+                            </button>
+                          ) : null}
                           {focusPlanDay.workoutId ? (
                             <Link
                               href={`/workouts/${focusPlanDay.workoutId}/let-others-join`}
@@ -681,6 +738,11 @@ export default function TrainingHubPage() {
                             </Link>
                           ) : null}
                         </div>
+                        {focusIsToday && garminPushMessage ? (
+                          <p className="mt-3 text-sm text-gray-700" role="status">
+                            {garminPushMessage}
+                          </p>
+                        ) : null}
                       </>
                     )
                   ) : (
