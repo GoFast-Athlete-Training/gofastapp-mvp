@@ -169,6 +169,8 @@ export default function TrainingPlanDayPreviewPage() {
   const [workoutDetailError, setWorkoutDetailError] = useState<string | null>(null);
   const [workout, setWorkout] = useState<PreviewWorkout | null>(null);
   const [openingWorkout, setOpeningWorkout] = useState(false);
+  const [pushingGarmin, setPushingGarmin] = useState(false);
+  const [garminPushMessage, setGarminPushMessage] = useState<string | null>(null);
   /** e.g. navigate to /workouts/[id] failed — does not mean the day is unscheduled */
   const [openWorkoutError, setOpenWorkoutError] = useState<string | null>(null);
   const [raceResultRow, setRaceResultRow] = useState<{
@@ -211,6 +213,7 @@ export default function TrainingPlanDayPreviewPage() {
     setWorkoutError(null);
     setWorkoutDetailError(null);
     setOpenWorkoutError(null);
+    setGarminPushMessage(null);
     try {
       const u = auth.currentUser;
       if (!u) throw new Error("Sign in required");
@@ -340,6 +343,55 @@ export default function TrainingPlanDayPreviewPage() {
     : dateKey ?? "";
   const canOpenWorkout = workoutId != null;
 
+  async function pushWorkoutIdToGarmin(wid: string, token: string, showSuccess: boolean) {
+    const res = await fetch(`/api/workouts/${encodeURIComponent(wid)}/push-to-garmin`, {
+      method: "POST",
+      headers: athleteBearerFetchHeaders(token),
+    });
+    const data = (await res.json()) as {
+      error?: string;
+      details?: string;
+      scheduledDate?: string;
+    };
+    if (!res.ok) {
+      throw new Error(data.error || data.details || "Could not send to Garmin");
+    }
+    if (showSuccess) {
+      setGarminPushMessage(
+        data.scheduledDate
+          ? `Sent to Garmin for ${data.scheduledDate}. Sync your watch in Garmin Connect.`
+          : "Sent to Garmin. Sync your watch in Garmin Connect."
+      );
+    }
+  }
+
+  async function handlePushToGarmin() {
+    if (!planDetail || !dateKey) return;
+    const u = auth.currentUser;
+    if (!u) return;
+    setPushingGarmin(true);
+    setGarminPushMessage(null);
+    setOpenWorkoutError(null);
+    try {
+      const token = await u.getIdToken();
+      const wid =
+        workoutId ?? (await resolveWorkoutForPlanDay(planDetail.id, dateKey, token));
+      if (!workoutId) setWorkoutId(wid);
+      await pushWorkoutIdToGarmin(wid, token, true);
+      try {
+        const { workout: rawW } = await fetchTrainingWorkoutDetail(wid, token);
+        setWorkout(pickWorkoutPayload(rawW));
+        setWorkoutDetailError(null);
+      } catch {
+        // Push succeeded; detail refresh is helpful but not required.
+      }
+    } catch (e) {
+      setGarminPushMessage(e instanceof Error ? e.message : "Could not send to Garmin");
+    } finally {
+      setPushingGarmin(false);
+    }
+  }
+
   async function handleDoThisWorkout() {
     if (!planDetail || !dateKey) return;
     const u = auth.currentUser;
@@ -350,8 +402,17 @@ export default function TrainingPlanDayPreviewPage() {
       const token = await u.getIdToken();
       const wid =
         workoutId ?? (await resolveWorkoutForPlanDay(planDetail.id, dateKey, token));
+      if (isToday) {
+        setPushingGarmin(true);
+        setGarminPushMessage(null);
+        try {
+          await pushWorkoutIdToGarmin(wid, token, false);
+        } finally {
+          setPushingGarmin(false);
+        }
+      }
       stashWorkoutDayNav(wid, { source: "plan-preview", backPath: previewBackPath });
-      router.push(`/workouts/${wid}?edit=1`);
+      router.push(`/workouts/${wid}`);
     } catch (e) {
       setOpenWorkoutError(e instanceof Error ? e.message : "Could not open workout");
     } finally {
@@ -437,6 +498,11 @@ export default function TrainingPlanDayPreviewPage() {
                   {openWorkoutError}
                 </p>
               )}
+              {garminPushMessage && (
+                <p className="text-sm text-gray-700 rounded-lg border border-sky-100 bg-sky-50 px-3 py-2" role="status">
+                  {garminPushMessage}
+                </p>
+              )}
               {!workoutLoading && workout && workout.segments.length === 0 && (
                 <p className="text-sm text-gray-600">
                   No structured steps yet for this workout type. You can still open the full workout
@@ -514,13 +580,23 @@ export default function TrainingPlanDayPreviewPage() {
             </div>
 
             <div className="border-t border-gray-100 px-5 py-4 space-y-3 bg-gray-50/60">
+              {isToday ? (
+                <button
+                  type="button"
+                  onClick={() => void handlePushToGarmin()}
+                  disabled={pushingGarmin || workoutLoading || !!workoutError}
+                  className="w-full rounded-xl border border-orange-200 bg-white py-3 text-sm font-semibold text-orange-700 hover:bg-orange-50 disabled:opacity-50"
+                >
+                  {pushingGarmin ? "Sending to Garmin..." : "Send to Garmin"}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => void handleDoThisWorkout()}
-                disabled={openingWorkout || !canOpenWorkout || workoutLoading || !!workoutError}
+                disabled={openingWorkout || pushingGarmin || !canOpenWorkout || workoutLoading || !!workoutError}
                 className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
               >
-                See details
+                {openingWorkout || pushingGarmin ? "Preparing..." : "See details"}
               </button>
               <div className="flex gap-2">
                 {prevDateKey && (
