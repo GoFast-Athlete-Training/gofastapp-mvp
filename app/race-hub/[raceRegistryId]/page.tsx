@@ -578,11 +578,6 @@ function RaceHubPageInner() {
                       {distanceFallback}
                     </span>
                   ) : null}
-                  {hubReadOnlyGoalTime ? (
-                    <span className="inline-flex rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-900">
-                      Goal: {hubReadOnlyGoalTime}
-                    </span>
-                  ) : null}
                 </div>
               </div>
             </div>

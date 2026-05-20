@@ -11,8 +11,6 @@ import {
   daysUntilRace,
   formatRaceListDate,
 } from "@/lib/races-display";
-import { InlineGoalForm } from "@/components/races/InlineGoalForm";
-
 type RaceRegistryRow = {
   id: string;
   name: string;
@@ -65,8 +63,8 @@ function bigCountdownLabel(iso: string): string {
   return `${w} week${w === 1 ? "" : "s"} to go`;
 }
 
-/** Next 4 calendar months from today, each a compact card with race list (nice-to-have at page bottom). */
-function NextFourMonthsRaceCards({
+/** Next 6 calendar months from today, each a compact card with race list. */
+function NextSixMonthsRaceCards({
   upcomingSignups,
 }: {
   upcomingSignups: Signup[];
@@ -74,7 +72,7 @@ function NextFourMonthsRaceCards({
   const windowMonths = useMemo(() => {
     const d0 = new Date();
     const out: { y: number; m: number }[] = [];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 6; i++) {
       const d = new Date(d0.getFullYear(), d0.getMonth() + i, 1);
       out.push({ y: d.getFullYear(), m: d.getMonth() });
     }
@@ -193,18 +191,12 @@ function SignupRaceCard({
               ? `${r.distanceMiles} mi · ${r.raceType ?? "—"}`
               : "—")}
       </p>
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <div className="mt-2.5">
         <Link
           href={personalRaceHref(r)}
           className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-2.5 py-1.5"
         >
-          Open →
-        </Link>
-        <Link
-          href={`/race-hub/${r.id}`}
-          className="text-xs font-semibold text-orange-700 hover:underline"
-        >
-          Hub
+          Get Ready →
         </Link>
       </div>
     </li>
@@ -325,15 +317,6 @@ export default function MyRacesPage() {
   }
 
   const heroGoal = heroSignup ? goalByRegistryId.get(heroSignup.raceRegistryId) ?? null : null;
-  const raceForGoalForm = heroSignup
-    ? {
-        id: heroSignup.race_registry.id,
-        name: heroSignup.race_registry.name,
-        raceDate: heroSignup.race_registry.raceDate,
-        distanceLabel: heroSignup.race_registry.distanceLabel,
-        distanceMeters: heroSignup.race_registry.distanceMeters,
-      }
-    : null;
 
   return (
     <div className="space-y-8">
@@ -364,13 +347,13 @@ export default function MyRacesPage() {
             <div className="min-w-0">
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Races</h1>
               <p className="text-gray-600 text-sm mt-1 max-w-xl">
-                Primary race and goal first; other races as cards; glance at upcoming months below.
+                Your race schedule — tap any race for your personal dashboard.
               </p>
             </div>
             <div className="flex flex-col items-stretch sm:items-end gap-2 shrink-0 text-sm">
               <Link
                 href="/races/find"
-                className="text-xs font-semibold text-orange-700 hover:underline sm:text-right"
+                className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-orange-600 shadow-sm"
               >
                 Find more races →
               </Link>
@@ -419,7 +402,7 @@ export default function MyRacesPage() {
             </p>
           ) : null}
 
-          {heroSignup && raceForGoalForm ? (
+          {heroSignup ? (
             <section className="rounded-3xl border-2 border-orange-200 bg-gradient-to-br from-orange-50 via-white to-amber-50/50 p-6 sm:p-8 shadow-sm">
               <div className="flex flex-col lg:flex-row lg:items-start gap-6">
                 {heroSignup.race_registry.logoUrl ? (
@@ -462,15 +445,13 @@ export default function MyRacesPage() {
                     ) : null}
                   </div>
 
-                  <div className="mt-5">
-                    <p className="text-xs font-semibold text-gray-600 mb-1">Finish goal</p>
-                    <InlineGoalForm
-                      race={raceForGoalForm}
-                      goal={heroGoal}
-                      onSaved={() => void loadAll()}
-                      className="mt-0"
-                    />
-                  </div>
+                  {heroGoal?.goalTime?.trim() ? (
+                    <div className="mt-5">
+                      <span className="inline-flex items-center rounded-full bg-orange-100 text-orange-900 px-3 py-1.5 text-sm font-bold tabular-nums">
+                        Goal {heroGoal.goalTime.trim()}
+                      </span>
+                    </div>
+                  ) : null}
 
                   <div className="mt-5 flex flex-wrap items-center gap-2">
                     {activePlanSummary?.hasSchedule &&
@@ -504,16 +485,16 @@ export default function MyRacesPage() {
 
                   <div className="mt-6 flex flex-wrap gap-3">
                     <Link
-                      href={`/race-hub/${heroSignup.race_registry.id}`}
+                      href={personalRaceHref(heroSignup.race_registry)}
                       className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-5 py-3 text-sm font-bold text-white hover:bg-orange-600 shadow-sm"
                     >
-                      Community hub →
+                      Get Ready →
                     </Link>
                     <Link
-                      href={personalRaceHref(heroSignup.race_registry)}
+                      href={`/race-hub/${heroSignup.race_registry.id}`}
                       className="inline-flex items-center justify-center rounded-xl border-2 border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-50"
                     >
-                      Race details →
+                      Join Others Racing This →
                     </Link>
                   </div>
                 </div>
@@ -546,9 +527,9 @@ export default function MyRacesPage() {
             <section className="pt-6 border-t border-gray-100">
               <h2 className="text-sm font-semibold text-gray-700 mb-0.5">Next few months</h2>
               <p className="text-xs text-gray-500 mb-3">
-                Quick view — tap a race to open details.
+                Quick view — tap a race to open your dashboard.
               </p>
-              <NextFourMonthsRaceCards upcomingSignups={upcomingSignups} />
+              <NextSixMonthsRaceCards upcomingSignups={upcomingSignups} />
             </section>
           ) : null}
         </>
