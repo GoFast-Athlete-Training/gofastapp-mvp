@@ -25,6 +25,7 @@ export type SegmentSnapshotDocument = {
 export type SegmentSnapshotSource =
   | "api_lazy_segments"
   | "plan_day_materialize"
+  | "plan_day_materialize_existing"
   | "segments_put"
   | "standalone_workout_post"
   | "garmin_push";
