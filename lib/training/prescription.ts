@@ -332,21 +332,50 @@ export function prescribe(params: {
   const type = entry.workoutType as WorkoutType;
 
   if (type === "Easy") {
-    const offset =
+    const workOffset =
       easyWorkPaceOffsetOverrideSecPerMile != null &&
       Number.isFinite(easyWorkPaceOffsetOverrideSecPerMile)
         ? easyWorkPaceOffsetOverrideSecPerMile
         : entry.workPaceOffsetSecPerMile;
-    const pace = secPerMile(anchorSecondsPerMile, offset);
-    return [
-      {
-        stepOrder: 1,
-        title: "Easy Run",
+    const warmupM = entry.warmupMiles != null && entry.warmupMiles > 0 ? round(entry.warmupMiles, 2) : 0;
+    const cooldownM =
+      entry.cooldownMiles != null && entry.cooldownMiles > 0 ? round(entry.cooldownMiles, 2) : 0;
+    const explicitWorkM =
+      entry.workBaseMiles != null && entry.workBaseMiles > 0 ? round(entry.workBaseMiles, 2) : null;
+    const workM = Math.max(
+      0,
+      explicitWorkM ?? round(totalMiles - warmupM - cooldownM, 2)
+    );
+    let order = 1;
+    const out: WorkoutStep[] = [];
+    if (warmupM > 0) {
+      out.push({
+        stepOrder: order++,
+        title: "Warmup",
         durationType: "DISTANCE",
-        durationValue: round(totalMiles, 2),
-        ...targetsOrOpen(pace),
-      },
-    ];
+        durationValue: warmupM,
+        ...targetsOrOpen(secPerMile(anchorSecondsPerMile, entry.warmupPaceOffsetSecPerMile)),
+      });
+    }
+    if (workM > 0) {
+      out.push({
+        stepOrder: order++,
+        title: "Work",
+        durationType: "DISTANCE",
+        durationValue: round(workM, 2),
+        ...targetsOrOpen(secPerMile(anchorSecondsPerMile, workOffset)),
+      });
+    }
+    if (cooldownM > 0) {
+      out.push({
+        stepOrder: order++,
+        title: "Cooldown",
+        durationType: "DISTANCE",
+        durationValue: cooldownM,
+        ...targetsOrOpen(secPerMile(anchorSecondsPerMile, entry.cooldownPaceOffsetSecPerMile)),
+      });
+    }
+    return out;
   }
 
   if (type === "LongRun") {

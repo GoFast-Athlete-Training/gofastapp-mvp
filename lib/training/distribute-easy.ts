@@ -6,6 +6,10 @@
 
 import type { PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";
 import type { EasyRunConfigResolved } from "@/lib/training/easy-run-config";
+import {
+  estimateCatalogueWorkoutMiles,
+  type CatalogueMileEstimateInput,
+} from "@/lib/training/catalogue-mile-estimate";
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -18,6 +22,7 @@ export type DistributeEasyInput = {
   maxWeeklyMiles?: number | null;
   raceDistanceMiles: number;
   easyRunConfig: EasyRunConfigResolved;
+  catalogueRowsById: Map<string, CatalogueMileEstimateInput>;
   /** Preferred training days count (typical full week); used to scale week-1 standard miles. */
   typicalWeekPreferredCount: number;
 };
@@ -60,9 +65,13 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
     const easySlots = week.days.filter((d) => d.workoutType === "Easy");
     if (easySlots.length === 0) continue;
 
-    const milesPerEasy = round2(cfg.standardMiles * w1Scale);
-
     for (const ep of easySlots) {
+      const row = ep.catalogueWorkoutId
+        ? input.catalogueRowsById.get(ep.catalogueWorkoutId)
+        : undefined;
+      const milesPerEasy = round2(
+        estimateCatalogueWorkoutMiles(row ?? null, "Easy", cfg.standardMiles) * w1Scale
+      );
       ep.miles = milesPerEasy > 0 ? milesPerEasy : 0;
     }
 

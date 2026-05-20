@@ -76,8 +76,6 @@ const LONG_RUN_DAY_OPTIONS: { value: number; label: string }[] = [
   { value: 7, label: "Sunday" },
 ];
 
-const MI_TARGET_FALLBACK = "50";
-
 const MI_PER_M = 1609.34;
 
 function typeLabelForCard(workoutType: string): string {
@@ -191,9 +189,7 @@ export default function TrainingSetupPlanPage({
   const [weekNumber, setWeekNumber] = useState(1);
   const [phaseModalOpen, setPhaseModalOpen] = useState(false);
   const [preferredDaysLocal, setPreferredDaysLocal] = useState<number[]>([]);
-  const [weeklyMilesTarget, setWeeklyMilesTarget] = useState(MI_TARGET_FALLBACK);
-  /** Saved profile default; never derived from preset baseMiles (that's long-run pool, not weekly target). */
-  const [profileWeeklyTargetMi, setProfileWeeklyTargetMi] = useState<number | null>(null);
+  const [weeklyMilesTarget, setWeeklyMilesTarget] = useState("");
   const [preferredLongRunDowLocal, setPreferredLongRunDowLocal] = useState(6);
   const [preferredTempoDowLocal, setPreferredTempoDowLocal] = useState<number | null>(null);
   const [preferredIntervalDowLocal, setPreferredIntervalDowLocal] = useState<number | null>(
@@ -212,9 +208,8 @@ export default function TrainingSetupPlanPage({
     setError(null);
     try {
       const token = await getToken();
-      const { plan, weeklyMileageTargetPreference } = await fetchTrainingPlanDetail(planId, token);
+      const { plan } = await fetchTrainingPlanDetail(planId, token);
       setPlan(plan as PlanDetail);
-      setProfileWeeklyTargetMi(weeklyMileageTargetPreference);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
       setPlan(null);
@@ -233,21 +228,7 @@ export default function TrainingSetupPlanPage({
     } else {
       setPreferredDaysLocal([]);
     }
-    const fromPlan =
-      plan.weeklyMileageTarget != null && Number.isFinite(Number(plan.weeklyMileageTarget))
-        ? Math.round(Number(plan.weeklyMileageTarget))
-        : null;
-    const fromProfile =
-      profileWeeklyTargetMi != null && Number.isFinite(profileWeeklyTargetMi)
-        ? Math.round(profileWeeklyTargetMi)
-        : null;
-    if (fromPlan != null) {
-      setWeeklyMilesTarget(String(fromPlan));
-    } else if (fromProfile != null) {
-      setWeeklyMilesTarget(String(fromProfile));
-    } else {
-      setWeeklyMilesTarget(MI_TARGET_FALLBACK);
-    }
+    setWeeklyMilesTarget("");
     const pld = plan.preferredLongRunDow;
     if (pld === 6 || pld === 7) {
       setPreferredLongRunDowLocal(pld);
@@ -277,8 +258,6 @@ export default function TrainingSetupPlanPage({
     plan?.preferredTempoDow,
     plan?.preferredIntervalDow,
     plan?.preferredQualityDays,
-    plan?.weeklyMileageTarget,
-    profileWeeklyTargetMi,
   ]);
 
   useEffect(() => {
@@ -491,7 +470,8 @@ export default function TrainingSetupPlanPage({
         setError("Select at least one preferred training day.");
         return;
       }
-      let targetMiles = Math.round(Number(weeklyMilesTarget));
+      const weeklyMilesRaw = weeklyMilesTarget.trim();
+      let targetMiles = weeklyMilesRaw === "" ? NaN : Math.round(Number(weeklyMilesRaw));
       if (!Number.isFinite(targetMiles)) {
         setError("Please enter a number for your weekly miles.");
         return;

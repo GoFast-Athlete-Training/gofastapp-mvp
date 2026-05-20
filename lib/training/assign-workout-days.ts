@@ -231,16 +231,7 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
       continue;
     }
 
-    const preferredInWeek1 =
-      weekNumber === 1
-        ? preferred.filter((d) => {
-            const dt = dateForDayInWeek(input.planStartDate, weekNumber, d);
-            if (dt.getTime() < planStart.getTime()) return false;
-            if (nOffset !== 0 && dt.getTime() > raceUtc.getTime()) return false;
-            return true;
-          }).length
-        : 999;
-    const partialWeek1 = weekNumber === 1 && preferredInWeek1 < 4;
+    const partialWeek1 = weekNumber === 1 && planStart.getTime() > weekAnchor.getTime();
 
     const lrCycleIndex = cyclePos;
     const lrMod =
@@ -278,28 +269,31 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
     const tRotMod = Math.max(input.tempoPositions.length, 1);
     const iRotMod = Math.max(input.intervalsPositions.length, 1);
 
-    if (!partialWeek1) {
-      for (let slot = 0; slot < HARD_SESSION_SLOTS; slot++) {
-        const idealDow = slot === 0 ? tempoDow1 : intervalDow2;
-        const isTempo = slot === 0;
-        const ordBefore = isTempo ? tempoSessionOrdinal : intervalSessionOrdinal;
-        const rotMod = isTempo ? tRotMod : iRotMod;
-        const pci = ordBefore % (rotMod > 0 ? rotMod : 4);
-        const posId = catalogueIdForRotation(
-          isTempo ? input.tempoPositions : input.intervalsPositions,
-          ordBefore
-        );
-        const kind = isTempo ? "tempo" : ("interval" as const);
-        if (
-          tryPlaceSessionEntry(
+    let hardSessionsPlacedThisWeek = 0;
+    for (let slot = 0; slot < HARD_SESSION_SLOTS; slot++) {
+      if (partialWeek1 && hardSessionsPlacedThisWeek >= 1) break;
+      const idealDow = slot === 0 ? tempoDow1 : intervalDow2;
+      const isTempo = slot === 0;
+      const ordBefore = isTempo ? tempoSessionOrdinal : intervalSessionOrdinal;
+      const rotMod = isTempo ? tRotMod : iRotMod;
+      const pci = ordBefore % (rotMod > 0 ? rotMod : 4);
+      const posId = catalogueIdForRotation(
+        isTempo ? input.tempoPositions : input.intervalsPositions,
+        ordBefore
+      );
+      const kind = isTempo ? "tempo" : ("interval" as const);
+      const placed = partialWeek1
+        ? preferred.includes(idealDow) &&
+          tryPlaceEntrySkeleton(idealDow, { kind, catalogueWorkoutId: posId, planCycleIndex: pci })
+        : tryPlaceSessionEntry(
             idealDow,
             { kind, catalogueWorkoutId: posId, planCycleIndex: pci },
             false
-          )
-        ) {
-          if (slot === 0) tempoSessionOrdinal++;
-          else intervalSessionOrdinal++;
-        }
+          );
+      if (placed) {
+        hardSessionsPlacedThisWeek++;
+        if (slot === 0) tempoSessionOrdinal++;
+        else intervalSessionOrdinal++;
       }
     }
 

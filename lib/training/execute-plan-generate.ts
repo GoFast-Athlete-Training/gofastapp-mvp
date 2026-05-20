@@ -269,6 +269,7 @@ export async function executePlanGenerate(params: {
         : undefined,
     raceDistanceMiles,
     easyRunConfig: easyRunResolved,
+    catalogueRowsById,
     typicalWeekPreferredCount: preferredDays.length,
   });
 
