@@ -20,6 +20,7 @@ const raceSearchSelect = {
   startTime: true,
   logoUrl: true,
   slug: true,
+  summaryPhrase: true,
 } satisfies Prisma.race_registrySelect;
 
 async function searchRaces(
