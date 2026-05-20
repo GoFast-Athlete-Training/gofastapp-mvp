@@ -9,6 +9,7 @@ import { dateForDayInWeek } from "@/lib/training/plan-schedule-dates";
 import { dayNameToOurDow } from "@/lib/training/schedule-parser";
 import { ymdFromDate } from "@/lib/training/plan-utils";
 import { segmentSnapshotDocumentFromDbRows } from "@/lib/training/workout-segment-snapshot";
+import { materializeWorkoutForPlanDay } from "@/lib/training/workout-materializer";
 
 export type PushWorkoutForAthleteResult =
   | {
@@ -48,19 +49,31 @@ export async function pushWorkoutToGarminForAthlete(
   scheduleDateYmdOverride?: string
 ): Promise<PushWorkoutForAthleteResult> {
   try {
-    const workout = await prisma.workouts.findFirst({
-      where: { id: workoutId, athleteId },
-      include: {
-        segments: { orderBy: { stepOrder: "asc" } },
-        training_plans: { select: { id: true, startDate: true } },
-      },
-    });
+    const loadWorkout = () =>
+      prisma.workouts.findFirst({
+        where: { id: workoutId, athleteId },
+        include: {
+          segments: { orderBy: { stepOrder: "asc" } },
+          training_plans: { select: { id: true, startDate: true } },
+        },
+      });
+
+    let workout = await loadWorkout();
 
     if (!workout) {
       return { ok: false, code: "not_found", message: "Workout not found" };
     }
 
-    if (!workout.segments?.length) {
+    if (!workout.segments?.length && workout.planId && workout.date) {
+      await materializeWorkoutForPlanDay({
+        planId: workout.planId,
+        athleteId,
+        dateParam: ymdFromDate(workout.date),
+      });
+      workout = await loadWorkout();
+    }
+
+    if (!workout?.segments?.length) {
       return { ok: false, code: "no_segments", message: "Workout has no segments" };
     }
 

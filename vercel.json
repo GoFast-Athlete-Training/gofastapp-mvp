@@ -9,7 +9,7 @@
       "schedule": "0 5 * * *"
     },
     {
-      "path": "/api/cron/auto-push-garmin",
+      "path": "/api/cron/auto-push-garmin-backup",
       "schedule": "0 12 * * *"
     }
   ]

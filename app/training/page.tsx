@@ -286,6 +286,13 @@ export default function TrainingHubPage() {
     }
   }
 
+  async function handleOpenSession(dateKey: string) {
+    if (dateKey === localTodayKey()) {
+      await handleSendTodayToGarmin();
+    }
+    router.push(`/training/day/${dateKey}`);
+  }
+
   async function deleteActivePlan() {
     if (!planDetail) return;
     if (
@@ -713,12 +720,14 @@ export default function TrainingHubPage() {
                             : ""}
                         </p>
                         <div className="mt-5 flex flex-wrap items-center gap-3">
-                          <Link
-                            href={`/training/day/${focusPlanDay.dateKey}`}
-                            className="inline-flex justify-center rounded-xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-700"
+                          <button
+                            type="button"
+                            onClick={() => void handleOpenSession(focusPlanDay.dateKey)}
+                            disabled={pushingGarmin}
+                            className="inline-flex justify-center rounded-xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
                           >
-                            Open session
-                          </Link>
+                            {focusIsToday && pushingGarmin ? "Sending…" : "Open session"}
+                          </button>
                           {focusIsToday ? (
                             <button
                               type="button"

@@ -15,10 +15,13 @@ import { dateForDayInWeek } from "./schedule-parser";
 import {
   prescribe,
   anchorSecondsPerMileFromPlanPace,
+  type WorkoutStep,
 } from "./prescription";
 import { metersToMiles } from "@/lib/pace-utils";
 import { segmentSnapshotDocumentFromApiSegments } from "./workout-segment-snapshot";
 import { resolveRacePaceSecondsPerMileForPlan } from "./goal-pace-calculator";
+import { parseEasyRunConfigJson } from "./easy-run-config";
+import { paceTargetFromSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 
 function utcDayBounds(d: Date): { gte: Date; lte: Date } {
   const x = utcDateOnly(d);
@@ -43,6 +46,62 @@ function parseDateParam(dateParam: string): Date {
 
 function dateKeyUtc(d: Date): string {
   return utcDateOnly(d).toISOString().slice(0, 10);
+}
+
+function round(n: number, d: number): number {
+  const f = 10 ** d;
+  return Math.round(n * f) / f;
+}
+
+function fallbackEasyRunSteps(params: {
+  scheduleMiles: number;
+  currentFiveKPace: string | null | undefined;
+  easyRunConfig: unknown;
+}): WorkoutStep[] {
+  if (!params.currentFiveKPace?.trim()) return [];
+  const anchor = anchorSecondsPerMileFromPlanPace(params.currentFiveKPace);
+  const easyCfg = parseEasyRunConfigJson(params.easyRunConfig);
+  const easyPaceSecPerMile = Math.max(1, anchor + easyCfg.paceOffsetSecPerMile);
+  return [
+    {
+      stepOrder: 1,
+      title: "Easy Run",
+      durationType: "DISTANCE",
+      durationValue: round(params.scheduleMiles, 2),
+      targets: [paceTargetFromSecondsPerMile(easyPaceSecPerMile)],
+    },
+  ];
+}
+
+async function createSegmentsForWorkout(params: {
+  tx: Prisma.TransactionClient;
+  workoutId: string;
+  steps: WorkoutStep[];
+  snapshotSource: string;
+}): Promise<void> {
+  const { tx, workoutId, steps, snapshotSource } = params;
+  if (steps.length === 0) return;
+  const segmentRows: Prisma.workout_segmentsCreateManyInput[] = steps.map((s) => ({
+    workoutId,
+    stepOrder: s.stepOrder,
+    title: s.title,
+    durationType: s.durationType,
+    durationValue: s.durationValue,
+    targets: s.targets as object | undefined,
+    repeatCount: s.repeatCount ?? undefined,
+    paceTargetEncodingVersion: 2,
+    updatedAt: new Date(),
+  }));
+  await tx.workout_segments.createMany({ data: segmentRows });
+  await tx.workouts.update({
+    where: { id: workoutId },
+    data: {
+      segmentSnapshotJson: segmentSnapshotDocumentFromApiSegments(
+        steps,
+        snapshotSource
+      ),
+    },
+  });
 }
 
 function stampWorkoutIdOnStructuredPlanSchedule(params: {
@@ -140,9 +199,12 @@ export async function materializeWorkoutForPlanDay(params: {
       athleteId,
       date: { gte, lte },
     },
-    select: { id: true },
+    select: {
+      id: true,
+      _count: { select: { segments: true } },
+    },
   });
-  if (existing) {
+  if (existing && existing._count.segments > 0) {
     return { workoutId: existing.id };
   }
 
@@ -194,6 +256,24 @@ export async function materializeWorkoutForPlanDay(params: {
       planCycleIndex: scheduled.planCycleIndex ?? null,
       easyWorkPaceOffsetOverrideSecPerMile: null,
     });
+  } else if (scheduled.workoutType === "Easy") {
+    steps = fallbackEasyRunSteps({
+      scheduleMiles: miles,
+      currentFiveKPace: plan.currentFiveKPace,
+      easyRunConfig: plan.easyRunConfig,
+    });
+  }
+
+  if (existing) {
+    await prisma.$transaction(async (tx) => {
+      await createSegmentsForWorkout({
+        tx,
+        workoutId: existing.id,
+        steps,
+        snapshotSource: "plan_day_materialize_existing",
+      });
+    });
+    return { workoutId: existing.id };
   }
 
   const planJson = plan.planSchedule;
@@ -218,31 +298,12 @@ export async function materializeWorkoutForPlanDay(params: {
       },
     });
 
-    if (steps.length) {
-      const segmentRows: Prisma.workout_segmentsCreateManyInput[] = steps.map(
-        (s) => ({
-          workoutId: w.id,
-          stepOrder: s.stepOrder,
-          title: s.title,
-          durationType: s.durationType,
-          durationValue: s.durationValue,
-          targets: s.targets as object | undefined,
-          repeatCount: s.repeatCount ?? undefined,
-          paceTargetEncodingVersion: 2,
-          updatedAt: new Date(),
-        })
-      );
-      await tx.workout_segments.createMany({ data: segmentRows });
-      await tx.workouts.update({
-        where: { id: w.id },
-        data: {
-          segmentSnapshotJson: segmentSnapshotDocumentFromApiSegments(
-            steps,
-            "plan_day_materialize"
-          ),
-        },
-      });
-    }
+    await createSegmentsForWorkout({
+      tx,
+      workoutId: w.id,
+      steps,
+      snapshotSource: "plan_day_materialize",
+    });
 
     if (jsonLooksStructured) {
       const nextSchedule = stampWorkoutIdOnStructuredPlanSchedule({
