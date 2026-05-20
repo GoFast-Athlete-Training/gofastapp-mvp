@@ -203,7 +203,9 @@ function PerformanceHub() {
       {authReady && !loading ? (
         <>
           {lastRun ? (
-            <LastRunPanel workout={lastRun} />
+            <LastRunPanel workout={lastRun}>
+              <AnalysisDeepPanel workoutId={lastRun.id} />
+            </LastRunPanel>
           ) : fallbackForDisplay ? (
             <LastActivityFallbackPanel row={fallbackForDisplay} />
           ) : (
@@ -223,15 +225,6 @@ function PerformanceHub() {
               </Link>
             </section>
           )}
-
-          {lastRun ? (
-            <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-4">
-                Analysis
-              </h2>
-              <AnalysisDeepPanel workoutId={lastRun.id} />
-            </section>
-          ) : null}
 
           <RunHistoryPanel rows={recentActivities} />
 

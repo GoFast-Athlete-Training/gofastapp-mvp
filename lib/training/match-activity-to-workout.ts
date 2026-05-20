@@ -20,13 +20,6 @@ function speedMpsToSecPerMile(mps: number | null | undefined): number | null {
   return Math.round(1609.34 / mps);
 }
 
-function utcDayBounds(d: Date): { start: Date; end: Date } {
-  const start = new Date(d);
-  start.setUTCHours(0, 0, 0, 0);
-  const end = new Date(d);
-  end.setUTCHours(23, 59, 59, 999);
-  return { start, end };
-}
 
 function isRunningActivityType(activityType: string | null | undefined): boolean {
   if (!activityType) return true; // allow unknown — many payloads omit; treat as eligible for match
@@ -261,19 +254,6 @@ export async function tryMatchActivityToTrainingWorkout(
         garminWorkoutId,
         matchedActivityId: null,
       },
-      include: workoutMatchInclude,
-    });
-  }
-
-  if (!candidate) {
-    const { start, end } = utcDayBounds(activity.startTime);
-    candidate = await prisma.workouts.findFirst({
-      where: {
-        athleteId: activity.athleteId,
-        date: { gte: start, lte: end },
-        matchedActivityId: null,
-      },
-      orderBy: { date: "asc" },
       include: workoutMatchInclude,
     });
   }

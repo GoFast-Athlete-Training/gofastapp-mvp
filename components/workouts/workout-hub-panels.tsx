@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { metersToMiDisplay } from "@/lib/training/workout-preview-payload";
 
@@ -141,7 +142,7 @@ function paceBandBadgeClasses(band: string | null): string {
   return "bg-gray-100 text-gray-700 border-gray-200";
 }
 
-export function LastRunPanel({ workout }: { workout: LastLoggedWorkout }) {
+export function LastRunPanel({ workout, children }: { workout: LastLoggedWorkout; children?: ReactNode }) {
   const day = lastRunDayLabel(workout.activityStartTime, workout.date);
   const actual = workout.actualAvgPaceSecPerMile;
   const delta = workout.paceDeltaSecPerMile;
@@ -230,6 +231,7 @@ export function LastRunPanel({ workout }: { workout: LastLoggedWorkout }) {
               : "on midpoint"}
         </p>
       ) : null}
+      {children ? <div className="mt-6 border-t border-gray-100 pt-5">{children}</div> : null}
     </section>
   );
 }

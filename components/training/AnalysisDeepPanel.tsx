@@ -140,13 +140,10 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
   if (loading) {
     return (
       <div
-        className="mt-4 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white p-5 shadow-sm"
         aria-busy="true"
-        aria-label="Loading full analysis"
+        aria-label="Loading analysis"
       >
-        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
-          Full analysis
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Analysis</p>
         <SkeletonBlock />
       </div>
     );
@@ -154,7 +151,7 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
 
   if (error || !workout) {
     return (
-      <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         {error ?? "Analysis unavailable"}
       </div>
     );
@@ -163,7 +160,7 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
   const isLogged = Boolean(workout.matchedActivityId ?? workout.matched_activity);
   if (!isLogged) {
     return (
-      <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+      <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
         Full analysis appears after your run is linked from Garmin or logged.
       </div>
     );
@@ -205,25 +202,12 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
           : "single_on";
   }
 
+  const hasTargetPace = workout.targetPaceSecPerMile != null && workout.targetPaceSecPerMile > 0;
+
   return (
-    <div className="mt-4 rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-sm">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-emerald-800">Full analysis</p>
-          <h3 className="mt-1 text-lg font-bold text-gray-900">{workout.title}</h3>
-          <p className="text-sm font-medium text-emerald-900/90">Pace &amp; execution</p>
-          {workout.matched_activity?.startTime ? (
-            <p className="mt-1 text-xs text-gray-600">
-              {new Date(workout.matched_activity.startTime).toLocaleString(undefined, {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-              })}
-            </p>
-          ) : null}
-        </div>
+    <div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
+        <p className="text-xs font-bold uppercase tracking-widest text-emerald-800">Analysis</p>
         {resultsPaceBadgeLabel != null ? (
           <span
             className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
@@ -245,26 +229,32 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
         ) : null}
       </div>
 
-      <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
-          <dt className="text-xs font-medium text-gray-500">Target pace</dt>
-          <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
-            {formatPaceTargetRangeDisplay(workout.targetPaceSecPerMile, workout.targetPaceSecPerMileHigh) ??
-              (workout.targetPaceSecPerMile != null
-                ? formatSecPerMile(workout.targetPaceSecPerMile)
-                : "—")}
-          </dd>
-        </div>
-        <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
-          <dt className="text-xs font-medium text-gray-500">Your pace</dt>
-          <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
-            {formatSecPerMile(workout.actualAvgPaceSecPerMile) ?? "—"}
-          </dd>
-        </div>
-        <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
-          <dt className="text-xs font-medium text-gray-500">Vs plan</dt>
-          <dd className="mt-1 text-sm font-semibold text-gray-900">{paceVsPlanMessage ?? "—"}</dd>
-        </div>
+      {!hasTargetPace ? (
+        <p className="text-sm text-gray-500 italic mb-3">No pace target set for this session.</p>
+      ) : (
+        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-3">
+          <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
+            <dt className="text-xs font-medium text-gray-500">Target pace</dt>
+            <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
+              {formatPaceTargetRangeDisplay(workout.targetPaceSecPerMile, workout.targetPaceSecPerMileHigh) ??
+                formatSecPerMile(workout.targetPaceSecPerMile) ??
+                "—"}
+            </dd>
+          </div>
+          <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
+            <dt className="text-xs font-medium text-gray-500">Your pace</dt>
+            <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
+              {formatSecPerMile(workout.actualAvgPaceSecPerMile) ?? "—"}
+            </dd>
+          </div>
+          <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
+            <dt className="text-xs font-medium text-gray-500">Vs plan</dt>
+            <dd className="mt-1 text-sm font-semibold text-gray-900">{paceVsPlanMessage ?? "—"}</dd>
+          </div>
+        </dl>
+      )}
+
+      <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {workout.actualDistanceMeters != null && workout.actualDistanceMeters > 0 ? (
           <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
             <dt className="text-xs font-medium text-gray-500">Distance</dt>
