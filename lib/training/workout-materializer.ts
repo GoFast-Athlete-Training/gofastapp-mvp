@@ -18,7 +18,10 @@ import {
   type WorkoutStep,
 } from "./prescription";
 import { metersToMiles } from "@/lib/pace-utils";
-import { segmentSnapshotDocumentFromApiSegments } from "./workout-segment-snapshot";
+import {
+  segmentSnapshotDocumentFromApiSegments,
+  type SegmentSnapshotSource,
+} from "./workout-segment-snapshot";
 import { resolveRacePaceSecondsPerMileForPlan } from "./goal-pace-calculator";
 import { parseEasyRunConfigJson } from "./easy-run-config";
 import { paceTargetFromSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
@@ -77,7 +80,7 @@ async function createSegmentsForWorkout(params: {
   tx: Prisma.TransactionClient;
   workoutId: string;
   steps: WorkoutStep[];
-  snapshotSource: string;
+  snapshotSource: SegmentSnapshotSource;
 }): Promise<void> {
   const { tx, workoutId, steps, snapshotSource } = params;
   if (steps.length === 0) return;
