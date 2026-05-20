@@ -104,7 +104,6 @@ export default function MyRacePage() {
   const [goalExpanded, setGoalExpanded] = useState(false);
   const [activePlanSummary, setActivePlanSummary] = useState<ActivePlanSummary | null>(null);
   const [nextSession, setNextSession] = useState<UpcomingSession | null>(null);
-  const [matchedPlanId, setMatchedPlanId] = useState<string | null>(null);
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
   const [removingGoal, setRemovingGoal] = useState(false);
   const [removeGoalError, setRemoveGoalError] = useState<string | null>(null);
@@ -172,7 +171,6 @@ export default function MyRacePage() {
       const planForGoal = g?.id
         ? plans.find((p) => p.athleteGoalId === g.id) ?? null
         : null;
-      setMatchedPlanId(planForGoal?.id ?? null);
 
       const summary = upcomingRes.data.activePlanSummary ?? null;
       const sessions = upcomingRes.data.sessions ?? [];
@@ -188,7 +186,6 @@ export default function MyRacePage() {
       setGoal(null);
       setActivePlanSummary(null);
       setNextSession(null);
-      setMatchedPlanId(null);
     } finally {
       setLoadingUser(false);
     }

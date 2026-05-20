@@ -32,6 +32,7 @@ type CatalogRace = {
   startTime?: string | null;
   logoUrl?: string | null;
   slug?: string | null;
+  summaryPhrase?: string | null;
 };
 
 type Signup = {
@@ -45,16 +46,22 @@ function hubHrefForCatalogRace(race: CatalogRace): string {
   return s ? `/myrace/${encodeURIComponent(s)}` : `/race-hub/${race.id}`;
 }
 
+function isFeaturedCandidate(race: CatalogRace): boolean {
+  return Boolean(race.logoUrl?.trim() && race.summaryPhrase?.trim());
+}
+
 export default function RacesFindPage() {
   const router = useRouter();
   const [signups, setSignups] = useState<Signup[]>([]);
   const [catalog, setCatalog] = useState<CatalogRace[]>([]);
+  const [featuredPool, setFeaturedPool] = useState<CatalogRace[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("");
   const [bostonOnly, setBostonOnly] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [pastCatalog, setPastCatalog] = useState<CatalogRace[]>([]);
   const [loadingPast, setLoadingPast] = useState(true);
@@ -67,6 +74,25 @@ export default function RacesFindPage() {
     [signups]
   );
 
+  const hasActiveFilters = Boolean(
+    debouncedSearch.trim() ||
+      cityFilter.trim() ||
+      bostonOnly ||
+      dateFrom.trim() ||
+      dateTo.trim()
+  );
+
+  const featuredRaces = useMemo(() => {
+    if (hasActiveFilters) return [];
+    return featuredPool.filter(isFeaturedCandidate).slice(0, 2);
+  }, [featuredPool, hasActiveFilters]);
+
+  const catalogWithoutFeatured = useMemo(() => {
+    if (featuredRaces.length === 0) return catalog;
+    const featuredIds = new Set(featuredRaces.map((r) => r.id));
+    return catalog.filter((r) => !featuredIds.has(r.id));
+  }, [catalog, featuredRaces]);
+
   const loadSignups = useCallback(async () => {
     try {
       const { data } = await api.get<{ signups: Signup[] }>("/race-signups");
@@ -74,6 +100,18 @@ export default function RacesFindPage() {
     } catch (e) {
       console.error(e);
       setSignups([]);
+    }
+  }, []);
+
+  const loadFeaturedPool = useCallback(async () => {
+    try {
+      const { data } = await api.get<{ success?: boolean; race_registry?: CatalogRace[] }>(
+        "/race/search?upcoming=true"
+      );
+      setFeaturedPool(data.race_registry ?? []);
+    } catch (e) {
+      console.error(e);
+      setFeaturedPool([]);
     }
   }, []);
 
@@ -128,7 +166,8 @@ export default function RacesFindPage() {
 
   useEffect(() => {
     loadSignups();
-  }, [loadSignups]);
+    loadFeaturedPool();
+  }, [loadSignups, loadFeaturedPool]);
 
   useEffect(() => {
     loadCatalog();
@@ -157,22 +196,39 @@ export default function RacesFindPage() {
     }
   }, []);
 
-  const renderCatalogCard = (race: CatalogRace, variant: "upcoming" | "past") => {
+  const renderCatalogCard = (
+    race: CatalogRace,
+    variant: "upcoming" | "past" | "featured"
+  ) => {
     const signedUp = signedRaceIds.has(race.id);
     const busy = submittingRaceId === race.id;
     const bq = race.tags?.includes(BOSTON_TAG);
     const startLabel = formatStartTime(race.startTime ?? null);
     const isPast = variant === "past";
+    const isFeatured = variant === "featured";
     return (
       <li
         key={`${variant}-${race.id}`}
         className={`rounded-xl border p-5 shadow-sm flex flex-col overflow-hidden ${
-          isPast ? "border-gray-100 bg-gray-50/80 opacity-90" : "border-gray-200 bg-white"
+          isFeatured
+            ? "border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-white"
+            : isPast
+              ? "border-gray-100 bg-gray-50/80 opacity-90"
+              : "border-gray-200 bg-white"
         }`}
       >
+        {isFeatured ? (
+          <span className="mb-3 inline-flex w-fit rounded-full bg-orange-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+            Featured
+          </span>
+        ) : null}
         <div className="flex gap-4">
           {race.logoUrl ? (
-            <div className="shrink-0 w-16 h-16 rounded-lg bg-gray-100 overflow-hidden border border-gray-100">
+            <div
+              className={`shrink-0 rounded-lg bg-gray-100 overflow-hidden border border-gray-100 ${
+                isFeatured ? "w-20 h-20" : "w-16 h-16"
+              }`}
+            >
               <img
                 src={race.logoUrl}
                 alt=""
@@ -181,19 +237,32 @@ export default function RacesFindPage() {
               />
             </div>
           ) : (
-            <div className="shrink-0 w-16 h-16 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-400">
-              <Calendar className="w-7 h-7" />
+            <div
+              className={`shrink-0 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-400 ${
+                isFeatured ? "w-20 h-20" : "w-16 h-16"
+              }`}
+            >
+              <Calendar className={isFeatured ? "w-9 h-9" : "w-7 h-7"} />
             </div>
           )}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-semibold text-gray-900 text-lg leading-snug">{race.name}</h3>
+              <h3
+                className={`font-semibold text-gray-900 leading-snug ${
+                  isFeatured ? "text-xl" : "text-lg"
+                }`}
+              >
+                {race.name}
+              </h3>
               {bq ? (
                 <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-100">
                   BQ
                 </span>
               ) : null}
             </div>
+            {isFeatured && race.summaryPhrase?.trim() ? (
+              <p className="mt-1 text-sm text-gray-600 line-clamp-2">{race.summaryPhrase.trim()}</p>
+            ) : null}
             <dl className="mt-2 space-y-1.5 text-sm text-gray-600">
               <div className="flex items-center gap-2 flex-wrap">
                 <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
@@ -242,7 +311,7 @@ export default function RacesFindPage() {
                 href={hubHrefForCatalogRace(race)}
                 className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-4 py-2"
               >
-                My race →
+                Get Ready →
               </Link>
               <span className="inline-flex items-center rounded-full bg-green-50 text-green-800 text-xs font-medium px-3 py-1">
                 On my calendar
@@ -308,15 +377,10 @@ export default function RacesFindPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Find a race</h1>
           <p className="text-gray-600 text-sm mt-1 max-w-xl">
-            Upcoming events in the registry. Add races to{" "}
+            Add a race to your calendar, then set your goal from your race page.{" "}
             <Link href="/races" className="text-orange-600 font-medium hover:underline">
               My Races
             </Link>
-            , then set a goal from{" "}
-            <Link href="/goals" className="text-orange-600 font-medium hover:underline">
-              Goals
-            </Link>
-            .
           </p>
         </div>
         <Link
@@ -328,8 +392,8 @@ export default function RacesFindPage() {
       </div>
 
       <section className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="sm:col-span-2">
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+          <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Search by name</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -337,65 +401,112 @@ export default function RacesFindPage() {
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Marine Corps Marathon, Boston, …"
                 className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
               />
             </div>
           </div>
-          <div>
+          <div className="sm:w-48">
             <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
             <input
               type="text"
               value={cityFilter}
               onChange={(e) => setCityFilter(e.target.value)}
+              placeholder="Arlington"
               className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
             />
           </div>
-          <div className="flex flex-col justify-end">
-            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={bostonOnly}
-                onChange={(e) => setBostonOnly(e.target.checked)}
-                className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-              />
-              Boston qualifier
-            </label>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">From date</label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">To date</label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-            />
-          </div>
         </div>
-        <p className="text-xs text-gray-500">
-          Showing upcoming active races. Refine with name, city, Boston qualifier tag, or a date
-          range.
-        </p>
+
+        <div>
+          <button
+            type="button"
+            onClick={() => setMoreFiltersOpen((o) => !o)}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-gray-900"
+          >
+            More filters
+            <ChevronDown
+              className={`w-4 h-4 transition-transform ${moreFiltersOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+          {moreFiltersOpen ? (
+            <div className="mt-3 grid gap-3 sm:grid-cols-3 rounded-xl border border-gray-200 bg-gray-50/80 p-4">
+              <div className="flex items-end sm:col-span-3">
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={bostonOnly}
+                    onChange={(e) => setBostonOnly(e.target.checked)}
+                    className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                  />
+                  Boston qualifier only
+                </label>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">From date</label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">To date</label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        {featuredRaces.length > 0 ? (
+          <div>
+            <h2 className="text-sm font-semibold text-gray-800 mb-3">Featured races</h2>
+            <ul className="grid gap-4 sm:grid-cols-2">
+              {featuredRaces.map((race) => renderCatalogCard(race, "featured"))}
+            </ul>
+          </div>
+        ) : null}
 
         {loadingCatalog ? (
           <p className="text-gray-500 text-sm">Loading races…</p>
-        ) : catalog.length === 0 ? (
+        ) : catalogWithoutFeatured.length === 0 && featuredRaces.length === 0 ? (
           <p className="text-gray-600 text-sm">
             No races match these filters. Try widening the date range or clearing search.
           </p>
-        ) : (
-          <ul className="grid gap-4 sm:grid-cols-2">
-            {catalog.map((race) => renderCatalogCard(race, "upcoming"))}
-          </ul>
-        )}
+        ) : catalogWithoutFeatured.length > 0 ? (
+          <>
+            {featuredRaces.length > 0 ? (
+              <h2 className="text-sm font-semibold text-gray-800">All upcoming races</h2>
+            ) : null}
+            <ul className="grid gap-4 sm:grid-cols-2">
+              {catalogWithoutFeatured.map((race) => renderCatalogCard(race, "upcoming"))}
+            </ul>
+          </>
+        ) : null}
+
+        <div className="rounded-xl border border-dashed border-orange-200 bg-orange-50/50 px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Don&apos;t see your race?</p>
+            <p className="text-sm text-gray-600 mt-0.5">
+              Race director? Get your event in front of GoFast runners.
+            </p>
+          </div>
+          <a
+            href={`${COMPANY_APP_ORIGIN}/dashboard/races`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-1 rounded-lg bg-white border border-orange-300 px-4 py-2 text-sm font-semibold text-orange-800 hover:bg-orange-50 shrink-0"
+          >
+            List your race
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
 
         <div className="mt-10 border-t border-gray-200 pt-8">
           <button

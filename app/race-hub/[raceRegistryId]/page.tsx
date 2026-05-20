@@ -191,7 +191,6 @@ function RaceHubPageInner() {
   const [inviteCopied, setInviteCopied] = useState(false);
   const [myRaceResult, setMyRaceResult] = useState<MyRaceResultRow | null>(null);
   const [hubGoalId, setHubGoalId] = useState<string | null>(null);
-  const [hubReadOnlyGoalTime, setHubReadOnlyGoalTime] = useState<string | null>(null);
   const [hubSignupId, setHubSignupId] = useState<string | null>(null);
   const [logSheetOpen, setLogSheetOpen] = useState(false);
 
@@ -235,7 +234,6 @@ function RaceHubPageInner() {
         setShakeouts([]);
         setMyRaceResult(null);
         setHubGoalId(null);
-        setHubReadOnlyGoalTime(null);
         setHubSignupId(null);
         return { canAccessHub: false, loadedRace };
       }
@@ -256,7 +254,6 @@ function RaceHubPageInner() {
         setShakeouts([]);
         setMyRaceResult(null);
         setHubGoalId(null);
-        setHubReadOnlyGoalTime(null);
         return { canAccessHub: false, loadedRace };
       }
 
@@ -300,11 +297,6 @@ function RaceHubPageInner() {
         (g) => g.raceRegistryId === id || g.race_registry?.id === id
       );
       setHubGoalId(goalMatch?.id ?? null);
-      setHubReadOnlyGoalTime(
-        goalMatch && typeof goalMatch.goalTime === "string" && goalMatch.goalTime.trim()
-          ? goalMatch.goalTime.trim()
-          : null
-      );
 
       return { canAccessHub: true, loadedRace };
     } catch (e: unknown) {
@@ -316,7 +308,6 @@ function RaceHubPageInner() {
         setShakeouts([]);
         setMyRaceResult(null);
         setHubGoalId(null);
-        setHubReadOnlyGoalTime(null);
         setHubSignupId(null);
         return { canAccessHub: false, loadedRace };
       }

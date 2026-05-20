@@ -99,7 +99,7 @@ function NextSixMonthsRaceCards({
   }, [upcomingSignups]);
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
       {windowMonths.map(({ y, m }) => {
         const key = `${y}-${m}`;
         const races = byMonth.get(key) ?? [];
