@@ -1,6 +1,5 @@
 export const dynamic = 'force-dynamic';
 
-import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
@@ -172,7 +171,6 @@ export async function POST(request: Request) {
     // This ensures only one athlete record exists per firebaseId
     const updateData: any = {};
     const createData: any = {
-      id: randomUUID(),
       firebaseId,
       companyId: company.id,
     };

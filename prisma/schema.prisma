@@ -27,7 +27,7 @@ enum CoachReviewStatus {
 }
 
 model Athlete {
-  id                      String                   @id
+  id                      String                   @id @default(uuid())
   firebaseId              String                   @unique
   email                   String?
   companyId               String
@@ -75,7 +75,7 @@ model Athlete {
   role                    AthleteRole               @default(USER)
   runClubId               String?
   createdAt               DateTime                 @default(now())
-  updatedAt               DateTime
+  updatedAt               DateTime                 @updatedAt
   go_fast_companies       go_fast_companies        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   runClub                 run_clubs?               @relation(fields: [runClubId], references: [id], onDelete: SetNull)
   ambassador_credits      ambassador_credits[]
