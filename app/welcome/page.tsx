@@ -52,9 +52,11 @@ export default function WelcomePage() {
       }
 
       if (!firebaseUser) {
-        hasProcessedRef.current = true;
-        clearSessionGate();
-        router.replace('/signup');
+        if (!LocalStorageAPI.getAthleteId()) {
+          hasProcessedRef.current = true;
+          clearSessionGate();
+          router.replace('/signup');
+        }
         return;
       }
 
@@ -78,7 +80,11 @@ export default function WelcomePage() {
         if (response.data?.success && response.data?.athleteId) {
           LocalStorageAPI.setAthleteId(response.data.athleteId);
           setSessionGate(firebaseUser.uid, response.data.athleteId);
-          router.replace('/athlete-home');
+          const profRes = await api.get(`/athlete/${response.data.athleteId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const hasProfile = !!profRes.data?.athlete?.gofastHandle;
+          router.replace(hasProfile ? '/athlete-home' : '/athlete-create-profile');
           return;
         }
 

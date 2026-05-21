@@ -159,9 +159,15 @@ export default function AthleteCreateProfilePage() {
         return;
       }
 
-      const storedAthleteId = LocalStorageAPI.getAthleteId();
-
-      let athleteId = storedAthleteId;
+      let athleteId: string | null = null;
+      try {
+        const meRes = await api.get('/athlete/me');
+        athleteId = meRes.data?.athleteId || null;
+      } catch (meErr: any) {
+        if (meErr?.response?.status !== 404) {
+          throw meErr;
+        }
+      }
 
       if (!athleteId) {
         const res = await api.post('/athlete/create', {});
@@ -172,6 +178,7 @@ export default function AthleteCreateProfilePage() {
           throw new Error('No athlete ID returned from server');
         }
       }
+      LocalStorageAPI.setAthleteId(athleteId);
 
       const photoURL = firebaseUser.photoURL || null;
 
@@ -186,7 +193,7 @@ export default function AthleteCreateProfilePage() {
         photoURL,
       });
 
-      let nextPath = '/goals';
+      let nextPath = '/welcome';
       const createCrewIntent = LocalStorageAPI.getRunCrewCreateIntent();
       if (createCrewIntent) {
         LocalStorageAPI.removeRunCrewCreateIntent();

@@ -326,10 +326,20 @@ export default function AthleteHomePage() {
         router.replace('/welcome');
         return;
       }
+      if (!row.gofastHandle) {
+        router.replace('/athlete-create-profile');
+        return;
+      }
       setAthlete(row);
     } catch (profileErr: any) {
       const status = profileErr?.response?.status;
       if (status === 404 || status === 401) {
+        router.replace('/welcome');
+        return;
+      }
+      if (status === 403) {
+        LocalStorageAPI.setAthleteId('');
+        localStorage.removeItem('athleteId');
         router.replace('/welcome');
         return;
       }
