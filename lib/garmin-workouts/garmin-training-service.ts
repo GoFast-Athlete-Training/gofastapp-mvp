@@ -212,35 +212,29 @@ function buildStepsFromSegments(segments: WorkoutSegment[]): GarminWorkoutStep[]
       Boolean(segment.repeatCount && segment.repeatCount > 1) &&
       Boolean(next && isPairRecovery(segment, next));
 
-    if (segment.repeatCount && segment.repeatCount > 1 && (inlineRec || mergedRowRec)) {
-      const recoverySeg = inlineRec ? syntheticRecoverySegment(segment) : next!;
-      if (!inlineRec) i++;
+    if (segment.repeatCount && segment.repeatCount > 1) {
+      const recSeg = inlineRec
+        ? syntheticRecoverySegment(segment)
+        : mergedRowRec
+          ? next!
+          : null;
+      if (!inlineRec && mergedRowRec) i++;
+
+      const nestedSteps = recSeg
+        ? [buildSegmentStep(1, segment), buildSegmentStep(2, recSeg)]
+        : [buildSegmentStep(1, segment)];
 
       steps.push({
         stepOrder: garminStepOrder++,
         type: "WorkoutRepeatStep",
         repeatType: GarminRepeatType.REPEAT_UNTIL_STEPS_CMPLT,
         repeatValue: segment.repeatCount,
-        steps: [buildSegmentStep(1, segment), buildSegmentStep(2, recoverySeg)],
+        steps: nestedSteps,
       });
       continue;
     }
 
-    if (segment.repeatCount && segment.repeatCount > 1) {
-      steps.push({
-        stepOrder: garminStepOrder++,
-        type: "WorkoutRepeatStep",
-        repeatType:
-          segment.durationType === "DISTANCE"
-            ? GarminRepeatType.DISTANCE
-            : GarminRepeatType.TIME,
-        repeatValue: segment.repeatCount,
-      });
-
-      steps.push(buildSegmentStep(garminStepOrder++, segment));
-    } else {
-      steps.push(buildSegmentStep(garminStepOrder++, segment));
-    }
+    steps.push(buildSegmentStep(garminStepOrder++, segment));
   }
 
   return steps;

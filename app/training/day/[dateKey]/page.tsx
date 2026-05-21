@@ -24,6 +24,7 @@ import {
   formatSegmentDuration,
   groupSegmentsForDisplay,
   formatGroupedSegmentDuration,
+  type SegmentDisplayGroup,
 } from "@/lib/training/segment-summary";
 import {
   formatPaceTargetRangeForDisplay,
@@ -135,13 +136,13 @@ function segmentRunRestTag(title: string): "RUN" | "REST" {
 }
 
 function previewGroupedSegmentTargetSummary(
-  group: ReturnType<typeof groupSegmentsForDisplay>[number]
+  group: SegmentDisplayGroup<PreviewWorkout["segments"][number]>
 ): string | null {
   return previewSegmentTargetSummary(group.work);
 }
 
 function previewGroupedRecoveryDistanceLine(
-  group: ReturnType<typeof groupSegmentsForDisplay>[number]
+  group: SegmentDisplayGroup<PreviewWorkout["segments"][number]>
 ): string | null {
   if (!group.recovery) return null;
   return formatSegmentDuration({

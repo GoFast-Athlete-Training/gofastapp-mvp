@@ -4,7 +4,7 @@
 
 export type SegmentLike = {
   stepOrder: number;
-  durationType: "DISTANCE" | "TIME";
+  durationType: "DISTANCE" | "TIME" | string;
   durationValue: number;
   repeatCount?: number | null;
   title?: string;

@@ -1229,17 +1229,15 @@ export default function WorkoutDetailPage() {
   );
 
   const adjustQuickRepeat = useCallback(
-    (segmentId: string, delta: number) => {
+    (segmentId: string, delta: number, initialCount: number) => {
       setSegmentOverrides((prev) => {
-        const seg = sortedSegments.find((s) => s.id === segmentId);
-        if (!seg) return prev;
         const prevOv = prev[segmentId];
-        const current = prevOv?.repeatCount ?? seg.repeatCount ?? 1;
+        const current = prevOv?.repeatCount ?? initialCount;
         const next = Math.min(20, Math.max(1, current + delta));
         return { ...prev, [segmentId]: { ...prevOv, repeatCount: next } };
       });
     },
-    [sortedSegments]
+    []
   );
 
   const updateQuickPaceSplit = useCallback(
@@ -1324,22 +1322,34 @@ export default function WorkoutDetailPage() {
     setSavingQuick(true);
     setQuickEditError(null);
     try {
-      const ordered = getQuickOrderedSegments();
-      if (ordered.length === 0) {
+      if (segmentDisplayGroups.length === 0) {
         setQuickEditError("No segments to save");
         return;
       }
-      const editable: EditableSegment[] = ordered.map((seg) => {
-        const o = segmentOverrides[seg.id];
-        const merged = mergedQuickEditable(seg, o);
-        const conversational = conversationalPaceBySegmentId[seg.id];
-        return {
-          ...merged,
-          paceLowMin: conversational ? "" : merged.paceLowMin,
-          paceLowSec: conversational ? "" : merged.paceLowSec,
-          paceHighMin: conversational ? "" : merged.paceHighMin,
-          paceHighSec: conversational ? "" : merged.paceHighSec,
+      const editable: EditableSegment[] = segmentDisplayGroups.flatMap((group) => {
+        const reps =
+          segmentOverrides[group.work.id]?.repeatCount ?? effectiveRepeatCount(group);
+        const mergedWork = mergedQuickEditable(group.work, {
+          ...segmentOverrides[group.work.id],
+          repeatCount: reps > 1 ? reps : undefined,
+        });
+        const conversational = conversationalPaceBySegmentId[group.work.id];
+        const workRow: EditableSegment = {
+          ...mergedWork,
+          paceLowMin: conversational ? "" : mergedWork.paceLowMin,
+          paceLowSec: conversational ? "" : mergedWork.paceLowSec,
+          paceHighMin: conversational ? "" : mergedWork.paceHighMin,
+          paceHighSec: conversational ? "" : mergedWork.paceHighSec,
+          repeatCount: String(reps > 1 ? reps : ""),
         };
+        if (group.recovery) {
+          const mergedRec = mergedQuickEditable(
+            group.recovery,
+            segmentOverrides[group.recovery.id]
+          );
+          return [workRow, { ...mergedRec, repeatCount: "" }];
+        }
+        return [workRow];
       });
       const payload = editableSegmentsToApiPayload(editable);
       await api.put(`/workouts/${workoutId}/segments`, payload);
@@ -1366,7 +1376,7 @@ export default function WorkoutDetailPage() {
     }
   }, [
     workout,
-    getQuickOrderedSegments,
+    segmentDisplayGroups,
     segmentOverrides,
     conversationalPaceBySegmentId,
     workoutId,
@@ -2867,7 +2877,7 @@ export default function WorkoutDetailPage() {
                           <span className="font-medium text-gray-800">Repeats</span>
                           <button
                             type="button"
-                            onClick={() => adjustQuickRepeat(segment.id, -1)}
+                            onClick={() => adjustQuickRepeat(segment.id, -1, effRepeat)}
                             disabled={effRepeat <= 1}
                             className="h-8 w-8 rounded-lg border border-gray-300 bg-white font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-40"
                           >
@@ -2878,7 +2888,7 @@ export default function WorkoutDetailPage() {
                           </span>
                           <button
                             type="button"
-                            onClick={() => adjustQuickRepeat(segment.id, 1)}
+                            onClick={() => adjustQuickRepeat(segment.id, 1, effRepeat)}
                             disabled={effRepeat >= 20}
                             className="h-8 w-8 rounded-lg border border-gray-300 bg-white font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-40"
                           >
