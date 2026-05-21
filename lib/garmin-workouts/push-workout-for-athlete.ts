@@ -39,6 +39,74 @@ function utcTodayYmd(): string {
   return ymdFromDate(new Date());
 }
 
+/** Avoid double-prefixing when title already has GF W1: or W1: style week label. */
+export function garminTitleForWorkout(workout: {
+  title: string;
+  weekNumber: number | null;
+}): string {
+  const title = workout.title.trim();
+  if (/^(GF\s+)?W\d+\s*:/i.test(title)) return title;
+  if (workout.weekNumber != null && Number.isFinite(workout.weekNumber)) {
+    return `GF W${workout.weekNumber}: ${title}`;
+  }
+  return title;
+}
+
+type WorkoutGarminLookup = {
+  id: string;
+  planId: string | null;
+  date: Date | null;
+  weekNumber: number | null;
+  dayAssigned: string | null;
+  garminWorkoutId: number | null;
+};
+
+/** Reuse Garmin id from this row or a sibling plan-day row (prevents duplicate library entries). */
+async function resolveGarminWorkoutIdForPush(
+  athleteId: string,
+  workout: WorkoutGarminLookup
+): Promise<number | null> {
+  if (workout.garminWorkoutId != null) return workout.garminWorkoutId;
+
+  const siblingWhere = {
+    athleteId,
+    id: { not: workout.id },
+    garminWorkoutId: { not: null },
+  };
+
+  if (workout.planId && workout.date) {
+    const byDate = await prisma.workouts.findFirst({
+      where: { ...siblingWhere, planId: workout.planId, date: workout.date },
+      orderBy: { updatedAt: "desc" },
+      select: { garminWorkoutId: true },
+    });
+    if (byDate?.garminWorkoutId != null) return byDate.garminWorkoutId;
+  }
+
+  if (workout.planId && workout.weekNumber != null && workout.dayAssigned?.trim()) {
+    const byPlanDay = await prisma.workouts.findFirst({
+      where: {
+        ...siblingWhere,
+        planId: workout.planId,
+        weekNumber: workout.weekNumber,
+        dayAssigned: workout.dayAssigned.trim(),
+      },
+      orderBy: { updatedAt: "desc" },
+      select: { garminWorkoutId: true },
+    });
+    if (byPlanDay?.garminWorkoutId != null) return byPlanDay.garminWorkoutId;
+  }
+
+  return null;
+}
+
+async function persistGarminWorkoutId(workoutId: string, garminWorkoutId: number): Promise<void> {
+  await prisma.workouts.update({
+    where: { id: workoutId },
+    data: { garminWorkoutId },
+  });
+}
+
 /**
  * Push a single workout to Garmin Training API for the owning athlete (no HTTP).
  * Used by POST /api/workouts/[id]/push-to-garmin and cron auto-push.
@@ -113,11 +181,10 @@ export async function pushWorkoutToGarminForAthlete(
 
     const token = await requireGarminTokenFresh(athleteId);
 
-    const hasWeekPrefix = /^W\d/i.test(workout.title.trim());
-    const garminTitle =
-      !hasWeekPrefix && workout.weekNumber != null
-        ? `W${workout.weekNumber}: ${workout.title}`
-        : workout.title;
+    const garminTitle = garminTitleForWorkout({
+      title: workout.title,
+      weekNumber: workout.weekNumber,
+    });
 
     const garminWorkout = assembleGarminWorkout({
       id: workout.id,
@@ -148,7 +215,15 @@ export async function pushWorkoutToGarminForAthlete(
 
     const client = createGarminTrainingApiForAthlete(athleteId, token);
 
-    let garminWorkoutId = workout.garminWorkoutId;
+    let garminWorkoutId = await resolveGarminWorkoutIdForPush(athleteId, {
+      id: workout.id,
+      planId: workout.planId,
+      date: workout.date,
+      weekNumber: workout.weekNumber,
+      dayAssigned: workout.dayAssigned,
+      garminWorkoutId: workout.garminWorkoutId,
+    });
+
     if (garminWorkoutId != null) {
       try {
         await client.updateWorkout(garminWorkoutId, garminWorkout);
@@ -157,6 +232,7 @@ export async function pushWorkoutToGarminForAthlete(
         if (e instanceof GarminApiError && e.status === 404) {
           const result = await client.createWorkout(garminWorkout);
           garminWorkoutId = result.workoutId;
+          await persistGarminWorkoutId(workout.id, garminWorkoutId);
         } else {
           throw e;
         }
@@ -164,6 +240,7 @@ export async function pushWorkoutToGarminForAthlete(
     } else {
       const result = await client.createWorkout(garminWorkout);
       garminWorkoutId = result.workoutId;
+      await persistGarminWorkoutId(workout.id, garminWorkoutId);
     }
 
     if (workout.garminScheduleId != null) {
