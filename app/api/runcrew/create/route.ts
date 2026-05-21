@@ -21,6 +21,7 @@ export async function POST(request: Request) {
     const { 
       name, 
       handle,
+      joinCode,
       description, 
       city,
       state,
@@ -48,6 +49,21 @@ export async function POST(request: Request) {
         { error: 'Name is required' },
         { status: 400 }
       );
+    }
+
+    let normalizedJoinCode: string | undefined;
+    if (joinCode != null && String(joinCode).trim() !== '') {
+      normalizedJoinCode = String(joinCode).toLowerCase().trim();
+      const joinCodeRegex = /^[a-z0-9]{3,30}$/;
+      if (!joinCodeRegex.test(normalizedJoinCode)) {
+        return NextResponse.json(
+          {
+            error:
+              'Invite code must be 3–30 characters, letters and numbers only (e.g. running4life)',
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Validate handle format (letters and numbers only, like Instagram)
@@ -112,6 +128,7 @@ export async function POST(request: Request) {
       crew = await createCrew({
         name,
         handle: handle ? handle.toLowerCase().trim() : undefined,
+        joinCode: normalizedJoinCode,
         description,
         athleteId: athlete.id,
         city,
@@ -136,12 +153,18 @@ export async function POST(request: Request) {
       });
     } catch (err: any) {
       console.error('❌ RUNCREW CREATE: Error creating crew:', err);
-      console.error('❌ RUNCREW CREATE: Error details:', err?.message, err?.code);
-      return NextResponse.json({ 
-        success: false,
-        error: 'Failed to create run crew',
-        details: err?.message || 'Unknown error'
-      }, { status: 500 });
+      const msg = err?.message || 'Unknown error';
+      const isClient =
+        typeof msg === 'string' &&
+        (msg.includes('already taken') || msg.includes('Handle'));
+      return NextResponse.json(
+        {
+          success: false,
+          error: isClient ? msg : 'Failed to create run crew',
+          details: msg,
+        },
+        { status: isClient ? 400 : 500 }
+      );
     }
 
     if (!crew) {

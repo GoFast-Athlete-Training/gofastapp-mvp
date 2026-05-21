@@ -177,7 +177,7 @@ function generateJoinCode(name: string): string {
   // Add random 4-digit number
   const random = Math.floor(1000 + Math.random() * 9000);
   
-  return `${initials}${random}`;
+  return `${initials}${random}`.toLowerCase();
 }
 
 /**
@@ -259,9 +259,20 @@ export async function createCrew(data: {
     }
   }
 
-  // Auto-generate joinCode if not provided (for backward compatibility)
-  let joinCode = data.joinCode;
-  if (!joinCode) {
+  let joinCode = data.joinCode?.toLowerCase().trim();
+  if (joinCode) {
+    const existingCode = await prisma.run_crews.findFirst({
+      where: {
+        joinCode: {
+          equals: joinCode,
+          mode: 'insensitive',
+        },
+      },
+    });
+    if (existingCode) {
+      throw new Error(`Invite code "${joinCode}" is already taken`);
+    }
+  } else {
     // Generate unique code - keep trying until we get a unique one
     let attempts = 0;
     while (!joinCode && attempts < 10) {
@@ -333,9 +344,14 @@ export async function createCrew(data: {
 }
 
 export async function joinCrew(joinCode: string, athleteId: string) {
-  // Find crew by join code
-  const crew = await prisma.run_crews.findUnique({
-    where: { joinCode },
+  const normalized = joinCode.toLowerCase().trim();
+  const crew = await prisma.run_crews.findFirst({
+    where: {
+      joinCode: {
+        equals: normalized,
+        mode: 'insensitive',
+      },
+    },
   });
 
   if (!crew) {

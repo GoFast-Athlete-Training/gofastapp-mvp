@@ -6,22 +6,27 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import Image from 'next/image';
 
-/**
- * Detect if user is on coach subdomain (e.g. coach.gofastcrushgoals.com)
- */
 function isCoachSubdomain(): boolean {
   if (typeof window === 'undefined') return false;
   return window.location.hostname.startsWith('coach.');
 }
 
-/**
- * Detect if user is on leader subdomain
- * Simple hostname check - no cookies/middleware needed
- */
 function isLeaderSubdomain(): boolean {
   if (typeof window === 'undefined') return false;
-  const hostname = window.location.hostname;
-  return hostname.startsWith('leader.');
+  return window.location.hostname.startsWith('leader.');
+}
+
+function SplashLogo({ pulse = false }: { pulse?: boolean }) {
+  return (
+    <Image
+      src="/logo.png"
+      alt="GoFast Logo"
+      width={128}
+      height={128}
+      className={`w-32 h-32 rounded-full shadow-xl object-cover ${pulse ? 'animate-pulse' : ''}`}
+      priority
+    />
+  );
 }
 
 export default function RootPage() {
@@ -49,26 +54,21 @@ export default function RootPage() {
   }, []);
 
   useEffect(() => {
-    if (!isLoading) {
-      const timer = setTimeout(() => {
-        if (isCoachIntent) {
-          if (isAuthenticated) {
-            router.replace('/coach-hub');
-          } else {
-            router.replace('/coach-signup');
-          }
-          return;
-        }
-        if (isAuthenticated) {
-          router.replace('/welcome');
-        } else {
-          const intentParam = isLeaderIntent ? '?intent=club-leader' : '';
-          router.replace(`/signup${intentParam}`);
-        }
-      }, 1500);
+    if (isLoading) return;
 
-      return () => clearTimeout(timer);
+    if (isCoachIntent) {
+      router.replace(isAuthenticated ? '/coach-hub' : '/coach-signup');
+      return;
     }
+    if (isAuthenticated) {
+      router.replace('/welcome');
+      return;
+    }
+    if (isLeaderIntent) {
+      router.replace('/signup?intent=club-leader');
+      return;
+    }
+    router.replace('/explainer');
   }, [isLoading, isAuthenticated, isLeaderIntent, isCoachIntent, router]);
 
   const coachHeadline = 'Train your athletes. Build champions.';
@@ -92,43 +92,26 @@ export default function RootPage() {
     ? 'bg-gradient-to-br from-amber-500 to-orange-700'
     : 'bg-gradient-to-br from-sky-400 to-sky-600';
 
-  if (isLoading) {
-    return (
-      <div
-        className={`min-h-screen ${gradientClass} flex items-center justify-center`}
-      >
-        <div className="animate-pulse">
-          <div className="w-16 h-16 bg-white rounded-full mx-auto mb-4"></div>
-        </div>
-      </div>
-    );
-  }
+  const showIntentSplash = !isLoading && (isCoachIntent || isLeaderIntent) && !isAuthenticated;
 
   return (
     <div className={`min-h-screen ${gradientClass} flex items-center justify-center`}>
-      <div className="animate-fade-in text-center px-4">
-        <Image
-          src="/logo.jpg"
-          alt="GoFast Logo"
-          width={192}
-          height={192}
-          className="w-48 h-48 rounded-full shadow-2xl mx-auto mb-6"
-          priority
-        />
-        <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">{headline}</h1>
-        {isCoachIntent && (
-          <p className="text-xl md:text-2xl text-white/90 mb-8">{coachSub}</p>
-        )}
-        {!isCoachIntent && !isLeaderIntent && (
-          <p className="text-xl md:text-2xl text-white/90 mb-8">
-            Find runs. Join crews. Race.
-          </p>
-        )}
-        {!isAuthenticated && (
+      {showIntentSplash ? (
+        <div className="animate-fade-in text-center px-4">
+          <SplashLogo />
+          <h1 className="text-3xl md:text-4xl font-bold text-white mb-4 mt-6">{headline}</h1>
+          {isCoachIntent && (
+            <p className="text-xl md:text-2xl text-white/90 mb-8">{coachSub}</p>
+          )}
+          {!isCoachIntent && !isLeaderIntent && (
+            <p className="text-xl md:text-2xl text-white/90 mb-8">
+              Find runs. Join crews. Race.
+            </p>
+          )}
           <button
             onClick={() => {
               if (isCoachIntent) router.replace('/coach-signup');
-              else router.replace(isLeaderIntent ? '/signup?intent=club-leader' : '/signup');
+              else router.replace('/signup?intent=club-leader');
             }}
             className={
               isCoachIntent
@@ -138,8 +121,10 @@ export default function RootPage() {
           >
             {ctaText}
           </button>
-        )}
-      </div>
+        </div>
+      ) : (
+        <SplashLogo pulse={isLoading} />
+      )}
     </div>
   );
 }

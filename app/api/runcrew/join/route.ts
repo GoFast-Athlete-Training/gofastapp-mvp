@@ -3,17 +3,18 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteByFirebaseId } from '@/lib/domain-athlete';
-import { joinCrewById } from '@/lib/domain-runcrew';
+import { joinCrew, joinCrewById } from '@/lib/domain-runcrew';
 
 /**
  * POST /api/runcrew/join
  * 
- * Join a RunCrew by crewId
+ * Join a RunCrew by crewId or invite joinCode
  * Requires authentication
  * 
  * Request body:
  * {
  *   "crewId": "clx123abc",
+ *   "joinCode": "running4life",
  *   "athleteId": "optional - from localStorage"
  * }
  * 
@@ -32,10 +33,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    const { crewId, athleteId: bodyAthleteId } = body;
+    const { crewId, joinCode, athleteId: bodyAthleteId } = body;
 
-    if (!crewId) {
-      return NextResponse.json({ error: 'Missing crewId' }, { status: 400 });
+    if (!crewId && !joinCode) {
+      return NextResponse.json({ error: 'Missing crewId or joinCode' }, { status: 400 });
     }
 
     const authHeader = request.headers.get('authorization');
@@ -70,14 +71,18 @@ export async function POST(request: Request) {
       ? bodyAthleteId 
       : athlete.id;
 
-    // Join crew by crewId
     let crew;
     try {
-      crew = await joinCrewById(crewId, finalAthleteId);
+      if (joinCode) {
+        const normalized = String(joinCode).toLowerCase().trim();
+        crew = await joinCrew(normalized, finalAthleteId);
+      } else {
+        crew = await joinCrewById(crewId, finalAthleteId);
+      }
     } catch (err: any) {
       console.error('❌ RUNCREW JOIN: Error joining crew:', err);
       if (err.message === 'Crew not found') {
-        return NextResponse.json({ error: 'Crew not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Invalid invite code' }, { status: 404 });
       }
       return NextResponse.json({ error: 'Failed to join crew', details: err?.message }, { status: 500 });
     }
