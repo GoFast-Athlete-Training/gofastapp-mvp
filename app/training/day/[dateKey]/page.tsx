@@ -20,7 +20,11 @@ import {
   fetchTrainingWorkoutDetail,
   resolveWorkoutForPlanDay,
 } from "@/lib/training/fetch-plan-week-client";
-import { formatSegmentDuration } from "@/lib/training/segment-summary";
+import {
+  formatSegmentDuration,
+  groupSegmentsForDisplay,
+  formatGroupedSegmentDuration,
+} from "@/lib/training/segment-summary";
 import {
   formatPaceTargetRangeForDisplay,
   formatPaceTargetSingleForDisplay,
@@ -130,20 +134,23 @@ function segmentRunRestTag(title: string): "RUN" | "REST" {
   return title.toLowerCase().includes("recovery") ? "REST" : "RUN";
 }
 
-function previewSegmentDistanceLine(
-  segment: PreviewWorkout["segments"][number]
-): string {
-  const duration = formatSegmentDuration({
-    stepOrder: segment.stepOrder,
-    durationType: segment.durationType === "TIME" ? "TIME" : "DISTANCE",
-    durationValue: segment.durationValue,
-    repeatCount: segment.repeatCount ?? null,
-    title: segment.title,
+function previewGroupedSegmentTargetSummary(
+  group: ReturnType<typeof groupSegmentsForDisplay>[number]
+): string | null {
+  return previewSegmentTargetSummary(group.work);
+}
+
+function previewGroupedRecoveryDistanceLine(
+  group: ReturnType<typeof groupSegmentsForDisplay>[number]
+): string | null {
+  if (!group.recovery) return null;
+  return formatSegmentDuration({
+    stepOrder: group.recovery.stepOrder,
+    durationType: group.recovery.durationType === "TIME" ? "TIME" : "DISTANCE",
+    durationValue: group.recovery.durationValue,
+    repeatCount: group.recovery.repeatCount ?? null,
+    title: group.recovery.title,
   });
-  if (segment.repeatCount != null && segment.repeatCount > 1) {
-    return `Repeat ${segment.repeatCount}× · ${duration}`;
-  }
-  return duration;
 }
 
 export default function TrainingPlanDayPreviewPage() {
@@ -508,13 +515,15 @@ export default function TrainingPlanDayPreviewPage() {
                     </p>
                   ) : null}
                   <ul className="space-y-1.5 list-none pl-0 m-0">
-                    {workout.segments.map((segment, index) => {
-                      const paceLine = previewSegmentTargetSummary(segment);
-                      const distanceLine = previewSegmentDistanceLine(segment);
+                    {groupSegmentsForDisplay(workout.segments).map((group, index) => {
+                      const segment = group.work;
+                      const paceLine = previewGroupedSegmentTargetSummary(group);
+                      const distanceLine = formatGroupedSegmentDuration(group);
+                      const recoveryLine = previewGroupedRecoveryDistanceLine(group);
                       const runRest = segmentRunRestTag(segment.title);
                       return (
                         <li
-                          key={segment.id}
+                          key={`${segment.id}:${group.recovery?.id ?? ""}`}
                           className="overflow-hidden rounded-lg border border-gray-100"
                         >
                           <div
@@ -534,6 +543,11 @@ export default function TrainingPlanDayPreviewPage() {
                                 <span className="ml-1.5 text-xs tabular-nums text-gray-500">
                                   {paceLine}
                                 </span>
+                              ) : null}
+                              {recoveryLine ? (
+                                <p className="mt-0.5 text-xs text-gray-500">
+                                  Between reps: {recoveryLine}
+                                </p>
                               ) : null}
                             </div>
                             <span className="shrink-0 text-[10px] font-bold tracking-wider text-gray-400">

@@ -10,6 +10,7 @@ import { dayNameToOurDow } from "@/lib/training/schedule-parser";
 import { ymdFromDate } from "@/lib/training/plan-utils";
 import { segmentSnapshotDocumentFromDbRows } from "@/lib/training/workout-segment-snapshot";
 import { materializeWorkoutForPlanDay } from "@/lib/training/workout-materializer";
+import { expandSegmentsForGarminPush } from "@/lib/training/segment-summary";
 
 export type PushWorkoutForAthleteResult =
   | {
@@ -186,12 +187,14 @@ export async function pushWorkoutToGarminForAthlete(
       weekNumber: workout.weekNumber,
     });
 
+    const garminSegments = expandSegmentsForGarminPush(workout.segments);
+
     const garminWorkout = assembleGarminWorkout({
       id: workout.id,
       title: garminTitle,
       workoutType: workout.workoutType,
       description: workout.description || undefined,
-      segments: workout.segments.map((seg) => ({
+      segments: garminSegments.map((seg) => ({
         id: seg.id,
         workoutId: seg.workoutId,
         stepOrder: seg.stepOrder,

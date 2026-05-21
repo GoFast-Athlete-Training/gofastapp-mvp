@@ -52,6 +52,9 @@ import {
   formatSegmentDuration,
   formatSegmentDistance,
   groupSegmentsInDisplayOrder,
+  effectiveRepeatCount,
+  formatGroupedSegmentDuration,
+  milesToDisplayMeters,
   SEGMENT_METERS_PER_MILE,
 } from "@/lib/training/segment-summary";
 import {
@@ -549,7 +552,7 @@ function segmentToEditable(s: WorkoutSegment): EditableSegment {
     durType === "DISTANCE" ? inferDistanceDisplayUnit("DISTANCE", milesNum) : "mi";
   const durationValue =
     durType === "DISTANCE" && distanceDisplayUnit === "m"
-      ? String(Math.round(milesNum * SEGMENT_METERS_PER_MILE))
+      ? String(milesToDisplayMeters(milesNum))
       : String(s.durationValue);
 
   let recoveryDurationType = "";
@@ -563,7 +566,7 @@ function segmentToEditable(s: WorkoutSegment): EditableSegment {
       recoveryDistanceDisplayUnit = inferDistanceDisplayUnit("DISTANCE", rv);
       recoveryDurationValue =
         recoveryDistanceDisplayUnit === "m"
-          ? String(Math.round(rv * SEGMENT_METERS_PER_MILE))
+          ? String(milesToDisplayMeters(rv))
           : String(rv);
     } else if (rt === "TIME" && Number.isFinite(rv) && rv > 0) {
       recoveryDurationValue = String(rv);
@@ -2811,7 +2814,8 @@ export default function WorkoutDetailPage() {
                   displayListFlat.length
                 );
                 const o = segmentOverrides[segment.id];
-                const effRepeat = o?.repeatCount ?? segment.repeatCount ?? 1;
+                const effRepeat =
+                  o?.repeatCount ?? effectiveRepeatCount(group);
                 const showRepeatStepper = !isLogged && effRepeat >= 2;
                 const { low: baseLow, high: baseHigh } = getPaceSecsFromSegment(segment);
                 const qStr = quickPaceDisplayStrings(segment, o);
@@ -2886,11 +2890,10 @@ export default function WorkoutDetailPage() {
                         </div>
                       )}
                       {isLogged &&
-                        segment.repeatCount != null &&
-                        segment.repeatCount > 1 && (
+                        effRepeat > 1 && (
                           <p className="text-sm text-gray-600 mt-1">
                             <span className="font-medium text-gray-800">Repeats: </span>
-                            {segment.repeatCount}× this block (do the step this many times
+                            {effRepeat}× this block (do the step this many times
                             before moving on)
                           </p>
                         )}
@@ -2993,7 +2996,7 @@ export default function WorkoutDetailPage() {
                           </dd>
                         ) : (
                           <dd className="text-base text-gray-900 font-medium">
-                            {formatSegmentDuration(segment)}
+                            {formatGroupedSegmentDuration(group)}
                           </dd>
                         )}
                         {inlineRecoveryBetweenRepsLabel(segment) && (

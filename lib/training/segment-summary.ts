@@ -57,7 +57,74 @@ export function isRecoveryTitle(title: string): boolean {
 export type SegmentDisplayGroup<T extends SegmentLike = SegmentLike> = {
   work: T;
   recovery?: T;
+  /** Repeats when flat per-rep DB rows were collapsed for display (not stored on work row). */
+  flatRepeatCount?: number;
 };
+
+/** Miles → meters for editable inputs; snaps to 50m track reps like formatSegmentDistance. */
+export function milesToDisplayMeters(miles: number): number {
+  if (!Number.isFinite(miles) || miles <= 0) return 0;
+  const meters = miles * SEGMENT_METERS_PER_MILE;
+  if (meters <= 5000) {
+    const rounded50 = Math.round(meters / 50) * 50;
+    if (rounded50 > 0) {
+      const relErr = Math.abs(meters - rounded50) / meters;
+      if (relErr <= 0.005) return rounded50;
+    }
+  }
+  return Math.round(meters);
+}
+
+export function segmentsMatchForRepeat(a: SegmentLike, b: SegmentLike): boolean {
+  const titleA = (a.title ?? "").trim().toLowerCase();
+  const titleB = (b.title ?? "").trim().toLowerCase();
+  if (titleA !== titleB) return false;
+  if (a.durationType !== b.durationType) return false;
+  const da = Number(a.durationValue);
+  const db = Number(b.durationValue);
+  if (!Number.isFinite(da) || !Number.isFinite(db)) return false;
+  return Math.abs(da - db) < 1e-5;
+}
+
+/** Effective repeat count for a display group (stored repeatCount or collapsed flat reps). */
+export function effectiveRepeatCount(group: SegmentDisplayGroup): number {
+  const stored = group.work.repeatCount;
+  if (stored != null && stored > 1) return stored;
+  if (group.flatRepeatCount != null && group.flatRepeatCount > 1) return group.flatRepeatCount;
+  return 1;
+}
+
+function tryCollapseAlternatingWorkRecovery<T extends SegmentLike>(
+  segmentsInOrder: T[],
+  start: number
+): { workCount: number; recovery?: T; nextIndex: number } | null {
+  const work = segmentsInOrder[start];
+  if (!work || isRecoveryTitle(work.title ?? "")) return null;
+
+  let workCount = 0;
+  let recovery: T | undefined;
+  let i = start;
+
+  while (i < segmentsInOrder.length) {
+    const w = segmentsInOrder[i];
+    if (!w || isRecoveryTitle(w.title ?? "")) break;
+    if (workCount > 0 && !segmentsMatchForRepeat(work, w)) break;
+
+    workCount++;
+    const r = segmentsInOrder[i + 1];
+    if (r && isRecoveryTitle(r.title ?? "")) {
+      if (!recovery) recovery = r;
+      else if (!segmentsMatchForRepeat(recovery, r)) break;
+      i += 2;
+      continue;
+    }
+    i += 1;
+    break;
+  }
+
+  if (workCount <= 1) return null;
+  return { workCount, recovery, nextIndex: i };
+}
 
 /** Pair repeat blocks with the following recovery row when titles match (catalogue materialization pattern). */
 export function groupSegmentsForDisplay<T extends SegmentLike>(
@@ -83,13 +150,104 @@ export function groupSegmentsInDisplayOrder<T extends SegmentLike>(
   segmentsInOrder: T[]
 ): SegmentDisplayGroup<T>[] {
   const out: SegmentDisplayGroup<T>[] = [];
-  for (let i = 0; i < segmentsInOrder.length; i++) {
+  let i = 0;
+
+  while (i < segmentsInOrder.length) {
     const work = segmentsInOrder[i]!;
-    if (i > 0 && isPairRecovery(segmentsInOrder[i - 1]!, work)) continue;
+
+    if (i > 0 && isPairRecovery(segmentsInOrder[i - 1]!, work)) {
+      i++;
+      continue;
+    }
+
+    if (work.repeatCount != null && work.repeatCount > 1) {
+      const next = segmentsInOrder[i + 1];
+      const recovery = next && isPairRecovery(work, next) ? next : undefined;
+      out.push({ work, recovery });
+      i += recovery ? 2 : 1;
+      continue;
+    }
+
+    const alt = tryCollapseAlternatingWorkRecovery(segmentsInOrder, i);
+    if (alt) {
+      out.push({ work, recovery: alt.recovery, flatRepeatCount: alt.workCount });
+      i = alt.nextIndex;
+      continue;
+    }
+
+    if (!isRecoveryTitle(work.title ?? "")) {
+      let count = 1;
+      let j = i + 1;
+      while (j < segmentsInOrder.length) {
+        const nextSeg = segmentsInOrder[j]!;
+        if (isRecoveryTitle(nextSeg.title ?? "")) break;
+        if (!segmentsMatchForRepeat(work, nextSeg)) break;
+        count++;
+        j++;
+      }
+      if (count > 1) {
+        out.push({ work, flatRepeatCount: count });
+        i = j;
+        continue;
+      }
+    }
+
     const next = segmentsInOrder[i + 1];
     const recovery = next && isPairRecovery(work, next) ? next : undefined;
     out.push({ work, recovery });
+    i += recovery ? 2 : 1;
   }
+
+  return out;
+}
+
+/** Human-readable distance/duration for a grouped segment row (includes × N when collapsed). */
+export function formatGroupedSegmentDuration(group: SegmentDisplayGroup): string {
+  const duration = formatSegmentDuration(group.work);
+  const reps = effectiveRepeatCount(group);
+  if (reps > 1) return `${duration} × ${reps}`;
+  return duration;
+}
+
+/**
+ * Collapse flat materialized reps into canonical rows with repeatCount for Garmin assembly.
+ * UI stays grouped via groupSegmentsInDisplayOrder; Garmin push calls this first.
+ */
+export function expandSegmentsForGarminPush<T extends SegmentLike>(
+  segmentsInOrder: T[]
+): Array<T & { stepOrder: number; repeatCount?: number | null }> {
+  const groups = groupSegmentsInDisplayOrder(segmentsInOrder);
+  const out: Array<T & { stepOrder: number; repeatCount?: number | null }> = [];
+  let stepOrder = 1;
+
+  for (const g of groups) {
+    const reps = effectiveRepeatCount(g);
+    if (reps > 1) {
+      out.push({
+        ...g.work,
+        stepOrder,
+        repeatCount: reps,
+      });
+      stepOrder++;
+      if (g.recovery) {
+        out.push({
+          ...g.recovery,
+          stepOrder,
+          repeatCount: 1,
+        });
+        stepOrder++;
+      }
+      continue;
+    }
+
+    out.push({ ...g.work, stepOrder, repeatCount: g.work.repeatCount ?? null });
+    stepOrder++;
+    if (g.recovery) {
+      out.push({ ...g.recovery, stepOrder, repeatCount: g.recovery.repeatCount ?? null });
+      stepOrder++;
+    }
+  }
+
   return out;
 }
 
