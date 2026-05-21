@@ -714,7 +714,51 @@ type SegmentQuickOverride = {
   quickPaceLowSec?: string;
   quickPaceHighMin?: string;
   quickPaceHighSec?: string;
+  durationType?: "DISTANCE" | "TIME";
+  durationValue?: string;
+  distanceDisplayUnit?: DistanceDisplayUnit;
+  recoveryDurationType?: string;
+  recoveryDurationValue?: string;
+  recoveryDistanceDisplayUnit?: DistanceDisplayUnit;
 };
+
+function segmentQuickOverrideHasEdits(o: SegmentQuickOverride): boolean {
+  return (
+    o.repeatCount != null ||
+    o.quickPaceLowMin !== undefined ||
+    o.quickPaceLowSec !== undefined ||
+    o.quickPaceHighMin !== undefined ||
+    o.quickPaceHighSec !== undefined ||
+    o.durationType !== undefined ||
+    o.durationValue !== undefined ||
+    o.distanceDisplayUnit !== undefined ||
+    o.recoveryDurationType !== undefined ||
+    o.recoveryDurationValue !== undefined ||
+    o.recoveryDistanceDisplayUnit !== undefined
+  );
+}
+
+function mergedQuickEditable(seg: WorkoutSegment, o?: SegmentQuickOverride): EditableSegment {
+  const base = segmentToEditable(seg);
+  if (!o) return base;
+  const q = quickPaceDisplayStrings(seg, o);
+  return {
+    ...base,
+    durationType: o.durationType ?? base.durationType,
+    durationValue: o.durationValue ?? base.durationValue,
+    distanceDisplayUnit: o.distanceDisplayUnit ?? base.distanceDisplayUnit,
+    repeatCount:
+      o.repeatCount != null ? (o.repeatCount > 1 ? String(o.repeatCount) : "") : base.repeatCount,
+    recoveryDurationType: o.recoveryDurationType ?? base.recoveryDurationType,
+    recoveryDurationValue: o.recoveryDurationValue ?? base.recoveryDurationValue,
+    recoveryDistanceDisplayUnit:
+      o.recoveryDistanceDisplayUnit ?? base.recoveryDistanceDisplayUnit,
+    paceLowMin: q.lowMin,
+    paceLowSec: q.lowSec,
+    paceHighMin: q.highMin,
+    paceHighSec: q.highSec,
+  };
+}
 
 function quickPaceDisplayStrings(
   seg: WorkoutSegment,
@@ -1227,16 +1271,45 @@ export default function WorkoutDetailPage() {
           else o.quickPaceHighSec = String(Math.min(59, parseInt(v, 10) || 0));
         }
 
-        const hasPace =
-          o.quickPaceLowMin !== undefined ||
-          o.quickPaceLowSec !== undefined ||
-          o.quickPaceHighMin !== undefined ||
-          o.quickPaceHighSec !== undefined;
-        const hasAny = o.repeatCount != null || hasPace;
+        const hasAny = segmentQuickOverrideHasEdits(o);
         if (!hasAny) {
           const { [segmentId]: _, ...rest } = prev;
           return rest;
         }
+        return { ...prev, [segmentId]: o };
+      });
+    },
+    [sortedSegments]
+  );
+
+  const patchQuickSegmentOverride = useCallback(
+    (segmentId: string, patch: Partial<SegmentQuickOverride>) => {
+      setSegmentOverrides((prev) => {
+        const seg = sortedSegments.find((s) => s.id === segmentId);
+        if (!seg) return prev;
+        const o: SegmentQuickOverride = { ...prev[segmentId], ...patch };
+        if (!segmentQuickOverrideHasEdits(o)) {
+          const { [segmentId]: _, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, [segmentId]: o };
+      });
+    },
+    [sortedSegments]
+  );
+
+  const toggleQuickDistanceUnit = useCallback(
+    (segmentId: string) => {
+      setSegmentOverrides((prev) => {
+        const seg = sortedSegments.find((s) => s.id === segmentId);
+        if (!seg) return prev;
+        const merged = mergedQuickEditable(seg, prev[segmentId]);
+        const toggled = toggleEditableDistanceUnit(merged);
+        const o: SegmentQuickOverride = {
+          ...prev[segmentId],
+          durationValue: toggled.durationValue,
+          distanceDisplayUnit: toggled.distanceDisplayUnit,
+        };
         return { ...prev, [segmentId]: o };
       });
     },
@@ -1255,20 +1328,14 @@ export default function WorkoutDetailPage() {
       }
       const editable: EditableSegment[] = ordered.map((seg) => {
         const o = segmentOverrides[seg.id];
-        const base = segmentToEditable(seg);
-        let repeatCount = base.repeatCount;
-        if (o?.repeatCount != null) {
-          repeatCount = o.repeatCount > 1 ? String(o.repeatCount) : "";
-        }
-        const q = quickPaceDisplayStrings(seg, o);
+        const merged = mergedQuickEditable(seg, o);
         const conversational = conversationalPaceBySegmentId[seg.id];
         return {
-          ...base,
-          repeatCount,
-          paceLowMin: conversational ? "" : q.lowMin,
-          paceLowSec: conversational ? "" : q.lowSec,
-          paceHighMin: conversational ? "" : q.highMin,
-          paceHighSec: conversational ? "" : q.highSec,
+          ...merged,
+          paceLowMin: conversational ? "" : merged.paceLowMin,
+          paceLowSec: conversational ? "" : merged.paceLowSec,
+          paceHighMin: conversational ? "" : merged.paceHighMin,
+          paceHighSec: conversational ? "" : merged.paceHighSec,
         };
       });
       const payload = editableSegmentsToApiPayload(editable);
@@ -2749,6 +2816,10 @@ export default function WorkoutDetailPage() {
                 const { low: baseLow, high: baseHigh } = getPaceSecsFromSegment(segment);
                 const qStr = quickPaceDisplayStrings(segment, o);
                 const hasPaceTarget = baseLow != null || baseHigh != null;
+                const quickEditable = mergedQuickEditable(segment, o);
+                const recoveryQuickEditable = recoverySeg
+                  ? mergedQuickEditable(recoverySeg, segmentOverrides[recoverySeg.id])
+                  : null;
                 return (
                   <div
                     key={`${segment.id}:${recoverySeg?.id ?? ""}`}
@@ -2857,9 +2928,74 @@ export default function WorkoutDetailPage() {
                         <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
                           Duration
                         </dt>
-                        <dd className="text-base text-gray-900 font-medium">
-                          {formatSegmentDuration(segment)}
-                        </dd>
+                        {!isLogged && !isEditing ? (
+                          <dd className="space-y-2">
+                            {quickEditable.durationType === "DISTANCE" ? (
+                              <div className="flex flex-wrap items-center gap-2 max-w-xs">
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={quickEditable.durationValue}
+                                  onChange={(e) =>
+                                    patchQuickSegmentOverride(segment.id, {
+                                      durationValue: e.target.value,
+                                    })
+                                  }
+                                  className="flex-1 min-w-[5rem] rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                                />
+                                <span className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-white">
+                                  <button
+                                    type="button"
+                                    className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                                      quickEditable.distanceDisplayUnit === "mi"
+                                        ? "bg-orange-100 text-orange-900"
+                                        : "text-gray-600 hover:bg-gray-50"
+                                    }`}
+                                    onClick={() => {
+                                      if (quickEditable.distanceDisplayUnit !== "mi") {
+                                        toggleQuickDistanceUnit(segment.id);
+                                      }
+                                    }}
+                                  >
+                                    mi
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                                      quickEditable.distanceDisplayUnit === "m"
+                                        ? "bg-orange-100 text-orange-900"
+                                        : "text-gray-600 hover:bg-gray-50"
+                                    }`}
+                                    onClick={() => {
+                                      if (quickEditable.distanceDisplayUnit !== "m") {
+                                        toggleQuickDistanceUnit(segment.id);
+                                      }
+                                    }}
+                                  >
+                                    m
+                                  </button>
+                                </span>
+                              </div>
+                            ) : (
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={quickEditable.durationValue}
+                                onChange={(e) =>
+                                  patchQuickSegmentOverride(segment.id, {
+                                    durationValue: e.target.value,
+                                  })
+                                }
+                                className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                                placeholder="Minutes"
+                              />
+                            )}
+                          </dd>
+                        ) : (
+                          <dd className="text-base text-gray-900 font-medium">
+                            {formatSegmentDuration(segment)}
+                          </dd>
+                        )}
                         {inlineRecoveryBetweenRepsLabel(segment) && (
                           <p className="text-sm text-gray-600 mt-2">
                             <span className="font-medium text-gray-700">Between repeats: </span>
@@ -2873,9 +3009,59 @@ export default function WorkoutDetailPage() {
                           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
                             Recovery jog (between reps)
                           </p>
-                          <p className="text-base text-gray-800 font-medium">
-                            {formatSegmentDuration(recoverySeg)}
-                          </p>
+                          {!isLogged && !isEditing && recoveryQuickEditable ? (
+                            <div className="flex flex-wrap items-center gap-2 max-w-xs">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={recoveryQuickEditable.durationValue}
+                                onChange={(e) =>
+                                  patchQuickSegmentOverride(recoverySeg.id, {
+                                    durationValue: e.target.value,
+                                  })
+                                }
+                                className="flex-1 min-w-[5rem] rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                              />
+                              {recoveryQuickEditable.durationType === "DISTANCE" ? (
+                                <span className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-white">
+                                  <button
+                                    type="button"
+                                    className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                                      recoveryQuickEditable.distanceDisplayUnit === "mi"
+                                        ? "bg-orange-100 text-orange-900"
+                                        : "text-gray-600 hover:bg-gray-50"
+                                    }`}
+                                    onClick={() => {
+                                      if (recoveryQuickEditable.distanceDisplayUnit !== "mi") {
+                                        toggleQuickDistanceUnit(recoverySeg.id);
+                                      }
+                                    }}
+                                  >
+                                    mi
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                                      recoveryQuickEditable.distanceDisplayUnit === "m"
+                                        ? "bg-orange-100 text-orange-900"
+                                        : "text-gray-600 hover:bg-gray-50"
+                                    }`}
+                                    onClick={() => {
+                                      if (recoveryQuickEditable.distanceDisplayUnit !== "m") {
+                                        toggleQuickDistanceUnit(recoverySeg.id);
+                                      }
+                                    }}
+                                  >
+                                    m
+                                  </button>
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <p className="text-base text-gray-800 font-medium">
+                              {formatSegmentDuration(recoverySeg)}
+                            </p>
+                          )}
                           {recoverySeg.targets &&
                             recoverySeg.targets.length > 0 && (
                               <div className="mt-3 space-y-2">

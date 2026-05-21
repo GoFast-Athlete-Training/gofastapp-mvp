@@ -402,15 +402,6 @@ export default function TrainingPlanDayPreviewPage() {
       const token = await u.getIdToken();
       const wid =
         workoutId ?? (await resolveWorkoutForPlanDay(planDetail.id, dateKey, token));
-      if (isToday) {
-        setPushingGarmin(true);
-        setGarminPushMessage(null);
-        try {
-          await pushWorkoutIdToGarmin(wid, token, false);
-        } finally {
-          setPushingGarmin(false);
-        }
-      }
       stashWorkoutDayNav(wid, { source: "plan-preview", backPath: previewBackPath });
       router.push(`/workouts/${wid}`);
     } catch (e) {
@@ -593,10 +584,10 @@ export default function TrainingPlanDayPreviewPage() {
               <button
                 type="button"
                 onClick={() => void handleDoThisWorkout()}
-                disabled={openingWorkout || pushingGarmin || !canOpenWorkout || workoutLoading || !!workoutError}
+                disabled={openingWorkout || !canOpenWorkout || workoutLoading || !!workoutError}
                 className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
               >
-                {openingWorkout || pushingGarmin ? "Preparing..." : "Modify workout"}
+                {openingWorkout ? "Opening…" : "Modify workout"}
               </button>
               <div className="flex gap-2">
                 {prevDateKey && (
