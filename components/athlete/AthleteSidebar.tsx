@@ -27,7 +27,7 @@ function planHubMatch(p: string | null): boolean {
 /** Logged work, metrics, full workout log */
 function performanceHubMatch(p: string | null): boolean {
   if (!p) return false;
-  return p === "/performance" || p.startsWith("/performance/") || p.startsWith("/workouts");
+  return p === "/performance" || p.startsWith("/performance/");
 }
 
 function gorunMatch(p: string | null): boolean {

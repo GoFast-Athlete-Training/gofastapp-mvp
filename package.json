@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@gofast/shared-db": "file:./packages/shared-db",
-    "@prisma/client": "6.16.3",
+    "@prisma/client": "^6.16.3",
     "@vercel/blob": "^2.0.0",
     "@vercel/functions": "^3.4.3",
     "axios": "^1.9.0",
@@ -49,7 +49,7 @@
     "autoprefixer": "^10.4.20",
     "pg": "^8.19.0",
     "postcss": "^8.4.47",
-    "prisma": "6.16.3",
+    "prisma": "^6.16.3",
     "tailwindcss": "^3.4.13",
     "tsx": "^4.20.6",
     "typescript": "^5.5.3"

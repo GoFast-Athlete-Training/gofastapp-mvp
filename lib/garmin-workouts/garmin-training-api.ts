@@ -158,7 +158,7 @@ export class GarminTrainingApi {
 
   async updateWorkout(workoutId: number, workout: GarminWorkout): Promise<void> {
     return this.with401Retry(() =>
-      this.request<void>("PUT", `/workout/${workoutId}`, workout)
+      this.request<void>("PUT", `/workout/${workoutId}`, { ...workout, workoutId })
     );
   }
 

@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, MessageCircle, MoreHorizontal, Users } from "lucide-react";
+import { BookOpen, CalendarClock, MessageCircle, MoreHorizontal, Users } from "lucide-react";
+import api from "@/lib/api";
+import type { ScheduledRunJson } from "@/app/api/training/schedule-run/route";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
@@ -104,6 +106,7 @@ export default function TrainingHubPage() {
     hasReflection: boolean;
     resultId: string | null;
   } | null>(null);
+  const [scheduledRuns, setScheduledRuns] = useState<ScheduledRunJson[]>([]);
 
   const pastRacePhase = useMemo(
     () => (pastRacePlan?.raceDate ? getRacePhase(pastRacePlan.raceDate) : null),
@@ -240,6 +243,24 @@ export default function TrainingHubPage() {
     if (!authReady) return;
     void loadHub();
   }, [authReady, loadHub]);
+
+  useEffect(() => {
+    if (!authReady) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get<{ scheduledRuns: ScheduledRunJson[] }>(
+          "/training/schedule-run?days=7"
+        );
+        if (!cancelled) setScheduledRuns(data?.scheduledRuns ?? []);
+      } catch {
+        if (!cancelled) setScheduledRuns([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authReady]);
 
   async function handleSendTodayToGarmin() {
     const u = auth.currentUser;
@@ -607,6 +628,48 @@ export default function TrainingHubPage() {
               </div>
             </div>
 
+            {scheduledRuns.length > 0 ? (
+              <div className="rounded-xl border border-sky-100 bg-sky-50/60 px-4 py-3 text-sm">
+                <p className="font-semibold text-gray-900 flex items-center gap-2">
+                  <CalendarClock className="w-4 h-4 text-sky-700" />
+                  Upcoming scheduled runs
+                </p>
+                <ul className="mt-2 space-y-2">
+                  {scheduledRuns.map((sr) => {
+                    const dk = sr.date.slice(0, 10);
+                    return (
+                      <li
+                        key={sr.id}
+                        className="flex flex-wrap items-center justify-between gap-2 text-gray-800"
+                      >
+                        <span>
+                          <span className="font-medium">{sr.title}</span>
+                          <span className="text-gray-500">
+                            {" "}
+                            ·{" "}
+                            {formatPlanDateDisplay(dk, {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                            {sr.startTimeLabel ? ` · ${sr.startTimeLabel}` : ""}
+                          </span>
+                        </span>
+                        {sr.joinPath ? (
+                          <Link
+                            href={sr.joinPath}
+                            className="text-xs font-semibold text-sky-800 hover:text-sky-950"
+                          >
+                            Share link
+                          </Link>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
+
             {/* Week strip + day detail — adjacent so tapping a day shows instantly */}
             <div id="training-section-this-week" className="scroll-mt-24 space-y-3">
               {loadingWeek && (
@@ -738,14 +801,16 @@ export default function TrainingHubPage() {
                               {pushingGarmin ? "Sending…" : "Send to Garmin"}
                             </button>
                           ) : null}
-                          {focusPlanDay.workoutId ? (
-                            <Link
-                              href={`/workouts/${focusPlanDay.workoutId}/let-others-join`}
-                              className="text-sm font-medium text-sky-700 hover:text-sky-900"
-                            >
-                              Invite crew →
-                            </Link>
-                          ) : null}
+                          <Link
+                            href={
+                              focusPlanDay.workoutId
+                                ? `/training/schedule-run?date=${encodeURIComponent(focusPlanDay.dateKey)}&workoutId=${encodeURIComponent(focusPlanDay.workoutId)}`
+                                : `/training/schedule-run?date=${encodeURIComponent(focusPlanDay.dateKey)}`
+                            }
+                            className="inline-flex justify-center rounded-xl border-2 border-sky-600 bg-white px-5 py-2.5 text-sm font-semibold text-sky-900 hover:bg-sky-50"
+                          >
+                            Schedule this run
+                          </Link>
                         </div>
                         {focusIsToday && garminPushMessage ? (
                           <p className="mt-3 text-sm text-gray-700" role="status">
@@ -786,6 +851,13 @@ export default function TrainingHubPage() {
 
             {/* Secondary actions — always visible, not buried */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 text-sm">
+              <Link
+                href="/training/schedule-run"
+                className="font-medium text-sky-800 hover:text-sky-950"
+              >
+                Schedule a run
+              </Link>
+              <span className="text-gray-300" aria-hidden>·</span>
               <Link href="/gorun" className="font-medium text-gray-600 hover:text-gray-900">
                 Find a run with others
               </Link>

@@ -85,6 +85,7 @@ export function backLabelFromPath(path: string): string {
   if (p.startsWith("/training-setup/")) return "Back to plan setup";
   if (p === "/workouts") return "Back to Workouts";
   if (p === "/build-a-run") return "Back to Build a Run";
+  if (p === "/training/schedule-run") return "Back to My Training";
   return "Back";
 }
 

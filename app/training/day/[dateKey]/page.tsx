@@ -596,7 +596,7 @@ export default function TrainingPlanDayPreviewPage() {
                 disabled={openingWorkout || pushingGarmin || !canOpenWorkout || workoutLoading || !!workoutError}
                 className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
               >
-                {openingWorkout || pushingGarmin ? "Preparing..." : "See details"}
+                {openingWorkout || pushingGarmin ? "Preparing..." : "Modify workout"}
               </button>
               <div className="flex gap-2">
                 {prevDateKey && (
