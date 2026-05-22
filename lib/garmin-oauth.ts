@@ -1,6 +1,6 @@
 /**
  * Garmin OAuth Helper Module
- * 
+ *
  * Centralized OAuth utilities for Garmin integration
  */
 
@@ -18,6 +18,38 @@ export interface GarminOAuthResult {
   error?: string;
 }
 
+export type GarminCookieOptions = {
+  httpOnly: boolean;
+  secure: boolean;
+  sameSite: 'lax';
+  maxAge: number;
+  path: string;
+  domain?: string;
+};
+
+const PROD_GARMIN_OAUTH_ORIGIN = 'https://pr.gofastcrushgoals.com';
+
+/**
+ * OAuth server origin used for redirect_uri and mobile start redirects.
+ * Production always uses pr.gofastcrushgoals.com so Garmin callback stays registered.
+ */
+export function getGarminOAuthServerUrl(): string {
+  let serverUrl =
+    process.env.SERVER_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+
+  if (process.env.NODE_ENV === 'production') {
+    serverUrl = PROD_GARMIN_OAUTH_ORIGIN;
+  }
+
+  if (!serverUrl) {
+    throw new Error('SERVER_URL or NEXT_PUBLIC_APP_URL must be set');
+  }
+
+  return serverUrl.replace(/\/$/, '');
+}
+
 /**
  * Complete OAuth flow: exchange code for tokens and save to database
  */
@@ -30,21 +62,18 @@ export async function completeGarminOAuth(
   try {
     // 1. Exchange code for tokens
     const tokenResult = await exchangeCodeForTokens(code, codeVerifier, redirectUri);
-    
+
     if (!tokenResult.success) {
       return {
         success: false,
-        error: tokenResult.error || 'Token exchange failed'
+        error: tokenResult.error || 'Token exchange failed',
       };
     }
 
     const { tokens } = tokenResult;
 
     // 2. Fetch Garmin user info to get user ID
-    const userInfoResult = await fetchAndSaveGarminUserInfo(
-      athleteId,
-      tokens.access_token
-    );
+    const userInfoResult = await fetchAndSaveGarminUserInfo(athleteId, tokens.access_token);
 
     const garminUserId = userInfoResult.garminUserId;
 
@@ -79,42 +108,81 @@ export async function completeGarminOAuth(
       athleteId,
       garminUserId: garminUserId || undefined,
     };
-
   } catch (error: any) {
     console.error('❌ Complete OAuth flow error:', error);
     return {
       success: false,
-      error: error.message || 'OAuth flow failed'
+      error: error.message || 'OAuth flow failed',
     };
   }
 }
 
 /**
- * Get server URL for building redirect URIs
- * Production must use SERVER_URL environment variable
+ * @deprecated Prefer getGarminOAuthServerUrl for OAuth flows.
  */
 export function getServerUrl(): string {
-  const serverUrl = process.env.SERVER_URL || process.env.NEXT_PUBLIC_APP_URL || `https://${process.env.VERCEL_URL}`;
-  if (!serverUrl) {
-    throw new Error('SERVER_URL or NEXT_PUBLIC_APP_URL must be set');
-  }
-  return serverUrl;
+  return getGarminOAuthServerUrl();
 }
 
-/**
- * Get Garmin redirect URI (callback URL)
- */
+/** Garmin OAuth callback URL registered with Garmin Connect. */
 export function getGarminRedirectUri(): string {
-  const serverUrl = getServerUrl();
-  return `${serverUrl}/api/auth/garmin/callback`;
+  return `${getGarminOAuthServerUrl()}/api/auth/garmin/callback`;
+}
+
+/** HTTP-only cookie storing PKCE verifier keyed by athlete id. */
+export function getGarminVerifierCookieName(athleteId: string): string {
+  return `garmin_code_verifier_${athleteId}`;
+}
+
+/** HTTP-only cookie storing mobile deep-link return URL keyed by athlete id. */
+export function getGarminMobileReturnCookieName(athleteId: string): string {
+  return `garmin_mobile_return_${athleteId}`;
+}
+
+export function getGarminCookieOptions(): GarminCookieOptions {
+  const options: GarminCookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 600,
+    path: '/',
+  };
+
+  if (process.env.NODE_ENV === 'production') {
+    options.domain = '.gofastcrushgoals.com';
+  }
+
+  return options;
+}
+
+/** Allowlisted deep links for mobile OAuth return (gofast://settings/garmin). */
+export function isAllowedMobileReturnUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.protocol === 'gofast:' &&
+      parsed.hostname === 'settings' &&
+      parsed.pathname === '/garmin'
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function appendGarminMobileReturnParams(
+  returnUrl: string,
+  params: Record<string, string>
+): string {
+  const [base] = returnUrl.split('?');
+  const qs = new URLSearchParams(params).toString();
+  return qs ? `${base}?${qs}` : base;
 }
 
 /**
  * Get Garmin webhook URI
  */
 export function getGarminWebhookUri(): string {
-  const serverUrl = getServerUrl();
-  return `${serverUrl}/api/garmin/webhook`;
+  return `${getGarminOAuthServerUrl()}/api/garmin/webhook`;
 }
 
 export { generatePKCE, buildGarminAuthUrl, exchangeCodeForTokens, fetchGarminUserInfo };
