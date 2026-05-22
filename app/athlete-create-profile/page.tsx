@@ -22,6 +22,9 @@ export default function AthleteCreateProfilePage() {
     city: '',
     state: '',
     gofastHandle: '',
+    primarySport: '',
+    fiveKPaceMinutes: '',
+    fiveKPaceSeconds: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -135,6 +138,7 @@ export default function AthleteCreateProfilePage() {
       !formData.gofastHandle ||
       !formData.birthday ||
       !formData.gender ||
+      !formData.primarySport ||
       !formData.city ||
       !formData.state
     ) {
@@ -190,6 +194,11 @@ export default function AthleteCreateProfilePage() {
         gender: formData.gender,
         city: formData.city,
         state: formData.state,
+        primarySport: formData.primarySport || null,
+        fiveKPace:
+          formData.fiveKPaceMinutes && formData.fiveKPaceSeconds
+            ? `${parseInt(formData.fiveKPaceMinutes, 10)}:${formData.fiveKPaceSeconds.padStart(2, '0')}`
+            : null,
         photoURL,
       });
 
@@ -258,10 +267,10 @@ export default function AthleteCreateProfilePage() {
               className="w-16 h-16 rounded-full mx-auto mb-4"
             />
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-              You&apos;re almost in — let&apos;s set up your profile
+              You&apos;re an athlete. Let&apos;s set up your GoFast profile.
             </h1>
             <p className="text-gray-600 text-sm">
-              A few details help us personalize your training, runs, and races.
+              A few details help us personalize your training, runs, and races from day one.
             </p>
           </div>
 
@@ -282,6 +291,15 @@ export default function AthleteCreateProfilePage() {
               <span>
                 <strong className="text-gray-900">City and state</strong> help surface nearby community runs and races
                 that fit you.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-lg">
+                🏃
+              </span>
+              <span>
+                <strong className="text-gray-900">Sport and 5K pace</strong> power your training plan and pace zones
+                from the start.
               </span>
             </li>
             <li className="flex gap-3">
@@ -399,8 +417,8 @@ export default function AthleteCreateProfilePage() {
           />
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome to GoFast</h1>
           <p className="text-gray-600 text-sm">
-            Set up your basic info now. You can add bio, training details, and your public GoFast Page later from
-            Profile.
+            Set up your athlete profile — handle, location, sport, and pace. Add bio and your public GoFast Page
+            later from Profile.
           </p>
         </div>
 
@@ -502,33 +520,92 @@ export default function AthleteCreateProfilePage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Gender <span className="text-red-500">*</span>
             </label>
-            <div className="flex gap-4">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="gender"
-                  value="male"
-                  checked={formData.gender === 'male'}
-                  onChange={(e) => handleInputChange('gender', e.target.value)}
-                  className="mr-2"
-                  required
-                  disabled={loading}
-                />
-                Male
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="gender"
-                  value="female"
-                  checked={formData.gender === 'female'}
-                  onChange={(e) => handleInputChange('gender', e.target.value)}
-                  className="mr-2"
-                  required
-                  disabled={loading}
-                />
-                Female
-              </label>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: 'Male', value: 'male' },
+                { label: 'Female', value: 'female' },
+                { label: 'Non-binary', value: 'non-binary' },
+                { label: 'Prefer not to say', value: 'prefer-not-to-say' },
+              ].map((opt) => {
+                const selected = formData.gender === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => handleInputChange('gender', opt.value)}
+                    className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
+                      selected
+                        ? 'border-orange-500 bg-orange-500 text-white'
+                        : 'border-gray-300 bg-white text-gray-700 hover:border-orange-300'
+                    }`}>
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Primary sport <span className="text-red-500">*</span>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: 'Running', value: 'running' },
+                { label: 'Triathlon', value: 'triathlon' },
+                { label: 'Cycling', value: 'cycling' },
+                { label: 'Swimming', value: 'swimming' },
+              ].map((opt) => {
+                const selected = formData.primarySport === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => handleInputChange('primarySport', opt.value)}
+                    className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
+                      selected
+                        ? 'border-orange-500 bg-orange-500 text-white'
+                        : 'border-gray-300 bg-white text-gray-700 hover:border-orange-300'
+                    }`}>
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Current 5K pace <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <p className="text-xs text-gray-500 mb-2">
+              Used to calibrate training zones. Enter minutes and seconds per mile.
+            </p>
+            <div className="flex items-center gap-2 max-w-xs">
+              <input
+                type="number"
+                min={0}
+                max={59}
+                placeholder="min"
+                value={formData.fiveKPaceMinutes}
+                onChange={(e) => handleInputChange('fiveKPaceMinutes', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-center"
+                disabled={loading}
+              />
+              <span className="text-gray-500 font-bold">:</span>
+              <input
+                type="number"
+                min={0}
+                max={59}
+                placeholder="sec"
+                value={formData.fiveKPaceSeconds}
+                onChange={(e) => handleInputChange('fiveKPaceSeconds', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-center"
+                disabled={loading}
+              />
+              <span className="text-sm text-gray-500 whitespace-nowrap">/mi</span>
             </div>
           </div>
 
