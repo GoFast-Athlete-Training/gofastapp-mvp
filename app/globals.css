@@ -32,6 +32,15 @@ body {
   min-width: 0;
 }
 
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Ensure proper centering for loading states */
 .flex-center {
   display: flex;

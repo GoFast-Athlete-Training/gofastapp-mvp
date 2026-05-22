@@ -27,6 +27,8 @@ interface RaceMessageFeedProps {
   selectedTopic?: string;
   /** Override scroll area height (e.g. taller hub layout). */
   messageListClassName?: string;
+  /** Mobile hub layout: taller feed + sticky composer. */
+  variant?: "default" | "mobile-hub";
 }
 
 type ApiAthlete = {
@@ -63,7 +65,8 @@ export default function RaceMessageFeed({
   raceRegistryId,
   topics = [...RACE_HUB_DEFAULT_TOPICS],
   selectedTopic = "general",
-  messageListClassName = "max-h-96",
+  messageListClassName,
+  variant = "default",
 }: RaceMessageFeedProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -72,6 +75,13 @@ export default function RaceMessageFeed({
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  const isMobileHub = variant === "mobile-hub";
+  const resolvedListClassName =
+    messageListClassName ??
+    (isMobileHub
+      ? "min-h-[min(18rem,42dvh)] max-h-[min(32rem,calc(100dvh-18rem))]"
+      : "max-h-96");
 
   useEffect(() => {
     setCurrentUserId(LocalStorageAPI.getAthleteId());
@@ -155,15 +165,21 @@ export default function RaceMessageFeed({
     TOPIC_LABELS[t] ?? t.charAt(0).toUpperCase() + t.slice(1).replace(/-/g, " ");
 
   return (
-    <div className="space-y-4">
+    <div className={isMobileHub ? "flex min-h-0 flex-1 flex-col" : "space-y-4"}>
       {topics.length > 1 && (
-        <div className="flex gap-2 flex-wrap">
+        <div
+          className={
+            isMobileHub
+              ? "mb-3 flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide"
+              : "flex gap-2 flex-wrap"
+          }
+        >
           {topics.map((topic) => (
             <button
               key={topic}
               type="button"
               onClick={() => setCurrentTopic(topic)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              className={`shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition ${
                 currentTopic === topic
                   ? "bg-orange-500 text-white"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -176,7 +192,9 @@ export default function RaceMessageFeed({
       )}
 
       <div
-        className={`space-y-3 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50 ${messageListClassName}`}
+        className={`space-y-3 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50 ${resolvedListClassName} ${
+          isMobileHub ? "min-h-0 flex-1" : ""
+        }`}
       >
         {messages.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-8">No messages yet. Say hello!</p>
@@ -190,34 +208,38 @@ export default function RaceMessageFeed({
 
             return (
               <div key={message.id} className="bg-white rounded-lg p-3 border border-gray-200 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
+                <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-2">
                     {message.athlete.photoURL ? (
                       <img
                         src={message.athlete.photoURL}
                         alt=""
-                        className="w-6 h-6 rounded-full object-cover"
+                        className="w-6 h-6 rounded-full object-cover shrink-0"
                       />
                     ) : (
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-semibold">
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
                         {(name[0] || "R").toUpperCase()}
                       </div>
                     )}
-                    <span className="font-semibold text-sm text-gray-900">{name}</span>
-                    {message.athlete.gofastHandle ? (
-                      <span className="text-gray-500 text-xs">@{message.athlete.gofastHandle}</span>
-                    ) : null}
-                    <span className="text-xs text-gray-500">
-                      {new Date(message.createdAt).toLocaleString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
-                    </span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <span className="font-semibold text-sm text-gray-900">{name}</span>
+                        {message.athlete.gofastHandle ? (
+                          <span className="text-gray-500 text-xs">@{message.athlete.gofastHandle}</span>
+                        ) : null}
+                        <span className="text-xs text-gray-500">
+                          {new Date(message.createdAt).toLocaleString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                   {canEdit && !isEditing && (
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 pl-8 sm:pl-0">
                       <button
                         type="button"
                         onClick={() => {
@@ -280,19 +302,22 @@ export default function RaceMessageFeed({
         )}
       </div>
 
-      <form onSubmit={(e) => void handleSubmit(e)} className="flex gap-2">
+      <form
+        onSubmit={(e) => void handleSubmit(e)}
+        className={`flex gap-2 ${isMobileHub ? "sticky bottom-20 z-30 mt-3 border-t border-gray-200 bg-gray-50 pt-3" : ""}`}
+      >
         <input
           type="text"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           placeholder="Message the race crew…"
-          className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+          className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white"
           disabled={loading}
         />
         <button
           type="submit"
           disabled={loading || !newMessage.trim()}
-          className="px-6 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold transition"
+          className="px-4 sm:px-6 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold transition shrink-0"
         >
           {loading ? "Sending…" : "Send"}
         </button>

@@ -9,7 +9,9 @@ interface MessageFeedProps {
   topics?: string[];
   selectedTopic?: string;
   onTopicChange?: (topic: string) => void;
-  isAdmin?: boolean; // If true, can edit/delete any message
+  isAdmin?: boolean;
+  messageListClassName?: string;
+  variant?: 'default' | 'mobile-hub';
 }
 
 interface Message {
@@ -25,7 +27,15 @@ interface Message {
   };
 }
 
-export default function MessageFeed({ crewId, topics = ['#general', '#runs', '#training tips', '#myvictories', '#social'], selectedTopic = '#general', onTopicChange, isAdmin = false }: MessageFeedProps) {
+export default function MessageFeed({
+  crewId,
+  topics = ['#general', '#runs', '#training tips', '#myvictories', '#social'],
+  selectedTopic = '#general',
+  onTopicChange,
+  isAdmin = false,
+  messageListClassName,
+  variant = 'default',
+}: MessageFeedProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,6 +43,13 @@ export default function MessageFeed({ crewId, topics = ['#general', '#runs', '#t
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  const isMobileHub = variant === 'mobile-hub';
+  const resolvedListClassName =
+    messageListClassName ??
+    (isMobileHub
+      ? 'min-h-[min(18rem,42dvh)] max-h-[min(32rem,calc(100dvh-18rem))]'
+      : 'max-h-96');
 
   useEffect(() => {
     setCurrentUserId(LocalStorageAPI.getAthleteId());
@@ -44,16 +61,12 @@ export default function MessageFeed({ crewId, topics = ['#general', '#runs', '#t
 
   const loadMessages = async () => {
     try {
-      // Use main hydration endpoint which includes messagesBox
       const response = await api.get(`/runcrew/${crewId}`);
       if (response.data.success && response.data.runCrew?.messagesBox?.messages) {
-        // Filter messages by current topic (if topic field exists)
-        let allMessages = response.data.runCrew.messagesBox.messages;
-        const filtered = allMessages.filter((msg: any) => {
-          // If message has topic field, filter by it; otherwise show all (backward compatibility)
+        const allMessages = response.data.runCrew.messagesBox.messages;
+        const filtered = allMessages.filter((msg: { topic?: string }) => {
           return !msg.topic || msg.topic === currentTopic;
         });
-        // Messages come in desc order, reverse to show oldest first
         setMessages([...filtered].reverse());
       }
     } catch (error) {
@@ -69,12 +82,11 @@ export default function MessageFeed({ crewId, topics = ['#general', '#runs', '#t
     try {
       const response = await api.post(`/runcrew/${crewId}/messages`, {
         content: newMessage,
-        topic: currentTopic, // Include topic when posting
+        topic: currentTopic,
       });
-      
+
       if (response.data.success) {
         setNewMessage('');
-        // Reload messages after posting
         await loadMessages();
       }
     } catch (error) {
@@ -146,15 +158,21 @@ export default function MessageFeed({ crewId, topics = ['#general', '#runs', '#t
   };
 
   return (
-    <div className="space-y-4">
-      {/* Topic Selector */}
+    <div className={isMobileHub ? 'flex min-h-0 flex-1 flex-col' : 'space-y-4'}>
       {topics.length > 1 && (
-        <div className="flex gap-2 flex-wrap">
+        <div
+          className={
+            isMobileHub
+              ? 'mb-3 flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide'
+              : 'flex gap-2 flex-wrap'
+          }
+        >
           {topics.map((topic) => (
             <button
               key={topic}
+              type="button"
               onClick={() => handleTopicChange(topic)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              className={`shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition ${
                 currentTopic === topic
                   ? 'bg-orange-500 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -166,8 +184,11 @@ export default function MessageFeed({ crewId, topics = ['#general', '#runs', '#t
         </div>
       )}
 
-      {/* Messages List */}
-      <div className="space-y-3 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50">
+      <div
+        className={`space-y-3 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50 ${resolvedListClassName} ${
+          isMobileHub ? 'min-h-0 flex-1' : ''
+        }`}
+      >
         {messages.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-8">No messages yet. Start the conversation!</p>
         ) : (
@@ -177,40 +198,45 @@ export default function MessageFeed({ crewId, topics = ['#general', '#runs', '#t
 
             return (
               <div key={message.id} className="bg-white rounded-lg p-3 border border-gray-200 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
+                <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-2">
                     {message.athlete.photoURL ? (
                       <img
                         src={message.athlete.photoURL}
                         alt={message.athlete.gofastHandle ? `@${message.athlete.gofastHandle}` : message.athlete.firstName}
-                        className="w-6 h-6 rounded-full object-cover"
+                        className="w-6 h-6 rounded-full object-cover shrink-0"
                       />
                     ) : (
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-semibold">
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
                         {(message.athlete.firstName?.[0] || 'A').toUpperCase()}
                       </div>
                     )}
-                    <span className="font-semibold text-sm text-gray-900">
-                      {message.athlete.firstName}
-                      {message.athlete.gofastHandle && (
-                        <span className="text-gray-500 font-normal"> @{message.athlete.gofastHandle}</span>
-                      )}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      {new Date(message.createdAt).toLocaleString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit'
-                      })}
-                      {message.updatedAt && message.updatedAt !== message.createdAt && (
-                        <span className="ml-1 italic">(edited)</span>
-                      )}
-                    </span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <span className="font-semibold text-sm text-gray-900">
+                          {message.athlete.firstName}
+                          {message.athlete.gofastHandle && (
+                            <span className="text-gray-500 font-normal"> @{message.athlete.gofastHandle}</span>
+                          )}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(message.createdAt).toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })}
+                          {message.updatedAt && message.updatedAt !== message.createdAt && (
+                            <span className="ml-1 italic">(edited)</span>
+                          )}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                   {canEdit && !isEditing && (
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 pl-8 sm:pl-0">
                       <button
+                        type="button"
                         onClick={() => handleEdit(message)}
                         className="text-xs text-gray-500 hover:text-gray-700"
                         disabled={loading}
@@ -218,6 +244,7 @@ export default function MessageFeed({ crewId, topics = ['#general', '#runs', '#t
                         Edit
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleDelete(message.id)}
                         className="text-xs text-red-500 hover:text-red-700"
                         disabled={loading}
@@ -238,6 +265,7 @@ export default function MessageFeed({ crewId, topics = ['#general', '#runs', '#t
                     />
                     <div className="flex gap-2">
                       <button
+                        type="button"
                         onClick={() => handleSaveEdit(message.id)}
                         disabled={loading || !editContent.trim()}
                         className="px-3 py-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded text-xs font-semibold"
@@ -245,6 +273,7 @@ export default function MessageFeed({ crewId, topics = ['#general', '#runs', '#t
                         Save
                       </button>
                       <button
+                        type="button"
                         onClick={handleCancelEdit}
                         disabled={loading}
                         className="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs font-semibold"
@@ -254,7 +283,7 @@ export default function MessageFeed({ crewId, topics = ['#general', '#runs', '#t
                     </div>
                   </div>
                 ) : (
-                  <div className="text-sm text-gray-700 pl-8">{message.content}</div>
+                  <div className="text-sm text-gray-700 pl-8 whitespace-pre-wrap">{message.content}</div>
                 )}
               </div>
             );
@@ -262,20 +291,22 @@ export default function MessageFeed({ crewId, topics = ['#general', '#runs', '#t
         )}
       </div>
 
-      {/* Message Input Form */}
-      <form onSubmit={handleSubmit} className="flex gap-2">
+      <form
+        onSubmit={handleSubmit}
+        className={`flex gap-2 ${isMobileHub ? 'sticky bottom-20 z-30 mt-3 border-t border-gray-200 bg-gray-50 pt-3' : ''}`}
+      >
         <input
           type="text"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           placeholder="Type a message to your crew..."
-          className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+          className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white"
           disabled={loading}
         />
         <button
           type="submit"
           disabled={loading || !newMessage.trim()}
-          className="px-6 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold transition"
+          className="px-4 sm:px-6 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold transition shrink-0"
         >
           {loading ? 'Sending...' : 'Send'}
         </button>
@@ -283,4 +314,3 @@ export default function MessageFeed({ crewId, topics = ['#general', '#runs', '#t
     </div>
   );
 }
-

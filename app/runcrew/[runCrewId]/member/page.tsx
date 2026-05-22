@@ -9,6 +9,7 @@ import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
 import MessageFeed from '@/components/RunCrew/MessageFeed';
+import RunCrewMobileTabs from '@/components/RunCrew/RunCrewMobileTabs';
 import TopNav from '@/components/shared/TopNav';
 import { Copy, Check, Link as LinkIcon } from 'lucide-react';
 import { getRunCrewJoinLink } from '@/lib/domain-runcrew';
@@ -279,28 +280,32 @@ export default function RunCrewMemberPage() {
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <TopNav />
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-4 min-w-0 flex-1">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
               {crew.runCrewBaseInfo?.logo ? (
                 <img
                   src={crew.runCrewBaseInfo.logo}
                   alt={crew.runCrewBaseInfo?.name || 'RunCrew'}
-                  className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl object-cover border-2 border-gray-200 flex-shrink-0"
+                  className="w-10 h-10 sm:w-16 sm:h-16 rounded-xl object-cover border-2 border-gray-200 flex-shrink-0"
                 />
               ) : crew.runCrewBaseInfo?.icon ? (
-                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-2xl sm:text-3xl border-2 border-gray-200 flex-shrink-0">
+                <div className="w-10 h-10 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xl sm:text-3xl border-2 border-gray-200 flex-shrink-0">
                   {crew.runCrewBaseInfo.icon}
                 </div>
               ) : null}
               <div className="min-w-0 flex-1">
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">{crew.runCrewBaseInfo?.name}</h1>
+                <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold text-gray-900 truncate">
+                  {crew.runCrewBaseInfo?.name}
+                </h1>
                 {crew.runCrewBaseInfo?.description && (
-                  <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">{crew.runCrewBaseInfo.description}</p>
+                  <p className="hidden sm:block text-sm sm:text-base text-gray-600 mt-1 sm:mt-2 line-clamp-2">
+                    {crew.runCrewBaseInfo.description}
+                  </p>
                 )}
               </div>
             </div>
-            <div className="flex gap-2 sm:gap-4 flex-shrink-0">
+            <div className="hidden sm:flex gap-2 sm:gap-4 flex-shrink-0">
               {isAdmin && (
                 <Link
                   href={`/runcrew/${runCrewId}/admin`}
@@ -320,9 +325,20 @@ export default function RunCrewMemberPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-        {/* 3-Column Layout: Members + Chatter (Left) | Training (Right) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-10">
+        <RunCrewMobileTabs
+          runCrewId={runCrewId}
+          memberships={memberships}
+          messageTopics={crew.runCrewBaseInfo?.messageTopics || ['#general', '#runs', '#training tips', '#myvictories', '#social']}
+          isAdmin={isAdmin}
+          inviteUrl={inviteUrl}
+          copiedLink={copiedLink}
+          onCopyLink={() => void handleCopyLink()}
+          trainingWeek={trainingWeek}
+          currentUserId={LocalStorageAPI.getAthleteId() ?? undefined}
+        />
+
+        <div className="hidden lg:grid grid-cols-12 gap-4 sm:gap-6">
           {/* LEFT SIDEBAR: Members + Chatter */}
           <aside className="lg:col-span-4 space-y-6 min-w-0">
             <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 sticky top-6 overflow-hidden">
