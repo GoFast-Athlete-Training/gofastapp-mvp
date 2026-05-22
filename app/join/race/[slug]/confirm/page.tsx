@@ -6,6 +6,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import api from "@/lib/api";
+import { ExternalLink } from "lucide-react";
 
 const RACE_HUB_JOIN_INTENT_KEY = "raceHubJoinIntent";
 const RACE_HUB_JOIN_INTENT_SLUG_KEY = "raceHubJoinIntentSlug";
@@ -22,8 +23,16 @@ type PublicRace = {
   registrationUrl: string | null;
 };
 
+function pageShell(className = "") {
+  return `min-h-[100dvh] bg-gradient-to-br from-sky-50 to-orange-50 flex flex-col items-center justify-start sm:justify-center overflow-y-auto px-4 py-8 sm:py-10 ${className}`;
+}
+
+function cardShell(className = "") {
+  return `max-w-md w-full bg-white rounded-2xl shadow-xl border border-gray-200 p-5 sm:p-8 ${className}`;
+}
+
 /**
- * Race Hub — confirm join after signup
+ * Race Hub — confirm participant signup after auth
  * Route: /join/race/[slug]/confirm
  */
 export default function RaceHubJoinConfirmPage() {
@@ -155,7 +164,6 @@ export default function RaceHubJoinConfirmPage() {
     router.push(frontDoorPath);
   };
 
-  /** Already a member → land in hub */
   useEffect(() => {
     if (!race || loading) return;
 
@@ -182,7 +190,7 @@ export default function RaceHubJoinConfirmPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50 flex items-center justify-center">
+      <div className={pageShell("justify-center")}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4" />
           <p className="text-gray-600">Loading…</p>
@@ -193,8 +201,8 @@ export default function RaceHubJoinConfirmPage() {
 
   if (fetchError === "not_found") {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow p-6">
+      <div className={pageShell()}>
+        <div className={cardShell()}>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Race not found</h2>
           <p className="text-gray-600 mb-4">This race isn&apos;t available.</p>
         </div>
@@ -204,8 +212,8 @@ export default function RaceHubJoinConfirmPage() {
 
   if (fetchError === "error" || !race) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow p-6">
+      <div className={pageShell()}>
+        <div className={cardShell()}>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Error</h2>
           <p className="text-gray-600 mb-4">Couldn&apos;t load this race.</p>
           <button
@@ -220,33 +228,34 @@ export default function RaceHubJoinConfirmPage() {
     );
   }
 
-  if (registrationNudge && race.registrationUrl?.trim()) {
+  const registrationUrl = race.registrationUrl?.trim() || null;
+
+  if (registrationNudge && registrationUrl) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full px-6">
-          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-3">You&apos;re in for {race.name}</h2>
-              <p className="text-gray-600 mb-2 text-left text-sm">
-                We added this race to your GoFast calendar. Have you registered with the race yet? Use the official
-                link when you&apos;re ready — it helps support what we do.
-              </p>
-              <a
-                href={race.registrationUrl.trim()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mb-4 inline-flex w-full items-center justify-center rounded-xl border-2 border-orange-500 bg-white px-6 py-3 text-lg font-semibold text-orange-600 transition hover:bg-orange-50"
-              >
-                Open official registration
-              </a>
-              <button
-                type="button"
-                onClick={() => goToRaceHub()}
-                className="w-full bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold text-lg transition shadow-lg"
-              >
-                Continue to Race Hub
-              </button>
-            </div>
+      <div className={pageShell()}>
+        <div className={cardShell()}>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">You&apos;re in for {race.name}</h2>
+            <p className="text-gray-600 mb-4 text-left text-sm leading-relaxed">
+              We added this race to My Races and opened the Race Hub. Have you registered with the race organizer
+              yet? Use the official link when you&apos;re ready.
+            </p>
+            <a
+              href={registrationUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mb-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-orange-500 bg-white px-6 py-3 text-lg font-semibold text-orange-600 transition hover:bg-orange-50"
+            >
+              <ExternalLink className="w-5 h-5 shrink-0" />
+              Open official registration
+            </a>
+            <button
+              type="button"
+              onClick={() => goToRaceHub()}
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold text-lg transition shadow-lg"
+            >
+              Continue to Race Hub
+            </button>
           </div>
         </div>
       </div>
@@ -254,45 +263,41 @@ export default function RaceHubJoinConfirmPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
-          <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-green-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-              <span className="text-4xl" aria-hidden>
-                ✓
-              </span>
-            </div>
+    <div className={pageShell()}>
+      <div className={cardShell()}>
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 mb-3">Confirm you&apos;re running this race</h1>
+          <p className="text-gray-600 text-base leading-relaxed">
+            We&apos;ll add <strong>{race.name}</strong> to My Races, put it on your GoFast calendar, and open the Race
+            Hub for chatter and race-day updates.
+          </p>
+          <p className="mt-3 text-xs text-gray-500">
+            This does not register you with the race organizer.
+          </p>
+        </div>
 
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">You&apos;re all set!</h1>
-            <p className="text-gray-600">
-              Add <strong>{race.name}</strong> to your GoFast calendar and open the race hub.
-            </p>
-          </div>
+        {joinError ? (
+          <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">{joinError}</div>
+        ) : null}
 
-          {joinError ? (
-            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">{joinError}</div>
-          ) : null}
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => void handleConfirmJoin()}
+            disabled={joining || !isAuthenticated}
+            className="w-full bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold text-lg transition shadow-lg disabled:opacity-50"
+          >
+            {joining ? "Adding…" : "Yes, I'm running this race"}
+          </button>
 
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => void handleConfirmJoin()}
-              disabled={joining || !isAuthenticated}
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold text-lg transition shadow-lg disabled:opacity-50"
-            >
-              {joining ? "Adding…" : "Yes, I'm running it"}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleNotNow}
-              disabled={joining}
-              className="w-full bg-gray-200 hover:bg-gray-300 text-gray-900 px-6 py-3 rounded-xl font-semibold text-lg transition disabled:opacity-50"
-            >
-              Not now
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleNotNow}
+            disabled={joining}
+            className="w-full bg-gray-200 hover:bg-gray-300 text-gray-900 px-6 py-3 rounded-xl font-semibold text-lg transition disabled:opacity-50"
+          >
+            Not now
+          </button>
         </div>
       </div>
     </div>

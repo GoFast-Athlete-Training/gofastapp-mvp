@@ -356,9 +356,9 @@ export default function RaceHubJoinSignupExplainerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 to-orange-50 flex items-center justify-center p-4">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-sky-50 to-orange-50 flex flex-col items-center justify-start sm:justify-center overflow-y-auto px-4 py-8 sm:py-10">
       <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
+        <div className="bg-white rounded-2xl shadow-xl p-5 sm:p-8 border border-gray-200">
           <div className="text-center mb-6">
             <div className="flex justify-center mb-4">
               {race.logoUrl?.trim() &&
@@ -375,20 +375,19 @@ export default function RaceHubJoinSignupExplainerPage() {
               )}
             </div>
 
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">You&apos;re about to join {race.name}</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Ready to run {race.name}?</h1>
           </div>
 
           <div className="mb-6 text-left space-y-4 text-gray-700">
             <p className="text-base leading-relaxed">
-              Create a GoFast account to join this Race Hub — chat, meetups, and announcements with other runners.
+              Create a GoFast account to confirm you&apos;re running this race. We&apos;ll add it to My Races, put it
+              on your calendar, and open the Race Hub for chatter and race-day updates.
             </p>
 
-            <p className="text-sm font-medium text-gray-900">This helps us:</p>
-            <ul className="text-sm space-y-2 ml-4 list-disc">
-              <li>keep the community safe</li>
-              <li>tie you to your race crew</li>
-              <li>reduce spam</li>
-            </ul>
+            <p className="text-sm text-gray-500">
+              This does not register you with the race organizer. After signup, you&apos;ll confirm that you&apos;re
+              running this race.
+            </p>
           </div>
 
           {error && (
