@@ -77,10 +77,16 @@ function stepCopy(step: WelcomeStep): string {
     case 'resolving-profile':
       return 'Checking your runner profile.';
     case 'dashboard':
-      return 'Your dashboard is ready.';
+      return 'You\u2019re all set.';
     case 'finish-profile':
       return 'Your profile needs a few details.';
   }
+}
+
+function readySubtitle(step: WelcomeStep): string | null {
+  if (step === 'dashboard') return 'Ready to start crushing your goals.';
+  if (step === 'finish-profile') return 'Finish your profile, then you\u2019re in.';
+  return null;
 }
 
 /**
@@ -105,7 +111,7 @@ export default function WelcomePage() {
 
     setSecondaryCta(
       hasProfileHandle
-        ? { label: 'View profile', action: 'profile' }
+        ? null
         : { label: 'Go to dashboard anyway', action: 'dashboard' }
     );
   }, [hasProfileHandle]);
@@ -263,8 +269,8 @@ export default function WelcomePage() {
 
         <h1 className="mt-8 text-3xl font-bold text-white">Welcome, {runnerName}</h1>
         <p className="mt-2 text-base text-white/90">{stepCopy(step)}</p>
-        {!error && !resolving ? (
-          <p className="mt-2 text-sm text-white/80">Choose where to go next.</p>
+        {!error && !resolving && readySubtitle(step) ? (
+          <p className="mt-2 text-sm text-white/80">{readySubtitle(step)}</p>
         ) : null}
 
         {error ? (
@@ -291,16 +297,18 @@ export default function WelcomePage() {
                 recommendProfile ? 'bg-white text-sky-600' : 'bg-white/15 text-white'
               }`}
             >
-              {recommendProfile ? 'Finish profile' : 'Go to dashboard'}
+              {recommendProfile ? 'Finish profile' : "Let's go"}
             </button>
 
-            <button
-              type="button"
-              onClick={secondaryCta?.action === 'dashboard' ? goToDashboard : goToProfile}
-              className="w-full rounded-xl border border-white/40 px-5 py-4 text-base font-semibold text-white"
-            >
-              {secondaryCta?.label ?? 'View profile'}
-            </button>
+            {secondaryCta ? (
+              <button
+                type="button"
+                onClick={secondaryCta.action === 'dashboard' ? goToDashboard : goToProfile}
+                className="w-full rounded-xl border border-white/40 px-5 py-4 text-base font-semibold text-white"
+              >
+                {secondaryCta.label}
+              </button>
+            ) : null}
           </div>
         )}
       </div>
