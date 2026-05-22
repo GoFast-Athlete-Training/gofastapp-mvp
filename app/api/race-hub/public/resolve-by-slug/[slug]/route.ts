@@ -18,12 +18,13 @@ export async function GET(
       return NextResponse.json({ success: false, error: "slug required" }, { status: 400 });
     }
 
-    const race = await prisma.race_registry.findFirst({
-      where: {
-        slug,
-        isActive: true,
-        isCancelled: false,
-      },
+    const activeWhere = {
+      isActive: true,
+      isCancelled: false,
+    } as const;
+
+    let race = await prisma.race_registry.findFirst({
+      where: { slug, ...activeWhere },
       select: {
         id: true,
         name: true,
@@ -37,6 +38,50 @@ export async function GET(
         registrationUrl: true,
       },
     });
+
+    if (!race) {
+      race = await prisma.race_registry.findFirst({
+        where: {
+          slug: { equals: slug, mode: "insensitive" },
+          ...activeWhere,
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logoUrl: true,
+          raceDate: true,
+          city: true,
+          state: true,
+          distanceLabel: true,
+          distanceMeters: true,
+          registrationUrl: true,
+        },
+      });
+    }
+
+    /** Race-level public slug (e.g. twin-cities-marathon) → primary distance row (twin-cities-marathon-marathon). */
+    if (!race) {
+      race = await prisma.race_registry.findFirst({
+        where: {
+          slug: { startsWith: `${slug}-`, mode: "insensitive" },
+          ...activeWhere,
+        },
+        orderBy: [{ distanceMeters: "desc" }, { raceDate: "asc" }],
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logoUrl: true,
+          raceDate: true,
+          city: true,
+          state: true,
+          distanceLabel: true,
+          distanceMeters: true,
+          registrationUrl: true,
+        },
+      });
+    }
 
     if (!race) {
       return NextResponse.json({ success: false, error: "Race not found" }, { status: 404 });
