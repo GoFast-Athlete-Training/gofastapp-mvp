@@ -323,44 +323,20 @@ model race_registry {
   country                 String?                   @default("USA")
   createdAt               DateTime                  @default(now())
   updatedAt               DateTime
-  address                 String?
-  ageMaximum              Int?
-  ageMinimum              Int?
-  averageHumidity         Int?
-  averageTemperature      Int?
-  cancellationReason      String?
-  charityDescription      String?
   charityName             String?
-  charitySupported        Boolean                   @default(false)
   charityUrl              String?
   courseMapUrl            String?
   /// Public content site /course/[slug] — from Company race_courses.slug (prodpush).
   courseSlug              String?
-  courseProfile           Json?
-  courseType              String?
-  currentParticipants     Int?
   description             String?
   /// Short tagline / card summary (from Company sync).
   summaryPhrase           String?
   /// Canonical race distance in meters (aligned with GoFastCompany race_registrations).
   distanceMeters          Int?
-  earlyBirdDeadline       DateTime?
-  earlyBirdFee            Float?
-  elevationGain           Float?
-  elevationGainMeters     Float?
-  endTime                 DateTime?
-  finishLat               Float?
-  finishLng               Float?
-  finishLocation          String?
   isActive                Boolean                   @default(true)
   isCancelled             Boolean                   @default(false)
   isVirtual               Boolean                   @default(false)
-  maxParticipants         Int?
-  notes                   String?
   officialWebsiteUrl      String?
-  organizerEmail          String?
-  organizerName           String?
-  organizerWebsite        String?
   raceDate                DateTime
   registrationCloseDate   DateTime?
   registrationFee         Float?
@@ -369,16 +345,9 @@ model race_registry {
   registrationUrl         String?
   resultsUrl              String?
   slug                    String?                   @unique
-  startLat                Float?
-  startLng                Float?
-  startLocation           String?
   /// Wall-clock label from GoFastCompany (e.g. "10:00 AM"); not a timezone-aware instant.
   startTime               String?
-  stravaSegmentUrl        String?
-  surfaceType             String?
   tags                    String[]                  @default([])
-  timezone                String?
-  typicalWeather          String?
   /// When set, matches GoFastCompany races.id (multiple registry rows per race = multiple distances).
   companyRaceId           String?
   /// TODO(family-tree): self-referential FK — companion distances (5K, 10 Mile…) point to the
@@ -414,7 +383,6 @@ model race_registry {
   city_runs_tagged         city_runs[]               @relation("CityRunRaceRegistry")
   course_segments          race_registry_course_segments[]
 
-  @@index([charitySupported])
   @@index([city, state])
   @@index([isActive])
   @@index([raceDate])
