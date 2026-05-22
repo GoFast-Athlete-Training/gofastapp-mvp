@@ -169,8 +169,9 @@ export default function WelcomePage() {
             headers: { Authorization: `Bearer ${token}` },
           });
 
-          if (response.data?.success && response.data?.athleteId) {
-            athleteId = response.data.athleteId;
+          const apiAthleteId = response.data?.athleteId;
+          if (response.data?.success && typeof apiAthleteId === 'string' && apiAthleteId) {
+            athleteId = apiAthleteId;
             LocalStorageAPI.setAthleteId(athleteId);
             const profRes = await api.get(`/athlete/${athleteId}`, {
               headers: { Authorization: `Bearer ${token}` },
@@ -185,7 +186,8 @@ export default function WelcomePage() {
           }
 
           const createRes = await api.post('/athlete/create', {});
-          if (!createRes.data?.success || !createRes.data?.athleteId) {
+          const createdAthleteId = createRes.data?.athleteId;
+          if (!createRes.data?.success || typeof createdAthleteId !== 'string' || !createdAthleteId) {
             throw new Error('Create route did not return valid athlete data');
           }
 
@@ -197,9 +199,13 @@ export default function WelcomePage() {
           localStorage.setItem('firebaseId', firebaseUser.uid);
           localStorage.setItem('email', createRes.data.data?.email || firebaseUser.email || '');
 
-          athleteId = createRes.data.athleteId;
+          athleteId = createdAthleteId;
           LocalStorageAPI.setAthleteId(athleteId);
           athlete = createRes.data.data;
+        }
+
+        if (!athleteId) {
+          throw new Error('Could not resolve athlete id');
         }
 
         const hasHandle = !!athlete?.gofastHandle?.trim();
