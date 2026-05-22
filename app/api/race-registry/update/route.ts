@@ -423,7 +423,7 @@ export async function POST(request: NextRequest) {
       | Awaited<ReturnType<typeof prisma.race_registry.findUnique>>
       | null = null;
 
-    /** Prefer slug (per-distance), then explicit registry id, then companyRaceId + slug, then legacy companyRaceId. */
+    /** MVP1: exact slug, then registry id, then companyRaceId+slug — no broad companyRaceId-only fallback. */
     if (slugVal) {
       target = await prisma.race_registry.findUnique({
         where: { slug: slugVal },
@@ -437,16 +437,6 @@ export async function POST(request: NextRequest) {
     if (!target && companyRaceId && slugVal) {
       target = await prisma.race_registry.findFirst({
         where: { companyRaceId, slug: slugVal },
-      });
-    }
-    if (!target && companyRaceId) {
-      target = await prisma.race_registry.findFirst({
-        where: { companyRaceId },
-      });
-    }
-    if (!target) {
-      target = await prisma.race_registry.findUnique({
-        where: { id: companyRaceId },
       });
     }
 

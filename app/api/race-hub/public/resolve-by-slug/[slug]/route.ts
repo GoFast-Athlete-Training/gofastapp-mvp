@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 /**
  * GET /api/race-hub/public/resolve-by-slug/[slug]
  * Public race card for invite flow — no auth.
+ * MVP1: exact canonical slug only (case-insensitive fallback).
  */
 export async function GET(
   _request: Request,
@@ -45,29 +46,6 @@ export async function GET(
           slug: { equals: slug, mode: "insensitive" },
           ...activeWhere,
         },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          logoUrl: true,
-          raceDate: true,
-          city: true,
-          state: true,
-          distanceLabel: true,
-          distanceMeters: true,
-          registrationUrl: true,
-        },
-      });
-    }
-
-    /** Race-level public slug (e.g. twin-cities-marathon) → primary distance row (twin-cities-marathon-marathon). */
-    if (!race) {
-      race = await prisma.race_registry.findFirst({
-        where: {
-          slug: { startsWith: `${slug}-`, mode: "insensitive" },
-          ...activeWhere,
-        },
-        orderBy: [{ distanceMeters: "desc" }, { raceDate: "asc" }],
         select: {
           id: true,
           name: true,
