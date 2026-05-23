@@ -943,6 +943,7 @@ model run_series {
   meetUpPlaceId       String?
   meetUpLat           Float?
   meetUpLng           Float?
+  runType             String?              // "track" | "trail" | "neighborhood" | "park" — seeds city_runs.runType
   endPoint            String?              // end/finish location (null = same as meetUpPoint)
   endStreetAddress    String?
   endCity             String?

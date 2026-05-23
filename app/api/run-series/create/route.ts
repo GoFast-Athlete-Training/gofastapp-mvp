@@ -77,6 +77,7 @@ export async function POST(request: NextRequest) {
       startTimePeriod,
       seriesStartDate,
       seriesEndDate,
+      runType,
       staffGeneratedId,
       firstRunDate,
       createFirstRun = true,
@@ -198,12 +199,18 @@ export async function POST(request: NextRequest) {
 
     // Use provided description, or fall back to run_clubs.allRunsDescription (backwards compatible)
     const seriesDescription = description?.trim() || runClub.allRunsDescription || null;
+    const allowedRunTypes = new Set(['track', 'trail', 'neighborhood', 'park']);
+    const seriesRunType =
+      runType != null && allowedRunTypes.has(String(runType).trim().toLowerCase())
+        ? String(runType).trim().toLowerCase()
+        : null;
 
     const setupData = {
       dayOfWeek: canonicalDay,
       runClubId: runClub.id, // FK: Links this series to run_clubs table - CRITICAL for hydration
       name: baseName,
       description: seriesDescription, // Derived from run_clubs.allRunsDescription if not provided
+      runType: seriesRunType,
       gofastCity: gofastCity?.trim() || null,
       meetUpPoint: meetUpPoint?.trim() || null,
       meetUpStreetAddress: meetUpStreetAddress?.trim() || null,
@@ -324,6 +331,7 @@ export async function POST(request: NextRequest) {
         startTimeMinute: setup.startTimeMinute || null,
         startTimePeriod: setup.startTimePeriod || null,
         description: setup.description || null,
+        runType: setup.runType || null,
         stravaUrl: setup.stravaUrl || null,
         updatedAt: new Date(),
       },

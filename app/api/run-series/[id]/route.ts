@@ -66,6 +66,7 @@ export async function GET(
         dayOfWeek: series.dayOfWeek,
         name: series.name,
         description: series.description,
+        runType: series.runType,
         seriesRunRawText: series.seriesRunRawText,
         runClubId: series.runClubId,
         workflowStatus: series.workflowStatus,
@@ -153,7 +154,7 @@ export async function PUT(
     }
 
     const allowed = [
-      'name', 'description', 'seriesRunRawText', 'stravaUrl', 'gofastCity', 'meetUpPoint', 'meetUpStreetAddress',
+      'name', 'description', 'runType', 'seriesRunRawText', 'stravaUrl', 'gofastCity', 'meetUpPoint', 'meetUpStreetAddress',
       'meetUpCity', 'meetUpState', 'meetUpPlaceId', 'meetUpLat', 'meetUpLng',
       'endPoint', 'endStreetAddress', 'endCity', 'endState',
       'startTimeHour', 'startTimeMinute', 'startTimePeriod', 'startDate', 'endDate', 'slug',
@@ -201,6 +202,7 @@ export async function PUT(
         dayOfWeek: series.dayOfWeek,
         name: series.name,
         description: series.description,
+        runType: series.runType,
         seriesRunRawText: series.seriesRunRawText,
         runClubId: series.runClubId,
         workflowStatus: series.workflowStatus,
