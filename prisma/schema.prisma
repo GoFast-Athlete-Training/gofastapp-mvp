@@ -945,6 +945,10 @@ model run_series {
   meetUpLat           Float?
   meetUpLng           Float?
   runType             String?              // "track" | "trail" | "neighborhood" | "park" — seeds city_runs.runType
+  totalMiles          Float?               // typical distance — seeds city_runs.totalMiles
+  routeNeighborhood   String?              // route/area context — seeds city_runs.routeNeighborhood
+  workoutDescription  String?              // workout focus — seeds city_runs.workoutDescription
+  postRunActivity     String?              // post-run social — seeds city_runs.postRunActivity
   endPoint            String?              // end/finish location (null = same as meetUpPoint)
   endStreetAddress    String?
   endCity             String?

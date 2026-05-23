@@ -67,6 +67,10 @@ export async function GET(
         name: series.name,
         description: series.description,
         runType: series.runType,
+        totalMiles: series.totalMiles,
+        routeNeighborhood: series.routeNeighborhood,
+        workoutDescription: series.workoutDescription,
+        postRunActivity: series.postRunActivity,
         seriesRunRawText: series.seriesRunRawText,
         runClubId: series.runClubId,
         workflowStatus: series.workflowStatus,
@@ -154,15 +158,15 @@ export async function PUT(
     }
 
     const allowed = [
-      'name', 'description', 'runType', 'seriesRunRawText', 'stravaUrl', 'gofastCity', 'meetUpPoint', 'meetUpStreetAddress',
+      'name', 'description', 'runType', 'totalMiles', 'routeNeighborhood', 'workoutDescription', 'postRunActivity', 'seriesRunRawText', 'stravaUrl', 'gofastCity', 'meetUpPoint', 'meetUpStreetAddress',
       'meetUpCity', 'meetUpState', 'meetUpPlaceId', 'meetUpLat', 'meetUpLng',
       'endPoint', 'endStreetAddress', 'endCity', 'endState',
       'startTimeHour', 'startTimeMinute', 'startTimePeriod', 'startDate', 'endDate', 'slug',
     ];
     for (const key of allowed) {
       if (body[key] !== undefined) {
-        if (key === 'meetUpLat' || key === 'meetUpLng') {
-          (updateData as any)[key] = body[key] == null ? null : parseFloat(String(body[key]));
+        if (key === 'meetUpLat' || key === 'meetUpLng' || key === 'totalMiles') {
+          (updateData as any)[key] = body[key] == null || body[key] === '' ? null : parseFloat(String(body[key]));
         } else if (key === 'startTimeHour' || key === 'startTimeMinute') {
           (updateData as any)[key] = body[key] == null ? null : parseInt(String(body[key]), 10);
         } else if (key === 'startDate' || key === 'endDate') {
@@ -203,6 +207,10 @@ export async function PUT(
         name: series.name,
         description: series.description,
         runType: series.runType,
+        totalMiles: series.totalMiles,
+        routeNeighborhood: series.routeNeighborhood,
+        workoutDescription: series.workoutDescription,
+        postRunActivity: series.postRunActivity,
         seriesRunRawText: series.seriesRunRawText,
         runClubId: series.runClubId,
         workflowStatus: series.workflowStatus,

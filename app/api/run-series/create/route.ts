@@ -78,6 +78,10 @@ export async function POST(request: NextRequest) {
       seriesStartDate,
       seriesEndDate,
       runType,
+      totalMiles,
+      routeNeighborhood,
+      workoutDescription,
+      postRunActivity,
       staffGeneratedId,
       firstRunDate,
       createFirstRun = true,
@@ -204,6 +208,12 @@ export async function POST(request: NextRequest) {
       runType != null && allowedRunTypes.has(String(runType).trim().toLowerCase())
         ? String(runType).trim().toLowerCase()
         : null;
+    const seriesTotalMiles =
+      totalMiles != null && totalMiles !== ""
+        ? parseFloat(String(totalMiles))
+        : null;
+    const parsedTotalMiles =
+      seriesTotalMiles != null && Number.isFinite(seriesTotalMiles) ? seriesTotalMiles : null;
 
     const setupData = {
       dayOfWeek: canonicalDay,
@@ -211,6 +221,10 @@ export async function POST(request: NextRequest) {
       name: baseName,
       description: seriesDescription, // Derived from run_clubs.allRunsDescription if not provided
       runType: seriesRunType,
+      totalMiles: parsedTotalMiles,
+      routeNeighborhood: routeNeighborhood?.trim() || null,
+      workoutDescription: workoutDescription?.trim() || null,
+      postRunActivity: postRunActivity?.trim() || null,
       gofastCity: gofastCity?.trim() || null,
       meetUpPoint: meetUpPoint?.trim() || null,
       meetUpStreetAddress: meetUpStreetAddress?.trim() || null,
@@ -332,6 +346,10 @@ export async function POST(request: NextRequest) {
         startTimePeriod: setup.startTimePeriod || null,
         description: setup.description || null,
         runType: setup.runType || null,
+        totalMiles: setup.totalMiles ?? null,
+        routeNeighborhood: setup.routeNeighborhood || null,
+        workoutDescription: setup.workoutDescription || null,
+        postRunActivity: setup.postRunActivity || null,
         stravaUrl: setup.stravaUrl || null,
         updatedAt: new Date(),
       },
