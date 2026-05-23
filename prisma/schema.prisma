@@ -59,6 +59,7 @@ model Athlete {
   garmin_permissions       Json?
   garmin_user_profile      Json?
   garmin_user_sleep        Json?
+  garmin_user_daily        Json?
   garmin_user_preferences  Json?
   strava_id               Int?                     @unique
   strava_access_token     String?

@@ -1,0 +1,440 @@
+/**
+ * Shared promotion: link athlete_activity → workouts row and compute actuals/credits.
+ * Used by auto-match (Garmin webhook) and manual match (user confirm).
+ */
+
+import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import { applyWorkoutPaceCredit } from "./apply-workout-pace-credit";
+import { applyThresholdPaceCredit } from "./apply-threshold-pace-credit";
+import { applyAerobicCeilingCredit } from "./apply-aerobic-ceiling-credit";
+import {
+  normalizePaceTargetEncodingVersion,
+  storedPaceSecondsKmToSecondsPerMile,
+} from "@/lib/workout-generator/pace-calculator";
+/** Max sec/mi faster than prescribed easy pace before we skip aerobic HR credit (target − actual). */
+export const EASY_LONG_RUN_MAX_FAST_DRIFT_SEC_PER_MILE = 15;
+
+function defaultRepPaceOffsetSecPerMile(workoutType: string): number | null {
+  if (workoutType === "Tempo") return 15;
+  if (workoutType === "Intervals") return -10;
+  return null;
+}
+
+/**
+ * Which pace credits apply after a successful quality match.
+ * Intervals → 5K credit, Tempo → threshold credit.
+ */
+export function computeMatchedWorkoutPaceCredits(params: {
+  workoutType: string;
+  paceSecPerMile: number | null;
+  paceDeltaSecPerMile: number | null;
+  intervalsCatalogueOffsetSecPerMile: number | null | undefined;
+}): {
+  creditedFiveKPaceSecPerMile: number | null;
+  creditedThresholdPaceSecPerMile: number | null;
+} {
+  const {
+    workoutType,
+    paceSecPerMile,
+    paceDeltaSecPerMile,
+    intervalsCatalogueOffsetSecPerMile,
+  } = params;
+
+  const qualityOk =
+    paceSecPerMile != null && paceDeltaSecPerMile != null && paceDeltaSecPerMile >= 0;
+
+  let creditedFiveKPaceSecPerMile: number | null = null;
+  let creditedThresholdPaceSecPerMile: number | null = null;
+
+  if (workoutType === "Intervals" && qualityOk && paceSecPerMile != null) {
+    const offset =
+      intervalsCatalogueOffsetSecPerMile != null &&
+      Number.isFinite(intervalsCatalogueOffsetSecPerMile)
+        ? intervalsCatalogueOffsetSecPerMile
+        : defaultRepPaceOffsetSecPerMile("Intervals");
+    if (offset != null) {
+      creditedFiveKPaceSecPerMile = Math.round(paceSecPerMile - offset);
+    }
+  }
+
+  if (workoutType === "Tempo" && qualityOk && paceSecPerMile != null) {
+    creditedThresholdPaceSecPerMile = Math.round(paceSecPerMile);
+  }
+
+  return { creditedFiveKPaceSecPerMile, creditedThresholdPaceSecPerMile };
+}
+
+/**
+ * Easy/LongRun average HR as aerobic-ceiling evidence when execution was not an overly fast "easy" run.
+ */
+export function computeMatchedWorkoutAerobicCeilingCredit(params: {
+  workoutType: string;
+  averageHeartRateBpm: number | null | undefined;
+  paceDeltaSecPerMile: number | null;
+}): number | null {
+  const { workoutType, averageHeartRateBpm, paceDeltaSecPerMile } = params;
+  if (workoutType !== "Easy" && workoutType !== "LongRun") return null;
+  if (averageHeartRateBpm == null || !Number.isFinite(averageHeartRateBpm)) return null;
+  const hr = Math.round(averageHeartRateBpm);
+  if (hr < 80 || hr > 210) return null;
+  if (
+    paceDeltaSecPerMile != null &&
+    paceDeltaSecPerMile > EASY_LONG_RUN_MAX_FAST_DRIFT_SEC_PER_MILE
+  ) {
+    return null;
+  }
+  return hr;
+}
+
+/** m/s → seconds per mile */
+function speedMpsToSecPerMile(mps: number | null | undefined): number | null {
+  if (mps == null || mps <= 0) return null;
+  return Math.round(1609.34 / mps);
+}
+
+type SegmentTarget = { type?: string; valueLow?: number; valueHigh?: number; value?: number };
+
+function paceTargetSecPerMileFromSegment(
+  targets: unknown,
+  paceTargetEncodingVersion: number
+): number | null {
+  if (!Array.isArray(targets) || targets.length === 0) return null;
+  const t = targets[0] as SegmentTarget;
+  if (!t?.type || String(t.type).toUpperCase() !== "PACE") return null;
+  const low = t.valueLow ?? t.value;
+  if (low == null || typeof low !== "number" || low <= 0) return null;
+  const enc = normalizePaceTargetEncodingVersion(paceTargetEncodingVersion);
+  return Math.round(storedPaceSecondsKmToSecondsPerMile(low, enc));
+}
+
+function paceTargetHighSecPerMileFromSegment(
+  targets: unknown,
+  paceTargetEncodingVersion: number
+): number | null {
+  if (!Array.isArray(targets) || targets.length === 0) return null;
+  const t = targets[0] as SegmentTarget;
+  if (!t?.type || String(t.type).toUpperCase() !== "PACE") return null;
+  const highRaw = t.valueHigh;
+  if (highRaw == null || typeof highRaw !== "number" || highRaw <= 0) return null;
+  const enc = normalizePaceTargetEncodingVersion(paceTargetEncodingVersion);
+  return Math.round(storedPaceSecondsKmToSecondsPerMile(highRaw, enc));
+}
+
+function hrTargetMidpointBpmFromTargets(targets: unknown): number | null {
+  if (!Array.isArray(targets) || targets.length === 0) return null;
+  for (const raw of targets) {
+    const t = raw as SegmentTarget;
+    const typ = String(t?.type || "").toUpperCase();
+    if (typ !== "HEART_RATE" && typ !== "HEARTRATE") continue;
+    const low = t.valueLow ?? t.value;
+    const high = t.valueHigh ?? low;
+    if (low == null || typeof low !== "number") continue;
+    if (high != null && typeof high === "number") {
+      return Math.round((low + high) / 2);
+    }
+    return Math.round(low);
+  }
+  return null;
+}
+
+function pickMainPaceTargetSecPerMile(
+  segments: {
+    title: string;
+    targets: unknown;
+    stepOrder: number;
+    paceTargetEncodingVersion: number;
+  }[]
+): { targetSecPerMile: number | null; targetSecPerMileHigh: number | null } {
+  const sorted = [...segments].sort((a, b) => a.stepOrder - b.stepOrder);
+  for (const seg of sorted) {
+    const title = (seg.title || "").toLowerCase();
+    if (title.includes("warmup") || title.includes("warm-up")) continue;
+    if (title.includes("cooldown") || title.includes("cool-down")) continue;
+    const p = paceTargetSecPerMileFromSegment(seg.targets, seg.paceTargetEncodingVersion);
+    if (p != null) {
+      const ph = paceTargetHighSecPerMileFromSegment(
+        seg.targets,
+        seg.paceTargetEncodingVersion
+      );
+      return { targetSecPerMile: p, targetSecPerMileHigh: ph };
+    }
+  }
+  for (const seg of sorted) {
+    const p = paceTargetSecPerMileFromSegment(seg.targets, seg.paceTargetEncodingVersion);
+    if (p != null) {
+      const ph = paceTargetHighSecPerMileFromSegment(
+        seg.targets,
+        seg.paceTargetEncodingVersion
+      );
+      return { targetSecPerMile: p, targetSecPerMileHigh: ph };
+    }
+  }
+  return { targetSecPerMile: null, targetSecPerMileHigh: null };
+}
+
+function pickMainHrTargetBpm(
+  segments: {
+    title: string;
+    targets: unknown;
+    stepOrder: number;
+    paceTargetEncodingVersion: number;
+  }[]
+): number | null {
+  const sorted = [...segments].sort((a, b) => a.stepOrder - b.stepOrder);
+  for (const seg of sorted) {
+    const title = (seg.title || "").toLowerCase();
+    if (title.includes("warmup") || title.includes("warm-up")) continue;
+    if (title.includes("cooldown") || title.includes("cool-down")) continue;
+    const h = hrTargetMidpointBpmFromTargets(seg.targets);
+    if (h != null) return h;
+  }
+  for (const seg of sorted) {
+    const h = hrTargetMidpointBpmFromTargets(seg.targets);
+    if (h != null) return h;
+  }
+  return null;
+}
+
+export type WorkoutForActivityApply = {
+  id: string;
+  planId: string | null;
+  weekNumber: number | null;
+  workoutType: string;
+  segments: {
+    title: string;
+    targets: unknown;
+    stepOrder: number;
+    paceTargetEncodingVersion: number;
+  }[];
+  workout_catalogue: { workBasePaceOffsetSecPerMile: number | null } | null;
+};
+
+export type ActivityForWorkoutApply = {
+  id: string;
+  athleteId: string;
+  distance: number | null;
+  averageSpeed: number | null;
+  averageHeartRate: number | null;
+  duration: number | null;
+  maxHeartRate: number | null;
+  elevationGain: number | null;
+  calories: number | null;
+  steps: number | null;
+  summaryData: unknown;
+};
+
+/**
+ * Link activity to workout, compute actuals, apply credits, mark activity MATCHED.
+ */
+export async function applyActivityToWorkout(params: {
+  workout: WorkoutForActivityApply;
+  activity: ActivityForWorkoutApply;
+}): Promise<{ workoutId: string }> {
+  const { workout, activity } = params;
+  const summaryBlob = activity.summaryData as Record<string, unknown> | null;
+
+  const distanceMeters =
+    activity.distance != null && activity.distance > 0 ? activity.distance : null;
+
+  const paceSecPerMile = speedMpsToSecPerMile(activity.averageSpeed);
+
+  const {
+    targetSecPerMile: targetPaceSecPerMile,
+    targetSecPerMileHigh: targetPaceSecPerMileHigh,
+  } = pickMainPaceTargetSecPerMile(workout.segments);
+
+  let paceDeltaSecPerMile: number | null = null;
+  let evaluationEligible = false;
+
+  if (targetPaceSecPerMile != null && paceSecPerMile != null) {
+    paceDeltaSecPerMile = targetPaceSecPerMile - paceSecPerMile;
+    evaluationEligible = true;
+  }
+
+  let hrDeltaBpm: number | null = null;
+  const hrTargetMid = pickMainHrTargetBpm(workout.segments);
+  if (hrTargetMid != null && activity.averageHeartRate != null) {
+    hrDeltaBpm = Math.round(hrTargetMid - activity.averageHeartRate);
+  }
+
+  let creditedFiveKPaceSecPerMile: number | null = null;
+  let creditedThresholdPaceSecPerMile: number | null = null;
+
+  const qualityOk =
+    paceSecPerMile != null && paceDeltaSecPerMile != null && paceDeltaSecPerMile >= 0;
+
+  if (qualityOk) {
+    const matched = computeMatchedWorkoutPaceCredits({
+      workoutType: workout.workoutType,
+      paceSecPerMile,
+      paceDeltaSecPerMile,
+      intervalsCatalogueOffsetSecPerMile:
+        workout.workout_catalogue?.workBasePaceOffsetSecPerMile ?? null,
+    });
+    creditedFiveKPaceSecPerMile = matched.creditedFiveKPaceSecPerMile;
+    creditedThresholdPaceSecPerMile = matched.creditedThresholdPaceSecPerMile;
+  }
+
+  const creditedAerobicCeilingBpm = computeMatchedWorkoutAerobicCeilingCredit({
+    workoutType: workout.workoutType,
+    averageHeartRateBpm: activity.averageHeartRate,
+    paceDeltaSecPerMile,
+  });
+
+  await prisma.workouts.update({
+    where: { id: workout.id },
+    data: {
+      matchedActivityId: activity.id,
+      completedActivitySummaryJson:
+        summaryBlob != null && typeof summaryBlob === "object"
+          ? (summaryBlob as object)
+          : undefined,
+      actualDistanceMeters: distanceMeters,
+      actualAvgPaceSecPerMile: paceSecPerMile,
+      actualAverageHeartRate: activity.averageHeartRate,
+      actualDurationSeconds: activity.duration ?? null,
+      actualMaxHeartRate: activity.maxHeartRate ?? null,
+      actualElevationGain: activity.elevationGain ?? null,
+      actualCalories: activity.calories ?? null,
+      actualSteps: activity.steps ?? null,
+      paceDeltaSecPerMile,
+      targetPaceSecPerMile,
+      targetPaceSecPerMileHigh,
+      hrDeltaBpm,
+      creditedFiveKPaceSecPerMile,
+      creditedThresholdPaceSecPerMile,
+      creditedAerobicCeilingBpm,
+      evaluationEligibleFlag: evaluationEligible,
+      updatedAt: new Date(),
+    },
+  });
+
+  await prisma.athlete_activities.update({
+    where: { id: activity.id },
+    data: { ingestionStatus: "MATCHED" },
+  });
+
+  if (paceDeltaSecPerMile != null && paceSecPerMile != null) {
+    try {
+      const absD = Math.abs(Math.round(paceDeltaSecPerMile));
+      const direction =
+        paceDeltaSecPerMile > 0.5
+          ? `${absD} sec/mi faster than target`
+          : paceDeltaSecPerMile < -0.5
+            ? `${absD} sec/mi slower than target`
+            : "right on target pace";
+      const miDisplay =
+        distanceMeters != null
+          ? `${(distanceMeters / 1609.34).toFixed(1)} mi @ `
+          : "";
+      const paceMin = Math.floor(paceSecPerMile / 60);
+      const paceSec = String(paceSecPerMile % 60).padStart(2, "0");
+      await prisma.pace_adjustment_log.create({
+        data: {
+          athleteId: activity.athleteId,
+          planId: workout.planId ?? null,
+          weekNumber: workout.weekNumber ?? null,
+          workoutId: workout.id,
+          notificationType: "WORKOUT_MATCH",
+          summaryMessage: `${miDisplay}${paceMin}:${paceSec}/mi — ${direction}.`,
+        },
+      });
+    } catch (err) {
+      console.error("pace_adjustment_log WORKOUT_MATCH insert:", err);
+    }
+  }
+
+  if (creditedFiveKPaceSecPerMile != null) {
+    try {
+      await applyWorkoutPaceCredit({
+        athleteId: activity.athleteId,
+        creditedFiveKPaceSecPerMile,
+        planId: workout.planId ?? null,
+        weekNumber: workout.weekNumber ?? null,
+      });
+    } catch (err) {
+      console.error("applyWorkoutPaceCredit after match:", err);
+    }
+  }
+
+  if (creditedThresholdPaceSecPerMile != null) {
+    try {
+      await applyThresholdPaceCredit({
+        athleteId: activity.athleteId,
+        creditedThresholdPaceSecPerMile,
+        planId: workout.planId ?? null,
+        weekNumber: workout.weekNumber ?? null,
+        workoutId: workout.id,
+      });
+    } catch (err) {
+      console.error("applyThresholdPaceCredit after match:", err);
+    }
+  }
+
+  if (creditedAerobicCeilingBpm != null) {
+    try {
+      await applyAerobicCeilingCredit({
+        athleteId: activity.athleteId,
+        creditedAerobicCeilingBpm,
+        planId: workout.planId ?? null,
+        weekNumber: workout.weekNumber ?? null,
+        workoutId: workout.id,
+      });
+    } catch (err) {
+      console.error("applyAerobicCeilingCredit after match:", err);
+    }
+  }
+
+  return { workoutId: workout.id };
+}
+
+/** Clear manual/auto match from a workout and reset linked activity ingestion status. */
+export async function clearActivityFromWorkout(params: {
+  workoutId: string;
+  athleteId: string;
+}): Promise<{ cleared: boolean; previousActivityId?: string }> {
+  const workout = await prisma.workouts.findFirst({
+    where: { id: params.workoutId, athleteId: params.athleteId },
+    select: { id: true, matchedActivityId: true },
+  });
+
+  if (!workout?.matchedActivityId) {
+    return { cleared: false };
+  }
+
+  const previousActivityId = workout.matchedActivityId;
+
+  await prisma.workouts.update({
+    where: { id: workout.id },
+    data: {
+      matchedActivityId: null,
+      completedActivitySummaryJson: Prisma.DbNull,
+      actualDistanceMeters: null,
+      actualAvgPaceSecPerMile: null,
+      actualAverageHeartRate: null,
+      actualDurationSeconds: null,
+      actualMaxHeartRate: null,
+      actualElevationGain: null,
+      actualCalories: null,
+      actualSteps: null,
+      paceDeltaSecPerMile: null,
+      targetPaceSecPerMile: null,
+      targetPaceSecPerMileHigh: null,
+      hrDeltaBpm: null,
+      creditedFiveKPaceSecPerMile: null,
+      creditedThresholdPaceSecPerMile: null,
+      creditedAerobicCeilingBpm: null,
+      evaluationEligibleFlag: false,
+      analysisJson: Prisma.DbNull,
+      updatedAt: new Date(),
+    },
+  });
+
+  await prisma.athlete_activities.updateMany({
+    where: { id: previousActivityId, athleteId: params.athleteId },
+    data: { ingestionStatus: "UNMATCHED" },
+  });
+
+  return { cleared: true, previousActivityId };
+}

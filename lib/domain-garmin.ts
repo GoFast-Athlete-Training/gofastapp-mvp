@@ -134,6 +134,7 @@ async function wipeGarminProductionFields(athleteId: string) {
       garmin_permissions: Prisma.JsonNull,
       garmin_user_profile: Prisma.JsonNull,
       garmin_user_sleep: Prisma.JsonNull,
+      garmin_user_daily: Prisma.JsonNull,
       garmin_user_preferences: Prisma.JsonNull,
       garmin_is_connected: false,
       garmin_connected_at: null,

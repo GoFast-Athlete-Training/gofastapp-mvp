@@ -11,6 +11,7 @@ import { ymdFromDate } from "@/lib/training/plan-utils";
 import { segmentSnapshotDocumentFromDbRows } from "@/lib/training/workout-segment-snapshot";
 import { materializeWorkoutForPlanDay } from "@/lib/training/workout-materializer";
 import { expandSegmentsForGarminPush } from "@/lib/training/segment-summary";
+import { garminTitleForWorkout } from "@/lib/training/garmin-activity-match-helpers";
 
 export type PushWorkoutForAthleteResult =
   | {
@@ -38,19 +39,6 @@ function garminScheduleYmdFromDate(date: Date): string {
 
 function utcTodayYmd(): string {
   return ymdFromDate(new Date());
-}
-
-/** Avoid double-prefixing when title already has GF W1: or W1: style week label. */
-export function garminTitleForWorkout(workout: {
-  title: string;
-  weekNumber: number | null;
-}): string {
-  const title = workout.title.trim();
-  if (/^(GF\s+)?W\d+\s*:/i.test(title)) return title;
-  if (workout.weekNumber != null && Number.isFinite(workout.weekNumber)) {
-    return `GF W${workout.weekNumber}: ${title}`;
-  }
-  return title;
 }
 
 type WorkoutGarminLookup = {

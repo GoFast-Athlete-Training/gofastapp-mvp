@@ -6,7 +6,7 @@ import { handleActivityDetail } from '@/lib/garmin-events/handleActivityDetail';
 import { handleActivityFile } from '@/lib/garmin-events/handleActivityFile';
 import { handlePermissionChange } from '@/lib/garmin-events/handlePermissionChange';
 import { handleDeregistration } from '@/lib/garmin-events/handleDeregistration';
-import { handleSleepSummary } from '@/lib/garmin-events/handleSleepSummary';
+import { bodyHasHealthKeys } from '@/lib/garmin-events/process-health-webhook';
 
 const DEBUG = process.env.GARMIN_DEBUG === 'true';
 
@@ -217,6 +217,12 @@ async function processWebhookSafely(rawText: string): Promise<void> {
       }
     }
 
+    if (bodyHasHealthKeys(body)) {
+      console.warn(
+        '⚠️ Health payload received on activity webhook — point Sleeps/Dailies to /api/garmin/health-webhook in Garmin portal'
+      );
+    }
+
     if (hasActivitiesArray && isPing) {
       try {
         await handlePingActivities(
@@ -225,18 +231,6 @@ async function processWebhookSafely(rawText: string): Promise<void> {
         );
       } catch (err: unknown) {
         console.error('[GARMIN WEBHOOK] handlePingActivities:', err);
-      }
-    }
-
-    const sleeps = body.sleeps;
-    if (Array.isArray(sleeps) && sleeps.length > 0) {
-      try {
-        await handleSleepPingOrPush(
-          sleeps as unknown[],
-          (body.userId as string | undefined) ?? garminUserId ?? undefined
-        );
-      } catch (err: unknown) {
-        console.error('[GARMIN WEBHOOK] handleSleepPingOrPush:', err);
       }
     }
 
@@ -454,66 +448,6 @@ function detectEventTypeSafe(body: Record<string, unknown>): string {
     return 'UNKNOWN';
   } catch {
     return 'UNKNOWN';
-  }
-}
-
-/**
- * Garmin sleep push (inline) or ping/pull (callbackURL per row).
- */
-async function handleSleepPingOrPush(sleeps: unknown[], userId?: string): Promise<void> {
-  try {
-    const first = sleeps[0];
-    const isPing =
-      first !== null &&
-      typeof first === 'object' &&
-      first !== null &&
-      'callbackURL' in first &&
-      Boolean((first as { callbackURL?: unknown }).callbackURL);
-
-    if (isPing) {
-      const garminUserIdFromPing =
-        userId ?? (sleeps[0] as { userId?: string })?.userId;
-      if (!garminUserIdFromPing) {
-        console.warn('⚠️ Garmin sleep PING: no userId in payload or sleeps');
-        return;
-      }
-
-      const allFetched: unknown[] = [];
-      for (const item of sleeps as Array<{ userId?: string; callbackURL?: string }>) {
-        const url = item?.callbackURL;
-        if (!url) continue;
-        try {
-          const res = await fetch(url, { method: 'GET' });
-          if (!res.ok) {
-            console.warn(`⚠️ Garmin sleep PING fetch failed: ${res.status} ${url.slice(0, 80)}...`);
-            continue;
-          }
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            allFetched.push(...data);
-          } else if (data && typeof data === 'object') {
-            allFetched.push(data);
-          }
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.error('❌ Garmin sleep PING fetch error:', msg, url?.slice(0, 80));
-        }
-      }
-
-      if (allFetched.length === 0) {
-        console.log('📩 Garmin sleep PING: no sleep data returned from callbackURLs');
-        return;
-      }
-
-      const result = await handleSleepSummary(allFetched, garminUserIdFromPing);
-      console.log('📩 Garmin sleep PING processed', { fetched: allFetched.length, ...result });
-      return;
-    }
-
-    const result = await handleSleepSummary(sleeps, userId);
-    console.log('📩 Garmin sleep PUSH processed', { ...result, userId: userId ?? '(none)' });
-  } catch (err: unknown) {
-    console.error('❌ Garmin sleep handler error:', err);
   }
 }
 

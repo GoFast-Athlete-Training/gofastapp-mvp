@@ -185,5 +185,15 @@ export function getGarminWebhookUri(): string {
   return `${getGarminOAuthServerUrl()}/api/garmin/webhook`;
 }
 
+/**
+ * Garmin Health API webhook (sleeps, dailies / body battery).
+ * Register separately from activity webhook in Garmin Developer Portal.
+ */
+export function getGarminHealthWebhookUri(): string {
+  const override = process.env.GARMIN_HEALTH_WEBHOOK_URI?.trim();
+  if (override) return override;
+  return `${getGarminOAuthServerUrl()}/api/garmin/health-webhook`;
+}
+
 export { generatePKCE, buildGarminAuthUrl, exchangeCodeForTokens, fetchGarminUserInfo };
 

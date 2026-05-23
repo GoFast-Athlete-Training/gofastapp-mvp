@@ -74,6 +74,7 @@ import {
   isRunAnalysisJsonV1,
   type RunAnalysisJsonV1,
 } from "@/lib/training/run-analysis-types";
+import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
 
 interface WorkoutSegmentLap {
   lapIndex: number;
@@ -1919,6 +1920,10 @@ export default function WorkoutDetailPage() {
           <ArrowLeft className="w-5 h-5" />
           {backLabel}
         </Link>
+
+        {!isLogged && workoutId ? (
+          <WorkoutActivityMatchPanel workoutId={workoutId} onMatched={fetchWorkout} />
+        ) : null}
 
         {isLogged && (workout.matchedActivityId || workout.matched_activity) ? (
           <div className="rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 to-white p-6 sm:p-8 mb-6 shadow-sm">

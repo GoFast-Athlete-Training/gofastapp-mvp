@@ -16,16 +16,24 @@ export function extractGarminWorkoutIdFromSummary(raw: unknown): number | null {
     o.summary && typeof o.summary === "object"
       ? (o.summary as Record<string, unknown>)
       : null;
+  const metadata =
+    o.metadataDTO && typeof o.metadataDTO === "object"
+      ? (o.metadataDTO as Record<string, unknown>)
+      : null;
 
   const candidates = [
+    o.associatedWorkoutId,
     o.parentWorkoutId,
     o.workoutId,
     o.trainingWorkoutId,
     o.trainingPlanWorkoutId,
     o.manualWorkoutId,
+    nested?.associatedWorkoutId,
     nested?.parentWorkoutId,
     nested?.workoutId,
     nested?.trainingWorkoutId,
+    metadata?.associatedWorkoutId,
+    metadata?.workoutId,
   ];
 
   for (const c of candidates) {
