@@ -5,12 +5,15 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/firebase";
 import api from "@/lib/api";
-import { Calendar, MapPin, Search, ExternalLink, ChevronDown } from "lucide-react";
+import { Search, ExternalLink, ChevronDown } from "lucide-react";
 import {
   countdownLabel,
   formatRaceListDate,
-  formatStartTime,
 } from "@/lib/races-display";
+import {
+  raceSelectorDescription,
+  raceSelectorTagline,
+} from "@/lib/race-selector-card";
 
 const BOSTON_TAG = "boston-qualifier";
 
@@ -33,6 +36,7 @@ type CatalogRace = {
   logoUrl?: string | null;
   slug?: string | null;
   summaryPhrase?: string | null;
+  description?: string | null;
 };
 
 type Signup = {
@@ -203,9 +207,18 @@ export default function RacesFindPage() {
     const signedUp = signedRaceIds.has(race.id);
     const busy = submittingRaceId === race.id;
     const bq = race.tags?.includes(BOSTON_TAG);
-    const startLabel = formatStartTime(race.startTime ?? null);
     const isPast = variant === "past";
     const isFeatured = variant === "featured";
+    const tagline = raceSelectorTagline(race.summaryPhrase);
+    const descriptionPreview = raceSelectorDescription(race.description, 140);
+    const location = [race.city, race.state].filter(Boolean).join(", ");
+    const dateLine = formatRaceListDate(race.raceDate);
+    const distance =
+      race.distanceLabel?.trim() ||
+      (race.distanceMeters != null
+        ? `${(race.distanceMeters / 1609.344).toFixed(1)} mi`
+        : null);
+
     return (
       <li
         key={`${variant}-${race.id}`}
@@ -222,7 +235,7 @@ export default function RacesFindPage() {
             Featured
           </span>
         ) : null}
-        <div className="flex gap-4">
+        <div className="flex gap-4 min-w-0">
           {race.logoUrl ? (
             <div
               className={`shrink-0 rounded-lg bg-gray-100 overflow-hidden border border-gray-100 ${
@@ -236,61 +249,40 @@ export default function RacesFindPage() {
                 loading="lazy"
               />
             </div>
-          ) : (
-            <div
-              className={`shrink-0 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-400 ${
-                isFeatured ? "w-20 h-20" : "w-16 h-16"
-              }`}
-            >
-              <Calendar className={isFeatured ? "w-9 h-9" : "w-7 h-7"} />
-            </div>
-          )}
+          ) : null}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h3
-                className={`font-semibold text-gray-900 leading-snug ${
-                  isFeatured ? "text-xl" : "text-lg"
-                }`}
-              >
-                {race.name}
-              </h3>
+              <p className="text-[11px] font-semibold text-orange-700">
+                {dateLine}
+                {distance ? ` · ${distance}` : ""}
+              </p>
               {bq ? (
                 <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-100">
                   BQ
                 </span>
               ) : null}
             </div>
-            {isFeatured && race.summaryPhrase?.trim() ? (
-              <p className="mt-1 text-sm text-gray-600 line-clamp-2">{race.summaryPhrase.trim()}</p>
+            <h3
+              className={`mt-1 font-semibold text-gray-900 leading-snug ${
+                isFeatured ? "text-xl" : "text-lg"
+              }`}
+            >
+              {race.name}
+            </h3>
+            {location ? <p className="mt-0.5 text-sm text-gray-500">{location}</p> : null}
+            {tagline ? (
+              <p className="mt-1.5 text-sm font-medium text-gray-700 line-clamp-2">{tagline}</p>
             ) : null}
-            <dl className="mt-2 space-y-1.5 text-sm text-gray-600">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
-                <span>{formatRaceListDate(race.raceDate)}</span>
-                {startLabel ? (
-                  <>
-                    <span className="text-gray-400">·</span>
-                    <span>{startLabel}</span>
-                  </>
-                ) : null}
-                <span className="text-gray-400">·</span>
-                <span className="text-orange-600 font-medium text-xs">
-                  {countdownLabel(race.raceDate)}
-                </span>
-              </div>
-              {(race.city || race.state) && (
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span>{[race.city, race.state].filter(Boolean).join(", ")}</span>
-                </div>
-              )}
-              <div>
-                {race.distanceLabel?.trim() ||
-                  (race.distanceMeters != null
-                    ? `${(race.distanceMeters / 1609.344).toFixed(1)} mi`
-                    : "—")}
-              </div>
-            </dl>
+            {descriptionPreview && descriptionPreview !== tagline ? (
+              <p className="mt-1 text-sm text-gray-500 line-clamp-2 leading-snug">
+                {descriptionPreview}
+              </p>
+            ) : null}
+            {!isPast ? (
+              <p className="mt-1.5 text-xs font-medium text-orange-600">
+                {countdownLabel(race.raceDate)}
+              </p>
+            ) : null}
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">

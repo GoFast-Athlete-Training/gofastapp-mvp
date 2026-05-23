@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
-import { Calendar, MapPin, ChevronRight } from "lucide-react";
 import { formatRaceListDate } from "@/lib/races-display";
+import {
+  raceSelectorDescription,
+  raceSelectorTagline,
+} from "@/lib/race-selector-card";
 
 type CatalogRace = {
   id: string;
@@ -16,7 +19,14 @@ type CatalogRace = {
   state: string | null;
   slug?: string | null;
   logoUrl?: string | null;
+  summaryPhrase?: string | null;
+  description?: string | null;
 };
+
+function hubHrefForCatalogRace(race: CatalogRace): string {
+  const s = race.slug?.trim();
+  return s ? `/myrace/${encodeURIComponent(s)}` : `/race-hub/${race.id}`;
+}
 
 type DiscoverRacesSectionProps = {
   signedRaceIds: Set<string>;
@@ -84,7 +94,9 @@ export default function DiscoverRacesSection({
       <div className="flex items-center justify-between gap-2 mb-3">
         <div>
           <h2 className="text-sm font-semibold text-gray-700">Discover races</h2>
-          <p className="text-xs text-gray-500 mt-0.5">Popular upcoming races — add to your calendar</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Popular upcoming races — add to your calendar
+          </p>
         </div>
         <Link
           href="/races/find"
@@ -96,32 +108,37 @@ export default function DiscoverRacesSection({
       <ul className="grid gap-3 sm:grid-cols-3">
         {discoverRaces.map((race) => {
           const busy = submittingRaceId === race.id;
-          const distance =
-            race.distanceLabel?.trim() ||
-            (race.distanceMeters != null
-              ? `${(race.distanceMeters / 1609.344).toFixed(1)} mi`
-              : null);
+          const tagline = raceSelectorTagline(race.summaryPhrase);
+          const descriptionPreview = raceSelectorDescription(race.description, 120);
+          const location = [race.city, race.state].filter(Boolean).join(", ");
+          const dateLine = formatRaceListDate(race.raceDate);
+          const distance = race.distanceLabel?.trim() || null;
+
           return (
             <li
               key={race.id}
-              className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm flex flex-col"
+              className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm flex flex-col"
             >
-              <p className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2">
-                {race.name}
-              </p>
-              <p className="text-[11px] text-gray-500 flex items-center gap-1 mt-1.5">
-                <Calendar className="w-3 h-3 shrink-0" />
-                {formatRaceListDate(race.raceDate)}
-              </p>
-              {(race.city || race.state) && (
-                <p className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
-                  <MapPin className="w-3 h-3 shrink-0" />
-                  {[race.city, race.state].filter(Boolean).join(", ")}
+              <Link href={hubHrefForCatalogRace(race)} className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold text-orange-700">
+                  {dateLine}
+                  {distance ? ` · ${distance}` : ""}
                 </p>
-              )}
-              {distance ? (
-                <p className="text-[11px] text-gray-600 mt-0.5">{distance}</p>
-              ) : null}
+                <p className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2 mt-1">
+                  {race.name}
+                </p>
+                {location ? (
+                  <p className="text-[11px] text-gray-500 mt-0.5">{location}</p>
+                ) : null}
+                {tagline ? (
+                  <p className="text-xs font-medium text-gray-700 mt-1.5 line-clamp-2">{tagline}</p>
+                ) : null}
+                {descriptionPreview && descriptionPreview !== tagline ? (
+                  <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-snug">
+                    {descriptionPreview}
+                  </p>
+                ) : null}
+              </Link>
               <button
                 type="button"
                 disabled={busy}
@@ -138,8 +155,7 @@ export default function DiscoverRacesSection({
         href="/races/find"
         className="mt-3 inline-flex items-center text-sm font-semibold text-orange-700 hover:underline"
       >
-        See all races
-        <ChevronRight className="w-4 h-4 ml-0.5" />
+        See all races →
       </Link>
     </section>
   );

@@ -47,6 +47,7 @@ export async function GET(
         spectatorInfo: true,
         logisticsInfo: true,
         gearDropInstructions: true,
+        summaryPhrase: true,
       },
     });
 
