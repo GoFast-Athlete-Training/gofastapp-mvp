@@ -70,15 +70,3 @@ test("scoreAndSortActivityCandidates ranks title match above same-day only", () 
   assert.equal(sorted[0]?.id, "title-match");
   assert.ok(sorted[0]!.score > sorted[1]!.score);
 });
-
-test("scoreActivityCandidateForWorkout flags already linked activities", () => {
-  const scored = scoreActivityCandidateForWorkout({
-    workout: baseWorkout,
-    activity: baseActivity({
-      matchedWorkoutId: "other-workout",
-      matchedWorkoutTitle: "Tempo Tuesday",
-    }),
-  });
-  assert.ok(scored);
-  assert.ok(scored!.reasonLabels.includes("Already linked"));
-});

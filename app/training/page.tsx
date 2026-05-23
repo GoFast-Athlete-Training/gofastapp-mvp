@@ -11,6 +11,7 @@ import { auth } from "@/lib/firebase";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import WeekStrip from "@/components/training/WeekStrip";
+import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
 import { metersToMiDisplay } from "@/lib/training/workout-preview-payload";
 import {
   currentTrainingWeekNumber,
@@ -307,10 +308,7 @@ export default function TrainingHubPage() {
     }
   }
 
-  async function handleOpenSession(dateKey: string) {
-    if (dateKey === localTodayKey()) {
-      await handleSendTodayToGarmin();
-    }
+  function handleOpenSession(dateKey: string) {
     router.push(`/training/day/${dateKey}`);
   }
 
@@ -816,6 +814,15 @@ export default function TrainingHubPage() {
                           <p className="mt-3 text-sm text-gray-700" role="status">
                             {garminPushMessage}
                           </p>
+                        ) : null}
+                        {focusPlanDay.workoutId && !focusPlanDay.matchedActivityId ? (
+                          <div className="mt-4">
+                            <WorkoutActivityMatchPanel
+                              workoutId={focusPlanDay.workoutId}
+                              compact
+                              onMatched={loadHub}
+                            />
+                          </div>
                         ) : null}
                       </>
                     )

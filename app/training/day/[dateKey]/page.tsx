@@ -37,6 +37,7 @@ import {
 } from "@/lib/training/workout-preview-payload";
 import { stashWorkoutDayNav } from "@/lib/training/workout-day-nav";
 import LogRaceResultSheet from "@/components/races/LogRaceResultSheet";
+import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
 
 type PlanDetail = {
   id: string;
@@ -583,6 +584,14 @@ export default function TrainingPlanDayPreviewPage() {
                   </button>
                 </div>
               ) : null}
+
+              {workoutId && !workoutLoading && !workoutError ? (
+                <WorkoutActivityMatchPanel
+                  workoutId={workoutId}
+                  compact
+                  onMatched={load}
+                />
+              ) : null}
             </div>
 
             <div className="border-t border-gray-100 px-5 py-4 space-y-3 bg-gray-50/60">
@@ -602,8 +611,21 @@ export default function TrainingPlanDayPreviewPage() {
                 disabled={openingWorkout || !canOpenWorkout || workoutLoading || !!workoutError}
                 className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
               >
-                {openingWorkout ? "Opening…" : "Modify workout"}
+                {openingWorkout ? "Opening…" : "Open workout details"}
               </button>
+              {workoutId && !workoutLoading && !workoutError ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    document
+                      .getElementById("match-garmin-panel")
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  className="w-full rounded-xl border border-sky-200 bg-white py-3 text-sm font-semibold text-sky-800 hover:bg-sky-50"
+                >
+                  Match Garmin activity
+                </button>
+              ) : null}
               <div className="flex gap-2">
                 {prevDateKey && (
                   <Link

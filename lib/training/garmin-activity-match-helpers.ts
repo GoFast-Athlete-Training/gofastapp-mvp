@@ -20,6 +20,26 @@ export function normalizeGarminMatchText(value: string | null | undefined): stri
     .trim();
 }
 
+/** Strip Garmin location prefix before `GF W#:` and optional week label for title comparison. */
+export function normalizeActivityNameForMatch(
+  activityName: string | null | undefined
+): string {
+  let text = normalizeGarminMatchText(activityName);
+  const gfMarker = text.match(/\bgf\s+w\d+\s*:/i);
+  if (gfMarker?.index != null && gfMarker.index > 0) {
+    text = text.slice(gfMarker.index);
+  }
+  text = text.replace(/^gf\s+w\d+\s*:\s*/i, "");
+  return text.trim();
+}
+
+/** True when Garmin activity title looks like a pushed planned workout (GF W#: …). */
+export function activityNameHasPushedWorkoutMarker(
+  activityName: string | null | undefined
+): boolean {
+  return /\bgf\s+w\d+\s*:/i.test(activityName ?? "");
+}
+
 function numFromRecord(record: Record<string, unknown> | null, key: string): number | null {
   const value = record?.[key];
   if (value == null) return null;
@@ -52,11 +72,20 @@ export function activityNameContainsPushedWorkoutTitle(params: {
   weekNumber: number | null;
 }): boolean {
   const activityName = normalizeGarminMatchText(params.activityName);
+  const activityCore = normalizeActivityNameForMatch(params.activityName);
+  const workoutTitle = normalizeGarminMatchText(params.workoutTitle);
   const pushedTitle = normalizeGarminMatchText(
     garminTitleForWorkout({
       title: params.workoutTitle,
       weekNumber: params.weekNumber,
     })
   );
+
+  if (workoutTitle.length > 0 && activityCore === workoutTitle) {
+    return true;
+  }
+  if (workoutTitle.length > 0 && activityCore.includes(workoutTitle)) {
+    return true;
+  }
   return pushedTitle.length > 0 && activityName.includes(pushedTitle);
 }

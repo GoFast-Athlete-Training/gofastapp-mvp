@@ -4,6 +4,7 @@ import {
   activityLocalYmdFromSummary,
   activityNameContainsPushedWorkoutTitle,
   garminTitleForWorkout,
+  normalizeActivityNameForMatch,
 } from "./garmin-activity-match-helpers";
 
 test("garminTitleForWorkout prefixes unlabelled plan workouts with GF week", () => {
@@ -13,7 +14,14 @@ test("garminTitleForWorkout prefixes unlabelled plan workouts with GF week", () 
   );
 });
 
-test("activityNameContainsPushedWorkoutTitle matches Garmin location-prefixed names", () => {
+test("normalizeActivityNameForMatch strips location and GF week prefix", () => {
+  assert.equal(
+    normalizeActivityNameForMatch("Arlington County - GF W1: Long run 12.3 miles"),
+    "long run 12.3 miles"
+  );
+});
+
+test("activityNameContainsPushedWorkoutTitle matches core title after normalization", () => {
   assert.equal(
     activityNameContainsPushedWorkoutTitle({
       activityName: "Arlington County - GF W1: Long run 12.3 miles",

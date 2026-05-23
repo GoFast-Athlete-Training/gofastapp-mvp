@@ -8,8 +8,7 @@ import { ymdFromDate } from "@/lib/training/plan-utils";
 export type WorkoutActivityMatchReason =
   | "title_match"
   | "same_day"
-  | "distance_close"
-  | "already_linked";
+  | "distance_close";
 
 export const WORKOUT_ACTIVITY_MATCH_REASON_LABELS: Record<
   WorkoutActivityMatchReason,
@@ -18,7 +17,6 @@ export const WORKOUT_ACTIVITY_MATCH_REASON_LABELS: Record<
   title_match: "Title match",
   same_day: "Same day",
   distance_close: "Distance close",
-  already_linked: "Already linked",
 };
 
 export type ActivityCandidateInput = {
@@ -129,14 +127,6 @@ export function scoreActivityCandidateForWorkout(params: {
   if (isDistanceClose(activity.distance, workout.estimatedDistanceInMeters)) {
     reasons.push("distance_close");
     score += 20;
-  }
-
-  if (
-    activity.matchedWorkoutId != null &&
-    activity.matchedWorkoutId !== workout.id
-  ) {
-    reasons.push("already_linked");
-    score -= 500;
   }
 
   if (reasons.length === 0 && workoutYmd != null && activityYmd === workoutYmd) {

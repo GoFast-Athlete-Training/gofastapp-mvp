@@ -17,6 +17,12 @@ import {
   LastRunPanelSkeleton,
   RunHistoryPanel,
 } from "@/components/workouts/workout-hub-panels";
+import { RUNNING_ACTIVITY_TYPES } from "@/lib/training/activity-type-sets";
+
+function isRunningActivityType(activityType: string | null | undefined): boolean {
+  if (!activityType) return true;
+  return RUNNING_ACTIVITY_TYPES.has(activityType.toUpperCase());
+}
 
 export default function PerformancePage() {
   return (
@@ -90,7 +96,9 @@ function PerformanceHub() {
 
       const actJson = (await activitiesRes.json()) as { activities?: ActivitySummaryRow[] };
       if (activitiesRes.ok && Array.isArray(actJson.activities)) {
-        setRecentActivities(actJson.activities.slice(0, 5));
+        setRecentActivities(
+          actJson.activities.filter((a) => isRunningActivityType(a.activityType)).slice(0, 5)
+        );
       }
     } finally {
       setLoading(false);

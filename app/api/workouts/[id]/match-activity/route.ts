@@ -4,8 +4,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import {
-  applyActivityToWorkout,
+  classifyActivityLinkConflict,
   clearActivityFromWorkout,
+  reassignActivityToWorkout,
+  type ActivityLinkConflict,
 } from "@/lib/training/apply-activity-to-workout";
 import { RUNNING_ACTIVITY_TYPES } from "@/lib/training/activity-type-sets";
 import {
@@ -38,6 +40,45 @@ function isRunningActivityType(activityType: string | null | undefined): boolean
   return RUNNING_ACTIVITY_TYPES.has(activityType.toUpperCase());
 }
 
+function speedMpsToSecPerMile(mps: number | null | undefined): number | null {
+  if (mps == null || mps <= 0) return null;
+  return Math.round(1609.34 / mps);
+}
+
+function conflictForCandidate(params: {
+  targetWorkout: {
+    id: string;
+    title: string;
+    date: Date | null;
+    weekNumber: number | null;
+    planId: string | null;
+  };
+  matchedWorkout:
+    | {
+        id: string;
+        title: string;
+        date: Date | null;
+        weekNumber: number | null;
+        planId: string | null;
+      }
+    | null
+    | undefined;
+}): ActivityLinkConflict | null {
+  if (!params.matchedWorkout || params.matchedWorkout.id === params.targetWorkout.id) {
+    return null;
+  }
+  const type = classifyActivityLinkConflict({
+    targetWorkout: params.targetWorkout,
+    existingWorkout: params.matchedWorkout,
+  });
+  if (type === "same_workout") return null;
+  return {
+    type,
+    workoutId: params.matchedWorkout.id,
+    workoutTitle: params.matchedWorkout.title,
+  };
+}
+
 function serializeActivity(row: {
   id: string;
   activityName: string | null;
@@ -48,11 +89,9 @@ function serializeActivity(row: {
   duration: number | null;
   averageSpeed: number | null;
   paceSecPerMile?: number | null;
-  matchedWorkoutId?: string | null;
-  matchedWorkoutTitle?: string | null;
-  reasons?: string[];
   reasonLabels?: string[];
   score?: number;
+  conflict?: ActivityLinkConflict | null;
 }) {
   const paceSecPerMile =
     row.paceSecPerMile ??
@@ -70,11 +109,9 @@ function serializeActivity(row: {
     duration: row.duration,
     averageSpeed: row.averageSpeed,
     paceSecPerMile,
-    matchedWorkoutId: row.matchedWorkoutId ?? null,
-    matchedWorkoutTitle: row.matchedWorkoutTitle ?? null,
-    ...(row.reasons ? { reasons: row.reasons } : {}),
     ...(row.reasonLabels ? { reasonLabels: row.reasonLabels } : {}),
     ...(row.score != null ? { score: row.score } : {}),
+    conflict: row.conflict ?? null,
   };
 }
 
@@ -109,8 +146,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
         },
         matchedActivity: serializeActivity({
           ...workout.matched_activity,
-          matchedWorkoutId: workout.id,
-          matchedWorkoutTitle: workout.title,
+          paceSecPerMile: speedMpsToSecPerMile(workout.matched_activity.averageSpeed),
         }),
         candidates: [],
       });
@@ -140,7 +176,9 @@ export async function GET(request: NextRequest, ctx: Ctx) {
         averageSpeed: true,
         ingestionStatus: true,
         summaryData: true,
-        matched_workout: { select: { id: true, title: true } },
+        matched_workout: {
+          select: { id: true, title: true, planId: true, date: true, weekNumber: true },
+        },
       },
     });
 
@@ -179,8 +217,9 @@ export async function GET(request: NextRequest, ctx: Ctx) {
         matchedActivityId: workout.matchedActivityId,
       },
       matchedActivity: null,
-      candidates: candidates.map((c) =>
-        serializeActivity({
+      candidates: candidates.map((c) => {
+        const source = runningActivities.find((a) => a.id === c.id);
+        return serializeActivity({
           id: c.id,
           activityName: c.activityName,
           activityType: c.activityType,
@@ -190,12 +229,14 @@ export async function GET(request: NextRequest, ctx: Ctx) {
           duration: c.duration,
           averageSpeed: c.averageSpeed,
           paceSecPerMile: c.paceSecPerMile,
-          matchedWorkoutId: c.matchedWorkoutId,
-          matchedWorkoutTitle: c.matchedWorkoutTitle,
           reasonLabels: c.reasonLabels,
           score: c.score,
-        })
-      ),
+          conflict: conflictForCandidate({
+            targetWorkout: workout,
+            matchedWorkout: source?.matched_workout,
+          }),
+        });
+      }),
     });
   } catch (error: unknown) {
     console.error("GET /api/workouts/[id]/match-activity", error);
@@ -247,13 +288,6 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       return NextResponse.json({ success: true, cleared: result.cleared });
     }
 
-    if (workout.matchedActivityId && workout.matchedActivityId !== requestedActivityId) {
-      return NextResponse.json(
-        { error: "Workout is already linked to a different activity" },
-        { status: 409 }
-      );
-    }
-
     if (workout.matchedActivityId === requestedActivityId) {
       return NextResponse.json({ success: true, workoutId: workout.id, alreadyMatched: true });
     }
@@ -280,33 +314,32 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       );
     }
 
-    const existingLink = await prisma.workouts.findFirst({
-      where: {
-        athleteId: auth.athlete.id,
-        matchedActivityId: activity.id,
-        id: { not: workout.id },
-      },
-      select: { id: true, title: true },
+    const reassignResult = await reassignActivityToWorkout({
+      activityId: activity.id,
+      targetWorkoutId: workout.id,
+      athleteId: auth.athlete.id,
     });
 
-    if (existingLink) {
+    if (!reassignResult.success) {
       return NextResponse.json(
         {
-          error: `Activity is already linked to "${existingLink.title}"`,
-          linkedWorkoutId: existingLink.id,
+          error: `Activity is already linked to "${reassignResult.conflict.workoutTitle}"`,
+          conflict: reassignResult.conflict,
         },
         { status: 409 }
       );
     }
 
-    const { workoutId } = await applyActivityToWorkout({ workout, activity });
-
     void runRunAssessment({
-      workoutId,
+      workoutId: reassignResult.workoutId,
       athleteId: auth.athlete.id,
     }).catch((e) => console.error("runRunAssessment after manual match:", e));
 
-    return NextResponse.json({ success: true, workoutId });
+    return NextResponse.json({
+      success: true,
+      workoutId: reassignResult.workoutId,
+      reassignedFrom: reassignResult.reassignedFrom ?? null,
+    });
   } catch (error: unknown) {
     console.error("POST /api/workouts/[id]/match-activity", error);
     return NextResponse.json({ error: "Failed to match activity" }, { status: 500 });

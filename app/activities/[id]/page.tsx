@@ -77,6 +77,7 @@ export default function ActivityDetailPage() {
   const [activity, setActivity] = useState<ActivityPayload | null>(null);
   const [matched, setMatched] = useState<MatchedWorkoutPayload | null>(null);
   const [markRaceOpen, setMarkRaceOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -116,6 +117,37 @@ export default function ActivityDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function handleDeleteActivity() {
+    if (
+      !window.confirm(
+        "Delete this activity from GoFast? This does not delete it from Garmin."
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    setError(null);
+    try {
+      const u = auth.currentUser;
+      if (!u) return;
+      const token = await u.getIdToken();
+      const res = await fetch(`/api/activities/${encodeURIComponent(activityId)}`, {
+        method: "DELETE",
+        headers: athleteBearerFetchHeaders(token),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setError(json.error || "Could not delete activity");
+        return;
+      }
+      router.push("/activities");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete activity");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   const avgPace = activity ? speedMpsToSecPerMile(activity.averageSpeed) : null;
   const distMi =
@@ -389,6 +421,21 @@ export default function ActivityDetailPage() {
                     </ul>
                   </div>
                 ) : null}
+
+                <div className="rounded-xl border border-red-100 bg-red-50/40 p-5">
+                  <h2 className="text-sm font-semibold text-red-900">Remove from GoFast</h2>
+                  <p className="mt-1 text-sm text-red-800/90">
+                    Delete this activity from GoFast? This does not delete it from Garmin.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={deleting}
+                    onClick={() => void handleDeleteActivity()}
+                    className="mt-3 inline-flex rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    {deleting ? "Deleting…" : "Delete activity"}
+                  </button>
+                </div>
               </>
             )}
           </div>

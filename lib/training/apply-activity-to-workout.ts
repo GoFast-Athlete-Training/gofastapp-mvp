@@ -12,6 +12,11 @@ import {
   normalizePaceTargetEncodingVersion,
   storedPaceSecondsKmToSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
+import { normalizeGarminMatchText } from "./garmin-activity-match-helpers";
+import { ymdFromDate } from "./plan-utils";
+import { parseDetailData } from "./detail-data-parser";
+import { convertLapsToDerived } from "./lap-converter";
+import { writeLapsToWorkout } from "./lap-data-to-workout";
 /** Max sec/mi faster than prescribed easy pace before we skip aerobic HR credit (target − actual). */
 export const EASY_LONG_RUN_MAX_FAST_DRIFT_SEC_PER_MILE = 15;
 
@@ -437,4 +442,203 @@ export async function clearActivityFromWorkout(params: {
   });
 
   return { cleared: true, previousActivityId };
+}
+
+export type ActivityLinkConflictType =
+  | "same_workout"
+  | "standalone_workout"
+  | "sibling_planned_workout"
+  | "unrelated_planned_workout";
+
+export type ActivityLinkConflict = {
+  type: ActivityLinkConflictType;
+  workoutId: string;
+  workoutTitle: string;
+};
+
+const reassignWorkoutInclude = {
+  segments: { orderBy: { stepOrder: "asc" as const } },
+  workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true } },
+};
+
+function datesOnSameCalendarDay(a: Date | null, b: Date | null): boolean {
+  if (!a || !b) return false;
+  return ymdFromDate(a) === ymdFromDate(b);
+}
+
+/** Classify how an activity's existing workout link relates to a manual match target. */
+export function classifyActivityLinkConflict(params: {
+  targetWorkout: {
+    id: string;
+    title: string;
+    date: Date | null;
+    weekNumber: number | null;
+    planId: string | null;
+  };
+  existingWorkout: {
+    id: string;
+    title: string;
+    date: Date | null;
+    weekNumber: number | null;
+    planId: string | null;
+  };
+}): ActivityLinkConflictType {
+  const { targetWorkout, existingWorkout } = params;
+  if (existingWorkout.id === targetWorkout.id) return "same_workout";
+  if (existingWorkout.planId == null) return "standalone_workout";
+
+  const sameDate = datesOnSameCalendarDay(existingWorkout.date, targetWorkout.date);
+  const sameTitle =
+    normalizeGarminMatchText(existingWorkout.title) ===
+    normalizeGarminMatchText(targetWorkout.title);
+  const sameWeek =
+    existingWorkout.weekNumber != null &&
+    targetWorkout.weekNumber != null &&
+    existingWorkout.weekNumber === targetWorkout.weekNumber;
+
+  if (sameDate || sameTitle || sameWeek) {
+    return "sibling_planned_workout";
+  }
+  return "unrelated_planned_workout";
+}
+
+async function syncActivityDetailToLinkedWorkout(activityId: string): Promise<void> {
+  const activity = await prisma.athlete_activities.findUnique({
+    where: { id: activityId },
+    select: { id: true, detailData: true },
+  });
+  if (!activity?.detailData || typeof activity.detailData !== "object") return;
+
+  await prisma.workouts.updateMany({
+    where: { matchedActivityId: activity.id },
+    data: { completedActivityDetailJson: activity.detailData as object },
+  });
+
+  try {
+    const parsed = parseDetailData(activity.detailData);
+    const derived = convertLapsToDerived(parsed.laps, parsed.samples);
+    await writeLapsToWorkout(activity.id, derived);
+  } catch (lapErr) {
+    console.warn("lap pipeline after activity reassign:", lapErr);
+  }
+}
+
+/**
+ * Move an activity link from a ghost/sibling workout to the target planned workout.
+ * Keeps the raw athlete_activities row; clears or deletes the old owning workout when safe.
+ */
+export async function reassignActivityToWorkout(params: {
+  activityId: string;
+  targetWorkoutId: string;
+  athleteId: string;
+}): Promise<
+  | { success: true; workoutId: string; reassignedFrom?: string }
+  | { success: false; conflict: ActivityLinkConflict }
+> {
+  const targetWorkout = await prisma.workouts.findFirst({
+    where: { id: params.targetWorkoutId, athleteId: params.athleteId },
+    include: reassignWorkoutInclude,
+  });
+  if (!targetWorkout) {
+    throw new Error("Workout not found");
+  }
+
+  const activity = await prisma.athlete_activities.findFirst({
+    where: { id: params.activityId, athleteId: params.athleteId },
+  });
+  if (!activity) {
+    throw new Error("Activity not found");
+  }
+
+  if (targetWorkout.matchedActivityId === activity.id) {
+    return { success: true, workoutId: targetWorkout.id };
+  }
+
+  const existingLink = await prisma.workouts.findFirst({
+    where: {
+      athleteId: params.athleteId,
+      matchedActivityId: activity.id,
+    },
+    select: {
+      id: true,
+      title: true,
+      date: true,
+      weekNumber: true,
+      planId: true,
+    },
+  });
+
+  if (existingLink) {
+    const conflictType = classifyActivityLinkConflict({
+      targetWorkout,
+      existingWorkout: existingLink,
+    });
+
+    if (conflictType === "unrelated_planned_workout") {
+      return {
+        success: false,
+        conflict: {
+          type: conflictType,
+          workoutId: existingLink.id,
+          workoutTitle: existingLink.title,
+        },
+      };
+    }
+
+    if (conflictType === "standalone_workout") {
+      await prisma.workouts.delete({ where: { id: existingLink.id } });
+    } else if (conflictType === "sibling_planned_workout") {
+      await clearActivityFromWorkout({
+        workoutId: existingLink.id,
+        athleteId: params.athleteId,
+      });
+    }
+  }
+
+  if (
+    targetWorkout.matchedActivityId &&
+    targetWorkout.matchedActivityId !== activity.id
+  ) {
+    await clearActivityFromWorkout({
+      workoutId: targetWorkout.id,
+      athleteId: params.athleteId,
+    });
+  }
+
+  const { workoutId } = await applyActivityToWorkout({ workout: targetWorkout, activity });
+  await syncActivityDetailToLinkedWorkout(activity.id);
+
+  return {
+    success: true,
+    workoutId,
+    reassignedFrom: existingLink?.id,
+  };
+}
+
+/** Hard-delete a GoFast activity row (not Garmin). Clears any owning workout link first. */
+export async function deleteAthleteActivity(params: {
+  activityId: string;
+  athleteId: string;
+}): Promise<{ deleted: boolean }> {
+  const activity = await prisma.athlete_activities.findFirst({
+    where: { id: params.activityId, athleteId: params.athleteId },
+    select: { id: true },
+  });
+  if (!activity) {
+    return { deleted: false };
+  }
+
+  const owningWorkout = await prisma.workouts.findFirst({
+    where: { matchedActivityId: activity.id, athleteId: params.athleteId },
+    select: { id: true },
+  });
+  if (owningWorkout) {
+    await clearActivityFromWorkout({
+      workoutId: owningWorkout.id,
+      athleteId: params.athleteId,
+    });
+  }
+
+  await prisma.athlete_activities.delete({ where: { id: activity.id } });
+  return { deleted: true };
 }

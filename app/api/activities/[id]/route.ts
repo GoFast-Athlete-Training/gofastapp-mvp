@@ -79,3 +79,45 @@ export async function GET(
     );
   }
 }
+
+/**
+ * DELETE /api/activities/[id]
+ * Hard-delete a GoFast activity row (does not delete from Garmin).
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = await requireAthleteFromBearer(request);
+  if ("error" in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  const { id } = await params;
+  if (!id?.trim()) {
+    return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  }
+
+  try {
+    const { deleteAthleteActivity } = await import(
+      "@/lib/training/apply-activity-to-workout"
+    );
+    const result = await deleteAthleteActivity({
+      activityId: id.trim(),
+      athleteId: auth.athlete.id,
+    });
+    if (!result.deleted) {
+      return NextResponse.json({ error: "Activity not found" }, { status: 404 });
+    }
+    return NextResponse.json({ success: true, deleted: true });
+  } catch (err: unknown) {
+    console.error("DELETE /api/activities/[id]:", err);
+    return NextResponse.json(
+      {
+        error: "Server error",
+        details: err instanceof Error ? err.message : "Unknown",
+      },
+      { status: 500 }
+    );
+  }
+}

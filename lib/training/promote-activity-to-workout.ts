@@ -8,6 +8,8 @@ import { RUNNING_ACTIVITY_TYPES } from "@/lib/training/activity-type-sets";
 import { applyAerobicCeilingCredit } from "@/lib/training/apply-aerobic-ceiling-credit";
 import {
   activityLocalYmdFromSummary,
+  activityNameContainsPushedWorkoutTitle,
+  activityNameHasPushedWorkoutMarker,
   utcDayRangeFromYmd,
 } from "@/lib/training/garmin-activity-match-helpers";
 
@@ -79,6 +81,19 @@ export async function promoteUnmatchedRunningActivityToWorkout(
       activityName: activity.activityName,
       activityYmd,
       candidateWorkoutIds: plannedSameDay.map((workout) => workout.id),
+    });
+    return { promoted: false, blockedByPlannedWorkout: true };
+  }
+
+  if (activityNameHasPushedWorkoutMarker(activity.activityName)) {
+    console.warn("⚠️ not promoting pushed Garmin workout activity to standalone ghost", {
+      athleteActivityId,
+      activityName: activity.activityName,
+      activityYmd,
+    });
+    await prisma.athlete_activities.update({
+      where: { id: athleteActivityId },
+      data: { ingestionStatus: "UNMATCHED" },
     });
     return { promoted: false, blockedByPlannedWorkout: true };
   }

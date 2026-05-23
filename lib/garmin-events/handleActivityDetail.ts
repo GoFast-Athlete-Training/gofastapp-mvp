@@ -45,10 +45,19 @@ export async function handleActivityDetail(
 
       const activityId = detail.activityId?.toString();
       if (!activityId) {
-        console.warn("⚠️ No activityId found in activity detail");
+        console.warn("⚠️ No activityId found in activity detail", {
+          userId: garminUserId,
+          detailKeys:
+            detail && typeof detail === "object" ? Object.keys(detail) : [],
+        });
         skipped++;
         continue;
       }
+
+      console.log("📩 Processing activity detail", {
+        activityId,
+        userId: garminUserId,
+      });
 
       const updateResult = await prisma.athlete_activities.updateMany({
         where: {
@@ -62,6 +71,11 @@ export async function handleActivityDetail(
       });
 
       if (updateResult.count > 0) {
+        console.log("✅ Saved activity detail", {
+          activityId,
+          userId: garminUserId,
+          updateCount: updateResult.count,
+        });
         const row = await prisma.athlete_activities.findFirst({
           where: { athleteId: athlete.id, sourceActivityId: activityId },
         });
@@ -103,7 +117,12 @@ export async function handleActivityDetail(
         processed++;
       } else {
         skipped++;
-        console.warn(`⚠️ Activity ${activityId} not found for detail update`);
+        console.warn("⚠️ Activity detail update matched no rows", {
+          activityId,
+          athleteId: athlete.id,
+          sourceActivityId: activityId,
+          garminUserId,
+        });
       }
     } catch (error: any) {
       errors++;
