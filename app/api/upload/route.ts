@@ -1,6 +1,16 @@
 import { put } from '@vercel/blob';
 import { NextRequest, NextResponse } from 'next/server';
 
+function isMultipartParseError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes('Unexpected end of form') ||
+    message.includes('Failed to parse body as FormData') ||
+    message.includes('missing boundary') ||
+    message.includes('Malformed content type')
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -48,11 +58,15 @@ export async function POST(request: NextRequest) {
       success: true,
       url: blob.url,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Upload error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to upload file' },
-      { status: 500 }
-    );
+    if (isMultipartParseError(error)) {
+      return NextResponse.json(
+        { error: 'Invalid or incomplete upload. Please try again.' },
+        { status: 400 }
+      );
+    }
+    const message = error instanceof Error ? error.message : 'Failed to upload file';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

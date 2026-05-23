@@ -529,9 +529,7 @@ export default function RunCrewSettingsPage() {
                             const formData = new FormData();
                             formData.append('file', file);
                             
-                            const uploadResponse = await api.post('/upload', formData, {
-                              headers: { 'Content-Type': 'multipart/form-data' },
-                            });
+                            const uploadResponse = await api.post('/upload', formData);
                             
                             if (uploadResponse.data.success && uploadResponse.data.url) {
                               setCrewLogo(uploadResponse.data.url);
