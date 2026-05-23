@@ -15,8 +15,16 @@ export const SEGMENT_METERS_PER_MILE = 1609.34;
 
 /**
  * Human-readable distance for RUN prescriptions: show meters when the value matches a standard track rep length.
- * Otherwise show miles (1 decimal under 10 mi).
+ * Otherwise show miles, preserving tenths when the value is not effectively a whole mile.
  */
+function formatMilesWithOptionalTenth(miles: number): string {
+  const roundedTenth = Math.round(miles * 10) / 10;
+  if (Math.abs(roundedTenth - Math.round(roundedTenth)) < 1e-9) {
+    return `${Math.round(roundedTenth)} mi`;
+  }
+  return `${roundedTenth.toFixed(1)} mi`;
+}
+
 export function formatSegmentDistance(miles: number): string {
   if (!Number.isFinite(miles) || miles < 0) return "—";
   const meters = miles * SEGMENT_METERS_PER_MILE;
@@ -29,8 +37,7 @@ export function formatSegmentDistance(miles: number): string {
       }
     }
   }
-  if (miles >= 10) return `${Math.round(miles)} mi`;
-  return `${miles.toFixed(1)} mi`;
+  return formatMilesWithOptionalTenth(miles);
 }
 
 /** DISTANCE → formatted distance; TIME → rounded minutes. */
@@ -300,8 +307,7 @@ export function segmentStructureBadge(
 
 export function formatStructuredMilesTotal(miles: number): string | null {
   if (!Number.isFinite(miles) || miles <= 0) return null;
-  if (miles >= 10) return `${Math.round(miles)} mi`;
-  return `${miles.toFixed(1)} mi`;
+  return formatMilesWithOptionalTenth(miles);
 }
 
 export function formatStructuredMinutesTotal(minutes: number): string | null {

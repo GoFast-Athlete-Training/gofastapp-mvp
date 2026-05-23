@@ -1821,6 +1821,7 @@ export default function WorkoutDetailPage() {
   const weekLineDisplay = navWeekLine ?? weekOnPlan;
   const dateLineDisplay = navDateLine ?? scheduleLabel;
   const weekAndDateLine = [weekLineDisplay, dateLineDisplay].filter(Boolean).join(" · ");
+  const showStandaloneCopyAction = !workout.planId;
 
   const hasPaceRangeForResults =
     workout.targetPaceSecPerMile != null &&
@@ -2196,27 +2197,29 @@ export default function WorkoutDetailPage() {
                   </span>
                 ) : null}
               </div>
-              <div className="flex flex-wrap items-center gap-2 mb-3">
-                <button
-                  type="button"
-                  onClick={() => void handleDuplicateWorkout()}
-                  disabled={duplicatingWorkout || copyRepushing || pushing}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 shadow-sm"
-                  title="Creates another GoFast workout with the same structure on this calendar date (standalone copy). Does not send to Garmin."
-                >
-                  {duplicatingWorkout ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-700" />
-                      Copying…
-                    </>
-                  ) : (
-                    <>
-                      <CopyPlus className="w-4 h-4" />
-                      Copy workout
-                    </>
-                  )}
-                </button>
-              </div>
+              {showStandaloneCopyAction ? (
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => void handleDuplicateWorkout()}
+                    disabled={duplicatingWorkout || copyRepushing || pushing}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 shadow-sm"
+                    title="Creates another GoFast workout with the same structure on this calendar date. Does not send to Garmin."
+                  >
+                    {duplicatingWorkout ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-700" />
+                        Copying…
+                      </>
+                    ) : (
+                      <>
+                        <CopyPlus className="w-4 h-4" />
+                        Copy workout
+                      </>
+                    )}
+                  </button>
+                </div>
+              ) : null}
               {weekAndDateLine ? (
                 <p className="text-base text-gray-800 font-medium mb-2">{weekAndDateLine}</p>
               ) : null}

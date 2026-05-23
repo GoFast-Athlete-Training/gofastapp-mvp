@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   expandSegmentsForGarminPush,
   formatGroupedSegmentDuration,
+  formatSegmentDistance,
+  formatStructuredMilesTotal,
   groupSegmentsInDisplayOrder,
   milesToDisplayMeters,
 } from "./segment-summary";
@@ -72,4 +74,9 @@ test("expandSegmentsForGarminPush stretches collapsed flat reps into repeatCount
 
 test("milesToDisplayMeters snaps 400m track reps to 400 not 401", () => {
   assert.equal(milesToDisplayMeters(M400), 400);
+});
+
+test("distance labels keep tenths for non-whole long runs", () => {
+  assert.equal(formatStructuredMilesTotal(12.3), "12.3 mi");
+  assert.equal(formatSegmentDistance(12.3), "12.3 mi");
 });
