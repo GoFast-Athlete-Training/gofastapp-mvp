@@ -431,7 +431,7 @@ function RaceHubPageInner() {
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <TopNav showBack backUrl={hubBackUrl} backLabel="My race" />
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-start justify-between gap-3 sm:gap-4">
             <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
               {race.logoUrl?.trim() &&
@@ -454,7 +454,10 @@ function RaceHubPageInner() {
                   {dateLabel ? (
                     <span className="flex items-center gap-1 min-w-0">
                       <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                      <span className="truncate">{dateLabel}</span>
+                      <span className="truncate">
+                        {dateLabel}
+                        {raceStartLabel ? ` · ${raceStartLabel}` : ""}
+                      </span>
                     </span>
                   ) : null}
                   {locationText ? (
@@ -499,11 +502,12 @@ function RaceHubPageInner() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-6">
         <RaceHubMobileTabs {...sharedSectionProps} />
 
         <div className="hidden lg:grid grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
           <div className="lg:col-span-6 space-y-6 min-w-0 order-1">
+            <RaceHubChatterSection raceRegistryId={raceRegistryId} />
             <RaceHubAnnouncementsSection
               announcements={announcements}
               isAdmin={isAdmin}
@@ -517,16 +521,9 @@ function RaceHubPageInner() {
               onPostAnnouncement={postAnnouncement}
               postingAnnounce={postingAnnounce}
             />
-            <RaceHubChatterSection raceRegistryId={raceRegistryId} />
           </div>
 
           <aside className="lg:col-span-6 space-y-6 min-w-0 order-2">
-            {showPostRaceResultCard ? (
-              <RaceHubMyResultSection
-                myRaceResult={myRaceResult}
-                onOpenLogSheet={() => setLogSheetOpen(true)}
-              />
-            ) : null}
             <RaceHubAtAGlanceSection
               dateLabel={dateLabel}
               raceStartLabel={raceStartLabel}
@@ -536,6 +533,12 @@ function RaceHubPageInner() {
               publicRaceUrl={publicRaceUrl}
               courseTipsUrl={courseTipsUrl}
             />
+            {showPostRaceResultCard ? (
+              <RaceHubMyResultSection
+                myRaceResult={myRaceResult}
+                onOpenLogSheet={() => setLogSheetOpen(true)}
+              />
+            ) : null}
             <RaceHubShakeoutsSection
               shakeouts={shakeouts}
               onSetShakeoutRunRsvp={setShakeoutRunRsvp}

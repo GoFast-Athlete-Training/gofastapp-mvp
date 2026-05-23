@@ -8,16 +8,22 @@ import api from "@/lib/api";
 import {
   Calendar,
   MapPin,
-  Users,
   Flag,
   ChevronLeft,
   ChevronDown,
   ChevronUp,
   Zap,
   Trash2,
+  MessageCircle,
+  ExternalLink,
+  Route,
 } from "lucide-react";
-import { formatRaceListDate } from "@/lib/races-display";
+import { formatRaceListDate, daysUntilRace } from "@/lib/races-display";
 import { RacePlanSection } from "@/components/races/RacePlanSection";
+import {
+  getPublicCoursePageUrl,
+  getPublicRacePageUrl,
+} from "@/lib/public-race-url";
 
 type ResolvedRace = {
   id: string;
@@ -30,6 +36,11 @@ type ResolvedRace = {
   distanceLabel: string | null;
   distanceMeters: number | null;
   registrationUrl: string | null;
+};
+
+type RaceExtras = {
+  courseSlug: string | null;
+  courseMapUrl: string | null;
 };
 
 type Signup = {
@@ -67,6 +78,17 @@ type TrainingPlanRow = {
   athleteGoalId: string | null;
 };
 
+type ChatterPreviewMessage = {
+  id: string;
+  content: string;
+  createdAt: string;
+  athlete: {
+    firstName: string | null;
+    lastName: string | null;
+    gofastHandle: string | null;
+  };
+};
+
 function formatSecPerMile(sec: number | null | undefined): string {
   if (sec == null || !Number.isFinite(sec) || sec <= 0) return "—";
   const m = Math.floor(sec / 60);
@@ -88,12 +110,45 @@ function formatSessionWhen(iso: string): string {
   }
 }
 
+function countdownChipLabel(iso: string): string {
+  const d = daysUntilRace(iso);
+  if (d < 0) return "Past race";
+  if (d === 0) return "Race day!";
+  if (d === 1) return "1 day to go";
+  if (d <= 14) return `${d} days to go`;
+  const w = Math.ceil(d / 7);
+  return `${w} week${w === 1 ? "" : "s"} to go`;
+}
+
+function displayName(a: ChatterPreviewMessage["athlete"]): string {
+  const handle = a.gofastHandle?.trim();
+  if (handle) return `@${handle}`;
+  const name = [a.firstName, a.lastName].filter(Boolean).join(" ").trim();
+  return name || "Runner";
+}
+
+function normalizePreviewMessage(raw: Record<string, unknown>): ChatterPreviewMessage | null {
+  const a = (raw.Athlete ?? raw.athlete) as ChatterPreviewMessage["athlete"] | undefined;
+  if (!raw.id || typeof raw.content !== "string" || !a) return null;
+  return {
+    id: String(raw.id),
+    content: raw.content,
+    createdAt: String(raw.createdAt),
+    athlete: {
+      firstName: a.firstName ?? null,
+      lastName: a.lastName ?? null,
+      gofastHandle: a.gofastHandle ?? null,
+    },
+  };
+}
+
 export default function MyRacePage() {
   const params = useParams();
   const router = useRouter();
   const slug = typeof params.slug === "string" ? params.slug : "";
 
   const [race, setRace] = useState<ResolvedRace | null>(null);
+  const [raceExtras, setRaceExtras] = useState<RaceExtras | null>(null);
   const [resolveError, setResolveError] = useState<string | null>(null);
   const [loadingRace, setLoadingRace] = useState(true);
   const [signup, setSignup] = useState<Signup | null>(null);
@@ -107,6 +162,9 @@ export default function MyRacePage() {
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
   const [removingGoal, setRemovingGoal] = useState(false);
   const [removeGoalError, setRemoveGoalError] = useState<string | null>(null);
+  const [chatterPreview, setChatterPreview] = useState<ChatterPreviewMessage[] | null>(null);
+  const [chatterBlocked, setChatterBlocked] = useState(false);
+  const [hubMemberCount, setHubMemberCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!slug.trim()) {
@@ -145,51 +203,109 @@ export default function MyRacePage() {
     };
   }, [slug]);
 
-  const loadSignupAndGoal = useCallback(async (raceRegistryId: string) => {
-    setLoadingUser(true);
+  const loadRaceExtras = useCallback(async (raceRegistryId: string) => {
     try {
-      const [suRes, gRes, plansRes, upcomingRes] = await Promise.all([
-        api.get<{ signups: Signup[] }>("/race-signups"),
-        api.get<{ goals: GoalRow[] }>("/goals?status=ACTIVE").catch(() => ({ data: { goals: [] as const } })),
-        api.get<{ plans?: TrainingPlanRow[] }>("/training-plan?status=active").catch(() => ({ data: { plans: [] } })),
-        api.get<{ sessions?: UpcomingSession[]; activePlanSummary?: ActivePlanSummary | null }>(
-          "/training/upcoming?limit=1"
-        ).catch(() => ({ data: { sessions: [], activePlanSummary: null } })),
-      ]);
-      const su = (suRes.data.signups ?? []).find((s) => s.raceRegistryId === raceRegistryId) ?? null;
-      setSignup(su);
-      const goals = gRes.data.goals ?? [];
-      const g =
-        goals.find(
-          (x) =>
-            x.raceRegistryId === raceRegistryId ||
-            x.race_registry?.id === raceRegistryId
-        ) ?? null;
-      setGoal(g);
-
-      const plans = plansRes.data.plans ?? [];
-      const planForGoal = g?.id
-        ? plans.find((p) => p.athleteGoalId === g.id) ?? null
-        : null;
-
-      const summary = upcomingRes.data.activePlanSummary ?? null;
-      const sessions = upcomingRes.data.sessions ?? [];
-      if (planForGoal && summary) {
-        setActivePlanSummary(summary);
-        setNextSession(sessions[0] ?? null);
-      } else {
-        setActivePlanSummary(null);
-        setNextSession(null);
-      }
+      const { data } = await api.get<{
+        race?: {
+          courseSlug?: string | null;
+          courseMapUrl?: string | null;
+        };
+      }>(`/race-registry/${encodeURIComponent(raceRegistryId)}`);
+      const r = data.race;
+      setRaceExtras({
+        courseSlug: r?.courseSlug ?? null,
+        courseMapUrl: r?.courseMapUrl ?? null,
+      });
     } catch {
-      setSignup(null);
-      setGoal(null);
-      setActivePlanSummary(null);
-      setNextSession(null);
-    } finally {
-      setLoadingUser(false);
+      setRaceExtras(null);
     }
   }, []);
+
+  const loadChatterPreview = useCallback(async (raceRegistryId: string) => {
+    setChatterPreview(null);
+    setChatterBlocked(false);
+    setHubMemberCount(null);
+    try {
+      const msgRes = await api.get(`/race-hub/${encodeURIComponent(raceRegistryId)}/messages`);
+      const rawList = msgRes.data?.messages;
+      if (Array.isArray(rawList)) {
+        const normalized = rawList
+          .map((m: Record<string, unknown>) => normalizePreviewMessage(m))
+          .filter((m): m is ChatterPreviewMessage => m != null);
+        setChatterPreview(normalized.slice(-3).reverse());
+      } else {
+        setChatterPreview([]);
+      }
+    } catch {
+      setChatterBlocked(true);
+      setChatterPreview([]);
+      try {
+        const membersRes = await api.get(
+          `/race-hub/${encodeURIComponent(raceRegistryId)}/members`
+        );
+        const list = membersRes.data?.memberships;
+        if (Array.isArray(list)) {
+          setHubMemberCount(list.length);
+        }
+      } catch {
+        /* teaser without count */
+      }
+    }
+  }, []);
+
+  const loadSignupAndGoal = useCallback(
+    async (raceRegistryId: string) => {
+      setLoadingUser(true);
+      try {
+        const [suRes, gRes, plansRes, upcomingRes] = await Promise.all([
+          api.get<{ signups: Signup[] }>("/race-signups"),
+          api.get<{ goals: GoalRow[] }>("/goals?status=ACTIVE").catch(() => ({ data: { goals: [] as const } })),
+          api
+            .get<{ plans?: TrainingPlanRow[] }>("/training-plan?status=active")
+            .catch(() => ({ data: { plans: [] } })),
+          api
+            .get<{ sessions?: UpcomingSession[]; activePlanSummary?: ActivePlanSummary | null }>(
+              "/training/upcoming?limit=1"
+            )
+            .catch(() => ({ data: { sessions: [], activePlanSummary: null } })),
+        ]);
+        const su = (suRes.data.signups ?? []).find((s) => s.raceRegistryId === raceRegistryId) ?? null;
+        setSignup(su);
+        const goals = gRes.data.goals ?? [];
+        const g =
+          goals.find(
+            (x) => x.raceRegistryId === raceRegistryId || x.race_registry?.id === raceRegistryId
+          ) ?? null;
+        setGoal(g);
+
+        const plans = plansRes.data.plans ?? [];
+        const planForGoal = g?.id ? plans.find((p) => p.athleteGoalId === g.id) ?? null : null;
+
+        const summary = upcomingRes.data.activePlanSummary ?? null;
+        const sessions = upcomingRes.data.sessions ?? [];
+        if (planForGoal && summary) {
+          setActivePlanSummary(summary);
+          setNextSession(sessions[0] ?? null);
+        } else {
+          setActivePlanSummary(null);
+          setNextSession(null);
+        }
+
+        if (su) {
+          void loadRaceExtras(raceRegistryId);
+          void loadChatterPreview(raceRegistryId);
+        }
+      } catch {
+        setSignup(null);
+        setGoal(null);
+        setActivePlanSummary(null);
+        setNextSession(null);
+      } finally {
+        setLoadingUser(false);
+      }
+    },
+    [loadRaceExtras, loadChatterPreview]
+  );
 
   useEffect(() => {
     const rid = race?.id;
@@ -256,15 +372,19 @@ export default function MyRacePage() {
 
   const locationText = [race.city, race.state].filter(Boolean).join(", ") || null;
   const isGoalRace = Boolean(
-    goal &&
-      (goal.raceRegistryId === race.id || goal.race_registry?.id === race.id)
+    goal && (goal.raceRegistryId === race.id || goal.race_registry?.id === race.id)
   );
   const hasSignup = Boolean(signup);
   const goalTimeDisplay = goal?.goalTime?.trim() || null;
   const goalPaceDisplay = formatSecPerMile(goal?.goalRacePace);
+  const courseTipsUrl = getPublicCoursePageUrl(raceExtras?.courseSlug);
+  const publicRaceUrl = getPublicRacePageUrl(race.slug);
+  const hasCourseSection = Boolean(
+    courseTipsUrl || raceExtras?.courseMapUrl || race.registrationUrl || publicRaceUrl
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <Link
         href="/races"
         className="inline-flex items-center gap-1 text-sm font-medium text-orange-600 hover:underline"
@@ -273,15 +393,20 @@ export default function MyRacePage() {
         My Races
       </Link>
 
-      <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start gap-3">
         {race.logoUrl ? (
-          <div className="w-16 h-16 rounded-xl border border-gray-200 overflow-hidden bg-white shrink-0">
+          <div className="w-14 h-14 rounded-xl border border-gray-200 overflow-hidden bg-white shrink-0">
             <img src={race.logoUrl} alt="" className="w-full h-full object-contain" />
           </div>
         ) : null}
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-gray-900">{race.name}</h1>
-          <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-600">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{race.name}</h1>
+            <span className="inline-flex items-center rounded-full bg-orange-100 text-orange-900 px-2.5 py-0.5 text-xs font-bold tabular-nums">
+              {countdownChipLabel(race.raceDate)}
+            </span>
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-3 text-sm text-gray-600">
             <span className="flex items-center gap-1">
               <Calendar className="w-4 h-4 shrink-0" />
               {formatRaceListDate(race.raceDate)}
@@ -294,7 +419,7 @@ export default function MyRacePage() {
             ) : null}
           </div>
           {race.distanceLabel?.trim() ? (
-            <p className="text-sm text-gray-700 mt-2">{race.distanceLabel}</p>
+            <p className="text-sm text-gray-700 mt-1">{race.distanceLabel}</p>
           ) : null}
         </div>
       </div>
@@ -313,11 +438,150 @@ export default function MyRacePage() {
         </div>
       ) : (
         <>
+          {isGoalRace ? (
+            <section className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white p-5 shadow-sm">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-900 flex items-center gap-2">
+                <Zap className="w-4 h-4" />
+                Training
+              </h2>
+              {activePlanSummary?.hasSchedule &&
+              activePlanSummary.weekNumber != null &&
+              activePlanSummary.totalWeeks != null ? (
+                <>
+                  <p className="mt-2 text-base font-semibold text-gray-900">{activePlanSummary.name}</p>
+                  <span className="mt-2 inline-flex items-center rounded-full bg-emerald-100 text-emerald-900 px-3 py-1 text-xs font-bold">
+                    Week {activePlanSummary.weekNumber} of {activePlanSummary.totalWeeks}
+                  </span>
+                  {nextSession ? (
+                    <div className="mt-3 rounded-lg border border-emerald-100 bg-white/80 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase text-gray-500">Next session</p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900">{nextSession.title}</p>
+                      <p className="text-xs text-gray-600 mt-0.5">{formatSessionWhen(nextSession.date)}</p>
+                    </div>
+                  ) : null}
+                  <Link
+                    href="/training"
+                    className="mt-4 inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                  >
+                    View full plan →
+                  </Link>
+                </>
+              ) : goalTimeDisplay ? (
+                <>
+                  <p className="mt-2 text-sm text-gray-800">
+                    You have a <span className="font-bold tabular-nums">{goalTimeDisplay}</span> goal —
+                    build the plan to get race-ready.
+                  </p>
+                  <Link
+                    href={`/training-setup?goalId=${encodeURIComponent(goal!.id)}`}
+                    className="mt-4 inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
+                  >
+                    Build a training plan →
+                  </Link>
+                </>
+              ) : (
+                <p className="mt-2 text-sm text-gray-600">
+                  Set a goal time below, then start a training plan.
+                </p>
+              )}
+            </section>
+          ) : null}
+
+          <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-gray-800 flex items-center gap-2">
+              <MessageCircle className="w-4 h-4 text-orange-600" />
+              Race chatter
+            </h2>
+            {chatterPreview === null ? (
+              <p className="mt-2 text-sm text-gray-500">Loading conversation…</p>
+            ) : chatterBlocked ? (
+              <p className="mt-2 text-sm text-gray-600">
+                {hubMemberCount != null && hubMemberCount > 0
+                  ? `${hubMemberCount} runner${hubMemberCount === 1 ? "" : "s"} in the hub — join the conversation.`
+                  : "See who else is running and swap tips in the race hub."}
+              </p>
+            ) : chatterPreview.length === 0 ? (
+              <p className="mt-2 text-sm text-gray-600">No messages yet — be the first to say hello.</p>
+            ) : (
+              <ul className="mt-3 space-y-2.5">
+                {chatterPreview.map((m) => (
+                  <li key={m.id} className="rounded-lg bg-gray-50 px-3 py-2.5 text-sm">
+                    <p className="font-semibold text-gray-900 text-xs">{displayName(m.athlete)}</p>
+                    <p className="text-gray-700 mt-0.5 line-clamp-2">{m.content}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Link
+              href={`/race-hub/${race.id}`}
+              className="mt-4 inline-flex items-center justify-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+            >
+              Join the conversation →
+            </Link>
+          </section>
+
+          {hasCourseSection ? (
+            <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-gray-800 flex items-center gap-2">
+                <Route className="w-4 h-4 text-orange-600" />
+                Know the course
+              </h2>
+              {raceExtras?.courseMapUrl ? (
+                <a
+                  href={raceExtras.courseMapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 block rounded-lg border border-gray-200 overflow-hidden bg-gray-50"
+                >
+                  <img
+                    src={raceExtras.courseMapUrl}
+                    alt="Course map"
+                    className="w-full max-h-40 object-contain"
+                  />
+                </a>
+              ) : null}
+              <div className="mt-3 flex flex-wrap gap-2">
+                {courseTipsUrl ? (
+                  <a
+                    href={courseTipsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    Course tips
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                ) : null}
+                {publicRaceUrl ? (
+                  <a
+                    href={publicRaceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    Full race info
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                ) : null}
+                {race.registrationUrl ? (
+                  <a
+                    href={race.registrationUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    Register
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+
           {!isGoalRace ? (
             <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <p className="text-sm text-gray-700 mb-3">
-                This race is on your calendar. Make it your goal race to set a target time and build a
-                training plan around it.
+                Make this your goal race to set a target time and build a training plan around it.
               </p>
               <button
                 type="button"
@@ -328,166 +592,86 @@ export default function MyRacePage() {
                 <Flag className="w-4 h-4" />
                 {makingGoal ? "Setting…" : "Make this my goal race"}
               </button>
-              {makeGoalError ? (
-                <p className="mt-2 text-xs text-red-600">{makeGoalError}</p>
-              ) : null}
+              {makeGoalError ? <p className="mt-2 text-xs text-red-600">{makeGoalError}</p> : null}
             </section>
           ) : (
-            <>
-              {/* Widget 1 — My Goal */}
-              <section className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white shadow-sm overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setGoalExpanded((v) => !v)}
-                  className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-orange-50/50 transition-colors"
-                >
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold uppercase tracking-wide text-orange-800">My goal</p>
-                    {goalTimeDisplay ? (
-                      <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                        <span className="text-xl font-bold text-gray-900 tabular-nums">{goalTimeDisplay}</span>
-                        {goalPaceDisplay !== "—" ? (
-                          <span className="text-sm text-gray-600">avg {goalPaceDisplay}</span>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <p className="mt-1 text-sm text-gray-700">Set your finish goal time</p>
-                    )}
-                  </div>
-                  {goalExpanded ? (
-                    <ChevronUp className="w-5 h-5 text-orange-600 shrink-0" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-orange-600 shrink-0" />
-                  )}
-                </button>
-                {goalExpanded ? (
-                  <div className="px-5 pb-5 border-t border-orange-100">
-                    <RacePlanSection race={race} goal={goal} onGoalSaved={setGoal} />
-                  </div>
-                ) : null}
-              </section>
-
-              {/* Widget 2 — My Training Plan */}
-              <section className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white p-5 shadow-sm">
-                <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-900 flex items-center gap-2">
-                  <Zap className="w-4 h-4" />
-                  My training plan
-                </h2>
-                {activePlanSummary?.hasSchedule &&
-                activePlanSummary.weekNumber != null &&
-                activePlanSummary.totalWeeks != null ? (
-                  <>
-                    <p className="mt-2 text-base font-semibold text-gray-900">
-                      {activePlanSummary.name}
-                    </p>
-                    <span className="mt-2 inline-flex items-center rounded-full bg-emerald-100 text-emerald-900 px-3 py-1 text-xs font-bold">
-                      Week {activePlanSummary.weekNumber} of {activePlanSummary.totalWeeks}
-                    </span>
-                    {nextSession ? (
-                      <div className="mt-3 rounded-lg border border-emerald-100 bg-white/80 px-4 py-3">
-                        <p className="text-xs font-semibold uppercase text-gray-500">Next session</p>
-                        <p className="mt-1 text-sm font-semibold text-gray-900">{nextSession.title}</p>
-                        <p className="text-xs text-gray-600 mt-0.5">{formatSessionWhen(nextSession.date)}</p>
-                      </div>
-                    ) : null}
-                    <Link
-                      href="/training"
-                      className="mt-4 inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-                    >
-                      View full plan →
-                    </Link>
-                  </>
-                ) : goalTimeDisplay ? (
-                  <>
-                    <p className="mt-2 text-sm text-gray-700">
-                      You have a goal time — build a plan to get race-ready.
-                    </p>
-                    <Link
-                      href={`/training-setup?goalId=${encodeURIComponent(goal!.id)}`}
-                      className="mt-4 inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
-                    >
-                      Build a training plan
-                    </Link>
-                  </>
-                ) : (
-                  <p className="mt-2 text-sm text-gray-600">
-                    Set a goal time above, then start a training plan.
-                  </p>
-                )}
-              </section>
-
-              {/* Widget 3 — Remove as goal race */}
-              <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                {!removeConfirmOpen ? (
-                  <button
-                    type="button"
-                    onClick={() => setRemoveConfirmOpen(true)}
-                    className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-red-700"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Remove as goal race
-                  </button>
-                ) : (
-                  <div>
-                    <p className="text-sm text-gray-800">
-                      Are you sure? This will archive your goal for this race.
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void handleRemoveGoal()}
-                        disabled={removingGoal}
-                        className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-                      >
-                        {removingGoal ? "Removing…" : "Yes, remove goal"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRemoveConfirmOpen(false);
-                          setRemoveGoalError(null);
-                        }}
-                        disabled={removingGoal}
-                        className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                      >
-                        Cancel
-                      </button>
+            <section className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white shadow-sm overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setGoalExpanded((v) => !v)}
+                className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-orange-50/50 transition-colors"
+              >
+                <div className="min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-wide text-orange-800">My goal</p>
+                  {goalTimeDisplay ? (
+                    <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                      <span className="text-xl font-bold text-gray-900 tabular-nums">{goalTimeDisplay}</span>
+                      {goalPaceDisplay !== "—" ? (
+                        <span className="text-sm text-gray-600">avg {goalPaceDisplay}</span>
+                      ) : null}
                     </div>
-                    {removeGoalError ? (
-                      <p className="mt-2 text-xs text-red-600">{removeGoalError}</p>
-                    ) : null}
-                  </div>
+                  ) : (
+                    <p className="mt-1 text-sm text-gray-700">Set your finish goal time</p>
+                  )}
+                </div>
+                {goalExpanded ? (
+                  <ChevronUp className="w-5 h-5 text-orange-600 shrink-0" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-orange-600 shrink-0" />
                 )}
-              </section>
-            </>
+              </button>
+              {goalExpanded ? (
+                <div className="px-5 pb-5 border-t border-orange-100">
+                  <RacePlanSection race={race} goal={goal} onGoalSaved={setGoal} />
+                </div>
+              ) : null}
+            </section>
           )}
 
-          {/* Widget 4 — Others racing this race */}
-          <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2">
-              <Users className="w-5 h-5 text-orange-600" />
-              Others racing this race
-            </h2>
-            <p className="text-sm text-gray-600 mb-4">
-              See who else is running, join the chatter, and find shakeout runs.
-            </p>
-            <Link
-              href={`/race-hub/${race.id}`}
-              className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
-            >
-              Join others racing this →
-            </Link>
-            {race.registrationUrl ? (
-              <a
-                href={race.registrationUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-3 text-sm font-medium text-orange-600 hover:underline"
-              >
-                Official registration
-              </a>
-            ) : null}
-          </section>
+          {isGoalRace ? (
+            <div className="pt-2 border-t border-gray-100">
+              {!removeConfirmOpen ? (
+                <button
+                  type="button"
+                  onClick={() => setRemoveConfirmOpen(true)}
+                  className="inline-flex items-center gap-2 text-xs font-medium text-gray-400 hover:text-red-700"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Remove as goal race
+                </button>
+              ) : (
+                <div className="rounded-lg border border-gray-100 bg-gray-50/80 px-4 py-3">
+                  <p className="text-sm text-gray-700">
+                    Archive your goal for this race?
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleRemoveGoal()}
+                      disabled={removingGoal}
+                      className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                    >
+                      {removingGoal ? "Removing…" : "Yes, remove"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRemoveConfirmOpen(false);
+                        setRemoveGoalError(null);
+                      }}
+                      disabled={removingGoal}
+                      className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-white"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {removeGoalError ? (
+                    <p className="mt-2 text-xs text-red-600">{removeGoalError}</p>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          ) : null}
         </>
       )}
     </div>

@@ -11,6 +11,7 @@ import {
   daysUntilRace,
   formatRaceListDate,
 } from "@/lib/races-display";
+import DiscoverRacesSection from "@/components/races/DiscoverRacesSection";
 type RaceRegistryRow = {
   id: string;
   name: string;
@@ -53,7 +54,7 @@ function personalRaceHref(r: RaceRegistryRow): string {
   return s ? `/myrace/${encodeURIComponent(s)}` : `/race-hub/${r.id}`;
 }
 
-function bigCountdownLabel(iso: string): string {
+function countdownChipLabel(iso: string): string {
   const d = daysUntilRace(iso);
   if (d < 0) return "Past race";
   if (d === 0) return "Race day!";
@@ -61,6 +62,27 @@ function bigCountdownLabel(iso: string): string {
   if (d <= 14) return `${d} days to go`;
   const w = Math.ceil(d / 7);
   return `${w} week${w === 1 ? "" : "s"} to go`;
+}
+
+function heroPrimaryCta(
+  heroGoal: GoalRow | null,
+  activePlanSummary: ActivePlanSummary | null,
+  myRaceHref: string
+): { href: string; label: string } {
+  if (
+    activePlanSummary?.hasSchedule &&
+    activePlanSummary.weekNumber != null &&
+    activePlanSummary.totalWeeks != null
+  ) {
+    return { href: "/training", label: "View training →" };
+  }
+  if (heroGoal?.goalTime?.trim() && heroGoal.id) {
+    return {
+      href: `/training-setup?goalId=${encodeURIComponent(heroGoal.id)}`,
+      label: "Build a plan →",
+    };
+  }
+  return { href: myRaceHref, label: "Set a goal →" };
 }
 
 /** Next 6 calendar months from today, each a compact card with race list. */
@@ -304,6 +326,11 @@ export default function MyRacesPage() {
     goalRaceId && upcomingSignups.some((s) => s.raceRegistryId === goalRaceId)
   );
 
+  const signedRaceIds = useMemo(
+    () => new Set(signups.map((s) => s.raceRegistryId)),
+    [signups]
+  );
+
   async function onRemove(signupId: string) {
     setRemovingSignupId(signupId);
     try {
@@ -403,10 +430,10 @@ export default function MyRacesPage() {
           ) : null}
 
           {heroSignup ? (
-            <section className="rounded-3xl border-2 border-orange-200 bg-gradient-to-br from-orange-50 via-white to-amber-50/50 p-6 sm:p-8 shadow-sm">
-              <div className="flex flex-col lg:flex-row lg:items-start gap-6">
+            <section className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50/80 via-white to-white p-5 sm:p-6 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                 {heroSignup.race_registry.logoUrl ? (
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border border-orange-100 bg-white overflow-hidden shrink-0 shadow-sm">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl border border-orange-100 bg-white overflow-hidden shrink-0 shadow-sm">
                     <img
                       src={heroSignup.race_registry.logoUrl}
                       alt=""
@@ -415,24 +442,26 @@ export default function MyRacesPage() {
                   </div>
                 ) : null}
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold uppercase tracking-[0.15em] text-orange-800 flex items-center gap-2">
-                    <Flag className="w-4 h-4" />
-                    {heroGoal?.goalTime?.trim() ? "Primary race & goal" : "Primary race"}
-                  </p>
-                  <h2 className="mt-2 text-2xl sm:text-3xl font-extrabold text-gray-900 leading-tight">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-orange-800 flex items-center gap-1.5">
+                      <Flag className="w-3.5 h-3.5" />
+                      {heroGoal?.goalTime?.trim() ? "Goal race" : "Up next"}
+                    </p>
+                    <span className="inline-flex items-center rounded-full bg-orange-100 text-orange-900 px-2.5 py-0.5 text-xs font-bold tabular-nums">
+                      {countdownChipLabel(heroSignup.race_registry.raceDate)}
+                    </span>
+                  </div>
+                  <h2 className="mt-1.5 text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
                     {heroSignup.race_registry.name}
                   </h2>
-                  <p className="mt-3 text-3xl sm:text-4xl font-black tabular-nums text-orange-600 tracking-tight">
-                    {bigCountdownLabel(heroSignup.race_registry.raceDate)}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
+                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-gray-600">
                     <span className="inline-flex items-center gap-1">
-                      <Calendar className="w-4 h-4 text-gray-400" />
+                      <Calendar className="w-3.5 h-3.5 text-gray-400" />
                       {formatRaceListDate(heroSignup.race_registry.raceDate)}
                     </span>
                     {heroSignup.race_registry.city || heroSignup.race_registry.state ? (
                       <span className="inline-flex items-center gap-1">
-                        <MapPin className="w-4 h-4 text-gray-400" />
+                        <MapPin className="w-3.5 h-3.5 text-gray-400" />
                         {[heroSignup.race_registry.city, heroSignup.race_registry.state]
                           .filter(Boolean)
                           .join(", ")}
@@ -445,57 +474,51 @@ export default function MyRacesPage() {
                     ) : null}
                   </div>
 
-                  {heroGoal?.goalTime?.trim() ? (
-                    <div className="mt-5">
-                      <span className="inline-flex items-center rounded-full bg-orange-100 text-orange-900 px-3 py-1.5 text-sm font-bold tabular-nums">
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {heroGoal?.goalTime?.trim() ? (
+                      <span className="inline-flex items-center rounded-full bg-orange-100 text-orange-900 px-2.5 py-1 text-xs font-bold tabular-nums">
                         Goal {heroGoal.goalTime.trim()}
                       </span>
-                    </div>
-                  ) : null}
-
-                  <div className="mt-5 flex flex-wrap items-center gap-2">
+                    ) : null}
                     {activePlanSummary?.hasSchedule &&
                     activePlanSummary.weekNumber != null &&
                     activePlanSummary.totalWeeks != null ? (
-                      <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-900 px-3 py-1 text-xs font-bold">
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-900 px-2.5 py-1 text-xs font-bold">
                         Week {activePlanSummary.weekNumber} of {activePlanSummary.totalWeeks}
                       </span>
-                    ) : (
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                        <Link
-                          href={
-                            heroGoal?.id && heroGoal.goalTime?.trim()
-                              ? `/training-setup?goalId=${encodeURIComponent(heroGoal.id)}`
-                              : "/training-setup"
-                          }
-                          className="inline-flex items-center rounded-full bg-gray-900 text-white px-3 py-1.5 text-xs font-bold hover:bg-gray-800 w-fit"
-                        >
-                          {heroGoal?.goalTime?.trim()
-                            ? "Start a training plan"
-                            : "Set a goal time above, then start a training plan"}
-                        </Link>
-                        {!heroGoal?.goalTime?.trim() ? (
-                          <span className="text-xs text-gray-500">
-                            Plans work best once you have a target finish time.
-                          </span>
-                        ) : null}
-                      </div>
-                    )}
+                    ) : null}
                   </div>
 
-                  <div className="mt-6 flex flex-wrap gap-3">
-                    <Link
-                      href={personalRaceHref(heroSignup.race_registry)}
-                      className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-5 py-3 text-sm font-bold text-white hover:bg-orange-600 shadow-sm"
-                    >
-                      Get Ready →
-                    </Link>
-                    <Link
-                      href={`/race-hub/${heroSignup.race_registry.id}`}
-                      className="inline-flex items-center justify-center rounded-xl border-2 border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-50"
-                    >
-                      Join Others Racing This →
-                    </Link>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {(() => {
+                      const primary = heroPrimaryCta(
+                        heroGoal,
+                        activePlanSummary,
+                        personalRaceHref(heroSignup.race_registry)
+                      );
+                      return (
+                        <>
+                          <Link
+                            href={primary.href}
+                            className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-orange-600 shadow-sm"
+                          >
+                            {primary.label}
+                          </Link>
+                          <Link
+                            href={`/race-hub/${heroSignup.race_registry.id}`}
+                            className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50"
+                          >
+                            Race hub →
+                          </Link>
+                          <Link
+                            href={personalRaceHref(heroSignup.race_registry)}
+                            className="inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:underline"
+                          >
+                            Race prep
+                          </Link>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -532,6 +555,11 @@ export default function MyRacesPage() {
               <NextSixMonthsRaceCards upcomingSignups={upcomingSignups} />
             </section>
           ) : null}
+
+          <DiscoverRacesSection
+            signedRaceIds={signedRaceIds}
+            onRaceAdded={() => void loadAll()}
+          />
         </>
       )}
     </div>

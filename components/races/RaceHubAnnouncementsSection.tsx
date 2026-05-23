@@ -34,6 +34,10 @@ export default function RaceHubAnnouncementsSection({
   postingAnnounce,
   compact = false,
 }: RaceHubAnnouncementsSectionProps) {
+  if (announcements.length === 0 && !isAdmin) {
+    return null;
+  }
+
   return (
     <section className="space-y-3">
       {!compact ? (

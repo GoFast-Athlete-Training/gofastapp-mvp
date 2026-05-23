@@ -350,13 +350,12 @@ model race_registry {
   tags                    String[]                  @default([])
   /// When set, matches GoFastCompany races.id (multiple registry rows per race = multiple distances).
   companyRaceId           String?
-  /// TODO(family-tree): self-referential FK — companion distances (5K, 10 Mile…) point to the
-  /// primary/marathon row.  races (Company) = weekend family parent;
-  /// race_registrations (Company) = individual distances = one race_registry row each.
-  /// Add migration + @@index before wiring pushFamilyRegistrationsToMVP in GoFastCompany.
-  // parentRaceId            String?
-  // parentRace              race_registry? @relation("RaceFamily", fields: [parentRaceId], references: [id])
-  // childRaces              race_registry[] @relation("RaceFamily")
+  /// GoFastCompany race_registrations.id — stable upsert key per distance.
+  companyRegistrationId   String?                   @unique
+  /// Companion distances (5K, 10 Mile…) point to the primary/marathon row.
+  parentRaceId            String?
+  parentRace              race_registry?            @relation("RaceFamily", fields: [parentRaceId], references: [id])
+  childRaces              race_registry[]           @relation("RaceFamily")
   /// External image URL for browse cards (editorial asset or CDN).
   logoUrl                 String?
   /// Distance label from registration or pipe-joined snapshot from company sync.
@@ -389,6 +388,8 @@ model race_registry {
   @@index([slug])
   @@index([tags])
   @@index([companyRaceId])
+  @@index([parentRaceId])
+  @@index([companyRegistrationId])
 }
 
 /// Course segments mirrored from GoFastCompany race_course_segments (prodpush).

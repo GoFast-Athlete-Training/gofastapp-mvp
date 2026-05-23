@@ -59,6 +59,7 @@ export async function resolveActiveRaceByCompanyRaceId(companyRaceId: string) {
   let race = await prisma.race_registry.findFirst({
     where: {
       companyRaceId: id,
+      parentRaceId: null,
       isActive: true,
       isCancelled: false,
     },

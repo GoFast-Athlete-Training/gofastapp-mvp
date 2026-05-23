@@ -166,7 +166,7 @@ function readOptionalBoolean(
 /**
  * POST /api/race-registry/update
  * Receives race payload from GoFastCompany (prodpush). Upserts race_registry.
- * Lookup order: slug (per distance) → registryId → companyRaceId+slug → legacy companyRaceId.
+ * Lookup order: companyRegistrationId → slug → registryId → companyRaceId+slug.
  * New rows require `slug`; `companyRaceId` is GoFastCompany races.id (may repeat across distances).
  */
 export async function POST(request: NextRequest) {
@@ -204,6 +204,16 @@ export async function POST(request: NextRequest) {
       registryIdRaw != null && String(registryIdRaw).trim()
         ? String(registryIdRaw).trim()
         : null;
+
+    const companyRegistrationId =
+      racePayload.companyRegistrationId != null &&
+      String(racePayload.companyRegistrationId).trim()
+        ? String(racePayload.companyRegistrationId).trim()
+        : null;
+
+    const parentRaceIdRaw = readOptionalTrimmedString(racePayload, "parentRaceId");
+    const parentRaceId =
+      parentRaceIdRaw === undefined ? undefined : parentRaceIdRaw;
 
     const raceDateRaw = racePayload.raceDate;
     if (raceDateRaw == null || raceDateRaw === "") {
@@ -406,6 +416,10 @@ export async function POST(request: NextRequest) {
         ? { registrationCloseDate }
         : {}),
       ...(registrationFee !== undefined ? { registrationFee } : {}),
+      ...(companyRegistrationId !== null
+        ? { companyRegistrationId }
+        : {}),
+      ...(parentRaceId !== undefined ? { parentRaceId } : {}),
       updatedAt: new Date(),
     };
 
@@ -423,8 +437,13 @@ export async function POST(request: NextRequest) {
       | Awaited<ReturnType<typeof prisma.race_registry.findUnique>>
       | null = null;
 
-    /** MVP1: exact slug, then registry id, then companyRaceId+slug — no broad companyRaceId-only fallback. */
-    if (slugVal) {
+    /** companyRegistrationId → slug → registryId → companyRaceId+slug */
+    if (companyRegistrationId) {
+      target = await prisma.race_registry.findUnique({
+        where: { companyRegistrationId },
+      });
+    }
+    if (!target && slugVal) {
       target = await prisma.race_registry.findUnique({
         where: { slug: slugVal },
       });

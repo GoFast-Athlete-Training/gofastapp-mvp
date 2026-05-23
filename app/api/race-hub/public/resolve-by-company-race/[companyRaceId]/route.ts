@@ -21,6 +21,7 @@ export async function GET(
     const race = await prisma.race_registry.findFirst({
       where: {
         companyRaceId: companyRaceId.trim(),
+        parentRaceId: null,
         isActive: true,
         isCancelled: false,
       },
