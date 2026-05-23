@@ -28,6 +28,8 @@ type CandidateActivity = {
 
 interface Props {
   workoutId: string;
+  /** Planned workout title for inline context */
+  workoutTitle?: string | null;
   onMatched: () => void | Promise<void>;
   /** Compact surface for training day / hub flows */
   compact?: boolean;
@@ -61,14 +63,19 @@ function conflictMessage(conflict: ActivityLinkConflict | null): string | null {
   if (conflict.type === "unrelated_planned_workout") {
     return `Linked to another workout: ${conflict.workoutTitle}. Unlink there first.`;
   }
-  if (conflict.type === "standalone_workout") {
-    return `Will move from standalone run "${conflict.workoutTitle}".`;
-  }
-  return `Will replace link on "${conflict.workoutTitle}".`;
+  return `This activity row is currently matched to "${conflict.workoutTitle}". Confirming will delink that workout and match the same activity here.`;
+}
+
+function isRepairableConflict(conflict: ActivityLinkConflict | null): boolean {
+  return (
+    conflict?.type === "standalone_workout" ||
+    conflict?.type === "sibling_planned_workout"
+  );
 }
 
 export default function WorkoutActivityMatchPanel({
   workoutId,
+  workoutTitle,
   onMatched,
   compact = false,
 }: Props) {
@@ -135,6 +142,7 @@ export default function WorkoutActivityMatchPanel({
 
   const selectedBlocked =
     selectedCandidate?.conflict?.type === "unrelated_planned_workout";
+  const selectedRepairable = isRepairableConflict(selectedCandidate?.conflict ?? null);
 
   const confirmMatch = async () => {
     if (!selectedId || selectedBlocked) return;
@@ -158,7 +166,7 @@ export default function WorkoutActivityMatchPanel({
   const deleteCandidate = async (activityId: string) => {
     if (
       !window.confirm(
-        "Delete this activity from GoFast? This does not delete it from Garmin."
+        "Delete this bad GoFast activity row? This does not delete it from Garmin."
       )
     ) {
       return;
@@ -193,6 +201,7 @@ export default function WorkoutActivityMatchPanel({
     const pace = formatPace(a.paceSecPerMile);
     const dur = formatDuration(a.duration);
     const conflictNote = conflictMessage(a.conflict);
+    const repairableConflict = isRepairableConflict(a.conflict);
 
     return (
       <div
@@ -241,21 +250,27 @@ export default function WorkoutActivityMatchPanel({
             </p>
           ) : null}
         </button>
-        <div className="border-t border-gray-100 px-3 py-1.5 flex justify-end">
-          <button
-            type="button"
-            disabled={deletingId === a.id}
-            onClick={() => void deleteCandidate(a.id)}
-            className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-red-700 disabled:opacity-50"
-          >
-            {deletingId === a.id ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Trash2 className="h-3 w-3" />
-            )}
-            Delete from GoFast
-          </button>
-        </div>
+        {repairableConflict ? (
+          <div className="border-t border-sky-100 bg-sky-50/50 px-3 py-1.5 text-xs font-medium text-sky-800">
+            Delink happens on the old workout link. This Garmin activity row stays in GoFast.
+          </div>
+        ) : a.conflict == null ? (
+          <div className="border-t border-gray-100 px-3 py-1.5 flex justify-end">
+            <button
+              type="button"
+              disabled={deletingId === a.id}
+              onClick={() => void deleteCandidate(a.id)}
+              className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-red-700 disabled:opacity-50"
+            >
+              {deletingId === a.id ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Trash2 className="h-3 w-3" />
+              )}
+              Delete bad GoFast row
+            </button>
+          </div>
+        ) : null}
       </div>
     );
   };
@@ -285,17 +300,22 @@ export default function WorkoutActivityMatchPanel({
         compact ? "mb-4" : "mb-6"
       }`}
     >
-      <div className="px-4 pt-4 pb-3 border-b border-gray-100 flex items-center gap-2">
-        <Watch className="h-4 w-4 text-gray-400" />
-        <h2 className="font-semibold text-gray-900 text-sm">
-          {compact ? "Match your Garmin run" : "Match your Garmin run"}
-        </h2>
+      <div className="px-4 pt-4 pb-3 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <Watch className="h-4 w-4 text-gray-400" />
+          <h2 className="font-semibold text-gray-900 text-sm">Match your Garmin run</h2>
+        </div>
+        {workoutTitle?.trim() ? (
+          <p className="mt-1 text-xs text-gray-600 line-clamp-2">
+            For planned workout: <span className="font-medium text-gray-800">{workoutTitle.trim()}</span>
+          </p>
+        ) : null}
       </div>
       <div className="p-4 space-y-4">
         <p className="text-xs text-gray-600 leading-relaxed">
           {compact && suggested
-            ? "We found a Garmin run near this workout. Use this activity?"
-            : "We found activities near this workout's date. Pick the run you completed and confirm to log results and analysis."}
+            ? "Pick the Garmin activity you completed for this planned workout."
+            : "Pick the Garmin activity you completed. We'll match it to this planned workout."}
         </p>
 
         {candidates.length === 0 ? (
@@ -356,6 +376,8 @@ export default function WorkoutActivityMatchPanel({
               )}
               {saving
                 ? "Matching…"
+                : selectedRepairable
+                  ? "Delink and match this activity"
                 : compact
                   ? "Use this Garmin activity"
                   : "Yes, match this activity"}

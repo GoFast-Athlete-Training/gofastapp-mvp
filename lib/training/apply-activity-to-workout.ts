@@ -227,7 +227,45 @@ export type ActivityForWorkoutApply = {
   calories: number | null;
   steps: number | null;
   summaryData: unknown;
+  detailData?: unknown;
 };
+
+/** Clear lap rows and segment-level actuals for a workout (derived match state only). */
+export async function clearWorkoutDerivedActuals(workoutId: string): Promise<void> {
+  await prisma.workout_segment_laps.deleteMany({
+    where: { segment: { workoutId } },
+  });
+  await prisma.workout_segments.updateMany({
+    where: { workoutId },
+    data: {
+      actualPaceSecPerMile: null,
+      actualDistanceMiles: null,
+      actualDurationSeconds: null,
+      updatedAt: new Date(),
+    },
+  });
+}
+
+async function syncActivityDetailToLinkedWorkout(activityId: string): Promise<void> {
+  const activity = await prisma.athlete_activities.findUnique({
+    where: { id: activityId },
+    select: { id: true, detailData: true },
+  });
+  if (!activity?.detailData || typeof activity.detailData !== "object") return;
+
+  await prisma.workouts.updateMany({
+    where: { matchedActivityId: activity.id },
+    data: { completedActivityDetailJson: activity.detailData as object },
+  });
+
+  try {
+    const parsed = parseDetailData(activity.detailData);
+    const derived = convertLapsToDerived(parsed.laps, parsed.samples);
+    await writeLapsToWorkout(activity.id, derived);
+  } catch (lapErr) {
+    console.warn("lap pipeline after activity match:", lapErr);
+  }
+}
 
 /**
  * Link activity to workout, compute actuals, apply credits, mark activity MATCHED.
@@ -287,6 +325,11 @@ export async function applyActivityToWorkout(params: {
     paceDeltaSecPerMile,
   });
 
+  const detailBlob =
+    activity.detailData != null && typeof activity.detailData === "object"
+      ? (activity.detailData as object)
+      : undefined;
+
   await prisma.workouts.update({
     where: { id: workout.id },
     data: {
@@ -295,6 +338,7 @@ export async function applyActivityToWorkout(params: {
         summaryBlob != null && typeof summaryBlob === "object"
           ? (summaryBlob as object)
           : undefined,
+      completedActivityDetailJson: detailBlob,
       actualDistanceMeters: distanceMeters,
       actualAvgPaceSecPerMile: paceSecPerMile,
       actualAverageHeartRate: activity.averageHeartRate,
@@ -391,6 +435,10 @@ export async function applyActivityToWorkout(params: {
     }
   }
 
+  if (detailBlob) {
+    await syncActivityDetailToLinkedWorkout(activity.id);
+  }
+
   return { workoutId: workout.id };
 }
 
@@ -410,11 +458,14 @@ export async function clearActivityFromWorkout(params: {
 
   const previousActivityId = workout.matchedActivityId;
 
+  await clearWorkoutDerivedActuals(workout.id);
+
   await prisma.workouts.update({
     where: { id: workout.id },
     data: {
       matchedActivityId: null,
       completedActivitySummaryJson: Prisma.DbNull,
+      completedActivityDetailJson: Prisma.DbNull,
       actualDistanceMeters: null,
       actualAvgPaceSecPerMile: null,
       actualAverageHeartRate: null,
@@ -502,27 +553,6 @@ export function classifyActivityLinkConflict(params: {
   return "unrelated_planned_workout";
 }
 
-async function syncActivityDetailToLinkedWorkout(activityId: string): Promise<void> {
-  const activity = await prisma.athlete_activities.findUnique({
-    where: { id: activityId },
-    select: { id: true, detailData: true },
-  });
-  if (!activity?.detailData || typeof activity.detailData !== "object") return;
-
-  await prisma.workouts.updateMany({
-    where: { matchedActivityId: activity.id },
-    data: { completedActivityDetailJson: activity.detailData as object },
-  });
-
-  try {
-    const parsed = parseDetailData(activity.detailData);
-    const derived = convertLapsToDerived(parsed.laps, parsed.samples);
-    await writeLapsToWorkout(activity.id, derived);
-  } catch (lapErr) {
-    console.warn("lap pipeline after activity reassign:", lapErr);
-  }
-}
-
 /**
  * Move an activity link from a ghost/sibling workout to the target planned workout.
  * Keeps the raw athlete_activities row; clears or deletes the old owning workout when safe.
@@ -606,7 +636,6 @@ export async function reassignActivityToWorkout(params: {
   }
 
   const { workoutId } = await applyActivityToWorkout({ workout: targetWorkout, activity });
-  await syncActivityDetailToLinkedWorkout(activity.id);
 
   return {
     success: true,

@@ -781,13 +781,26 @@ export default function TrainingHubPage() {
                             : ""}
                         </p>
                         <div className="mt-5 flex flex-wrap items-center gap-3">
+                          {focusPlanDay.workoutId && !focusPlanDay.matchedActivityId ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                document
+                                  .getElementById("match-garmin-panel")
+                                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                              }}
+                              className="inline-flex justify-center rounded-xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-700"
+                            >
+                              I did this workout
+                            </button>
+                          ) : null}
                           <button
                             type="button"
-                            onClick={() => void handleOpenSession(focusPlanDay.dateKey)}
+                            onClick={() => handleOpenSession(focusPlanDay.dateKey)}
                             disabled={pushingGarmin}
-                            className="inline-flex justify-center rounded-xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+                            className="inline-flex justify-center rounded-xl border-2 border-orange-300 bg-white px-6 py-3 text-sm font-semibold text-orange-900 hover:bg-orange-50 disabled:opacity-50"
                           >
-                            {focusIsToday && pushingGarmin ? "Sending…" : "Open session"}
+                            Open session
                           </button>
                           {focusIsToday ? (
                             <button
@@ -819,6 +832,7 @@ export default function TrainingHubPage() {
                           <div className="mt-4">
                             <WorkoutActivityMatchPanel
                               workoutId={focusPlanDay.workoutId}
+                              workoutTitle={displayWorkoutListTitle(focusPlanDay)}
                               compact
                               onMatched={loadHub}
                             />

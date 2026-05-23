@@ -187,6 +187,7 @@ export default function TrainingPlanDayPreviewPage() {
     officialFinishTime: string | null;
   } | null>(null);
   const [logRaceOpen, setLogRaceOpen] = useState(false);
+  const [matchedActivityId, setMatchedActivityId] = useState<string | null>(null);
 
   const previewBackPath = useMemo(() => {
     const qs = searchParams.toString();
@@ -223,6 +224,7 @@ export default function TrainingPlanDayPreviewPage() {
     setWorkoutDetailError(null);
     setOpenWorkoutError(null);
     setGarminPushMessage(null);
+    setMatchedActivityId(null);
     try {
       const u = auth.currentUser;
       if (!u) throw new Error("Sign in required");
@@ -263,6 +265,9 @@ export default function TrainingPlanDayPreviewPage() {
           const { workout: rawW } = await fetchTrainingWorkoutDetail(wid, token);
           raceDayPayload = pickWorkoutPayload(rawW);
           setWorkout(raceDayPayload);
+          const rawRecord = rawW as Record<string, unknown>;
+          const mid = rawRecord.matchedActivityId;
+          setMatchedActivityId(typeof mid === "string" && mid.trim() ? mid.trim() : null);
           setWorkoutDetailError(null);
         } catch (e) {
           setWorkout(null);
@@ -351,6 +356,15 @@ export default function TrainingPlanDayPreviewPage() {
       )
     : dateKey ?? "";
   const canOpenWorkout = workoutId != null;
+  const showInlineMatcher =
+    workoutId != null && !workoutLoading && !workoutError && matchedActivityId == null;
+
+  function scrollToMatchPanel() {
+    document.getElementById("match-garmin-panel")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
 
   async function pushWorkoutIdToGarmin(wid: string, token: string, showSuccess: boolean) {
     const res = await fetch(`/api/workouts/${encodeURIComponent(wid)}/push-to-garmin`, {
@@ -585,9 +599,10 @@ export default function TrainingPlanDayPreviewPage() {
                 </div>
               ) : null}
 
-              {workoutId && !workoutLoading && !workoutError ? (
+              {showInlineMatcher && workoutId ? (
                 <WorkoutActivityMatchPanel
                   workoutId={workoutId}
+                  workoutTitle={title}
                   compact
                   onMatched={load}
                 />
@@ -595,6 +610,15 @@ export default function TrainingPlanDayPreviewPage() {
             </div>
 
             <div className="border-t border-gray-100 px-5 py-4 space-y-3 bg-gray-50/60">
+              {showInlineMatcher ? (
+                <button
+                  type="button"
+                  onClick={scrollToMatchPanel}
+                  className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700"
+                >
+                  I did this workout
+                </button>
+              ) : null}
               {isToday ? (
                 <button
                   type="button"
@@ -613,14 +637,10 @@ export default function TrainingPlanDayPreviewPage() {
               >
                 {openingWorkout ? "Opening…" : "Open workout details"}
               </button>
-              {workoutId && !workoutLoading && !workoutError ? (
+              {showInlineMatcher ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    document
-                      .getElementById("match-garmin-panel")
-                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }}
+                  onClick={scrollToMatchPanel}
                   className="w-full rounded-xl border border-sky-200 bg-white py-3 text-sm font-semibold text-sky-800 hover:bg-sky-50"
                 >
                   Match Garmin activity

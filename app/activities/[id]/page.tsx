@@ -121,7 +121,7 @@ export default function ActivityDetailPage() {
   async function handleDeleteActivity() {
     if (
       !window.confirm(
-        "Delete this activity from GoFast? This does not delete it from Garmin."
+        "Delete this bad GoFast activity row? This does not delete it from Garmin."
       )
     ) {
       return;
@@ -425,7 +425,7 @@ export default function ActivityDetailPage() {
                 <div className="rounded-xl border border-red-100 bg-red-50/40 p-5">
                   <h2 className="text-sm font-semibold text-red-900">Remove from GoFast</h2>
                   <p className="mt-1 text-sm text-red-800/90">
-                    Delete this activity from GoFast? This does not delete it from Garmin.
+                    Delete this bad GoFast activity row? This does not delete it from Garmin.
                   </p>
                   <button
                     type="button"
@@ -433,7 +433,7 @@ export default function ActivityDetailPage() {
                     onClick={() => void handleDeleteActivity()}
                     className="mt-3 inline-flex rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
                   >
-                    {deleting ? "Deleting…" : "Delete activity"}
+                    {deleting ? "Deleting…" : "Delete bad GoFast row"}
                   </button>
                 </div>
               </>
