@@ -36,3 +36,7 @@ export async function assertStaffBearerAuth(
     );
   }
 }
+
+export function getForwardedStaffId(request: NextRequest): string | null {
+  return request.headers.get(STAFF_ID_HEADER)?.trim() || null;
+}

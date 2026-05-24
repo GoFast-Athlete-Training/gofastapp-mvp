@@ -1,11 +1,9 @@
 export const dynamic = "force-dynamic";
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import {
-  requireInternalRaceHubSecret,
-  resolveActiveRaceByCompanyRaceId,
-} from "@/lib/race-hub-internal-company";
+import { resolveActiveRaceByCompanyRaceId } from "@/lib/race-hub-internal-company";
+import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 
 const athleteInclude = {
   Athlete: {
@@ -13,15 +11,15 @@ const athleteInclude = {
   },
 } as const;
 
-/** PUT — staff editorial update (no author check) */
+/** PUT — staff editorial update (Firebase auth via Company proxy) */
 export async function PUT(
-  request: Request,
+  request: NextRequest,
   {
     params,
   }: { params: Promise<{ companyRaceId: string; announcementId: string }> }
 ) {
   try {
-    const unauthorized = requireInternalRaceHubSecret(request);
+    const unauthorized = await assertStaffBearerAuth(request);
     if (unauthorized) return unauthorized;
 
     const { companyRaceId, announcementId } = await params;

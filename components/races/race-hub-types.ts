@@ -33,7 +33,9 @@ export type AnnouncementRow = {
   title: string;
   content: string;
   createdAt: string;
-  Athlete: { firstName: string | null; lastName: string | null };
+  authorId?: string | null;
+  staffGeneratedId?: string | null;
+  Athlete: { firstName: string | null; lastName: string | null } | null;
 };
 
 export type RaceEventRow = {

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { RunWorkflowStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireInternalRaceHubSecret } from "@/lib/race-hub-internal-company";
 
 export const dynamic = "force-dynamic";
 
@@ -11,15 +10,11 @@ export const dynamic = "force-dynamic";
  * Used by GoFastCompany commissions API when run data lives in this app (proxied setup).
  * Credit = workflowStatus SUBMITTED or APPROVED. Counts all such runs (no run-club filter).
  *
- * Auth: GOFAST_INTERNAL_RACE_HUB_SECRET via Bearer or x-gofast-internal-secret header.
- *
  * Query: staffIds (optional) — comma-separated list of company_staff ids to restrict to.
  * Response: { runCreditsByStaffId: { [staffId]: number } }
  */
 export async function GET(request: NextRequest) {
   try {
-    const authError = requireInternalRaceHubSecret(request);
-    if (authError) return authError;
     const { searchParams } = new URL(request.url);
     const staffIdsParam = searchParams.get("staffIds");
     const staffIds =

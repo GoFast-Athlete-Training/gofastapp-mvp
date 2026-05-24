@@ -1,12 +1,12 @@
 export const dynamic = "force-dynamic";
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { resolveActiveRaceByCompanyRaceId } from "@/lib/race-hub-internal-company";
 import {
-  requireInternalRaceHubSecret,
-  requireStaffAuthorEnv,
-  resolveActiveRaceByCompanyRaceId,
-} from "@/lib/race-hub-internal-company";
+  assertStaffBearerAuth,
+  getForwardedStaffId,
+} from "@/lib/training/training-engine-auth";
 
 const athleteInclude = {
   Athlete: {
@@ -14,13 +14,13 @@ const athleteInclude = {
   },
 } as const;
 
-/** GET — list announcements (same shape as member GET) */
+/** GET — list announcements (staff Firebase auth via Company proxy) */
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ companyRaceId: string }> }
 ) {
   try {
-    const unauthorized = requireInternalRaceHubSecret(request);
+    const unauthorized = await assertStaffBearerAuth(request);
     if (unauthorized) return unauthorized;
 
     const { companyRaceId } = await params;
@@ -46,16 +46,19 @@ export async function GET(
   }
 }
 
-/** POST — create as staff sentinel author */
+/** POST — create as authenticated staff author */
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ companyRaceId: string }> }
 ) {
   try {
-    const unauthorized = requireInternalRaceHubSecret(request);
+    const unauthorized = await assertStaffBearerAuth(request);
     if (unauthorized) return unauthorized;
-    const noAuthor = requireStaffAuthorEnv();
-    if (noAuthor) return noAuthor;
+
+    const staffGeneratedId = getForwardedStaffId(request);
+    if (!staffGeneratedId) {
+      return NextResponse.json({ error: "Missing staff id" }, { status: 401 });
+    }
 
     const { companyRaceId } = await params;
     if (!companyRaceId?.trim()) {
@@ -65,15 +68,6 @@ export async function POST(
     const race = await resolveActiveRaceByCompanyRaceId(companyRaceId);
     if (!race) {
       return NextResponse.json({ error: "Race not found" }, { status: 404 });
-    }
-
-    const authorId = process.env.RACE_HUB_STAFF_AUTHOR_ATHLETE_ID!.trim();
-    const athlete = await prisma.athlete.findUnique({ where: { id: authorId } });
-    if (!athlete) {
-      return NextResponse.json(
-        { error: "Staff author athlete not found in database" },
-        { status: 503 }
-      );
     }
 
     const body = await request.json().catch(() => ({}));
@@ -86,7 +80,7 @@ export async function POST(
     const announcement = await prisma.race_announcements.create({
       data: {
         raceId: race.id,
-        authorId,
+        staffGeneratedId,
         title,
         content,
       },
