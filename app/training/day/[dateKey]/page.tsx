@@ -24,6 +24,9 @@ import {
   formatSegmentDuration,
   groupSegmentsForDisplay,
   formatGroupedSegmentDuration,
+  formatBetweenRepeatsRecoveryLabel,
+  displayGroupTitle,
+  isMultiStepRepeatGroup,
   type SegmentDisplayGroup,
 } from "@/lib/training/segment-summary";
 import {
@@ -169,6 +172,8 @@ function previewGroupedSegmentTargetSummary(
 function previewGroupedRecoveryDistanceLine(
   group: SegmentDisplayGroup<PreviewWorkout["segments"][number]>
 ): string | null {
+  const between = formatBetweenRepeatsRecoveryLabel(group);
+  if (between) return between.replace(/^Between repeats: /, "");
   if (!group.recovery) return null;
   return formatSegmentDuration({
     stepOrder: group.recovery.stepOrder,
@@ -670,7 +675,7 @@ export default function TrainingPlanDayPreviewPage() {
               )}
               {!isLogged && !workoutLoading && workout && workout.segments.length > 0 && (
                 <div>
-                  {workout.segments.length > 1 ? (
+                  {groupSegmentsForDisplay(workout.segments).length > 1 ? (
                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500 mb-2">
                       {"Today's plan"}
                     </p>
@@ -678,6 +683,7 @@ export default function TrainingPlanDayPreviewPage() {
                   <ul className="space-y-1.5 list-none pl-0 m-0">
                     {groupSegmentsForDisplay(workout.segments).map((group, index) => {
                       const segment = group.work;
+                      const multiStepRepeat = isMultiStepRepeatGroup(group);
                       const paceLine = previewGroupedSegmentTargetSummary(group);
                       const distanceLine = formatGroupedSegmentDuration(group);
                       const recoveryLine = previewGroupedRecoveryDistanceLine(group);
@@ -688,26 +694,45 @@ export default function TrainingPlanDayPreviewPage() {
                           className="overflow-hidden rounded-lg border border-gray-100"
                         >
                           <div
-                            className={`px-3 py-1 text-xs font-semibold uppercase tracking-wide ${segmentHeaderClass(segment.title)}`}
+                            className={`px-3 py-1 text-xs font-semibold uppercase tracking-wide ${multiStepRepeat ? "bg-orange-500 text-white" : segmentHeaderClass(segment.title)}`}
                           >
-                            {segment.title}
+                            {displayGroupTitle(group)}
                           </div>
                           <div className="flex items-center gap-2.5 bg-white px-3 py-2">
                             <span className="w-4 shrink-0 text-sm font-bold tabular-nums text-gray-400">
                               {index + 1}
                             </span>
                             <div className="min-w-0 flex-1">
-                              <span className="text-sm font-semibold text-gray-900">
-                                {distanceLine}
-                              </span>
-                              {paceLine ? (
-                                <span className="ml-1.5 text-xs tabular-nums text-gray-500">
-                                  {paceLine}
-                                </span>
-                              ) : null}
+                              {multiStepRepeat && group.cycleSteps ? (
+                                <ul className="space-y-1 list-none pl-0 m-0">
+                                  {group.cycleSteps.map((step) => (
+                                    <li key={step.id} className="text-sm font-semibold text-gray-900">
+                                      {formatSegmentDuration(step)}
+                                      {previewSegmentTargetSummary(step) ? (
+                                        <span className="ml-1.5 text-xs tabular-nums text-gray-500">
+                                          {previewSegmentTargetSummary(step)}
+                                        </span>
+                                      ) : null}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <>
+                                  <span className="text-sm font-semibold text-gray-900">
+                                    {distanceLine}
+                                  </span>
+                                  {paceLine ? (
+                                    <span className="ml-1.5 text-xs tabular-nums text-gray-500">
+                                      {paceLine}
+                                    </span>
+                                  ) : null}
+                                </>
+                              )}
                               {recoveryLine ? (
                                 <p className="mt-0.5 text-xs text-gray-500">
-                                  Between reps: {recoveryLine}
+                                  {formatBetweenRepeatsRecoveryLabel(group)
+                                    ? recoveryLine
+                                    : `Between reps: ${recoveryLine}`}
                                 </p>
                               ) : null}
                             </div>

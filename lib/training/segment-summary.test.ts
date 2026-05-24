@@ -2,11 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   expandSegmentsForGarminPush,
+  formatBetweenRepeatsRecoveryLabel,
   formatGroupedSegmentDuration,
+  formatRepeatBlockLabel,
   formatSegmentDistance,
   formatStructuredMilesTotal,
   groupSegmentsInDisplayOrder,
+  isMultiStepRepeatGroup,
   milesToDisplayMeters,
+  segmentsMatchForRepeat,
 } from "./segment-summary";
 
 const M400 = 400 / 1609.34;
@@ -15,17 +19,21 @@ function seg(
   stepOrder: number,
   title: string,
   durationValue: number,
-  extra: { repeatCount?: number } = {}
+  extra: { repeatCount?: number; targets?: unknown; durationType?: "DISTANCE" | "TIME" } = {}
 ) {
   return {
     id: `seg-${stepOrder}`,
     stepOrder,
     title,
-    durationType: "DISTANCE" as const,
+    durationType: extra.durationType ?? ("DISTANCE" as const),
     durationValue,
     repeatCount: extra.repeatCount ?? null,
+    targets: extra.targets,
   };
 }
+
+const paceA = [{ type: "PACE", valueLow: 415, valueHigh: 447 }];
+const paceB = [{ type: "PACE", valueLow: 380, valueHigh: 412 }];
 
 test("collapses flat interval + recovery pairs into one group with flatRepeatCount", () => {
   const segments = [
@@ -43,6 +51,56 @@ test("collapses flat interval + recovery pairs into one group with flatRepeatCou
   assert.equal(groups[1]!.flatRepeatCount, 3);
   assert.equal(groups[1]!.recovery?.title, "Recovery");
   assert.match(formatGroupedSegmentDuration(groups[1]!), /× 3$/);
+});
+
+test("collapses multi-step tempo block with rest between repeats", () => {
+  const segments = [
+    seg(1, "Warmup", 1.5),
+    seg(2, "Tempo", 1, { targets: paceA }),
+    seg(3, "Tempo", 1, { targets: paceB }),
+    seg(4, "Recovery", 2, { durationType: "TIME" }),
+    seg(5, "Tempo", 1, { targets: paceA }),
+    seg(6, "Tempo", 1, { targets: paceB }),
+    seg(7, "Cooldown", 1.5),
+  ];
+  const groups = groupSegmentsInDisplayOrder(segments);
+  assert.equal(groups.length, 3);
+  assert.equal(groups[0]!.work.title, "Warmup");
+  assert.equal(groups[1]!.flatRepeatCount, 2);
+  assert.equal(groups[1]!.cycleSteps?.length, 2);
+  assert.equal(groups[1]!.betweenRepeatsRecovery?.title, "Recovery");
+  assert.equal(formatRepeatBlockLabel(groups[1]!), "Repeat 2×");
+  assert.equal(formatBetweenRepeatsRecoveryLabel(groups[1]!), "Between repeats: 2 min");
+  assert.equal(groups[2]!.work.title, "Cooldown");
+});
+
+test("collapses Runna-style multi-step repeat with trailing rest", () => {
+  const segments = [
+    seg(1, "Warm-Up", 1),
+    seg(2, "Tempo", 0.5, { targets: paceA }),
+    seg(3, "Tempo", 0.5, { targets: paceB }),
+    seg(4, "Tempo", 0.5, { targets: paceA }),
+    seg(5, "Tempo", 0.5, { targets: paceB }),
+    seg(6, "Tempo", 0.5, { targets: paceA }),
+    seg(7, "Tempo", 0.5, { targets: paceB }),
+    seg(8, "Rest", 1.5, { durationType: "TIME" }),
+    seg(9, "Cool-down", 0.5),
+  ];
+  const groups = groupSegmentsInDisplayOrder(segments);
+  assert.equal(groups.length, 4);
+  assert.equal(isMultiStepRepeatGroup(groups[1]!), true);
+  assert.equal(groups[1]!.flatRepeatCount, 3);
+  assert.equal(groups[1]!.cycleSteps?.length, 2);
+  assert.equal(groups[2]!.work.title, "Rest");
+  assert.equal(groups[3]!.work.title, "Cool-down");
+});
+
+test("does not collapse same-distance steps with different pace targets", () => {
+  const a = seg(1, "Tempo", 1, { targets: paceA });
+  const b = seg(2, "Tempo", 1, { targets: paceB });
+  assert.equal(segmentsMatchForRepeat(a, b), false);
+  const groups = groupSegmentsInDisplayOrder([a, b]);
+  assert.equal(groups.length, 2);
 });
 
 test("preserves stored repeatCount on work rows", () => {

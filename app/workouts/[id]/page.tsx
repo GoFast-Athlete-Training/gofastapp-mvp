@@ -56,6 +56,10 @@ import {
   formatGroupedSegmentDuration,
   milesToDisplayMeters,
   SEGMENT_METERS_PER_MILE,
+  isMultiStepRepeatGroup,
+  formatRepeatBlockLabel,
+  formatBetweenRepeatsRecoveryLabel,
+  displayGroupTitle,
 } from "@/lib/training/segment-summary";
 import {
   displayWorkoutListTitle,
@@ -1339,6 +1343,25 @@ export default function WorkoutDetailPage() {
         return;
       }
       const editable: EditableSegment[] = segmentDisplayGroups.flatMap((group) => {
+        if (isMultiStepRepeatGroup(group) && group.cycleSteps) {
+          const reps =
+            segmentOverrides[group.work.id]?.repeatCount ?? effectiveRepeatCount(group);
+          const rows: EditableSegment[] = [];
+          for (let r = 0; r < reps; r++) {
+            for (const step of group.cycleSteps) {
+              const merged = mergedQuickEditable(step, segmentOverrides[step.id]);
+              rows.push({ ...merged, repeatCount: "" });
+            }
+            if (r < reps - 1 && group.betweenRepeatsRecovery) {
+              const mergedRec = mergedQuickEditable(
+                group.betweenRepeatsRecovery,
+                segmentOverrides[group.betweenRepeatsRecovery.id]
+              );
+              rows.push({ ...mergedRec, repeatCount: "" });
+            }
+          }
+          return rows;
+        }
         const reps =
           segmentOverrides[group.work.id]?.repeatCount ?? effectiveRepeatCount(group);
         const mergedWork = mergedQuickEditable(group.work, {
@@ -2305,10 +2328,25 @@ export default function WorkoutDetailPage() {
                       <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                         Step {index + 1}
                       </span>
-                      <p className="font-medium text-gray-900">{group.work.title}</p>
-                      <p className="text-gray-600 tabular-nums">
-                        {formatGroupedSegmentDuration(group)}
-                      </p>
+                      <p className="font-medium text-gray-900">{displayGroupTitle(group)}</p>
+                      {isMultiStepRepeatGroup(group) && group.cycleSteps ? (
+                        <ul className="mt-1 space-y-1 list-none pl-0 m-0">
+                          {group.cycleSteps.map((step) => (
+                            <li key={step.id} className="text-sm text-gray-600 tabular-nums">
+                              {step.title}: {formatSegmentDuration(step)}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-gray-600 tabular-nums">
+                          {formatGroupedSegmentDuration(group)}
+                        </p>
+                      )}
+                      {formatBetweenRepeatsRecoveryLabel(group) ? (
+                        <p className="text-sm text-gray-500 mt-1">
+                          {formatBetweenRepeatsRecoveryLabel(group)}
+                        </p>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -2977,19 +3015,22 @@ export default function WorkoutDetailPage() {
               {segmentDisplayGroups.map((group, pairIdx) => {
                 const segment = group.work;
                 const recoverySeg = group.recovery;
+                const multiStepRepeat = isMultiStepRepeatGroup(group);
                 const displayListFlat = segmentDisplayGroups.flatMap((g) =>
                   g.recovery ? [g.work, g.recovery] : [g.work]
                 );
                 const structIdx = displayListFlat.findIndex((s) => s.id === segment.id);
-                const structBadge = segmentStructureBadge(
-                  segment.title,
-                  structIdx < 0 ? pairIdx : structIdx,
-                  displayListFlat.length
-                );
+                const structBadge = multiStepRepeat
+                  ? "Repeat block"
+                  : segmentStructureBadge(
+                      segment.title,
+                      structIdx < 0 ? pairIdx : structIdx,
+                      displayListFlat.length
+                    );
                 const o = segmentOverrides[segment.id];
                 const effRepeat =
                   o?.repeatCount ?? effectiveRepeatCount(group);
-                const showRepeatStepper = !isLogged && effRepeat >= 2;
+                const showRepeatStepper = !isLogged && effRepeat >= 2 && !multiStepRepeat;
                 const { low: baseLow, high: baseHigh } = getPaceSecsFromSegment(segment);
                 const qStr = quickPaceDisplayStrings(segment, o);
                 const hasPaceTarget = baseLow != null || baseHigh != null;
@@ -3000,7 +3041,7 @@ export default function WorkoutDetailPage() {
                 return (
                   <div
                     key={`${segment.id}:${recoverySeg?.id ?? ""}`}
-                    className={`border border-gray-200 border-l-4 ${segmentAccentBorderClass(segment.title)} rounded-lg p-4 sm:p-5 bg-gray-50`}
+                    className={`border border-gray-200 border-l-4 ${multiStepRepeat ? "border-orange-500" : segmentAccentBorderClass(segment.title)} rounded-lg p-4 sm:p-5 bg-gray-50`}
                   >
                     <div className="mb-4">
                       <div className="flex flex-wrap items-start gap-2">
@@ -3027,7 +3068,7 @@ export default function WorkoutDetailPage() {
                           </div>
                         )}
                         <h3 className="font-semibold text-gray-900 text-lg flex flex-wrap items-center gap-2 min-w-0">
-                          <span>{segment.title}</span>
+                          <span>{displayGroupTitle(group)}</span>
                           {structBadge ? (
                             <span className="inline-flex items-center rounded-full bg-white border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-700">
                               {structBadge}
@@ -3071,6 +3112,22 @@ export default function WorkoutDetailPage() {
                           </p>
                         )}
                     </div>
+
+                    {multiStepRepeat && group.cycleSteps ? (
+                      <ul className="mb-4 space-y-2 list-none pl-0 m-0">
+                        {group.cycleSteps.map((step) => (
+                          <li
+                            key={step.id}
+                            className="rounded-lg border border-orange-100 bg-white px-3 py-2"
+                          >
+                            <p className="text-sm font-semibold text-gray-900">{step.title}</p>
+                            <p className="text-sm text-gray-600 tabular-nums">
+                              {formatSegmentDuration(step)}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
 
                     {!isLogged &&
                       !isEditing &&
@@ -3169,10 +3226,17 @@ export default function WorkoutDetailPage() {
                           </dd>
                         ) : (
                           <dd className="text-base text-gray-900 font-medium">
-                            {formatGroupedSegmentDuration(group)}
+                            {multiStepRepeat
+                              ? formatRepeatBlockLabel(group)
+                              : formatGroupedSegmentDuration(group)}
                           </dd>
                         )}
-                        {inlineRecoveryBetweenRepsLabel(segment) && (
+                        {formatBetweenRepeatsRecoveryLabel(group) ? (
+                          <p className="text-sm text-gray-600 mt-2">
+                            {formatBetweenRepeatsRecoveryLabel(group)}
+                          </p>
+                        ) : null}
+                        {!multiStepRepeat && inlineRecoveryBetweenRepsLabel(segment) && (
                           <p className="text-sm text-gray-600 mt-2">
                             <span className="font-medium text-gray-700">Between repeats: </span>
                             {inlineRecoveryBetweenRepsLabel(segment)}

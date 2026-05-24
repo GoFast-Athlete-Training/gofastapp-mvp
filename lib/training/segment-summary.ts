@@ -8,6 +8,7 @@ export type SegmentLike = {
   durationValue: number;
   repeatCount?: number | null;
   title?: string;
+  targets?: unknown;
 };
 
 /** Miles → meters (matches Garmin conversion in lib/garmin-workouts/types). */
@@ -66,6 +67,10 @@ export type SegmentDisplayGroup<T extends SegmentLike = SegmentLike> = {
   recovery?: T;
   /** Repeats when flat per-rep DB rows were collapsed for display (not stored on work row). */
   flatRepeatCount?: number;
+  /** Full work cycle for multi-step blockRepeat materialization (e.g. tempo A + tempo B). */
+  cycleSteps?: T[];
+  /** Recovery shown once between repetitions of the cycle. */
+  betweenRepeatsRecovery?: T;
 };
 
 /** Miles → meters for editable inputs; snaps to 50m track reps like formatSegmentDistance. */
@@ -82,6 +87,35 @@ export function milesToDisplayMeters(miles: number): number {
   return Math.round(meters);
 }
 
+function normalizeTargetsForRepeatMatch(targets: unknown): string {
+  if (targets == null) return "";
+  if (!Array.isArray(targets)) return JSON.stringify(targets);
+  const parts = targets
+    .map((t) => {
+      if (!t || typeof t !== "object") return String(t);
+      const o = t as Record<string, unknown>;
+      const type = String(o.type ?? "").toUpperCase();
+      if (type === "PACE") {
+        const vl = Number(o.valueLow ?? o.value);
+        const vh = Number(o.valueHigh ?? o.value ?? o.valueLow);
+        if (Number.isFinite(vl) && Number.isFinite(vh)) {
+          return `PACE:${Math.min(vl, vh)}:${Math.max(vl, vh)}`;
+        }
+        if (Number.isFinite(vl)) return `PACE:${vl}:${vl}`;
+      }
+      if (type === "HEART_RATE" || type === "HEARTRATE") {
+        const vl = Number(o.valueLow);
+        const vh = Number(o.valueHigh);
+        if (Number.isFinite(vl) && Number.isFinite(vh)) {
+          return `HR:${Math.min(vl, vh)}:${Math.max(vl, vh)}`;
+        }
+      }
+      return JSON.stringify(t);
+    })
+    .sort();
+  return parts.join("|");
+}
+
 export function segmentsMatchForRepeat(a: SegmentLike, b: SegmentLike): boolean {
   const titleA = (a.title ?? "").trim().toLowerCase();
   const titleB = (b.title ?? "").trim().toLowerCase();
@@ -90,7 +124,87 @@ export function segmentsMatchForRepeat(a: SegmentLike, b: SegmentLike): boolean 
   const da = Number(a.durationValue);
   const db = Number(b.durationValue);
   if (!Number.isFinite(da) || !Number.isFinite(db)) return false;
-  return Math.abs(da - db) < 1e-5;
+  if (Math.abs(da - db) >= 1e-5) return false;
+  return normalizeTargetsForRepeatMatch(a.targets) === normalizeTargetsForRepeatMatch(b.targets);
+}
+
+function cyclesMatchForRepeat(a: SegmentLike[], b: SegmentLike[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((seg, i) => segmentsMatchForRepeat(seg, b[i]!));
+}
+
+function isBookendTitle(title: string): boolean {
+  const t = title.toLowerCase();
+  return t.includes("warm") || t.includes("cool");
+}
+
+function tryCollapseMultiStepRepeatCycle<T extends SegmentLike>(
+  segmentsInOrder: T[],
+  start: number
+): {
+  cycleSteps: T[];
+  repeatCount: number;
+  betweenRepeatsRecovery?: T;
+  trailingRecovery?: T;
+  nextIndex: number;
+} | null {
+  const first = segmentsInOrder[start];
+  if (!first || isRecoveryTitle(first.title ?? "") || isBookendTitle(first.title ?? "")) {
+    return null;
+  }
+
+  const remaining = segmentsInOrder.length - start;
+  const maxCycleLen = Math.min(8, Math.floor(remaining / 2));
+  if (maxCycleLen < 1) return null;
+
+  for (let cycleLen = 2; cycleLen <= maxCycleLen; cycleLen++) {
+    const cycle = segmentsInOrder.slice(start, start + cycleLen);
+    if (cycle.some((s) => isRecoveryTitle(s.title ?? ""))) continue;
+
+    let repeatCount = 1;
+    let idx = start + cycleLen;
+    let betweenRepeatsRecovery: T | undefined;
+
+    while (idx < segmentsInOrder.length) {
+      const maybeRecovery = segmentsInOrder[idx];
+      if (maybeRecovery && isRecoveryTitle(maybeRecovery.title ?? "")) {
+        const nextStart = idx + 1;
+        if (nextStart + cycleLen > segmentsInOrder.length) break;
+        const nextCycle = segmentsInOrder.slice(nextStart, nextStart + cycleLen);
+        if (!cyclesMatchForRepeat(cycle, nextCycle)) break;
+        if (!betweenRepeatsRecovery) betweenRepeatsRecovery = maybeRecovery;
+        else if (!segmentsMatchForRepeat(betweenRepeatsRecovery, maybeRecovery)) break;
+        repeatCount++;
+        idx = nextStart + cycleLen;
+        continue;
+      }
+
+      if (idx + cycleLen > segmentsInOrder.length) break;
+      const nextCycle = segmentsInOrder.slice(idx, idx + cycleLen);
+      if (!cyclesMatchForRepeat(cycle, nextCycle)) break;
+      repeatCount++;
+      idx += cycleLen;
+    }
+
+    if (repeatCount < 2) continue;
+
+    let trailingRecovery: T | undefined;
+    const maybeTrailing = segmentsInOrder[idx];
+    if (maybeTrailing && isRecoveryTitle(maybeTrailing.title ?? "")) {
+      trailingRecovery = maybeTrailing;
+      idx++;
+    }
+
+    return {
+      cycleSteps: cycle,
+      repeatCount,
+      betweenRepeatsRecovery,
+      trailingRecovery,
+      nextIndex: idx,
+    };
+  }
+
+  return null;
 }
 
 /** Effective repeat count for a display group (stored repeatCount or collapsed flat reps). */
@@ -175,6 +289,21 @@ export function groupSegmentsInDisplayOrder<T extends SegmentLike>(
       continue;
     }
 
+    const multiStep = tryCollapseMultiStepRepeatCycle(segmentsInOrder, i);
+    if (multiStep) {
+      out.push({
+        work: multiStep.cycleSteps[0]!,
+        flatRepeatCount: multiStep.repeatCount,
+        cycleSteps: multiStep.cycleSteps,
+        betweenRepeatsRecovery: multiStep.betweenRepeatsRecovery,
+      });
+      if (multiStep.trailingRecovery) {
+        out.push({ work: multiStep.trailingRecovery });
+      }
+      i = multiStep.nextIndex;
+      continue;
+    }
+
     const alt = tryCollapseAlternatingWorkRecovery(segmentsInOrder, i);
     if (alt) {
       out.push({ work, recovery: alt.recovery, flatRepeatCount: alt.workCount });
@@ -208,12 +337,39 @@ export function groupSegmentsInDisplayOrder<T extends SegmentLike>(
   return out;
 }
 
+/** True when the group represents a multi-step repeat block (e.g. tempo A + tempo B × N). */
+export function isMultiStepRepeatGroup(group: SegmentDisplayGroup): boolean {
+  const steps = group.cycleSteps;
+  return steps != null && steps.length > 1 && effectiveRepeatCount(group) > 1;
+}
+
+/** Header label for a repeat block card. */
+export function formatRepeatBlockLabel(group: SegmentDisplayGroup): string {
+  return `Repeat ${effectiveRepeatCount(group)}×`;
+}
+
+/** Primary title for a display group row/card. */
+export function displayGroupTitle(group: SegmentDisplayGroup): string {
+  if (isMultiStepRepeatGroup(group)) return formatRepeatBlockLabel(group);
+  return group.work.title?.trim() || "Segment";
+}
+
 /** Human-readable distance/duration for a grouped segment row (includes × N when collapsed). */
 export function formatGroupedSegmentDuration(group: SegmentDisplayGroup): string {
+  if (isMultiStepRepeatGroup(group)) {
+    return formatRepeatBlockLabel(group);
+  }
   const duration = formatSegmentDuration(group.work);
   const reps = effectiveRepeatCount(group);
   if (reps > 1) return `${duration} × ${reps}`;
   return duration;
+}
+
+/** Recovery line for between-repetition rest on a repeat block. */
+export function formatBetweenRepeatsRecoveryLabel(group: SegmentDisplayGroup): string | null {
+  const rec = group.betweenRepeatsRecovery;
+  if (!rec) return null;
+  return `Between repeats: ${formatSegmentDuration(rec)}`;
 }
 
 /**
@@ -229,6 +385,19 @@ export function expandSegmentsForGarminPush<T extends SegmentLike>(
 
   for (const g of groups) {
     const reps = effectiveRepeatCount(g);
+    if (reps > 1 && g.cycleSteps != null && g.cycleSteps.length > 1) {
+      for (let r = 0; r < reps; r++) {
+        for (const step of g.cycleSteps) {
+          out.push({ ...step, stepOrder, repeatCount: 1 });
+          stepOrder++;
+        }
+        if (r < reps - 1 && g.betweenRepeatsRecovery) {
+          out.push({ ...g.betweenRepeatsRecovery, stepOrder, repeatCount: 1 });
+          stepOrder++;
+        }
+      }
+      continue;
+    }
     if (reps > 1) {
       out.push({
         ...g.work,
