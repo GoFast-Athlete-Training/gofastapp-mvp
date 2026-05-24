@@ -228,8 +228,18 @@ export async function POST(request: NextRequest) {
 
     const baseName = name?.trim() || `${runClub.name} ${canonicalDay.charAt(0) + canonicalDay.slice(1).toLowerCase()} Run`;
 
-    // Use provided description, or fall back to run_clubs.allRunsDescription (backwards compatible)
-    const seriesDescription = description?.trim() || runClub.allRunsDescription || null;
+    const descriptionExplicit = Object.prototype.hasOwnProperty.call(body, 'description');
+    let seriesDescription: string | null;
+    if (descriptionExplicit) {
+      seriesDescription =
+        description == null || String(description).trim() === ''
+          ? null
+          : String(description).trim();
+    } else if (!setup) {
+      seriesDescription = description?.trim() || runClub.allRunsDescription || null;
+    } else {
+      seriesDescription = setup.description;
+    }
     const allowedRunTypes = new Set(['track', 'trail', 'neighborhood', 'park']);
     const seriesRunType =
       runType != null && allowedRunTypes.has(String(runType).trim().toLowerCase())
