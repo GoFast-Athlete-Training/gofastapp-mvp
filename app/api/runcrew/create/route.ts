@@ -22,7 +22,9 @@ export async function POST(request: Request) {
       name, 
       handle,
       joinCode,
-      description, 
+      description,
+      icon,
+      logo,
       city,
       state,
       easyMilesPace,
@@ -51,19 +53,39 @@ export async function POST(request: Request) {
       );
     }
 
-    let normalizedJoinCode: string | undefined;
-    if (joinCode != null && String(joinCode).trim() !== '') {
-      normalizedJoinCode = String(joinCode).toLowerCase().trim();
-      const joinCodeRegex = /^[a-z0-9]{3,30}$/;
-      if (!joinCodeRegex.test(normalizedJoinCode)) {
-        return NextResponse.json(
-          {
-            error:
-              'Invite code must be 3–30 characters, letters and numbers only (e.g. running4life)',
-          },
-          { status: 400 }
-        );
-      }
+    if (description == null || String(description).trim() === '') {
+      return NextResponse.json(
+        { error: 'Description is required' },
+        { status: 400 }
+      );
+    }
+
+    const trimmedIcon = icon != null ? String(icon).trim() : '';
+    const trimmedLogo = logo != null ? String(logo).trim() : '';
+    if (!trimmedIcon && !trimmedLogo) {
+      return NextResponse.json(
+        { error: 'Crew graphic is required — choose an emoji or upload a photo' },
+        { status: 400 }
+      );
+    }
+
+    if (joinCode == null || String(joinCode).trim() === '') {
+      return NextResponse.json(
+        { error: 'Invite code is required' },
+        { status: 400 }
+      );
+    }
+
+    const normalizedJoinCode = String(joinCode).toLowerCase().trim();
+    const joinCodeRegex = /^[a-z0-9]{3,30}$/;
+    if (!joinCodeRegex.test(normalizedJoinCode)) {
+      return NextResponse.json(
+        {
+          error:
+            'Invite code must be 3–30 characters, letters and numbers only (e.g. running4life)',
+        },
+        { status: 400 }
+      );
     }
 
     // Validate handle format (letters and numbers only, like Instagram)
@@ -129,7 +151,9 @@ export async function POST(request: Request) {
         name,
         handle: handle ? handle.toLowerCase().trim() : undefined,
         joinCode: normalizedJoinCode,
-        description,
+        description: String(description).trim(),
+        icon: trimmedIcon || null,
+        logo: trimmedLogo || null,
         athleteId: athlete.id,
         city,
         state,
@@ -156,7 +180,12 @@ export async function POST(request: Request) {
       const msg = err?.message || 'Unknown error';
       const isClient =
         typeof msg === 'string' &&
-        (msg.includes('already taken') || msg.includes('Handle'));
+        (msg.includes('already taken') ||
+          msg.includes('Handle') ||
+          msg.includes('required') ||
+          msg.includes('Invite code') ||
+          msg.includes('Description') ||
+          msg.includes('graphic'));
       return NextResponse.json(
         {
           success: false,

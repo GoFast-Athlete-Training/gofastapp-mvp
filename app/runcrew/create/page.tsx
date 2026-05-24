@@ -109,6 +109,7 @@ export default function CreateCrewPage() {
   const [formData, setFormData] = useState({
     name: '',
     handle: '',
+    joinCode: '',
     description: '',
     city: '',
     state: '',
@@ -379,6 +380,28 @@ export default function CreateCrewPage() {
       return;
     }
 
+    if (!formData.joinCode.trim()) {
+      setError('Invite code is required');
+      return;
+    }
+
+    const normalizedJoinCode = formData.joinCode.toLowerCase().trim();
+    const joinCodeRegex = /^[a-z0-9]{3,30}$/;
+    if (!joinCodeRegex.test(normalizedJoinCode)) {
+      setError('Invite code must be 3–30 characters, letters and numbers only (e.g. running4life)');
+      return;
+    }
+
+    if (!formData.description.trim()) {
+      setError('Description is required');
+      return;
+    }
+
+    if (!icon.trim() && !logo.trim()) {
+      setError('Crew graphic is required — choose an emoji or upload a photo');
+      return;
+    }
+
     // Validate handle format (letters and numbers only, like Instagram)
     if (formData.handle.trim()) {
       const handleRegex = /^[a-z0-9]+$/;
@@ -436,7 +459,8 @@ export default function CreateCrewPage() {
       const response = await api.post('/runcrew/create', {
         name: formData.name,
         handle: formData.handle.trim() || undefined,
-        description: formData.description,
+        joinCode: normalizedJoinCode,
+        description: formData.description.trim(),
         logo: logo || null,
         icon: icon || null,
         city: formData.city || undefined,
@@ -588,10 +612,31 @@ export default function CreateCrewPage() {
             />
           </div>
 
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Invite Code <span className="text-red-500">*</span>
+            </label>
+            <p className="text-xs text-gray-500 mb-2">
+              You choose this — members type it to join (e.g. running4life)
+            </p>
+            <input
+              type="text"
+              value={formData.joinCode}
+              onChange={(e) => {
+                const value = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '');
+                setFormData({ ...formData, joinCode: value });
+                setError(null);
+              }}
+              className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
+              disabled={loading}
+              required
+            />
+          </div>
+
           {/* RunCrew Graphic - iPhone style */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-3">
-              RunCrew Graphic
+              RunCrew Graphic <span className="text-red-500">*</span>
             </label>
             
             {/* Current selection preview */}
@@ -689,7 +734,7 @@ export default function CreateCrewPage() {
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Description
+              Description <span className="text-red-500">*</span>
             </label>
             <textarea
               value={formData.description}
@@ -700,6 +745,7 @@ export default function CreateCrewPage() {
               rows={3}
               className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition resize-none"
               disabled={loading}
+              required
             />
           </div>
 

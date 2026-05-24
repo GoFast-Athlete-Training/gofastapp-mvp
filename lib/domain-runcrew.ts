@@ -163,24 +163,6 @@ export async function getCrewPublicMetadataByHandle(handle: string) {
 }
 
 /**
- * Generate a unique join code for backward compatibility
- * Uses crew name initials + random string
- */
-function generateJoinCode(name: string): string {
-  // Get first 3 letters of name, uppercase, remove spaces
-  const initials = name
-    .replace(/[^a-zA-Z0-9]/g, '')
-    .substring(0, 3)
-    .toUpperCase()
-    .padEnd(3, 'X');
-  
-  // Add random 4-digit number
-  const random = Math.floor(1000 + Math.random() * 9000);
-  
-  return `${initials}${random}`.toLowerCase();
-}
-
-/**
  * Generate a handle from crew name
  * Converts to lowercase, removes special chars (letters and numbers only, like Instagram)
  */
@@ -199,11 +181,24 @@ function generateHandle(name: string): string {
   return base;
 }
 
+function normalizeCrewGraphicFields(input: {
+  icon?: string | null;
+  logo?: string | null;
+}): { icon: string | null; logo: string | null } {
+  const icon = input.icon?.trim() || null;
+  const logo = input.logo?.trim() || null;
+  if (logo) return { icon: null, logo };
+  if (icon) return { icon, logo: null };
+  return { icon: null, logo: null };
+}
+
 export async function createCrew(data: {
   name: string;
   handle?: string; // Optional - auto-generated from name if not provided
-  description?: string;
-  joinCode?: string; // Optional - auto-generated if not provided
+  description: string;
+  joinCode: string;
+  icon?: string | null;
+  logo?: string | null;
   athleteId: string;
   city?: string;
   state?: string;
@@ -259,36 +254,31 @@ export async function createCrew(data: {
     }
   }
 
-  let joinCode = data.joinCode?.toLowerCase().trim();
-  if (joinCode) {
-    const existingCode = await prisma.run_crews.findFirst({
-      where: {
-        joinCode: {
-          equals: joinCode,
-          mode: 'insensitive',
-        },
+  const description = data.description?.trim();
+  if (!description) {
+    throw new Error('Description is required');
+  }
+
+  const joinCode = data.joinCode?.toLowerCase().trim();
+  if (!joinCode) {
+    throw new Error('Invite code is required');
+  }
+
+  const { icon, logo } = normalizeCrewGraphicFields(data);
+  if (!icon && !logo) {
+    throw new Error('Crew graphic is required — choose an emoji or upload a photo');
+  }
+
+  const existingCode = await prisma.run_crews.findFirst({
+    where: {
+      joinCode: {
+        equals: joinCode,
+        mode: 'insensitive',
       },
-    });
-    if (existingCode) {
-      throw new Error(`Invite code "${joinCode}" is already taken`);
-    }
-  } else {
-    // Generate unique code - keep trying until we get a unique one
-    let attempts = 0;
-    while (!joinCode && attempts < 10) {
-      const candidate = generateJoinCode(data.name);
-      const existing = await prisma.run_crews.findUnique({
-        where: { joinCode: candidate },
-      });
-      if (!existing) {
-        joinCode = candidate;
-      }
-      attempts++;
-    }
-    // Fallback to random if we can't generate from name
-    if (!joinCode) {
-      joinCode = `CREW${Math.floor(10000 + Math.random() * 90000)}`;
-    }
+    },
+  });
+  if (existingCode) {
+    throw new Error(`Invite code "${joinCode}" is already taken`);
   }
 
   // Generate a simple unique ID (cuid-like format)
@@ -304,8 +294,10 @@ export async function createCrew(data: {
       id: generateId(),
       name: data.name,
       handle,
-      description: data.description,
+      description,
       joinCode,
+      icon,
+      logo,
       city: data.city,
       state: data.state as any, // Prisma will validate enum
       easyMilesPace: data.easyMilesPace,
