@@ -59,7 +59,10 @@ export async function POST(request: NextRequest) {
       runClub: runClubPayload, // Source of truth from Company acq_run_clubs; upsert to run_clubs
       runClubId,
       runClubSlug,
-      /** If set, upsert this prod run_series row by slug (Company ↔ prod brother-sister key; no shared UUID). */
+      /** Company acq_run_series.id — when set, Product run_series uses the same id (Company ID alignment). */
+      seriesId,
+      id: seriesIdAlias,
+      /** If set, upsert this prod run_series row by slug (stable upsert key alongside shared id). */
       seriesSlug,
       dayOfWeek,
       name,
@@ -169,10 +172,34 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // Prefer explicit series slug (Company prodpush) for stable upserts; else match by day (+ city).
+    // Prefer Company series id, then slug, then day+city match.
     let setup: Awaited<ReturnType<typeof prisma.run_series.findUnique>> | null = null;
+    const seriesIdTrim =
+      seriesId != null
+        ? String(seriesId).trim()
+        : seriesIdAlias != null
+          ? String(seriesIdAlias).trim()
+          : '';
     const seriesSlugTrim = seriesSlug != null ? String(seriesSlug).trim() : '';
-    if (seriesSlugTrim) {
+
+    if (seriesIdTrim) {
+      const byId = await prisma.run_series.findUnique({
+        where: { id: seriesIdTrim },
+      });
+      if (byId) {
+        if (byId.runClubId !== runClub.id) {
+          const conflictRes = NextResponse.json(
+            { success: false, error: 'seriesId already exists for another run club' },
+            { status: 409 }
+          );
+          Object.entries(corsHeaders).forEach(([k, v]) => conflictRes.headers.set(k, v));
+          return conflictRes;
+        }
+        setup = byId;
+      }
+    }
+
+    if (!setup && seriesSlugTrim) {
       const bySlug = await prisma.run_series.findUnique({
         where: { slug: seriesSlugTrim },
       });
@@ -244,7 +271,10 @@ export async function POST(request: NextRequest) {
     if (setup) {
       setup = await prisma.run_series.update({
         where: { id: setup.id },
-        data: setupData,
+        data: {
+          ...setupData,
+          ...(seriesSlugTrim ? { slug: seriesSlugTrim } : {}),
+        },
       });
       // Verify FK was set
       if (!setup.runClubId) {
@@ -257,7 +287,7 @@ export async function POST(request: NextRequest) {
       const slug = await generateUniqueSeriesSlug(prisma, slugifyForSeries(slugHint));
       setup = await prisma.run_series.create({
         data: {
-          id: generateId(),
+          id: seriesIdTrim || generateId(),
           ...setupData,
           slug,
           workflowStatus: 'DEVELOP',
