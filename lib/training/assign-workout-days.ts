@@ -1,6 +1,6 @@
 /**
  * Pass 1: assign workout types to each training day (DOW placement).
- * Miles stay at 0 until long-run and quality/easy passes.
+ * Miles stay at 0 until long-run and tempo/interval/easy passes.
  */
 
 import type { WorkoutType } from "@prisma/client";

@@ -39,8 +39,14 @@ import { stashWorkoutDayNav, TRAINING_HUB_BACK_PATH } from "@/lib/training/worko
 import { workoutDetailPathWithBackHref } from "@/lib/training/workout-nav-query";
 import LogRaceResultSheet from "@/components/races/LogRaceResultSheet";
 import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
+import WorkoutSkipActions from "@/components/training/WorkoutSkipActions";
 import { metersToMiDisplay } from "@/lib/training/workout-preview-payload";
 import { buildRunResultStatus } from "@/lib/training/run-result-status";
+import {
+  deriveSessionStatus,
+  sessionStatusBadgeClass,
+  sessionStatusLabel,
+} from "@/lib/training/session-status";
 
 function formatSecPerMile(sec: number | null | undefined): string | null {
   if (sec == null || !Number.isFinite(sec) || sec <= 0) return null;
@@ -205,6 +211,7 @@ export default function TrainingPlanDayPreviewPage() {
   } | null>(null);
   const [logRaceOpen, setLogRaceOpen] = useState(false);
   const [matchedActivityId, setMatchedActivityId] = useState<string | null>(null);
+  const [skippedAt, setSkippedAt] = useState<string | null>(null);
   const [loggedActualDistanceMeters, setLoggedActualDistanceMeters] = useState<number | null>(
     null
   );
@@ -302,6 +309,8 @@ export default function TrainingPlanDayPreviewPage() {
           const rawRecord = rawW as Record<string, unknown>;
           const mid = rawRecord.matchedActivityId;
           setMatchedActivityId(typeof mid === "string" && mid.trim() ? mid.trim() : null);
+          const skip = rawRecord.skippedAt;
+          setSkippedAt(typeof skip === "string" && skip.trim() ? skip.trim() : null);
           const dist = rawRecord.actualDistanceMeters;
           setLoggedActualDistanceMeters(
             typeof dist === "number" && Number.isFinite(dist) && dist > 0 ? dist : null
@@ -417,6 +426,16 @@ export default function TrainingPlanDayPreviewPage() {
   const showInlineMatcher =
     workoutId != null && !workoutLoading && !workoutError && matchedActivityId == null;
   const isLogged = matchedActivityId != null;
+  const dayStatus =
+    dateKey != null
+      ? deriveSessionStatus({
+          dateKey,
+          matchedActivityId,
+          skippedAt,
+          workoutType: workout?.workoutType,
+          title: workout?.title,
+        })
+      : null;
 
   const loggedRunStatus = buildRunResultStatus({
     plannedDistanceMeters: loggedPlannedDistanceMeters,
@@ -726,12 +745,26 @@ export default function TrainingPlanDayPreviewPage() {
               ) : null}
 
               {!isLogged && showInlineMatcher && workoutId ? (
-                <WorkoutActivityMatchPanel
-                  workoutId={workoutId}
-                  workoutTitle={title}
-                  compact
-                  onMatched={load}
-                />
+                <div id="match-garmin-panel" className="space-y-4">
+                  {dayStatus === "missed" || dayStatus === "skipped" ? (
+                    <WorkoutSkipActions
+                      workoutId={workoutId}
+                      dateKey={dateKey ?? ""}
+                      matchedActivityId={matchedActivityId}
+                      skippedAt={skippedAt}
+                      workoutType={workout?.workoutType}
+                      title={title}
+                      showMissedPrompt={dayStatus === "missed"}
+                      onUpdated={load}
+                    />
+                  ) : null}
+                  <WorkoutActivityMatchPanel
+                    workoutId={workoutId}
+                    workoutTitle={title}
+                    compact
+                    onMatched={load}
+                  />
+                </div>
               ) : null}
             </div>
 

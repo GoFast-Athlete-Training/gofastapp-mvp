@@ -16,6 +16,8 @@ export type PlanDayCard = {
   phase: string;
   estimatedDistanceInMeters: number;
   matchedActivityId: string | null;
+  skippedAt: string | null;
+  skipReason: string | null;
   actualDistanceMeters: number | null;
   actualAvgPaceSecPerMile: number | null;
   actualAverageHeartRate: number | null;
@@ -122,6 +124,8 @@ export async function buildPlanWeekCards(params: {
       estimatedDistanceInMeters:
         row?.estimatedDistanceInMeters ?? s.estimatedDistanceInMeters,
       matchedActivityId: row?.matchedActivityId ?? null,
+      skippedAt: row?.skippedAt?.toISOString() ?? null,
+      skipReason: row?.skipReason ?? null,
       actualDistanceMeters: row?.actualDistanceMeters ?? null,
       actualAvgPaceSecPerMile: row?.actualAvgPaceSecPerMile ?? null,
       actualAverageHeartRate: row?.actualAverageHeartRate ?? null,

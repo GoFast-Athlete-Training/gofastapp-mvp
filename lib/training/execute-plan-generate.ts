@@ -101,18 +101,18 @@ export async function executePlanGenerate(params: {
     rawPreset.tempoConfig?.positions.map(mapPositionRow) ?? [];
   const easyPositions = rawPreset.easyConfig?.positions.map(mapPositionRow) ?? [];
 
-  function qualityRotationInvalid(
+  function structuredRotationInvalid(
     positions: readonly { catalogueWorkoutId: string | null }[]
   ): boolean {
     if (positions.length === 0) return true;
     return !positions.some((p) => p.catalogueWorkoutId?.trim());
   }
-  if (qualityRotationInvalid(intervalsPositions)) {
+  if (structuredRotationInvalid(intervalsPositions)) {
     throw new Error(
       `Training preset "${presetLabel}" has no interval rotation or every slot is missing a catalogue workout. Fix the intervals config in GoFast Company.`
     );
   }
-  if (qualityRotationInvalid(tempoPositions)) {
+  if (structuredRotationInvalid(tempoPositions)) {
     throw new Error(
       `Training preset "${presetLabel}" has no tempo rotation or every slot is missing a catalogue workout. Fix the tempo config in GoFast Company.`
     );

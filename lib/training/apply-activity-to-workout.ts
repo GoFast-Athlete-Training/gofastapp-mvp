@@ -27,7 +27,7 @@ function defaultRepPaceOffsetSecPerMile(workoutType: string): number | null {
 }
 
 /**
- * Which pace credits apply after a successful quality match.
+ * Which pace credits apply after a successful tempo or interval match.
  * Intervals → 5K credit, Tempo → threshold credit.
  */
 export function computeMatchedWorkoutPaceCredits(params: {
@@ -46,13 +46,13 @@ export function computeMatchedWorkoutPaceCredits(params: {
     intervalsCatalogueOffsetSecPerMile,
   } = params;
 
-  const qualityOk =
+  const paceCreditEligible =
     paceSecPerMile != null && paceDeltaSecPerMile != null && paceDeltaSecPerMile >= 0;
 
   let creditedFiveKPaceSecPerMile: number | null = null;
   let creditedThresholdPaceSecPerMile: number | null = null;
 
-  if (workoutType === "Intervals" && qualityOk && paceSecPerMile != null) {
+  if (workoutType === "Intervals" && paceCreditEligible && paceSecPerMile != null) {
     const offset =
       intervalsCatalogueOffsetSecPerMile != null &&
       Number.isFinite(intervalsCatalogueOffsetSecPerMile)
@@ -63,7 +63,7 @@ export function computeMatchedWorkoutPaceCredits(params: {
     }
   }
 
-  if (workoutType === "Tempo" && qualityOk && paceSecPerMile != null) {
+  if (workoutType === "Tempo" && paceCreditEligible && paceSecPerMile != null) {
     creditedThresholdPaceSecPerMile = Math.round(paceSecPerMile);
   }
 
@@ -304,10 +304,10 @@ export async function applyActivityToWorkout(params: {
   let creditedFiveKPaceSecPerMile: number | null = null;
   let creditedThresholdPaceSecPerMile: number | null = null;
 
-  const qualityOk =
+  const paceCreditEligible =
     paceSecPerMile != null && paceDeltaSecPerMile != null && paceDeltaSecPerMile >= 0;
 
-  if (qualityOk) {
+  if (paceCreditEligible) {
     const matched = computeMatchedWorkoutPaceCredits({
       workoutType: workout.workoutType,
       paceSecPerMile,
@@ -334,6 +334,8 @@ export async function applyActivityToWorkout(params: {
     where: { id: workout.id },
     data: {
       matchedActivityId: activity.id,
+      skippedAt: null,
+      skipReason: null,
       completedActivitySummaryJson:
         summaryBlob != null && typeof summaryBlob === "object"
           ? (summaryBlob as object)

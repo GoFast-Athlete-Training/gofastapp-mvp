@@ -8,6 +8,8 @@ import { LocalStorageAPI } from "@/lib/localstorage";
 export const RACE_HUB_DEFAULT_TOPICS = [
   "general",
   "pace-goals",
+  "getting-there",
+  "logistics",
   "social-meetups",
   "tips",
   "ask-the-community",
@@ -16,6 +18,8 @@ export const RACE_HUB_DEFAULT_TOPICS = [
 const TOPIC_LABELS: Record<string, string> = {
   general: "General",
   "pace-goals": "Pace goals",
+  "getting-there": "Getting there",
+  logistics: "Logistics",
   "social-meetups": "Social / meetups",
   tips: "Tips",
   "ask-the-community": "Ask the community",

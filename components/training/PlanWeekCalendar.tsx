@@ -10,6 +10,11 @@ import {
   workoutCardSubtypeLine,
   workoutTypeLeftBorderClass,
 } from "@/lib/training/plan-day-card-display";
+import {
+  deriveSessionStatus,
+  sessionStatusBadgeClass,
+  sessionStatusLabel,
+} from "@/lib/training/session-status";
 import WeekStrip from "@/components/training/WeekStrip";
 
 type Props = {
@@ -145,6 +150,14 @@ export default function PlanWeekCalendar({
           </p>
           {days.map((w) => {
             const selected = w.dateKey === selectedDateKey;
+            const status = deriveSessionStatus({
+              dateKey: w.dateKey,
+              matchedActivityId: w.matchedActivityId,
+              skippedAt: w.skippedAt,
+              workoutType: w.workoutType,
+              title: w.title,
+            });
+            const statusLabel = status === "rest" ? null : sessionStatusLabel(status);
             return (
               <li key={w.dateKey}>
                 <button
@@ -172,9 +185,11 @@ export default function PlanWeekCalendar({
                               })
                             : "—"}
                         </p>
-                        {w.matchedActivityId ? (
-                          <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
-                            Complete
+                        {statusLabel ? (
+                          <span
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${sessionStatusBadgeClass(status)}`}
+                          >
+                            {statusLabel}
                           </span>
                         ) : null}
                       </div>

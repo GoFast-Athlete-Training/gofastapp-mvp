@@ -6,6 +6,11 @@ import {
   formatPaceTargetSingleForDisplay,
   normalizePaceTargetEncodingVersion,
 } from "@/lib/workout-generator/pace-calculator";
+import {
+  deriveSessionStatus,
+  sessionStatusBadgeClass,
+  sessionStatusLabel,
+} from "@/lib/training/session-status";
 
 export type UpcomingWorkoutRow = {
   id: string;
@@ -13,6 +18,8 @@ export type UpcomingWorkoutRow = {
   workoutType: string;
   date: string | null;
   matchedActivityId: string | null;
+  skippedAt?: string | null;
+  skipReason?: string | null;
   paceDeltaSecPerMile?: number | null;
   segments?: {
     stepOrder: number;
@@ -59,11 +66,24 @@ function statusFor(w: UpcomingWorkoutRow): { label: string; className: string } 
     }
     return { label: "Completed", className: "bg-gray-100 text-gray-800" };
   }
-  const d = w.date ? new Date(w.date) : null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (d && d < today) return { label: "Missed", className: "bg-red-50 text-red-800" };
-  return { label: "Upcoming", className: "bg-sky-50 text-sky-900" };
+  const dateKey = w.date ? w.date.slice(0, 10) : "";
+  const status = deriveSessionStatus({
+    dateKey,
+    matchedActivityId: w.matchedActivityId,
+    skippedAt: w.skippedAt,
+    workoutType: w.workoutType,
+    title: w.title,
+  });
+  if (status === "skipped") {
+    return { label: sessionStatusLabel(status), className: sessionStatusBadgeClass(status) };
+  }
+  if (status === "missed") {
+    return { label: sessionStatusLabel(status), className: sessionStatusBadgeClass(status) };
+  }
+  if (status === "today") {
+    return { label: sessionStatusLabel(status), className: sessionStatusBadgeClass(status) };
+  }
+  return { label: sessionStatusLabel(status), className: sessionStatusBadgeClass(status) };
 }
 
 function WorkoutRowItem({ w }: { w: UpcomingWorkoutRow }) {

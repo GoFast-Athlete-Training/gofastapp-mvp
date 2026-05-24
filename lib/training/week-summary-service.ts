@@ -27,7 +27,7 @@ function isDeloadWeek(params: {
   phaseLabel: string;
   totalMiles: number;
   previousWeekTotalMiles?: number | null;
-  qualityCount: number;
+  structuredSessionCount: number;
 }): boolean {
   const phase = params.phaseLabel.toLowerCase();
   if (phase.includes("deload") || phase.includes("recovery") || phase.includes("down")) {
@@ -41,7 +41,25 @@ function isDeloadWeek(params: {
   ) {
     return true;
   }
-  return params.qualityCount === 0 && phase.includes("base") && params.totalMiles > 0;
+  return params.structuredSessionCount === 0 && phase.includes("base") && params.totalMiles > 0;
+}
+
+function structuredSessionChip(tempoCount: number, intervalCount: number): string {
+  const parts: string[] = [];
+  if (tempoCount === 1) parts.push("Tempo");
+  else if (tempoCount > 1) parts.push(`${tempoCount} tempo`);
+  if (intervalCount === 1) parts.push("Intervals");
+  else if (intervalCount > 1) parts.push(`${intervalCount} intervals`);
+  return parts.join(" + ");
+}
+
+function structuredSessionNoun(tempoCount: number, intervalCount: number): string {
+  const total = tempoCount + intervalCount;
+  if (total === 1) {
+    if (tempoCount === 1) return "tempo session";
+    return "interval session";
+  }
+  return `${total} workouts`;
 }
 
 function longRunDayLabel(day: PlanDayCard): string {
@@ -66,16 +84,16 @@ export function buildWeekSummary(params: {
     days.reduce((s, d) => s + (d.estimatedDistanceInMeters ?? 0), 0) / 1609.34;
 
   const longRuns = days.filter((d) => d.workoutType === "LongRun" || d.workoutType === "Race");
-  const quality = days.filter(
-    (d) => d.workoutType === "Tempo" || d.workoutType === "Intervals"
-  );
+  const tempoSessions = days.filter((d) => d.workoutType === "Tempo");
+  const intervalSessions = days.filter((d) => d.workoutType === "Intervals");
+  const structuredSessionCount = tempoSessions.length + intervalSessions.length;
   const easyDays = days.filter((d) => d.workoutType === "Easy");
   const hasRace = days.some((d) => d.workoutType === "Race");
   const deload = isDeloadWeek({
     phaseLabel,
     totalMiles,
     previousWeekTotalMiles: params.previousWeekTotalMiles,
-    qualityCount: quality.length,
+    structuredSessionCount,
   });
 
   let theme = phaseLabel;
@@ -97,12 +115,8 @@ export function buildWeekSummary(params: {
         : `Long run ${formatWeekCardMiles(lr.estimatedDistanceInMeters) || ""}`.trim()
     );
   }
-  if (quality.length > 0) {
-    chips.push(
-      quality.length === 1
-        ? `1 quality (${quality[0]!.workoutType === "Tempo" ? "tempo" : "intervals"})`
-        : `${quality.length} quality sessions`
-    );
+  if (structuredSessionCount > 0) {
+    chips.push(structuredSessionChip(tempoSessions.length, intervalSessions.length));
   }
   if (easyDays.length > 0) {
     chips.push(`${easyDays.length} easy ${easyDays.length === 1 ? "day" : "days"}`);
@@ -119,12 +133,12 @@ export function buildWeekSummary(params: {
             " "
           )
         : "Volume pulls back this week — easy days do most of the work while your legs absorb recent training.";
-  } else if (longRuns.length > 0 && quality.length > 0) {
-    narrative = `This week pairs ${quality.length} quality session${quality.length === 1 ? "" : "s"} with easy days around a ${formatWeekCardMiles(longRuns[0]!.estimatedDistanceInMeters) || "long"} run on ${longRunDayLabel(longRuns[0]!).split(" · ")[0]?.toLowerCase() ?? "the weekend"}.`;
+  } else if (longRuns.length > 0 && structuredSessionCount > 0) {
+    narrative = `This week pairs ${structuredSessionNoun(tempoSessions.length, intervalSessions.length)} with easy days around a ${formatWeekCardMiles(longRuns[0]!.estimatedDistanceInMeters) || "long"} run on ${longRunDayLabel(longRuns[0]!).split(" · ")[0]?.toLowerCase() ?? "the weekend"}.`;
   } else if (longRuns.length > 0) {
     narrative = `Long run week — ${longRunDayLabel(longRuns[0]!)} anchors the schedule with easy aerobic days filling in the rest.`;
-  } else if (quality.length > 0) {
-    narrative = `Quality-focused week with ${quality.length} structured session${quality.length === 1 ? "" : "s"} and easy days for recovery between efforts.`;
+  } else if (structuredSessionCount > 0) {
+    narrative = `Workout-focused week with ${structuredSessionNoun(tempoSessions.length, intervalSessions.length)} and easy days for recovery between efforts.`;
   } else if (easyDays.length > 0) {
     narrative = "Mostly easy aerobic work this week — stay relaxed and keep mileage honest.";
   } else {

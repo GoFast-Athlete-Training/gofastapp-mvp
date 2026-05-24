@@ -6,7 +6,7 @@ import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import type { PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";
 
 type LongRunRow = { weekNumber: number; miles: number; catalogueWorkoutId: string | null };
-type QualityRow = {
+type StructuredWorkoutRow = {
   weekNumber: number;
   dow: number;
   miles: number;
@@ -25,12 +25,12 @@ type CyclePoolData = {
 
 function extractFromSchedule(planSchedule: unknown): {
   longRunByWeek: LongRunRow[];
-  intervalsByWeek: QualityRow[];
-  temposByWeek: QualityRow[];
+  intervalsByWeek: StructuredWorkoutRow[];
+  temposByWeek: StructuredWorkoutRow[];
 } {
   const longRunByWeek: LongRunRow[] = [];
-  const intervalsByWeek: QualityRow[] = [];
-  const temposByWeek: QualityRow[] = [];
+  const intervalsByWeek: StructuredWorkoutRow[] = [];
+  const temposByWeek: StructuredWorkoutRow[] = [];
 
   if (!Array.isArray(planSchedule)) {
     return { longRunByWeek, intervalsByWeek, temposByWeek };

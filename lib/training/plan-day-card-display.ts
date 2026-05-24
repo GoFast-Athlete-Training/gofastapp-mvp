@@ -64,6 +64,26 @@ export function workoutTypeLeftBorderClass(workoutType: string): string {
   }
 }
 
+/** Soft strip cell surface — mirrors workout card left-border colors. */
+export function workoutTypeStripSurfaceClass(workoutType: string): string {
+  switch (workoutType) {
+    case "Easy":
+      return "border-green-200 bg-green-50/80";
+    case "LongRun":
+      return "border-purple-200 bg-purple-50/80";
+    case "Tempo":
+      return "border-amber-200 bg-amber-50/80";
+    case "Intervals":
+      return "border-orange-200 bg-orange-50/80";
+    case "Race":
+      return "border-red-200 bg-red-50/80";
+    case "Rest":
+      return "border-gray-200 bg-gray-50";
+    default:
+      return "border-gray-200 bg-white";
+  }
+}
+
 export function workoutCardSubtypeLine(w: PlanDayCard): string {
   const mi = formatWeekCardMiles(w.estimatedDistanceInMeters);
   return `${typeLabelForCard(w.workoutType)}${mi ? ` · ${mi}` : ""}`;

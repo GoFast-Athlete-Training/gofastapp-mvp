@@ -637,7 +637,7 @@ export default function TrainingSetupPlanPage({
                     This plan&apos;s blueprint enforces at least {presetMinWeeklyMiles}{" "}
                     mi/week when we build the schedule, so the generator may use that
                     minimum (or higher) for weekly totals—especially on weeks with
-                    quality and long runs.
+                    tempo, intervals, and long runs.
                   </p>
                 )}
               </div>

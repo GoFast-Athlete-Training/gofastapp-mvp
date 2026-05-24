@@ -360,7 +360,7 @@ export default function ActivityDetailPage() {
                     <h2 className="text-sm font-semibold text-gray-900 mb-1">No plan match</h2>
                     <p className="text-sm text-gray-600">
                       This activity isn&apos;t linked to a scheduled workout yet. If it was an easy
-                      day or a one-off, that&apos;s normal. Quality sessions from your plan usually
+                      day or a one-off, that&apos;s normal. Tempo or interval workouts from your plan usually
                       match automatically when the date and Garmin workout line up.
                     </p>
                   </div>

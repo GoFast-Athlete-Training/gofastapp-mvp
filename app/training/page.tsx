@@ -12,7 +12,13 @@ import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import PlanWeekCalendar from "@/components/training/PlanWeekCalendar";
 import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
+import WorkoutSkipActions from "@/components/training/WorkoutSkipActions";
 import { buildWeekSummary } from "@/lib/training/week-summary-service";
+import {
+  deriveSessionStatus,
+  sessionStatusBadgeClass,
+  sessionStatusLabel,
+} from "@/lib/training/session-status";
 import {
   currentTrainingWeekNumber,
   effectiveTrainingWeekCount,
@@ -349,6 +355,15 @@ export default function TrainingHubPage() {
   const focusKey = selectedDayKey || todayKey;
   const focusPlanDay = weekDays.find((d) => d.dateKey === focusKey) ?? null;
   const focusIsToday = focusKey === todayKey;
+  const focusStatus = focusPlanDay
+    ? deriveSessionStatus({
+        dateKey: focusPlanDay.dateKey,
+        matchedActivityId: focusPlanDay.matchedActivityId,
+        skippedAt: focusPlanDay.skippedAt,
+        workoutType: focusPlanDay.workoutType,
+        title: focusPlanDay.title,
+      })
+    : null;
 
   const weekPlannedMiles = useMemo(() => {
     if (!weekDays.length) return null;
@@ -757,6 +772,13 @@ export default function TrainingHubPage() {
                             month: "short",
                             day: "numeric",
                           })}
+                          {focusStatus && focusStatus !== "rest" ? (
+                            <span
+                              className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${sessionStatusBadgeClass(focusStatus)}`}
+                            >
+                              {sessionStatusLabel(focusStatus)}
+                            </span>
+                          ) : null}
                           {focusPlanDay.estimatedDistanceInMeters
                             ? ` · ${planDayMilesDisplay(focusPlanDay.estimatedDistanceInMeters)}`
                             : ""}
@@ -810,7 +832,17 @@ export default function TrainingHubPage() {
                           </p>
                         ) : null}
                         {focusPlanDay.workoutId && !focusPlanDay.matchedActivityId ? (
-                          <div className="mt-4">
+                          <div id="match-garmin-panel" className="mt-4 space-y-4">
+                            <WorkoutSkipActions
+                              workoutId={focusPlanDay.workoutId}
+                              dateKey={focusPlanDay.dateKey}
+                              matchedActivityId={focusPlanDay.matchedActivityId}
+                              skippedAt={focusPlanDay.skippedAt}
+                              workoutType={focusPlanDay.workoutType}
+                              title={focusPlanDay.title}
+                              showMissedPrompt={focusStatus === "missed"}
+                              onUpdated={loadHub}
+                            />
                             <WorkoutActivityMatchPanel
                               workoutId={focusPlanDay.workoutId}
                               workoutTitle={displayWorkoutListTitle(focusPlanDay)}

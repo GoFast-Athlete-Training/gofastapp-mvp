@@ -37,6 +37,11 @@ import {
 } from '@/lib/workout-generator/pace-calculator';
 import { metersToMiDisplay } from '@/lib/training/workout-preview-payload';
 import {
+  deriveSessionStatus,
+  sessionStatusBadgeClass,
+  sessionStatusLabel,
+} from '@/lib/training/session-status';
+import {
   fetchTrainingPlanDetail,
   fetchPlanWeekSchedule,
   type PlanDayCard,
@@ -1306,7 +1311,25 @@ export default function AthleteHomePage() {
                           })}
                           {todayPlanDay.matchedActivityId ? (
                             <span className="ml-2 font-semibold text-emerald-700">· Complete</span>
-                          ) : null}
+                          ) : (
+                            (() => {
+                              const st = deriveSessionStatus({
+                                dateKey: todayPlanDay.dateKey,
+                                matchedActivityId: todayPlanDay.matchedActivityId,
+                                skippedAt: todayPlanDay.skippedAt,
+                                workoutType: todayPlanDay.workoutType,
+                                title: todayPlanDay.title,
+                              });
+                              if (st === 'rest') return null;
+                              return (
+                                <span
+                                  className={`ml-2 font-semibold rounded-full px-2 py-0.5 text-xs ${sessionStatusBadgeClass(st)}`}
+                                >
+                                  · {sessionStatusLabel(st)}
+                                </span>
+                              );
+                            })()
+                          )}
                         </p>
                         <Link
                           href={todayPlanHref}
@@ -1690,6 +1713,12 @@ export default function AthleteHomePage() {
                 <p className="font-semibold text-gray-900 tabular-nums">
                   {weekPlanProgress.sessionsCompleted} of {weekPlanProgress.sessionsPlanned}{' '}
                   sessions complete
+                  {weekPlanProgress.sessionsMissed > 0
+                    ? ` · ${weekPlanProgress.sessionsMissed} missed`
+                    : ''}
+                  {weekPlanProgress.sessionsSkipped > 0
+                    ? ` · ${weekPlanProgress.sessionsSkipped} skipped`
+                    : ''}
                 </p>
                 {weekPlanProgress.plannedMetersTotal > 0 ? (
                   <p className="mt-1 tabular-nums text-gray-700">

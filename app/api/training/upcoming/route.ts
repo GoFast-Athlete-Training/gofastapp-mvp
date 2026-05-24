@@ -29,6 +29,8 @@ export type UpcomingSessionJson = {
   workoutType: string;
   date: string;
   matchedActivityId: string | null;
+  skippedAt: string | null;
+  skipReason: string | null;
   /** target − actual sec/mi; positive = faster than prescribed */
   paceDeltaSecPerMile: number | null;
   segments: { stepOrder: number; targets: unknown }[] | undefined;
@@ -163,6 +165,8 @@ export async function GET(request: NextRequest) {
         title: string;
         workoutType: string;
         matchedActivityId: string | null;
+        skippedAt: string | null;
+        skipReason: string | null;
         paceDeltaSecPerMile: number | null;
         estimatedDistanceInMeters: number | null;
         segments: { stepOrder: number; targets: unknown }[];
@@ -194,6 +198,8 @@ export async function GET(request: NextRequest) {
           title: w.title,
           workoutType: w.workoutType,
           matchedActivityId: w.matchedActivityId,
+          skippedAt: w.skippedAt?.toISOString() ?? null,
+          skipReason: w.skipReason ?? null,
           paceDeltaSecPerMile: w.paceDeltaSecPerMile ?? null,
           estimatedDistanceInMeters: w.estimatedDistanceInMeters,
           segments: w.segments.map((s) => ({
@@ -216,6 +222,8 @@ export async function GET(request: NextRequest) {
         workoutType: row?.workoutType ?? slot.workoutType,
         date: `${dateKey}T12:00:00.000Z`,
         matchedActivityId: row?.matchedActivityId ?? null,
+        skippedAt: row?.skippedAt ?? null,
+        skipReason: row?.skipReason ?? null,
         paceDeltaSecPerMile: row?.paceDeltaSecPerMile ?? null,
         segments: row?.segments,
         workoutId,
@@ -251,6 +259,8 @@ export async function GET(request: NextRequest) {
         workoutType: w.workoutType,
         date: w.date.toISOString(),
         matchedActivityId: w.matchedActivityId,
+        skippedAt: w.skippedAt?.toISOString() ?? null,
+        skipReason: w.skipReason ?? null,
         paceDeltaSecPerMile: w.paceDeltaSecPerMile ?? null,
         segments: w.segments.map((s) => ({
           stepOrder: s.stepOrder,

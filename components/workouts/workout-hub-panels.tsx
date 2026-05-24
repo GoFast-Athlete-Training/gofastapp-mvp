@@ -418,7 +418,7 @@ export function AnalysisPanel({ workout }: { workout: LastLoggedWorkout }) {
             <span className="font-bold tabular-nums">
               {formatSecPerMileDisplay(workout.creditedFiveKPaceSecPerMile)}
             </span>{" "}
-            /mi at 5K — we may use this to tune your plan when quality targets are met.
+            /mi at 5K — we may use this to tune your plan when workout pace targets are met.
           </p>
         ) : null}
       </div>

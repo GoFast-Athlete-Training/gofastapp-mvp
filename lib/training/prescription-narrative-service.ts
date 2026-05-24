@@ -147,7 +147,7 @@ Output rules:
 - Reference **week number** and **total weeks** when both are numbers (e.g. "Week 3 of your 24-week build").
 - Explain what this workout is *for* at this phase (e.g. first long run = aerobic base / finding rhythm; not racing the watch).
 - If workPaceOffsetSecPerMile is a number — describe it plainly (e.g. that many seconds per mile slower than their current 5K fitness) using the actual offset value in the JSON payload — do NOT invent offsets.
-- If hasMarathonBlock is false — do NOT mention marathon pace, MP finishes, or quality fast finishes unless notes/trainingIntent clearly say otherwise.
+- If hasMarathonBlock is false — do NOT mention marathon pace, MP finishes, or hard fast finishes unless notes/trainingIntent clearly say otherwise.
 - If hasMarathonBlock is true — you may briefly mention the marathon-pace segment as prescribed.
 - Do not shame. Practical, warm tone.
 

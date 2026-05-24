@@ -108,12 +108,12 @@ export async function generateWeeklySummary(params: {
       ? (metrics.actualMetersMatched / 1609.34).toFixed(1)
       : "0";
 
-  const qualityLine =
-    metrics.qualityAvgDeltaSecPerMile != null
-      ? ` Quality avg vs target: ${metrics.qualityAvgDeltaSecPerMile > 0 ? "+" : ""}${metrics.qualityAvgDeltaSecPerMile} sec/mi.`
+  const structuredPaceLine =
+    metrics.structuredPaceAvgDeltaSecPerMile != null
+      ? ` Tempo/interval pace vs target: ${metrics.structuredPaceAvgDeltaSecPerMile > 0 ? "+" : ""}${metrics.structuredPaceAvgDeltaSecPerMile} sec/mi.`
       : "";
 
-  const summaryMessage = `${WEEKLY_RECAP_PREFIX} Week ${weekNumber}: ${metrics.sessionsCompleted} of ${metrics.sessionsPlanned} sessions logged, ~${miLogged} mi${metrics.longRunCompleted ? ", long run done" : ""}.${qualityLine} Your current 5K pace is ${paceDisplay}.`;
+  const summaryMessage = `${WEEKLY_RECAP_PREFIX} Week ${weekNumber}: ${metrics.sessionsCompleted} of ${metrics.sessionsPlanned} sessions complete, ~${miLogged} mi${metrics.longRunCompleted ? ", long run done" : ""}.${structuredPaceLine} Your current 5K pace is ${paceDisplay}.`;
 
   await prisma.pace_adjustment_log.create({
     data: {
@@ -123,8 +123,8 @@ export async function generateWeeklySummary(params: {
       previousPaceSecPerMile: currentSec,
       newPaceSecPerMile: currentSec,
       adjustmentSecPerMile: 0,
-      qualityWorkoutsCount: metrics.qualitySessionsCompleted,
-      qualityAvgDeltaSecPerMile: metrics.qualityAvgDeltaSecPerMile,
+      qualityWorkoutsCount: metrics.structuredSessionsCompleted,
+      qualityAvgDeltaSecPerMile: metrics.structuredPaceAvgDeltaSecPerMile,
       longRunCompleted: metrics.longRunCompleted,
       longRunCompletionRatio: metrics.longRunCompletionRatio,
       weeklyMileageCompletionPct: metrics.weeklyMileageCompletionPct,

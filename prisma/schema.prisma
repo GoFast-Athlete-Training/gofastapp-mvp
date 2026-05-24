@@ -1339,6 +1339,9 @@ model workouts {
   garminScheduleId          Int?
   /// Matched activity after a run (promoted snapshot fields below)
   matchedActivityId         String?             @unique
+  /// Athlete explicitly skipped this planned workout (distinct from past-unmatched "missed")
+  skippedAt                 DateTime?
+  skipReason                String?             @db.Text
   actualDistanceMeters      Float?
   actualAvgPaceSecPerMile   Int?
   actualAverageHeartRate    Int?

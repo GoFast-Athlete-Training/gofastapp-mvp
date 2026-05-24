@@ -7,6 +7,7 @@ import type { WorkoutType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { effectiveTrainingWeekCount } from "@/lib/training/plan-utils";
 import { weekBoundsFromPlan } from "@/lib/training/plan-schedule";
+import { localTodayKey } from "@/lib/training/session-status";
 import type { WeekPerformanceSnapshot } from "@/lib/training/week-performance-types";
 
 export type { WeekPerformanceSnapshot } from "@/lib/training/week-performance-types";
@@ -14,31 +15,46 @@ export type { WeekPerformanceSnapshot } from "@/lib/training/week-performance-ty
 export type WeekPerformanceRow = {
   workoutType: WorkoutType | string;
   matchedActivityId: string | null;
+  skippedAt: Date | null;
+  date: Date | null;
   estimatedDistanceInMeters: number | null;
   actualDistanceMeters: number | null;
   paceDeltaSecPerMile: number | null;
 };
 
-function isQualityType(t: string): boolean {
+function isoDateKey(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function isStructuredWorkoutType(t: string): boolean {
   return t === "Tempo" || t === "Intervals";
 }
 
 export function computeWeekPerformanceMetrics(
-  rows: WeekPerformanceRow[]
+  rows: WeekPerformanceRow[],
+  todayKey: string = localTodayKey()
 ): WeekPerformanceSnapshot {
   const sessionsPlanned = rows.length;
   const matchedRows = rows.filter((w) => w.matchedActivityId != null);
   const sessionsCompleted = matchedRows.length;
+  const sessionsSkipped = rows.filter(
+    (w) => w.matchedActivityId == null && w.skippedAt != null
+  ).length;
+  const sessionsMissed = rows.filter((w) => {
+    if (w.matchedActivityId != null || w.skippedAt != null) return false;
+    if (!w.date) return false;
+    return isoDateKey(w.date) < todayKey;
+  }).length;
 
-  const qualityRows = rows.filter((w) => isQualityType(String(w.workoutType)));
-  const qualitySessionsPlanned = qualityRows.length;
-  const qualityMatched = qualityRows.filter((w) => w.matchedActivityId != null);
-  const qualitySessionsCompleted = qualityMatched.length;
+  const structuredRows = rows.filter((w) => isStructuredWorkoutType(String(w.workoutType)));
+  const structuredSessionsPlanned = structuredRows.length;
+  const structuredMatched = structuredRows.filter((w) => w.matchedActivityId != null);
+  const structuredSessionsCompleted = structuredMatched.length;
 
-  const deltas = qualityMatched
+  const deltas = structuredMatched
     .map((w) => w.paceDeltaSecPerMile)
     .filter((d): d is number => d != null && Number.isFinite(d));
-  const qualityAvgDeltaSecPerMile =
+  const structuredPaceAvgDeltaSecPerMile =
     deltas.length > 0
       ? Math.round(deltas.reduce((a, b) => a + b, 0) / deltas.length)
       : null;
@@ -94,9 +110,11 @@ export function computeWeekPerformanceMetrics(
   return {
     sessionsPlanned,
     sessionsCompleted,
-    qualitySessionsPlanned,
-    qualitySessionsCompleted,
-    qualityAvgDeltaSecPerMile,
+    sessionsSkipped,
+    sessionsMissed,
+    structuredSessionsPlanned,
+    structuredSessionsCompleted,
+    structuredPaceAvgDeltaSecPerMile,
     plannedMetersTotal,
     actualMetersMatched,
     weeklyMileageCompletionPct,
@@ -149,6 +167,8 @@ export async function loadWeekPerformanceSnapshot(params: {
     select: {
       workoutType: true,
       matchedActivityId: true,
+      skippedAt: true,
+      date: true,
       estimatedDistanceInMeters: true,
       actualDistanceMeters: true,
       paceDeltaSecPerMile: true,

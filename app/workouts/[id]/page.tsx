@@ -75,6 +75,7 @@ import {
   type RunAnalysisJsonV1,
 } from "@/lib/training/run-analysis-types";
 import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
+import WorkoutSkipActions from "@/components/training/WorkoutSkipActions";
 import RunContextPrompt from "@/components/training/RunContextPrompt";
 import {
   formatRecommendationDisplay,
@@ -157,6 +158,8 @@ interface Workout {
   estimatedDistanceInMeters?: number | null;
   segments: WorkoutSegment[];
   matchedActivityId?: string | null;
+  skippedAt?: string | null;
+  skipReason?: string | null;
   actualDistanceMeters?: number | null;
   actualAvgPaceSecPerMile?: number | null;
   actualDurationSeconds?: number | null;
@@ -391,7 +394,7 @@ function CataloguePrescriptionCard({
           )}
         </li>
         <li>
-          Quality block: ~
+          {catalogue.workoutType === "Tempo" ? "Tempo block" : "Workout block"}: ~
           {formatPaceMinPerMileFromSec(
             paceSecFromAnchor(anchor, catalogue.workPaceOffsetSecPerMile, p.tempo)
           )}
@@ -1954,7 +1957,23 @@ export default function WorkoutDetailPage() {
         </Link>
 
         {!isLogged && workoutId ? (
-          <WorkoutActivityMatchPanel workoutId={workoutId} onMatched={fetchWorkout} />
+          <div className="mb-6 space-y-4">
+            <WorkoutSkipActions
+              workoutId={workoutId}
+              dateKey={
+                workout.date
+                  ? String(workout.date).slice(0, 10)
+                  : new Date().toISOString().slice(0, 10)
+              }
+              matchedActivityId={workout.matchedActivityId}
+              skippedAt={workout.skippedAt}
+              workoutType={workout.workoutType}
+              title={workout.title}
+              showMissedPrompt
+              onUpdated={fetchWorkout}
+            />
+            <WorkoutActivityMatchPanel workoutId={workoutId} onMatched={fetchWorkout} />
+          </div>
         ) : null}
 
         {isLogged && (workout.matchedActivityId || workout.matched_activity) ? (
@@ -3479,7 +3498,7 @@ export default function WorkoutDetailPage() {
             {showVolumeGapNote && (
               <p className="text-xs text-gray-600 mt-3">
                 If the plan lists more miles than these steps, add easy miles before/after—often on
-                quality days.
+                tempo or interval days.
               </p>
             )}
           </div>

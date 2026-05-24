@@ -16,6 +16,8 @@ export type PlanDayCard = {
   phase: string;
   estimatedDistanceInMeters: number;
   matchedActivityId: string | null;
+  skippedAt: string | null;
+  skipReason: string | null;
   actualDistanceMeters: number | null;
   actualAvgPaceSecPerMile: number | null;
   actualAverageHeartRate: number | null;

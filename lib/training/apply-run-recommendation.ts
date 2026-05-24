@@ -157,7 +157,7 @@ export async function applyRunRecommendationFromWorkout(params: {
     return {
       ok: true,
       updatedField: "fiveKPaceSecPerMile",
-      summary: "5K pace nudged faster using the same safety rules as quality workouts.",
+      summary: "5K pace nudged faster using the same safety rules as tempo and interval workouts.",
     };
   }
 

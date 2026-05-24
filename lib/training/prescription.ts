@@ -261,7 +261,7 @@ function parseTempoBlockRepeatPayload(v: unknown): TempoBlockRepeatPayload | nul
   };
 }
 
-function buildSustainedQualityBlock(params: {
+function buildSustainedWorkoutBlock(params: {
   entry: workout_catalogue;
   totalMiles: number;
   anchorSecondsPerMile: number;
@@ -744,7 +744,7 @@ export function prescribe(params: {
       }
       if (out.length > 0) return out;
     }
-    return buildSustainedQualityBlock({
+    return buildSustainedWorkoutBlock({
       entry,
       totalMiles,
       anchorSecondsPerMile,
