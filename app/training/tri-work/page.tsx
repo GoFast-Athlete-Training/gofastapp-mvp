@@ -36,7 +36,7 @@ export default function TriWorkOverviewPage() {
         </li>
         <li>
           <Link href="/training" className="font-medium text-orange-600 hover:text-orange-700">
-            My Training
+            Training Hub
           </Link>
           <span className="text-gray-600"> — calendar, plan, and today&apos;s run focus.</span>
         </li>

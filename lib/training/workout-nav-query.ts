@@ -80,12 +80,12 @@ export function parseBackHrefParam(params: URLSearchParams): string | null {
 
 export function backLabelFromPath(path: string): string {
   const p = path.split("?")[0] ?? path;
-  if (p.startsWith("/training/day/")) return "Back to plan preview";
-  if (p === "/training") return "Back to My Training";
+  if (p.startsWith("/training/day/")) return "Back to Training Hub";
+  if (p === "/training") return "Back to Training Hub";
   if (p.startsWith("/training-setup/")) return "Back to plan setup";
   if (p === "/workouts") return "Back to Workouts";
   if (p === "/build-a-run") return "Back to Build a Run";
-  if (p === "/training/schedule-run") return "Back to My Training";
+  if (p === "/training/schedule-run") return "Back to Training Hub";
   return "Back";
 }
 
@@ -133,7 +133,7 @@ export function backHrefFromGoTrainContext(ctx: GoTrainNavContext): string {
 }
 
 export function backLabelFromGoTrainContext(ctx: GoTrainNavContext): string {
-  if (ctx.back === "training") return "Back to My Training";
+  if (ctx.back === "training") return "Back to Training Hub";
   if (ctx.back === "setup") return "Back to plan setup";
   return "Back to Workouts";
 }

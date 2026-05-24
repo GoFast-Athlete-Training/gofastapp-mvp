@@ -483,6 +483,9 @@ export async function clearActivityFromWorkout(params: {
       creditedAerobicCeilingBpm: null,
       evaluationEligibleFlag: false,
       analysisJson: Prisma.DbNull,
+      runContextTags: [],
+      runContextNote: null,
+      runContextUpdatedAt: null,
       updatedAt: new Date(),
     },
   });

@@ -1371,6 +1371,11 @@ model workouts {
   completedActivityDetailJson         Json?
   /// Computed readiness / delta summaries (product reads; optional).
   analysisJson                      Json?
+  /// User-provided chips describing what shaped the run (before coach feedback).
+  runContextTags                    String[]            @default([])
+  /// Free-text note from athlete about the run context.
+  runContextNote                    String?             @db.Text
+  runContextUpdatedAt               DateTime?
   /// AI-generated pre-workout coaching note (lazy, cached).
   prescriptionNarrative             String?
   /// Public share path slug for /mytrainingruns/[slug] (e.g. acole842719); set when athlete creates a join link

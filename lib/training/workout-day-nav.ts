@@ -1,13 +1,17 @@
 /**
- * Handoff when opening a workout from Go Train or a plan day preview without
+ * Handoff when opening a workout from Training Hub or Go Train without
  * putting `?back=` / `from=go-train` on the URL. Stashed in sessionStorage and
  * keyed by workouts.id so the detail page can resolve back + framing.
  */
 
 const STORAGE_KEY = "gofast.workoutDayNav.v1";
 
+export const TRAINING_HUB_BACK_PATH = "/training";
+
 export type WorkoutDayNavEntry =
   | { source: "go-train" }
+  | { source: "training-hub"; backPath: string }
+  /** @deprecated Legacy stash key — read-only compatibility */
   | { source: "plan-preview"; backPath: string };
 
 type StashedPayload = {
@@ -23,17 +27,40 @@ function isSafeInternalPath(path: string): boolean {
   return true;
 }
 
+function isStashableHubEntry(entry: WorkoutDayNavEntry): entry is
+  | { source: "training-hub"; backPath: string }
+  | { source: "plan-preview"; backPath: string } {
+  if (entry.source === "training-hub" || entry.source === "plan-preview") {
+    return isSafeInternalPath(entry.backPath);
+  }
+  return true;
+}
+
 export function stashWorkoutDayNav(workoutId: string, entry: WorkoutDayNavEntry): void {
   if (typeof window === "undefined" || !workoutId) return;
-  if (entry.source === "plan-preview" && !isSafeInternalPath(entry.backPath)) {
-    return;
-  }
+  if (!isStashableHubEntry(entry)) return;
   try {
     const payload: StashedPayload = { v: 1, workoutId, entry };
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
     /* quota / private mode */
   }
+}
+
+export function stashTrainingHubWorkoutNav(workoutId: string): void {
+  stashWorkoutDayNav(workoutId, {
+    source: "training-hub",
+    backPath: TRAINING_HUB_BACK_PATH,
+  });
+}
+
+/** Resolve hub back path from stash entry (supports legacy plan-preview). */
+export function hubBackPathFromStash(entry: WorkoutDayNavEntry | null): string | null {
+  if (!entry) return null;
+  if (entry.source === "training-hub" || entry.source === "plan-preview") {
+    return isSafeInternalPath(entry.backPath) ? entry.backPath : null;
+  }
+  return null;
 }
 
 /** Entry for this workout only; removes stale payloads for other ids. */
@@ -51,7 +78,7 @@ export function readWorkoutDayNav(workoutId: string): WorkoutDayNavEntry | null 
       sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }
-    if (p.entry.source === "plan-preview" && !isSafeInternalPath(p.entry.backPath)) {
+    if (!isStashableHubEntry(p.entry)) {
       sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }

@@ -35,7 +35,7 @@ import {
 } from "@/lib/workout-generator/pace-calculator";
 import { PaceMiSplitEditor } from "@/components/workout/PaceMiSplitEditor";
 import { parseSplitPaceToSecPerMile, secPerMileToSplitStrings } from "@/lib/workout/pace-mi-split";
-import { readWorkoutDayNav } from "@/lib/training/workout-day-nav";
+import { hubBackPathFromStash, readWorkoutDayNav } from "@/lib/training/workout-day-nav";
 import {
   backHrefFromGoTrainContext,
   backLabelFromGoTrainContext,
@@ -78,9 +78,9 @@ import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatc
 import RunContextPrompt from "@/components/training/RunContextPrompt";
 import {
   formatRecommendationDisplay,
-  shouldPromptRunContext,
   shouldShowProfileRecommendation,
 } from "@/lib/training/coach-read-display";
+import { buildRunResultStatus } from "@/lib/training/run-result-status";
 
 interface WorkoutSegmentLap {
   lapIndex: number;
@@ -180,6 +180,8 @@ interface Workout {
   city_runs?: Array<{ id: string; date: string; createdAt?: string }>;
   prescriptionNarrative?: string | null;
   analysisJson?: RunAnalysisJsonV1 | unknown | null;
+  runContextTags?: string[] | null;
+  runContextNote?: string | null;
 }
 
 function formatSecPerMile(sec: number | null | undefined): string | null {
@@ -1745,13 +1747,19 @@ export default function WorkoutDetailPage() {
       ? `Week ${workout.weekNumber} of ${workout.training_plans.totalWeeks}`
       : null;
 
-  const planPreviewBackFromStash =
-    navFromStash?.source === "plan-preview" ? navFromStash.backPath : null;
+  const planPreviewBackFromStash = hubBackPathFromStash(navFromStash);
   const fromGoTrainStash = navFromStash?.source === "go-train";
 
+  function normalizeTrainingHubBack(href: string | null | undefined): string | null {
+    if (!href) return null;
+    const base = href.split("?")[0] ?? href;
+    if (base === "/training" || base.startsWith("/training/day/")) return "/training";
+    return href;
+  }
+
   const backHref =
-    simpleBackHref ??
-    planPreviewBackFromStash ??
+    normalizeTrainingHubBack(simpleBackHref) ??
+    normalizeTrainingHubBack(planPreviewBackFromStash) ??
     (goTrainCtx ? backHrefFromGoTrainContext(goTrainCtx) : null) ??
     "/workouts";
   const backLabel = simpleBackHref
@@ -1865,16 +1873,15 @@ export default function WorkoutDetailPage() {
           : "single_on";
   }
 
-  const showRunContextPrompt =
-    isLogged &&
-    shouldPromptRunContext({
-      plannedDistanceMeters: workout.estimatedDistanceInMeters,
-      actualDistanceMeters: workout.actualDistanceMeters,
-      targetPaceSecPerMile: workout.targetPaceSecPerMile,
-      targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
-      actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
-      paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
-    });
+  const showRunContextPrompt = isLogged && !runAnalysisCoachRead;
+
+  const runResultStatus = buildRunResultStatus({
+    plannedDistanceMeters: workout.estimatedDistanceInMeters,
+    actualDistanceMeters: workout.actualDistanceMeters,
+    actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
+    targetPaceSecPerMile: workout.targetPaceSecPerMile,
+    targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
+  });
 
   const plannedMiForComparison =
     workout.estimatedDistanceInMeters != null && workout.estimatedDistanceInMeters > 0
@@ -1986,7 +1993,20 @@ export default function WorkoutDetailPage() {
                 ) : null}
               </div>
               {resultsPaceBadgeLabel != null ? (
-                <div className="shrink-0">
+                <div className="shrink-0 flex flex-wrap gap-2 justify-end">
+                  {runResultStatus.distanceStatus !== "unknown" ? (
+                    <span
+                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                        runResultStatus.distanceStatus === "on_plan"
+                          ? "bg-emerald-100 text-emerald-900 ring-1 ring-emerald-200"
+                          : runResultStatus.distanceStatus === "over"
+                            ? "bg-sky-100 text-sky-900 ring-1 ring-sky-200"
+                            : "bg-amber-100 text-amber-900 ring-1 ring-amber-200"
+                      }`}
+                    >
+                      {runResultStatus.distanceBadge}
+                    </span>
+                  ) : null}
                   <span
                     className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
                       resultsPaceBadgeLabel === "in_range" || resultsPaceBadgeLabel === "single_on"
@@ -2004,6 +2024,20 @@ export default function WorkoutDetailPage() {
                         : resultsPaceBadgeLabel === "single_on"
                           ? "On target"
                           : paceVsTargetBadgeText(resultsPaceBadgeLabel)}
+                  </span>
+                </div>
+              ) : runResultStatus.distanceStatus !== "unknown" ? (
+                <div className="shrink-0">
+                  <span
+                    className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                      runResultStatus.distanceStatus === "on_plan"
+                        ? "bg-emerald-100 text-emerald-900 ring-1 ring-emerald-200"
+                        : runResultStatus.distanceStatus === "over"
+                          ? "bg-sky-100 text-sky-900 ring-1 ring-sky-200"
+                          : "bg-amber-100 text-amber-900 ring-1 ring-amber-200"
+                    }`}
+                  >
+                    {runResultStatus.distanceBadge}
                   </span>
                 </div>
               ) : null}
@@ -2040,6 +2074,9 @@ export default function WorkoutDetailPage() {
                   <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
                     {(workout.actualDistanceMeters / 1609.34).toFixed(2)} mi
                   </dd>
+                  {runResultStatus.distanceMessage ? (
+                    <dd className="mt-1 text-xs text-gray-600">{runResultStatus.distanceMessage}</dd>
+                  ) : null}
                 </div>
               ) : null}
               {workout.actualDurationSeconds != null && workout.actualDurationSeconds > 0 ? (
@@ -2063,6 +2100,17 @@ export default function WorkoutDetailPage() {
                 </div>
               ) : null}
             </dl>
+
+            {showRunContextPrompt ? (
+              <RunContextPrompt
+                className="mt-6"
+                workoutId={workoutId}
+                initialTags={workout.runContextTags}
+                initialNote={workout.runContextNote}
+                hasCoachFeedback={Boolean(runAnalysisCoachRead)}
+                onFeedbackReady={() => void fetchWorkout()}
+              />
+            ) : null}
 
             {runAnalysisCoachRead ? (
               <div className="mt-6 rounded-2xl border border-violet-200 bg-violet-50/50 p-4">
@@ -2174,8 +2222,6 @@ export default function WorkoutDetailPage() {
                 Run shape details appear here after Garmin syncs lap splits for this activity.
               </p>
             )}
-
-            {showRunContextPrompt ? <RunContextPrompt className="mt-6" /> : null}
 
             {(plannedMiForComparison != null || ranMiForComparison != null) && (
               <div className="mt-6 rounded-xl border border-gray-200 bg-white/80 px-4 py-3 text-sm text-gray-800">

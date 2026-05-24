@@ -1,23 +1,30 @@
 /**
- * Post-sync AI assessment for any logged run (plan or standalone).
- * Writes structured copy to workouts.analysisJson for AnalysisDeepPanel.
+ * User-requested AI coach feedback for logged runs.
+ * Requires athlete run context before calling OpenAI.
  */
 
 import { prisma } from "@/lib/prisma";
 import type { RunAnalysisJsonV1 } from "@/lib/training/run-analysis-types";
+import {
+  buildRunResultStatus,
+  distanceStatusBadgeText,
+  distanceStatus as computeDistanceStatus,
+} from "@/lib/training/run-result-status";
+import { paceVsTargetBadgeText, paceVsTargetLabel } from "@/lib/training/pace-comparison-display";
+import { RUN_CONTEXT_OPTIONS, type RunContextOption } from "@/lib/training/coach-read-display";
 
 export type { RunAnalysisJsonV1 } from "@/lib/training/run-analysis-types";
 export { isRunAnalysisJsonV1 } from "@/lib/training/run-analysis-types";
+
+export type RunAssessmentContext = {
+  contextTags: string[];
+  contextNote?: string | null;
+};
 
 type AiAssessmentRaw = {
   narrative?: string;
   hrPattern?: string;
   effortQuality?: string;
-  recommendation?: {
-    field?: string | null;
-    suggestedValue?: number | null;
-    reason?: string;
-  } | null;
 };
 
 function normalizeHrPattern(
@@ -41,44 +48,9 @@ function normalizeEffortQuality(
   return "unknown";
 }
 
-function normalizeRecommendation(
-  rec: AiAssessmentRaw["recommendation"],
-  workoutType: string
-): RunAnalysisJsonV1["recommendation"] {
-  if (!rec || rec.field == null || rec.suggestedValue == null) return null;
-  const field = String(rec.field).trim();
-  const sv = Number(rec.suggestedValue);
-  if (!Number.isFinite(sv) || sv <= 0) return null;
-
-  const type = workoutType.trim();
-  if (field === "fiveKPaceSecPerMile" && (type === "LongRun" || type === "Easy")) {
-    return null;
-  }
-
-  if (field === "aerobicCeilingBpm") {
-    const bpm = Math.round(sv);
-    if (bpm < 80 || bpm > 210) return null;
-    return {
-      field: "aerobicCeilingBpm",
-      suggestedValue: bpm,
-      reason: String(rec.reason || "").slice(0, 500),
-    };
-  }
-  if (field === "fiveKPaceSecPerMile") {
-    const sec = Math.round(sv);
-    if (sec < 240 || sec > 840) return null;
-    return {
-      field: "fiveKPaceSecPerMile",
-      suggestedValue: sec,
-      reason: String(rec.reason || "").slice(0, 500),
-    };
-  }
-  return null;
-}
-
 function parseAssessmentJson(
   raw: string,
-  workoutType: string
+  context: RunAssessmentContext
 ): RunAnalysisJsonV1 | null {
   const cleaned = raw.replace(/^```json\s*/i, "").replace(/\s*```\s*$/i, "").trim();
   let parsed: AiAssessmentRaw;
@@ -95,22 +67,47 @@ function parseAssessmentJson(
     narrative,
     hrPattern: normalizeHrPattern(parsed.hrPattern),
     effortQuality: normalizeEffortQuality(parsed.effortQuality),
-    recommendation: normalizeRecommendation(parsed.recommendation, workoutType),
+    recommendation: null,
+    contextTags: context.contextTags,
+    contextNote: context.contextNote?.trim() || null,
   };
 }
 
+export function normalizeRunContextTags(tags: unknown): RunContextOption[] {
+  if (!Array.isArray(tags)) return [];
+  const allowed = new Set<string>(RUN_CONTEXT_OPTIONS);
+  return tags
+    .map((t) => String(t).trim())
+    .filter((t): t is RunContextOption => allowed.has(t));
+}
+
+export function hasRunContextInput(context: RunAssessmentContext): boolean {
+  const tags = normalizeRunContextTags(context.contextTags);
+  const note = context.contextNote?.trim() ?? "";
+  return tags.length > 0 || note.length > 0;
+}
+
 /**
- * Fire after Garmin match or promote. Safe to call from waitUntil; errors are logged only.
+ * Generate coach feedback after the athlete provides run context.
+ * Throws when context is missing or OpenAI fails to produce valid output.
  */
 export async function runRunAssessment(params: {
   workoutId: string;
   athleteId: string;
-}): Promise<void> {
+  context: RunAssessmentContext;
+}): Promise<RunAnalysisJsonV1> {
+  if (!hasRunContextInput(params.context)) {
+    throw new Error("Run context required before coach feedback");
+  }
+
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
-    console.warn("runRunAssessment: OPENAI_API_KEY missing, skipping");
-    return;
+    throw new Error("Coach feedback unavailable");
   }
+
+  const contextTags = normalizeRunContextTags(params.context.contextTags);
+  const contextNote = params.context.contextNote?.trim() || null;
+  const context: RunAssessmentContext = { contextTags, contextNote };
 
   const [workout, athlete] = await Promise.all([
     prisma.workouts.findFirst({
@@ -119,33 +116,14 @@ export async function runRunAssessment(params: {
         id: true,
         title: true,
         workoutType: true,
-        planId: true,
-        weekNumber: true,
-        paceDeltaSecPerMile: true,
+        matchedActivityId: true,
+        estimatedDistanceInMeters: true,
+        actualDistanceMeters: true,
         targetPaceSecPerMile: true,
         targetPaceSecPerMileHigh: true,
-        hrDeltaBpm: true,
+        paceDeltaSecPerMile: true,
         actualAvgPaceSecPerMile: true,
-        actualAverageHeartRate: true,
-        actualMaxHeartRate: true,
         actualDurationSeconds: true,
-        actualDistanceMeters: true,
-        estimatedDistanceInMeters: true,
-        segments: {
-          orderBy: { stepOrder: "asc" },
-          select: {
-            segment_laps: {
-              orderBy: { lapIndex: "asc" },
-              select: {
-                lapIndex: true,
-                avgPaceSecPerMile: true,
-                avgHeartRate: true,
-                distanceMiles: true,
-                durationSeconds: true,
-              },
-            },
-          },
-        },
         matched_activity: {
           select: {
             activityName: true,
@@ -165,73 +143,55 @@ export async function runRunAssessment(params: {
     }),
   ]);
 
-  if (!workout?.matched_activity) {
-    return;
+  if (!workout?.matchedActivityId || !workout.matched_activity) {
+    throw new Error("Workout is not linked to a Garmin activity");
   }
   if (!athlete) {
-    return;
+    throw new Error("Athlete not found");
   }
 
-  const hasPlanTargets =
-    workout.targetPaceSecPerMile != null || workout.hrDeltaBpm != null;
+  const resultStatus = buildRunResultStatus({
+    plannedDistanceMeters: workout.estimatedDistanceInMeters,
+    actualDistanceMeters: workout.actualDistanceMeters,
+    actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
+    targetPaceSecPerMile: workout.targetPaceSecPerMile,
+    targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
+  });
 
-  const lapsOrdered: Array<{
-    lapOrder: number;
-    garminLapIndex: number;
-    paceSecPerMile: number | null;
-    avgHeartRate: number | null;
-    distanceMiles: number | null;
-    durationSeconds: number | null;
-  }> = [];
-  let ord = 0;
-  for (const seg of workout.segments ?? []) {
-    for (const lap of seg.segment_laps ?? []) {
-      ord += 1;
-      lapsOrdered.push({
-        lapOrder: ord,
-        garminLapIndex: lap.lapIndex,
-        paceSecPerMile: lap.avgPaceSecPerMile,
-        avgHeartRate: lap.avgHeartRate,
-        distanceMiles: lap.distanceMiles,
-        durationSeconds: lap.durationSeconds,
-      });
-    }
-  }
-
-  const plannedMeters = workout.estimatedDistanceInMeters;
-  const actualMeters = workout.actualDistanceMeters;
-  const distanceRatio =
-    plannedMeters != null && plannedMeters > 0 && actualMeters != null && actualMeters > 0
-      ? actualMeters / plannedMeters
-      : null;
-  const elevationGainFt =
-    workout.matched_activity.elevationGain != null &&
-    Number.isFinite(workout.matched_activity.elevationGain)
-      ? Math.round(workout.matched_activity.elevationGain * 3.28084)
-      : null;
+  const distStatus = computeDistanceStatus(
+    workout.estimatedDistanceInMeters,
+    workout.actualDistanceMeters
+  );
+  const paceLabel = paceVsTargetLabel(
+    workout.actualAvgPaceSecPerMile,
+    workout.targetPaceSecPerMile,
+    workout.targetPaceSecPerMileHigh
+  );
 
   const payload = {
     workout: {
       title: workout.title,
       workoutType: workout.workoutType,
-      hasPlanTargets,
-      plannedDistanceMeters: plannedMeters,
-      actualDistanceMeters: actualMeters,
-      distanceRatio,
-      elevationGainFt,
+      plannedDistanceMeters: workout.estimatedDistanceInMeters,
+      actualDistanceMeters: workout.actualDistanceMeters,
       targetPaceSecPerMile: workout.targetPaceSecPerMile,
       targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
-      paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
-      hrDeltaBpm: workout.hrDeltaBpm,
       actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
-      actualAverageHeartRate: workout.actualAverageHeartRate,
-      actualMaxHeartRate: workout.actualMaxHeartRate,
       actualDurationSeconds: workout.actualDurationSeconds,
       activityName: workout.matched_activity.activityName,
-      activityType: workout.matched_activity.activityType,
     },
-    /// Per-lap snapshot when Garmin detail synced; empty otherwise.
-    laps: lapsOrdered,
+    deterministicFacts: {
+      distanceStatus: distStatus,
+      distanceSummary: resultStatus.distanceMessage,
+      distanceBadge: distanceStatusBadgeText(distStatus),
+      paceStatus: paceLabel,
+      paceSummary: resultStatus.paceMessage,
+      paceBadge: paceVsTargetBadgeText(paceLabel),
+    },
+    athleteContext: {
+      tags: contextTags,
+      note: contextNote,
+    },
     athleteBaseline: {
       fiveKPace: athlete.fiveKPace,
       thresholdPace: athlete.thresholdPace,
@@ -239,38 +199,24 @@ export async function runRunAssessment(params: {
     },
   };
 
-  const hasLapDetail = lapsOrdered.length > 0;
+  const systemPrompt = `You are an encouraging running coach writing a short post-run summary for an athlete.
 
-  const workoutType = workout.workoutType;
-  const isLongOrEasy = workoutType === "LongRun" || workoutType === "Easy";
+You receive:
+1. Deterministic facts about distance and pace vs plan (already computed — do not contradict them).
+2. The athlete's own context about what shaped the run (tags and optional note). Treat this as the primary explanation for why the run looked the way it did.
 
-  const systemPrompt = `You are an encouraging running coach. The athlete may or may not have followed a structured plan workout — many runs are standalone easy runs from their watch.
+Write 2-4 short sentences that:
+- Acknowledge whether distance was on plan, short, or over.
+- Acknowledge whether pace was faster, slower, or in range vs target (when a target exists).
+- Weave in the athlete's stated context as the reason — do not invent causes they did not mention.
+- Stay supportive and practical. Do not shame. Do not suggest profile or pace updates.
 
-You have activity *summary* stats (no second-by-second HR stream). If the user payload includes a non-empty "laps" array, these are ordered lap splits (often ~1 mile each). Use them to describe **where** pace changed (e.g. "strong through lap 8, faded lap 10–12") — cite lap numbers rather than guessing. When laps are empty or too few to infer splits, infer cautiously from summary only.
-
-**Run shape first:** Before interpreting pace vs plan, consider actual vs planned distance (distanceRatio), elevationGainFt, lap splits, and average/max HR. A long run that was much longer than planned and/or had substantial climbing makes average pace hard to interpret without context.
-
-**LongRun and Easy sessions:** Do NOT recommend fiveKPaceSecPerMile profile updates. If actual distance is meaningfully above planned (distanceRatio > 1.1) or pace is slower than target, prioritize asking what shaped the run (intentionally extended, group run, hills/terrain, heat, fueling practice) rather than suggesting faster paces. Avoid language like "targeting a faster pace will help" unless the run was near planned distance, effort looked clearly low-risk, and evidence is strong.
-
-**Profile recommendations:** Only suggest a change when evidence supports it:
-- fiveKPaceSecPerMile: quality workouts (Tempo, Intervals, SpeedDuration) with clear pace signal — never for LongRun or Easy.
-- aerobicCeilingBpm: easy aerobic ceiling updates when HR and duration evidence is strong.
-Otherwise set "recommendation": null.
-
-Respond with ONLY a JSON object (no markdown) with this exact shape:
+Respond with ONLY a JSON object (no markdown):
 {
-  "narrative": "2-5 short sentences: describe run shape (splits, distance vs plan, elevation if present), relate to plan targets when they exist, and ask for context when distance/pace differ meaningfully. Do not shame. ${
-    hasLapDetail
-      ? "When laps are provided, mention specific lap ranges where pace shifted."
-      : ""
-  } If there is no plan target, judge against easy aerobic norms using the athlete baseline HR ceiling and paces.",
+  "narrative": "2-4 sentences",
   "hrPattern": one of "steady","drift_up","drift_down","variable","unknown",
-  "effortQuality": one of "on_target","above","below","unknown" relative to what makes sense for this session type,
-  "recommendation": null OR an object with:
-    "field": either "aerobicCeilingBpm" OR "fiveKPaceSecPerMile",
-    "suggestedValue": integer — for aerobicCeilingBpm: plausible easy upper HR (80-210). For fiveKPaceSecPerMile: seconds per mile for current 5K fitness (240-840 range, lower=faster) — only for quality workout types, never LongRun/Easy.
-    "reason": one sentence why.
-  Only suggest a change when evidence supports it. Otherwise set "recommendation": null.`;
+  "effortQuality": one of "on_target","above","below","unknown"
+}`;
 
   const userPrompt = JSON.stringify(payload, null, 2);
 
@@ -294,29 +240,33 @@ Respond with ONLY a JSON object (no markdown) with this exact shape:
     if (!res.ok) {
       const errText = await res.text();
       console.error("runRunAssessment OpenAI HTTP", res.status, errText.slice(0, 500));
-      return;
+      throw new Error("Coach feedback generation failed");
     }
     const data = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
     };
     content = data.choices?.[0]?.message?.content ?? "";
   } catch (e) {
+    if (e instanceof Error && e.message === "Coach feedback generation failed") throw e;
     console.error("runRunAssessment fetch:", e);
-    return;
+    throw new Error("Coach feedback generation failed");
   }
 
-  const analysis = parseAssessmentJson(content, workoutType);
+  const analysis = parseAssessmentJson(content, context);
   if (!analysis) {
-    console.warn("runRunAssessment: could not parse model output");
-    return;
-  }
-
-  if (isLongOrEasy && analysis.recommendation?.field === "fiveKPaceSecPerMile") {
-    analysis.recommendation = null;
+    throw new Error("Could not parse coach feedback");
   }
 
   await prisma.workouts.update({
     where: { id: params.workoutId },
-    data: { analysisJson: analysis as object, updatedAt: new Date() },
+    data: {
+      analysisJson: analysis as object,
+      runContextTags: contextTags,
+      runContextNote: contextNote,
+      runContextUpdatedAt: new Date(),
+      updatedAt: new Date(),
+    },
   });
+
+  return analysis;
 }

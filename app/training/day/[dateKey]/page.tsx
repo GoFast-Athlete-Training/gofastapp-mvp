@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -35,10 +35,12 @@ import {
   pickWorkoutPayload,
   type PreviewWorkout,
 } from "@/lib/training/workout-preview-payload";
-import { stashWorkoutDayNav } from "@/lib/training/workout-day-nav";
+import { stashWorkoutDayNav, TRAINING_HUB_BACK_PATH } from "@/lib/training/workout-day-nav";
+import { workoutDetailPathWithBackHref } from "@/lib/training/workout-nav-query";
 import LogRaceResultSheet from "@/components/races/LogRaceResultSheet";
 import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
 import { metersToMiDisplay } from "@/lib/training/workout-preview-payload";
+import { buildRunResultStatus } from "@/lib/training/run-result-status";
 
 function formatSecPerMile(sec: number | null | undefined): string | null {
   if (sec == null || !Number.isFinite(sec) || sec <= 0) return null;
@@ -174,7 +176,6 @@ function previewGroupedRecoveryDistanceLine(
 export default function TrainingPlanDayPreviewPage() {
   const router = useRouter();
   const params = useParams();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   const rawDateKey = params.dateKey as string;
   const dateKey = normalizeDateKey(rawDateKey);
@@ -213,15 +214,17 @@ export default function TrainingPlanDayPreviewPage() {
   const [loggedActualDurationSeconds, setLoggedActualDurationSeconds] = useState<number | null>(
     null
   );
-
-  const previewBackPath = useMemo(() => {
-    const qs = searchParams.toString();
-    return qs ? `${pathname}?${qs}` : pathname;
-  }, [pathname, searchParams]);
+  const [loggedTargetPaceSecPerMile, setLoggedTargetPaceSecPerMile] = useState<number | null>(null);
+  const [loggedTargetPaceSecPerMileHigh, setLoggedTargetPaceSecPerMileHigh] = useState<
+    number | null
+  >(null);
+  const [loggedPlannedDistanceMeters, setLoggedPlannedDistanceMeters] = useState<number | null>(
+    null
+  );
 
   const hubBackHref =
-    sourceSetup && planDetail ? `/training-setup/${planDetail.id}` : "/training";
-  const hubBackLabel = sourceSetup ? "Back to plan setup" : "Back to My Training";
+    sourceSetup && planDetail ? `/training-setup/${planDetail.id}` : TRAINING_HUB_BACK_PATH;
+  const hubBackLabel = sourceSetup ? "Back to plan setup" : "Back to Training Hub";
 
   const prevDateKey = dateKey ? shiftDateKey(dateKey, -1) : null;
   const nextDateKey = dateKey ? shiftDateKey(dateKey, 1) : null;
@@ -250,6 +253,12 @@ export default function TrainingPlanDayPreviewPage() {
     setOpenWorkoutError(null);
     setGarminPushMessage(null);
     setMatchedActivityId(null);
+    setLoggedActualDistanceMeters(null);
+    setLoggedActualPaceSecPerMile(null);
+    setLoggedActualDurationSeconds(null);
+    setLoggedPlannedDistanceMeters(null);
+    setLoggedTargetPaceSecPerMile(null);
+    setLoggedTargetPaceSecPerMileHigh(null);
     try {
       const u = auth.currentUser;
       if (!u) throw new Error("Sign in required");
@@ -304,6 +313,18 @@ export default function TrainingPlanDayPreviewPage() {
           const dur = rawRecord.actualDurationSeconds;
           setLoggedActualDurationSeconds(
             typeof dur === "number" && Number.isFinite(dur) && dur > 0 ? dur : null
+          );
+          const planned = rawRecord.estimatedDistanceInMeters;
+          setLoggedPlannedDistanceMeters(
+            typeof planned === "number" && Number.isFinite(planned) && planned > 0 ? planned : null
+          );
+          const tp = rawRecord.targetPaceSecPerMile;
+          setLoggedTargetPaceSecPerMile(
+            typeof tp === "number" && Number.isFinite(tp) && tp > 0 ? tp : null
+          );
+          const tph = rawRecord.targetPaceSecPerMileHigh;
+          setLoggedTargetPaceSecPerMileHigh(
+            typeof tph === "number" && Number.isFinite(tph) && tph > 0 ? tph : null
           );
           setWorkoutDetailError(null);
         } catch (e) {
@@ -397,6 +418,29 @@ export default function TrainingPlanDayPreviewPage() {
     workoutId != null && !workoutLoading && !workoutError && matchedActivityId == null;
   const isLogged = matchedActivityId != null;
 
+  const loggedRunStatus = buildRunResultStatus({
+    plannedDistanceMeters: loggedPlannedDistanceMeters,
+    actualDistanceMeters: loggedActualDistanceMeters,
+    actualAvgPaceSecPerMile: loggedActualPaceSecPerMile,
+    targetPaceSecPerMile: loggedTargetPaceSecPerMile,
+    targetPaceSecPerMileHigh: loggedTargetPaceSecPerMileHigh,
+  });
+
+  useEffect(() => {
+    if (!authReady || loading || !matchedActivityId || !workoutId) return;
+    const back =
+      sourceSetup && planDetail ? `/training-setup/${planDetail.id}` : TRAINING_HUB_BACK_PATH;
+    router.replace(workoutDetailPathWithBackHref(workoutId, back));
+  }, [
+    authReady,
+    loading,
+    matchedActivityId,
+    workoutId,
+    sourceSetup,
+    planDetail,
+    router,
+  ]);
+
   function scrollToMatchPanel() {
     document.getElementById("match-garmin-panel")?.scrollIntoView({
       behavior: "smooth",
@@ -463,7 +507,13 @@ export default function TrainingPlanDayPreviewPage() {
       const token = await u.getIdToken();
       const wid =
         workoutId ?? (await resolveWorkoutForPlanDay(planDetail.id, dateKey, token));
-      stashWorkoutDayNav(wid, { source: "plan-preview", backPath: previewBackPath });
+      stashWorkoutDayNav(wid, {
+        source: "training-hub",
+        backPath:
+          sourceSetup && planDetail
+            ? `/training-setup/${planDetail.id}`
+            : TRAINING_HUB_BACK_PATH,
+      });
       router.push(`/workouts/${wid}`);
     } catch (e) {
       setOpenWorkoutError(e instanceof Error ? e.message : "Could not open workout");
@@ -549,6 +599,12 @@ export default function TrainingPlanDayPreviewPage() {
                       Ran: {metersToMiDisplay(loggedActualDistanceMeters)}
                     </p>
                   ) : null}
+                  {loggedRunStatus.distanceMessage ? (
+                    <p className="tabular-nums text-gray-700">{loggedRunStatus.distanceMessage}</p>
+                  ) : null}
+                  {loggedRunStatus.paceMessage ? (
+                    <p className="tabular-nums text-gray-700">{loggedRunStatus.paceMessage}</p>
+                  ) : null}
                   {loggedActualPaceSecPerMile != null ? (
                     <p className="tabular-nums">
                       Pace: {formatSecPerMile(loggedActualPaceSecPerMile)}
@@ -560,7 +616,7 @@ export default function TrainingPlanDayPreviewPage() {
                     </p>
                   ) : null}
                   <p className="text-gray-600 pt-1">
-                    Review your run results and coach read on the workout page.
+                    Review your run on the workout page. Add run context there to get coach feedback.
                   </p>
                 </div>
               ) : null}
@@ -682,7 +738,7 @@ export default function TrainingPlanDayPreviewPage() {
             <div className="border-t border-gray-100 px-5 py-4 space-y-3 bg-gray-50/60">
               {isLogged && workoutId ? (
                 <Link
-                  href={`/workouts/${workoutId}`}
+                  href={workoutDetailPathWithBackHref(workoutId, hubBackHref)}
                   className="block w-full text-center rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
                 >
                   Review run
@@ -750,7 +806,7 @@ export default function TrainingPlanDayPreviewPage() {
                 href={hubBackHref}
                 className="block w-full text-center rounded-xl border border-gray-200 bg-white py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
-                Back to plan
+                Back to Training Hub
               </Link>
             </div>
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
 import {
@@ -18,9 +18,9 @@ import {
 import RunContextPrompt from "@/components/training/RunContextPrompt";
 import {
   formatRecommendationDisplay,
-  shouldPromptRunContext,
   shouldShowProfileRecommendation,
 } from "@/lib/training/coach-read-display";
+import { buildRunResultStatus } from "@/lib/training/run-result-status";
 
 type MatchedActivitySummary = {
   activityName?: string | null;
@@ -45,8 +45,9 @@ interface WorkoutDeep {
   training_plans?: {
     currentFiveKPace?: string | null;
   } | null;
-  /** AI coach assessment (Garmin post-sync) */
   analysisJson?: RunAnalysisJsonV1 | unknown | null;
+  runContextTags?: string[] | null;
+  runContextNote?: string | null;
 }
 
 function formatSecPerMile(sec: number | null | undefined): string | null {
@@ -76,30 +77,27 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
   const [applyLoading, setApplyLoading] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadWorkout = useCallback(async () => {
     setLoading(true);
     setError(null);
-    void (async () => {
-      try {
-        const res = await api.get<{ workout: WorkoutDeep }>(`/training/workout/${workoutId}`);
-        const w = res.data?.workout;
-        if (cancelled) return;
-        if (w?.id) {
-          setWorkout(w);
-        } else {
-          setError("Could not load workout");
-        }
-      } catch {
-        if (!cancelled) setError("Could not load analysis");
-      } finally {
-        if (!cancelled) setLoading(false);
+    try {
+      const res = await api.get<{ workout: WorkoutDeep }>(`/training/workout/${workoutId}`);
+      const w = res.data?.workout;
+      if (w?.id) {
+        setWorkout(w);
+      } else {
+        setError("Could not load workout");
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    } catch {
+      setError("Could not load analysis");
+    } finally {
+      setLoading(false);
+    }
   }, [workoutId]);
+
+  useEffect(() => {
+    void loadWorkout();
+  }, [loadWorkout]);
 
   const analysis = workout?.analysisJson && isRunAnalysisJsonV1(workout.analysisJson)
     ? workout.analysisJson
@@ -129,9 +127,7 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
         field: rec.field,
         suggestedValue: rec.suggestedValue,
       });
-      const res = await api.get<{ workout: WorkoutDeep }>(`/training/workout/${workoutId}`);
-      const w = res.data?.workout;
-      if (w?.id) setWorkout(w);
+      await loadWorkout();
     } catch (e: unknown) {
       const msg =
         e && typeof e === "object" && "response" in e
@@ -145,10 +141,7 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
 
   if (loading) {
     return (
-      <div
-        aria-busy="true"
-        aria-label="Loading analysis"
-      >
+      <div aria-busy="true" aria-label="Loading analysis">
         <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Analysis</p>
         <SkeletonBlock />
       </div>
@@ -171,6 +164,14 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
       </div>
     );
   }
+
+  const runResultStatus = buildRunResultStatus({
+    plannedDistanceMeters: workout.estimatedDistanceInMeters,
+    actualDistanceMeters: workout.actualDistanceMeters,
+    actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
+    targetPaceSecPerMile: workout.targetPaceSecPerMile,
+    targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
+  });
 
   const hasPaceRangeForResults =
     workout.targetPaceSecPerMile != null &&
@@ -209,39 +210,46 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
   }
 
   const hasTargetPace = workout.targetPaceSecPerMile != null && workout.targetPaceSecPerMile > 0;
-
-  const showRunContextPrompt = shouldPromptRunContext({
-    plannedDistanceMeters: workout.estimatedDistanceInMeters,
-    actualDistanceMeters: workout.actualDistanceMeters,
-    targetPaceSecPerMile: workout.targetPaceSecPerMile,
-    targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
-    actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
-    paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
-  });
+  const showRunContextPrompt = !analysis;
 
   return (
     <div>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
         <p className="text-xs font-bold uppercase tracking-widest text-emerald-800">Analysis</p>
-        {resultsPaceBadgeLabel != null ? (
-          <span
-            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-              resultsPaceBadgeLabel === "in_range" || resultsPaceBadgeLabel === "single_on"
-                ? "bg-emerald-100 text-emerald-900 ring-1 ring-emerald-200"
-                : resultsPaceBadgeLabel === "faster" || resultsPaceBadgeLabel === "single_faster"
-                  ? "bg-sky-100 text-sky-900 ring-1 ring-sky-200"
-                  : "bg-amber-100 text-amber-900 ring-1 ring-amber-200"
-            }`}
-          >
-            {resultsPaceBadgeLabel === "single_faster"
-              ? "Faster than target"
-              : resultsPaceBadgeLabel === "single_slower"
-                ? "Slower than target"
-                : resultsPaceBadgeLabel === "single_on"
-                  ? "On target"
-                  : paceVsTargetBadgeText(resultsPaceBadgeLabel)}
-          </span>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          {runResultStatus.distanceStatus !== "unknown" ? (
+            <span
+              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                runResultStatus.distanceStatus === "on_plan"
+                  ? "bg-emerald-100 text-emerald-900 ring-1 ring-emerald-200"
+                  : runResultStatus.distanceStatus === "over"
+                    ? "bg-sky-100 text-sky-900 ring-1 ring-sky-200"
+                    : "bg-amber-100 text-amber-900 ring-1 ring-amber-200"
+              }`}
+            >
+              {runResultStatus.distanceBadge}
+            </span>
+          ) : null}
+          {resultsPaceBadgeLabel != null ? (
+            <span
+              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                resultsPaceBadgeLabel === "in_range" || resultsPaceBadgeLabel === "single_on"
+                  ? "bg-emerald-100 text-emerald-900 ring-1 ring-emerald-200"
+                  : resultsPaceBadgeLabel === "faster" || resultsPaceBadgeLabel === "single_faster"
+                    ? "bg-sky-100 text-sky-900 ring-1 ring-sky-200"
+                    : "bg-amber-100 text-amber-900 ring-1 ring-amber-200"
+              }`}
+            >
+              {resultsPaceBadgeLabel === "single_faster"
+                ? "Faster than target"
+                : resultsPaceBadgeLabel === "single_slower"
+                  ? "Slower than target"
+                  : resultsPaceBadgeLabel === "single_on"
+                    ? "On target"
+                    : paceVsTargetBadgeText(resultsPaceBadgeLabel)}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       {!hasTargetPace ? (
@@ -276,6 +284,9 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
             <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
               {(workout.actualDistanceMeters / 1609.34).toFixed(2)} mi
             </dd>
+            {runResultStatus.distanceMessage ? (
+              <dd className="mt-1 text-xs text-gray-600">{runResultStatus.distanceMessage}</dd>
+            ) : null}
           </div>
         ) : null}
         {workout.actualDurationSeconds != null && workout.actualDurationSeconds > 0 ? (
@@ -299,6 +310,17 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
           </div>
         ) : null}
       </dl>
+
+      {showRunContextPrompt ? (
+        <RunContextPrompt
+          className="mt-5"
+          workoutId={workoutId}
+          initialTags={workout.runContextTags}
+          initialNote={workout.runContextNote}
+          hasCoachFeedback={Boolean(analysis)}
+          onFeedbackReady={() => void loadWorkout()}
+        />
+      ) : null}
 
       {analysis ? (
         <div className="mt-5 rounded-2xl border border-violet-200 bg-violet-50/50 p-4">
@@ -337,9 +359,6 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
               >
                 {applyLoading ? "Applying…" : "Apply to my profile"}
               </button>
-              <p className="mt-2 text-xs text-gray-500">
-                Uses the same conservative update rules as automatic credits (capped per change).
-              </p>
             </div>
           ) : null}
           {analysis.recommendationAppliedAt ? (
@@ -347,8 +366,6 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
           ) : null}
         </div>
       ) : null}
-
-      {showRunContextPrompt ? <RunContextPrompt className="mt-5" /> : null}
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Link

@@ -75,7 +75,7 @@ export default function AthleteSidebar() {
           <span className="text-lg font-bold text-gray-900">GoFast</span>
         </Link>
         <p className="text-xs font-medium text-gray-700">Train for a goal</p>
-        <p className="text-xs text-gray-500 mt-0.5">Execution-first dashboard</p>
+        <p className="text-xs text-gray-500 mt-0.5">Your goal and training schedule</p>
       </div>
 
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto" aria-label="Primary">

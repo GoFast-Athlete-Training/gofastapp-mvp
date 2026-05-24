@@ -8,7 +8,6 @@ import { getAthleteByGarminUserId } from "../domain-garmin";
 import { parseDetailData } from "../training/detail-data-parser";
 import { convertLapsToDerived } from "../training/lap-converter";
 import { writeLapsToWorkout } from "../training/lap-data-to-workout";
-import { runRunAssessment } from "../training/run-assessment-service";
 
 export interface ActivityDetail {
   activityId: string | number;
@@ -98,20 +97,6 @@ export async function handleActivityDetail(
             }
           } catch (detailSnapErr) {
             console.warn("workout detail snapshot:", detailSnapErr);
-          }
-          try {
-            const linkedWorkout = await prisma.workouts.findFirst({
-              where: { matchedActivityId: row.id },
-              select: { id: true, athleteId: true },
-            });
-            if (linkedWorkout) {
-              void runRunAssessment({
-                workoutId: linkedWorkout.id,
-                athleteId: linkedWorkout.athleteId,
-              }).catch((e) => console.error("runRunAssessment (detail):", e));
-            }
-          } catch (reassessErr) {
-            console.warn("runRunAssessment enqueue after laps:", reassessErr);
           }
         }
         processed++;

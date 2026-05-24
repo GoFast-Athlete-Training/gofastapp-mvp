@@ -19,7 +19,7 @@ export type UpcomingWorkoutRow = {
     targets: unknown;
     paceTargetEncodingVersion?: number;
   }[];
-  /** Present when a DB row exists (open day in My Training). */
+  /** Present when a DB row exists (open day in Training Hub). */
   workoutId?: string | null;
   /** From plan schedule (`planSchedule`) before lazy materialization. */
   isPlanSession?: boolean;
@@ -112,7 +112,7 @@ export default function UpcomingRuns({ upcoming }: { upcoming: UpcomingWorkoutRo
         <p className="text-sm text-gray-500 mt-1">
           Past or missed workouts stay on{" "}
           <Link href="/workouts" className="text-orange-600 font-medium hover:underline">
-            My Training
+            Training Hub
           </Link>
           .
         </p>

@@ -22,7 +22,7 @@ function ScheduleRunPageInner() {
           className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to My Training
+          Back to Training Hub
         </button>
 
         <div className="flex items-center gap-2 mb-2">

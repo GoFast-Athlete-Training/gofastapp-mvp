@@ -14,7 +14,6 @@ import {
   scoreAndSortActivityCandidates,
   workoutMatchCandidateUtcRange,
 } from "@/lib/training/workout-activity-match-candidates";
-import { runRunAssessment } from "@/lib/training/run-assessment-service";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -329,11 +328,6 @@ export async function POST(request: NextRequest, ctx: Ctx) {
         { status: 409 }
       );
     }
-
-    void runRunAssessment({
-      workoutId: reassignResult.workoutId,
-      athleteId: auth.athlete.id,
-    }).catch((e) => console.error("runRunAssessment after manual match:", e));
 
     return NextResponse.json({
       success: true,

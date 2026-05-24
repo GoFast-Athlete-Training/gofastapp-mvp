@@ -28,6 +28,10 @@ type Props = {
   selectedDayDetail?: ReactNode;
   /** Hide full card list on small screens when detail is showing */
   collapseCardsOnMobile?: boolean;
+  /** Section label; pass null to hide (hub mode). */
+  sectionLabel?: string | null;
+  /** When false, calendar range is shown only in the hub goal strip. */
+  showCalendarRangeLabel?: boolean;
 };
 
 export default function PlanWeekCalendar({
@@ -44,6 +48,8 @@ export default function PlanWeekCalendar({
   onSelectDay,
   selectedDayDetail,
   collapseCardsOnMobile = false,
+  sectionLabel = "This week",
+  showCalendarRangeLabel = true,
 }: Props) {
   const atFirstWeek = weekNumber <= 1;
   const atLastWeek = weekNumber >= totalWeeks;
@@ -52,12 +58,18 @@ export default function PlanWeekCalendar({
     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-5 space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-            Plan calendar
-          </p>
+          {sectionLabel ? (
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              {sectionLabel}
+            </p>
+          ) : null}
           {summary ? (
             <>
-              <p className="mt-1 text-lg font-semibold text-gray-900 sm:text-xl">{summary.headline}</p>
+              <p
+                className={`${sectionLabel ? "mt-1" : ""} text-lg font-semibold text-gray-900 sm:text-xl`}
+              >
+                {summary.headline}
+              </p>
               <p className="mt-1 text-sm text-gray-700 leading-relaxed">{summary.narrative}</p>
               {summary.chips.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -73,12 +85,14 @@ export default function PlanWeekCalendar({
               ) : null}
             </>
           ) : (
-            <p className="mt-1 text-lg font-semibold text-gray-900 sm:text-xl">
+            <p
+              className={`${sectionLabel ? "mt-1" : ""} text-lg font-semibold text-gray-900 sm:text-xl`}
+            >
               Week {weekNumber} of {totalWeeks}
             </p>
           )}
-          {calendarRangeLabel ? (
-            <p className="mt-2 text-sm text-gray-500">Calendar week: {calendarRangeLabel}</p>
+          {showCalendarRangeLabel && calendarRangeLabel ? (
+            <p className="mt-2 text-sm text-gray-500">{calendarRangeLabel}</p>
           ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -160,7 +174,7 @@ export default function PlanWeekCalendar({
                         </p>
                         {w.matchedActivityId ? (
                           <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
-                            Logged
+                            Complete
                           </span>
                         ) : null}
                       </div>

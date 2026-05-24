@@ -12,6 +12,9 @@ export type RunAnalysisJsonV1 = {
     reason: string;
   } | null;
   recommendationAppliedAt?: string | null;
+  /** Snapshot of user context used when generating this analysis. */
+  contextTags?: string[];
+  contextNote?: string | null;
 };
 
 export function isRunAnalysisJsonV1(raw: unknown): raw is RunAnalysisJsonV1 {

@@ -13,7 +13,6 @@ import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import PlanWeekCalendar from "@/components/training/PlanWeekCalendar";
 import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
 import { buildWeekSummary } from "@/lib/training/week-summary-service";
-import { metersToMiDisplay } from "@/lib/training/workout-preview-payload";
 import {
   currentTrainingWeekNumber,
   effectiveTrainingWeekCount,
@@ -21,6 +20,7 @@ import {
   formatPlanDateDisplay,
   localTodayKey,
 } from "@/lib/training/plan-utils";
+import { workoutDetailPathWithBackHref } from "@/lib/training/workout-nav-query";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import {
   fetchTrainingPlanDetail,
@@ -308,8 +308,12 @@ export default function TrainingHubPage() {
     }
   }
 
-  function handleOpenSession(dateKey: string) {
-    router.push(`/training/day/${dateKey}`);
+  function handleOpenSession(day: PlanDayCard) {
+    if (day.workoutId) {
+      router.push(workoutDetailPathWithBackHref(day.workoutId, "/training"));
+      return;
+    }
+    router.push(`/training/day/${day.dateKey}`);
   }
 
   async function deleteActivePlan() {
@@ -338,7 +342,7 @@ export default function TrainingHubPage() {
     }
   }
 
-  const showDashboard = !!planDetail && hasSchedule(planDetail);
+  const showTrainingHub = !!planDetail && hasSchedule(planDetail);
   const showIncompletePlan = !!planDetail && !hasSchedule(planDetail);
 
   const todayKey = localTodayKey();
@@ -376,13 +380,9 @@ export default function TrainingHubPage() {
         <div className="mb-6 lg:mb-8">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Train</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Training Hub</h1>
               <p className="text-gray-600 text-sm sm:text-base">
-                Your schedule this week. Logged runs and analysis live in{" "}
-                <Link href="/performance" className="font-semibold text-orange-600 hover:text-orange-700">
-                  Performance
-                </Link>
-                .
+                Your goal, this week&apos;s plan, and what to do next.
               </p>
             </div>
             <Link
@@ -570,9 +570,9 @@ export default function TrainingHubPage() {
           </div>
         )}
 
-        {showDashboard && planDetail && (
+        {showTrainingHub && planDetail && (
           <div className="space-y-4 mb-8">
-            {/* Plan header — week context + miles all in one place */}
+            {/* Goal strip — plan, race, week progress */}
             <div className="flex flex-col gap-3 rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 text-sm sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-gray-900">{planDetail.name}</p>
@@ -679,7 +679,7 @@ export default function TrainingHubPage() {
               </div>
             ) : null}
 
-            {/* Plan calendar — week strip, colored cards, selected day detail */}
+            {/* Week calendar and selected workout */}
             <div id="training-section-this-week" className="scroll-mt-24">
               <PlanWeekCalendar
                 weekNumber={weekNumber}
@@ -694,6 +694,8 @@ export default function TrainingHubPage() {
                 onNextWeek={goNextWeek}
                 onSelectDay={(d) => setSelectedDayKey(d.dateKey)}
                 collapseCardsOnMobile
+                sectionLabel={null}
+                showCalendarRangeLabel={false}
                 selectedDayDetail={
                   !loadingWeek ? (
                 <div
@@ -715,14 +717,11 @@ export default function TrainingHubPage() {
                     focusPlanDay.matchedActivityId ? (
                       <>
                         <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-emerald-800">
-                          Workout logged
+                          Workout complete
                         </p>
                         <h2 className="mt-1 text-2xl font-bold text-gray-900">
-                          Workout logged!
-                        </h2>
-                        <p className="mt-2 text-lg font-semibold text-gray-800">
                           {displayWorkoutListTitle(focusPlanDay)}
-                        </p>
+                        </h2>
                         <p className="mt-1 text-sm text-gray-600">
                           {formatPlanDateDisplay(focusPlanDay.dateKey || String(focusPlanDay.date), {
                             weekday: "long",
@@ -730,37 +729,16 @@ export default function TrainingHubPage() {
                             day: "numeric",
                           })}
                           <span className="ml-2 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
-                            Logged
+                            Complete
                           </span>
                         </p>
-                        <div className="mt-4 space-y-1 rounded-xl border border-emerald-100 bg-white/70 px-4 py-3 text-sm text-gray-800">
-                          <p className="tabular-nums">
-                            <span className="text-gray-500">Scheduled: </span>
-                            {planDayMilesDisplay(focusPlanDay.estimatedDistanceInMeters)}
-                          </p>
-                          {focusPlanDay.actualDistanceMeters != null &&
-                          focusPlanDay.actualDistanceMeters > 0 ? (
-                            <p className="tabular-nums font-medium text-gray-900">
-                              Ran: {metersToMiDisplay(focusPlanDay.actualDistanceMeters)}
-                            </p>
-                          ) : null}
-                          {focusPlanDay.actualAvgPaceSecPerMile != null ? (
-                            <p className="tabular-nums">
-                              <span className="text-gray-500">Pace: </span>
-                              {formatSecPerMile(focusPlanDay.actualAvgPaceSecPerMile)}
-                            </p>
-                          ) : null}
-                          {formatDurationSeconds(focusPlanDay.actualDurationSeconds) ? (
-                            <p className="tabular-nums">
-                              <span className="text-gray-500">Time: </span>
-                              {formatDurationSeconds(focusPlanDay.actualDurationSeconds)}
-                            </p>
-                          ) : null}
-                        </div>
+                        <p className="mt-3 text-sm text-gray-600">
+                          Full results and coach feedback are on the workout page.
+                        </p>
                         <div className="mt-5 flex flex-wrap items-center gap-3">
                           {focusPlanDay.workoutId ? (
                             <Link
-                              href={`/workouts/${focusPlanDay.workoutId}`}
+                              href={workoutDetailPathWithBackHref(focusPlanDay.workoutId, "/training")}
                               className="inline-flex justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
                             >
                               Review run
@@ -799,7 +777,7 @@ export default function TrainingHubPage() {
                           ) : null}
                           <button
                             type="button"
-                            onClick={() => handleOpenSession(focusPlanDay.dateKey)}
+                            onClick={() => handleOpenSession(focusPlanDay)}
                             disabled={pushingGarmin}
                             className="inline-flex justify-center rounded-xl border-2 border-orange-300 bg-white px-6 py-3 text-sm font-semibold text-orange-900 hover:bg-orange-50 disabled:opacity-50"
                           >
@@ -899,7 +877,7 @@ export default function TrainingHubPage() {
           </div>
         )}
 
-        {authReady && !loading && !showDashboard && (
+        {authReady && !loading && !showTrainingHub && (
           <div className="mb-8">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
               More in training

@@ -9,7 +9,6 @@ import { activityExists } from './dedupe';
 import { normalizeActivityFields } from './normalizeActivityFields';
 import { tryMatchActivityToTrainingWorkout } from '../training/match-activity-to-workout';
 import { promoteUnmatchedRunningActivityToWorkout } from '../training/promote-activity-to-workout';
-import { runRunAssessment } from '../training/run-assessment-service';
 import { tryMatchActivityToBikeWorkout } from '../training/match-activity-to-bike-workout';
 import { isCyclingActivityType } from '../training/activity-type-sets';
 
@@ -120,24 +119,13 @@ export async function handleActivitySummary(
           await tryMatchActivityToBikeWorkout(created.id);
         } else {
           const matchResult = await tryMatchActivityToTrainingWorkout(created.id);
-          let workoutIdForAssessment: string | undefined = matchResult.matched
-            ? matchResult.workoutId
-            : undefined;
 
           const ingestRow = await prisma.athlete_activities.findUnique({
             where: { id: created.id },
             select: { ingestionStatus: true },
           });
-          if (!workoutIdForAssessment && ingestRow?.ingestionStatus === 'UNMATCHED') {
-            const promoteResult = await promoteUnmatchedRunningActivityToWorkout(created.id);
-            workoutIdForAssessment = promoteResult.workoutId;
-          }
-
-          if (workoutIdForAssessment) {
-            void runRunAssessment({
-              workoutId: workoutIdForAssessment,
-              athleteId: athlete.id,
-            }).catch((e) => console.error('runRunAssessment:', e));
+          if (!matchResult.matched && ingestRow?.ingestionStatus === 'UNMATCHED') {
+            await promoteUnmatchedRunningActivityToWorkout(created.id);
           }
         }
         console.log("✅ match attempt complete", {
