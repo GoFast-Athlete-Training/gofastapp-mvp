@@ -33,6 +33,7 @@ import {
   fetchPlanWeekSchedule,
   type PlanDayCard,
 } from "@/lib/training/fetch-plan-week-client";
+import { planScheduleLooksStructured } from "@/lib/training/plan-schedule-schema";
 import { getRacePhase } from "@/lib/race-calendar-phase";
 
 type PlanDetailHub = {
@@ -48,7 +49,17 @@ type PlanDetailHub = {
 };
 
 function hasSchedule(p: PlanDetailHub): boolean {
-  return Array.isArray(p.planSchedule) && (p.planSchedule as unknown[]).length > 0;
+  if (!Array.isArray(p.planSchedule) || (p.planSchedule as unknown[]).length === 0) {
+    return false;
+  }
+  if (planScheduleLooksStructured(p.planSchedule)) return true;
+  return (p.planSchedule as unknown[]).some(
+    (w) =>
+      w &&
+      typeof w === "object" &&
+      typeof (w as { schedule?: unknown }).schedule === "string" &&
+      String((w as { schedule: string }).schedule).trim().length > 0
+  );
 }
 
 function effectiveWeeksForPlanHub(p: PlanDetailHub): number {
