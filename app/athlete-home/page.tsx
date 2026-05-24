@@ -728,13 +728,26 @@ export default function AthleteHomePage() {
   const goalPhase = getRacePhase(goalRaceIsoStr);
   const goalDaysUntil = raceCalendarDaysFromTodayUtc(goalRaceIsoStr);
 
+  const nextTrainingIncomplete =
+    upcomingSessions.find(
+      (s: { matchedActivityId?: string | null; isPlanSession?: boolean }) =>
+        !s.matchedActivityId && s.isPlanSession
+    ) ??
+    upcomingSessions.find(
+      (s: { matchedActivityId?: string | null }) => !s.matchedActivityId
+    ) ??
+    null;
   const nextTraining =
+    nextTrainingIncomplete ??
     upcomingSessions.find((s: { isPlanSession?: boolean }) => s.isPlanSession) ??
     upcomingSessions[0] ??
     null;
+  const nextTrainingComplete = Boolean(nextTraining?.matchedActivityId);
   const nextTrainingHref =
     nextTraining?.workoutId && String(nextTraining.workoutId).length > 0
-      ? `/workouts/${nextTraining.workoutId}`
+      ? nextTrainingComplete
+        ? `/workouts/${nextTraining.workoutId}?back=/training`
+        : `/workouts/${nextTraining.workoutId}`
       : '/training';
   const nextTrainingDay =
     nextTraining?.date != null
@@ -930,6 +943,13 @@ export default function AthleteHomePage() {
   let todayRunIcon = Footprints;
   let todayTypeLabel = 'Workout';
   let todayStoredTitleSubtitle: string | null = null;
+  const todayPlanComplete = Boolean(todayPlanDay?.matchedActivityId);
+  const todayPlanHref =
+    todayPlanComplete && todayPlanDay?.workoutId
+      ? `/workouts/${todayPlanDay.workoutId}?back=/training`
+      : todayPlanDay?.dateKey
+        ? `/training/day/${todayPlanDay.dateKey}`
+        : '/training';
   if (todayPlanDay) {
     const tm = workoutTypeMeta(todayPlanDay.workoutType);
     todayRunIcon = tm.Icon;
@@ -1233,21 +1253,44 @@ export default function AthleteHomePage() {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">
               <div className="lg:col-span-3">
                 {todayPlanDay ? (
-                  <div className="rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-5 shadow-sm h-full flex flex-col">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-orange-900">
-                      Today&apos;s run
+                  <div
+                    className={`rounded-2xl border-2 p-5 shadow-sm h-full flex flex-col ${
+                      todayPlanComplete
+                        ? 'border-emerald-300 bg-gradient-to-br from-emerald-50 to-white'
+                        : 'border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50'
+                    }`}
+                  >
+                    <p
+                      className={`text-xs font-semibold uppercase tracking-wide ${
+                        todayPlanComplete ? 'text-emerald-800' : 'text-orange-900'
+                      }`}
+                    >
+                      {todayPlanComplete ? 'Your run' : "Today's run"}
                     </p>
                     <div className="mt-3 flex items-start gap-3">
                       {(() => {
                         const Icon = todayRunIcon;
-                        return <Icon className="h-9 w-9 shrink-0 text-orange-600" aria-hidden />;
+                        return (
+                          <Icon
+                            className={`h-9 w-9 shrink-0 ${
+                              todayPlanComplete ? 'text-emerald-600' : 'text-orange-600'
+                            }`}
+                            aria-hidden
+                          />
+                        );
                       })()}
                       <div className="min-w-0 flex-1">
                         <p className="text-2xl font-bold text-gray-900 leading-tight">{todayTypeLabel}</p>
-                        <p className="text-lg font-semibold text-gray-800 tabular-nums mt-1">
-                          {planDayMilesHome(todayPlanDay.estimatedDistanceInMeters)} total
-                        </p>
-                        {todayStoredTitleSubtitle ? (
+                        {todayPlanComplete ? (
+                          <p className="text-lg font-semibold text-emerald-800 mt-1">
+                            Workout complete
+                          </p>
+                        ) : (
+                          <p className="text-lg font-semibold text-gray-800 tabular-nums mt-1">
+                            {planDayMilesHome(todayPlanDay.estimatedDistanceInMeters)} total
+                          </p>
+                        )}
+                        {todayStoredTitleSubtitle && !todayPlanComplete ? (
                           <p className="text-xs text-gray-600 mt-2 italic leading-snug">
                             {todayStoredTitleSubtitle}
                             <span className="not-italic text-gray-500 block mt-1">
@@ -1262,14 +1305,18 @@ export default function AthleteHomePage() {
                             day: 'numeric',
                           })}
                           {todayPlanDay.matchedActivityId ? (
-                            <span className="ml-2 font-semibold text-emerald-700">· Done</span>
+                            <span className="ml-2 font-semibold text-emerald-700">· Complete</span>
                           ) : null}
                         </p>
                         <Link
-                          href={`/training/day/${todayPlanDay.dateKey}`}
-                          className="mt-4 inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 w-full sm:w-auto"
+                          href={todayPlanHref}
+                          className={`mt-4 inline-flex justify-center rounded-xl px-5 py-2.5 text-sm font-semibold text-white w-full sm:w-auto ${
+                            todayPlanComplete
+                              ? 'bg-emerald-600 hover:bg-emerald-700'
+                              : 'bg-orange-600 hover:bg-orange-700'
+                          }`}
                         >
-                          Open today&apos;s session
+                          {todayPlanComplete ? 'Review run' : 'Open today&apos;s session'}
                         </Link>
                       </div>
                     </div>
@@ -1277,7 +1324,7 @@ export default function AthleteHomePage() {
                 ) : activePlanSummary?.hasSchedule ? (
                   <div className="rounded-xl border border-dashed border-gray-300 bg-white p-5 shadow-sm h-full flex flex-col justify-center">
                     <p className="text-sm font-medium text-gray-800">No session on your schedule today</p>
-                    <p className="text-gray-600 text-sm mt-1">Log a run or check your week in Plan.</p>
+                    <p className="text-gray-600 text-sm mt-1">Log a run or check your week in Training Hub.</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Link
                         href="/performance"
@@ -1286,7 +1333,7 @@ export default function AthleteHomePage() {
                         Performance →
                       </Link>
                       <Link href="/training" className="text-sm font-semibold text-gray-700 hover:text-gray-900">
-                        Week view →
+                        Training Hub →
                       </Link>
                     </div>
                   </div>
@@ -1501,7 +1548,7 @@ export default function AthleteHomePage() {
               {showTrainingAtGlance ? (
                 <div className={`${cardTraining} lg:col-span-3 cursor-default hover:border-emerald-200`}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800 mb-1">
-                    Training plan
+                    Training Hub
                   </p>
                   {activePlanSummary?.name ? (
                     <h2 className="text-lg font-semibold text-gray-900 leading-snug">
@@ -1512,7 +1559,7 @@ export default function AthleteHomePage() {
                   )}
                   <div className="mt-3 pt-3 border-t border-emerald-200/80">
                     <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900 mb-2">
-                      Next session
+                      {nextTrainingComplete ? 'Latest completed' : 'Next session'}
                     </p>
                     {nextTraining ? (
                       <>
@@ -1530,17 +1577,25 @@ export default function AthleteHomePage() {
                               </span>
                             </>
                           ) : null}
+                          {nextTrainingComplete ? (
+                            <span className="ml-1 font-semibold text-emerald-700">· Complete</span>
+                          ) : null}
                         </p>
-                        {nextTrainingPace ? (
+                        {!nextTrainingComplete && nextTrainingPace ? (
                           <p className="text-sm text-gray-700 mt-2">
                             Target <span className="font-medium">{nextTrainingPace}</span>
+                          </p>
+                        ) : null}
+                        {nextTrainingComplete ? (
+                          <p className="text-sm text-gray-700 mt-2">
+                            Workout complete — review your pace, distance, and coach feedback.
                           </p>
                         ) : null}
                         <Link
                           href={nextTrainingHref}
                           className="text-sm font-semibold text-emerald-800 mt-2 inline-block hover:underline"
                         >
-                          Open workout →
+                          {nextTrainingComplete ? 'Review run →' : 'Open workout →'}
                         </Link>
                       </>
                     ) : (
@@ -1550,14 +1605,14 @@ export default function AthleteHomePage() {
                           href="/training"
                           className="text-sm font-semibold text-emerald-800 mt-2 inline-block hover:underline"
                         >
-                          Plan hub →
+                          Training Hub →
                         </Link>
                       </>
                     )}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm font-medium text-emerald-900">
                     <Link href="/training" className="hover:underline">
-                      Plan hub
+                      Training Hub
                     </Link>
                     <Link href="/profile#goal" className="hover:underline">
                       Goal
@@ -1572,7 +1627,7 @@ export default function AthleteHomePage() {
                   className={`${cardTraining} lg:col-span-3 cursor-default hover:border-emerald-200 hover:shadow-sm`}
                 >
                   <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800 mb-1">
-                    Training plan
+                    Training Hub
                   </p>
                   <h2 className="text-lg font-semibold text-gray-900">Start your plan</h2>
                   <p className="text-sm text-gray-700 mt-2">
@@ -1630,14 +1685,11 @@ export default function AthleteHomePage() {
             activePlanSummary?.hasSchedule ? (
               <div className="mb-6 rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3 text-sm text-gray-800">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                  This week (plan)
+                  This week
                 </p>
                 <p className="font-semibold text-gray-900 tabular-nums">
                   {weekPlanProgress.sessionsCompleted} of {weekPlanProgress.sessionsPlanned}{' '}
-                  sessions logged
-                  {weekPlanProgress.qualitySessionsPlanned > 0
-                    ? ` · ${weekPlanProgress.qualitySessionsCompleted}/${weekPlanProgress.qualitySessionsPlanned} quality`
-                    : ''}
+                  sessions complete
                 </p>
                 {weekPlanProgress.plannedMetersTotal > 0 ? (
                   <p className="mt-1 tabular-nums text-gray-700">
@@ -1653,15 +1705,15 @@ export default function AthleteHomePage() {
                   <p className="mt-1 text-gray-700">
                     Long run:{' '}
                     {weekPlanProgress.longRunCompleted
-                      ? `logged (${Math.round(weekPlanProgress.longRunCompletionRatio * 100)}% of planned)`
-                      : 'not logged yet'}
+                      ? `complete (${Math.round(weekPlanProgress.longRunCompletionRatio * 100)}% of planned)`
+                      : 'not complete yet'}
                   </p>
                 ) : null}
                 <Link
                   href="/training"
                   className="mt-2 inline-block text-sm font-semibold text-orange-700 hover:text-orange-800"
                 >
-                  Open Plan →
+                  Open Training Hub →
                 </Link>
               </div>
             ) : null}
@@ -1671,7 +1723,7 @@ export default function AthleteHomePage() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      Last synced run
+                      Latest run
                     </p>
                     <Link
                       href="/performance"
@@ -1721,12 +1773,12 @@ export default function AthleteHomePage() {
                 <Link
                   href={
                     lastSyncedActivity.linkedWorkoutId
-                      ? `/workouts/${lastSyncedActivity.linkedWorkoutId}`
+                      ? `/workouts/${lastSyncedActivity.linkedWorkoutId}?back=/training`
                       : `/activities/${lastSyncedActivity.id}`
                   }
                   className="shrink-0 text-sm font-semibold text-orange-600 hover:text-orange-700"
                 >
-                  {lastSyncedActivity.linkedWorkoutId ? 'View workout →' : 'View activity →'}
+                  {lastSyncedActivity.linkedWorkoutId ? 'Review run →' : 'View activity →'}
                 </Link>
               </div>
             ) : null}
@@ -1734,7 +1786,8 @@ export default function AthleteHomePage() {
             {lastSyncedActivity?.distance != null &&
             lastSyncedActivity.distance > 0 &&
             lastSyncedActivity.duration != null &&
-            lastSyncedActivity.duration > 0 ? (
+            lastSyncedActivity.duration > 0 &&
+            !lastSyncedActivity.linkedWorkoutId ? (
               <div className="mb-6">
                 <PaceContextCard
                   variant="embedded"
@@ -1765,7 +1818,7 @@ export default function AthleteHomePage() {
                   <span className="font-medium">
                     {paceNotifications[0].adjustmentSecPerMile > 0
                       ? '5K pace updated · '
-                      : 'Weekly review · '}
+                      : 'Training note · '}
                   </span>
                   <span className="text-gray-700">{paceNotifications[0].summaryMessage}</span>
                 </p>
