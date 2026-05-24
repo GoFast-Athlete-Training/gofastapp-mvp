@@ -10,8 +10,9 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
-import WeekStrip from "@/components/training/WeekStrip";
+import PlanWeekCalendar from "@/components/training/PlanWeekCalendar";
 import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
+import { buildWeekSummary } from "@/lib/training/week-summary-service";
 import { metersToMiDisplay } from "@/lib/training/workout-preview-payload";
 import {
   currentTrainingWeekNumber,
@@ -198,21 +199,7 @@ export default function TrainingHubPage() {
           effectiveWeeksForPlanHub(plan)
         );
         setWeekNumber(wn);
-        setLoadingWeek(true);
-        try {
-          const { days } = await fetchPlanWeekSchedule(
-            planId,
-            wn,
-            token
-          );
-          setWeekDays(days);
-          setSelectedDayKey(localTodayKey());
-        } catch (e) {
-          setHubError(e instanceof Error ? e.message : "Could not load this week");
-          setWeekDays([]);
-        } finally {
-          setLoadingWeek(false);
-        }
+        setSelectedDayKey(localTodayKey());
       }
     } catch (e) {
       setHubError(e instanceof Error ? e.message : "Load failed");
@@ -237,6 +224,37 @@ export default function TrainingHubPage() {
     if (!authReady) return;
     void loadHub();
   }, [authReady, loadHub]);
+
+  const fetchWeekDays = useCallback(
+    async (wn: number) => {
+      if (!planDetail || !hasSchedule(planDetail)) return;
+      setLoadingWeek(true);
+      try {
+        const u = auth.currentUser;
+        if (!u) return;
+        const token = await u.getIdToken();
+        const { days } = await fetchPlanWeekSchedule(planDetail.id, wn, token);
+        setWeekDays(days);
+        const today = localTodayKey();
+        setSelectedDayKey((prev) => {
+          if (days.some((d) => d.dateKey === prev)) return prev;
+          if (days.some((d) => d.dateKey === today)) return today;
+          return days[0]?.dateKey ?? today;
+        });
+      } catch (e) {
+        setHubError(e instanceof Error ? e.message : "Could not load this week");
+        setWeekDays([]);
+      } finally {
+        setLoadingWeek(false);
+      }
+    },
+    [planDetail]
+  );
+
+  useEffect(() => {
+    if (!authReady || !planDetail || !hasSchedule(planDetail)) return;
+    void fetchWeekDays(weekNumber);
+  }, [authReady, planDetail?.id, weekNumber, fetchWeekDays]);
 
   useEffect(() => {
     if (!authReady) return;
@@ -281,17 +299,7 @@ export default function TrainingHubPage() {
           : "Sent to Garmin. Sync your watch in Garmin Connect."
       );
       if (planDetail) {
-        setLoadingWeek(true);
-        try {
-          const { days } = await fetchPlanWeekSchedule(
-            planDetail.id,
-            weekNumber,
-            token
-          );
-          setWeekDays(days);
-        } finally {
-          setLoadingWeek(false);
-        }
+        void fetchWeekDays(weekNumber);
       }
     } catch (e) {
       setGarminPushMessage(e instanceof Error ? e.message : "Push failed");
@@ -344,6 +352,23 @@ export default function TrainingHubPage() {
     if (!Number.isFinite(m) || m <= 0) return null;
     return Math.round((m / 1609.34) * 10) / 10;
   }, [weekDays]);
+
+  const weekSummary = useMemo(() => {
+    if (!weekDays.length) return null;
+    return buildWeekSummary({
+      weekNumber,
+      totalWeeks: effectiveTotalWeeks,
+      days: weekDays,
+    });
+  }, [weekDays, weekNumber, effectiveTotalWeeks]);
+
+  function goPrevWeek() {
+    setWeekNumber((n) => Math.max(1, n - 1));
+  }
+
+  function goNextWeek() {
+    setWeekNumber((n) => Math.min(effectiveTotalWeeks, n + 1));
+  }
 
   return (
     <AthleteAppShell>
@@ -567,12 +592,6 @@ export default function TrainingHubPage() {
                 ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <Link
-                  href={`/training-setup/${planDetail.id}`}
-                  className="inline-flex justify-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 sm:text-sm sm:px-4 sm:py-2"
-                >
-                  View schedule
-                </Link>
                 <div className="relative">
                   <button
                     type="button"
@@ -660,27 +679,23 @@ export default function TrainingHubPage() {
               </div>
             ) : null}
 
-            {/* Week strip + day detail — adjacent so tapping a day shows instantly */}
-            <div id="training-section-this-week" className="scroll-mt-24 space-y-3">
-              {loadingWeek && (
-                <p className="text-sm text-gray-500">Loading this week…</p>
-              )}
-              {!loadingWeek && weekDays.length > 0 && (
-                <WeekStrip
-                  days={weekDays}
-                  todayKey={todayKey}
-                  selectedDateKey={focusKey}
-                  onSelectDay={(d) => {
-                    setSelectedDayKey(d.dateKey);
-                  }}
-                />
-              )}
-              {!loadingWeek && weekDays.length === 0 && (
-                <p className="text-sm text-gray-600">No sessions this week in the schedule.</p>
-              )}
-
-              {/* Day detail — immediately after the strip */}
-              {!loadingWeek && (
+            {/* Plan calendar — week strip, colored cards, selected day detail */}
+            <div id="training-section-this-week" className="scroll-mt-24">
+              <PlanWeekCalendar
+                weekNumber={weekNumber}
+                totalWeeks={effectiveTotalWeeks}
+                days={weekDays}
+                loading={loadingWeek}
+                todayKey={todayKey}
+                selectedDateKey={focusKey}
+                calendarRangeLabel={calendarRangeLabel}
+                summary={weekSummary}
+                onPrevWeek={goPrevWeek}
+                onNextWeek={goNextWeek}
+                onSelectDay={(d) => setSelectedDayKey(d.dateKey)}
+                collapseCardsOnMobile
+                selectedDayDetail={
+                  !loadingWeek ? (
                 <div
                   id="training-section-today"
                   className={
@@ -855,7 +870,9 @@ export default function TrainingHubPage() {
                     </>
                   )}
                 </div>
-              )}
+                  ) : null
+                }
+              />
             </div>
 
             {/* Secondary actions — always visible, not buried */}
@@ -879,28 +896,6 @@ export default function TrainingHubPage() {
                 Workout log
               </Link>
             </div>
-
-            {/* Full schedule collapsible */}
-            {planDetail ? (
-              <details className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm group">
-                <summary className="cursor-pointer font-medium text-gray-900 py-1 list-none [&::-webkit-details-marker]:hidden flex items-center gap-2">
-                  <span className="text-gray-400 group-open:rotate-90 transition inline-block">›</span>
-                  Full schedule ({effectiveTotalWeeks} weeks)
-                </summary>
-                <div className="pt-2 pb-1 text-gray-600 space-y-2">
-                  <p>
-                    Open the calendar to see every week, edit days, and regenerate when your goal
-                    changes.
-                  </p>
-                  <Link
-                    href={`/training-setup/${planDetail.id}`}
-                    className="inline-block font-semibold text-emerald-700 hover:text-emerald-800"
-                  >
-                    Open plan calendar →
-                  </Link>
-                </div>
-              </details>
-            ) : null}
           </div>
         )}
 

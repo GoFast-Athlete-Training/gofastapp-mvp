@@ -3,17 +3,16 @@
 import { useCallback, useEffect, useMemo, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, LayoutList } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
-import PhaseViewModal, { type PlanWeekRow } from "@/components/training/PhaseViewModal";
+import PlanWeekCalendar from "@/components/training/PlanWeekCalendar";
 import {
   parsePhasesJson,
   phaseNameForWeek,
   type PhaseRange,
 } from "@/lib/training/plan-phases";
-import { cataloguePhaseFallbackForWeek } from "@/lib/training/plan-utils";
+import { cataloguePhaseFallbackForWeek, localTodayKey } from "@/lib/training/plan-utils";
 import {
   effectiveTrainingWeekCount,
   formatCalendarWeekRangeLabel,
@@ -27,6 +26,25 @@ import {
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import { validatePreferredTempoInterval } from "@/lib/training/preferred-tempo-interval";
 import { isStructuredPlanWeek, type PlanDaySchedule } from "@/lib/training/plan-schedule-schema";
+import { buildWeekSummary } from "@/lib/training/week-summary-service";
+import {
+  formatWeekCardMiles,
+  workoutCardPrimaryName,
+  workoutCardSubtypeLine,
+} from "@/lib/training/plan-day-card-display";
+
+type PlanWeekRow =
+  | { weekNumber: number; phase: string; schedule: string }
+  | {
+      weekNumber: number;
+      phase: string;
+      structuredDays: Array<{
+        dow: number;
+        miles: number;
+        workoutType: string;
+        planCycleIndex: number | null;
+      }>;
+    };
 
 type PlanPresetSummary = {
   id: string;
@@ -76,77 +94,6 @@ const LONG_RUN_DAY_OPTIONS: { value: number; label: string }[] = [
   { value: 7, label: "Sunday" },
 ];
 
-const MI_PER_M = 1609.34;
-
-function typeLabelForCard(workoutType: string): string {
-  switch (workoutType) {
-    case "Easy":
-      return "Easy";
-    case "Tempo":
-      return "Tempo";
-    case "Intervals":
-      return "Intervals";
-    case "LongRun":
-      return "Long run";
-    case "Race":
-      return "Race";
-    default:
-      return "Run";
-  }
-}
-
-/** Bold primary line: catalogue / custom title when present; else type label (no miles). */
-function workoutCardPrimaryName(w: PlanDayCard): string {
-  const raw = w.title.trim();
-  if (/^Race\s*—/i.test(raw)) return raw;
-  if (/\b—\s*Week\s*\d+/i.test(raw) || /\bWeek\s*\d+\s*$/i.test(raw)) {
-    return typeLabelForCard(w.workoutType);
-  }
-  if (raw.length > 0) return raw;
-  return typeLabelForCard(w.workoutType);
-}
-
-function weekTotalMilesDisplay(days: PlanDayCard[]): string {
-  const m =
-    days.reduce((s, d) => s + (d.estimatedDistanceInMeters ?? 0), 0) / MI_PER_M;
-  if (!Number.isFinite(m) || m <= 0) return "—";
-  const rounded = Math.round(m * 10) / 10;
-  return `${rounded} mi`;
-}
-
-function formatWeekCardMiles(
-  estimatedDistanceInMeters: number | null
-): string {
-  if (
-    estimatedDistanceInMeters == null ||
-    !Number.isFinite(estimatedDistanceInMeters)
-  ) {
-    return "";
-  }
-  const mi = estimatedDistanceInMeters / MI_PER_M;
-  const rounded =
-    Math.abs(mi - Math.round(mi)) < 0.06
-      ? Math.round(mi)
-      : Math.round(mi * 10) / 10;
-  return `${rounded} mi`;
-}
-
-function workoutTypeLeftBorderClass(workoutType: string): string {
-  switch (workoutType) {
-    case "Easy":
-      return "bg-green-400";
-    case "LongRun":
-      return "bg-purple-500";
-    case "Tempo":
-      return "bg-amber-400";
-    case "Intervals":
-      return "bg-orange-500";
-    case "Race":
-      return "bg-red-500";
-    default:
-      return "bg-gray-400";
-  }
-}
 
 function parsePlanWeekOverviewRows(planSchedule: unknown): PlanWeekRow[] {
   if (!Array.isArray(planSchedule)) return [];
@@ -187,7 +134,7 @@ export default function TrainingSetupPlanPage({
   const [generating, setGenerating] = useState(false);
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [weekNumber, setWeekNumber] = useState(1);
-  const [phaseModalOpen, setPhaseModalOpen] = useState(false);
+  const [selectedDayKey, setSelectedDayKey] = useState("");
   const [preferredDaysLocal, setPreferredDaysLocal] = useState<number[]>([]);
   const [weeklyMilesTarget, setWeeklyMilesTarget] = useState("");
   const [preferredLongRunDowLocal, setPreferredLongRunDowLocal] = useState(6);
@@ -318,9 +265,6 @@ export default function TrainingSetupPlanPage({
   }, [plan?.planSchedule]);
   const hasSchedule = hasPlanSchedulePersisted;
 
-  const showPhaseModalButton =
-    phaseRanges.length > 0 || weekEntries.length > 0;
-
   const preferredCount = useMemo(
     () => preferredDaysLocal.filter((d) => d >= 1 && d <= 7).length,
     [preferredDaysLocal]
@@ -402,19 +346,6 @@ export default function TrainingSetupPlanPage({
     plan?.startDate,
   ]);
 
-  const showWeekPhaseBadge = useMemo(() => {
-    const relevant = weekEntries.filter(
-      (e) => e.weekNumber <= effectiveTotalWeeks
-    );
-    if (relevant.length < 2) return false;
-    const labels = new Set(
-      relevant.map((e) =>
-        phaseNameForWeek(phaseRanges, e.weekNumber, e.phase?.trim() ?? "")
-      )
-    );
-    return labels.size > 1;
-  }, [weekEntries, effectiveTotalWeeks, phaseRanges]);
-
   const calendarWeekRangeLabel = useMemo(() => {
     if (!plan) return "";
     return formatCalendarWeekRangeLabel(plan.startDate, weekNumber, {
@@ -431,6 +362,12 @@ export default function TrainingSetupPlanPage({
         const token = await getToken();
         const { days } = await fetchPlanWeekSchedule(planId, wn, token);
         setWeekDays(days);
+        const today = localTodayKey();
+        setSelectedDayKey((prev) => {
+          if (days.some((d) => d.dateKey === prev)) return prev;
+          if (days.some((d) => d.dateKey === today)) return today;
+          return days[0]?.dateKey ?? today;
+        });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Week load failed");
         setWeekDays([]);
@@ -585,7 +522,25 @@ export default function TrainingSetupPlanPage({
     setWeekNumber((n) => Math.min(effectiveTotalWeeks, n + 1));
   }
 
+  const todayKey = localTodayKey();
+  const focusKey = selectedDayKey || todayKey;
+  const focusPlanDay = weekDays.find((d) => d.dateKey === focusKey) ?? null;
+
+  const weekSummary = useMemo(() => {
+    if (!weekDays.length) return null;
+    return buildWeekSummary({
+      weekNumber,
+      totalWeeks: effectiveTotalWeeks,
+      days: weekDays,
+      weekPhaseLabel: weekPhaseLabel,
+    });
+  }, [weekDays, weekNumber, effectiveTotalWeeks, weekPhaseLabel]);
+
   function openPlanDay(day: PlanDayCard) {
+    setSelectedDayKey(day.dateKey);
+  }
+
+  function navigateToPlanDay(day: PlanDayCard) {
     if (!plan) return;
     router.push(
       `/training/day/${day.dateKey}?planId=${encodeURIComponent(plan.id)}&source=setup`
@@ -892,16 +847,6 @@ export default function TrainingSetupPlanPage({
               </p>
 
               <div className="mb-4 flex flex-wrap items-center gap-2">
-                {showPhaseModalButton && (
-                  <button
-                    type="button"
-                    onClick={() => setPhaseModalOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
-                  >
-                    <LayoutList className="h-4 w-4" aria-hidden />
-                    View plan overview
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={() => void regenerateSchedule()}
@@ -918,112 +863,61 @@ export default function TrainingSetupPlanPage({
                 </Link>
               </div>
 
-              <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-5">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                      Week preview
-                    </p>
-                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                      <p className="text-lg font-semibold text-gray-900 sm:text-xl">
-                        Week {weekNumber} of {effectiveTotalWeeks}
+              <PlanWeekCalendar
+                weekNumber={weekNumber}
+                totalWeeks={effectiveTotalWeeks}
+                days={weekDays}
+                loading={loadingWeek}
+                todayKey={todayKey}
+                selectedDateKey={focusKey}
+                calendarRangeLabel={calendarWeekRangeLabel}
+                summary={weekSummary}
+                onPrevWeek={goPrevWeek}
+                onNextWeek={goNextWeek}
+                onSelectDay={openPlanDay}
+                selectedDayDetail={
+                  focusPlanDay ? (
+                    <div className="rounded-xl border border-orange-200 bg-white p-4 sm:p-5">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Selected workout
                       </p>
-                      {weekDays.length > 0 && (
-                        <p className="text-sm font-medium text-gray-600 tabular-nums">
-                          {weekTotalMilesDisplay(weekDays)} total
-                        </p>
-                      )}
-                    </div>
-                    {showWeekPhaseBadge && weekPhaseLabel && (
-                      <span className="mt-1 inline-block rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">
-                        {weekPhaseLabel}
-                      </span>
-                    )}
-                    {calendarWeekRangeLabel && (
-                      <p className="mt-2 text-sm text-gray-500">
-                        Calendar week: {calendarWeekRangeLabel}
+                      <h3 className="mt-1 text-lg font-semibold text-gray-900">
+                        {workoutCardPrimaryName(focusPlanDay)}
+                      </h3>
+                      <p className="mt-1 text-sm text-gray-600">
+                        {formatPlanDateDisplay(focusPlanDay.dateKey || focusPlanDay.date, {
+                          weekday: "long",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                        {focusPlanDay.estimatedDistanceInMeters
+                          ? ` · ${formatWeekCardMiles(focusPlanDay.estimatedDistanceInMeters)}`
+                          : ""}
                       </p>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 gap-1">
-                    <button
-                      type="button"
-                      onClick={goPrevWeek}
-                      disabled={weekNumber <= 1}
-                      className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-100 disabled:opacity-40"
-                      aria-label="Previous week"
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={goNextWeek}
-                      disabled={weekNumber >= effectiveTotalWeeks}
-                      className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-100 disabled:opacity-40"
-                      aria-label="Next week"
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-                {weekDays.length > 0 ? (
-                  <ul className="mt-1 space-y-3">
-                    {weekDays.map((w) => {
-                      const mi = formatWeekCardMiles(
-                        w.estimatedDistanceInMeters
-                      );
-                      const subtype = `${typeLabelForCard(w.workoutType)}${
-                        mi ? ` · ${mi}` : ""
-                      }`;
-                      return (
-                        <li key={w.dateKey}>
-                          <button
-                            type="button"
-                            onClick={() => openPlanDay(w)}
-                            className="block w-full overflow-hidden rounded-xl border border-gray-100 bg-white text-left shadow-sm transition hover:border-orange-200 hover:shadow-md"
+                      <p className="mt-1 text-sm text-gray-500">
+                        {workoutCardSubtypeLine(focusPlanDay)}
+                      </p>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => navigateToPlanDay(focusPlanDay)}
+                          className="inline-flex rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+                        >
+                          Open workout
+                        </button>
+                        {focusPlanDay.workoutId ? (
+                          <Link
+                            href={`/workouts/${focusPlanDay.workoutId}`}
+                            className="inline-flex rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
                           >
-                            <div className="flex min-h-[4.25rem]">
-                              <div
-                                className={`w-1.5 shrink-0 ${workoutTypeLeftBorderClass(
-                                  w.workoutType
-                                )}`}
-                              />
-                              <div className="flex flex-1 flex-col px-4 py-3">
-                                <p className="text-xs text-gray-500">
-                                  {w.date
-                                    ? formatPlanDateDisplay(w.date, {
-                                        weekday: "short",
-                                        month: "short",
-                                        day: "numeric",
-                                      })
-                                    : "—"}
-                                </p>
-                                <p className="mt-0.5 text-base font-semibold leading-snug text-gray-900">
-                                  {workoutCardPrimaryName(w)}
-                                </p>
-                                <p className="mt-0.5 text-sm text-gray-500">
-                                  {subtype || "—"}
-                                </p>
-                              </div>
-                            </div>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : loadingWeek ? (
-                  <p className="text-sm leading-relaxed text-gray-600">
-                    Loading this week&apos;s sessions…
-                  </p>
-                ) : (
-                  <p className="text-sm text-gray-500">
-                    No sessions scheduled for this week.
-                  </p>
-                )}
-                {loadingWeek && (
-                  <p className="mt-2 text-xs text-gray-500">Loading workouts…</p>
-                )}
-              </div>
+                            Workout detail
+                          </Link>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null
+                }
+              />
             </>
           )}
 
@@ -1049,14 +943,6 @@ export default function TrainingSetupPlanPage({
           </div>
         </div>
       </div>
-
-      <PhaseViewModal
-        open={phaseModalOpen}
-        onClose={() => setPhaseModalOpen(false)}
-        phases={phaseRanges}
-        overviewWeeks={weekEntries}
-        onJumpToWeek={(wn) => setWeekNumber(wn)}
-      />
 
     </AthleteAppShell>
   );
