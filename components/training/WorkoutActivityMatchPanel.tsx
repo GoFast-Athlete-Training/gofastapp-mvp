@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ChevronDown, Loader2, Trash2, Watch } from "lucide-react";
+import { CheckCircle2, ChevronDown, Link2Off, Loader2, Trash2, Watch } from "lucide-react";
 import api from "@/lib/api";
 
 type ActivityLinkConflict = {
@@ -58,12 +58,16 @@ function formatDuration(sec: number | null | undefined): string | null {
   return `${m}m`;
 }
 
+function activityDisplayTitle(a: Pick<CandidateActivity, "activityName" | "activityType">): string {
+  return (a.activityName || a.activityType || "Run").replace(/_/g, " ");
+}
+
 function conflictMessage(conflict: ActivityLinkConflict | null): string | null {
   if (!conflict) return null;
   if (conflict.type === "unrelated_planned_workout") {
-    return `Linked to another workout: ${conflict.workoutTitle}. Unlink there first.`;
+    return `Linked to another planned workout: ${conflict.workoutTitle}. Unlink that workout first.`;
   }
-  return `This activity row is currently matched to "${conflict.workoutTitle}". Confirming will delink that workout and match the same activity here.`;
+  return `Looks like the right Garmin run. It's attached to an older duplicate workout — confirming moves it here.`;
 }
 
 function isRepairableConflict(conflict: ActivityLinkConflict | null): boolean {
@@ -73,6 +77,17 @@ function isRepairableConflict(conflict: ActivityLinkConflict | null): boolean {
   );
 }
 
+function confirmButtonLabel(
+  selected: CandidateActivity | null,
+  suggested: CandidateActivity | null,
+  saving: boolean
+): string {
+  if (saving) return "Matching…";
+  if (!selected) return "Use this Garmin activity";
+  if (suggested?.id === selected.id) return "Yep, looks right";
+  return "Use this Garmin activity";
+}
+
 export default function WorkoutActivityMatchPanel({
   workoutId,
   workoutTitle,
@@ -80,36 +95,41 @@ export default function WorkoutActivityMatchPanel({
   compact = false,
 }: Props) {
   const [loading, setLoading] = useState(true);
-  const [alreadyMatched, setAlreadyMatched] = useState(false);
+  const [matchedActivity, setMatchedActivity] = useState<CandidateActivity | null>(null);
   const [candidates, setCandidates] = useState<CandidateActivity[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [matchSuccess, setMatchSuccess] = useState(false);
   const [showAllCandidates, setShowAllCandidates] = useState(false);
   const [visibleStepIndex, setVisibleStepIndex] = useState(0);
+  const [changingMatch, setChangingMatch] = useState(false);
 
   const loadCandidates = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setMatchSuccess(false);
     try {
       const res = await api.get<{
         candidates: CandidateActivity[];
         matchedActivity: CandidateActivity | null;
       }>(`/workouts/${workoutId}/match-activity`);
       if (res.data?.matchedActivity) {
-        setAlreadyMatched(true);
+        setMatchedActivity(res.data.matchedActivity);
         setCandidates([]);
         setSelectedId("");
         return;
       }
-      setAlreadyMatched(false);
+      setMatchedActivity(null);
       const list = res.data?.candidates;
       setCandidates(Array.isArray(list) ? list : []);
     } catch (e: unknown) {
       const ax = e as { response?: { data?: { error?: string } } };
       setError(ax.response?.data?.error || "Could not load activities");
       setCandidates([]);
+      setMatchedActivity(null);
     } finally {
       setLoading(false);
     }
@@ -142,7 +162,6 @@ export default function WorkoutActivityMatchPanel({
 
   const selectedBlocked =
     selectedCandidate?.conflict?.type === "unrelated_planned_workout";
-  const selectedRepairable = isRepairableConflict(selectedCandidate?.conflict ?? null);
 
   const confirmMatch = async () => {
     if (!selectedId || selectedBlocked) return;
@@ -152,6 +171,7 @@ export default function WorkoutActivityMatchPanel({
       await api.post(`/workouts/${workoutId}/match-activity`, {
         activityId: selectedId,
       });
+      setMatchSuccess(true);
       await onMatched();
     } catch (e: unknown) {
       const ax = e as {
@@ -160,6 +180,31 @@ export default function WorkoutActivityMatchPanel({
       setError(ax.response?.data?.error || "Could not match activity");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const unlinkCurrentMatch = async (options?: { forChange?: boolean }) => {
+    if (
+      !options?.forChange &&
+      !window.confirm(
+        "Unlink the current Garmin activity from this workout? You can then choose a different activity."
+      )
+    ) {
+      return;
+    }
+    setUnlinking(true);
+    setError(null);
+    try {
+      await api.post(`/workouts/${workoutId}/match-activity`, { activityId: null });
+      setMatchedActivity(null);
+      setChangingMatch(Boolean(options?.forChange));
+      await loadCandidates();
+      await onMatched();
+    } catch (e: unknown) {
+      const ax = e as { response?: { data?: { error?: string } } };
+      setError(ax.response?.data?.error || "Could not unlink activity");
+    } finally {
+      setUnlinking(false);
     }
   };
 
@@ -185,9 +230,7 @@ export default function WorkoutActivityMatchPanel({
     }
   };
 
-  const renderCandidate = (a: CandidateActivity, highlight?: boolean) => {
-    const selected = selectedId === a.id;
-    const title = (a.activityName || a.activityType || "Run").replace(/_/g, " ");
+  const renderActivityStats = (a: CandidateActivity) => {
     const when = a.startTime
       ? new Date(a.startTime).toLocaleString(undefined, {
           weekday: "short",
@@ -200,6 +243,31 @@ export default function WorkoutActivityMatchPanel({
     const dist = metersToMiShort(a.distance);
     const pace = formatPace(a.paceSecPerMile);
     const dur = formatDuration(a.duration);
+    return (
+      <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-gray-600">
+        {a.reasonLabels?.map((label) => (
+          <span
+            key={label}
+            className={`rounded px-1.5 py-0.5 font-medium ${
+              label === "Title match"
+                ? "bg-emerald-100 text-emerald-900"
+                : "bg-gray-100 text-gray-700"
+            }`}
+          >
+            {label}
+          </span>
+        ))}
+        {when ? <span>{when}</span> : null}
+        {dist ? <span>{dist}</span> : null}
+        {pace ? <span>{pace}</span> : null}
+        {dur ? <span>{dur}</span> : null}
+      </div>
+    );
+  };
+
+  const renderCandidate = (a: CandidateActivity, highlight?: boolean) => {
+    const selected = selectedId === a.id;
+    const title = activityDisplayTitle(a);
     const conflictNote = conflictMessage(a.conflict);
     const repairableConflict = isRepairableConflict(a.conflict);
 
@@ -220,41 +288,20 @@ export default function WorkoutActivityMatchPanel({
           className="w-full text-left px-3 py-2.5 hover:bg-black/[0.02] rounded-xl"
         >
           <p className="text-sm font-semibold text-gray-900 line-clamp-2">{title}</p>
-          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-gray-600">
-            {a.reasonLabels.map((label) => (
-              <span
-                key={label}
-                className={`rounded px-1.5 py-0.5 font-medium ${
-                  label === "Title match"
-                    ? "bg-emerald-100 text-emerald-900"
-                    : "bg-gray-100 text-gray-700"
-                }`}
-              >
-                {label}
-              </span>
-            ))}
-            {when ? <span>{when}</span> : null}
-            {dist ? <span>{dist}</span> : null}
-            {pace ? <span>{pace}</span> : null}
-            {dur ? <span>{dur}</span> : null}
-          </div>
+          {renderActivityStats(a)}
           {conflictNote ? (
             <p
               className={`mt-1 text-xs ${
                 a.conflict?.type === "unrelated_planned_workout"
                   ? "text-red-700"
-                  : "text-sky-800"
+                  : "text-gray-600"
               }`}
             >
               {conflictNote}
             </p>
           ) : null}
         </button>
-        {repairableConflict ? (
-          <div className="border-t border-sky-100 bg-sky-50/50 px-3 py-1.5 text-xs font-medium text-sky-800">
-            Delink happens on the old workout link. This Garmin activity row stays in GoFast.
-          </div>
-        ) : a.conflict == null ? (
+        {!repairableConflict && a.conflict == null ? (
           <div className="border-t border-gray-100 px-3 py-1.5 flex justify-end">
             <button
               type="button"
@@ -275,13 +322,15 @@ export default function WorkoutActivityMatchPanel({
     );
   };
 
+  const shellClass = `bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden ${
+    compact ? "mb-4" : "mb-6"
+  }`;
+
   if (loading) {
     return (
       <div
         id="match-garmin-panel"
-        className={`bg-white rounded-2xl shadow-sm border border-gray-200 p-4 flex items-center gap-2 text-sm text-gray-500 ${
-          compact ? "mb-4" : "mb-6"
-        }`}
+        className={`${shellClass} p-4 flex items-center gap-2 text-sm text-gray-500`}
       >
         <Loader2 className="h-4 w-4 animate-spin" />
         Looking for matching Garmin activities…
@@ -289,17 +338,76 @@ export default function WorkoutActivityMatchPanel({
     );
   }
 
-  if (alreadyMatched) {
-    return null;
+  if (matchSuccess) {
+    return (
+      <div
+        id="match-garmin-panel"
+        className={`${shellClass} p-4`}
+        role="status"
+        aria-live="polite"
+      >
+        <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-emerald-900">Workout logged</p>
+            <p className="mt-0.5 text-sm text-emerald-800">
+              Matched to your Garmin run.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (matchedActivity && !changingMatch) {
+    const title = activityDisplayTitle(matchedActivity);
+    return (
+      <div id="match-garmin-panel" className={shellClass}>
+        <div className="px-4 pt-4 pb-3 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            <h2 className="font-semibold text-gray-900 text-sm">Garmin run matched</h2>
+          </div>
+        </div>
+        <div className="p-4 space-y-4">
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-3 py-3">
+            <p className="text-sm font-semibold text-gray-900">{title}</p>
+            {renderActivityStats(matchedActivity)}
+          </div>
+          <p className="text-xs text-gray-600">
+            This workout is already linked to a Garmin activity.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={unlinking}
+              onClick={() => void unlinkCurrentMatch()}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {unlinking ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Link2Off className="h-4 w-4" />
+              )}
+              Unlink current match
+            </button>
+            <button
+              type="button"
+              disabled={unlinking}
+              onClick={() => void unlinkCurrentMatch({ forChange: true })}
+              className="inline-flex items-center rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-900 hover:bg-orange-100 disabled:opacity-50"
+            >
+              Change activity
+            </button>
+          </div>
+          {error ? <p className="text-xs text-red-600">{error}</p> : null}
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div
-      id="match-garmin-panel"
-      className={`bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden ${
-        compact ? "mb-4" : "mb-6"
-      }`}
-    >
+    <div id="match-garmin-panel" className={shellClass}>
       <div className="px-4 pt-4 pb-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
           <Watch className="h-4 w-4 text-gray-400" />
@@ -307,16 +415,23 @@ export default function WorkoutActivityMatchPanel({
         </div>
         {workoutTitle?.trim() ? (
           <p className="mt-1 text-xs text-gray-600 line-clamp-2">
-            For planned workout: <span className="font-medium text-gray-800">{workoutTitle.trim()}</span>
+            For planned workout:{" "}
+            <span className="font-medium text-gray-800">{workoutTitle.trim()}</span>
           </p>
         ) : null}
       </div>
       <div className="p-4 space-y-4">
-        <p className="text-xs text-gray-600 leading-relaxed">
-          {compact && suggested
-            ? "Pick the Garmin activity you completed for this planned workout."
-            : "Pick the Garmin activity you completed. We'll match it to this planned workout."}
-        </p>
+        {changingMatch ? (
+          <p className="text-xs text-gray-600">
+            Pick a different Garmin activity for this workout.
+          </p>
+        ) : (
+          <p className="text-xs text-gray-600 leading-relaxed">
+            {compact && suggested
+              ? "Pick the Garmin activity you completed for this planned workout."
+              : "Pick the Garmin activity you completed. We'll match it to this planned workout."}
+          </p>
+        )}
 
         {candidates.length === 0 ? (
           <p className="text-sm text-gray-500">
@@ -374,13 +489,7 @@ export default function WorkoutActivityMatchPanel({
               ) : (
                 <CheckCircle2 className="h-4 w-4" />
               )}
-              {saving
-                ? "Matching…"
-                : selectedRepairable
-                  ? "Delink and match this activity"
-                : compact
-                  ? "Use this Garmin activity"
-                  : "Yes, match this activity"}
+              {confirmButtonLabel(selectedCandidate, suggested, saving)}
             </button>
           </>
         )}
