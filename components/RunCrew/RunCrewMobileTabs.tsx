@@ -6,7 +6,21 @@ import { Check, Link as LinkIcon, MessageCircle, Route, Users } from "lucide-rea
 import MobileHubTabs from "@/components/shared/MobileHubTabs";
 import MessageFeed from "@/components/RunCrew/MessageFeed";
 import MemberDetailCard from "@/components/RunCrew/MemberDetailCard";
-import TrainingPanel from "@/components/RunCrew/TrainingPanel";
+import RunCard from "@/components/RunCrew/RunCard";
+
+type CrewRun = {
+  id: string;
+  title: string;
+  date: string;
+  startTimeHour?: number | null;
+  startTimeMinute?: number | null;
+  startTimePeriod?: string | null;
+  startTime?: string | null;
+  meetUpPoint: string;
+  totalMiles?: number;
+  pace?: string;
+  rsvps?: Array<{ status: string; athlete: { firstName: string; lastName: string } }>;
+};
 
 type RunCrewMobileTabsProps = {
   runCrewId: string;
@@ -22,7 +36,7 @@ type RunCrewMobileTabsProps = {
   inviteUrl: string;
   copiedLink: boolean;
   onCopyLink: () => void;
-  trainingWeek: Parameters<typeof TrainingPanel>[0]["trainingWeek"];
+  runs: CrewRun[];
   currentUserId?: string;
 };
 
@@ -42,10 +56,12 @@ export default function RunCrewMobileTabs({
   inviteUrl,
   copiedLink,
   onCopyLink,
-  trainingWeek,
+  runs,
   currentUserId,
 }: RunCrewMobileTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>("chatter");
+
+  const upcomingRuns = runs.filter((run) => new Date(run.date).getTime() >= Date.now());
 
   return (
     <MobileHubTabs tabs={[...TABS]} activeTab={activeTab} onTabChange={(id) => setActiveTab(id as TabId)}>
@@ -63,7 +79,16 @@ export default function RunCrewMobileTabs({
 
       {activeTab === "runs" ? (
         <div className="space-y-4">
-          <TrainingPanel trainingWeek={trainingWeek} />
+          {upcomingRuns.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500">
+              <p className="font-medium text-gray-700">No upcoming runs</p>
+              <p className="mt-1">When your crew schedules a run, it will show up here.</p>
+            </div>
+          ) : (
+            upcomingRuns.map((run) => (
+              <RunCard key={run.id} run={run} crewId={runCrewId} />
+            ))
+          )}
         </div>
       ) : null}
 

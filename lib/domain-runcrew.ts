@@ -693,6 +693,8 @@ export async function hydrateCrew(runCrewId: string) {
       joinCode: true,
       logo: true,
       icon: true,
+      city: true,
+      state: true,
       archivedAt: true,
       messageTopics: true,
       run_crew_announcements: {
@@ -806,6 +808,8 @@ export async function hydrateCrew(runCrewId: string) {
       joinCode: crew.joinCode,
       logo: crew.logo,
       icon: crew.icon,
+      city: crew.city,
+      state: crew.state,
       messageTopics,
       archivedAt: crew.archivedAt,
     },

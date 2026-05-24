@@ -38,6 +38,9 @@ export async function GET(request: Request) {
             logo: true,
             icon: true,
             description: true,
+            city: true,
+            state: true,
+            _count: { select: { run_crew_memberships: true } },
             city_runs: {
               where: { date: { gte: now } },
               orderBy: { date: "asc" },
@@ -86,6 +89,9 @@ export async function GET(request: Request) {
         logo: m.run_crews.logo,
         icon: m.run_crews.icon,
         description: m.run_crews.description,
+        city: m.run_crews.city,
+        state: m.run_crews.state,
+        memberCount: m.run_crews._count.run_crew_memberships,
         runs: m.run_crews.city_runs.map((r) => ({
           id: r.id,
           title: r.title,

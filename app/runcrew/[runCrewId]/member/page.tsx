@@ -14,7 +14,7 @@ import TopNav from '@/components/shared/TopNav';
 import { Copy, Check, Link as LinkIcon } from 'lucide-react';
 import { getRunCrewJoinLink } from '@/lib/domain-runcrew';
 import MemberDetailCard from '@/components/RunCrew/MemberDetailCard';
-import TrainingPanel from '@/components/RunCrew/TrainingPanel';
+import RunCard from '@/components/RunCrew/RunCard';
 
 /**
  * Member Page - CLIENT-SIDE
@@ -37,43 +37,6 @@ export default function RunCrewMemberPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
-
-  // Mock training week data (front-end only)
-  const trainingWeek = {
-    coach: {
-      name: "Coach Sarah",
-      avatarUrl: "/avatar.png",
-    },
-    coachAdvice: "Focus on consistency this week. If you miss a day, don't chase it. Listen to your body and adjust as needed.",
-    weekOutlook: {
-      focus: "Aerobic consistency",
-      intensity: "Moderate",
-      goal: "Finish the week feeling strong",
-    },
-    trainings: [
-      {
-        role: "Easy Run",
-        title: "Easy Miles",
-        miles: 5,
-        effort: "Easy / Conversational",
-        notes: "Keep it relaxed.",
-      },
-      {
-        role: "Quality Workout",
-        title: "Tempo Run",
-        miles: 6,
-        effort: "10K effort + 10 sec",
-        notes: "Stay controlled.",
-      },
-      {
-        role: "Long Run",
-        title: "Long Run",
-        miles: 10,
-        effort: "Marathon effort",
-        notes: "Finish smooth.",
-      },
-    ],
-  };
 
   useEffect(() => {
     if (!runCrewId) {
@@ -245,6 +208,7 @@ export default function RunCrewMemberPage() {
   const isManager = membership?.role === 'manager';
   const canPostAnnouncements = isAdmin || isManager;
   const memberships = crew.membershipsBox?.memberships || [];
+  const crewRuns = crew.runsBox?.runs || [];
   // Use handle-based join link (public front door)
   const handle = crew.runCrewBaseInfo?.handle || crew.handle;
   const inviteUrl = handle 
@@ -334,7 +298,7 @@ export default function RunCrewMemberPage() {
           inviteUrl={inviteUrl}
           copiedLink={copiedLink}
           onCopyLink={() => void handleCopyLink()}
-          trainingWeek={trainingWeek}
+          runs={crewRuns}
           currentUserId={LocalStorageAPI.getAthleteId() ?? undefined}
         />
 
@@ -423,9 +387,32 @@ export default function RunCrewMemberPage() {
             </section>
           </aside>
 
-          {/* RIGHT SIDE: Training Panel */}
+          {/* RIGHT SIDE: Upcoming runs */}
           <div className="lg:col-span-8 space-y-6 min-w-0">
-            <TrainingPanel trainingWeek={trainingWeek} />
+            <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Upcoming runs</h2>
+              {crewRuns.filter((run: { date: string }) => new Date(run.date).getTime() >= Date.now()).length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
+                  No upcoming runs scheduled yet.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {crewRuns
+                    .filter((run: { date: string }) => new Date(run.date).getTime() >= Date.now())
+                    .map((run: {
+                      id: string;
+                      title: string;
+                      date: string;
+                      meetUpPoint: string;
+                      totalMiles?: number;
+                      pace?: string;
+                      rsvps?: Array<{ status: string; athlete: { firstName: string; lastName: string } }>;
+                    }) => (
+                      <RunCard key={run.id} run={run} crewId={runCrewId} />
+                    ))}
+                </div>
+              )}
+            </section>
           </div>
         </div>
       </main>
