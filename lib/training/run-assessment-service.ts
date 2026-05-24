@@ -42,12 +42,19 @@ function normalizeEffortQuality(
 }
 
 function normalizeRecommendation(
-  rec: AiAssessmentRaw["recommendation"]
+  rec: AiAssessmentRaw["recommendation"],
+  workoutType: string
 ): RunAnalysisJsonV1["recommendation"] {
   if (!rec || rec.field == null || rec.suggestedValue == null) return null;
   const field = String(rec.field).trim();
   const sv = Number(rec.suggestedValue);
   if (!Number.isFinite(sv) || sv <= 0) return null;
+
+  const type = workoutType.trim();
+  if (field === "fiveKPaceSecPerMile" && (type === "LongRun" || type === "Easy")) {
+    return null;
+  }
+
   if (field === "aerobicCeilingBpm") {
     const bpm = Math.round(sv);
     if (bpm < 80 || bpm > 210) return null;
@@ -69,7 +76,10 @@ function normalizeRecommendation(
   return null;
 }
 
-function parseAssessmentJson(raw: string): RunAnalysisJsonV1 | null {
+function parseAssessmentJson(
+  raw: string,
+  workoutType: string
+): RunAnalysisJsonV1 | null {
   const cleaned = raw.replace(/^```json\s*/i, "").replace(/\s*```\s*$/i, "").trim();
   let parsed: AiAssessmentRaw;
   try {
@@ -85,7 +95,7 @@ function parseAssessmentJson(raw: string): RunAnalysisJsonV1 | null {
     narrative,
     hrPattern: normalizeHrPattern(parsed.hrPattern),
     effortQuality: normalizeEffortQuality(parsed.effortQuality),
-    recommendation: normalizeRecommendation(parsed.recommendation),
+    recommendation: normalizeRecommendation(parsed.recommendation, workoutType),
   };
 }
 
@@ -120,6 +130,7 @@ export async function runRunAssessment(params: {
         actualMaxHeartRate: true,
         actualDurationSeconds: true,
         actualDistanceMeters: true,
+        estimatedDistanceInMeters: true,
         segments: {
           orderBy: { stepOrder: "asc" },
           select: {
@@ -136,7 +147,11 @@ export async function runRunAssessment(params: {
           },
         },
         matched_activity: {
-          select: { activityName: true, activityType: true },
+          select: {
+            activityName: true,
+            activityType: true,
+            elevationGain: true,
+          },
         },
       },
     }),
@@ -183,11 +198,27 @@ export async function runRunAssessment(params: {
     }
   }
 
+  const plannedMeters = workout.estimatedDistanceInMeters;
+  const actualMeters = workout.actualDistanceMeters;
+  const distanceRatio =
+    plannedMeters != null && plannedMeters > 0 && actualMeters != null && actualMeters > 0
+      ? actualMeters / plannedMeters
+      : null;
+  const elevationGainFt =
+    workout.matched_activity.elevationGain != null &&
+    Number.isFinite(workout.matched_activity.elevationGain)
+      ? Math.round(workout.matched_activity.elevationGain * 3.28084)
+      : null;
+
   const payload = {
     workout: {
       title: workout.title,
       workoutType: workout.workoutType,
       hasPlanTargets,
+      plannedDistanceMeters: plannedMeters,
+      actualDistanceMeters: actualMeters,
+      distanceRatio,
+      elevationGainFt,
       targetPaceSecPerMile: workout.targetPaceSecPerMile,
       targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
       paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
@@ -196,7 +227,6 @@ export async function runRunAssessment(params: {
       actualAverageHeartRate: workout.actualAverageHeartRate,
       actualMaxHeartRate: workout.actualMaxHeartRate,
       actualDurationSeconds: workout.actualDurationSeconds,
-      actualDistanceMeters: workout.actualDistanceMeters,
       activityName: workout.matched_activity.activityName,
       activityType: workout.matched_activity.activityType,
     },
@@ -211,24 +241,36 @@ export async function runRunAssessment(params: {
 
   const hasLapDetail = lapsOrdered.length > 0;
 
+  const workoutType = workout.workoutType;
+  const isLongOrEasy = workoutType === "LongRun" || workoutType === "Easy";
+
   const systemPrompt = `You are an encouraging running coach. The athlete may or may not have followed a structured plan workout — many runs are standalone easy runs from their watch.
 
 You have activity *summary* stats (no second-by-second HR stream). If the user payload includes a non-empty "laps" array, these are ordered lap splits (often ~1 mile each). Use them to describe **where** pace changed (e.g. "strong through lap 8, faded lap 10–12") — cite lap numbers rather than guessing. When laps are empty or too few to infer splits, infer cautiously from summary only.
 
+**Run shape first:** Before interpreting pace vs plan, consider actual vs planned distance (distanceRatio), elevationGainFt, lap splits, and average/max HR. A long run that was much longer than planned and/or had substantial climbing makes average pace hard to interpret without context.
+
+**LongRun and Easy sessions:** Do NOT recommend fiveKPaceSecPerMile profile updates. If actual distance is meaningfully above planned (distanceRatio > 1.1) or pace is slower than target, prioritize asking what shaped the run (intentionally extended, group run, hills/terrain, heat, fueling practice) rather than suggesting faster paces. Avoid language like "targeting a faster pace will help" unless the run was near planned distance, effort looked clearly low-risk, and evidence is strong.
+
+**Profile recommendations:** Only suggest a change when evidence supports it:
+- fiveKPaceSecPerMile: quality workouts (Tempo, Intervals, SpeedDuration) with clear pace signal — never for LongRun or Easy.
+- aerobicCeilingBpm: easy aerobic ceiling updates when HR and duration evidence is strong.
+Otherwise set "recommendation": null.
+
 Respond with ONLY a JSON object (no markdown) with this exact shape:
 {
-  "narrative": "2-5 short sentences: what this run suggests about aerobic load, whether it looks sustainable/easy, and one practical takeaway. Do not shame. If plan targets exist, relate execution to them. ${
+  "narrative": "2-5 short sentences: describe run shape (splits, distance vs plan, elevation if present), relate to plan targets when they exist, and ask for context when distance/pace differ meaningfully. Do not shame. ${
     hasLapDetail
-      ? "When laps are provided in the payload, mention specific lap ranges where pace shifted versus the rest."
+      ? "When laps are provided, mention specific lap ranges where pace shifted."
       : ""
   } If there is no plan target, judge against easy aerobic norms using the athlete baseline HR ceiling and paces.",
   "hrPattern": one of "steady","drift_up","drift_down","variable","unknown",
   "effortQuality": one of "on_target","above","below","unknown" relative to what makes sense for this session type,
   "recommendation": null OR an object with:
     "field": either "aerobicCeilingBpm" OR "fiveKPaceSecPerMile",
-    "suggestedValue": integer — for aerobicCeilingBpm: plausible easy upper HR (80-210). For fiveKPaceSecPerMile: seconds per mile for current 5K fitness (240-840 range, lower=faster).
+    "suggestedValue": integer — for aerobicCeilingBpm: plausible easy upper HR (80-210). For fiveKPaceSecPerMile: seconds per mile for current 5K fitness (240-840 range, lower=faster) — only for quality workout types, never LongRun/Easy.
     "reason": one sentence why.
-  Only suggest a change when evidence supports it (e.g. easy run held well below ceiling for meaningful duration, or interval-quality signal). Otherwise set "recommendation": null.`;
+  Only suggest a change when evidence supports it. Otherwise set "recommendation": null.`;
 
   const userPrompt = JSON.stringify(payload, null, 2);
 
@@ -263,10 +305,14 @@ Respond with ONLY a JSON object (no markdown) with this exact shape:
     return;
   }
 
-  const analysis = parseAssessmentJson(content);
+  const analysis = parseAssessmentJson(content, workoutType);
   if (!analysis) {
     console.warn("runRunAssessment: could not parse model output");
     return;
+  }
+
+  if (isLongOrEasy && analysis.recommendation?.field === "fiveKPaceSecPerMile") {
+    analysis.recommendation = null;
   }
 
   await prisma.workouts.update({

@@ -75,6 +75,12 @@ import {
   type RunAnalysisJsonV1,
 } from "@/lib/training/run-analysis-types";
 import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
+import RunContextPrompt from "@/components/training/RunContextPrompt";
+import {
+  formatRecommendationDisplay,
+  shouldPromptRunContext,
+  shouldShowProfileRecommendation,
+} from "@/lib/training/coach-read-display";
 
 interface WorkoutSegmentLap {
   lapIndex: number;
@@ -1729,8 +1735,7 @@ export default function WorkoutDetailPage() {
     workout.garminWorkoutId != null && workout.garminWorkoutId !== undefined;
 
   const scheduleLabel = formatWorkoutScheduleLong(workout.date);
-  const showGarminHeaderCard =
-    !isLogged || (isLogged && alreadyOnGarmin);
+  const showGarminHeaderCard = !isLogged;
   const dayRel = dayRelativeToToday(workout.date);
   const planName = workout.training_plans?.name?.trim();
   const weekOnPlan =
@@ -1860,6 +1865,26 @@ export default function WorkoutDetailPage() {
           : "single_on";
   }
 
+  const showRunContextPrompt =
+    isLogged &&
+    shouldPromptRunContext({
+      plannedDistanceMeters: workout.estimatedDistanceInMeters,
+      actualDistanceMeters: workout.actualDistanceMeters,
+      targetPaceSecPerMile: workout.targetPaceSecPerMile,
+      targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
+      actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
+      paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
+    });
+
+  const plannedMiForComparison =
+    workout.estimatedDistanceInMeters != null && workout.estimatedDistanceInMeters > 0
+      ? workout.estimatedDistanceInMeters / 1609.34
+      : null;
+  const ranMiForComparison =
+    workout.actualDistanceMeters != null && workout.actualDistanceMeters > 0
+      ? workout.actualDistanceMeters / 1609.34
+      : null;
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
@@ -1933,7 +1958,11 @@ export default function WorkoutDetailPage() {
                   Your run
                 </p>
                 <h2 className="mt-1 text-xl sm:text-2xl font-bold text-gray-900">
-                  Results &amp; analysis
+                  {displayWorkoutListTitle({
+                    title: workout.title,
+                    workoutType: workout.workoutType,
+                    estimatedDistanceInMeters: workout.estimatedDistanceInMeters ?? null,
+                  })}
                 </h2>
                 {workout.matched_activity ? (
                   <p className="mt-2 text-sm text-gray-700">
@@ -2056,13 +2085,15 @@ export default function WorkoutDetailPage() {
                 {runAnalysisCoachRead.recommendation &&
                 !runAnalysisCoachRead.recommendationAppliedAt &&
                 runAnalysisCoachRead.recommendation.field &&
-                runAnalysisCoachRead.recommendation.suggestedValue != null ? (
+                runAnalysisCoachRead.recommendation.suggestedValue != null &&
+                shouldShowProfileRecommendation(
+                  workout.workoutType,
+                  runAnalysisCoachRead.recommendation
+                ) ? (
                   <div className="mt-4 rounded-xl border border-violet-300 bg-white/90 px-3 py-3">
                     <p className="text-sm text-gray-800">{runAnalysisCoachRead.recommendation.reason}</p>
                     <p className="mt-2 text-xs text-gray-600">
-                      {runAnalysisCoachRead.recommendation.field === "aerobicCeilingBpm"
-                        ? `Suggested aerobic ceiling: ~${runAnalysisCoachRead.recommendation.suggestedValue} bpm`
-                        : `Suggested 5K pace: ~${formatSecPerMile(runAnalysisCoachRead.recommendation.suggestedValue) ?? "—"} /mi`}
+                      {formatRecommendationDisplay(runAnalysisCoachRead.recommendation)}
                     </p>
                     {coachApplyError ? (
                       <p className="mt-2 text-sm text-red-600" role="alert">
@@ -2088,7 +2119,7 @@ export default function WorkoutDetailPage() {
             {orderedLapsFromGarmin.length > 0 ? (
               <div className="mt-6">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-emerald-800 mb-2">
-                  Lap splits (from Garmin)
+                  Run shape
                 </h3>
                 <div className="overflow-x-auto rounded-xl border border-emerald-100 bg-white/90">
                   <table className="min-w-full text-sm">
@@ -2140,32 +2171,91 @@ export default function WorkoutDetailPage() {
               </div>
             ) : (
               <p className="mt-4 text-xs text-gray-500">
-                Lap splits appear here after Garmin syncs detailed splits for this activity.
+                Run shape details appear here after Garmin syncs lap splits for this activity.
               </p>
             )}
 
-            {workout.training_plans?.currentFiveKPace ? (
-              <p className="mt-4 text-xs text-gray-500">
-                Plan baseline 5K (snapshot): {workout.training_plans.currentFiveKPace}
-                {workout.creditedFiveKPaceSecPerMile != null &&
-                workout.creditedFiveKPaceSecPerMile > 0 ? (
-                  <>
-                    {" "}
-                    · Implied 5K from this run:{" "}
-                    <span className="font-medium text-gray-700">
-                      {formatSecPerMile(workout.creditedFiveKPaceSecPerMile)}
-                    </span>
-                  </>
+            {showRunContextPrompt ? <RunContextPrompt className="mt-6" /> : null}
+
+            {(plannedMiForComparison != null || ranMiForComparison != null) && (
+              <div className="mt-6 rounded-xl border border-gray-200 bg-white/80 px-4 py-3 text-sm text-gray-800">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                  Plan comparison
+                </p>
+                {plannedMiForComparison != null ? (
+                  <p className="mt-2 tabular-nums">
+                    <span className="text-gray-500">Planned: </span>
+                    {plannedMiForComparison.toFixed(1)} mi
+                    {formatPaceTargetRangeDisplay(
+                      workout.targetPaceSecPerMile,
+                      workout.targetPaceSecPerMileHigh
+                    )
+                      ? ` at ${formatPaceTargetRangeDisplay(
+                          workout.targetPaceSecPerMile,
+                          workout.targetPaceSecPerMileHigh
+                        )}`
+                      : workout.targetPaceSecPerMile != null
+                        ? ` at ${formatSecPerMile(workout.targetPaceSecPerMile)}`
+                        : ""}
+                  </p>
                 ) : null}
-              </p>
-            ) : null}
-            <p className="mt-3 text-xs text-gray-600">
-              Prescription and segment breakdown below are your plan — scroll down to compare
-              structure to what you ran.
-            </p>
+                {ranMiForComparison != null ? (
+                  <p className="mt-1 tabular-nums font-medium text-gray-900">
+                    <span className="text-gray-500 font-normal">Ran: </span>
+                    {ranMiForComparison.toFixed(2)} mi
+                    {workout.actualAvgPaceSecPerMile != null
+                      ? ` at ${formatSecPerMile(workout.actualAvgPaceSecPerMile)}`
+                      : ""}
+                  </p>
+                ) : null}
+              </div>
+            )}
           </div>
         ) : null}
 
+        {isLogged ? (
+          <details className="mb-6 rounded-lg border border-gray-200 bg-white p-5 group">
+            <summary className="cursor-pointer font-semibold text-gray-900 list-none [&::-webkit-details-marker]:hidden flex items-center gap-2">
+              <span className="text-gray-400 group-open:rotate-90 transition inline-block">›</span>
+              Original plan
+            </summary>
+            <div className="mt-4 space-y-3 text-sm text-gray-800">
+              <p className="font-medium text-gray-900">
+                {displayWorkoutListTitle({
+                  title: workout.title,
+                  workoutType: workout.workoutType,
+                  estimatedDistanceInMeters: workout.estimatedDistanceInMeters ?? null,
+                })}
+              </p>
+              {weekAndDateLine ? (
+                <p className="text-gray-600">{weekAndDateLine}</p>
+              ) : null}
+              {sortedSegments.length > 0 ? (
+                <ul className="space-y-2 list-none pl-0 m-0">
+                  {segmentDisplayGroups.map((group, index) => (
+                    <li
+                      key={`${group.work.id}:${group.recovery?.id ?? ""}`}
+                      className="rounded-lg border border-gray-100 px-3 py-2"
+                    >
+                      <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Step {index + 1}
+                      </span>
+                      <p className="font-medium text-gray-900">{group.work.title}</p>
+                      <p className="text-gray-600 tabular-nums">
+                        {formatGroupedSegmentDuration(group)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-gray-600">No structured segments for this workout.</p>
+              )}
+            </div>
+          </details>
+        ) : null}
+
+        {!isLogged && (
+        <>
         <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-5 mb-4">
           <div className="min-w-0">
               <p
@@ -3347,6 +3437,9 @@ export default function WorkoutDetailPage() {
               </p>
             )}
           </div>
+        )}
+
+        </>
         )}
 
       </div>

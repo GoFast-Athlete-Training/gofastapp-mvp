@@ -25,7 +25,6 @@ import {
   fetchTrainingPlanDetail,
   fetchPlanWeekSchedule,
   type PlanDayCard,
-  type WeekPerformanceSnapshot,
 } from "@/lib/training/fetch-plan-week-client";
 import { getRacePhase } from "@/lib/race-calendar-phase";
 
@@ -84,8 +83,6 @@ export default function TrainingHubPage() {
   const [athleteFiveKPace, setAthleteFiveKPace] = useState<string | null>(null);
   const [weekNumber, setWeekNumber] = useState(1);
   const [weekDays, setWeekDays] = useState<PlanDayCard[]>([]);
-  const [weekPerformance, setWeekPerformance] =
-    useState<WeekPerformanceSnapshot | null>(null);
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [hubError, setHubError] = useState<string | null>(null);
@@ -140,7 +137,6 @@ export default function TrainingHubPage() {
     setPastRacePlan(null);
     setPastRaceResultStatus(null);
     setWeekDays([]);
-    setWeekPerformance(null);
     try {
       const u = auth.currentUser;
       if (!u) return;
@@ -176,7 +172,6 @@ export default function TrainingHubPage() {
                 : null,
         });
         setWeekDays([]);
-        setWeekPerformance(null);
         // Probe whether the athlete already logged a result + reflection
         if (plan.raceId) {
           fetch(`/api/race-results?raceRegistryId=${encodeURIComponent(plan.raceId)}`, {
@@ -205,18 +200,16 @@ export default function TrainingHubPage() {
         setWeekNumber(wn);
         setLoadingWeek(true);
         try {
-          const { days, weekPerformance: wp } = await fetchPlanWeekSchedule(
+          const { days } = await fetchPlanWeekSchedule(
             planId,
             wn,
             token
           );
           setWeekDays(days);
-          setWeekPerformance(wp);
           setSelectedDayKey(localTodayKey());
         } catch (e) {
           setHubError(e instanceof Error ? e.message : "Could not load this week");
           setWeekDays([]);
-          setWeekPerformance(null);
         } finally {
           setLoadingWeek(false);
         }
@@ -290,13 +283,12 @@ export default function TrainingHubPage() {
       if (planDetail) {
         setLoadingWeek(true);
         try {
-          const { days, weekPerformance: wp } = await fetchPlanWeekSchedule(
+          const { days } = await fetchPlanWeekSchedule(
             planDetail.id,
             weekNumber,
             token
           );
           setWeekDays(days);
-          setWeekPerformance(wp);
         } finally {
           setLoadingWeek(false);
         }
@@ -708,10 +700,10 @@ export default function TrainingHubPage() {
                     focusPlanDay.matchedActivityId ? (
                       <>
                         <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-emerald-800">
-                          Workout complete
+                          Workout logged
                         </p>
                         <h2 className="mt-1 text-2xl font-bold text-gray-900">
-                          You crushed it
+                          Workout logged!
                         </h2>
                         <p className="mt-2 text-lg font-semibold text-gray-800">
                           {displayWorkoutListTitle(focusPlanDay)}
@@ -722,7 +714,9 @@ export default function TrainingHubPage() {
                             month: "short",
                             day: "numeric",
                           })}
-                          <span className="ml-2 font-semibold text-emerald-700">· Done</span>
+                          <span className="ml-2 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                            Logged
+                          </span>
                         </p>
                         <div className="mt-4 space-y-1 rounded-xl border border-emerald-100 bg-white/70 px-4 py-3 text-sm text-gray-800">
                           <p className="tabular-nums">
@@ -754,15 +748,9 @@ export default function TrainingHubPage() {
                               href={`/workouts/${focusPlanDay.workoutId}`}
                               className="inline-flex justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
                             >
-                              View results
+                              Review run
                             </Link>
                           ) : null}
-                          <Link
-                            href={`/training/day/${focusPlanDay.dateKey}`}
-                            className="inline-flex justify-center rounded-xl px-6 py-3 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-200 hover:bg-emerald-50"
-                          >
-                            Session detail
-                          </Link>
                         </div>
                       </>
                     ) : (
@@ -891,49 +879,6 @@ export default function TrainingHubPage() {
                 Workout log
               </Link>
             </div>
-
-            {/* Week performance */}
-            {!loadingWeek &&
-              weekPerformance &&
-              weekPerformance.sessionsPlanned > 0 && (
-                <div className="rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3 text-sm text-gray-800">
-                  <p className="font-semibold text-gray-900">Week performance</p>
-                  <p className="mt-1 tabular-nums">
-                    {weekPerformance.sessionsCompleted} of{" "}
-                    {weekPerformance.sessionsPlanned} sessions logged
-                    {weekPerformance.qualitySessionsPlanned > 0
-                      ? ` · ${weekPerformance.qualitySessionsCompleted}/${weekPerformance.qualitySessionsPlanned} quality (tempo/intervals)`
-                      : ""}
-                  </p>
-                  {weekPerformance.plannedMetersTotal > 0 && (
-                    <p className="mt-1 tabular-nums text-gray-700">
-                      Volume: {(weekPerformance.actualMetersMatched / 1609.34).toFixed(1)} mi logged
-                      {" "}of {(weekPerformance.plannedMetersTotal / 1609.34).toFixed(1)} mi scheduled
-                      {weekPerformance.weeklyMileageCompletionPct != null
-                        ? ` (${weekPerformance.weeklyMileageCompletionPct.toFixed(0)}%)`
-                        : ""}
-                    </p>
-                  )}
-                  {weekPerformance.qualityAvgDeltaSecPerMile != null && (
-                    <p className="mt-1 text-gray-700">
-                      Quality avg vs target:{" "}
-                      <span className="font-mono tabular-nums">
-                        {weekPerformance.qualityAvgDeltaSecPerMile > 0 ? "+" : ""}
-                        {weekPerformance.qualityAvgDeltaSecPerMile} sec/mi
-                      </span>
-                      <span className="text-gray-500"> (positive = faster)</span>
-                    </p>
-                  )}
-                  {weekPerformance.longRunCompletionRatio != null && (
-                    <p className="mt-1 text-gray-700">
-                      Long run:{" "}
-                      {weekPerformance.longRunCompleted
-                        ? `logged (${Math.round(weekPerformance.longRunCompletionRatio * 100)}% of scheduled distance)`
-                        : "not logged yet"}
-                    </p>
-                  )}
-                </div>
-              )}
 
             {/* Full schedule collapsible */}
             {planDetail ? (

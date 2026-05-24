@@ -15,6 +15,12 @@ import {
   isRunAnalysisJsonV1,
   type RunAnalysisJsonV1,
 } from "@/lib/training/run-analysis-types";
+import RunContextPrompt from "@/components/training/RunContextPrompt";
+import {
+  formatRecommendationDisplay,
+  shouldPromptRunContext,
+  shouldShowProfileRecommendation,
+} from "@/lib/training/coach-read-display";
 
 type MatchedActivitySummary = {
   activityName?: string | null;
@@ -204,6 +210,15 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
 
   const hasTargetPace = workout.targetPaceSecPerMile != null && workout.targetPaceSecPerMile > 0;
 
+  const showRunContextPrompt = shouldPromptRunContext({
+    plannedDistanceMeters: workout.estimatedDistanceInMeters,
+    actualDistanceMeters: workout.actualDistanceMeters,
+    targetPaceSecPerMile: workout.targetPaceSecPerMile,
+    targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
+    actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
+    paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
+  });
+
   return (
     <div>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
@@ -302,13 +317,12 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
           {analysis.recommendation &&
           !analysis.recommendationAppliedAt &&
           analysis.recommendation.field &&
-          analysis.recommendation.suggestedValue != null ? (
+          analysis.recommendation.suggestedValue != null &&
+          shouldShowProfileRecommendation(workout.workoutType, analysis.recommendation) ? (
             <div className="mt-4 rounded-xl border border-violet-300 bg-white/90 px-3 py-3">
               <p className="text-sm text-gray-800">{analysis.recommendation.reason}</p>
               <p className="mt-2 text-xs text-gray-600">
-                {analysis.recommendation.field === "aerobicCeilingBpm"
-                  ? `Suggested aerobic ceiling: ~${analysis.recommendation.suggestedValue} bpm`
-                  : `Suggested 5K pace: ~${formatSecPerMile(analysis.recommendation.suggestedValue) ?? "—"} /mi`}
+                {formatRecommendationDisplay(analysis.recommendation)}
               </p>
               {applyError ? (
                 <p className="mt-2 text-sm text-red-600" role="alert">
@@ -334,27 +348,14 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
         </div>
       ) : null}
 
-      {workout.training_plans?.currentFiveKPace ? (
-        <p className="mt-4 text-xs text-gray-500">
-          Plan baseline 5K (snapshot): {workout.training_plans.currentFiveKPace}
-          {workout.creditedFiveKPaceSecPerMile != null && workout.creditedFiveKPaceSecPerMile > 0 ? (
-            <>
-              {" "}
-              · Implied 5K from this run:{" "}
-              <span className="font-medium text-gray-700">
-                {formatSecPerMile(workout.creditedFiveKPaceSecPerMile)}
-              </span>
-            </>
-          ) : null}
-        </p>
-      ) : null}
+      {showRunContextPrompt ? <RunContextPrompt className="mt-5" /> : null}
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Link
           href={`/workouts/${workout.id}`}
           className="inline-flex rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
         >
-          Open full workout page
+          Review run
         </Link>
       </div>
     </div>

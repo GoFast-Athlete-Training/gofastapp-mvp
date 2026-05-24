@@ -38,7 +38,7 @@ export default function WeekStrip({ days, todayKey, selectedDateKey, onSelectDay
               {formatPlanDateDisplay(d.dateKey || String(d.date), { day: "numeric" })}
             </div>
             {d.matchedActivityId ? (
-              <div className="text-[10px] font-medium text-emerald-600 mt-0.5">Done</div>
+              <div className="text-[10px] font-medium text-emerald-600 mt-0.5">Logged</div>
             ) : (
               <div className="text-[10px] text-transparent mt-0.5 select-none">—</div>
             )}
