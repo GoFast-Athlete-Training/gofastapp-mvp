@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { prisma } from "@/lib/prisma";
+import { syncAthleteProfileSnapshot } from "@/lib/athlete-profile-snapshot";
 import { upsertRaceMembershipFromSignup } from "@/lib/race-container-membership";
 
 async function athleteFromRequest(request: NextRequest) {
@@ -106,6 +107,7 @@ export async function POST(request: NextRequest) {
     });
 
     await upsertRaceMembershipFromSignup(athlete!.id, raceRegistryId);
+    await syncAthleteProfileSnapshot(athlete!.id);
 
     return NextResponse.json({ signup });
   } catch (err: unknown) {

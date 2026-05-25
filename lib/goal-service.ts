@@ -1,3 +1,4 @@
+import { syncAthleteProfileSnapshot } from "@/lib/athlete-profile-snapshot";
 import { prisma } from "@/lib/prisma";
 import { MOTIVATION_ICON_SLUGS } from "@/lib/goals-motivation-icons";
 import {
@@ -142,7 +143,7 @@ export async function createGoal(athleteId: string, input: CreateGoalInput) {
   const completionFeeling = trimText(input.completionFeeling);
   const motivationIcon = normalizeMotivationIcon(input.motivationIcon);
 
-  return prisma.athleteGoal.create({
+  const goal = await prisma.athleteGoal.create({
     data: {
       athleteId,
       name: nameTrimmed,
@@ -174,6 +175,9 @@ export async function createGoal(athleteId: string, input: CreateGoalInput) {
       },
     },
   });
+
+  await syncAthleteProfileSnapshot(athleteId);
+  return goal;
 }
 
 export type UpdateGoalInput = Partial<{
@@ -232,7 +236,7 @@ export async function updateGoal(
     distanceMiles,
   });
 
-  return prisma.athleteGoal.update({
+  const goal = await prisma.athleteGoal.update({
     where: { id: goalId },
     data: {
       ...(patch.name !== undefined && {
@@ -276,4 +280,7 @@ export async function updateGoal(
       },
     },
   });
+
+  await syncAthleteProfileSnapshot(athleteId);
+  return goal;
 }

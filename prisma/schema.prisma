@@ -73,6 +73,19 @@ model Athlete {
   /// Functional threshold power (watts) — bike workout intensity anchor.
   ftpWatts                Int?
   weeklyMileage           Int?
+  /// Profile hydration snapshot: copied from active goal for quick reads.
+  primaryGoalNameSnapshot            String?
+  primaryGoalTimeSnapshot            String?
+  primaryGoalTargetByDateSnapshot    DateTime?
+  primaryGoalRaceNameSnapshot        String?
+  /// Profile hydration snapshot: copied from primary race for quick reads.
+  primaryRaceRegistryIdSnapshot      String?
+  primaryRaceSlugSnapshot            String?
+  primaryRaceNameSnapshot            String?
+  primaryRaceDateSnapshot            DateTime?
+  primaryRaceDistanceLabelSnapshot   String?
+  primaryRaceCitySnapshot            String?
+  primaryRaceStateSnapshot           String?
   role                    AthleteRole               @default(USER)
   runClubId               String?
   createdAt               DateTime                 @default(now())
