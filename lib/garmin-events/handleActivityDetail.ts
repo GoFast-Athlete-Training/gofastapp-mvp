@@ -3,6 +3,7 @@
  * Hydrates athlete_activities.detailData for lap/sample-based evaluation.
  */
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 import { getAthleteByGarminUserId } from "../domain-garmin";
 import { activityExists } from "./dedupe";
@@ -63,7 +64,7 @@ async function resolveAthleteForDetailFallback(
   const recentSummaries = await prisma.athlete_activities.findMany({
     where: {
       source: "garmin",
-      summaryData: { not: null },
+      summaryData: { not: Prisma.DbNull },
     },
     orderBy: { createdAt: "desc" },
     take: 50,
@@ -231,7 +232,7 @@ export async function handleActivityDetail(
             elevationGain: norm.elevationGain,
             averagePower: norm.averagePower,
             steps: norm.steps,
-            summaryData: summary ? (summary as object) : null,
+            summaryData: summary ? (summary as object) : Prisma.DbNull,
             detailData: detail as object,
             hydratedAt: now,
             updatedAt: now,
