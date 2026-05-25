@@ -19,11 +19,33 @@ function parseJsonSafe(rawText: string): unknown {
   }
 }
 
-function normalizeParsedToObject(parsed: unknown): Record<string, unknown> {
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+function normalizeParsedToBody(parsed: unknown): Record<string, unknown> {
+  if (Array.isArray(parsed)) {
+    return { activityDetails: parsed };
+  }
+  if (parsed === null || typeof parsed !== "object") {
     return {};
   }
   return parsed as Record<string, unknown>;
+}
+
+function readActivityIdCandidates(item: unknown): string[] {
+  if (item === null || typeof item !== "object") return [];
+  const detail = item as {
+    activityId?: unknown;
+    summaryId?: unknown;
+    summary?: { activityId?: unknown } | null;
+  };
+  const ids = [
+    detail.activityId,
+    detail.summary?.activityId,
+    typeof detail.summaryId === "string" && detail.summaryId.endsWith("-detail")
+      ? detail.summaryId.slice(0, -"detail".length - 1)
+      : detail.summaryId,
+  ];
+  return ids
+    .filter((id) => id !== undefined && id !== null && String(id).length > 0)
+    .map(String);
 }
 
 function readUserIdFromObject(item: unknown): string | null {
@@ -50,15 +72,7 @@ function resolveGarminUserIdFromBody(body: Record<string, unknown>): string | nu
 function readActivityIds(body: Record<string, unknown>): string[] {
   const details = body.activityDetails;
   if (!Array.isArray(details)) return [];
-  return details
-    .map((item) => {
-      if (item !== null && typeof item === "object" && "activityId" in item) {
-        const id = (item as { activityId?: unknown }).activityId;
-        if (id !== undefined && id !== null) return String(id);
-      }
-      return null;
-    })
-    .filter((id): id is string => id != null);
+  return Array.from(new Set(details.flatMap(readActivityIdCandidates)));
 }
 
 export function buildActivityDetailWebhookMeta(
@@ -69,7 +83,7 @@ export function buildActivityDetailWebhookMeta(
     contentLengthHeader?: string | null;
   } = {}
 ): ActivityDetailWebhookMeta {
-  const body = normalizeParsedToObject(parseJsonSafe(rawText));
+  const body = normalizeParsedToBody(parseJsonSafe(rawText));
   return {
     method: options.method ?? "POST",
     contentType: options.contentType ?? null,
@@ -122,7 +136,7 @@ export async function processActivityDetailWebhook(
     }
   }
 
-  const body = normalizeParsedToObject(parseJsonSafe(rawText));
+  const body = normalizeParsedToBody(parseJsonSafe(rawText));
   const activityDetails = body.activityDetails;
   const userId = meta.garminUserId ?? undefined;
 

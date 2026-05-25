@@ -44,6 +44,17 @@ const meta = buildActivityDetailWebhookMeta(small, {
 assert.equal(meta.garminUserId, "garmin-test-user");
 assert.deepEqual(meta.activityIds, ["123456789"]);
 
+const rawArrayPayload = JSON.stringify([
+  {
+    summaryId: "14229628-detail",
+    activityId: 14229628,
+    summary: { activityId: 13938903 },
+    samples: [{ startTimeInSeconds: 1779601781 }],
+  },
+]);
+const rawArrayMeta = buildActivityDetailWebhookMeta(rawArrayPayload);
+assert.deepEqual(rawArrayMeta.activityIds, ["14229628", "13938903"]);
+
 console.log("verify:payload-limits OK", {
   smallBytes: Buffer.byteLength(small, "utf8"),
   overVercelBytes: Buffer.byteLength(overVercel, "utf8"),

@@ -26,6 +26,7 @@ The Vercel route at `/api/garmin/activity-detail-webhook` remains for small Garm
 | `DATABASE_URL` | yes | Same pooled Neon URL used by the Next.js app |
 | `PORT` | no | Defaults to `8080` (Cloud Run sets this) |
 | `MAX_BODY_BYTES` | no | Defaults to `31457280` (30 MB) |
+| `GARMIN_DETAIL_CREATE_MISSING_ACTIVITY` | no | When `true`, create a minimal `athlete_activities` row if detail arrives without a matching summary row (Garmin test fixtures). Leave unset/false in production unless intentionally testing mismatched IDs. |
 | `GCS_ARCHIVE_BUCKET` | no | If set, raw payloads archive to `gs://bucket/garmin/activity-detail/...` |
 | `BLOB_READ_WRITE_TOKEN` | no | Optional Vercel Blob archive fallback |
 
