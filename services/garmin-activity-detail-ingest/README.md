@@ -1,5 +1,7 @@
 # Cloud Run Garmin Activity Detail Ingest
 
+> **Agent context:** See [`docs/GARMIN_ACTIVITY_DETAIL_INGEST.md`](../../docs/GARMIN_ACTIVITY_DETAIL_INGEST.md) for the full story — Vercel payload limits, summary/detail lifecycle, Garmin test ID mismatches, and detail fallback behavior.
+
 Large Garmin `activityDetails` payloads exceed Vercel's ~4.5 MB function body limit and are rejected before our handler runs (`FUNCTION_PAYLOAD_TOO_LARGE`). This sidecar accepts payloads up to **30 MB** (under Cloud Run's 32 MB HTTP/1 cap), archives optional raw JSON, and reuses the same DB persistence path as the Vercel route.
 
 ## Architecture
