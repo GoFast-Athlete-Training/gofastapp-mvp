@@ -8,6 +8,7 @@ import { Prisma } from "@prisma/client";
 import { applyWorkoutPaceCredit } from "./apply-workout-pace-credit";
 import { applyThresholdPaceCredit } from "./apply-threshold-pace-credit";
 import { applyAerobicCeilingCredit } from "./apply-aerobic-ceiling-credit";
+import { applyLightAdaptiveIfEligible } from "./light-adaptive-service";
 import {
   normalizePaceTargetEncodingVersion,
   storedPaceSecondsKmToSecondsPerMile,
@@ -434,6 +435,22 @@ export async function applyActivityToWorkout(params: {
       });
     } catch (err) {
       console.error("applyAerobicCeilingCredit after match:", err);
+    }
+  }
+
+  if (
+    (workout.workoutType === "LongRun" || workout.workoutType === "Race") &&
+    workout.planId
+  ) {
+    try {
+      await applyLightAdaptiveIfEligible({
+        athleteId: activity.athleteId,
+        planId: workout.planId,
+        weekNumber: workout.weekNumber ?? null,
+        workoutId: workout.id,
+      });
+    } catch (err) {
+      console.error("applyLightAdaptiveIfEligible after long run match:", err);
     }
   }
 

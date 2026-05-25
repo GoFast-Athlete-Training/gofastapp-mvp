@@ -411,12 +411,20 @@ export default function TrainingHubPage() {
                 Your goal, this week&apos;s plan, and what to do next.
               </p>
             </div>
-            <Link
-              href="/training/past-plans"
-              className="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-sm hover:border-gray-300 hover:text-gray-900"
-            >
-              Past plans
-            </Link>
+            <div className="flex shrink-0 flex-col items-end gap-2">
+              <Link
+                href="/training/past-plans"
+                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-sm hover:border-gray-300 hover:text-gray-900"
+              >
+                Past plans
+              </Link>
+              <Link
+                href="/training/hydrate-sandbox"
+                className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-800 shadow-sm hover:border-violet-300"
+              >
+                Hydrate sandbox
+              </Link>
+            </div>
           </div>
         </div>
 
