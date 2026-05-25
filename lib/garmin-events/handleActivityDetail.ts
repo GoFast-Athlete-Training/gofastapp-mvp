@@ -34,10 +34,6 @@ export function activityIdCandidates(detail: ActivityDetail): string[] {
   );
 }
 
-export function isDetailFallbackCreateEnabled(): boolean {
-  return process.env.GARMIN_DETAIL_CREATE_MISSING_ACTIVITY === "true";
-}
-
 function generateId(): string {
   const timestamp = Date.now().toString(36);
   const random = Math.random().toString(36).substring(2, 15);
@@ -172,7 +168,7 @@ export async function handleActivityDetail(
           await runDetailHydrationPipeline(row.id, detail as object);
         }
         processed++;
-      } else if (isDetailFallbackCreateEnabled()) {
+      } else {
         const sourceActivityId = ids[0];
         const resolvedAthlete = await resolveAthleteForDetailFallback(
           garminUserId ? String(garminUserId) : undefined
@@ -253,13 +249,6 @@ export async function handleActivityDetail(
 
         await runDetailHydrationPipeline(created.id, detail as object);
         processed++;
-      } else {
-        skipped++;
-        console.warn("⚠️ Activity detail update matched no rows", {
-          activityIds: ids,
-          athleteId: athlete?.id ?? "(unknown)",
-          garminUserId: garminUserId ?? "(none)",
-        });
       }
     } catch (error: any) {
       errors++;
