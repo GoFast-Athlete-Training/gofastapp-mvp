@@ -6,7 +6,7 @@
  */
 
 import assert from "node:assert/strict";
-import { buildActivityDetailWebhookMeta } from "../../../lib/garmin-events/process-activity-detail-webhook.js";
+import { buildActivityDetailWebhookMeta } from "../../../lib/garmin-events/process-activity-detail-webhook";
 
 const VERCEL_LIMIT = 4.5 * 1024 * 1024;
 const CLOUD_RUN_LIMIT = 30 * 1024 * 1024;

@@ -1,10 +1,10 @@
 import express from "express";
 import {
   archiveActivityDetailPayloadIfConfigured,
-} from "../../../lib/garmin-events/archive-activity-detail-payload.js";
+} from "../../../lib/garmin-events/archive-activity-detail-payload";
 import {
   processActivityDetailWebhook,
-} from "../../../lib/garmin-events/process-activity-detail-webhook.js";
+} from "../../../lib/garmin-events/process-activity-detail-webhook";
 
 const PORT = Number(process.env.PORT ?? 8080);
 /** Cloud Run HTTP/1 request cap is 32 MiB; stay slightly under. */
@@ -39,16 +39,18 @@ async function handleWebhook(
 ): Promise<void> {
   const rawText = typeof req.body === "string" ? req.body : "";
 
-  res.status(200).send("OK");
-
-  void processActivityDetailWebhook(rawText, {
-    method,
-    contentType: req.header("content-type") ?? null,
-    contentLengthHeader: req.header("content-length") ?? null,
-    archiveRaw: archiveActivityDetailPayloadIfConfigured,
-  }).catch((error: unknown) => {
+  try {
+    await processActivityDetailWebhook(rawText, {
+      method,
+      contentType: req.header("content-type") ?? null,
+      contentLengthHeader: req.header("content-length") ?? null,
+      archiveRaw: archiveActivityDetailPayloadIfConfigured,
+    });
+  } catch (error: unknown) {
     console.error("❌ Cloud Run activity-detail webhook error:", error);
-  });
+  }
+
+  res.status(200).send("OK");
 }
 
 app.post("/", (req, res) => {
