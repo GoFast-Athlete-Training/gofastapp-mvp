@@ -195,5 +195,15 @@ export function getGarminHealthWebhookUri(): string {
   return `${getGarminOAuthServerUrl()}/api/garmin/health-webhook`;
 }
 
+/**
+ * Garmin Activity Details webhook — large payloads should use Cloud Run sidecar.
+ * Register in Garmin Developer Portal under Activity API → Activity Details.
+ */
+export function getGarminActivityDetailWebhookUri(): string {
+  const override = process.env.GARMIN_ACTIVITY_DETAIL_WEBHOOK_URI?.trim();
+  if (override) return override;
+  return `${getGarminOAuthServerUrl()}/api/garmin/activity-detail-webhook`;
+}
+
 export { generatePKCE, buildGarminAuthUrl, exchangeCodeForTokens, fetchGarminUserInfo };
 

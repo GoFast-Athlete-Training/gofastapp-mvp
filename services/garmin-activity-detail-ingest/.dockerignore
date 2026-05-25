@@ -1,0 +1,7 @@
+node_modules
+.next
+.git
+.env*
+*.md
+!services/garmin-activity-detail-ingest/README.md
+tsconfig.tsbuildinfo
