@@ -7,13 +7,17 @@ import { prisma } from "@/lib/prisma";
 import { metersToMiles } from "@/lib/pace-utils";
 import { loadPlanMileageSnapshot, type PlanMileageSnapshot } from "@/lib/training/plan-mileage-metrics";
 import { evaluateLightAdaptive, type LightAdaptiveEvaluation } from "@/lib/training/light-adaptive-service";
+import { loadRecentLongEffortEvidence } from "@/lib/training/endurance-evidence";
 import {
-  differenceToGoal,
+  computeRaceReadiness,
+  differenceToGoal as computeDifferenceToGoal,
   formatSecPerMile,
   parseGoalTimeToSeconds,
   parsePaceStringToSecPerMile,
   projectRaceFromFiveKSecPerMile,
   raceDistanceMilesFromRegistry,
+  requiresEnduranceEvidence,
+  type RaceReadinessPrediction,
 } from "@/lib/training/race-projection";
 
 export type TrainingHydrateGoalRace = {
@@ -38,7 +42,8 @@ export type TrainingHydrateSnapshot = {
   currentRacePaceSecPerMile: number | null;
   currentProjectedFinish: string | null;
   currentProjectedFinishSec: number | null;
-  differenceToGoal: ReturnType<typeof differenceToGoal>;
+  differenceToGoal: ReturnType<typeof computeDifferenceToGoal>;
+  raceReadiness: RaceReadinessPrediction;
   planMiles: PlanMileageSnapshot | null;
   lightAdaptive: LightAdaptiveEvaluation | null;
 };
@@ -59,6 +64,101 @@ async function getActiveGoalWithRace(athleteId: string) {
       },
     },
   });
+}
+
+function buildHydratePredictorFields(params: {
+  current5kSecPerMile: number | null;
+  goalFinishTime: string | null;
+  goalPaceSecPerMile: number | null;
+  goalPace5KSecPerMile: number | null;
+  distanceMiles: number | null;
+  evidence: Awaited<ReturnType<typeof loadRecentLongEffortEvidence>>;
+}) {
+  const {
+    current5kSecPerMile,
+    goalFinishTime,
+    goalPaceSecPerMile,
+    goalPace5KSecPerMile,
+    distanceMiles,
+    evidence,
+  } = params;
+
+  const raceReadiness = computeRaceReadiness({
+    current5kSecPerMile,
+    goalFinishSec: parseGoalTimeToSeconds(goalFinishTime),
+    goalPaceSecPerMile,
+    goalPace5KSecPerMile,
+    eventMiles: distanceMiles,
+    evidence,
+  });
+
+  const fiveKOnlyProjection =
+    current5kSecPerMile != null && distanceMiles != null
+      ? projectRaceFromFiveKSecPerMile(current5kSecPerMile, distanceMiles)
+      : null;
+
+  const useTriangulated =
+    distanceMiles != null &&
+    requiresEnduranceEvidence(distanceMiles) &&
+    raceReadiness.confidence !== "none";
+
+  const currentProjectedFinish = useTriangulated
+    ? raceReadiness.estimatedFinish
+    : raceReadiness.confidence === "none" && requiresEnduranceEvidence(distanceMiles ?? 0)
+      ? null
+      : raceReadiness.estimatedFinish ?? fiveKOnlyProjection?.projectedFinish ?? null;
+
+  const currentProjectedFinishSec = useTriangulated
+    ? raceReadiness.estimatedFinishSec
+    : raceReadiness.confidence === "none" && requiresEnduranceEvidence(distanceMiles ?? 0)
+      ? null
+      : raceReadiness.estimatedFinishSec ?? fiveKOnlyProjection?.projectedFinishSec ?? null;
+
+  const currentRacePace = useTriangulated
+    ? raceReadiness.estimatedPace
+    : raceReadiness.confidence === "none" && requiresEnduranceEvidence(distanceMiles ?? 0)
+      ? null
+      : raceReadiness.estimatedPace ?? fiveKOnlyProjection?.projectedPace ?? null;
+
+  const currentRacePaceSecPerMile = useTriangulated
+    ? raceReadiness.estimatedPaceSecPerMile
+    : raceReadiness.confidence === "none" && requiresEnduranceEvidence(distanceMiles ?? 0)
+      ? null
+      : raceReadiness.estimatedPaceSecPerMile ??
+        fiveKOnlyProjection?.projectedPaceSecPerMile ??
+        null;
+
+  const goalDifference = useTriangulated
+    ? {
+        finishDeltaSec: raceReadiness.finishDeltaSec,
+        finishDeltaLabel: raceReadiness.gapLabel,
+        paceDeltaSecPerMile: raceReadiness.fitnessGapSecPerMile,
+        paceDeltaLabel: raceReadiness.fitnessGapLabel,
+        onTrack: raceReadiness.onTrack,
+      }
+    : raceReadiness.requiresEnduranceEvidence && raceReadiness.confidence === "none"
+      ? {
+          finishDeltaSec: null,
+          finishDeltaLabel: null,
+          paceDeltaSecPerMile: raceReadiness.fitnessGapSecPerMile,
+          paceDeltaLabel: raceReadiness.fitnessGapLabel,
+          onTrack: null,
+        }
+      : computeDifferenceToGoal({
+          goalFinishSec: parseGoalTimeToSeconds(goalFinishTime),
+          projectedFinishSec: currentProjectedFinishSec,
+          goalPaceSecPerMile,
+          projectedPaceSecPerMile: currentRacePaceSecPerMile,
+        });
+
+  return {
+    raceReadiness,
+    currentProjectedFinish,
+    currentProjectedFinishSec,
+    currentRacePace,
+    currentRacePaceSecPerMile,
+    differenceToGoal: goalDifference,
+  };
 }
 
 export async function loadTrainingHydrateSnapshot(
@@ -104,6 +204,15 @@ export async function loadTrainingHydrateSnapshot(
     getActiveGoalWithRace(athleteId),
   ]);
 
+  const emptyRaceReadiness = computeRaceReadiness({
+    current5kSecPerMile: null,
+    goalFinishSec: null,
+    goalPaceSecPerMile: null,
+    goalPace5KSecPerMile: null,
+    eventMiles: null,
+    evidence: null,
+  });
+
   const empty: TrainingHydrateSnapshot = {
     hasActivePlan: false,
     planId: null,
@@ -118,28 +227,36 @@ export async function loadTrainingHydrateSnapshot(
     currentRacePaceSecPerMile: null,
     currentProjectedFinish: null,
     currentProjectedFinishSec: null,
-    differenceToGoal: differenceToGoal({
+    differenceToGoal: computeDifferenceToGoal({
       goalFinishSec: null,
       projectedFinishSec: null,
       goalPaceSecPerMile: null,
       projectedPaceSecPerMile: null,
     }),
+    raceReadiness: emptyRaceReadiness,
     planMiles: null,
     lightAdaptive: null,
   };
 
+  const enduranceEvidence =
+    athlete != null ? await loadRecentLongEffortEvidence(athleteId) : null;
+
   if (!plan) {
     const raceReg = goal?.race_registry ?? null;
     const distanceMiles = raceDistanceMilesFromRegistry(raceReg?.distanceMeters ?? null);
-    const current5k =
-      athlete?.fiveKPace?.trim() || null;
+    const current5k = athlete?.fiveKPace?.trim() || null;
     const current5kSecPerMile = parsePaceStringToSecPerMile(current5k);
     const goalFinishTime = goal?.goalTime?.trim() || null;
     const goalPaceSecPerMile = goal?.goalRacePace ?? null;
-    const projection =
-      current5kSecPerMile != null && distanceMiles != null
-        ? projectRaceFromFiveKSecPerMile(current5kSecPerMile, distanceMiles)
-        : null;
+    const goalPace5KSecPerMile = goal?.goalPace5K ?? null;
+    const predictor = buildHydratePredictorFields({
+      current5kSecPerMile,
+      goalFinishTime,
+      goalPaceSecPerMile,
+      goalPace5KSecPerMile,
+      distanceMiles,
+      evidence: enduranceEvidence,
+    });
 
     return {
       ...empty,
@@ -155,19 +272,15 @@ export async function loadTrainingHydrateSnapshot(
       goalFinishTime,
       goalPaceSecPerMile,
       goalPace: formatSecPerMile(goalPaceSecPerMile),
-      goalPace5KSecPerMile: goal?.goalPace5K ?? null,
+      goalPace5KSecPerMile,
       current5k,
       current5kSecPerMile,
-      currentRacePace: projection?.projectedPace ?? null,
-      currentRacePaceSecPerMile: projection?.projectedPaceSecPerMile ?? null,
-      currentProjectedFinish: projection?.projectedFinish ?? null,
-      currentProjectedFinishSec: projection?.projectedFinishSec ?? null,
-      differenceToGoal: differenceToGoal({
-        goalFinishSec: parseGoalTimeToSeconds(goalFinishTime),
-        projectedFinishSec: projection?.projectedFinishSec ?? null,
-        goalPaceSecPerMile,
-        projectedPaceSecPerMile: projection?.projectedPaceSecPerMile ?? null,
-      }),
+      currentRacePace: predictor.currentRacePace,
+      currentRacePaceSecPerMile: predictor.currentRacePaceSecPerMile,
+      currentProjectedFinish: predictor.currentProjectedFinish,
+      currentProjectedFinishSec: predictor.currentProjectedFinishSec,
+      differenceToGoal: predictor.differenceToGoal,
+      raceReadiness: predictor.raceReadiness,
     };
   }
 
@@ -197,11 +310,16 @@ export async function loadTrainingHydrateSnapshot(
     plan.currentFiveKPace?.trim() ||
     null;
   const current5kSecPerMile = parsePaceStringToSecPerMile(current5k);
+  const goalPace5KSecPerMile = linkedGoal?.goalPace5K ?? null;
 
-  const projection =
-    current5kSecPerMile != null && distanceMiles != null
-      ? projectRaceFromFiveKSecPerMile(current5kSecPerMile, distanceMiles)
-      : null;
+  const predictor = buildHydratePredictorFields({
+    current5kSecPerMile,
+    goalFinishTime,
+    goalPaceSecPerMile,
+    goalPace5KSecPerMile,
+    distanceMiles,
+    evidence: enduranceEvidence,
+  });
 
   const planMiles = await loadPlanMileageSnapshot({
     planId: plan.id,
@@ -234,19 +352,15 @@ export async function loadTrainingHydrateSnapshot(
     goalFinishTime,
     goalPaceSecPerMile,
     goalPace: formatSecPerMile(goalPaceSecPerMile),
-    goalPace5KSecPerMile: linkedGoal?.goalPace5K ?? null,
+    goalPace5KSecPerMile,
     current5k,
     current5kSecPerMile,
-    currentRacePace: projection?.projectedPace ?? null,
-    currentRacePaceSecPerMile: projection?.projectedPaceSecPerMile ?? null,
-    currentProjectedFinish: projection?.projectedFinish ?? null,
-    currentProjectedFinishSec: projection?.projectedFinishSec ?? null,
-    differenceToGoal: differenceToGoal({
-      goalFinishSec: parseGoalTimeToSeconds(goalFinishTime),
-      projectedFinishSec: projection?.projectedFinishSec ?? null,
-      goalPaceSecPerMile,
-      projectedPaceSecPerMile: projection?.projectedPaceSecPerMile ?? null,
-    }),
+    currentRacePace: predictor.currentRacePace,
+    currentRacePaceSecPerMile: predictor.currentRacePaceSecPerMile,
+    currentProjectedFinish: predictor.currentProjectedFinish,
+    currentProjectedFinishSec: predictor.currentProjectedFinishSec,
+    differenceToGoal: predictor.differenceToGoal,
+    raceReadiness: predictor.raceReadiness,
     planMiles,
     lightAdaptive,
   };

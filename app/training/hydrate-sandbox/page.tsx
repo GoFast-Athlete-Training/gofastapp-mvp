@@ -69,6 +69,7 @@ export default function TrainingHydrateSandboxPage() {
   }
 
   const diff = snapshot?.differenceToGoal;
+  const readiness = snapshot?.raceReadiness;
   const miles = snapshot?.planMiles;
   const adaptive = snapshot?.lightAdaptive;
 
@@ -132,9 +133,33 @@ export default function TrainingHydrateSandboxPage() {
                 <Row label="Goal finish" value={snapshot.goalFinishTime} />
                 <Row label="Goal pace" value={snapshot.goalPace} />
                 <Row label="Current 5K" value={snapshot.current5k} />
-                <Row label="Projected race pace" value={snapshot.currentRacePace} />
-                <Row label="Projected finish" value={snapshot.currentProjectedFinish} />
-                <Row label="Gap" value={diff?.finishDeltaLabel ?? diff?.paceDeltaLabel} />
+                <Row label="Estimated race pace" value={snapshot.currentRacePace} />
+                <Row label="Estimated finish" value={snapshot.currentProjectedFinish} />
+                <Row
+                  label="Readiness confidence"
+                  value={readiness?.confidence ?? null}
+                />
+                <Row
+                  label="Gap / readiness"
+                  value={
+                    readiness?.gapLabel ??
+                    readiness?.readinessLabel ??
+                    diff?.finishDeltaLabel ??
+                    diff?.paceDeltaLabel
+                  }
+                />
+                <Row
+                  label="5K-only model (secondary)"
+                  value={readiness?.modelFinishFrom5k}
+                />
+                <Row
+                  label="Long effort evidence"
+                  value={
+                    readiness?.evidence
+                      ? `${readiness.evidence.distanceMiles.toFixed(1)} mi @ ${readiness.evidence.avgPace}`
+                      : null
+                  }
+                />
               </dl>
             </section>
 

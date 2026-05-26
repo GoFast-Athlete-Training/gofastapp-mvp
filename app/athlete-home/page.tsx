@@ -58,6 +58,12 @@ import {
 import { getRacePhase, raceCalendarDaysFromTodayUtc } from '@/lib/race-calendar-phase';
 import { formatPlannedWorkoutTitle } from '@/lib/training/workout-display-title';
 import { normalizeDistanceForPace } from '@/lib/pace-utils';
+import {
+  buildLongEffortEvidenceFromRun,
+  computeRaceReadiness,
+  parseGoalTimeToSeconds,
+  parsePaceStringToSecPerMile,
+} from '@/lib/training/race-projection';
 
 function homeSessionPaceLabel(
   segments:
@@ -176,8 +182,6 @@ function planDayMilesHome(meters: number | null | undefined): string {
   return `${mi.toFixed(1)} mi`;
 }
 
-const MILES_5K_RIEGEL = RACE_DISTANCES_MILES['5k'] ?? 3.10686;
-
 function workoutTypeMeta(workoutType: string): { Icon: LucideIcon; label: string } {
   switch (workoutType) {
     case 'Easy':
@@ -191,41 +195,6 @@ function workoutTypeMeta(workoutType: string): { Icon: LucideIcon; label: string
     default:
       return { Icon: Footprints, label: 'Workout' };
   }
-}
-
-/** Parse "6:48/mi" or "6:48" style pace → sec/mile */
-function parsePaceStringToSecPerMile(pace: string): number | null {
-  const t = pace.trim();
-  const m = t.match(/^(\d+):(\d{2})/);
-  if (!m) return null;
-  const sec = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-  return sec > 0 ? sec : null;
-}
-
-function formatFinishClock(totalSec: number): string {
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-/**
- * Riegel projection: current 5K pace → estimated race time & avg pace at goal distance.
- */
-function projectRaceFromFiveKPace(
-  fiveKPaceStr: string,
-  eventMiles: number
-): { projectedFinish: string; projectedPace: string } | null {
-  const secPerMile = parsePaceStringToSecPerMile(fiveKPaceStr);
-  if (!secPerMile || !Number.isFinite(eventMiles) || eventMiles <= 0) return null;
-  const fiveKSec = secPerMile * MILES_5K_RIEGEL;
-  const projSec = Math.round(fiveKSec * Math.pow(eventMiles / MILES_5K_RIEGEL, 1.06));
-  const paceSecPerMile = projSec / eventMiles;
-  return {
-    projectedFinish: formatFinishClock(projSec),
-    projectedPace: formatSecPerMile(Math.round(paceSecPerMile)),
-  };
 }
 
 type LastSyncedActivityStrip = {
@@ -913,9 +882,36 @@ export default function AthleteHomePage() {
         ? Number(primaryGoal.race_registry.distanceMeters) / 1609.344
         : null;
 
-  const paceProjection =
-    fiveKPaceStr && eventMilesForProjection != null && eventMilesForProjection > 0
-      ? projectRaceFromFiveKPace(fiveKPaceStr, eventMilesForProjection)
+  const longEffortEvidence =
+    lastSyncedActivity?.distance != null &&
+    lastSyncedActivity.duration != null &&
+    lastSyncedActivity.distance > 0 &&
+    lastSyncedActivity.duration > 0
+      ? buildLongEffortEvidenceFromRun({
+          activityId: lastSyncedActivity.id,
+          activityName: lastSyncedActivity.activityName,
+          startTime: lastSyncedActivity.startTime,
+          distanceMiles: lastSyncedActivity.distance / 1609.344,
+          durationSeconds: lastSyncedActivity.duration,
+        })
+      : null;
+
+  const current5kSecPerMile = fiveKPaceStr ? parsePaceStringToSecPerMile(fiveKPaceStr) : null;
+
+  const raceReadiness =
+    eventMilesForProjection != null && eventMilesForProjection > 0
+      ? computeRaceReadiness({
+          current5kSecPerMile,
+          goalFinishSec: primaryGoal?.goalTime?.trim()
+            ? parseGoalTimeToSeconds(primaryGoal.goalTime.trim())
+            : null,
+          goalPaceSecPerMile:
+            typeof primaryGoal?.goalRacePace === 'number' ? primaryGoal.goalRacePace : null,
+          goalPace5KSecPerMile:
+            typeof primaryGoal?.goalPace5K === 'number' ? primaryGoal.goalPace5K : null,
+          eventMiles: eventMilesForProjection,
+          evidence: longEffortEvidence,
+        })
       : null;
 
   const raceLogoUrl =
@@ -1498,21 +1494,45 @@ export default function AthleteHomePage() {
                         </dd>
                       </div>
                       <div>
-                        <dt className="text-gray-500 text-xs">Projected (from 5K)</dt>
+                        <dt className="text-gray-500 text-xs">
+                          {raceReadiness?.confidence && raceReadiness.confidence !== 'none'
+                            ? 'Estimated finish'
+                            : 'Race estimate'}
+                        </dt>
                         <dd className="font-semibold text-gray-900 tabular-nums leading-tight">
-                          {paceProjection ? (
+                          {raceReadiness?.estimatedFinish ? (
                             <>
-                              {paceProjection.projectedFinish}
-                              <span className="block text-xs font-normal text-gray-600">
-                                {paceProjection.projectedPace} avg
-                              </span>
+                              {raceReadiness.estimatedFinish}
+                              {raceReadiness.estimatedPace ? (
+                                <span className="block text-xs font-normal text-gray-600">
+                                  {raceReadiness.estimatedPace} avg
+                                </span>
+                              ) : null}
                             </>
+                          ) : raceReadiness?.readinessLabel ? (
+                            <span className="text-sm font-medium text-gray-700 leading-snug">
+                              {raceReadiness.readinessLabel}
+                            </span>
                           ) : (
                             '—'
                           )}
                         </dd>
                       </div>
                     </dl>
+                    {raceReadiness?.gapLabel &&
+                    raceReadiness.gapLabel !== raceReadiness.readinessLabel ? (
+                      <p className="mt-2 text-sm text-gray-700 border-t border-gray-100 pt-2">
+                        {raceReadiness.gapLabel}
+                      </p>
+                    ) : null}
+                    {raceReadiness?.modelFinishFrom5k &&
+                    raceReadiness.confidence === 'none' &&
+                    raceReadiness.requiresEnduranceEvidence ? (
+                      <p className="mt-1 text-xs text-gray-500">
+                        5K-only model would suggest ~{raceReadiness.modelFinishFrom5k} — not used
+                        without a recent long run.
+                      </p>
+                    ) : null}
                     <Link
                       href={goalRaceHref}
                       className="mt-3 text-sm font-semibold text-orange-600 hover:text-orange-700"
