@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { totalWeeksFromDates } from "@/lib/training/plan-utils";
 import { TrainingPlanLifecycle } from "@prisma/client";
+import { markOtherActivePlansAsUnused } from "@/lib/training/plan-lifecycle";
 import { goalRacePaceDisplayString } from "@/lib/training/goal-pace-calculator";
 import { metersToMiles } from "@/lib/pace-utils";
 import {
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
       current5KPace: bodyLegacy5k,
       syncAthleteBaseline,
       presetId: bodyPresetId,
+      replaceActivePlan,
     } = body;
     const body5k = bodyFiveK ?? bodyLegacy5k;
 
@@ -180,18 +182,38 @@ export async function POST(request: NextRequest) {
     }
     const presetIdResolved = preset.id;
 
+    const existingActive = await prisma.training_plans.findFirst({
+      where: {
+        athleteId: athlete.id,
+        lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+      },
+      select: { id: true, name: true },
+    });
+    if (existingActive && replaceActivePlan !== true && replaceActivePlan !== "true") {
+      return NextResponse.json(
+        {
+          error:
+            "You already have an active training plan. Set replaceActivePlan: true to replace it, or archive/delete the current plan first.",
+          existingActivePlanId: existingActive.id,
+        },
+        { status: 409 }
+      );
+    }
+
     const now = new Date();
     const plan = await prisma.$transaction(async (tx) => {
-      await tx.training_plans.updateMany({
-        where: {
-          athleteId: athlete.id,
-          lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
-        },
-        data: {
-          lifecycleStatus: TrainingPlanLifecycle.ARCHIVED,
-          updatedAt: now,
-        },
-      });
+      if (existingActive) {
+        await tx.training_plans.updateMany({
+          where: {
+            athleteId: athlete.id,
+            lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+          },
+          data: {
+            lifecycleStatus: TrainingPlanLifecycle.OLD_PLAN_UNUSED,
+            updatedAt: now,
+          },
+        });
+      }
       return tx.training_plans.create({
         data: {
           id: randomUUID(),
@@ -257,7 +279,12 @@ export async function GET(request: NextRequest) {
       statusParam === "active"
         ? TrainingPlanLifecycle.ACTIVE
         : statusParam === "archived"
-          ? TrainingPlanLifecycle.ARCHIVED
+          ? {
+              in: [
+                TrainingPlanLifecycle.ARCHIVED,
+                TrainingPlanLifecycle.OLD_PLAN_UNUSED,
+              ],
+            }
           : null;
 
     const plans = await prisma.training_plans.findMany({

@@ -10,6 +10,7 @@ import {
   easyRunConfigToSnapshot,
   parseEasyRunConfigJson,
 } from "@/lib/training/easy-run-config";
+import { validatePresetRotationConfigs } from "@/lib/training/run-type-config-validation";
 
 function isDow1to7(n: number): boolean {
   return Number.isInteger(n) && n >= 1 && n <= 7;
@@ -242,6 +243,52 @@ export async function PATCH(
           );
         }
       }
+    }
+
+    function resolvedConfigId(bodyKey: string, currentId: string | null): string | null {
+      if (!(bodyKey in body)) return currentId;
+      const v = (body as Record<string, unknown>)[bodyKey];
+      if (v === null || v === "") return null;
+      return typeof v === "string" ? v : currentId;
+    }
+
+    const rotationPreset = {
+      easyConfig: await (async () => {
+        const cid = resolvedConfigId("easyConfigId", existing.easyConfigId);
+        if (!cid) return null;
+        return prisma.easy_config.findUnique({
+          where: { id: cid },
+          select: { name: true, positions: { select: { catalogueWorkoutId: true } } },
+        });
+      })(),
+      longRunConfig: await (async () => {
+        const cid = resolvedConfigId("longRunConfigId", existing.longRunConfigId);
+        if (!cid) return null;
+        return prisma.long_run_config.findUnique({
+          where: { id: cid },
+          select: { name: true, positions: { select: { catalogueWorkoutId: true } } },
+        });
+      })(),
+      tempoConfig: await (async () => {
+        const cid = resolvedConfigId("tempoConfigId", existing.tempoConfigId);
+        if (!cid) return null;
+        return prisma.tempo_config.findUnique({
+          where: { id: cid },
+          select: { name: true, positions: { select: { catalogueWorkoutId: true } } },
+        });
+      })(),
+      intervalsConfig: await (async () => {
+        const cid = resolvedConfigId("intervalsConfigId", existing.intervalsConfigId);
+        if (!cid) return null;
+        return prisma.intervals_config.findUnique({
+          where: { id: cid },
+          select: { name: true, positions: { select: { catalogueWorkoutId: true } } },
+        });
+      })(),
+    };
+    const rotationCheck = validatePresetRotationConfigs(rotationPreset);
+    if (!rotationCheck.ok) {
+      return NextResponse.json({ success: false, error: rotationCheck.error }, { status: 400 });
     }
 
     const updated = await prisma.training_plan_preset.update({

@@ -10,6 +10,7 @@ import {
   parseEasyRunConfigJson,
 } from "@/lib/training/easy-run-config";
 import { Prisma } from "@prisma/client";
+import { validatePresetRotationConfigs } from "@/lib/training/run-type-config-validation";
 
 function slugifyPresetTitle(title: string): string {
   const s = title
@@ -248,52 +249,97 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const presetData: Prisma.training_plan_presetCreateInput = {
+      slug,
+      title: String(title).trim(),
+      description:
+        typeof description === "string" && description.trim()
+          ? description.trim()
+          : null,
+      publicDescription:
+        typeof publicDescription === "string" && publicDescription.trim()
+          ? publicDescription.trim()
+          : null,
+      ...(tdl.value !== undefined ? { targetDistanceLabel: tdl.value } : {}),
+      cycleLen,
+      minWeeklyMiles,
+      maxWeeklyMiles: maxWeeklyMiles ?? null,
+      baseMiles,
+      peakMiles,
+      taperMiles,
+      tempoIdealDow: tNum,
+      intervalIdealDow: iNum,
+      longRunDefaultDow: lNum,
+      ...(longRunConfigId !== undefined
+        ? longRunConfigId
+          ? { longRunConfig: { connect: { id: longRunConfigId } } }
+          : {}
+        : {}),
+      ...(intervalsConfigId !== undefined
+        ? intervalsConfigId
+          ? { intervalsConfig: { connect: { id: intervalsConfigId } } }
+          : {}
+        : {}),
+      ...(tempoConfigId !== undefined
+        ? tempoConfigId
+          ? { tempoConfig: { connect: { id: tempoConfigId } } }
+          : {}
+        : {}),
+      ...(easyConfigId !== undefined
+        ? easyConfigId
+          ? { easyConfig: { connect: { id: easyConfigId } } }
+          : {}
+        : {}),
+      ...(easyRunConfigCreate !== undefined
+        ? { easyRunConfig: easyRunConfigCreate }
+        : {}),
+    };
+
+    const rotationPreset = {
+      easyConfig: easyConfigId
+        ? await prisma.easy_config.findUnique({
+            where: { id: easyConfigId },
+            select: {
+              name: true,
+              positions: { select: { catalogueWorkoutId: true } },
+            },
+          })
+        : null,
+      longRunConfig: longRunConfigId
+        ? await prisma.long_run_config.findUnique({
+            where: { id: longRunConfigId },
+            select: {
+              name: true,
+              positions: { select: { catalogueWorkoutId: true } },
+            },
+          })
+        : null,
+      tempoConfig: tempoConfigId
+        ? await prisma.tempo_config.findUnique({
+            where: { id: tempoConfigId },
+            select: {
+              name: true,
+              positions: { select: { catalogueWorkoutId: true } },
+            },
+          })
+        : null,
+      intervalsConfig: intervalsConfigId
+        ? await prisma.intervals_config.findUnique({
+            where: { id: intervalsConfigId },
+            select: {
+              name: true,
+              positions: { select: { catalogueWorkoutId: true } },
+            },
+          })
+        : null,
+    };
+    const rotationCheck = validatePresetRotationConfigs(rotationPreset);
+    if (!rotationCheck.ok) {
+      return NextResponse.json({ success: false, error: rotationCheck.error }, { status: 400 });
+    }
+
     const preset = await prisma.training_plan_preset.create({
-      data: {
-        slug,
-        title: String(title).trim(),
-        description:
-          typeof description === "string" && description.trim()
-            ? description.trim()
-            : null,
-        publicDescription:
-          typeof publicDescription === "string" && publicDescription.trim()
-            ? publicDescription.trim()
-            : null,
-        ...(tdl.value !== undefined ? { targetDistanceLabel: tdl.value } : {}),
-        cycleLen,
-        minWeeklyMiles,
-        maxWeeklyMiles: maxWeeklyMiles ?? null,
-        baseMiles,
-        peakMiles,
-        taperMiles,
-        tempoIdealDow: tNum,
-        intervalIdealDow: iNum,
-        longRunDefaultDow: lNum,
-        ...(longRunConfigId !== undefined
-          ? longRunConfigId
-            ? { longRunConfig: { connect: { id: longRunConfigId } } }
-            : {}
-          : {}),
-        ...(intervalsConfigId !== undefined
-          ? intervalsConfigId
-            ? { intervalsConfig: { connect: { id: intervalsConfigId } } }
-            : {}
-          : {}),
-        ...(tempoConfigId !== undefined
-          ? tempoConfigId
-            ? { tempoConfig: { connect: { id: tempoConfigId } } }
-            : {}
-          : {}),
-        ...(easyConfigId !== undefined
-          ? easyConfigId
-            ? { easyConfig: { connect: { id: easyConfigId } } }
-            : {}
-          : {}),
-        ...(easyRunConfigCreate !== undefined
-          ? { easyRunConfig: easyRunConfigCreate }
-          : {}),
-      },
+      data: presetData,
       include: presetInclude,
     });
 

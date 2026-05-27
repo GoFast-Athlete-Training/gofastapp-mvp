@@ -23,8 +23,7 @@ import {
   type SegmentSnapshotSource,
 } from "./workout-segment-snapshot";
 import { resolveRacePaceSecondsPerMileForPlan } from "./goal-pace-calculator";
-import { parseEasyRunConfigJson } from "./easy-run-config";
-import { paceTargetFromSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
+import { EASY_RUN_NOT_CONFIGURED } from "./run-type-config-validation";
 
 function utcDayBounds(d: Date): { gte: Date; lte: Date } {
   const x = utcDateOnly(d);
@@ -51,29 +50,28 @@ function dateKeyUtc(d: Date): string {
   return utcDateOnly(d).toISOString().slice(0, 10);
 }
 
-function round(n: number, d: number): number {
-  const f = 10 ** d;
-  return Math.round(n * f) / f;
-}
-
-function fallbackEasyRunSteps(params: {
-  scheduleMiles: number;
-  currentFiveKPace: string | null | undefined;
-  easyRunConfig: unknown;
-}): WorkoutStep[] {
-  if (!params.currentFiveKPace?.trim()) return [];
-  const anchor = anchorSecondsPerMileFromPlanPace(params.currentFiveKPace);
-  const easyCfg = parseEasyRunConfigJson(params.easyRunConfig);
-  const easyPaceSecPerMile = Math.max(1, anchor + easyCfg.paceOffsetSecPerMile);
-  return [
-    {
-      stepOrder: 1,
-      title: "Work",
-      durationType: "DISTANCE",
-      durationValue: round(params.scheduleMiles, 2),
-      targets: [paceTargetFromSecondsPerMile(easyPaceSecPerMile)],
-    },
-  ];
+function workoutNeedsRematerialize(params: {
+  existing: {
+    catalogueWorkoutId: string | null;
+    estimatedDistanceInMeters: number | null;
+    segmentCount: number;
+  };
+  scheduled: PlanScheduleDay;
+}): boolean {
+  if (params.existing.segmentCount === 0) return true;
+  const scheduledCat = params.scheduled.catalogueWorkoutId?.trim() ?? null;
+  const existingCat = params.existing.catalogueWorkoutId?.trim() ?? null;
+  if (scheduledCat !== existingCat) return true;
+  const scheduledMeters = params.scheduled.estimatedDistanceInMeters;
+  const existingMeters = params.existing.estimatedDistanceInMeters;
+  if (
+    scheduledMeters != null &&
+    existingMeters != null &&
+    Math.abs(scheduledMeters - existingMeters) > 80
+  ) {
+    return true;
+  }
+  return false;
 }
 
 async function createSegmentsForWorkout(params: {
@@ -194,6 +192,8 @@ export async function materializeWorkoutForPlanDay(params: {
   const stampId = scheduled.workoutId?.trim();
   let existing: {
     id: string;
+    catalogueWorkoutId: string | null;
+    estimatedDistanceInMeters: number | null;
     _count: { segments: number };
   } | null = null;
 
@@ -206,10 +206,16 @@ export async function materializeWorkoutForPlanDay(params: {
       },
       select: {
         id: true,
+        catalogueWorkoutId: true,
+        estimatedDistanceInMeters: true,
         _count: { select: { segments: true } },
       },
     });
-    if (existing && existing._count.segments > 0) {
+    if (
+      existing &&
+      existing._count.segments > 0 &&
+      !workoutNeedsRematerialize({ existing: { ...existing, segmentCount: existing._count.segments }, scheduled })
+    ) {
       return { workoutId: existing.id };
     }
   }
@@ -223,12 +229,31 @@ export async function materializeWorkoutForPlanDay(params: {
       },
       select: {
         id: true,
+        catalogueWorkoutId: true,
+        estimatedDistanceInMeters: true,
         _count: { select: { segments: true } },
       },
     });
-    if (existing && existing._count.segments > 0) {
+    if (
+      existing &&
+      existing._count.segments > 0 &&
+      !workoutNeedsRematerialize({ existing: { ...existing, segmentCount: existing._count.segments }, scheduled })
+    ) {
       return { workoutId: existing.id };
     }
+  }
+
+  if (existing && existing._count.segments > 0) {
+    await prisma.workout_segments.deleteMany({ where: { workoutId: existing.id } });
+    await prisma.workouts.update({
+      where: { id: existing.id },
+      data: {
+        catalogueWorkoutId: scheduled.catalogueWorkoutId ?? null,
+        estimatedDistanceInMeters: scheduled.estimatedDistanceInMeters,
+        title: scheduled.title,
+        updatedAt: new Date(),
+      },
+    });
   }
 
   const needsCatalogueAnchoredIT =
@@ -261,6 +286,10 @@ export async function materializeWorkoutForPlanDay(params: {
 
   const miles = scheduled.estimatedDistanceInMeters / 1609.34;
 
+  if (scheduled.workoutType === "Easy" && !scheduled.catalogueWorkoutId?.trim()) {
+    throw new Error(EASY_RUN_NOT_CONFIGURED);
+  }
+
   let steps: ReturnType<typeof prescribe> = [];
   if (catalogueEntryForDay && plan.currentFiveKPace?.trim()) {
     const anchorSecPerMile = anchorSecondsPerMileFromPlanPace(
@@ -280,11 +309,7 @@ export async function materializeWorkoutForPlanDay(params: {
       easyWorkPaceOffsetOverrideSecPerMile: null,
     });
   } else if (scheduled.workoutType === "Easy") {
-    steps = fallbackEasyRunSteps({
-      scheduleMiles: miles,
-      currentFiveKPace: plan.currentFiveKPace,
-      easyRunConfig: plan.easyRunConfig,
-    });
+    throw new Error(EASY_RUN_NOT_CONFIGURED);
   }
 
   if (existing) {

@@ -1,5 +1,9 @@
 /**
- * Preset / plan snapshot: easy-day miles defaults and pace offset vs 5K anchor (sec/mile).
+ * Preset / plan snapshot: easy-day mileage defaults and transitional metadata only.
+ *
+ * Pace for generated Easy workouts comes from the linked catalogue row's
+ * `workPaceOffsetSecPerMile` (fixed sec/mi vs 5K anchor), not from
+ * `paceOffsetSecPerMile` here. Do not use this blob as Easy pace truth.
  */
 
 export type EasyRunConfigResolved = {

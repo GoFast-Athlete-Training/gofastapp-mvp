@@ -8,6 +8,7 @@ import {
   parseRunTypePositionsBody,
   runTypeCatalogueSelect,
 } from "@/lib/training/run-type-config-parser";
+import { validateRunTypePositionsForSave } from "@/lib/training/run-type-config-validation";
 
 export async function PUT(
   request: NextRequest,
@@ -34,22 +35,13 @@ export async function PUT(
     return NextResponse.json({ success: false, error: parsed.error }, { status: 400 });
   }
 
-  const ids = new Set(
-    parsed.rows
-      .map((r) => r.catalogueWorkoutId)
-      .filter((x): x is string => x != null && x.length > 0)
-  );
-  if (ids.size > 0) {
-    const found = await prisma.workout_catalogue.findMany({
-      where: { id: { in: [...ids] } },
-      select: { id: true },
-    });
-    if (found.length !== ids.size) {
-      return NextResponse.json(
-        { success: false, error: "One or more catalogueWorkoutId values are invalid" },
-        { status: 400 }
-      );
-    }
+  const validated = await validateRunTypePositionsForSave({
+    rows: parsed.rows,
+    configLabel: "Intervals config",
+    expectedWorkoutType: "Intervals",
+  });
+  if (!validated.ok) {
+    return NextResponse.json({ success: false, error: validated.error }, { status: 400 });
   }
 
   const now = new Date();

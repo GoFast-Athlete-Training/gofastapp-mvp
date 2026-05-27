@@ -28,6 +28,10 @@ import {
   type CatalogueGenerationRowSelection,
 } from "@/lib/training/plan-generate-presets-loader";
 import type { CatalogueMileEstimateInput } from "@/lib/training/catalogue-mile-estimate";
+import {
+  assertScheduleEasyDaysHaveCatalogue,
+  rotationMissingCatalogueWorkout,
+} from "@/lib/training/run-type-config-validation";
 
 export async function executePlanGenerate(params: {
   athleteId: string;
@@ -101,20 +105,24 @@ export async function executePlanGenerate(params: {
     rawPreset.tempoConfig?.positions.map(mapPositionRow) ?? [];
   const easyPositions = rawPreset.easyConfig?.positions.map(mapPositionRow) ?? [];
 
-  function structuredRotationInvalid(
-    positions: readonly { catalogueWorkoutId: string | null }[]
-  ): boolean {
-    if (positions.length === 0) return true;
-    return !positions.some((p) => p.catalogueWorkoutId?.trim());
+  if (rotationMissingCatalogueWorkout(longRunPositions)) {
+    throw new Error(
+      `Training preset "${presetLabel}" has no long-run rotation or every slot is missing a catalogue workout. Fix the long-run config in GoFast Company.`
+    );
   }
-  if (structuredRotationInvalid(intervalsPositions)) {
+  if (rotationMissingCatalogueWorkout(intervalsPositions)) {
     throw new Error(
       `Training preset "${presetLabel}" has no interval rotation or every slot is missing a catalogue workout. Fix the intervals config in GoFast Company.`
     );
   }
-  if (structuredRotationInvalid(tempoPositions)) {
+  if (rotationMissingCatalogueWorkout(tempoPositions)) {
     throw new Error(
       `Training preset "${presetLabel}" has no tempo rotation or every slot is missing a catalogue workout. Fix the tempo config in GoFast Company.`
+    );
+  }
+  if (rotationMissingCatalogueWorkout(easyPositions)) {
+    throw new Error(
+      `Training preset "${presetLabel}" has no easy rotation or every slot is missing a catalogue workout. Fix the easy config in GoFast Company.`
     );
   }
 
@@ -259,6 +267,8 @@ export async function executePlanGenerate(params: {
 
   applyTempoSchedule({ planSchedule: schedule, catalogueRowsById });
   applyIntervalSchedule({ planSchedule: schedule, catalogueRowsById });
+  assertScheduleEasyDaysHaveCatalogue(schedule);
+
   distributeEasyMiles({
     planSchedule: schedule,
     weeklyMileageTarget,

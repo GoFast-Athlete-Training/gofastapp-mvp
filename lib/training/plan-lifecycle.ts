@@ -49,6 +49,24 @@ export async function cascadeLinkedGoalAfterPlanArchived(
   });
 }
 
+/** Mark every ACTIVE plan for this athlete as OLD_PLAN_UNUSED (explicit replace, not archive). */
+export async function markOtherActivePlansAsUnused(
+  athleteId: string,
+  exceptPlanId?: string | null
+): Promise<void> {
+  await prisma.training_plans.updateMany({
+    where: {
+      athleteId,
+      lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+      ...(exceptPlanId ? { NOT: { id: exceptPlanId } } : {}),
+    },
+    data: {
+      lifecycleStatus: TrainingPlanLifecycle.OLD_PLAN_UNUSED,
+      updatedAt: new Date(),
+    },
+  });
+}
+
 /** Archive every ACTIVE plan for this athlete except the given id (if provided). */
 export async function archiveOtherActivePlans(
   athleteId: string,

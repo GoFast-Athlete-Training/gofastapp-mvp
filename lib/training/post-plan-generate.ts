@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { executePlanGenerate } from "@/lib/training/execute-plan-generate";
 import { ensureTrainingPlanPresetLinked } from "@/lib/training/ensure-training-plan-preset-linked";
+import { cleanupFuturePlanWorkoutsAfterRegenerate } from "@/lib/training/plan-regenerate-cleanup";
 
 export async function planGeneratePostHandler(
   request: NextRequest
@@ -113,10 +114,16 @@ export async function planGeneratePostHandler(
       minWeeklyMiles,
     });
 
+    const clearedWorkouts = await cleanupFuturePlanWorkoutsAfterRegenerate({
+      planId: trainingPlanId,
+      athleteId: athlete.id,
+    });
+
     return NextResponse.json({
       success: true,
       planId: result.planId,
       weekCount: result.weekCount,
+      clearedFutureWorkouts: clearedWorkouts,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Plan generation failed";

@@ -19,6 +19,8 @@ enum AthleteRole {
 enum TrainingPlanLifecycle {
   ACTIVE
   ARCHIVED
+  /// Plan replaced or abandoned before natural completion — not a completed lifecycle.
+  OLD_PLAN_UNUSED
 }
 
 enum CoachReviewStatus {

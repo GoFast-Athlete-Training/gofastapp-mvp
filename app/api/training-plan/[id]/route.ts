@@ -7,6 +7,7 @@ import { totalWeeksFromDates, ymdFromDate } from "@/lib/training/plan-utils";
 import { TrainingPlanLifecycle } from "@prisma/client";
 import { archiveOtherActivePlans, cascadeLinkedGoalAfterPlanArchived } from "@/lib/training/plan-lifecycle";
 import { validatePreferredTempoInterval } from "@/lib/training/preferred-tempo-interval";
+import { cleanupPlanWorkoutsBeforeDelete } from "@/lib/training/plan-delete-cleanup";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -85,6 +86,23 @@ export async function GET(request: NextRequest, context: Ctx) {
               },
             },
             tempoConfig: {
+              include: {
+                positions: {
+                  orderBy: { cyclePosition: "asc" },
+                  include: {
+                    workout_catalogue: {
+                      select: {
+                        id: true,
+                        name: true,
+                        workoutType: true,
+                        slug: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            easyConfig: {
               include: {
                 positions: {
                   orderBy: { cyclePosition: "asc" },
@@ -404,13 +422,26 @@ export async function DELETE(request: NextRequest, context: Ctx) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
     const { id } = await context.params;
-    const result = await prisma.training_plans.deleteMany({
+    const existing = await prisma.training_plans.findFirst({
       where: { id, athleteId: auth.athlete.id },
+      select: { id: true },
     });
-    if (result.count === 0) {
+    if (!existing) {
       return NextResponse.json({ error: "Plan not found" }, { status: 404 });
     }
-    return NextResponse.json({ success: true });
+
+    const cleanup = await cleanupPlanWorkoutsBeforeDelete({
+      planId: id,
+      athleteId: auth.athlete.id,
+    });
+
+    await prisma.training_plans.delete({ where: { id } });
+
+    return NextResponse.json({
+      success: true,
+      deletedFutureWorkouts: cleanup.deletedFutureWorkouts,
+      detachedCompletedWorkouts: cleanup.detachedCompletedWorkouts,
+    });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Failed to delete plan";
     console.error("DELETE /api/training-plan/[id]", e);

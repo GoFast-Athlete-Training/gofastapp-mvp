@@ -38,6 +38,15 @@ test("mid-week week 1 skips missed tempo instead of cramming both quality sessio
   );
 });
 
+test("easy days receive catalogue workout ids from easy rotation", () => {
+  const { schedule } = assignWorkoutDays(baseInput);
+  const easyDays = schedule.flatMap((w) => w.days.filter((d) => d.workoutType === "Easy"));
+  assert.ok(easyDays.length > 0);
+  for (const day of easyDays) {
+    assert.equal(day.catalogueWorkoutId, "easy-1");
+  }
+});
+
 test("partial week 1 caps quality work at one hard session", () => {
   const { schedule } = assignWorkoutDays({
     ...baseInput,
