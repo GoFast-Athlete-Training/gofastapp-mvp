@@ -94,6 +94,16 @@ const LONG_RUN_DAY_OPTIONS: { value: number; label: string }[] = [
   { value: 7, label: "Sunday" },
 ];
 
+function dayLabelsFromValues(values: number[]): string {
+  return values
+    .map((v) => DAY_OPTIONS.find((d) => d.value === v)?.label ?? String(v))
+    .join(", ");
+}
+
+function longRunDayLabel(dow: number | null | undefined): string {
+  return LONG_RUN_DAY_OPTIONS.find((d) => d.value === dow)?.label ?? "Saturday";
+}
+
 
 function parsePlanWeekOverviewRows(planSchedule: unknown): PlanWeekRow[] {
   if (!Array.isArray(planSchedule)) return [];
@@ -144,6 +154,10 @@ export default function TrainingSetupPlanPage({
   );
   const [error, setError] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [showPreferencesEditor, setShowPreferencesEditor] = useState(false);
+  const [regenerationSuccess, setRegenerationSuccess] = useState(false);
+  /** Bumped after generate/regenerate so week fetch uses fresh planSchedule. */
+  const [planScheduleEpoch, setPlanScheduleEpoch] = useState(0);
   const [athleteWeeklyTargetPreference, setAthleteWeeklyTargetPreference] = useState<
     number | null
   >(null);
@@ -153,8 +167,10 @@ export default function TrainingSetupPlanPage({
     return u.getIdToken();
   }
 
-  const loadPlan = useCallback(async () => {
-    setLoading(true);
+  const loadPlan = useCallback(async (opts?: { quiet?: boolean }) => {
+    if (!opts?.quiet) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const token = await getToken();
@@ -166,9 +182,13 @@ export default function TrainingSetupPlanPage({
       setAthleteWeeklyTargetPreference(weeklyMileageTargetPreference);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
-      setPlan(null);
+      if (!opts?.quiet) {
+        setPlan(null);
+      }
     } finally {
-      setLoading(false);
+      if (!opts?.quiet) {
+        setLoading(false);
+      }
     }
   }, [planId]);
 
@@ -285,6 +305,12 @@ export default function TrainingSetupPlanPage({
     return Array.isArray(plan.planSchedule) && plan.planSchedule.length > 0;
   }, [plan?.planSchedule]);
   const hasSchedule = hasPlanSchedulePersisted;
+
+  /** Setup form: first-time generate, or user opened "Edit preferences". */
+  const inPreferencesSetupMode = !hasSchedule || showPreferencesEditor;
+  /** Preview calendar: only after schedule exists, not while editing or regenerating. */
+  const showSchedulePreview =
+    hasSchedule && !generating && !showPreferencesEditor;
 
   const preferredCount = useMemo(
     () => preferredDaysLocal.filter((d) => d >= 1 && d <= 7).length,
@@ -441,9 +467,33 @@ export default function TrainingSetupPlanPage({
   );
 
   useEffect(() => {
-    if (!authReady || !plan || !hasSchedule) return;
+    if (!authReady || !plan || !showSchedulePreview) return;
     void fetchWeekWorkouts(weekNumber);
-  }, [authReady, plan, hasSchedule, weekNumber, fetchWeekWorkouts]);
+  }, [
+    authReady,
+    plan,
+    showSchedulePreview,
+    weekNumber,
+    planScheduleEpoch,
+    fetchWeekWorkouts,
+  ]);
+
+  function beginRegeneration() {
+    setGenerating(true);
+    setError(null);
+    setRegenerationSuccess(false);
+    setWeekDays([]);
+    setSelectedDayKey("");
+    setWeekNumber(1);
+    setLoadingWeek(false);
+  }
+
+  async function finishGenerationSuccess() {
+    setShowPreferencesEditor(false);
+    setRegenerationSuccess(true);
+    setPlanScheduleEpoch((epoch) => epoch + 1);
+    await loadPlan({ quiet: true });
+  }
 
   function togglePreferredDay(d: number) {
     setPreferredDaysLocal((prev) => {
@@ -530,8 +580,7 @@ export default function TrainingSetupPlanPage({
   }
 
   async function savePreferredAndGenerate() {
-    setGenerating(true);
-    setError(null);
+    beginRegeneration();
     try {
       const token = await getToken();
       const targetMiles = resolveTargetMiles();
@@ -543,7 +592,7 @@ export default function TrainingSetupPlanPage({
       if (!saved) return;
       const generated = await generatePlanSchedule(token, targetMiles);
       if (!generated) return;
-      await loadPlan();
+      await finishGenerationSuccess();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generation failed");
     } finally {
@@ -553,8 +602,7 @@ export default function TrainingSetupPlanPage({
 
   async function regenerateSchedule() {
     if (!plan) return;
-    setGenerating(true);
-    setError(null);
+    beginRegeneration();
     try {
       const token = await getToken();
       const targetMiles = resolveTargetMiles();
@@ -566,7 +614,7 @@ export default function TrainingSetupPlanPage({
       if (!saved) return;
       const generated = await generatePlanSchedule(token, targetMiles);
       if (!generated) return;
-      await loadPlan();
+      await finishGenerationSuccess();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Regeneration failed");
     } finally {
@@ -642,14 +690,165 @@ export default function TrainingSetupPlanPage({
             {formatPlanDateDisplay(plan.startDate)}
           </p>
 
+          {regenerationSuccess && showSchedulePreview && (
+            <div
+              className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950"
+              role="status"
+            >
+              Schedule regenerated from your latest preferences. Review week 1 below, then
+              open workouts or go to your plan.
+            </div>
+          )}
+
+          {generating && hasSchedule && (
+            <div
+              className="mb-6 rounded-xl border border-orange-200 bg-orange-50 px-4 py-6 text-center text-sm text-gray-800"
+              role="status"
+            >
+              <p className="font-medium text-gray-900">Regenerating your schedule…</p>
+              <p className="mt-2 text-gray-600">
+                Building a fresh plan from your preferences. Your previous week preview is
+                hidden until the new schedule is ready.
+              </p>
+            </div>
+          )}
+
+          {showSchedulePreview && (
+            <>
+              <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800">
+                <p className="font-medium text-gray-900">Here&apos;s your plan preview</p>
+                <p className="mt-2 text-gray-600">
+                  Step through weeks below and open each workout. Your saved preferences are
+                  summarized here—edit them only when you want to regenerate.
+                </p>
+                <dl className="mt-4 grid gap-2 text-xs text-gray-700 sm:grid-cols-2">
+                  <div>
+                    <dt className="font-medium text-gray-500">Weekly target</dt>
+                    <dd>
+                      {plan.weeklyMileageTarget != null &&
+                      Number.isFinite(Number(plan.weeklyMileageTarget))
+                        ? `${Math.round(Number(plan.weeklyMileageTarget))} mi/week`
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-gray-500">Training days</dt>
+                    <dd>{dayLabelsFromValues(plan.preferredDays ?? []) || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-gray-500">Long run</dt>
+                    <dd>{longRunDayLabel(plan.preferredLongRunDow)}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-gray-500">Tempo / interval</dt>
+                    <dd>
+                      {plan.preferredTempoDow != null
+                        ? DAY_OPTIONS.find((d) => d.value === plan.preferredTempoDow)?.label ??
+                          "Preset default"
+                        : "Preset default"}
+                      {" · "}
+                      {plan.preferredIntervalDow != null
+                        ? DAY_OPTIONS.find((d) => d.value === plan.preferredIntervalDow)?.label ??
+                          "Preset default"
+                        : "Preset default"}
+                    </dd>
+                  </div>
+                </dl>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRegenerationSuccess(false);
+                    setShowPreferencesEditor(true);
+                  }}
+                  className="mt-4 text-sm font-semibold text-orange-600 hover:text-orange-700"
+                >
+                  Edit preferences & regenerate
+                </button>
+              </div>
+
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <Link
+                  href="/training"
+                  className="inline-flex items-center rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
+                >
+                  Go to my plan
+                </Link>
+              </div>
+
+              <PlanWeekCalendar
+                weekNumber={weekNumber}
+                totalWeeks={effectiveTotalWeeks}
+                days={weekDays}
+                loading={loadingWeek}
+                todayKey={todayKey}
+                selectedDateKey={focusKey}
+                calendarRangeLabel={calendarWeekRangeLabel}
+                summary={weekSummary}
+                onPrevWeek={goPrevWeek}
+                onNextWeek={goNextWeek}
+                onSelectDay={openPlanDay}
+                selectedDayDetail={
+                  focusPlanDay ? (
+                    <div className="rounded-xl border border-orange-200 bg-white p-4 sm:p-5">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Selected workout
+                      </p>
+                      <h3 className="mt-1 text-lg font-semibold text-gray-900">
+                        {workoutCardPrimaryName(focusPlanDay)}
+                      </h3>
+                      <p className="mt-1 text-sm text-gray-600">
+                        {formatPlanDateDisplay(focusPlanDay.dateKey || focusPlanDay.date, {
+                          weekday: "long",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                        {focusPlanDay.estimatedDistanceInMeters
+                          ? ` · ${formatWeekCardMiles(focusPlanDay.estimatedDistanceInMeters)}`
+                          : ""}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-500">
+                        {workoutCardSubtypeLine(focusPlanDay)}
+                      </p>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => navigateToPlanDay(focusPlanDay)}
+                          className="inline-flex rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+                        >
+                          Open workout
+                        </button>
+                        {focusPlanDay.workoutId ? (
+                          <Link
+                            href={`/workouts/${focusPlanDay.workoutId}`}
+                            className="inline-flex rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                          >
+                            Workout detail
+                          </Link>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null
+                }
+              />
+
+              {!loadingWeek && weekDays.length === 0 && (
+                <p className="mb-4 text-sm text-gray-500">
+                  Loading workouts for this week… If nothing appears, set your 5K pace on
+                  your profile so we can build segments.
+                </p>
+              )}
+            </>
+          )}
+
+          {inPreferencesSetupMode && !generating && (
           <div className="mb-6 space-y-6">
             <div className="rounded-xl border border-orange-100 bg-orange-50/80 p-4 text-sm text-gray-800">
               <p className="font-medium text-gray-900">
-                {hasSchedule ? "Edit weekly miles" : "Choose your training preferences"}
+                {hasSchedule ? "Edit training preferences" : "Choose your training preferences"}
               </p>
               <p className="mt-2 leading-relaxed text-gray-700">
                 {hasSchedule
-                  ? "Set your weekly mileage target, then regenerate your schedule. You can also adjust training days below if needed."
+                  ? "Adjust your weekly target and training days, then regenerate. Your current schedule preview is hidden while you edit."
                   : "Tell us roughly how many miles you want in a typical week and which days you like to run. We use that to size the plan before we generate your schedule. Each week won't match that number exactly—long-run weeks, taper, and recovery will move weekly volume up and down."}
               </p>
               <p className="mt-2 text-xs text-gray-600">
@@ -663,6 +862,18 @@ export default function TrainingSetupPlanPage({
                   Saved weekly target: {Math.round(Number(plan.weeklyMileageTarget))} mi/week
                 </p>
               ) : null}
+              {hasSchedule && showPreferencesEditor && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPreferencesEditor(false);
+                    setError(null);
+                  }}
+                  className="mt-3 text-sm font-semibold text-orange-700 hover:text-orange-800"
+                >
+                  Cancel — back to plan preview
+                </button>
+              )}
             </div>
 
             {!hasSchedule && presetGenerateWarnings.length > 0 && (
@@ -911,89 +1122,24 @@ export default function TrainingSetupPlanPage({
                     : "Save & regenerate schedule"
                   : "Save preferences & generate schedule"}
             </button>
+
+            {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
-
-          {hasSchedule && (
-            <>
-              <p className="mb-4 text-base text-gray-700">
-                Your schedule is ready. Step through weeks below and open each workout.
-              </p>
-
-              <div className="mb-4 flex flex-wrap items-center gap-2">
-                <Link
-                  href="/training"
-                  className="inline-flex items-center rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
-                >
-                  Go to my plan
-                </Link>
-              </div>
-
-              <PlanWeekCalendar
-                weekNumber={weekNumber}
-                totalWeeks={effectiveTotalWeeks}
-                days={weekDays}
-                loading={loadingWeek}
-                todayKey={todayKey}
-                selectedDateKey={focusKey}
-                calendarRangeLabel={calendarWeekRangeLabel}
-                summary={weekSummary}
-                onPrevWeek={goPrevWeek}
-                onNextWeek={goNextWeek}
-                onSelectDay={openPlanDay}
-                selectedDayDetail={
-                  focusPlanDay ? (
-                    <div className="rounded-xl border border-orange-200 bg-white p-4 sm:p-5">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        Selected workout
-                      </p>
-                      <h3 className="mt-1 text-lg font-semibold text-gray-900">
-                        {workoutCardPrimaryName(focusPlanDay)}
-                      </h3>
-                      <p className="mt-1 text-sm text-gray-600">
-                        {formatPlanDateDisplay(focusPlanDay.dateKey || focusPlanDay.date, {
-                          weekday: "long",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                        {focusPlanDay.estimatedDistanceInMeters
-                          ? ` · ${formatWeekCardMiles(focusPlanDay.estimatedDistanceInMeters)}`
-                          : ""}
-                      </p>
-                      <p className="mt-1 text-sm text-gray-500">
-                        {workoutCardSubtypeLine(focusPlanDay)}
-                      </p>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => navigateToPlanDay(focusPlanDay)}
-                          className="inline-flex rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
-                        >
-                          Open workout
-                        </button>
-                        {focusPlanDay.workoutId ? (
-                          <Link
-                            href={`/workouts/${focusPlanDay.workoutId}`}
-                            className="inline-flex rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-                          >
-                            Workout detail
-                          </Link>
-                        ) : null}
-                      </div>
-                    </div>
-                  ) : null
-                }
-              />
-            </>
           )}
 
-          {hasSchedule && !loadingWeek && weekDays.length === 0 && (
-            <p className="text-sm text-gray-500 mb-4">
-              No workouts for this week yet. If something failed above, set your
-              5K pace on your profile so we can build segments.
-            </p>
+          {generating && !hasSchedule && (
+            <div
+              className="mb-6 rounded-xl border border-orange-200 bg-orange-50 px-4 py-6 text-center text-sm text-gray-800"
+              role="status"
+            >
+              <p className="font-medium text-gray-900">Generating your schedule…</p>
+              <p className="mt-2 text-gray-600">This usually takes a few seconds.</p>
+            </div>
           )}
 
-          {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+          {error && !inPreferencesSetupMode && (
+            <p className="mb-4 text-sm text-red-600">{error}</p>
+          )}
 
           <div className="flex flex-wrap gap-4 text-sm text-gray-500">
             <Link href="/training-setup" className="hover:text-orange-600">
