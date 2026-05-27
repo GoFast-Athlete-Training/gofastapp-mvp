@@ -176,6 +176,16 @@ export async function PUT(
       }
       data.state = v;
     }
+    if (has('email')) {
+      const raw = body.email == null || body.email === '' ? null : trimReq(body.email);
+      if (raw && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid email', message: 'Enter a valid email address' },
+          { status: 400 }
+        );
+      }
+      data.email = raw;
+    }
     if (has('phoneNumber')) {
       data.phoneNumber =
         body.phoneNumber == null || body.phoneNumber === '' ? null : String(body.phoneNumber);
