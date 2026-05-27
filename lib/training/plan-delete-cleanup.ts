@@ -16,10 +16,10 @@ export async function cleanupPlanWorkoutsBeforeDelete(params: {
   });
 
   const futureUncompleted = workouts.filter(
-    (w) => w.matchedActivityId == null && w.date >= todayUtc
+    (w) => w.matchedActivityId == null && w.date != null && w.date >= todayUtc
   );
   const completedOrPast = workouts.filter(
-    (w) => w.matchedActivityId != null || w.date < todayUtc
+    (w) => w.matchedActivityId != null || w.date == null || w.date < todayUtc
   );
 
   await prisma.$transaction(async (tx) => {
