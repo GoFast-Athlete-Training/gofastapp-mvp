@@ -144,6 +144,9 @@ export default function TrainingSetupPlanPage({
   );
   const [error, setError] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [athleteWeeklyTargetPreference, setAthleteWeeklyTargetPreference] = useState<
+    number | null
+  >(null);
   async function getToken() {
     const u = auth.currentUser;
     if (!u) throw new Error("Sign in required");
@@ -155,8 +158,12 @@ export default function TrainingSetupPlanPage({
     setError(null);
     try {
       const token = await getToken();
-      const { plan } = await fetchTrainingPlanDetail(planId, token);
+      const { plan, weeklyMileageTargetPreference } = await fetchTrainingPlanDetail(
+        planId,
+        token
+      );
       setPlan(plan as PlanDetail);
+      setAthleteWeeklyTargetPreference(weeklyMileageTargetPreference);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
       setPlan(null);
@@ -175,7 +182,19 @@ export default function TrainingSetupPlanPage({
     } else {
       setPreferredDaysLocal([]);
     }
-    setWeeklyMilesTarget("");
+    if (
+      plan.weeklyMileageTarget != null &&
+      Number.isFinite(Number(plan.weeklyMileageTarget))
+    ) {
+      setWeeklyMilesTarget(String(Math.round(Number(plan.weeklyMileageTarget))));
+    } else if (
+      athleteWeeklyTargetPreference != null &&
+      Number.isFinite(athleteWeeklyTargetPreference)
+    ) {
+      setWeeklyMilesTarget(String(Math.round(athleteWeeklyTargetPreference)));
+    } else {
+      setWeeklyMilesTarget("");
+    }
     const pld = plan.preferredLongRunDow;
     if (pld === 6 || pld === 7) {
       setPreferredLongRunDowLocal(pld);
@@ -205,6 +224,8 @@ export default function TrainingSetupPlanPage({
     plan?.preferredTempoDow,
     plan?.preferredIntervalDow,
     plan?.preferredQualityDays,
+    plan?.weeklyMileageTarget,
+    athleteWeeklyTargetPreference,
   ]);
 
   useEffect(() => {
@@ -289,6 +310,47 @@ export default function TrainingSetupPlanPage({
     const fourDays = preferredCount === 4;
     return { belowEngineFloor, fewDays, fourDays };
   }, [weeklyMilesTarget, preferredCount, presetMinWeeklyMiles]);
+
+  function arraysEqual(a: number[], b: number[]): boolean {
+    if (a.length !== b.length) return false;
+    const sa = [...a].sort((x, y) => x - y);
+    const sb = [...b].sort((x, y) => x - y);
+    return sa.every((v, i) => v === sb[i]);
+  }
+
+  const mileageOnlyEdit = useMemo(() => {
+    if (!hasSchedule || !plan) return false;
+    const savedDays = (plan.preferredDays ?? []).filter((n) => n >= 1 && n <= 7);
+    const savedTarget =
+      plan.weeklyMileageTarget != null && Number.isFinite(Number(plan.weeklyMileageTarget))
+        ? Math.round(Number(plan.weeklyMileageTarget))
+        : null;
+    const inputTarget = Math.round(Number(weeklyMilesTarget.trim()));
+    const targetChanged =
+      Number.isFinite(inputTarget) &&
+      (savedTarget == null || inputTarget !== savedTarget);
+    const daysUnchanged = arraysEqual(preferredDaysLocal, savedDays);
+    const longRunUnchanged =
+      preferredLongRunDowLocal === (plan.preferredLongRunDow === 7 ? 7 : 6);
+    const tempoUnchanged = preferredTempoDowLocal === (plan.preferredTempoDow ?? null);
+    const intervalUnchanged =
+      preferredIntervalDowLocal === (plan.preferredIntervalDow ?? null);
+    return (
+      targetChanged &&
+      daysUnchanged &&
+      longRunUnchanged &&
+      tempoUnchanged &&
+      intervalUnchanged
+    );
+  }, [
+    hasSchedule,
+    plan,
+    weeklyMilesTarget,
+    preferredDaysLocal,
+    preferredLongRunDowLocal,
+    preferredTempoDowLocal,
+    preferredIntervalDowLocal,
+  ]);
 
   const presetGenerateWarnings = useMemo(() => {
     if (!plan || hasSchedule) return [] as string[];
@@ -397,72 +459,90 @@ export default function TrainingSetupPlanPage({
     });
   }
 
+  function resolveTargetMiles(): number | null {
+    const weeklyMilesRaw = weeklyMilesTarget.trim();
+    let targetMiles = weeklyMilesRaw === "" ? NaN : Math.round(Number(weeklyMilesRaw));
+    if (!Number.isFinite(targetMiles)) {
+      return null;
+    }
+    return Math.max(25, Math.min(100, targetMiles));
+  }
+
+  async function savePlanPreferences(token: string, targetMiles: number) {
+    const normalized = preferredDaysLocal.filter((d) => d >= 1 && d <= 7);
+    if (normalized.length === 0) {
+      setError("Select at least one preferred training day.");
+      return false;
+    }
+
+    const prefCheck = validatePreferredTempoInterval({
+      preferredTempoDow: preferredTempoDowLocal,
+      preferredIntervalDow: preferredIntervalDowLocal,
+      preferredLongRunDow: preferredLongRunDowLocal,
+      preferredDays: normalized,
+    });
+    if (!prefCheck.ok) {
+      setError(prefCheck.error);
+      return false;
+    }
+
+    const patchRes = await fetch(`/api/training-plan/${planId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...athleteBearerFetchHeaders(token),
+      },
+      body: JSON.stringify({
+        preferredDays: normalized,
+        weeklyMileageTarget: targetMiles,
+        preferredLongRunDow: preferredLongRunDowLocal,
+        preferredTempoDow: preferredTempoDowLocal,
+        preferredIntervalDow: preferredIntervalDowLocal,
+      }),
+    });
+    const patchData = await patchRes.json();
+    if (!patchRes.ok) {
+      setError(patchData.error || "Could not save preferences");
+      return false;
+    }
+    return true;
+  }
+
+  async function generatePlanSchedule(token: string, targetMiles: number) {
+    const genRes = await fetch("/api/training/plan/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...athleteBearerFetchHeaders(token),
+      },
+      body: JSON.stringify({
+        trainingPlanId: planId,
+        weeklyMileageTarget: targetMiles,
+        minWeeklyMiles: presetMinWeeklyMiles,
+      }),
+    });
+    const genData = await genRes.json();
+    if (!genRes.ok) {
+      setError(genData.error || "Generation failed");
+      return false;
+    }
+    return true;
+  }
+
   async function savePreferredAndGenerate() {
     setGenerating(true);
     setError(null);
     try {
       const token = await getToken();
-      const normalized = preferredDaysLocal.filter((d) => d >= 1 && d <= 7);
-      if (normalized.length === 0) {
-        setError("Select at least one preferred training day.");
-        return;
-      }
-      const weeklyMilesRaw = weeklyMilesTarget.trim();
-      let targetMiles = weeklyMilesRaw === "" ? NaN : Math.round(Number(weeklyMilesRaw));
-      if (!Number.isFinite(targetMiles)) {
+      const targetMiles = resolveTargetMiles();
+      if (targetMiles == null) {
         setError("Please enter a number for your weekly miles.");
         return;
       }
-      targetMiles = Math.max(25, Math.min(100, targetMiles));
-
-      const prefCheck = validatePreferredTempoInterval({
-        preferredTempoDow: preferredTempoDowLocal,
-        preferredIntervalDow: preferredIntervalDowLocal,
-        preferredLongRunDow: preferredLongRunDowLocal,
-        preferredDays: normalized,
-      });
-      if (!prefCheck.ok) {
-        setError(prefCheck.error);
-        return;
-      }
-
-      const patchRes = await fetch(`/api/training-plan/${planId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...athleteBearerFetchHeaders(token),
-        },
-        body: JSON.stringify({
-          preferredDays: normalized,
-          weeklyMileageTarget: targetMiles,
-          preferredLongRunDow: preferredLongRunDowLocal,
-          preferredTempoDow: preferredTempoDowLocal,
-          preferredIntervalDow: preferredIntervalDowLocal,
-        }),
-      });
-      const patchData = await patchRes.json();
-      if (!patchRes.ok) {
-        setError(patchData.error || "Could not save preferences");
-        return;
-      }
-
-      const genRes = await fetch("/api/training/plan/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...athleteBearerFetchHeaders(token),
-        },
-        body: JSON.stringify({
-          trainingPlanId: planId,
-          weeklyMileageTarget: targetMiles,
-          minWeeklyMiles: presetMinWeeklyMiles,
-        }),
-      });
-      const genData = await genRes.json();
-      if (!genRes.ok) {
-        setError(genData.error || "Generation failed");
-        return;
-      }
+      const saved = await savePlanPreferences(token, targetMiles);
+      if (!saved) return;
+      const generated = await generatePlanSchedule(token, targetMiles);
+      if (!generated) return;
       await loadPlan();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generation failed");
@@ -477,34 +557,15 @@ export default function TrainingSetupPlanPage({
     setError(null);
     try {
       const token = await getToken();
-      const fromPlan =
-        plan.weeklyMileageTarget != null &&
-        Number.isFinite(Number(plan.weeklyMileageTarget))
-          ? Math.round(Number(plan.weeklyMileageTarget))
-          : null;
-      const fromInput = Math.round(Number(weeklyMilesTarget));
-      const targetMiles = Math.max(
-        25,
-        Math.min(100, fromPlan ?? (Number.isFinite(fromInput) ? fromInput : 45))
-      );
-
-      const genRes = await fetch("/api/training/plan/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...athleteBearerFetchHeaders(token),
-        },
-        body: JSON.stringify({
-          trainingPlanId: planId,
-          weeklyMileageTarget: targetMiles,
-          minWeeklyMiles: presetMinWeeklyMiles,
-        }),
-      });
-      const genData = await genRes.json();
-      if (!genRes.ok) {
-        setError(genData.error || "Regeneration failed");
+      const targetMiles = resolveTargetMiles();
+      if (targetMiles == null) {
+        setError("Please enter a number for your weekly miles.");
         return;
       }
+      const saved = await savePlanPreferences(token, targetMiles);
+      if (!saved) return;
+      const generated = await generatePlanSchedule(token, targetMiles);
+      if (!generated) return;
       await loadPlan();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Regeneration failed");
@@ -581,280 +642,284 @@ export default function TrainingSetupPlanPage({
             {formatPlanDateDisplay(plan.startDate)}
           </p>
 
-          {!hasSchedule && (
-            <div className="mb-6 space-y-6">
-              <div className="rounded-xl border border-orange-100 bg-orange-50/80 p-4 text-sm text-gray-800">
-                <p className="font-medium text-gray-900">
-                  Choose your training preferences
+          <div className="mb-6 space-y-6">
+            <div className="rounded-xl border border-orange-100 bg-orange-50/80 p-4 text-sm text-gray-800">
+              <p className="font-medium text-gray-900">
+                {hasSchedule ? "Edit weekly miles" : "Choose your training preferences"}
+              </p>
+              <p className="mt-2 leading-relaxed text-gray-700">
+                {hasSchedule
+                  ? "Set your weekly mileage target, then regenerate your schedule. You can also adjust training days below if needed."
+                  : "Tell us roughly how many miles you want in a typical week and which days you like to run. We use that to size the plan before we generate your schedule. Each week won't match that number exactly—long-run weeks, taper, and recovery will move weekly volume up and down."}
+              </p>
+              <p className="mt-2 text-xs text-gray-600">
+                Target is the weekly volume the plan aims toward. Planned miles are the
+                generated workouts for a specific week.
+              </p>
+              {hasSchedule &&
+              plan.weeklyMileageTarget != null &&
+              Number.isFinite(Number(plan.weeklyMileageTarget)) ? (
+                <p className="mt-2 text-xs font-medium text-orange-900/90">
+                  Saved weekly target: {Math.round(Number(plan.weeklyMileageTarget))} mi/week
                 </p>
-                <p className="mt-2 leading-relaxed text-gray-700">
-                  Tell us roughly how many miles you want in a typical week and
-                  which days you like to run. We use that to size the plan before we
-                  generate your schedule. Each week won&apos;t match that number
-                  exactly—long-run weeks, taper, and recovery will move weekly volume
-                  up and down.
-                </p>
-              </div>
+              ) : null}
+            </div>
 
-              {presetGenerateWarnings.length > 0 && (
-                <div
-                  className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+            {!hasSchedule && presetGenerateWarnings.length > 0 && (
+              <div
+                className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+                role="status"
+              >
+                <p className="mb-2 font-medium text-amber-950">Before you continue</p>
+                <ul className="list-disc space-y-1 pl-5 text-amber-900/95">
+                  {presetGenerateWarnings.map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-800">
+                How many miles do you want to do weekly?
+              </label>
+              <p className="mb-2 text-xs text-gray-500">
+                Your ballpark for how much you want to run in a normal week—we aim the
+                plan at it.
+              </p>
+              <input
+                type="number"
+                inputMode="numeric"
+                step={1}
+                min={25}
+                max={100}
+                className="w-full max-w-md rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                value={weeklyMilesTarget}
+                onChange={(e) => setWeeklyMilesTarget(e.target.value)}
+              />
+              {buildWarnings.belowEngineFloor && (
+                <p
+                  className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950"
                   role="status"
                 >
-                  <p className="mb-2 font-medium text-amber-950">
-                    Before you continue
-                  </p>
-                  <ul className="list-disc space-y-1 pl-5 text-amber-900/95">
-                    {presetGenerateWarnings.map((w, i) => (
-                      <li key={i}>{w}</li>
-                    ))}
-                  </ul>
-                </div>
+                  You entered {Math.round(Number(weeklyMilesTarget))} mi/week. This
+                  plan&apos;s blueprint enforces at least {presetMinWeeklyMiles} mi/week when
+                  we build the schedule, so the generator may use that minimum (or higher)
+                  for weekly totals—especially on weeks with tempo, intervals, and long
+                  runs.
+                </p>
               )}
+            </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-800">
-                  How many miles do you want to do weekly?
+            <div>
+              <p className="mb-2 text-sm font-medium text-gray-800">Preferred training days</p>
+              <p className="mb-3 text-xs text-gray-500">
+                Choose the days you want to train. We assign sessions on these days
+                (Mon–Sun).
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {DAY_OPTIONS.map(({ value, label }) => (
+                  <label
+                    key={value}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50"
+                  >
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                      checked={preferredDaysLocal.includes(value)}
+                      onChange={() => togglePreferredDay(value)}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              {buildWarnings.fewDays && (
+                <p
+                  className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950"
+                  role="status"
+                >
+                  Fewer than four days makes it harder to spread easy mileage, interval/tempo
+                  days, and recovery. Adding another day or two usually feels better on the
+                  legs.
+                </p>
+              )}
+              {buildWarnings.fourDays && (
+                <p
+                  className="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm text-sky-950"
+                  role="status"
+                >
+                  With four sessions a week, your off days are real recovery days—we aim to
+                  make each workout day count (tempo, intervals, long, or easy). Listen to
+                  easy days if we prescribe them.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm font-medium text-gray-800">Long run day</p>
+              <p className="mb-3 text-xs text-gray-500">
+                Pick Saturday or Sunday for your long run. Interval and tempo days avoid this
+                day.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                {LONG_RUN_DAY_OPTIONS.map(({ value, label }) => (
+                  <label
+                    key={value}
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50"
+                  >
+                    <input
+                      type="radio"
+                      name="preferredLongRunDow"
+                      className="border-gray-300 text-orange-600 focus:ring-orange-500"
+                      checked={preferredLongRunDowLocal === value}
+                      onChange={() => {
+                        setPreferredLongRunDowLocal(value);
+                        setPreferredTempoDowLocal((t) => (t === value ? null : t));
+                        setPreferredIntervalDowLocal((i) => (i === value ? null : i));
+                      }}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm font-medium text-gray-800">Tempo day</p>
+              <p className="mb-3 text-xs text-gray-500">
+                Pick a day for your tempo workout (from your preferred days, not your long
+                run). If you skip this, we use the preset default (often Tuesday).
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50">
+                  <input
+                    type="radio"
+                    name="preferredTempoDow"
+                    className="border-gray-300 text-orange-600 focus:ring-orange-500"
+                    checked={preferredTempoDowLocal === null}
+                    onChange={() => {
+                      setPreferredTempoDowLocal(null);
+                      setError(null);
+                    }}
+                  />
+                  No preference
                 </label>
-                <p className="mb-2 text-xs text-gray-500">
-                  Your ballpark for how much you want to run in a normal week—we
-                  aim the plan at it.
-                </p>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  step={1}
-                  className="w-full max-w-md rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                  value={weeklyMilesTarget}
-                  onChange={(e) => setWeeklyMilesTarget(e.target.value)}
-                />
-                {buildWarnings.belowEngineFloor && (
-                  <p
-                    className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950"
-                    role="status"
-                  >
-                    You entered {Math.round(Number(weeklyMilesTarget))} mi/week.
-                    This plan&apos;s blueprint enforces at least {presetMinWeeklyMiles}{" "}
-                    mi/week when we build the schedule, so the generator may use that
-                    minimum (or higher) for weekly totals—especially on weeks with
-                    tempo, intervals, and long runs.
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <p className="mb-2 text-sm font-medium text-gray-800">
-                  Preferred training days
-                </p>
-                <p className="mb-3 text-xs text-gray-500">
-                  Choose the days you want to train. We assign sessions on these
-                  days (Mon–Sun).
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {DAY_OPTIONS.map(({ value, label }) => (
+                {DAY_OPTIONS.map(({ value, label }) => {
+                  const ok =
+                    preferredDaysLocal.includes(value) &&
+                    value !== preferredLongRunDowLocal &&
+                    value !== preferredIntervalDowLocal;
+                  return (
                     <label
-                      key={value}
-                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50"
-                    >
-                      <input
-                        type="checkbox"
-                        className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-                        checked={preferredDaysLocal.includes(value)}
-                        onChange={() => togglePreferredDay(value)}
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-                {buildWarnings.fewDays && (
-                  <p
-                    className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950"
-                    role="status"
-                  >
-                    Fewer than four days makes it harder to spread easy mileage,
-                    interval/tempo days, and recovery. Adding another day or two usually
-                    feels better on the legs.
-                  </p>
-                )}
-                {buildWarnings.fourDays && (
-                  <p
-                    className="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm text-sky-950"
-                    role="status"
-                  >
-                    With four sessions a week, your off days are real recovery
-                    days—we aim to make each workout day count (tempo, intervals,
-                    long, or easy). Listen to easy days if we prescribe them.
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <p className="mb-2 text-sm font-medium text-gray-800">
-                  Long run day
-                </p>
-                <p className="mb-3 text-xs text-gray-500">
-                  Pick Saturday or Sunday for your long run. Interval and tempo days avoid
-                  this day.
-                </p>
-                <div className="flex flex-wrap gap-3">
-                  {LONG_RUN_DAY_OPTIONS.map(({ value, label }) => (
-                    <label
-                      key={value}
-                      className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50"
+                      key={`tempo-${value}`}
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2.5 text-sm ${
+                        ok
+                          ? "cursor-pointer border-gray-200 bg-gray-50 has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50"
+                          : "cursor-not-allowed border-gray-100 bg-gray-100 text-gray-400"
+                      }`}
                     >
                       <input
                         type="radio"
-                        name="preferredLongRunDow"
-                        className="border-gray-300 text-orange-600 focus:ring-orange-500"
-                        checked={preferredLongRunDowLocal === value}
+                        name="preferredTempoDow"
+                        className="border-gray-300 text-orange-600 focus:ring-orange-500 disabled:opacity-40"
+                        checked={preferredTempoDowLocal === value}
+                        disabled={!ok}
                         onChange={() => {
-                          setPreferredLongRunDowLocal(value);
-                          setPreferredTempoDowLocal((t) => (t === value ? null : t));
+                          setPreferredTempoDowLocal(value);
                           setPreferredIntervalDowLocal((i) => (i === value ? null : i));
+                          setError(null);
                         }}
                       />
                       {label}
                     </label>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-
-              <div>
-                <p className="mb-2 text-sm font-medium text-gray-800">Tempo day</p>
-                <p className="mb-3 text-xs text-gray-500">
-                  Pick a day for your tempo workout (from your preferred days, not your long run).
-                  If you skip this, we use the preset default (often Tuesday).
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50">
-                    <input
-                      type="radio"
-                      name="preferredTempoDow"
-                      className="border-gray-300 text-orange-600 focus:ring-orange-500"
-                      checked={preferredTempoDowLocal === null}
-                      onChange={() => {
-                        setPreferredTempoDowLocal(null);
-                        setError(null);
-                      }}
-                    />
-                    No preference
-                  </label>
-                  {DAY_OPTIONS.map(({ value, label }) => {
-                    const ok =
-                      preferredDaysLocal.includes(value) &&
-                      value !== preferredLongRunDowLocal &&
-                      value !== preferredIntervalDowLocal;
-                    return (
-                      <label
-                        key={`tempo-${value}`}
-                        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2.5 text-sm ${
-                          ok
-                            ? "cursor-pointer border-gray-200 bg-gray-50 has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50"
-                            : "cursor-not-allowed border-gray-100 bg-gray-100 text-gray-400"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="preferredTempoDow"
-                          className="border-gray-300 text-orange-600 focus:ring-orange-500 disabled:opacity-40"
-                          checked={preferredTempoDowLocal === value}
-                          disabled={!ok}
-                          onChange={() => {
-                            setPreferredTempoDowLocal(value);
-                            setPreferredIntervalDowLocal((i) => (i === value ? null : i));
-                            setError(null);
-                          }}
-                        />
-                        {label}
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <p className="mb-2 text-sm font-medium text-gray-800">Interval day</p>
-                <p className="mb-3 text-xs text-gray-500">
-                  Pick a day for intervals (from your preferred days, not your long run).
-                  If you skip this, we use the preset default (often Thursday). When both tempo and
-                  interval are set, they must be at least two weekdays apart.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50">
-                    <input
-                      type="radio"
-                      name="preferredIntervalDow"
-                      className="border-gray-300 text-orange-600 focus:ring-orange-500"
-                      checked={preferredIntervalDowLocal === null}
-                      onChange={() => {
-                        setPreferredIntervalDowLocal(null);
-                        setError(null);
-                      }}
-                    />
-                    No preference
-                  </label>
-                  {DAY_OPTIONS.map(({ value, label }) => {
-                    const ok =
-                      preferredDaysLocal.includes(value) &&
-                      value !== preferredLongRunDowLocal &&
-                      value !== preferredTempoDowLocal;
-                    return (
-                      <label
-                        key={`interval-${value}`}
-                        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2.5 text-sm ${
-                          ok
-                            ? "cursor-pointer border-gray-200 bg-gray-50 has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50"
-                            : "cursor-not-allowed border-gray-100 bg-gray-100 text-gray-400"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="preferredIntervalDow"
-                          className="border-gray-300 text-orange-600 focus:ring-orange-500 disabled:opacity-40"
-                          checked={preferredIntervalDowLocal === value}
-                          disabled={!ok}
-                          onChange={() => {
-                            setPreferredIntervalDowLocal(value);
-                            setPreferredTempoDowLocal((t) => (t === value ? null : t));
-                            setError(null);
-                          }}
-                        />
-                        {label}
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => void savePreferredAndGenerate()}
-                disabled={generating}
-                className="w-full rounded-lg bg-orange-500 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-orange-600 disabled:opacity-50"
-              >
-                {generating
-                  ? "Saving preferences & generating schedule…"
-                  : "Save preferences & generate schedule"}
-              </button>
             </div>
-          )}
+
+            <div>
+              <p className="mb-2 text-sm font-medium text-gray-800">Interval day</p>
+              <p className="mb-3 text-xs text-gray-500">
+                Pick a day for intervals (from your preferred days, not your long run). If you
+                skip this, we use the preset default (often Thursday). When both tempo and
+                interval are set, they must be at least two weekdays apart.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50">
+                  <input
+                    type="radio"
+                    name="preferredIntervalDow"
+                    className="border-gray-300 text-orange-600 focus:ring-orange-500"
+                    checked={preferredIntervalDowLocal === null}
+                    onChange={() => {
+                      setPreferredIntervalDowLocal(null);
+                      setError(null);
+                    }}
+                  />
+                  No preference
+                </label>
+                {DAY_OPTIONS.map(({ value, label }) => {
+                  const ok =
+                    preferredDaysLocal.includes(value) &&
+                    value !== preferredLongRunDowLocal &&
+                    value !== preferredTempoDowLocal;
+                  return (
+                    <label
+                      key={`interval-${value}`}
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2.5 text-sm ${
+                        ok
+                          ? "cursor-pointer border-gray-200 bg-gray-50 has-[:checked]:border-orange-400 has-[:checked]:bg-orange-50"
+                          : "cursor-not-allowed border-gray-100 bg-gray-100 text-gray-400"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="preferredIntervalDow"
+                        className="border-gray-300 text-orange-600 focus:ring-orange-500 disabled:opacity-40"
+                        checked={preferredIntervalDowLocal === value}
+                        disabled={!ok}
+                        onChange={() => {
+                          setPreferredIntervalDowLocal(value);
+                          setPreferredTempoDowLocal((t) => (t === value ? null : t));
+                          setError(null);
+                        }}
+                      />
+                      {label}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                void (hasSchedule ? regenerateSchedule() : savePreferredAndGenerate())
+              }
+              disabled={generating}
+              className="w-full rounded-lg bg-orange-500 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-orange-600 disabled:opacity-50"
+            >
+              {generating
+                ? hasSchedule
+                  ? mileageOnlyEdit
+                    ? "Saving mileage target & regenerating…"
+                    : "Saving & regenerating schedule…"
+                  : "Saving preferences & generating schedule…"
+                : hasSchedule
+                  ? mileageOnlyEdit
+                    ? "Save mileage target & regenerate"
+                    : "Save & regenerate schedule"
+                  : "Save preferences & generate schedule"}
+            </button>
+          </div>
 
           {hasSchedule && (
             <>
               <p className="mb-4 text-base text-gray-700">
-                Your schedule is ready. Step through weeks below and open each
-                workout.
+                Your schedule is ready. Step through weeks below and open each workout.
               </p>
 
               <div className="mb-4 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void regenerateSchedule()}
-                  disabled={generating}
-                  className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  {generating ? "Regenerating…" : "Regenerate schedule"}
-                </button>
                 <Link
                   href="/training"
                   className="inline-flex items-center rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"

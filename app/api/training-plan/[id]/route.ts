@@ -10,6 +10,15 @@ import { validatePreferredTempoInterval } from "@/lib/training/preferred-tempo-i
 
 type Ctx = { params: Promise<{ id: string }> };
 
+/** Preference fields allowed on generated plans before regenerate. */
+const REGENERATE_PATCH_KEYS = new Set([
+  "weeklyMileageTarget",
+  "preferredDays",
+  "preferredLongRunDow",
+  "preferredTempoDow",
+  "preferredIntervalDow",
+]);
+
 /** `id` = `training_plans.id` (see `lib/training/persisted-training-plan.ts` for generate vs week/workout flows). */
 export async function GET(request: NextRequest, context: Ctx) {
   try {
@@ -166,13 +175,16 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     }
     if (scheduleLocked) {
       const invalid = patchKeys.filter(
-        (k) => k !== "lifecycleStatus" && k !== "currentFiveKPace"
+        (k) =>
+          k !== "lifecycleStatus" &&
+          k !== "currentFiveKPace" &&
+          !REGENERATE_PATCH_KEYS.has(k)
       );
       if (invalid.length > 0) {
         return NextResponse.json(
           {
             error:
-              "After the training schedule is generated, only lifecycleStatus and currentFiveKPace can be updated",
+              "After the training schedule is generated, only lifecycleStatus, currentFiveKPace, weeklyMileageTarget, and training-day preferences can be updated",
           },
           { status: 400 }
         );
@@ -181,7 +193,10 @@ export async function PATCH(request: NextRequest, context: Ctx) {
 
     const data: Record<string, unknown> = { updatedAt: new Date() };
 
-    if (!scheduleLocked) {
+    const canUpdatePreferences =
+      !scheduleLocked || patchKeys.some((k) => REGENERATE_PATCH_KEYS.has(k));
+
+    if (canUpdatePreferences) {
       let nextPreferredDays = (existing.preferredDays ?? []).filter(
         (n) => n >= 1 && n <= 7
       );
@@ -192,19 +207,47 @@ export async function PATCH(request: NextRequest, context: Ctx) {
       let finalTempo = existing.preferredTempoDow ?? null;
       let finalInterval = existing.preferredIntervalDow ?? null;
 
-      if (typeof body.name === "string") data.name = body.name.trim();
-      if (body.startDate != null) {
-        const d = new Date(body.startDate);
-        if (Number.isNaN(d.getTime())) {
-          return NextResponse.json({ error: "Invalid startDate" }, { status: 400 });
+      if (!scheduleLocked) {
+        if (typeof body.name === "string") data.name = body.name.trim();
+        if (body.startDate != null) {
+          const d = new Date(body.startDate);
+          if (Number.isNaN(d.getTime())) {
+            return NextResponse.json({ error: "Invalid startDate" }, { status: 400 });
+          }
+          data.startDate = d;
+          if (existing.race_registry) {
+            data.totalWeeks = totalWeeksFromDates(d, existing.race_registry.raceDate);
+          }
         }
-        data.startDate = d;
-        if (existing.race_registry) {
-          data.totalWeeks = totalWeeksFromDates(d, existing.race_registry.raceDate);
+        if (body.currentWeeklyMileage != null) {
+          data.currentWeeklyMileage = Number(body.currentWeeklyMileage);
         }
-      }
-      if (body.currentWeeklyMileage != null) {
-        data.currentWeeklyMileage = Number(body.currentWeeklyMileage);
+        if (body.athleteGoalId != null) {
+          const gid = String(body.athleteGoalId);
+          const g = await prisma.athleteGoal.findFirst({
+            where: { id: gid, athleteId: auth.athlete.id },
+          });
+          if (!g) {
+            return NextResponse.json({ error: "Goal not found" }, { status: 404 });
+          }
+          data.athleteGoalId = gid;
+        }
+        if ("presetId" in body) {
+          const raw = body.presetId;
+          if (raw === null || raw === "") {
+            data.presetId = null;
+          } else {
+            const pid = String(raw).trim();
+            const exists = await prisma.training_plan_preset.findUnique({
+              where: { id: pid },
+              select: { id: true },
+            });
+            if (!exists) {
+              return NextResponse.json({ error: "presetId not found" }, { status: 400 });
+            }
+            data.presetId = pid;
+          }
+        }
       }
       if (Array.isArray(body.preferredDays)) {
         nextPreferredDays = body.preferredDays
@@ -229,32 +272,6 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         const n = Number(body.weeklyMileageTarget);
         if (Number.isFinite(n)) {
           data.weeklyMileageTarget = Math.max(25, Math.min(100, Math.round(n)));
-        }
-      }
-      if (body.athleteGoalId != null) {
-        const gid = String(body.athleteGoalId);
-        const g = await prisma.athleteGoal.findFirst({
-          where: { id: gid, athleteId: auth.athlete.id },
-        });
-        if (!g) {
-          return NextResponse.json({ error: "Goal not found" }, { status: 404 });
-        }
-        data.athleteGoalId = gid;
-      }
-      if ("presetId" in body) {
-        const raw = body.presetId;
-        if (raw === null || raw === "") {
-          data.presetId = null;
-        } else {
-          const pid = String(raw).trim();
-          const exists = await prisma.training_plan_preset.findUnique({
-            where: { id: pid },
-            select: { id: true },
-          });
-          if (!exists) {
-            return NextResponse.json({ error: "presetId not found" }, { status: 400 });
-          }
-          data.presetId = pid;
         }
       }
 

@@ -275,6 +275,7 @@ export async function GET(request: NextRequest) {
         athleteGoalId: true,
         phases: true,
         planSchedule: true,
+        weeklyMileageTarget: true,
         lifecycleStatus: true,
         currentFiveKPace: true,
         createdAt: true,

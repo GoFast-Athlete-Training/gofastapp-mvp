@@ -1,7 +1,7 @@
 /**
- * Pass 4c: race miles, fixed standard easy miles per slot (from preset), trim only
- * easy down toward min when week exceeds target + buffer. Does not inflate totals
- * to hit weekly mileage (no “fill remainder” on easy days).
+ * Pass 4c: race miles, standard easy miles per slot (from preset), trim when week
+ * exceeds target + buffer, and fill easy days toward weeklyMileageTarget when below
+ * target (pre-taper weeks only).
  */
 
 import type { PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";
@@ -25,6 +25,8 @@ export type DistributeEasyInput = {
   catalogueRowsById: Map<string, CatalogueMileEstimateInput>;
   /** Preferred training days count (typical full week); used to scale week-1 standard miles. */
   typicalWeekPreferredCount: number;
+  /** Weeks at or after this number skip fill-toward-target (taper/race). */
+  taperStartWeekNumber?: number | null;
 };
 
 /** Mutates planSchedule in-place */
@@ -32,6 +34,7 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
   const {
     easyRunConfig: cfg,
     typicalWeekPreferredCount: prefCountRaw,
+    taperStartWeekNumber,
   } = input;
   const typicalWeekPreferredCount = Math.max(1, Math.floor(prefCountRaw));
 
@@ -53,6 +56,11 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
 
     const trimThreshold =
       Math.min(100, weeklyCap + cfg.weeklyTargetBufferMiles) + 0.05;
+    const fillTarget = weeklyCap;
+    const shouldFillTowardTarget =
+      taperStartWeekNumber == null ||
+      !Number.isFinite(Number(taperStartWeekNumber)) ||
+      weekNum < Number(taperStartWeekNumber);
 
     for (const d of week.days.filter((x) => x.workoutType === "Race")) {
       d.miles = round2(Math.max(input.raceDistanceMiles, 0));
@@ -89,6 +97,20 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
         hit = true;
       }
       if (!hit) break;
+    }
+
+    if (shouldFillTowardTarget) {
+      const increment = 0.25;
+      let safety = 0;
+      while (weekSum() < fillTarget - 0.05 && safety++ < 2000) {
+        let progressed = false;
+        for (const d of easySlots) {
+          if (weekSum() >= fillTarget - 0.05) break;
+          d.miles = round2(d.miles + increment);
+          progressed = true;
+        }
+        if (!progressed) break;
+      }
     }
   }
 }

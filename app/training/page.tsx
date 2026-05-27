@@ -42,6 +42,7 @@ type PlanDetailHub = {
   totalWeeks: number;
   startDate: string;
   planSchedule: unknown;
+  weeklyMileageTarget?: number | null;
   currentFiveKPace?: string | null;
   _count?: { planned_workouts: number };
   raceId?: string | null;
@@ -383,6 +384,12 @@ export default function TrainingHubPage() {
     return Math.round((m / 1609.34) * 10) / 10;
   }, [weekDays]);
 
+  const savedWeeklyTarget = useMemo(() => {
+    const raw = planDetail?.weeklyMileageTarget;
+    if (raw == null || !Number.isFinite(Number(raw))) return null;
+    return Math.round(Number(raw));
+  }, [planDetail?.weeklyMileageTarget]);
+
   const weekSummary = useMemo(() => {
     if (!weekDays.length) return null;
     return buildWeekSummary({
@@ -418,12 +425,14 @@ export default function TrainingHubPage() {
               >
                 Past plans
               </Link>
-              <Link
-                href="/training/hydrate-sandbox"
-                className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-800 shadow-sm hover:border-violet-300"
-              >
-                Hydrate sandbox
-              </Link>
+              {process.env.NODE_ENV === "development" ? (
+                <Link
+                  href="/training/hydrate-sandbox"
+                  className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-800 shadow-sm hover:border-violet-300"
+                >
+                  Hydrate sandbox
+                </Link>
+              ) : null}
             </div>
           </div>
         </div>
@@ -612,7 +621,6 @@ export default function TrainingHubPage() {
                 <p className="font-semibold text-gray-900">{planDetail.name}</p>
                 <p className="text-gray-600 tabular-nums">
                   Week {weekNumber} of {effectiveTotalWeeks}
-                  {weekPlannedMiles != null ? ` · ${weekPlannedMiles} mi` : ""}
                   {calendarRangeLabel ? ` · ${calendarRangeLabel}` : ""}
                 </p>
                 {planDetail.race_registry?.name ? (
@@ -651,7 +659,7 @@ export default function TrainingHubPage() {
                           className="block px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
                           onClick={() => setPlanMenuOpen(false)}
                         >
-                          Update plan
+                          Edit weekly miles
                         </Link>
                         <button
                           type="button"
@@ -668,6 +676,42 @@ export default function TrainingHubPage() {
                     </>
                   ) : null}
                 </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-orange-200 bg-orange-50/70 px-4 py-3 text-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-orange-900">
+                    Weekly miles
+                  </p>
+                  {savedWeeklyTarget != null ? (
+                    <p className="mt-1 tabular-nums text-gray-900">
+                      Target:{" "}
+                      <span className="font-semibold">{savedWeeklyTarget} mi/week</span>
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-gray-700">No target set yet</p>
+                  )}
+                  {weekPlannedMiles != null ? (
+                    <p className="mt-1 tabular-nums text-gray-700">
+                      This week:{" "}
+                      <span className="font-medium">{weekPlannedMiles} mi planned</span>
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-gray-600">This week: schedule loading…</p>
+                  )}
+                  <p className="mt-2 text-xs text-gray-600">
+                    Target is the weekly volume your plan aims toward. Planned miles are
+                    the workouts generated for this specific week.
+                  </p>
+                </div>
+                <Link
+                  href={`/training-setup/${planDetail.id}`}
+                  className="inline-flex shrink-0 items-center justify-center rounded-lg border border-orange-300 bg-white px-3 py-2 text-sm font-semibold text-orange-900 hover:bg-orange-100"
+                >
+                  {savedWeeklyTarget != null ? "Edit weekly miles" : "Set weekly target"}
+                </Link>
               </div>
             </div>
 

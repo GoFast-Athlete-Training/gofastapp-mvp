@@ -271,6 +271,7 @@ export async function executePlanGenerate(params: {
     easyRunConfig: easyRunResolved,
     catalogueRowsById,
     typicalWeekPreferredCount: preferredDays.length,
+    taperStartWeekNumber: placement.taperStartWeekNumber,
   });
 
   const syncedFiveKPace =
