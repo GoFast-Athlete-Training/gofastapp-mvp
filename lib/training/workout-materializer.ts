@@ -24,6 +24,13 @@ import {
 } from "./workout-segment-snapshot";
 import { resolveRacePaceSecondsPerMileForPlan } from "./goal-pace-calculator";
 import { EASY_RUN_NOT_CONFIGURED } from "./run-type-config-validation";
+import { ensureWorkoutPrescriptionNarrative } from "./prescription-narrative-service";
+
+function enqueuePrescriptionNarrative(workoutId: string, athleteId: string): void {
+  void ensureWorkoutPrescriptionNarrative({ workoutId, athleteId }).catch((e) =>
+    console.warn("ensureWorkoutPrescriptionNarrative:", e)
+  );
+}
 
 function utcDayBounds(d: Date): { gte: Date; lte: Date } {
   const x = utcDateOnly(d);
@@ -216,6 +223,7 @@ export async function materializeWorkoutForPlanDay(params: {
       existing._count.segments > 0 &&
       !workoutNeedsRematerialize({ existing: { ...existing, segmentCount: existing._count.segments }, scheduled })
     ) {
+      enqueuePrescriptionNarrative(existing.id, athleteId);
       return { workoutId: existing.id };
     }
   }
@@ -239,6 +247,7 @@ export async function materializeWorkoutForPlanDay(params: {
       existing._count.segments > 0 &&
       !workoutNeedsRematerialize({ existing: { ...existing, segmentCount: existing._count.segments }, scheduled })
     ) {
+      enqueuePrescriptionNarrative(existing.id, athleteId);
       return { workoutId: existing.id };
     }
   }
@@ -321,6 +330,7 @@ export async function materializeWorkoutForPlanDay(params: {
         snapshotSource: "plan_day_materialize_existing",
       });
     });
+    enqueuePrescriptionNarrative(existing.id, athleteId);
     return { workoutId: existing.id };
   }
 
@@ -374,5 +384,6 @@ export async function materializeWorkoutForPlanDay(params: {
     return w.id;
   });
 
+  enqueuePrescriptionNarrative(workoutId, athleteId);
   return { workoutId };
 }

@@ -13,7 +13,7 @@ import type { Prisma, WorkoutType } from "@prisma/client";
 import { segmentSnapshotDocumentFromApiSegments } from "@/lib/training/workout-segment-snapshot";
 import { isStructuredPlanWeek } from "@/lib/training/plan-schedule-schema";
 import { parseEasyRunConfigJson } from "@/lib/training/easy-run-config";
-import { maybeGeneratePrescriptionNarrative } from "@/lib/training/prescription-narrative-service";
+import { ensureWorkoutPrescriptionNarrative } from "@/lib/training/prescription-narrative-service";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -281,10 +281,10 @@ export async function GET(request: NextRequest, context: Ctx) {
       (workout.workoutType !== "Intervals" && workout.workoutType !== "Tempo") &&
       !(typeof workout.prescriptionNarrative === "string" && workout.prescriptionNarrative.trim());
     if (shouldEnqueuePrescription) {
-      void maybeGeneratePrescriptionNarrative({
+      void ensureWorkoutPrescriptionNarrative({
         workoutId: workout.id,
         athleteId: auth.athlete.id,
-      }).catch((e) => console.warn("maybeGeneratePrescriptionNarrative:", e));
+      }).catch((e) => console.warn("ensureWorkoutPrescriptionNarrative:", e));
     }
 
     return NextResponse.json({ workout });

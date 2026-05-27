@@ -1396,7 +1396,7 @@ model workouts {
   /// Free-text note from athlete about the run context.
   runContextNote                    String?             @db.Text
   runContextUpdatedAt               DateTime?
-  /// AI-generated pre-workout coaching note (lazy, cached).
+  /// AI-generated pre-workout coach guidance (materialize + GET fallback; cached).
   prescriptionNarrative             String?
   /// Public share path slug for /mytrainingruns/[slug] (e.g. acole842719); set when athlete creates a join link
   slug                      String?             @unique

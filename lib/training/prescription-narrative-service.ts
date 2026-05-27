@@ -1,6 +1,6 @@
 /**
- * Lazy AI coaching note shown as "Coach prescription" on workout detail.
- * Cached on workouts.prescriptionNarrative.
+ * Tactical pre-workout coach guidance persisted on workouts.prescriptionNarrative.
+ * One OpenAI call per workout row (idempotent); triggered at materialization with GET fallback.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -15,15 +15,16 @@ function truncate(s: string, max: number): string {
 }
 
 /**
- * Called from GET workout when prescription missing. Idempotent via DB field.
+ * Ensures workouts.prescriptionNarrative exists for catalogue-backed workouts.
+ * No-op when already set, missing catalogue, or skipped workout types.
  */
-export async function maybeGeneratePrescriptionNarrative(params: {
+export async function ensureWorkoutPrescriptionNarrative(params: {
   workoutId: string;
   athleteId: string;
 }): Promise<void> {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
-    console.warn("maybeGeneratePrescriptionNarrative: OPENAI_API_KEY missing");
+    console.warn("ensureWorkoutPrescriptionNarrative: OPENAI_API_KEY missing");
     return;
   }
 
@@ -34,6 +35,8 @@ export async function maybeGeneratePrescriptionNarrative(params: {
       workoutType: true,
       title: true,
       weekNumber: true,
+      dayAssigned: true,
+      date: true,
       estimatedDistanceInMeters: true,
       targetPaceSecPerMile: true,
       targetPaceSecPerMileHigh: true,
@@ -59,6 +62,7 @@ export async function maybeGeneratePrescriptionNarrative(params: {
           name: true,
           totalWeeks: true,
           currentFiveKPace: true,
+          planSchedule: true,
         },
       },
       segments: {
@@ -125,6 +129,8 @@ export async function maybeGeneratePrescriptionNarrative(params: {
       title: workout.title,
       workoutType: workout.workoutType,
       weekNumber: workout.weekNumber,
+      dayAssigned: workout.dayAssigned,
+      scheduledDate: workout.date,
       planName: workout.training_plans?.name ?? null,
       planTotalWeeks: workout.training_plans?.totalWeeks ?? null,
       scheduledDistanceMeters: workout.estimatedDistanceInMeters,
@@ -136,22 +142,25 @@ export async function maybeGeneratePrescriptionNarrative(params: {
     },
     catalogue: catalogueContext,
     paceTargetLine,
+    planSchedule: workout.training_plans?.planSchedule ?? null,
   };
 
-  const systemPrompt = `You are an encouraging running coach writing the **pre-workout** coaching note for an athlete viewing their upcoming session.
+  const systemPrompt = `You are an encouraging running coach writing **Coach Guidance** for an athlete's upcoming session — tactical, week-aware, and actionable.
 
 Output rules:
-- Return ONLY plain text — no markdown, no JSON, no bullet lists prefixed with "-" if you must use sentences; prefer short paragraphs over lists.
-- 2–4 sentences total unless the catalogue has complex structure (Intervals not used here often).
+- Return ONLY plain text — no markdown, no JSON, no bullet lists.
+- Exactly 2–3 sentences. Each sentence should help the athlete execute and succeed today.
 - Use the athlete's first name naturally if provided; omit if absent.
-- Reference **week number** and **total weeks** when both are numbers (e.g. "Week 3 of your 24-week build").
-- Explain what this workout is *for* at this phase (e.g. first long run = aerobic base / finding rhythm; not racing the watch).
-- If workPaceOffsetSecPerMile is a number — describe it plainly (e.g. that many seconds per mile slower than their current 5K fitness) using the actual offset value in the JSON payload — do NOT invent offsets.
-- If hasMarathonBlock is false — do NOT mention marathon pace, MP finishes, or hard fast finishes unless notes/trainingIntent clearly say otherwise.
+- When weekNumber and planTotalWeeks are numbers, anchor placement (e.g. "Week 3 of your 24-week build").
+- When dayAssigned is present, reference the day of week naturally if it helps framing.
+- Use catalogue.trainingIntent and notes as the "why" — your job is the "how to run it today."
+- Be specific when you can infer context: first quality session of the week, easy day tomorrow, save legs for the long run, commit on the last rep/push — only when supported by workout type, week, day, or structuredSteps. Do not invent schedule facts not in the payload.
+- If workPaceOffsetSecPerMile is a number, describe it plainly using the actual value — do NOT invent offsets.
+- If hasMarathonBlock is false — do NOT mention marathon pace or hard fast finishes unless notes/trainingIntent clearly say otherwise.
 - If hasMarathonBlock is true — you may briefly mention the marathon-pace segment as prescribed.
-- Do not shame. Practical, warm tone.
+- Practical, warm, direct tone — "do this and succeed," not generic filler.
 
-If structuredSteps is non-empty and helps explain the workout, you may weave in one clause (e.g. warm / main piece) without repeating Garmin jargon.`;
+If structuredSteps is non-empty, weave in one concrete execution cue (warmup discipline, where to push, what to hold back) without Garmin jargon.`;
 
   let content = "";
   try {
