@@ -1335,7 +1335,7 @@ export default function AthleteHomePage() {
                               : 'bg-orange-600 hover:bg-orange-700'
                           }`}
                         >
-                          {todayPlanComplete ? 'Review run' : 'Open today&apos;s session'}
+                          {todayPlanComplete ? 'Review run' : "Open today's session"}
                         </Link>
                       </div>
                     </div>

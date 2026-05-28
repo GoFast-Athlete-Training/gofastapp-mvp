@@ -24,7 +24,7 @@ export default function ExplainerPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 relative">
       {/* Splash: centered logo holds, then fades up/out */}
       <div
         className={`fixed inset-0 z-20 flex items-center justify-center pointer-events-none transition-opacity ease-out ${
@@ -48,22 +48,22 @@ export default function ExplainerPage() {
 
       {/* Explainer content fades/slides in after splash */}
       <div
-        className={`min-h-screen flex items-center justify-center transition-all ease-out ${
+        className={`min-h-screen overflow-y-auto flex items-center justify-center transition-all ease-out ${
           revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
         }`}
         style={{ transitionDuration: `${TRANSITION_MS}ms` }}
       >
-        <div className="max-w-2xl w-full mx-auto px-4 py-12">
-          <div className="text-center mb-10">
+        <div className="max-w-2xl w-full mx-auto px-4 py-8 sm:py-12">
+          <div className="text-center mb-8 sm:mb-10">
             <Image
               src="/logo.png"
               alt="GoFast Logo"
               width={128}
               height={128}
-              className="w-32 h-32 rounded-full shadow-xl mx-auto mb-6 object-cover"
+              className="w-24 h-24 sm:w-32 sm:h-32 rounded-full shadow-xl mx-auto mb-4 sm:mb-6 object-cover"
               priority
             />
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-3">
               Find your pace group.<br />Train hard. PR.
             </h1>
           </div>

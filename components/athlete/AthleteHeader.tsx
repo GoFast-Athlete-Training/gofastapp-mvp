@@ -42,7 +42,7 @@ export default function AthleteHeader() {
     <header className="bg-white border-b border-gray-200 relative z-50">
       <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img src="/logo.jpg" alt="GoFast" className="w-8 h-8 rounded-full" />
+          <img src="/logo.png" alt="GoFast" className="w-8 h-8 rounded-full object-cover" />
           <span className="text-xl font-bold text-gray-900">GoFast</span>
         </div>
         <div className="flex items-center gap-3">

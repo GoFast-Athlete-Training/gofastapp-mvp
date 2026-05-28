@@ -71,7 +71,7 @@ export default function AthleteSidebar() {
     <aside className="w-64 bg-white border-r-2 border-gray-200 flex flex-col overflow-y-auto shrink-0">
       <div className="p-4 border-b border-gray-200">
         <Link href="/athlete-home" className="flex items-center gap-3 mb-2 rounded-md outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2">
-          <Image src="/logo.jpg" alt="GoFast" width={32} height={32} className="w-8 h-8 rounded-full" />
+          <Image src="/logo.png" alt="GoFast" width={32} height={32} className="w-8 h-8 rounded-full object-cover" />
           <span className="text-lg font-bold text-gray-900">GoFast</span>
         </Link>
         <p className="text-xs font-medium text-gray-700">Train for a goal</p>
