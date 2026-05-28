@@ -12,6 +12,10 @@ import {
 } from "@/lib/training/run-result-status";
 import { paceVsTargetBadgeText, paceVsTargetLabel } from "@/lib/training/pace-comparison-display";
 import { RUN_CONTEXT_OPTIONS, type RunContextOption } from "@/lib/training/coach-read-display";
+import {
+  computeWorkoutPerformanceAnalysis,
+  resolveTargetComparisonPace,
+} from "@/lib/training/workout-performance-analysis";
 
 export type { RunAnalysisJsonV1 } from "@/lib/training/run-analysis-types";
 export { isRunAnalysisJsonV1 } from "@/lib/training/run-analysis-types";
@@ -124,11 +128,28 @@ export async function runRunAssessment(params: {
         paceDeltaSecPerMile: true,
         actualAvgPaceSecPerMile: true,
         actualDurationSeconds: true,
+        completedActivityDetailJson: true,
         matched_activity: {
           select: {
             activityName: true,
             activityType: true,
             elevationGain: true,
+            detailData: true,
+            hydratedAt: true,
+          },
+        },
+        segments: {
+          orderBy: { stepOrder: "asc" },
+          select: {
+            id: true,
+            title: true,
+            stepOrder: true,
+            targets: true,
+            paceTargetEncodingVersion: true,
+            actualPaceSecPerMile: true,
+            actualDurationSeconds: true,
+            actualDistanceMiles: true,
+            segment_laps: { select: { id: true } },
           },
         },
       },
@@ -150,33 +171,71 @@ export async function runRunAssessment(params: {
     throw new Error("Athlete not found");
   }
 
+  const performanceAnalysis = computeWorkoutPerformanceAnalysis({
+    workoutType: workout.workoutType,
+    targetPaceSecPerMile: workout.targetPaceSecPerMile,
+    targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
+    paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
+    actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
+    completedActivityDetailJson: workout.completedActivityDetailJson,
+    matchedActivityId: workout.matchedActivityId,
+    matched_activity: workout.matched_activity,
+    segments: workout.segments,
+  });
+
+  if (
+    performanceAnalysis.requiresDetailForTargetAnalysis &&
+    performanceAnalysis.analysisMode === "summary_pending_detail"
+  ) {
+    throw new Error(
+      "Garmin lap detail is still syncing — coach target feedback needs per-rep detail for interval and tempo workouts"
+    );
+  }
+
+  const comparison = resolveTargetComparisonPace({
+    analysis: performanceAnalysis,
+    workoutType: workout.workoutType,
+    actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
+    paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
+    targetPaceSecPerMile: workout.targetPaceSecPerMile,
+    targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
+  });
+
   const resultStatus = buildRunResultStatus({
     plannedDistanceMeters: workout.estimatedDistanceInMeters,
     actualDistanceMeters: workout.actualDistanceMeters,
-    actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
-    targetPaceSecPerMile: workout.targetPaceSecPerMile,
-    targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
+    actualAvgPaceSecPerMile: performanceAnalysis.canJudgeTargetPace
+      ? comparison.actualPaceSecPerMile
+      : null,
+    targetPaceSecPerMile: comparison.targetPaceSecPerMile,
+    targetPaceSecPerMileHigh: comparison.targetPaceSecPerMileHigh,
   });
 
   const distStatus = computeDistanceStatus(
     workout.estimatedDistanceInMeters,
     workout.actualDistanceMeters
   );
-  const paceLabel = paceVsTargetLabel(
-    workout.actualAvgPaceSecPerMile,
-    workout.targetPaceSecPerMile,
-    workout.targetPaceSecPerMileHigh
-  );
+  const paceLabel = performanceAnalysis.canJudgeTargetPace
+    ? paceVsTargetLabel(
+        comparison.actualPaceSecPerMile,
+        comparison.targetPaceSecPerMile,
+        comparison.targetPaceSecPerMileHigh
+      )
+    : "unknown";
 
   const payload = {
+    analysisMode: performanceAnalysis.analysisMode,
+    canJudgeTargetPace: performanceAnalysis.canJudgeTargetPace,
+    workSegmentActual: performanceAnalysis.workSegmentActual,
     workout: {
       title: workout.title,
       workoutType: workout.workoutType,
       plannedDistanceMeters: workout.estimatedDistanceInMeters,
       actualDistanceMeters: workout.actualDistanceMeters,
-      targetPaceSecPerMile: workout.targetPaceSecPerMile,
-      targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
-      actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
+      targetPaceSecPerMile: comparison.targetPaceSecPerMile,
+      targetPaceSecPerMileHigh: comparison.targetPaceSecPerMileHigh,
+      actualAvgPaceSecPerMile: comparison.actualPaceSecPerMile,
+      wholeRunAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
       actualDurationSeconds: workout.actualDurationSeconds,
       activityName: workout.matched_activity.activityName,
     },
@@ -185,8 +244,10 @@ export async function runRunAssessment(params: {
       distanceSummary: resultStatus.distanceMessage,
       distanceBadge: distanceStatusBadgeText(distStatus),
       paceStatus: paceLabel,
-      paceSummary: resultStatus.paceMessage,
-      paceBadge: paceVsTargetBadgeText(paceLabel),
+      paceSummary: performanceAnalysis.canJudgeTargetPace ? resultStatus.paceMessage : null,
+      paceBadge: performanceAnalysis.canJudgeTargetPace
+        ? paceVsTargetBadgeText(paceLabel)
+        : "Pace target pending detail",
     },
     athleteContext: {
       tags: contextTags,
@@ -204,10 +265,12 @@ export async function runRunAssessment(params: {
 You receive:
 1. Deterministic facts about distance and pace vs plan (already computed — do not contradict them).
 2. The athlete's own context about what shaped the run (tags and optional note). Treat this as the primary explanation for why the run looked the way it did.
+3. For interval/tempo workouts, pace facts use work-rep segments only (easy/recovery laps excluded). If canJudgeTargetPace is false, do not claim the athlete missed or beat pace targets.
 
 Write 2-4 short sentences that:
 - Acknowledge whether distance was on plan, short, or over.
-- Acknowledge whether pace was faster, slower, or in range vs target (when a target exists).
+- Acknowledge whether pace was faster, slower, or in range vs target only when canJudgeTargetPace is true.
+- If canJudgeTargetPace is false, say detailed lap analysis is still pending instead of judging targets.
 - Weave in the athlete's stated context as the reason — do not invent causes they did not mention.
 - Stay supportive and practical. Do not shame. Do not suggest profile or pace updates.
 

@@ -21,6 +21,11 @@ import {
   shouldShowProfileRecommendation,
 } from "@/lib/training/coach-read-display";
 import { buildRunResultStatus } from "@/lib/training/run-result-status";
+import type {
+  WorkoutPerformanceAnalysis,
+  WorkSegmentActualRow,
+} from "@/lib/training/workout-performance-analysis";
+import { resolveTargetComparisonPace } from "@/lib/training/workout-performance-analysis";
 
 type MatchedActivitySummary = {
   activityName?: string | null;
@@ -72,6 +77,8 @@ function SkeletonBlock() {
 
 export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) {
   const [workout, setWorkout] = useState<WorkoutDeep | null>(null);
+  const [performanceAnalysis, setPerformanceAnalysis] =
+    useState<WorkoutPerformanceAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [applyLoading, setApplyLoading] = useState(false);
@@ -81,10 +88,14 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<{ workout: WorkoutDeep }>(`/training/workout/${workoutId}`);
+      const res = await api.get<{
+        workout: WorkoutDeep;
+        performanceAnalysis?: WorkoutPerformanceAnalysis;
+      }>(`/training/workout/${workoutId}`);
       const w = res.data?.workout;
       if (w?.id) {
         setWorkout(w);
+        setPerformanceAnalysis(res.data?.performanceAnalysis ?? null);
       } else {
         setError("Could not load workout");
       }
@@ -165,27 +176,49 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
     );
   }
 
-  const runResultStatus = buildRunResultStatus({
-    plannedDistanceMeters: workout.estimatedDistanceInMeters,
-    actualDistanceMeters: workout.actualDistanceMeters,
+  const analysisMeta = performanceAnalysis;
+  const pendingDetail = analysisMeta?.analysisMode === "summary_pending_detail";
+  const canJudgePace = analysisMeta?.canJudgeTargetPace ?? false;
+
+  const comparison = resolveTargetComparisonPace({
+    analysis: analysisMeta ?? {
+      hasActivityDetail: false,
+      hasSegmentActuals: false,
+      hasWorkSegmentActuals: false,
+      analysisMode: "summary_only",
+      requiresDetailForTargetAnalysis: false,
+      canJudgeTargetPace: false,
+      workSegmentActual: null,
+    },
+    workoutType: workout.workoutType,
     actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
+    paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
     targetPaceSecPerMile: workout.targetPaceSecPerMile,
     targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
   });
 
-  const hasPaceRangeForResults =
-    workout.targetPaceSecPerMile != null &&
-    workout.targetPaceSecPerMileHigh != null &&
-    workout.targetPaceSecPerMileHigh !== workout.targetPaceSecPerMile;
+  const runResultStatus = buildRunResultStatus({
+    plannedDistanceMeters: workout.estimatedDistanceInMeters,
+    actualDistanceMeters: workout.actualDistanceMeters,
+    actualAvgPaceSecPerMile: canJudgePace ? comparison.actualPaceSecPerMile : null,
+    targetPaceSecPerMile: comparison.targetPaceSecPerMile,
+    targetPaceSecPerMileHigh: comparison.targetPaceSecPerMileHigh,
+  });
 
-  const paceVsPlanMessage =
-    hasPaceRangeForResults && workout.actualAvgPaceSecPerMile != null
+  const hasPaceRangeForResults =
+    comparison.targetPaceSecPerMile != null &&
+    comparison.targetPaceSecPerMileHigh != null &&
+    comparison.targetPaceSecPerMileHigh !== comparison.targetPaceSecPerMile;
+
+  const paceVsPlanMessage = canJudgePace
+    ? hasPaceRangeForResults && comparison.actualPaceSecPerMile != null
       ? paceRangeDeltaMessage(
-          workout.actualAvgPaceSecPerMile,
-          workout.targetPaceSecPerMile,
-          workout.targetPaceSecPerMileHigh
+          comparison.actualPaceSecPerMile,
+          comparison.targetPaceSecPerMile,
+          comparison.targetPaceSecPerMileHigh
         )
-      : singleTargetPaceDeltaMessage(workout.paceDeltaSecPerMile);
+      : singleTargetPaceDeltaMessage(comparison.paceDeltaSecPerMile)
+    : null;
 
   let resultsPaceBadgeLabel:
     | PaceVsTargetLabel
@@ -193,24 +226,30 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
     | "single_slower"
     | "single_on"
     | null = null;
-  if (hasPaceRangeForResults && workout.actualAvgPaceSecPerMile != null) {
-    const l = paceVsTargetLabel(
-      workout.actualAvgPaceSecPerMile,
-      workout.targetPaceSecPerMile,
-      workout.targetPaceSecPerMileHigh
-    );
-    if (l !== "unknown") resultsPaceBadgeLabel = l;
-  } else if (workout.paceDeltaSecPerMile != null) {
-    resultsPaceBadgeLabel =
-      workout.paceDeltaSecPerMile > 0
-        ? "single_faster"
-        : workout.paceDeltaSecPerMile < 0
-          ? "single_slower"
-          : "single_on";
+  if (canJudgePace) {
+    if (hasPaceRangeForResults && comparison.actualPaceSecPerMile != null) {
+      const l = paceVsTargetLabel(
+        comparison.actualPaceSecPerMile,
+        comparison.targetPaceSecPerMile,
+        comparison.targetPaceSecPerMileHigh
+      );
+      if (l !== "unknown") resultsPaceBadgeLabel = l;
+    } else if (comparison.paceDeltaSecPerMile != null) {
+      resultsPaceBadgeLabel =
+        comparison.paceDeltaSecPerMile > 0
+          ? "single_faster"
+          : comparison.paceDeltaSecPerMile < 0
+            ? "single_slower"
+            : "single_on";
+    }
   }
 
-  const hasTargetPace = workout.targetPaceSecPerMile != null && workout.targetPaceSecPerMile > 0;
+  const hasTargetPace =
+    comparison.targetPaceSecPerMile != null && comparison.targetPaceSecPerMile > 0;
   const showRunContextPrompt = !analysis;
+  const workSegments = analysisMeta?.workSegmentActual?.segments ?? [];
+  const showWorkSegmentBreakdown =
+    canJudgePace && workSegments.some((s) => s.actualPaceSecPerMile != null);
 
   return (
     <div>
@@ -252,22 +291,36 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
         </div>
       </div>
 
-      {!hasTargetPace ? (
+      {pendingDetail ? (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Garmin lap detail is still syncing. We have your run summary, but interval target
+          analysis needs per-rep detail — easy and recovery laps are excluded once detail arrives.
+        </div>
+      ) : null}
+
+      {!hasTargetPace && !pendingDetail ? (
         <p className="text-sm text-gray-500 italic mb-3">No pace target set for this session.</p>
-      ) : (
+      ) : hasTargetPace && canJudgePace ? (
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-3">
           <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
-            <dt className="text-xs font-medium text-gray-500">Target pace</dt>
+            <dt className="text-xs font-medium text-gray-500">
+              {analysisMeta?.requiresDetailForTargetAnalysis ? "Work target pace" : "Target pace"}
+            </dt>
             <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
-              {formatPaceTargetRangeDisplay(workout.targetPaceSecPerMile, workout.targetPaceSecPerMileHigh) ??
-                formatSecPerMile(workout.targetPaceSecPerMile) ??
+              {formatPaceTargetRangeDisplay(
+                comparison.targetPaceSecPerMile,
+                comparison.targetPaceSecPerMileHigh
+              ) ??
+                formatSecPerMile(comparison.targetPaceSecPerMile) ??
                 "—"}
             </dd>
           </div>
           <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
-            <dt className="text-xs font-medium text-gray-500">Your pace</dt>
+            <dt className="text-xs font-medium text-gray-500">
+              {analysisMeta?.requiresDetailForTargetAnalysis ? "Work rep pace" : "Your pace"}
+            </dt>
             <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
-              {formatSecPerMile(workout.actualAvgPaceSecPerMile) ?? "—"}
+              {formatSecPerMile(comparison.actualPaceSecPerMile) ?? "—"}
             </dd>
           </div>
           <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
@@ -275,7 +328,11 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
             <dd className="mt-1 text-sm font-semibold text-gray-900">{paceVsPlanMessage ?? "—"}</dd>
           </div>
         </dl>
-      )}
+      ) : null}
+
+      {showWorkSegmentBreakdown ? (
+        <WorkSegmentBreakdown rows={workSegments} />
+      ) : null}
 
       <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {workout.actualDistanceMeters != null && workout.actualDistanceMeters > 0 ? (
@@ -318,6 +375,8 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
           initialTags={workout.runContextTags}
           initialNote={workout.runContextNote}
           hasCoachFeedback={Boolean(analysis)}
+          coachFeedbackBlocked={pendingDetail && (analysisMeta?.requiresDetailForTargetAnalysis ?? false)}
+          coachFeedbackBlockedReason="Coach target feedback needs Garmin lap detail for interval and tempo workouts."
           onFeedbackReady={() => void loadWorkout()}
         />
       ) : null}
@@ -375,6 +434,38 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
           Review run
         </Link>
       </div>
+    </div>
+  );
+}
+
+function WorkSegmentBreakdown({ rows }: { rows: WorkSegmentActualRow[] }) {
+  const withActuals = rows.filter((r) => r.actualPaceSecPerMile != null);
+  if (withActuals.length === 0) return null;
+
+  return (
+    <div className="mb-4 rounded-xl border border-emerald-100 bg-emerald-50/40 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900">
+        Work segments
+      </p>
+      <ul className="mt-2 space-y-2">
+        {withActuals.map((row) => (
+          <li
+            key={row.segmentId}
+            className="flex flex-wrap items-baseline justify-between gap-2 text-sm text-gray-800"
+          >
+            <span className="font-medium">{row.title}</span>
+            <span className="tabular-nums text-gray-700">
+              {formatSecPerMile(row.actualPaceSecPerMile) ?? "—"}
+              {row.targetPaceSecPerMile != null ? (
+                <span className="text-gray-500">
+                  {" "}
+                  vs {formatSecPerMile(row.targetPaceSecPerMile)}
+                </span>
+              ) : null}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

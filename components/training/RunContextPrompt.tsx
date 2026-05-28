@@ -14,6 +14,8 @@ type RunContextPromptProps = {
   initialTags?: string[] | null;
   initialNote?: string | null;
   hasCoachFeedback?: boolean;
+  coachFeedbackBlocked?: boolean;
+  coachFeedbackBlockedReason?: string;
   className?: string;
   onFeedbackReady?: (analysis: RunAnalysisJsonV1) => void | Promise<void>;
 };
@@ -23,6 +25,8 @@ export default function RunContextPrompt({
   initialTags,
   initialNote,
   hasCoachFeedback = false,
+  coachFeedbackBlocked = false,
+  coachFeedbackBlockedReason,
   className = "",
   onFeedbackReady,
 }: RunContextPromptProps) {
@@ -48,9 +52,10 @@ export default function RunContextPrompt({
   }
 
   const hasInput = selected.size > 0 || note.trim().length > 0;
+  const feedbackDisabled = coachFeedbackBlocked && !hasCoachFeedback;
 
   async function requestCoachFeedback() {
-    if (!hasInput || loading || hasCoachFeedback) return;
+    if (!hasInput || loading || hasCoachFeedback || feedbackDisabled) return;
     setLoading(true);
     setError(null);
     try {
@@ -115,7 +120,7 @@ export default function RunContextPrompt({
           className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-emerald-300 focus:outline-none focus:ring-1 focus:ring-emerald-300 disabled:bg-gray-50"
         />
       </label>
-      {!hasCoachFeedback ? (
+      {!hasCoachFeedback && !feedbackDisabled ? (
         <button
           type="button"
           disabled={!hasInput || loading}
@@ -131,6 +136,12 @@ export default function RunContextPrompt({
             "Get coach feedback"
           )}
         </button>
+      ) : null}
+      {feedbackDisabled ? (
+        <p className="mt-4 text-sm text-amber-800">
+          {coachFeedbackBlockedReason ??
+            "Coach target feedback is unavailable until Garmin lap detail syncs."}
+        </p>
       ) : null}
       {error ? (
         <p className="mt-2 text-sm text-red-600" role="alert">

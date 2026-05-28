@@ -14,6 +14,7 @@ import { segmentSnapshotDocumentFromApiSegments } from "@/lib/training/workout-s
 import { isStructuredPlanWeek } from "@/lib/training/plan-schedule-schema";
 import { parseEasyRunConfigJson } from "@/lib/training/easy-run-config";
 import { ensureWorkoutPrescriptionNarrative } from "@/lib/training/prescription-narrative-service";
+import { computeWorkoutPerformanceAnalysis } from "@/lib/training/workout-performance-analysis";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -165,6 +166,8 @@ export async function GET(request: NextRequest, context: Ctx) {
               distance: true,
               duration: true,
               averageSpeed: true,
+              detailData: true,
+              hydratedAt: true,
             },
           },
           city_runs: {
@@ -287,7 +290,29 @@ export async function GET(request: NextRequest, context: Ctx) {
       }).catch((e) => console.warn("ensureWorkoutPrescriptionNarrative:", e));
     }
 
-    return NextResponse.json({ workout });
+    const performanceAnalysis = computeWorkoutPerformanceAnalysis({
+      workoutType: workout.workoutType,
+      targetPaceSecPerMile: workout.targetPaceSecPerMile,
+      targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
+      paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
+      actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
+      completedActivityDetailJson: workout.completedActivityDetailJson,
+      matchedActivityId: workout.matchedActivityId,
+      matched_activity: workout.matched_activity,
+      segments: workout.segments.map((s) => ({
+        id: s.id,
+        title: s.title,
+        stepOrder: s.stepOrder,
+        targets: s.targets,
+        paceTargetEncodingVersion: s.paceTargetEncodingVersion,
+        actualPaceSecPerMile: s.actualPaceSecPerMile,
+        actualDurationSeconds: s.actualDurationSeconds,
+        actualDistanceMiles: s.actualDistanceMiles,
+        segment_laps: s.segment_laps,
+      })),
+    });
+
+    return NextResponse.json({ workout, performanceAnalysis });
   } catch (e: unknown) {
     console.error("GET /api/training/workout/[id]", e);
     return NextResponse.json({ error: "Failed to load workout" }, { status: 500 });
