@@ -177,6 +177,8 @@ export async function runRunAssessment(params: {
     targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
     paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
     actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
+    actualDistanceMeters: workout.actualDistanceMeters,
+    actualDurationSeconds: workout.actualDurationSeconds,
     completedActivityDetailJson: workout.completedActivityDetailJson,
     matchedActivityId: workout.matchedActivityId,
     matched_activity: workout.matched_activity,
@@ -185,10 +187,10 @@ export async function runRunAssessment(params: {
 
   if (
     performanceAnalysis.requiresDetailForTargetAnalysis &&
-    performanceAnalysis.analysisMode === "summary_pending_detail"
+    performanceAnalysis.analysisMode === "completion_only"
   ) {
     throw new Error(
-      "Garmin lap detail is still syncing — coach target feedback needs per-rep detail for interval and tempo workouts"
+      "Coach target feedback needs Garmin lap detail for interval and tempo workouts"
     );
   }
 
@@ -226,7 +228,9 @@ export async function runRunAssessment(params: {
   const payload = {
     analysisMode: performanceAnalysis.analysisMode,
     canJudgeTargetPace: performanceAnalysis.canJudgeTargetPace,
+    executionHeadline: performanceAnalysis.executionHeadline,
     workSegmentActual: performanceAnalysis.workSegmentActual,
+    workRepsOnTarget: performanceAnalysis.workRepsOnTarget,
     workout: {
       title: workout.title,
       workoutType: workout.workoutType,
@@ -247,7 +251,7 @@ export async function runRunAssessment(params: {
       paceSummary: performanceAnalysis.canJudgeTargetPace ? resultStatus.paceMessage : null,
       paceBadge: performanceAnalysis.canJudgeTargetPace
         ? paceVsTargetBadgeText(paceLabel)
-        : "Pace target pending detail",
+        : performanceAnalysis.completionOnlyMessage ?? "Completion logged",
     },
     athleteContext: {
       tags: contextTags,
@@ -265,12 +269,12 @@ export async function runRunAssessment(params: {
 You receive:
 1. Deterministic facts about distance and pace vs plan (already computed — do not contradict them).
 2. The athlete's own context about what shaped the run (tags and optional note). Treat this as the primary explanation for why the run looked the way it did.
-3. For interval/tempo workouts, pace facts use work-rep segments only (easy/recovery laps excluded). If canJudgeTargetPace is false, do not claim the athlete missed or beat pace targets.
+3. For interval/tempo workouts, pace facts use work-rep segments only (easy/recovery laps excluded). If canJudgeTargetPace is false, do not claim the athlete missed or beat pace targets — use completion-only/supportive language instead.
 
 Write 2-4 short sentences that:
 - Acknowledge whether distance was on plan, short, or over.
 - Acknowledge whether pace was faster, slower, or in range vs target only when canJudgeTargetPace is true.
-- If canJudgeTargetPace is false, say detailed lap analysis is still pending instead of judging targets.
+- If canJudgeTargetPace is false, congratulate completion using executionHeadline or distance/duration facts — do not say detail is pending or syncing.
 - Weave in the athlete's stated context as the reason — do not invent causes they did not mention.
 - Stay supportive and practical. Do not shame. Do not suggest profile or pace updates.
 

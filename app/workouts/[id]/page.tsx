@@ -86,6 +86,11 @@ import {
   shouldShowProfileRecommendation,
 } from "@/lib/training/coach-read-display";
 import { buildRunResultStatus } from "@/lib/training/run-result-status";
+import {
+  computeWorkoutPerformanceAnalysis,
+  resolveTargetComparisonPace,
+  type PhaseAwareLapRow,
+} from "@/lib/training/workout-performance-analysis";
 
 interface WorkoutSegmentLap {
   lapIndex: number;
@@ -196,6 +201,32 @@ function formatSecPerMile(sec: number | null | undefined): string | null {
   const m = Math.floor(sec / 60);
   const s = Math.round(sec % 60);
   return `${m}:${String(s).padStart(2, "0")} /mi`;
+}
+
+function phaseDisplayLabel(phase: PhaseAwareLapRow["phase"]): string {
+  switch (phase) {
+    case "warmup":
+      return "Warmup";
+    case "work":
+      return "Work rep";
+    case "recovery":
+      return "Recovery";
+    case "cooldown":
+      return "Cooldown";
+  }
+}
+
+function lapRowToneClass(tone: PhaseAwareLapRow["vsPlanTone"]): string {
+  switch (tone) {
+    case "good":
+      return "bg-emerald-50/60";
+    case "fast":
+      return "bg-sky-50/50";
+    case "slow":
+      return "bg-amber-50/60";
+    default:
+      return "";
+  }
 }
 
 /** Plan/workout dates are calendar days; avoid UTC-midnight → wrong local weekday (see formatPlanDateDisplay). */
@@ -899,30 +930,31 @@ export default function WorkoutDetailPage() {
     return [...workout.segments].sort((a, b) => a.stepOrder - b.stepOrder);
   }, [workout?.segments]);
 
-  const orderedLapsFromGarmin = useMemo(() => {
-    const rows: Array<{
-      lapOrder: number;
-      lapIndex: number;
-      paceSecPerMile: number | null;
-      avgHr: number | null;
-      distanceMiles: number | null;
-    }> = [];
-    let o = 0;
-    for (const s of sortedSegments) {
-      const laps = [...(s.segment_laps ?? [])].sort((a, b) => a.lapIndex - b.lapIndex);
-      for (const lap of laps) {
-        o += 1;
-        rows.push({
-          lapOrder: o,
-          lapIndex: lap.lapIndex,
-          paceSecPerMile: lap.avgPaceSecPerMile ?? null,
-          avgHr: lap.avgHeartRate ?? null,
-          distanceMiles: lap.distanceMiles ?? null,
-        });
-      }
-    }
-    return rows;
-  }, [sortedSegments]);
+  const performanceAnalysis = useMemo(() => {
+    if (!workout) return null;
+    return computeWorkoutPerformanceAnalysis({
+      workoutType: workout.workoutType,
+      targetPaceSecPerMile: workout.targetPaceSecPerMile ?? null,
+      targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh ?? null,
+      paceDeltaSecPerMile: workout.paceDeltaSecPerMile ?? null,
+      actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile ?? null,
+      actualDistanceMeters: workout.actualDistanceMeters ?? null,
+      actualDurationSeconds: workout.actualDurationSeconds ?? null,
+      segments: sortedSegments.map((s) => ({
+        id: s.id,
+        title: s.title,
+        stepOrder: s.stepOrder,
+        targets: s.targets ?? null,
+        paceTargetEncodingVersion: s.paceTargetEncodingVersion ?? 2,
+        actualPaceSecPerMile: s.actualPaceSecPerMile ?? null,
+        actualDurationSeconds: s.actualDurationSeconds ?? null,
+        actualDistanceMiles: s.actualDistanceMiles ?? null,
+        segment_laps: s.segment_laps,
+      })),
+    });
+  }, [workout, sortedSegments]);
+
+  const phaseAwareLaps = performanceAnalysis?.phaseAwareLaps ?? [];
 
   const runAnalysisCoachRead = useMemo(() => {
     if (!workout?.analysisJson || !isRunAnalysisJsonV1(workout.analysisJson)) return null;
@@ -1863,19 +1895,46 @@ export default function WorkoutDetailPage() {
   const weekAndDateLine = [weekLineDisplay, dateLineDisplay].filter(Boolean).join(" · ");
   const showStandaloneCopyAction = !workout.planId;
 
-  const hasPaceRangeForResults =
-    workout.targetPaceSecPerMile != null &&
-    workout.targetPaceSecPerMileHigh != null &&
-    workout.targetPaceSecPerMileHigh !== workout.targetPaceSecPerMile;
+  const canJudgePace = performanceAnalysis?.canJudgeTargetPace ?? false;
+  const completionOnly = performanceAnalysis?.analysisMode === "completion_only";
+  const requiresDetail = performanceAnalysis?.requiresDetailForTargetAnalysis ?? false;
+  const executionHeadline = performanceAnalysis?.executionHeadline ?? null;
 
-  const paceVsPlanMessage =
-    hasPaceRangeForResults && workout.actualAvgPaceSecPerMile != null
+  const comparison = resolveTargetComparisonPace({
+    analysis: performanceAnalysis ?? {
+      hasActivityDetail: false,
+      hasSegmentActuals: false,
+      hasWorkSegmentActuals: false,
+      analysisMode: "summary_only",
+      requiresDetailForTargetAnalysis: false,
+      canJudgeTargetPace: false,
+      workSegmentActual: null,
+      workRepsOnTarget: null,
+      completionOnlyMessage: null,
+      executionHeadline: null,
+      phaseAwareLaps: [],
+    },
+    workoutType: workout.workoutType,
+    actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile ?? null,
+    paceDeltaSecPerMile: workout.paceDeltaSecPerMile ?? null,
+    targetPaceSecPerMile: workout.targetPaceSecPerMile ?? null,
+    targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh ?? null,
+  });
+
+  const hasPaceRangeForResults =
+    comparison.targetPaceSecPerMile != null &&
+    comparison.targetPaceSecPerMileHigh != null &&
+    comparison.targetPaceSecPerMileHigh !== comparison.targetPaceSecPerMile;
+
+  const paceVsPlanMessage = canJudgePace
+    ? hasPaceRangeForResults && comparison.actualPaceSecPerMile != null
       ? paceRangeDeltaMessage(
-          workout.actualAvgPaceSecPerMile,
-          workout.targetPaceSecPerMile,
-          workout.targetPaceSecPerMileHigh
+          comparison.actualPaceSecPerMile,
+          comparison.targetPaceSecPerMile,
+          comparison.targetPaceSecPerMileHigh
         )
-      : singleTargetPaceDeltaMessage(workout.paceDeltaSecPerMile);
+      : singleTargetPaceDeltaMessage(comparison.paceDeltaSecPerMile)
+    : null;
 
   let resultsPaceBadgeLabel:
     | PaceVsTargetLabel
@@ -1883,20 +1942,26 @@ export default function WorkoutDetailPage() {
     | "single_slower"
     | "single_on"
     | null = null;
-  if (hasPaceRangeForResults && workout.actualAvgPaceSecPerMile != null) {
-    const l = paceVsTargetLabel(
-      workout.actualAvgPaceSecPerMile,
-      workout.targetPaceSecPerMile,
-      workout.targetPaceSecPerMileHigh
-    );
-    if (l !== "unknown") resultsPaceBadgeLabel = l;
-  } else if (workout.paceDeltaSecPerMile != null) {
-    resultsPaceBadgeLabel =
-      workout.paceDeltaSecPerMile > 0
-        ? "single_faster"
-        : workout.paceDeltaSecPerMile < 0
-          ? "single_slower"
-          : "single_on";
+  if (canJudgePace) {
+    if (requiresDetail && performanceAnalysis?.workRepsOnTarget) {
+      const { onTarget, total } = performanceAnalysis.workRepsOnTarget;
+      if (onTarget === total) resultsPaceBadgeLabel = "in_range";
+      else if (onTarget === 0) resultsPaceBadgeLabel = "slower";
+    } else if (hasPaceRangeForResults && comparison.actualPaceSecPerMile != null) {
+      const l = paceVsTargetLabel(
+        comparison.actualPaceSecPerMile,
+        comparison.targetPaceSecPerMile,
+        comparison.targetPaceSecPerMileHigh
+      );
+      if (l !== "unknown") resultsPaceBadgeLabel = l;
+    } else if (comparison.paceDeltaSecPerMile != null) {
+      resultsPaceBadgeLabel =
+        comparison.paceDeltaSecPerMile > 0
+          ? "single_faster"
+          : comparison.paceDeltaSecPerMile < 0
+            ? "single_slower"
+            : "single_on";
+    }
   }
 
   const showRunContextPrompt = isLogged && !runAnalysisCoachRead;
@@ -1904,9 +1969,9 @@ export default function WorkoutDetailPage() {
   const runResultStatus = buildRunResultStatus({
     plannedDistanceMeters: workout.estimatedDistanceInMeters,
     actualDistanceMeters: workout.actualDistanceMeters,
-    actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
-    targetPaceSecPerMile: workout.targetPaceSecPerMile,
-    targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
+    actualAvgPaceSecPerMile: canJudgePace ? comparison.actualPaceSecPerMile : null,
+    targetPaceSecPerMile: comparison.targetPaceSecPerMile,
+    targetPaceSecPerMileHigh: comparison.targetPaceSecPerMileHigh,
   });
 
   const plannedMiForComparison =
@@ -2085,31 +2150,43 @@ export default function WorkoutDetailPage() {
               ) : null}
             </div>
 
+            {executionHeadline ? (
+              <p className="mt-4 text-sm font-medium text-gray-900">{executionHeadline}</p>
+            ) : null}
+
             <dl className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
-                <dt className="text-xs font-medium text-gray-500">Target pace</dt>
-                <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
-                  {formatPaceTargetRangeDisplay(
-                    workout.targetPaceSecPerMile,
-                    workout.targetPaceSecPerMileHigh
-                  ) ??
-                    (workout.targetPaceSecPerMile != null
-                      ? formatSecPerMile(workout.targetPaceSecPerMile)
-                      : "—")}
-                </dd>
-              </div>
-              <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
-                <dt className="text-xs font-medium text-gray-500">Your pace</dt>
-                <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
-                  {formatSecPerMile(workout.actualAvgPaceSecPerMile) ?? "—"}
-                </dd>
-              </div>
-              <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3 sm:col-span-1">
-                <dt className="text-xs font-medium text-gray-500">Vs plan</dt>
-                <dd className="mt-1 text-sm font-semibold text-gray-900">
-                  {paceVsPlanMessage ?? "—"}
-                </dd>
-              </div>
+              {completionOnly ? null : canJudgePace ? (
+                <>
+                  <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
+                    <dt className="text-xs font-medium text-gray-500">
+                      {requiresDetail ? "Work target pace" : "Target pace"}
+                    </dt>
+                    <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
+                      {formatPaceTargetRangeDisplay(
+                        comparison.targetPaceSecPerMile,
+                        comparison.targetPaceSecPerMileHigh
+                      ) ??
+                        (comparison.targetPaceSecPerMile != null
+                          ? formatSecPerMile(comparison.targetPaceSecPerMile)
+                          : "—")}
+                    </dd>
+                  </div>
+                  <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
+                    <dt className="text-xs font-medium text-gray-500">
+                      {requiresDetail ? "Work rep pace" : "Your pace"}
+                    </dt>
+                    <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
+                      {formatSecPerMile(comparison.actualPaceSecPerMile) ?? "—"}
+                    </dd>
+                  </div>
+                  <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3 sm:col-span-1">
+                    <dt className="text-xs font-medium text-gray-500">Vs plan</dt>
+                    <dd className="mt-1 text-sm font-semibold text-gray-900">
+                      {paceVsPlanMessage ?? "—"}
+                    </dd>
+                  </div>
+                </>
+              ) : null}
               {workout.actualDistanceMeters != null && workout.actualDistanceMeters > 0 ? (
                 <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
                   <dt className="text-xs font-medium text-gray-500">Distance</dt>
@@ -2150,6 +2227,8 @@ export default function WorkoutDetailPage() {
                 initialTags={workout.runContextTags}
                 initialNote={workout.runContextNote}
                 hasCoachFeedback={Boolean(runAnalysisCoachRead)}
+                coachFeedbackBlocked={completionOnly && requiresDetail}
+                coachFeedbackBlockedReason="Coach target feedback needs Garmin lap detail for interval and tempo workouts."
                 onFeedbackReady={() => void fetchWorkout()}
               />
             ) : null}
@@ -2206,7 +2285,7 @@ export default function WorkoutDetailPage() {
               </div>
             ) : null}
 
-            {orderedLapsFromGarmin.length > 0 ? (
+            {phaseAwareLaps.length > 0 ? (
               <div className="mt-6">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-emerald-800 mb-2">
                   Run shape
@@ -2216,54 +2295,38 @@ export default function WorkoutDetailPage() {
                     <thead>
                       <tr className="border-b border-emerald-100 bg-emerald-50/80 text-left text-xs uppercase tracking-wide text-gray-600">
                         <th className="py-2 pl-3 pr-2 font-medium">Lap</th>
+                        <th className="py-2 px-2 font-medium">Phase</th>
                         <th className="py-2 px-2 font-medium">Pace</th>
                         <th className="py-2 px-2 font-medium">HR</th>
                         <th className="py-2 pl-2 pr-3 font-medium">Vs plan pace</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {orderedLapsFromGarmin.map((lap) => {
-                        const lbl = paceVsTargetLabel(
-                          lap.paceSecPerMile,
-                          workout.targetPaceSecPerMile,
-                          workout.targetPaceSecPerMileHigh
-                        );
-                        const vs =
-                          lap.paceSecPerMile == null ||
-                          workout.targetPaceSecPerMile == null ||
-                          lbl === "unknown"
-                            ? "—"
-                            : lbl === "in_range"
-                              ? "In range"
-                              : lbl === "faster"
-                                ? "Faster"
-                                : "Slower";
-                        const rowTone =
-                          lbl === "unknown" || lap.paceSecPerMile == null
-                            ? ""
-                            : lbl === "in_range"
-                              ? "bg-emerald-50/60"
-                              : lbl === "faster"
-                                ? "bg-sky-50/50"
-                                : "bg-amber-50/60";
-                        return (
-                          <tr key={`${lap.lapOrder}-${lap.lapIndex}`} className={`border-t border-emerald-50 ${rowTone}`}>
-                            <td className="py-2 pl-3 pr-2 tabular-nums font-medium text-gray-900">{lap.lapOrder}</td>
-                            <td className="py-2 px-2 tabular-nums">{formatSecPerMile(lap.paceSecPerMile) ?? "—"}</td>
-                            <td className="py-2 px-2 tabular-nums">{lap.avgHr != null ? `${lap.avgHr}` : "—"}</td>
-                            <td className="py-2 pl-2 pr-3 tabular-nums text-gray-800">{vs}</td>
-                          </tr>
-                        );
-                      })}
+                      {phaseAwareLaps.map((lap) => (
+                        <tr
+                          key={`${lap.lapOrder}-${lap.lapIndex}-${lap.segmentId}`}
+                          className={`border-t border-emerald-50 ${lapRowToneClass(lap.vsPlanTone)}`}
+                        >
+                          <td className="py-2 pl-3 pr-2 tabular-nums font-medium text-gray-900">
+                            {lap.lapOrder}
+                          </td>
+                          <td className="py-2 px-2 text-gray-800">{phaseDisplayLabel(lap.phase)}</td>
+                          <td className="py-2 px-2 tabular-nums">
+                            {formatSecPerMile(lap.paceSecPerMile) ?? "—"}
+                          </td>
+                          <td className="py-2 px-2 tabular-nums">
+                            {lap.avgHr != null ? `${lap.avgHr}` : "—"}
+                          </td>
+                          <td className="py-2 pl-2 pr-3 tabular-nums text-gray-800">
+                            {lap.vsPlanPaceLabel}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
               </div>
-            ) : (
-              <p className="mt-4 text-xs text-gray-500">
-                Run shape details appear here after Garmin syncs lap splits for this activity.
-              </p>
-            )}
+            ) : null}
 
             {(plannedMiForComparison != null || ranMiForComparison != null) && (
               <div className="mt-6 rounded-xl border border-gray-200 bg-white/80 px-4 py-3 text-sm text-gray-800">
@@ -2291,8 +2354,13 @@ export default function WorkoutDetailPage() {
                   <p className="mt-1 tabular-nums font-medium text-gray-900">
                     <span className="text-gray-500 font-normal">Ran: </span>
                     {ranMiForComparison.toFixed(2)} mi
-                    {workout.actualAvgPaceSecPerMile != null
-                      ? ` at ${formatSecPerMile(workout.actualAvgPaceSecPerMile)}`
+                    {(canJudgePace ? comparison.actualPaceSecPerMile : workout.actualAvgPaceSecPerMile) !=
+                    null
+                      ? ` at ${formatSecPerMile(
+                          canJudgePace
+                            ? comparison.actualPaceSecPerMile
+                            : workout.actualAvgPaceSecPerMile
+                        )}`
                       : ""}
                   </p>
                 ) : null}

@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildPhaseAwareLapRows,
+  classifySegmentPhase,
   computeWorkSegmentActual,
   computeWorkoutPerformanceAnalysis,
+  countWorkRepsOnTarget,
+  formatCompletionOnlyMessage,
   isWorkSegmentTitle,
   requiresDetailForTargetAnalysis,
   resolveTargetComparisonPace,
@@ -15,13 +19,22 @@ test("isWorkSegmentTitle excludes recovery and bookends", () => {
   assert.equal(isWorkSegmentTitle("Cooldown"), false);
 });
 
-test("interval workout without detail is summary_pending_detail", () => {
+test("classifySegmentPhase maps warmup work recovery cooldown", () => {
+  assert.equal(classifySegmentPhase("Warmup"), "warmup");
+  assert.equal(classifySegmentPhase("600m"), "work");
+  assert.equal(classifySegmentPhase("Recovery jog"), "recovery");
+  assert.equal(classifySegmentPhase("Cooldown"), "cooldown");
+});
+
+test("interval workout without detail is completion_only", () => {
   const analysis = computeWorkoutPerformanceAnalysis({
     workoutType: "Intervals",
     targetPaceSecPerMile: 420,
     targetPaceSecPerMileHigh: 430,
     paceDeltaSecPerMile: -20,
     actualAvgPaceSecPerMile: 450,
+    actualDistanceMeters: 10000,
+    actualDurationSeconds: 2880,
     completedActivityDetailJson: null,
     matchedActivityId: "act1",
     matched_activity: { detailData: null, hydratedAt: null },
@@ -51,9 +64,11 @@ test("interval workout without detail is summary_pending_detail", () => {
     ],
   });
 
-  assert.equal(analysis.analysisMode, "summary_pending_detail");
+  assert.equal(analysis.analysisMode, "completion_only");
   assert.equal(analysis.canJudgeTargetPace, false);
   assert.equal(requiresDetailForTargetAnalysis("Intervals"), true);
+  assert.match(analysis.completionOnlyMessage ?? "", /Nice work/);
+  assert.match(analysis.completionOnlyMessage ?? "", /6\.21 mi/);
 });
 
 test("interval workout with work segment actuals uses rep pace not whole run", () => {
@@ -67,7 +82,7 @@ test("interval workout with work segment actuals uses rep pace not whole run", (
       actualPaceSecPerMile: 540,
       actualDurationSeconds: 600,
       actualDistanceMiles: 1.5,
-      segment_laps: [{ id: "l1" }],
+      segment_laps: [{ lapIndex: 0, avgPaceSecPerMile: 540 }],
     },
     {
       id: "s2",
@@ -78,7 +93,7 @@ test("interval workout with work segment actuals uses rep pace not whole run", (
       actualPaceSecPerMile: 400,
       actualDurationSeconds: 120,
       actualDistanceMiles: 0.37,
-      segment_laps: [{ id: "l2" }],
+      segment_laps: [{ lapIndex: 0, avgPaceSecPerMile: 400 }],
     },
     {
       id: "s3",
@@ -89,7 +104,7 @@ test("interval workout with work segment actuals uses rep pace not whole run", (
       actualPaceSecPerMile: 720,
       actualDurationSeconds: 90,
       actualDistanceMiles: 0.1,
-      segment_laps: [{ id: "l3" }],
+      segment_laps: [{ lapIndex: 0, avgPaceSecPerMile: 720 }],
     },
   ];
 
@@ -113,6 +128,7 @@ test("interval workout with work segment actuals uses rep pace not whole run", (
 
   assert.equal(analysis.analysisMode, "detail");
   assert.equal(analysis.canJudgeTargetPace, true);
+  assert.equal(analysis.executionHeadline, "1 of 1 work reps on target");
 
   const comparison = resolveTargetComparisonPace({
     analysis,
@@ -125,6 +141,87 @@ test("interval workout with work segment actuals uses rep pace not whole run", (
 
   assert.equal(comparison.actualPaceSecPerMile, 400);
   assert.notEqual(comparison.actualPaceSecPerMile, 520);
+});
+
+test("recovery laps are labeled recovery not slower", () => {
+  const rows = buildPhaseAwareLapRows({
+    segments: [
+      {
+        id: "s1",
+        title: "Warmup",
+        stepOrder: 1,
+        targets: null,
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: null,
+        actualDurationSeconds: null,
+        actualDistanceMiles: null,
+        segment_laps: [{ lapIndex: 0, avgPaceSecPerMile: 540 }],
+      },
+      {
+        id: "s2",
+        title: "600m",
+        stepOrder: 2,
+        targets: [{ type: "PACE", valueLow: 260, valueHigh: 270 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: 400,
+        actualDurationSeconds: null,
+        actualDistanceMiles: null,
+        segment_laps: [{ lapIndex: 0, avgPaceSecPerMile: 420 }],
+      },
+      {
+        id: "s3",
+        title: "Recovery",
+        stepOrder: 3,
+        targets: null,
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: 720,
+        actualDurationSeconds: null,
+        actualDistanceMiles: null,
+        segment_laps: [{ lapIndex: 0, avgPaceSecPerMile: 720 }],
+      },
+    ],
+    workoutTargetLow: 420,
+    workoutTargetHigh: 430,
+  });
+
+  assert.equal(rows.length, 3);
+  assert.equal(rows[0]!.vsPlanPaceLabel, "Warmup");
+  assert.notEqual(rows[1]!.vsPlanPaceLabel, "Slower");
+  assert.equal(rows[2]!.vsPlanPaceLabel, "Recovery");
+});
+
+test("countWorkRepsOnTarget ignores recovery segments", () => {
+  const work = computeWorkSegmentActual(
+    [
+      {
+        id: "s2",
+        title: "600m",
+        stepOrder: 2,
+        targets: [{ type: "PACE", valueLow: 260, valueHigh: 270 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: 500,
+        actualDurationSeconds: 120,
+        actualDistanceMiles: 0.37,
+        segment_laps: [{ lapIndex: 0 }],
+      },
+      {
+        id: "s4",
+        title: "600m",
+        stepOrder: 4,
+        targets: [{ type: "PACE", valueLow: 260, valueHigh: 270 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: 400,
+        actualDurationSeconds: 120,
+        actualDistanceMiles: 0.37,
+        segment_laps: [{ lapIndex: 0 }],
+      },
+    ],
+    420,
+    430
+  );
+
+  const counts = countWorkRepsOnTarget(work);
+  assert.deepEqual(counts, { onTarget: 1, total: 2 });
 });
 
 test("easy run can judge pace from summary whole-run average", () => {
@@ -153,4 +250,14 @@ test("easy run can judge pace from summary whole-run average", () => {
   });
 
   assert.equal(comparison.actualPaceSecPerMile, 530);
+});
+
+test("formatCompletionOnlyMessage builds distance and duration copy", () => {
+  assert.equal(
+    formatCompletionOnlyMessage({
+      actualDistanceMeters: 10000,
+      actualDurationSeconds: 2880,
+    }),
+    "Nice work — you completed 6.21 mi in 48 min."
+  );
 });

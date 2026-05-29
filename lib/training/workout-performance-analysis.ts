@@ -1,15 +1,18 @@
 /**
  * Unified performance analysis: detail readiness + work-segment actuals (reps only).
- * Used by workout GET, AnalysisDeepPanel, and coach feedback.
+ * Used by workout GET, AnalysisDeepPanel, coach feedback, and workout detail UI.
  */
 
 import {
   normalizePaceTargetEncodingVersion,
   storedPaceSecondsKmToSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
+import { paceVsTargetLabel } from "@/lib/training/pace-comparison-display";
 import { isRecoveryTitle } from "@/lib/training/segment-summary";
 
-export type AnalysisMode = "detail" | "summary_pending_detail" | "summary_only";
+export type AnalysisMode = "detail" | "completion_only" | "summary_only";
+
+export type SegmentPhase = "warmup" | "work" | "recovery" | "cooldown";
 
 export type WorkSegmentActualRow = {
   segmentId: string;
@@ -33,6 +36,26 @@ export type WorkSegmentActual = {
   segments: WorkSegmentActualRow[];
 };
 
+export type WorkRepsOnTarget = {
+  onTarget: number;
+  total: number;
+};
+
+export type PhaseAwareLapRow = {
+  lapOrder: number;
+  lapIndex: number;
+  segmentId: string;
+  segmentTitle: string;
+  phase: SegmentPhase;
+  paceSecPerMile: number | null;
+  avgHr: number | null;
+  distanceMiles: number | null;
+  targetPaceSecPerMile: number | null;
+  targetPaceSecPerMileHigh: number | null;
+  vsPlanPaceLabel: string;
+  vsPlanTone: "neutral" | "good" | "fast" | "slow";
+};
+
 export type WorkoutPerformanceAnalysis = {
   hasActivityDetail: boolean;
   hasSegmentActuals: boolean;
@@ -41,6 +64,10 @@ export type WorkoutPerformanceAnalysis = {
   requiresDetailForTargetAnalysis: boolean;
   canJudgeTargetPace: boolean;
   workSegmentActual: WorkSegmentActual | null;
+  workRepsOnTarget: WorkRepsOnTarget | null;
+  completionOnlyMessage: string | null;
+  executionHeadline: string | null;
+  phaseAwareLaps: PhaseAwareLapRow[];
 };
 
 type SegmentTarget = { type?: string; valueLow?: number; valueHigh?: number; value?: number };
@@ -54,7 +81,13 @@ export type PerformanceAnalysisSegmentInput = {
   actualPaceSecPerMile: number | null;
   actualDurationSeconds: number | null;
   actualDistanceMiles: number | null;
-  segment_laps?: { id: string }[];
+  segment_laps?: Array<{
+    id?: string;
+    lapIndex?: number;
+    avgPaceSecPerMile?: number | null;
+    avgHeartRate?: number | null;
+    distanceMiles?: number | null;
+  }>;
 };
 
 export type PerformanceAnalysisWorkoutInput = {
@@ -63,6 +96,8 @@ export type PerformanceAnalysisWorkoutInput = {
   targetPaceSecPerMileHigh: number | null;
   paceDeltaSecPerMile: number | null;
   actualAvgPaceSecPerMile: number | null;
+  actualDistanceMeters?: number | null;
+  actualDurationSeconds?: number | null;
   completedActivityDetailJson?: unknown;
   matchedActivityId?: string | null;
   matched_activity?: {
@@ -79,11 +114,17 @@ function isBookendTitle(title: string): boolean {
   return t.includes("warm") || t.includes("cool");
 }
 
+export function classifySegmentPhase(title: string | null | undefined): SegmentPhase {
+  if (!title) return "work";
+  const t = title.toLowerCase();
+  if (t.includes("warm")) return "warmup";
+  if (t.includes("cool")) return "cooldown";
+  if (isRecoveryTitle(title)) return "recovery";
+  return "work";
+}
+
 export function isWorkSegmentTitle(title: string | null | undefined): boolean {
-  if (!title) return true;
-  if (isRecoveryTitle(title)) return false;
-  if (isBookendTitle(title)) return false;
-  return true;
+  return classifySegmentPhase(title) === "work";
 }
 
 export function requiresDetailForTargetAnalysis(workoutType: string): boolean {
@@ -136,6 +177,170 @@ function pickWorkTargetFromSegments(
     }
   }
   return { targetSecPerMile: null, targetSecPerMileHigh: null };
+}
+
+export function countWorkRepsOnTarget(
+  workSegmentActual: WorkSegmentActual | null
+): WorkRepsOnTarget | null {
+  if (!workSegmentActual) return null;
+  let onTarget = 0;
+  let total = 0;
+  for (const row of workSegmentActual.segments) {
+    if (row.actualPaceSecPerMile == null) continue;
+    total++;
+    const label = paceVsTargetLabel(
+      row.actualPaceSecPerMile,
+      row.targetPaceSecPerMile,
+      row.targetPaceSecPerMileHigh ?? row.targetPaceSecPerMile
+    );
+    if (label === "in_range" || label === "faster") onTarget++;
+  }
+  if (total === 0) return null;
+  return { onTarget, total };
+}
+
+export function formatCompletionOnlyMessage(params: {
+  actualDistanceMeters?: number | null;
+  actualDurationSeconds?: number | null;
+}): string {
+  const parts: string[] = ["Nice work"];
+  const detailParts: string[] = [];
+  if (params.actualDistanceMeters != null && params.actualDistanceMeters > 0) {
+    detailParts.push(`you completed ${(params.actualDistanceMeters / 1609.34).toFixed(2)} mi`);
+  }
+  if (params.actualDurationSeconds != null && params.actualDurationSeconds > 0) {
+    detailParts.push(`in ${Math.round(params.actualDurationSeconds / 60)} min`);
+  }
+  if (detailParts.length > 0) {
+    parts.push(`— ${detailParts.join(" ")}`);
+  }
+  return `${parts.join(" ")}.`;
+}
+
+function formatStructuredExecutionHeadline(
+  workRepsOnTarget: WorkRepsOnTarget | null,
+  workSegmentActual: WorkSegmentActual | null
+): string | null {
+  if (workRepsOnTarget) {
+    return `${workRepsOnTarget.onTarget} of ${workRepsOnTarget.total} work reps on target`;
+  }
+  if (workSegmentActual?.actualPaceSecPerMile != null) {
+    return "Work rep pace available";
+  }
+  return null;
+}
+
+function formatEasyLongExecutionHeadline(params: {
+  segments: PerformanceAnalysisSegmentInput[];
+  workoutTargetLow: number | null;
+  workoutTargetHigh: number | null;
+}): string | null {
+  const laps = buildPhaseAwareLapRows({
+    segments: params.segments,
+    workoutTargetLow: params.workoutTargetLow,
+    workoutTargetHigh: params.workoutTargetHigh,
+  }).filter((lap) => lap.phase === "work" && lap.paceSecPerMile != null);
+
+  if (laps.length === 0) return null;
+
+  let onTarget = 0;
+  for (const lap of laps) {
+    const label = paceVsTargetLabel(
+      lap.paceSecPerMile,
+      lap.targetPaceSecPerMile ?? params.workoutTargetLow,
+      lap.targetPaceSecPerMileHigh ??
+        params.workoutTargetHigh ??
+        lap.targetPaceSecPerMile ??
+        params.workoutTargetLow
+    );
+    if (label === "in_range" || label === "faster") onTarget++;
+  }
+
+  const unit = laps.length === 1 ? "mile" : "miles";
+  return `${onTarget} of ${laps.length} ${unit} on target`;
+}
+
+export function phaseAwareVsPlanPaceLabel(params: {
+  phase: SegmentPhase;
+  paceSecPerMile: number | null;
+  targetPaceSecPerMile: number | null;
+  targetPaceSecPerMileHigh: number | null;
+}): { label: string; tone: PhaseAwareLapRow["vsPlanTone"] } {
+  if (params.phase === "warmup") return { label: "Warmup", tone: "neutral" };
+  if (params.phase === "cooldown") return { label: "Cooldown", tone: "neutral" };
+  if (params.phase === "recovery") return { label: "Recovery", tone: "neutral" };
+
+  if (params.paceSecPerMile == null || params.targetPaceSecPerMile == null) {
+    return { label: "—", tone: "neutral" };
+  }
+
+  const label = paceVsTargetLabel(
+    params.paceSecPerMile,
+    params.targetPaceSecPerMile,
+    params.targetPaceSecPerMileHigh ?? params.targetPaceSecPerMile
+  );
+
+  if (label === "in_range") return { label: "In range", tone: "good" };
+  if (label === "faster") return { label: "Faster", tone: "fast" };
+  if (label === "slower") return { label: "Slower", tone: "slow" };
+  return { label: "—", tone: "neutral" };
+}
+
+export function buildPhaseAwareLapRows(params: {
+  segments: PerformanceAnalysisSegmentInput[];
+  workoutTargetLow: number | null;
+  workoutTargetHigh: number | null;
+}): PhaseAwareLapRow[] {
+  const sorted = [...params.segments].sort((a, b) => a.stepOrder - b.stepOrder);
+  const rows: PhaseAwareLapRow[] = [];
+  let lapOrder = 0;
+
+  for (const segment of sorted) {
+    const phase = classifySegmentPhase(segment.title);
+    const segmentTargetLow = paceTargetSecPerMileFromSegment(
+      segment.targets,
+      segment.paceTargetEncodingVersion
+    );
+    const segmentTargetHigh = paceTargetHighSecPerMileFromSegment(
+      segment.targets,
+      segment.paceTargetEncodingVersion
+    );
+    const targetLow =
+      phase === "work" ? (segmentTargetLow ?? params.workoutTargetLow) : null;
+    const targetHigh =
+      phase === "work"
+        ? (segmentTargetHigh ?? params.workoutTargetHigh ?? targetLow)
+        : null;
+
+    const laps = [...(segment.segment_laps ?? [])].sort(
+      (a, b) => (a.lapIndex ?? 0) - (b.lapIndex ?? 0)
+    );
+    for (const lap of laps) {
+      lapOrder += 1;
+      const vs = phaseAwareVsPlanPaceLabel({
+        phase,
+        paceSecPerMile: lap.avgPaceSecPerMile ?? null,
+        targetPaceSecPerMile: targetLow,
+        targetPaceSecPerMileHigh: targetHigh,
+      });
+      rows.push({
+        lapOrder,
+        lapIndex: lap.lapIndex ?? lapOrder - 1,
+        segmentId: segment.id,
+        segmentTitle: segment.title,
+        phase,
+        paceSecPerMile: lap.avgPaceSecPerMile ?? null,
+        avgHr: lap.avgHeartRate ?? null,
+        distanceMiles: lap.distanceMiles ?? null,
+        targetPaceSecPerMile: targetLow,
+        targetPaceSecPerMileHigh: targetHigh,
+        vsPlanPaceLabel: vs.label,
+        vsPlanTone: vs.tone,
+      });
+    }
+  }
+
+  return rows;
 }
 
 export function computeWorkSegmentActual(
@@ -226,12 +431,10 @@ export function computeWorkoutPerformanceAnalysis(
 
   let analysisMode: AnalysisMode;
   if (requiresDetail) {
-    if (hasActivityDetail && hasWorkSegmentActuals) {
-      analysisMode = "detail";
-    } else if (hasActivityDetail && hasSegmentActuals) {
+    if (hasActivityDetail && (hasWorkSegmentActuals || hasSegmentActuals)) {
       analysisMode = "detail";
     } else {
-      analysisMode = "summary_pending_detail";
+      analysisMode = "completion_only";
     }
   } else if (hasActivityDetail || hasSegmentActuals) {
     analysisMode = "detail";
@@ -249,9 +452,52 @@ export function computeWorkoutPerformanceAnalysis(
       : null;
 
   const canJudgeTargetPace = requiresDetail
-    ? analysisMode === "detail" && workSegmentActual?.actualPaceSecPerMile != null
-    : workout.actualAvgPaceSecPerMile != null ||
-      workSegmentActual?.actualPaceSecPerMile != null;
+    ? analysisMode === "detail" &&
+      (workSegmentActual?.actualPaceSecPerMile != null ||
+        (workSegmentActual?.segments.some((s) => s.actualPaceSecPerMile != null) ?? false))
+    : analysisMode === "detail"
+      ? Boolean(
+          workSegmentActual?.actualPaceSecPerMile != null ||
+            buildPhaseAwareLapRows({
+              segments: workout.segments,
+              workoutTargetLow: workout.targetPaceSecPerMile,
+              workoutTargetHigh: workout.targetPaceSecPerMileHigh,
+            }).some((lap) => lap.phase === "work" && lap.paceSecPerMile != null)
+        )
+      : workout.actualAvgPaceSecPerMile != null ||
+        workSegmentActual?.actualPaceSecPerMile != null;
+
+  const workRepsOnTarget =
+    requiresDetail && canJudgeTargetPace
+      ? countWorkRepsOnTarget(workSegmentActual)
+      : null;
+
+  const completionOnlyMessage =
+    analysisMode === "completion_only"
+      ? formatCompletionOnlyMessage({
+          actualDistanceMeters: workout.actualDistanceMeters,
+          actualDurationSeconds: workout.actualDurationSeconds,
+        })
+      : null;
+
+  let executionHeadline: string | null = null;
+  if (analysisMode === "completion_only") {
+    executionHeadline = completionOnlyMessage;
+  } else if (requiresDetail && canJudgeTargetPace) {
+    executionHeadline = formatStructuredExecutionHeadline(workRepsOnTarget, workSegmentActual);
+  } else if (!requiresDetail && analysisMode === "detail" && canJudgeTargetPace) {
+    executionHeadline = formatEasyLongExecutionHeadline({
+      segments: workout.segments,
+      workoutTargetLow: workout.targetPaceSecPerMile,
+      workoutTargetHigh: workout.targetPaceSecPerMileHigh,
+    });
+  }
+
+  const phaseAwareLaps = buildPhaseAwareLapRows({
+    segments: workout.segments,
+    workoutTargetLow: workout.targetPaceSecPerMile,
+    workoutTargetHigh: workout.targetPaceSecPerMileHigh,
+  });
 
   return {
     hasActivityDetail,
@@ -261,6 +507,10 @@ export function computeWorkoutPerformanceAnalysis(
     requiresDetailForTargetAnalysis: requiresDetail,
     canJudgeTargetPace,
     workSegmentActual,
+    workRepsOnTarget,
+    completionOnlyMessage,
+    executionHeadline,
+    phaseAwareLaps,
   };
 }
 
@@ -292,6 +542,27 @@ export function resolveTargetComparisonPace(params: {
     analysis.requiresDetailForTargetAnalysis &&
     analysis.workSegmentActual?.actualPaceSecPerMile != null
   ) {
+    return {
+      actualPaceSecPerMile: analysis.workSegmentActual.actualPaceSecPerMile,
+      paceDeltaSecPerMile: analysis.workSegmentActual.paceDeltaSecPerMile,
+      targetPaceSecPerMile:
+        analysis.workSegmentActual.targetPaceSecPerMile ?? params.targetPaceSecPerMile,
+      targetPaceSecPerMileHigh:
+        analysis.workSegmentActual.targetPaceSecPerMileHigh ??
+        params.targetPaceSecPerMileHigh,
+    };
+  }
+
+  if (analysis.requiresDetailForTargetAnalysis) {
+    return {
+      actualPaceSecPerMile: null,
+      paceDeltaSecPerMile: null,
+      targetPaceSecPerMile: params.targetPaceSecPerMile,
+      targetPaceSecPerMileHigh: params.targetPaceSecPerMileHigh,
+    };
+  }
+
+  if (analysis.workSegmentActual?.actualPaceSecPerMile != null) {
     return {
       actualPaceSecPerMile: analysis.workSegmentActual.actualPaceSecPerMile,
       paceDeltaSecPerMile: analysis.workSegmentActual.paceDeltaSecPerMile,

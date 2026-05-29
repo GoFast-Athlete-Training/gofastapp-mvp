@@ -177,8 +177,9 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
   }
 
   const analysisMeta = performanceAnalysis;
-  const pendingDetail = analysisMeta?.analysisMode === "summary_pending_detail";
+  const completionOnly = analysisMeta?.analysisMode === "completion_only";
   const canJudgePace = analysisMeta?.canJudgeTargetPace ?? false;
+  const executionHeadline = analysisMeta?.executionHeadline ?? null;
 
   const comparison = resolveTargetComparisonPace({
     analysis: analysisMeta ?? {
@@ -189,12 +190,16 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
       requiresDetailForTargetAnalysis: false,
       canJudgeTargetPace: false,
       workSegmentActual: null,
+      workRepsOnTarget: null,
+      completionOnlyMessage: null,
+      executionHeadline: null,
+      phaseAwareLaps: [],
     },
     workoutType: workout.workoutType,
-    actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
-    paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
-    targetPaceSecPerMile: workout.targetPaceSecPerMile,
-    targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
+    actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile ?? null,
+    paceDeltaSecPerMile: workout.paceDeltaSecPerMile ?? null,
+    targetPaceSecPerMile: workout.targetPaceSecPerMile ?? null,
+    targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh ?? null,
   });
 
   const runResultStatus = buildRunResultStatus({
@@ -227,7 +232,14 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
     | "single_on"
     | null = null;
   if (canJudgePace) {
-    if (hasPaceRangeForResults && comparison.actualPaceSecPerMile != null) {
+    if (
+      analysisMeta?.requiresDetailForTargetAnalysis &&
+      analysisMeta.workRepsOnTarget
+    ) {
+      const { onTarget, total } = analysisMeta.workRepsOnTarget;
+      if (onTarget === total) resultsPaceBadgeLabel = "in_range";
+      else if (onTarget === 0) resultsPaceBadgeLabel = "slower";
+    } else if (hasPaceRangeForResults && comparison.actualPaceSecPerMile != null) {
       const l = paceVsTargetLabel(
         comparison.actualPaceSecPerMile,
         comparison.targetPaceSecPerMile,
@@ -291,14 +303,11 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
         </div>
       </div>
 
-      {pendingDetail ? (
-        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Garmin lap detail is still syncing. We have your run summary, but interval target
-          analysis needs per-rep detail — easy and recovery laps are excluded once detail arrives.
-        </div>
+      {executionHeadline ? (
+        <p className="mb-4 text-sm font-medium text-gray-900">{executionHeadline}</p>
       ) : null}
 
-      {!hasTargetPace && !pendingDetail ? (
+      {!hasTargetPace && !completionOnly ? (
         <p className="text-sm text-gray-500 italic mb-3">No pace target set for this session.</p>
       ) : hasTargetPace && canJudgePace ? (
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-3">
@@ -375,7 +384,7 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
           initialTags={workout.runContextTags}
           initialNote={workout.runContextNote}
           hasCoachFeedback={Boolean(analysis)}
-          coachFeedbackBlocked={pendingDetail && (analysisMeta?.requiresDetailForTargetAnalysis ?? false)}
+          coachFeedbackBlocked={completionOnly && (analysisMeta?.requiresDetailForTargetAnalysis ?? false)}
           coachFeedbackBlockedReason="Coach target feedback needs Garmin lap detail for interval and tempo workouts."
           onFeedbackReady={() => void loadWorkout()}
         />

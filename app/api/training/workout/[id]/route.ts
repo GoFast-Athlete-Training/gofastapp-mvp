@@ -296,6 +296,8 @@ export async function GET(request: NextRequest, context: Ctx) {
       targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
       paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
       actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
+      actualDistanceMeters: workout.actualDistanceMeters,
+      actualDurationSeconds: workout.actualDurationSeconds,
       completedActivityDetailJson: workout.completedActivityDetailJson,
       matchedActivityId: workout.matchedActivityId,
       matched_activity: workout.matched_activity,
