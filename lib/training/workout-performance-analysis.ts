@@ -7,7 +7,13 @@ import {
   normalizePaceTargetEncodingVersion,
   storedPaceSecondsKmToSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
-import { paceVsTargetLabel } from "@/lib/training/pace-comparison-display";
+import { paceVsTargetLabel, type PaceVsTargetLabel } from "@/lib/training/pace-comparison-display";
+import {
+  distanceStatus,
+  distanceStatusBadgeText,
+  distanceStatusMessage,
+  type DistanceStatus,
+} from "@/lib/training/run-result-status";
 import { isRecoveryTitle } from "@/lib/training/segment-summary";
 
 export type AnalysisMode = "detail" | "completion_only" | "summary_only";
@@ -41,6 +47,45 @@ export type WorkRepsOnTarget = {
   total: number;
 };
 
+export type WorkSegmentDelta = {
+  segmentId: string;
+  title: string;
+  stepOrder: number;
+  actualPaceSecPerMile: number | null;
+  targetPaceSecPerMile: number | null;
+  targetPaceSecPerMileHigh: number | null;
+  /** target − actual; positive = faster than target */
+  paceDeltaSecPerMile: number | null;
+  vsTargetLabel: PaceVsTargetLabel;
+  deltaDisplay: string;
+};
+
+export type TotalMilesScorecard = {
+  actualMiles: number | null;
+  plannedMiles: number | null;
+  status: DistanceStatus;
+  badge: string;
+  message: string | null;
+};
+
+export type WorkEffortScorecard = {
+  repsOnTarget: number | null;
+  totalReps: number | null;
+  workMilesOnTarget: number | null;
+  totalWorkMiles: number | null;
+  workMinutesOnTarget: number | null;
+  totalWorkMinutes: number | null;
+  workAvgPaceSecPerMile: number | null;
+  summary: string | null;
+};
+
+export type WorkoutScorecard = {
+  totalMiles: TotalMilesScorecard;
+  workEffort: WorkEffortScorecard | null;
+  workSegmentDeltas: WorkSegmentDelta[];
+  completionOnlyMessage: string | null;
+};
+
 export type PhaseAwareLapRow = {
   lapOrder: number;
   lapIndex: number;
@@ -68,6 +113,7 @@ export type WorkoutPerformanceAnalysis = {
   completionOnlyMessage: string | null;
   executionHeadline: string | null;
   phaseAwareLaps: PhaseAwareLapRow[];
+  scorecard: WorkoutScorecard;
 };
 
 type SegmentTarget = { type?: string; valueLow?: number; valueHigh?: number; value?: number };
@@ -98,6 +144,7 @@ export type PerformanceAnalysisWorkoutInput = {
   actualAvgPaceSecPerMile: number | null;
   actualDistanceMeters?: number | null;
   actualDurationSeconds?: number | null;
+  estimatedDistanceInMeters?: number | null;
   completedActivityDetailJson?: unknown;
   matchedActivityId?: string | null;
   matched_activity?: {
@@ -188,15 +235,195 @@ export function countWorkRepsOnTarget(
   for (const row of workSegmentActual.segments) {
     if (row.actualPaceSecPerMile == null) continue;
     total++;
-    const label = paceVsTargetLabel(
-      row.actualPaceSecPerMile,
-      row.targetPaceSecPerMile,
-      row.targetPaceSecPerMileHigh ?? row.targetPaceSecPerMile
-    );
-    if (label === "in_range" || label === "faster") onTarget++;
+    if (isWorkSegmentOnTarget(row)) onTarget++;
   }
   if (total === 0) return null;
   return { onTarget, total };
+}
+
+function isWorkSegmentOnTarget(row: WorkSegmentActualRow): boolean {
+  if (row.actualPaceSecPerMile == null) return false;
+  const label = paceVsTargetLabel(
+    row.actualPaceSecPerMile,
+    row.targetPaceSecPerMile,
+    row.targetPaceSecPerMileHigh ?? row.targetPaceSecPerMile
+  );
+  return label === "in_range" || label === "faster";
+}
+
+export function formatWorkSegmentDeltaDisplay(row: WorkSegmentActualRow): string {
+  if (row.actualPaceSecPerMile == null || row.targetPaceSecPerMile == null) return "—";
+  const label = paceVsTargetLabel(
+    row.actualPaceSecPerMile,
+    row.targetPaceSecPerMile,
+    row.targetPaceSecPerMileHigh ?? row.targetPaceSecPerMile
+  );
+  if (label === "in_range") return "On target";
+  const delta = row.targetPaceSecPerMile - row.actualPaceSecPerMile;
+  if (delta > 0) return `${Math.round(delta)}s/mi faster`;
+  if (delta < 0) return `${Math.abs(Math.round(delta))}s/mi slower`;
+  return "On target";
+}
+
+export function buildWorkSegmentDeltas(
+  workSegmentActual: WorkSegmentActual | null
+): WorkSegmentDelta[] {
+  if (!workSegmentActual) return [];
+  return workSegmentActual.segments
+    .filter((row) => row.actualPaceSecPerMile != null)
+    .map((row) => {
+      const vsTargetLabel = paceVsTargetLabel(
+        row.actualPaceSecPerMile,
+        row.targetPaceSecPerMile,
+        row.targetPaceSecPerMileHigh ?? row.targetPaceSecPerMile
+      );
+      const paceDeltaSecPerMile =
+        row.targetPaceSecPerMile != null && row.actualPaceSecPerMile != null
+          ? row.targetPaceSecPerMile - row.actualPaceSecPerMile
+          : null;
+      return {
+        segmentId: row.segmentId,
+        title: row.title,
+        stepOrder: row.stepOrder,
+        actualPaceSecPerMile: row.actualPaceSecPerMile,
+        targetPaceSecPerMile: row.targetPaceSecPerMile,
+        targetPaceSecPerMileHigh: row.targetPaceSecPerMileHigh,
+        paceDeltaSecPerMile,
+        vsTargetLabel,
+        deltaDisplay: formatWorkSegmentDeltaDisplay(row),
+      };
+    })
+    .sort((a, b) => a.stepOrder - b.stepOrder);
+}
+
+function computeWorkEffortScorecard(params: {
+  workSegmentActual: WorkSegmentActual | null;
+  workRepsOnTarget: WorkRepsOnTarget | null;
+  canJudgeTargetPace: boolean;
+  requiresDetail: boolean;
+  actualAvgPaceSecPerMile: number | null;
+  targetPaceSecPerMile: number | null;
+  targetPaceSecPerMileHigh: number | null;
+  paceDeltaSecPerMile: number | null;
+}): WorkEffortScorecard | null {
+  if (params.requiresDetail) {
+    if (!params.canJudgeTargetPace || !params.workSegmentActual) return null;
+
+    let workMilesOnTarget = 0;
+    let totalWorkMiles = 0;
+    let workMinutesOnTarget = 0;
+    let totalWorkMinutes = 0;
+
+    for (const row of params.workSegmentActual.segments) {
+      const miles = row.actualDistanceMiles ?? 0;
+      const minutes = (row.actualDurationSeconds ?? 0) / 60;
+      if (miles > 0) totalWorkMiles += miles;
+      if (minutes > 0) totalWorkMinutes += minutes;
+      if (isWorkSegmentOnTarget(row)) {
+        if (miles > 0) workMilesOnTarget += miles;
+        if (minutes > 0) workMinutesOnTarget += minutes;
+      }
+    }
+
+    const parts: string[] = [];
+    if (params.workRepsOnTarget) {
+      parts.push(
+        `${params.workRepsOnTarget.onTarget} of ${params.workRepsOnTarget.total} reps on target`
+      );
+    }
+    if (totalWorkMiles > 0) {
+      parts.push(
+        `${workMilesOnTarget.toFixed(1)} of ${totalWorkMiles.toFixed(1)} work mi on target`
+      );
+    } else if (totalWorkMinutes > 0) {
+      parts.push(
+        `${Math.round(workMinutesOnTarget)} of ${Math.round(totalWorkMinutes)} work min on target`
+      );
+    }
+
+    return {
+      repsOnTarget: params.workRepsOnTarget?.onTarget ?? null,
+      totalReps: params.workRepsOnTarget?.total ?? null,
+      workMilesOnTarget: totalWorkMiles > 0 ? workMilesOnTarget : null,
+      totalWorkMiles: totalWorkMiles > 0 ? totalWorkMiles : null,
+      workMinutesOnTarget: totalWorkMinutes > 0 ? workMinutesOnTarget : null,
+      totalWorkMinutes: totalWorkMinutes > 0 ? totalWorkMinutes : null,
+      workAvgPaceSecPerMile: params.workSegmentActual.actualPaceSecPerMile,
+      summary: parts.length > 0 ? parts.join(" · ") : null,
+    };
+  }
+
+  if (!params.canJudgeTargetPace || params.actualAvgPaceSecPerMile == null) return null;
+
+  const label = paceVsTargetLabel(
+    params.actualAvgPaceSecPerMile,
+    params.targetPaceSecPerMile,
+    params.targetPaceSecPerMileHigh ?? params.targetPaceSecPerMile
+  );
+  let summary: string | null = null;
+  if (label === "in_range") summary = "Pace in range";
+  else if (label === "faster") summary = "Pace faster than target";
+  else if (label === "slower") summary = "Pace slower than target";
+
+  return {
+    repsOnTarget: null,
+    totalReps: null,
+    workMilesOnTarget: null,
+    totalWorkMiles: null,
+    workMinutesOnTarget: null,
+    totalWorkMinutes: null,
+    workAvgPaceSecPerMile: params.actualAvgPaceSecPerMile,
+    summary,
+  };
+}
+
+export function computeWorkoutScorecard(params: {
+  workout: PerformanceAnalysisWorkoutInput;
+  analysis: Omit<WorkoutPerformanceAnalysis, "scorecard">;
+}): WorkoutScorecard {
+  const { workout, analysis } = params;
+  const actualMiles =
+    workout.actualDistanceMeters != null && workout.actualDistanceMeters > 0
+      ? workout.actualDistanceMeters / 1609.34
+      : null;
+  const plannedMiles =
+    workout.estimatedDistanceInMeters != null && workout.estimatedDistanceInMeters > 0
+      ? workout.estimatedDistanceInMeters / 1609.34
+      : null;
+  const distStatus = distanceStatus(
+    workout.estimatedDistanceInMeters,
+    workout.actualDistanceMeters
+  );
+
+  const workEffort =
+    analysis.analysisMode === "completion_only"
+      ? null
+      : computeWorkEffortScorecard({
+          workSegmentActual: analysis.workSegmentActual,
+          workRepsOnTarget: analysis.workRepsOnTarget,
+          canJudgeTargetPace: analysis.canJudgeTargetPace,
+          requiresDetail: analysis.requiresDetailForTargetAnalysis,
+          actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
+          targetPaceSecPerMile: workout.targetPaceSecPerMile,
+          targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
+          paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
+        });
+
+  return {
+    totalMiles: {
+      actualMiles,
+      plannedMiles,
+      status: distStatus,
+      badge: distanceStatusBadgeText(distStatus),
+      message: distanceStatusMessage(
+        workout.estimatedDistanceInMeters,
+        workout.actualDistanceMeters
+      ),
+    },
+    workEffort,
+    workSegmentDeltas: buildWorkSegmentDeltas(analysis.workSegmentActual),
+    completionOnlyMessage: analysis.completionOnlyMessage,
+  };
 }
 
 export function formatCompletionOnlyMessage(params: {
@@ -499,7 +726,7 @@ export function computeWorkoutPerformanceAnalysis(
     workoutTargetHigh: workout.targetPaceSecPerMileHigh,
   });
 
-  return {
+  const analysisWithoutScorecard = {
     hasActivityDetail,
     hasSegmentActuals,
     hasWorkSegmentActuals,
@@ -511,6 +738,16 @@ export function computeWorkoutPerformanceAnalysis(
     completionOnlyMessage,
     executionHeadline,
     phaseAwareLaps,
+  };
+
+  const scorecard = computeWorkoutScorecard({
+    workout,
+    analysis: analysisWithoutScorecard,
+  });
+
+  return {
+    ...analysisWithoutScorecard,
+    scorecard,
   };
 }
 

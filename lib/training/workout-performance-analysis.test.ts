@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildPhaseAwareLapRows,
+  buildWorkSegmentDeltas,
   classifySegmentPhase,
   computeWorkSegmentActual,
   computeWorkoutPerformanceAnalysis,
@@ -129,6 +130,9 @@ test("interval workout with work segment actuals uses rep pace not whole run", (
   assert.equal(analysis.analysisMode, "detail");
   assert.equal(analysis.canJudgeTargetPace, true);
   assert.equal(analysis.executionHeadline, "1 of 1 work reps on target");
+  assert.equal(analysis.scorecard.workEffort?.summary, "1 of 1 reps on target · 0.4 of 0.4 work mi on target");
+  assert.equal(analysis.scorecard.workSegmentDeltas.length, 1);
+  assert.notEqual(analysis.scorecard.workSegmentDeltas[0]!.deltaDisplay, "—");
 
   const comparison = resolveTargetComparisonPace({
     analysis,
@@ -250,6 +254,60 @@ test("easy run can judge pace from summary whole-run average", () => {
   });
 
   assert.equal(comparison.actualPaceSecPerMile, 530);
+});
+
+test("scorecard exposes total miles and work segment deltas", () => {
+  const work = computeWorkSegmentActual(
+    [
+      {
+        id: "s2",
+        title: "600m",
+        stepOrder: 2,
+        targets: [{ type: "PACE", valueLow: 260, valueHigh: 270 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: 500,
+        actualDurationSeconds: 120,
+        actualDistanceMiles: 0.37,
+        segment_laps: [{ lapIndex: 0 }],
+      },
+    ],
+    420,
+    430
+  );
+
+  const deltas = buildWorkSegmentDeltas(work);
+  assert.equal(deltas.length, 1);
+  assert.match(deltas[0]!.deltaDisplay, /slower|faster|On target/);
+
+  const analysis = computeWorkoutPerformanceAnalysis({
+    workoutType: "Intervals",
+    targetPaceSecPerMile: 420,
+    targetPaceSecPerMileHigh: 430,
+    paceDeltaSecPerMile: -30,
+    actualAvgPaceSecPerMile: 520,
+    actualDistanceMeters: 10000,
+    estimatedDistanceInMeters: 10000,
+    completedActivityDetailJson: { laps: [] },
+    matchedActivityId: "act1",
+    matched_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
+    segments: [
+      {
+        id: "s2",
+        title: "600m",
+        stepOrder: 2,
+        targets: [{ type: "PACE", valueLow: 260, valueHigh: 270 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: 500,
+        actualDurationSeconds: 120,
+        actualDistanceMiles: 0.37,
+        segment_laps: [{ lapIndex: 0, avgPaceSecPerMile: 500 }],
+      },
+    ],
+  });
+
+  assert.ok(Math.abs((analysis.scorecard.totalMiles.actualMiles ?? 0) - 6.21) < 0.01);
+  assert.equal(analysis.scorecard.totalMiles.status, "on_plan");
+  assert.ok(analysis.scorecard.workEffort?.summary?.includes("reps on target"));
 });
 
 test("formatCompletionOnlyMessage builds distance and duration copy", () => {
