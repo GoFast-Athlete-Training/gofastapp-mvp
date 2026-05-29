@@ -193,6 +193,7 @@ export default function TrainingPlanDayPreviewPage() {
 
   const planIdFromQuery = searchParams.get("planId")?.trim() || null;
   const sourceSetup = searchParams.get("source") === "setup";
+  const sourceHome = searchParams.get("source") === "home";
 
   const [authReady, setAuthReady] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -235,8 +236,16 @@ export default function TrainingPlanDayPreviewPage() {
   );
 
   const hubBackHref =
-    sourceSetup && planDetail ? `/training-setup/${planDetail.id}` : TRAINING_HUB_BACK_PATH;
-  const hubBackLabel = sourceSetup ? "Back to plan setup" : "Back to Training Hub";
+    sourceSetup && planDetail
+      ? `/training-setup/${planDetail.id}`
+      : sourceHome
+        ? "/athlete-home"
+        : TRAINING_HUB_BACK_PATH;
+  const hubBackLabel = sourceSetup
+    ? "Back to plan setup"
+    : sourceHome
+      ? "Back to Home"
+      : "Back to Training Hub";
 
   const prevDateKey = dateKey ? shiftDateKey(dateKey, -1) : null;
   const nextDateKey = dateKey ? shiftDateKey(dateKey, 1) : null;
@@ -245,9 +254,10 @@ export default function TrainingPlanDayPreviewPage() {
     const parts = new URLSearchParams();
     if (planIdFromQuery) parts.set("planId", planIdFromQuery);
     if (sourceSetup) parts.set("source", "setup");
+    else if (sourceHome) parts.set("source", "home");
     const s = parts.toString();
     return s ? `?${s}` : "";
-  }, [planIdFromQuery, sourceSetup]);
+  }, [planIdFromQuery, sourceSetup, sourceHome]);
 
   const load = useCallback(async () => {
     if (!dateKey) {
@@ -453,7 +463,11 @@ export default function TrainingPlanDayPreviewPage() {
   useEffect(() => {
     if (!authReady || loading || !matchedActivityId || !workoutId) return;
     const back =
-      sourceSetup && planDetail ? `/training-setup/${planDetail.id}` : TRAINING_HUB_BACK_PATH;
+      sourceSetup && planDetail
+        ? `/training-setup/${planDetail.id}`
+        : sourceHome
+          ? "/athlete-home"
+          : TRAINING_HUB_BACK_PATH;
     router.replace(workoutDetailPathWithBackHref(workoutId, back));
   }, [
     authReady,
@@ -461,6 +475,7 @@ export default function TrainingPlanDayPreviewPage() {
     matchedActivityId,
     workoutId,
     sourceSetup,
+    sourceHome,
     planDetail,
     router,
   ]);
@@ -536,7 +551,9 @@ export default function TrainingPlanDayPreviewPage() {
         backPath:
           sourceSetup && planDetail
             ? `/training-setup/${planDetail.id}`
-            : TRAINING_HUB_BACK_PATH,
+            : sourceHome
+              ? "/athlete-home"
+              : TRAINING_HUB_BACK_PATH,
       });
       router.push(`/workouts/${wid}`);
     } catch (e) {
@@ -564,7 +581,9 @@ export default function TrainingPlanDayPreviewPage() {
         )}
 
         {dateKey && loading && (
-          <p className="text-sm text-gray-500">Loading plan day…</p>
+          <p className="text-sm text-gray-500">
+            {sourceHome ? "Loading today's workout…" : "Loading plan day…"}
+          </p>
         )}
 
         {dateKey && error && (
@@ -580,6 +599,10 @@ export default function TrainingPlanDayPreviewPage() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
                   Workout logged
                 </p>
+              ) : isToday && sourceHome ? (
+                <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">
+                  Today&apos;s workout
+                </p>
               ) : isToday ? (
                 <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">
                   {"Here's your work for today"}
@@ -589,7 +612,7 @@ export default function TrainingPlanDayPreviewPage() {
                   Planned in your schedule
                 </p>
               )}
-              {planDetail.name?.trim() ? (
+              {planDetail.name?.trim() && !(sourceHome && isToday) ? (
                 <p className="mt-0.5 text-xs text-gray-600 truncate">{planDetail.name}</p>
               ) : null}
               {isRaceDay ? (

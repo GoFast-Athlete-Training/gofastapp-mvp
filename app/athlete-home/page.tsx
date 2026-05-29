@@ -949,7 +949,7 @@ export default function AthleteHomePage() {
     todayPlanComplete && todayPlanDay?.workoutId
       ? `/workouts/${todayPlanDay.workoutId}?back=/training`
       : todayPlanDay?.dateKey
-        ? `/training/day/${todayPlanDay.dateKey}`
+        ? `/training/day/${todayPlanDay.dateKey}?source=home`
         : '/training';
   if (todayPlanDay) {
     const tm = workoutTypeMeta(todayPlanDay.workoutType);
@@ -1335,7 +1335,7 @@ export default function AthleteHomePage() {
                               : 'bg-orange-600 hover:bg-orange-700'
                           }`}
                         >
-                          {todayPlanComplete ? 'Review run' : "Open today's session"}
+                          {todayPlanComplete ? 'Review run' : "View today's workout"}
                         </Link>
                       </div>
                     </div>
