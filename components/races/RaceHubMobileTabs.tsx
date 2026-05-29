@@ -72,7 +72,7 @@ export default function RaceHubMobileTabs(props: RaceHubMobileTabsProps) {
         <RaceHubChatterSection
           raceRegistryId={props.raceRegistryId}
           variant="mobile-hub"
-          showHeading={false}
+          showHeading
           latestAnnouncement={latestAnnouncement}
           announcementCount={props.announcements.length}
           onViewAllAnnouncements={() => setActiveTab("info")}

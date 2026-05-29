@@ -35,10 +35,10 @@ export default function RaceHubChatterSection({
     >
       {showHeading ? (
         <div className={isMobileHub ? "mb-3 px-0.5" : "mb-4"}>
-          <h2 className="text-xl font-bold text-gray-900 mb-1">Race chatter</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-1">Race Chat</h2>
           <p className="text-sm text-gray-500">
-            Pace goals, meetups, tips — this is where the crew talks. Full course and logistics live on
-            the public race page.
+            Ask questions, coordinate pace groups, share race-day logistics, and plan meetups with
+            other runners.
           </p>
         </div>
       ) : null}

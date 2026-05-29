@@ -201,7 +201,9 @@ export default function RaceMessageFeed({
         }`}
       >
         {messages.length === 0 ? (
-          <p className="text-sm text-gray-500 text-center py-8">No messages yet. Say hello!</p>
+          <p className="text-sm text-gray-500 text-center py-8">
+            No messages yet. Start the conversation.
+          </p>
         ) : (
           messages.map((message) => {
             const isEditing = editingMessageId === message.id;
@@ -314,7 +316,7 @@ export default function RaceMessageFeed({
           type="text"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
-          placeholder="Message the race crew…"
+          placeholder="Write a message..."
           className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white"
           disabled={loading}
         />
