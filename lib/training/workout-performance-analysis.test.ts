@@ -11,6 +11,7 @@ import {
   isWorkSegmentTitle,
   requiresDetailForTargetAnalysis,
   resolveTargetComparisonPace,
+  structuredSegmentLapsAligned,
 } from "./workout-performance-analysis";
 
 test("isWorkSegmentTitle excludes recovery and bookends", () => {
@@ -145,6 +146,57 @@ test("interval workout with work segment actuals uses rep pace not whole run", (
 
   assert.equal(comparison.actualPaceSecPerMile, 400);
   assert.notEqual(comparison.actualPaceSecPerMile, 520);
+});
+
+test("interval with detail but misaligned laps is completion_only", () => {
+  const segments = [
+    {
+      id: "s1",
+      title: "Warmup",
+      stepOrder: 1,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+      actualPaceSecPerMile: 540,
+      actualDurationSeconds: 600,
+      actualDistanceMiles: 1.5,
+      segment_laps: [
+        { lapIndex: 0, avgPaceSecPerMile: 540 },
+        { lapIndex: 1, avgPaceSecPerMile: 530 },
+      ],
+    },
+    {
+      id: "s2",
+      title: "600m",
+      stepOrder: 2,
+      targets: [{ type: "PACE", valueLow: 260, valueHigh: 270 }],
+      paceTargetEncodingVersion: 2,
+      actualPaceSecPerMile: 400,
+      actualDurationSeconds: 120,
+      actualDistanceMiles: 0.37,
+      segment_laps: [{ lapIndex: 0, avgPaceSecPerMile: 400 }],
+    },
+  ];
+
+  assert.equal(structuredSegmentLapsAligned(segments), false);
+
+  const analysis = computeWorkoutPerformanceAnalysis({
+    workoutType: "Intervals",
+    targetPaceSecPerMile: 420,
+    targetPaceSecPerMileHigh: 430,
+    paceDeltaSecPerMile: -30,
+    actualAvgPaceSecPerMile: 520,
+    actualDistanceMeters: 10000,
+    actualDurationSeconds: 2880,
+    completedActivityDetailJson: { laps: [] },
+    matchedActivityId: "act1",
+    matched_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
+    segments,
+  });
+
+  assert.equal(analysis.analysisMode, "completion_only");
+  assert.equal(analysis.canJudgeTargetPace, false);
+  assert.equal(analysis.phaseAwareLaps.length, 0);
+  assert.equal(analysis.workSegmentActual, null);
 });
 
 test("recovery laps are labeled recovery not slower", () => {

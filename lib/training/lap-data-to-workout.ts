@@ -1,6 +1,9 @@
 /**
  * Map derived Garmin laps to workout segment rows, persist workout_segment_laps,
  * and refresh segment + workout-level aggregates.
+ *
+ * Structured workouts (Intervals/Tempo): lap[i] → segment row i only when counts match.
+ * Easy/LongRun: mile-chunk auto alignment when lap count matches prescription totals.
  */
 
 import { randomUUID } from "crypto";
@@ -11,6 +14,7 @@ import {
   storedPaceSecondsKmToSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
 import type { DerivedLap } from "./lap-converter";
+import { requiresDetailForTargetAnalysis } from "./structured-workout-types";
 
 function paceTargetSecPerMileFromTargets(
   targets: unknown,
@@ -25,40 +29,10 @@ function paceTargetSecPerMileFromTargets(
   return Math.round(storedPaceSecondsKmToSecondsPerMile(low, enc));
 }
 
-type Slot = {
-  segmentId: string;
-  targets: Prisma.JsonValue;
-  paceTargetEncodingVersion: number;
-};
-
-function expandSegmentSlots(
-  segments: {
-    id: string;
-    stepOrder: number;
-    targets: Prisma.JsonValue;
-    title: string;
-    repeatCount?: number | null;
-    paceTargetEncodingVersion: number;
-  }[]
-): Slot[] {
-  const sorted = [...segments].sort((a, b) => a.stepOrder - b.stepOrder);
-  const slots: Slot[] = [];
-  for (const seg of sorted) {
-    const r = Math.max(1, seg.repeatCount ?? 1);
-    for (let k = 0; k < r; k++) {
-      slots.push({
-        segmentId: seg.id,
-        targets: seg.targets,
-        paceTargetEncodingVersion: seg.paceTargetEncodingVersion,
-      });
-    }
-  }
-  return slots;
-}
-
 type BaseSeg = {
   id: string;
   stepOrder: number;
+  title: string;
   durationType: string;
   durationValue: number;
   repeatCount: number | null;
@@ -66,17 +40,10 @@ type BaseSeg = {
   paceTargetEncodingVersion: number;
 };
 
-function expectedAutoLapCountForSegment(seg: BaseSeg): number {
-  if (String(seg.durationType).toUpperCase() !== "DISTANCE") return 0;
-  const miles = seg.durationValue * Math.max(1, seg.repeatCount ?? 1);
-  return Math.max(1, Math.round(miles));
-}
+export type LapAssignmentMode = "step" | "auto" | "unassigned";
 
-type Assignment = {
-  mode: "step" | "auto" | "fallback";
-  /**
-   * For each (segmentId), ordered list of derived laps in that segment.
-   */
+export type LapAssignment = {
+  mode: LapAssignmentMode;
   bySegment: Map<string, DerivedLap[]>;
 };
 
@@ -90,59 +57,97 @@ function emptyBySegment(
   return m;
 }
 
-function assignLaps(
+/** One Garmin lap per materialized segment row (stepOrder). */
+function assignStructuredLaps(
   derived: DerivedLap[],
-  slots: Slot[],
   baseSegments: BaseSeg[]
-): Assignment {
-  // Step: 1:1 with repeat-expanded slot rows
-  if (derived.length === slots.length && slots.length > 0) {
-    const bySeg = emptyBySegment(baseSegments);
-    for (let i = 0; i < derived.length; i++) {
-      const segId = slots[i]!.segmentId;
-      bySeg.get(segId)!.push(derived[i]!);
-    }
-    return { mode: "step", bySegment: bySeg };
-  }
+): LapAssignment | null {
+  const sorted = [...baseSegments].sort((a, b) => a.stepOrder - b.stepOrder);
+  if (derived.length !== sorted.length || sorted.length === 0) return null;
 
-  // Auto: sum of per-segment (rounded) mile-lap counts must equal # of
-  // Garmin laps; then take consecutive chunk per segment.
+  const bySeg = emptyBySegment(baseSegments);
+  for (let i = 0; i < derived.length; i++) {
+    bySeg.get(sorted[i]!.id)!.push(derived[i]!);
+  }
+  return { mode: "step", bySegment: bySeg };
+}
+
+function isBookendTitle(title: string): boolean {
+  const t = title.toLowerCase();
+  return t.includes("warm") || t.includes("cool");
+}
+
+/** Expected auto-lap count per segment row (Easy/LongRun mile boundaries). */
+function expectedAutoLapCountForSegment(seg: BaseSeg): number {
+  const dt = String(seg.durationType).toUpperCase();
+  if (dt === "TIME") return 1;
+  if (dt !== "DISTANCE") return 0;
+
+  const miles = seg.durationValue * Math.max(1, seg.repeatCount ?? 1);
+  if (!Number.isFinite(miles) || miles <= 0) return 0;
+  if (miles < 0.9) return 1;
+  if (isBookendTitle(seg.title)) {
+    return Math.max(1, Math.round(miles));
+  }
+  return Math.max(1, Math.round(miles));
+}
+
+/** Consecutive mile chunks per segment when total laps match prescription. */
+function assignContinuousRunLaps(
+  derived: DerivedLap[],
+  baseSegments: BaseSeg[]
+): LapAssignment | null {
   const sorted = [...baseSegments].sort((a, b) => a.stepOrder - b.stepOrder);
   const totalNeed = sorted.reduce(
     (a, s) => a + expectedAutoLapCountForSegment(s),
     0
   );
-  if (totalNeed > 0 && totalNeed === derived.length) {
-    const byAuto = emptyBySegment(baseSegments);
-    let idx = 0;
-    for (const seg of sorted) {
-      const need = expectedAutoLapCountForSegment(seg);
-      if (need === 0) continue;
-      const chunk = derived.slice(idx, idx + need);
-      if (chunk.length !== need) {
-        break;
-      }
-      idx += need;
-      for (const d of chunk) {
-        byAuto.get(seg.id)!.push(d);
-      }
+  if (totalNeed <= 0 || totalNeed !== derived.length) return null;
+
+  const byAuto = emptyBySegment(baseSegments);
+  let idx = 0;
+  for (const seg of sorted) {
+    const need = expectedAutoLapCountForSegment(seg);
+    if (need === 0) continue;
+    const chunk = derived.slice(idx, idx + need);
+    if (chunk.length !== need) return null;
+    idx += need;
+    for (const d of chunk) {
+      byAuto.get(seg.id)!.push(d);
     }
-    if (idx === derived.length) {
-      return { mode: "auto", bySegment: byAuto };
-    }
+  }
+  if (idx !== derived.length) return null;
+  return { mode: "auto", bySegment: byAuto };
+}
+
+/**
+ * Assign laps to segments. Returns null when alignment cannot be trusted
+ * (structured: no guessing; continuous: no fallback dump to first segment).
+ */
+export function assignLapsToSegments(
+  derived: DerivedLap[],
+  baseSegments: BaseSeg[],
+  workoutType: string
+): LapAssignment | null {
+  if (derived.length === 0 || baseSegments.length === 0) return null;
+
+  if (requiresDetailForTargetAnalysis(workoutType)) {
+    return assignStructuredLaps(derived, baseSegments);
   }
 
-  // Fallback: all derived laps to first segment
-  const first = sorted[0];
-  if (first) {
-    const m = emptyBySegment(baseSegments);
-    m.set(first.id, [...derived]);
-    console.warn(
-      `[lapDataToWorkout] fallback: ${derived.length} laps → first segment ${first.id}`
-    );
-    return { mode: "fallback", bySegment: m };
-  }
-  return { mode: "fallback", bySegment: emptyBySegment(baseSegments) };
+  const auto = assignContinuousRunLaps(derived, baseSegments);
+  if (auto) return auto;
+
+  return assignStructuredLaps(derived, baseSegments);
+}
+
+/** @internal */
+export function assignLapsForTest(
+  derived: DerivedLap[],
+  segments: BaseSeg[],
+  workoutType: string
+): LapAssignment | null {
+  return assignLapsToSegments(derived, segments, workoutType);
 }
 
 function recomputeSegmentAggregates(laps: DerivedLap[]) {
@@ -169,6 +174,34 @@ function recomputeSegmentAggregates(laps: DerivedLap[]) {
   };
 }
 
+async function clearWorkoutLapExecution(
+  tx: Prisma.TransactionClient,
+  workout: { id: string; segments: { id: string }[] }
+): Promise<void> {
+  await tx.workout_segment_laps.deleteMany({
+    where: { segment: { workoutId: workout.id } },
+  });
+  for (const seg of workout.segments) {
+    await tx.workout_segments.update({
+      where: { id: seg.id },
+      data: {
+        actualPaceSecPerMile: null,
+        actualDistanceMiles: null,
+        actualDurationSeconds: null,
+        updatedAt: new Date(),
+      },
+    });
+  }
+  await tx.workouts.update({
+    where: { id: workout.id },
+    data: {
+      paceDeltaSecPerMile: null,
+      evaluationEligibleFlag: false,
+      updatedAt: new Date(),
+    },
+  });
+}
+
 /**
  * After ACTIVITY_DETAIL: persist derived laps + segment / workout updates.
  */
@@ -192,15 +225,31 @@ export async function writeLapsToWorkout(
   const baseSegments: BaseSeg[] = workout.segments.map((s) => ({
     id: s.id,
     stepOrder: s.stepOrder,
+    title: s.title,
     durationType: s.durationType,
     durationValue: s.durationValue,
     repeatCount: s.repeatCount,
     targets: s.targets,
     paceTargetEncodingVersion: s.paceTargetEncodingVersion,
   }));
-  const slots = expandSegmentSlots(workout.segments);
-  const { mode, bySegment } = assignLaps(derived, slots, baseSegments);
 
+  const assignment = assignLapsToSegments(
+    derived,
+    baseSegments,
+    workout.workoutType
+  );
+
+  if (!assignment) {
+    await prisma.$transaction(async (tx) => {
+      await clearWorkoutLapExecution(tx, workout);
+    });
+    console.warn(
+      `[lapDataToWorkout] unassigned activity=${athleteActivityId} workout=${workout.id} type=${workout.workoutType} laps=${derived.length} segments=${workout.segments.length}`
+    );
+    return;
+  }
+
+  const { mode, bySegment } = assignment;
   const toCreate: Prisma.workout_segment_lapsCreateManyInput[] = [];
   for (const [segmentId, laps] of bySegment) {
     for (const d of laps) {
@@ -219,27 +268,15 @@ export async function writeLapsToWorkout(
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.workout_segment_laps.deleteMany({
-      where: { segment: { workoutId: workout.id } },
-    });
+    await clearWorkoutLapExecution(tx, workout);
+
     if (toCreate.length > 0) {
       await tx.workout_segment_laps.createMany({ data: toCreate });
     }
 
     for (const seg of workout.segments) {
       const ls = bySegment.get(seg.id) ?? [];
-      if (ls.length === 0) {
-        await tx.workout_segments.update({
-          where: { id: seg.id },
-          data: {
-            actualPaceSecPerMile: null,
-            actualDistanceMiles: null,
-            actualDurationSeconds: null,
-            updatedAt: new Date(),
-          },
-        });
-        continue;
-      }
+      if (ls.length === 0) continue;
       const agg = recomputeSegmentAggregates(ls);
       await tx.workout_segments.update({
         where: { id: seg.id },
@@ -250,13 +287,16 @@ export async function writeLapsToWorkout(
       });
     }
 
-    // Workout-level pace delta (evaluationEligible)
     const deltas: number[] = [];
     if (mode === "step") {
-      for (let i = 0; i < slots.length; i++) {
+      const sorted = [...workout.segments].sort(
+        (a, b) => a.stepOrder - b.stepOrder
+      );
+      for (let i = 0; i < derived.length && i < sorted.length; i++) {
+        const seg = sorted[i]!;
         const target = paceTargetSecPerMileFromTargets(
-          slots[i]!.targets,
-          slots[i]!.paceTargetEncodingVersion
+          seg.targets,
+          seg.paceTargetEncodingVersion
         );
         const act = derived[i]!.avgPaceSecPerMile;
         if (target != null && act != null) {
@@ -287,6 +327,7 @@ export async function writeLapsToWorkout(
         data: {
           paceDeltaSecPerMile: avgDelta,
           evaluationEligibleFlag: true,
+          updatedAt: new Date(),
         },
       });
     }

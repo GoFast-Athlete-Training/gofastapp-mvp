@@ -15,6 +15,9 @@ import {
   type DistanceStatus,
 } from "@/lib/training/run-result-status";
 import { isRecoveryTitle } from "@/lib/training/segment-summary";
+import { requiresDetailForTargetAnalysis } from "@/lib/training/structured-workout-types";
+
+export { requiresDetailForTargetAnalysis } from "@/lib/training/structured-workout-types";
 
 export type AnalysisMode = "detail" | "completion_only" | "summary_only";
 
@@ -154,8 +157,6 @@ export type PerformanceAnalysisWorkoutInput = {
   segments: PerformanceAnalysisSegmentInput[];
 };
 
-const STRUCTURED_TARGET_TYPES = new Set(["Intervals", "Tempo"]);
-
 function isBookendTitle(title: string): boolean {
   const t = title.toLowerCase();
   return t.includes("warm") || t.includes("cool");
@@ -172,10 +173,6 @@ export function classifySegmentPhase(title: string | null | undefined): SegmentP
 
 export function isWorkSegmentTitle(title: string | null | undefined): boolean {
   return classifySegmentPhase(title) === "work";
-}
-
-export function requiresDetailForTargetAnalysis(workoutType: string): boolean {
-  return STRUCTURED_TARGET_TYPES.has(workoutType);
 }
 
 function paceTargetSecPerMileFromSegment(
@@ -519,10 +516,27 @@ export function buildPhaseAwareLapRows(params: {
   workoutTargetHigh: number | null;
 }): PhaseAwareLapRow[] {
   const sorted = [...params.segments].sort((a, b) => a.stepOrder - b.stepOrder);
+  type LapEntry = {
+    lap: NonNullable<PerformanceAnalysisSegmentInput["segment_laps"]>[number];
+    segment: PerformanceAnalysisSegmentInput;
+  };
+  const flat: LapEntry[] = [];
+  for (const segment of sorted) {
+    for (const lap of segment.segment_laps ?? []) {
+      flat.push({ lap, segment });
+    }
+  }
+  flat.sort((a, b) => {
+    const ai = a.lap.lapIndex ?? 0;
+    const bi = b.lap.lapIndex ?? 0;
+    if (ai !== bi) return ai - bi;
+    return a.segment.stepOrder - b.segment.stepOrder;
+  });
+
   const rows: PhaseAwareLapRow[] = [];
   let lapOrder = 0;
-
-  for (const segment of sorted) {
+  for (const { lap, segment } of flat) {
+    lapOrder += 1;
     const phase = classifySegmentPhase(segment.title);
     const segmentTargetLow = paceTargetSecPerMileFromSegment(
       segment.targets,
@@ -538,33 +552,26 @@ export function buildPhaseAwareLapRows(params: {
       phase === "work"
         ? (segmentTargetHigh ?? params.workoutTargetHigh ?? targetLow)
         : null;
-
-    const laps = [...(segment.segment_laps ?? [])].sort(
-      (a, b) => (a.lapIndex ?? 0) - (b.lapIndex ?? 0)
-    );
-    for (const lap of laps) {
-      lapOrder += 1;
-      const vs = phaseAwareVsPlanPaceLabel({
-        phase,
-        paceSecPerMile: lap.avgPaceSecPerMile ?? null,
-        targetPaceSecPerMile: targetLow,
-        targetPaceSecPerMileHigh: targetHigh,
-      });
-      rows.push({
-        lapOrder,
-        lapIndex: lap.lapIndex ?? lapOrder - 1,
-        segmentId: segment.id,
-        segmentTitle: segment.title,
-        phase,
-        paceSecPerMile: lap.avgPaceSecPerMile ?? null,
-        avgHr: lap.avgHeartRate ?? null,
-        distanceMiles: lap.distanceMiles ?? null,
-        targetPaceSecPerMile: targetLow,
-        targetPaceSecPerMileHigh: targetHigh,
-        vsPlanPaceLabel: vs.label,
-        vsPlanTone: vs.tone,
-      });
-    }
+    const vs = phaseAwareVsPlanPaceLabel({
+      phase,
+      paceSecPerMile: lap.avgPaceSecPerMile ?? null,
+      targetPaceSecPerMile: targetLow,
+      targetPaceSecPerMileHigh: targetHigh,
+    });
+    rows.push({
+      lapOrder,
+      lapIndex: lap.lapIndex ?? lapOrder - 1,
+      segmentId: segment.id,
+      segmentTitle: segment.title,
+      phase,
+      paceSecPerMile: lap.avgPaceSecPerMile ?? null,
+      avgHr: lap.avgHeartRate ?? null,
+      distanceMiles: lap.distanceMiles ?? null,
+      targetPaceSecPerMile: targetLow,
+      targetPaceSecPerMileHigh: targetHigh,
+      vsPlanPaceLabel: vs.label,
+      vsPlanTone: vs.tone,
+    });
   }
 
   return rows;
@@ -640,6 +647,17 @@ function segmentHasActuals(seg: PerformanceAnalysisSegmentInput): boolean {
   );
 }
 
+/**
+ * Structured execution detail: exactly one persisted lap per segment row (lap[i] → segment[i]).
+ */
+export function structuredSegmentLapsAligned(
+  segments: PerformanceAnalysisSegmentInput[]
+): boolean {
+  if (segments.length === 0) return false;
+  const sorted = [...segments].sort((a, b) => a.stepOrder - b.stepOrder);
+  return sorted.every((s) => (s.segment_laps?.length ?? 0) === 1);
+}
+
 export function computeWorkoutPerformanceAnalysis(
   workout: PerformanceAnalysisWorkoutInput
 ): WorkoutPerformanceAnalysis {
@@ -655,10 +673,16 @@ export function computeWorkoutPerformanceAnalysis(
   );
 
   const requiresDetail = requiresDetailForTargetAnalysis(workout.workoutType);
+  const segmentLapsAligned = structuredSegmentLapsAligned(workout.segments);
+  const hasTrustworthyStructuredDetail =
+    requiresDetail &&
+    hasActivityDetail &&
+    segmentLapsAligned &&
+    hasWorkSegmentActuals;
 
   let analysisMode: AnalysisMode;
   if (requiresDetail) {
-    if (hasActivityDetail && (hasWorkSegmentActuals || hasSegmentActuals)) {
+    if (hasTrustworthyStructuredDetail) {
       analysisMode = "detail";
     } else {
       analysisMode = "completion_only";
@@ -669,8 +693,13 @@ export function computeWorkoutPerformanceAnalysis(
     analysisMode = "summary_only";
   }
 
-  const workSegmentActual =
-    hasWorkSegmentActuals || (analysisMode === "detail" && hasSegmentActuals)
+  const workSegmentActual = hasTrustworthyStructuredDetail
+    ? computeWorkSegmentActual(
+        workout.segments,
+        workout.targetPaceSecPerMile,
+        workout.targetPaceSecPerMileHigh
+      )
+    : !requiresDetail && (hasWorkSegmentActuals || hasSegmentActuals)
       ? computeWorkSegmentActual(
           workout.segments,
           workout.targetPaceSecPerMile,
@@ -720,11 +749,14 @@ export function computeWorkoutPerformanceAnalysis(
     });
   }
 
-  const phaseAwareLaps = buildPhaseAwareLapRows({
-    segments: workout.segments,
-    workoutTargetLow: workout.targetPaceSecPerMile,
-    workoutTargetHigh: workout.targetPaceSecPerMileHigh,
-  });
+  const phaseAwareLaps =
+    !requiresDetail || segmentLapsAligned
+      ? buildPhaseAwareLapRows({
+          segments: workout.segments,
+          workoutTargetLow: workout.targetPaceSecPerMile,
+          workoutTargetHigh: workout.targetPaceSecPerMileHigh,
+        })
+      : [];
 
   const analysisWithoutScorecard = {
     hasActivityDetail,
