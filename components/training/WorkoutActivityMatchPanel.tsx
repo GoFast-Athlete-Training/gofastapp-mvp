@@ -30,7 +30,11 @@ interface Props {
   workoutId: string;
   /** Planned workout title for inline context */
   workoutTitle?: string | null;
+  /** Planned distance for mismatch warnings */
+  plannedDistanceMeters?: number | null;
   onMatched: () => void | Promise<void>;
+  /** Return to planned workout view without matching */
+  onClose?: () => void;
   /** Compact surface for training day / hub flows */
   compact?: boolean;
 }
@@ -77,6 +81,33 @@ function isRepairableConflict(conflict: ActivityLinkConflict | null): boolean {
   );
 }
 
+function isHighConfidenceCandidate(candidate: Pick<CandidateActivity, "reasonLabels">): boolean {
+  if (candidate.reasonLabels.includes("Distance far off")) return false;
+  if (candidate.reasonLabels.includes("Title match")) return true;
+  return (
+    candidate.reasonLabels.includes("Distance close") &&
+    candidate.reasonLabels.includes("Same day")
+  );
+}
+
+function distanceMismatchWarning(
+  activityMeters: number | null,
+  plannedMeters: number | null | undefined
+): string | null {
+  if (
+    activityMeters == null ||
+    activityMeters <= 0 ||
+    plannedMeters == null ||
+    plannedMeters <= 0
+  ) {
+    return null;
+  }
+  const ratio = activityMeters / plannedMeters;
+  if (ratio < 0.5) return "This is much shorter than planned.";
+  if (ratio > 1.5) return "This is much longer than planned.";
+  return null;
+}
+
 function confirmButtonLabel(
   selected: CandidateActivity | null,
   suggested: CandidateActivity | null,
@@ -84,14 +115,21 @@ function confirmButtonLabel(
 ): string {
   if (saving) return "Matching…";
   if (!selected) return "Use this Garmin activity";
-  if (suggested?.id === selected.id) return "Yep, looks right";
+  if (
+    suggested?.id === selected.id &&
+    isHighConfidenceCandidate(selected)
+  ) {
+    return "Yep, looks right";
+  }
   return "Use this Garmin activity";
 }
 
 export default function WorkoutActivityMatchPanel({
   workoutId,
   workoutTitle,
+  plannedDistanceMeters,
   onMatched,
+  onClose,
   compact = false,
 }: Props) {
   const [loading, setLoading] = useState(true);
@@ -139,7 +177,11 @@ export default function WorkoutActivityMatchPanel({
     void loadCandidates();
   }, [loadCandidates]);
 
-  const suggested = useMemo(() => candidates[0] ?? null, [candidates]);
+  const suggested = useMemo(() => {
+    const top = candidates[0] ?? null;
+    if (!top) return null;
+    return isHighConfidenceCandidate(top) ? top : null;
+  }, [candidates]);
 
   const visibleLimit = VISIBLE_STEPS[visibleStepIndex] ?? Number.POSITIVE_INFINITY;
   const visibleCandidates = useMemo(() => {
@@ -158,6 +200,12 @@ export default function WorkoutActivityMatchPanel({
   const selectedCandidate = useMemo(
     () => candidates.find((c) => c.id === selectedId) ?? null,
     [candidates, selectedId]
+  );
+
+  const selectedDistanceWarning = useMemo(
+    () =>
+      distanceMismatchWarning(selectedCandidate?.distance ?? null, plannedDistanceMeters),
+    [selectedCandidate?.distance, plannedDistanceMeters]
   );
 
   const selectedBlocked =
@@ -251,7 +299,9 @@ export default function WorkoutActivityMatchPanel({
             className={`rounded px-1.5 py-0.5 font-medium ${
               label === "Title match"
                 ? "bg-emerald-100 text-emerald-900"
-                : "bg-gray-100 text-gray-700"
+                : label === "Distance far off"
+                  ? "bg-amber-100 text-amber-900"
+                  : "bg-gray-100 text-gray-700"
             }`}
           >
             {label}
@@ -427,9 +477,7 @@ export default function WorkoutActivityMatchPanel({
           </p>
         ) : (
           <p className="text-xs text-gray-600 leading-relaxed">
-            {compact && suggested
-              ? "Pick the Garmin activity you completed for this planned workout."
-              : "Pick the Garmin activity you completed. We'll match it to this planned workout."}
+            Choose a Garmin activity only if this workout is done.
           </p>
         )}
 
@@ -478,6 +526,12 @@ export default function WorkoutActivityMatchPanel({
               </div>
             )}
 
+            {selectedDistanceWarning ? (
+              <p className="text-xs font-medium text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                {selectedDistanceWarning}
+              </p>
+            ) : null}
+
             <button
               type="button"
               disabled={!selectedId || saving || selectedBlocked}
@@ -491,6 +545,15 @@ export default function WorkoutActivityMatchPanel({
               )}
               {confirmButtonLabel(selectedCandidate, suggested, saving)}
             </button>
+            {onClose ? (
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Still planning to do this workout
+              </button>
+            ) : null}
           </>
         )}
 

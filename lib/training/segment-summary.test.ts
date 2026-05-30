@@ -9,6 +9,9 @@ import {
   formatStructuredMilesTotal,
   groupSegmentsInDisplayOrder,
   isMultiStepRepeatGroup,
+  humanDisplayGroupTitle,
+  humanizeSegmentTitle,
+  humanPlanStepSideTag,
   milesToDisplayMeters,
   segmentsMatchForRepeat,
 } from "./segment-summary";
@@ -137,4 +140,23 @@ test("milesToDisplayMeters snaps 400m track reps to 400 not 401", () => {
 test("distance labels keep tenths for non-whole long runs", () => {
   assert.equal(formatStructuredMilesTotal(12.3), "12.3 mi");
   assert.equal(formatSegmentDistance(12.3), "12.3 mi");
+});
+
+test("humanizeSegmentTitle replaces raw Work with athlete-facing labels", () => {
+  assert.equal(humanizeSegmentTitle("Work", "Tempo"), "Tempo");
+  assert.equal(humanizeSegmentTitle("Work", "Intervals"), "Intervals");
+  assert.equal(humanizeSegmentTitle("Work", "Easy"), "Easy run");
+  assert.equal(humanizeSegmentTitle("Work"), "Main set");
+  assert.equal(humanizeSegmentTitle("Recovery"), "Recovery");
+});
+
+test("humanDisplayGroupTitle uses workout type for lone Work segments", () => {
+  const groups = groupSegmentsInDisplayOrder([seg(1, "Work", 3)]);
+  assert.equal(humanDisplayGroupTitle(groups[0]!, "LongRun"), "Long run");
+});
+
+test("humanPlanStepSideTag hides redundant recovery chip", () => {
+  assert.equal(humanPlanStepSideTag("Recovery"), null);
+  assert.equal(humanPlanStepSideTag("Warm-up"), null);
+  assert.equal(humanPlanStepSideTag("Work"), "Run");
 });

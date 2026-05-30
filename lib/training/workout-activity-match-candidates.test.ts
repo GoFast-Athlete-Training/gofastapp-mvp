@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  isHighConfidenceActivityCandidate,
   scoreActivityCandidateForWorkout,
   scoreAndSortActivityCandidates,
 } from "./workout-activity-match-candidates";
@@ -69,4 +70,50 @@ test("scoreAndSortActivityCandidates ranks title match above same-day only", () 
   });
   assert.equal(sorted[0]?.id, "title-match");
   assert.ok(sorted[0]!.score > sorted[1]!.score);
+});
+
+test("tiny same-day activity is not a high-confidence match for long planned workout", () => {
+  const longRunWorkout = {
+    id: "w-long",
+    title: "Long run 10.5 miles",
+    weekNumber: 1,
+    date: new Date("2026-05-23T12:00:00.000Z"),
+    estimatedDistanceInMeters: 10.5 * 1609.34,
+  };
+  const tinyRun = baseActivity({
+    id: "tiny-run",
+    activityName: "Arlington County Run",
+    distance: 0.3 * 1609.34,
+    startTime: new Date("2026-05-23T08:00:00.000Z"),
+  });
+  const scored = scoreActivityCandidateForWorkout({
+    workout: longRunWorkout,
+    activity: tinyRun,
+  });
+  assert.ok(scored);
+  assert.ok(scored!.reasonLabels.includes("Same day"));
+  assert.ok(scored!.reasonLabels.includes("Distance far off"));
+  assert.equal(isHighConfidenceActivityCandidate(scored!), false);
+});
+
+test("distance-close same-day activity can be high-confidence without title match", () => {
+  const longRunWorkout = {
+    id: "w-long",
+    title: "Long run 10.5 miles",
+    weekNumber: 1,
+    date: new Date("2026-05-23T12:00:00.000Z"),
+    estimatedDistanceInMeters: 10.5 * 1609.34,
+  };
+  const closeRun = baseActivity({
+    id: "close-run",
+    activityName: "Morning long run",
+    distance: 10.4 * 1609.34,
+    startTime: new Date("2026-05-23T08:00:00.000Z"),
+  });
+  const scored = scoreActivityCandidateForWorkout({
+    workout: longRunWorkout,
+    activity: closeRun,
+  });
+  assert.ok(scored);
+  assert.equal(isHighConfidenceActivityCandidate(scored!), true);
 });

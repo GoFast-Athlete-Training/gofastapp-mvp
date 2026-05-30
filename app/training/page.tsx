@@ -109,6 +109,7 @@ export default function TrainingHubPage() {
   const [selectedDayKey, setSelectedDayKey] = useState<string>("");
   const [pushingGarmin, setPushingGarmin] = useState(false);
   const [garminPushMessage, setGarminPushMessage] = useState<string | null>(null);
+  const [showMatchPanel, setShowMatchPanel] = useState(false);
   /** Active plan in DB is past race day — prompt next goal instead of full schedule UI. */
   const [pastRacePlan, setPastRacePlan] = useState<{
     id: string;
@@ -275,6 +276,10 @@ export default function TrainingHubPage() {
   }, [authReady, planDetail?.id, weekNumber, fetchWeekDays]);
 
   useEffect(() => {
+    setShowMatchPanel(false);
+  }, [selectedDayKey]);
+
+  useEffect(() => {
     if (!authReady) return;
     let cancelled = false;
     (async () => {
@@ -313,8 +318,8 @@ export default function TrainingHubPage() {
       }
       setGarminPushMessage(
         data.scheduledDate
-          ? `Sent to Garmin for ${data.scheduledDate}. Sync your watch in Garmin Connect.`
-          : "Sent to Garmin. Sync your watch in Garmin Connect."
+          ? `Added to Garmin Connect calendar for ${data.scheduledDate}. Sync your watch in Garmin Connect.`
+          : "Added to your Garmin Connect calendar. Sync your watch in Garmin Connect."
       );
       if (planDetail) {
         void fetchWeekDays(weekNumber);
@@ -851,9 +856,12 @@ export default function TrainingHubPage() {
                             <button
                               type="button"
                               onClick={() => {
-                                document
-                                  .getElementById("match-garmin-panel")
-                                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                setShowMatchPanel(true);
+                                requestAnimationFrame(() => {
+                                  document
+                                    .getElementById("match-garmin-panel")
+                                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                });
                               }}
                               className="inline-flex justify-center rounded-xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-700"
                             >
@@ -894,7 +902,9 @@ export default function TrainingHubPage() {
                             {garminPushMessage}
                           </p>
                         ) : null}
-                        {focusPlanDay.workoutId && !focusPlanDay.matchedActivityId ? (
+                        {focusPlanDay.workoutId &&
+                        !focusPlanDay.matchedActivityId &&
+                        showMatchPanel ? (
                           <div id="match-garmin-panel" className="mt-4 space-y-4">
                             <WorkoutSkipActions
                               workoutId={focusPlanDay.workoutId}
@@ -909,8 +919,10 @@ export default function TrainingHubPage() {
                             <WorkoutActivityMatchPanel
                               workoutId={focusPlanDay.workoutId}
                               workoutTitle={displayWorkoutListTitle(focusPlanDay)}
+                              plannedDistanceMeters={focusPlanDay.estimatedDistanceInMeters ?? null}
                               compact
                               onMatched={loadHub}
+                              onClose={() => setShowMatchPanel(false)}
                             />
                           </div>
                         ) : null}

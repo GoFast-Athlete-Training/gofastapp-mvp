@@ -268,6 +268,7 @@ model athlete_activities {
   matched_bike_workout bike_workout? @relation("BikeWorkoutMatchedActivity")
   city_run_activity_links city_run_activity_links[]
   athlete_race_result athlete_race_results?
+  workout_segment_laps workout_segment_laps[]
 
   @@index([athleteId, ingestionStatus])
 }
@@ -1383,6 +1384,10 @@ model workouts {
   /// Qualifying Easy/LongRun: average HR (bpm) used as aerobic-ceiling evidence when pace was not too fast vs target.
   creditedAerobicCeilingBpm       Int?
   evaluationEligibleFlag          Boolean             @default(false)
+  /// ALIGNED | ALIGNMENT_FAILED after activity-to-segment parse
+  segmentExecutionStatus          String?
+  segmentExecutionLapCount        Int?
+  segmentExecutionSegmentCount    Int?
   /// Frozen prescription segments at last materialize/send (segments table remains FK source for edits).
   segmentSnapshotJson               Json?
   /// Normalized copy of ingest summary payload (`athlete_activities.summaryData`).
@@ -1477,9 +1482,10 @@ model workout_segments {
   @@index([workoutId, stepOrder])
 }
 
-/// One row per Garmin lap window (time boundaries from detailData.laps + derived stats from samples).
+/// One row per Garmin lap mapped to a prescribed workout segment after activity parse.
 model workout_segment_laps {
-  id                  String            @id @default(cuid())
+  id                  String              @id @default(cuid())
+  activityId          String
   segmentId           String
   /// 0-based index in the original Garmin Laps[] array
   lapIndex            Int
@@ -1489,12 +1495,15 @@ model workout_segment_laps {
   avgHeartRate        Int?
   distanceMiles       Float?
   durationSeconds     Int?
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
-  segment             workout_segments  @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  activity            athlete_activities  @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  segment             workout_segments    @relation(fields: [segmentId], references: [id], onDelete: Cascade)
 
+  @@unique([activityId, lapIndex])
   @@unique([segmentId, lapIndex])
   @@index([segmentId])
+  @@index([activityId])
 }
 
 /// Sport for a leg within a tri / multi-sport session (ordering is on tri_workout_leg.legOrder).

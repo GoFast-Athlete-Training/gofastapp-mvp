@@ -4,6 +4,11 @@ import {
   GarminApiError,
   createGarminTrainingApiForAthlete,
 } from "@/lib/garmin-workouts/garmin-training-api";
+import {
+  deleteGarminScheduleIfPresent,
+  scheduleAndVerifyWorkout,
+  scheduleFailureToGarminApiResult,
+} from "@/lib/garmin-workouts/garmin-schedule-service";
 import { GarminNotConnectedError, requireGarminTokenFresh } from "@/lib/domain-garmin";
 import { dateForDayInWeek } from "@/lib/training/plan-schedule-dates";
 import { dayNameToOurDow } from "@/lib/training/schedule-parser";
@@ -234,18 +239,31 @@ export async function pushWorkoutToGarminForAthlete(
       await persistGarminWorkoutId(workout.id, garminWorkoutId);
     }
 
-    if (workout.garminScheduleId != null) {
-      try {
-        await client.deleteSchedule(workout.garminScheduleId);
-      } catch (e) {
-        if (!(e instanceof GarminApiError && e.status === 404)) {
-          throw e;
-        }
-      }
+    const deleteResult = await deleteGarminScheduleIfPresent(
+      client,
+      workout.garminScheduleId
+    );
+    if (deleteResult.wasStaleOnGarmin) {
+      await prisma.workouts.update({
+        where: { id: workout.id },
+        data: { garminScheduleId: null },
+      });
     }
 
-    const scheduleResult = await client.scheduleWorkout(garminWorkoutId, scheduledDate);
-    const garminScheduleId = scheduleResult.scheduleId;
+    const scheduleResult = await scheduleAndVerifyWorkout(client, {
+      garminWorkoutId,
+      scheduledDate,
+    });
+    if (!scheduleResult.ok) {
+      const fail = scheduleFailureToGarminApiResult(scheduleResult);
+      return {
+        ok: false,
+        code: fail.code,
+        message: fail.message,
+        garminStatus: fail.garminStatus,
+      };
+    }
+    const garminScheduleId = scheduleResult.garminScheduleId;
 
     await prisma.workouts.update({
       where: { id: workout.id },

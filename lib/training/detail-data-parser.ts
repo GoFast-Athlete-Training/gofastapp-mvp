@@ -1,9 +1,19 @@
 /**
  * Parse raw Garmin activity detail JSON (detailData) into typed lap + sample rows.
  * Pure: no DB, no side effects.
+ *
+ * Supports both:
+ * - flat lap summaries (distance/duration/pace/hr on each lap object)
+ * - lap start times + per-second samples (legacy path)
  */
 
-export type LapRow = { startTimeInSeconds: number };
+export type LapRow = {
+  startTimeInSeconds: number;
+  durationSeconds?: number | null;
+  distanceMeters?: number | null;
+  avgSpeedMetersPerSecond?: number | null;
+  avgHeartRate?: number | null;
+};
 
 export type SampleRow = {
   startTimeInSeconds: number;
@@ -24,18 +34,60 @@ function toNum(x: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function readHeartRate(s: Record<string, unknown>): number | null {
+function readHeartRate(obj: Record<string, unknown>): number | null {
   return (
-    toNum(s.heartRate) ??
-    toNum(s.HeartRate) ??
-    toNum(s.heartRateInBeatsPerMinute) ??
-    toNum(s.HeartRateInBeatsPerMinute) ??
+    toNum(obj.heartRate) ??
+    toNum(obj.HeartRate) ??
+    toNum(obj.heartRateInBeatsPerMinute) ??
+    toNum(obj.HeartRateInBeatsPerMinute) ??
+    toNum(obj.averageHeartRateInBeatsPerMinute) ??
+    toNum(obj.AverageHeartRateInBeatsPerMinute) ??
     null
   );
 }
 
-function readSpeed(s: Record<string, unknown>): number | null {
-  return toNum(s.speedMetersPerSecond) ?? toNum(s.SpeedMetersPerSecond) ?? null;
+function readSpeed(obj: Record<string, unknown>): number | null {
+  return (
+    toNum(obj.speedMetersPerSecond) ??
+    toNum(obj.SpeedMetersPerSecond) ??
+    toNum(obj.averageSpeedInMetersPerSecond) ??
+    toNum(obj.AverageSpeedInMetersPerSecond) ??
+    null
+  );
+}
+
+function readDurationSeconds(obj: Record<string, unknown>): number | null {
+  return (
+    toNum(obj.timerDurationInSeconds) ??
+    toNum(obj.TimerDurationInSeconds) ??
+    toNum(obj.durationInSeconds) ??
+    toNum(obj.DurationInSeconds) ??
+    toNum(obj.elapsedDurationInSeconds) ??
+    toNum(obj.ElapsedDurationInSeconds) ??
+    null
+  );
+}
+
+function readDistanceMeters(obj: Record<string, unknown>): number | null {
+  return (
+    toNum(obj.totalDistanceInMeters) ??
+    toNum(obj.TotalDistanceInMeters) ??
+    toNum(obj.distanceInMeters) ??
+    toNum(obj.DistanceInMeters) ??
+    null
+  );
+}
+
+function parseLapRow(item: Record<string, unknown>): LapRow | null {
+  const t = toNum(item.startTimeInSeconds) ?? toNum(item.StartTimeInSeconds);
+  if (t == null) return null;
+  return {
+    startTimeInSeconds: Math.floor(t),
+    durationSeconds: readDurationSeconds(item),
+    distanceMeters: readDistanceMeters(item),
+    avgSpeedMetersPerSecond: readSpeed(item),
+    avgHeartRate: readHeartRate(item),
+  };
 }
 
 /**
@@ -53,10 +105,8 @@ export function parseDetailData(blob: unknown): ParsedDetailData {
   if (Array.isArray(rawLaps)) {
     for (const item of rawLaps) {
       if (item == null || typeof item !== "object") continue;
-      const lo = item as Record<string, unknown>;
-      const t = toNum(lo.startTimeInSeconds) ?? toNum(lo.StartTimeInSeconds);
-      if (t == null) continue;
-      laps.push({ startTimeInSeconds: Math.floor(t) });
+      const row = parseLapRow(item as Record<string, unknown>);
+      if (row) laps.push(row);
     }
   }
 
@@ -69,8 +119,7 @@ export function parseDetailData(blob: unknown): ParsedDetailData {
       if (t == null) continue;
       const speed = readSpeed(s);
       const hr = readHeartRate(s);
-      const dist =
-        toNum(s.totalDistanceInMeters) ?? toNum(s.TotalDistanceInMeters) ?? null;
+      const dist = readDistanceMeters(s);
       samples.push({
         startTimeInSeconds: Math.floor(t),
         speedMetersPerSecond: speed,
@@ -81,4 +130,15 @@ export function parseDetailData(blob: unknown): ParsedDetailData {
   }
 
   return { laps, samples };
+}
+
+/** True when each lap row already carries usable summary metrics. */
+export function lapsHaveFlatSummaries(laps: LapRow[]): boolean {
+  if (laps.length === 0) return false;
+  return laps.every(
+    (lap) =>
+      (lap.durationSeconds != null && lap.durationSeconds > 0) ||
+      (lap.distanceMeters != null && lap.distanceMeters > 0) ||
+      (lap.avgSpeedMetersPerSecond != null && lap.avgSpeedMetersPerSecond > 0)
+  );
 }

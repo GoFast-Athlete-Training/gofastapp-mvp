@@ -302,6 +302,9 @@ export async function GET(request: NextRequest, context: Ctx) {
       completedActivityDetailJson: workout.completedActivityDetailJson,
       matchedActivityId: workout.matchedActivityId,
       matched_activity: workout.matched_activity,
+      segmentExecutionStatus: workout.segmentExecutionStatus,
+      segmentExecutionLapCount: workout.segmentExecutionLapCount,
+      segmentExecutionSegmentCount: workout.segmentExecutionSegmentCount,
       segments: workout.segments.map((s) => ({
         id: s.id,
         title: s.title,

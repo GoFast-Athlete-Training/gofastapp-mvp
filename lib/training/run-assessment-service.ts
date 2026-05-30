@@ -129,6 +129,9 @@ export async function runRunAssessment(params: {
         actualAvgPaceSecPerMile: true,
         actualDurationSeconds: true,
         completedActivityDetailJson: true,
+        segmentExecutionStatus: true,
+        segmentExecutionLapCount: true,
+        segmentExecutionSegmentCount: true,
         matched_activity: {
           select: {
             activityName: true,
@@ -182,6 +185,9 @@ export async function runRunAssessment(params: {
     completedActivityDetailJson: workout.completedActivityDetailJson,
     matchedActivityId: workout.matchedActivityId,
     matched_activity: workout.matched_activity,
+    segmentExecutionStatus: workout.segmentExecutionStatus,
+    segmentExecutionLapCount: workout.segmentExecutionLapCount,
+    segmentExecutionSegmentCount: workout.segmentExecutionSegmentCount,
     segments: workout.segments,
   });
 

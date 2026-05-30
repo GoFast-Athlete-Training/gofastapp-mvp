@@ -9,9 +9,7 @@ import { getAthleteByGarminUserId } from "../domain-garmin";
 import { activityExists } from "./dedupe";
 import { normalizeActivityFields } from "./normalizeActivityFields";
 import { RUNNING_ACTIVITY_TYPES } from "../training/activity-type-sets";
-import { parseDetailData } from "../training/detail-data-parser";
-import { convertLapsToDerived } from "../training/lap-converter";
-import { writeLapsToWorkout } from "../training/lap-data-to-workout";
+import { parseMatchedActivityToSegmentExecution } from "../training/activity-to-segment-execution";
 
 export interface ActivityDetail {
   activityId?: string | number;
@@ -87,14 +85,6 @@ async function resolveAthleteForDetailFallback(
 
 async function runDetailHydrationPipeline(rowId: string, detailData: object): Promise<void> {
   try {
-    const parsed = parseDetailData(detailData);
-    const derived = convertLapsToDerived(parsed.laps, parsed.samples);
-    await writeLapsToWorkout(rowId, derived);
-  } catch (lapErr) {
-    console.warn("lap pipeline (detailData → workout):", lapErr);
-  }
-
-  try {
     await prisma.workouts.updateMany({
       where: { matchedActivityId: rowId },
       data: {
@@ -103,6 +93,18 @@ async function runDetailHydrationPipeline(rowId: string, detailData: object): Pr
     });
   } catch (detailSnapErr) {
     console.warn("workout detail snapshot:", detailSnapErr);
+  }
+
+  try {
+    const workout = await prisma.workouts.findFirst({
+      where: { matchedActivityId: rowId },
+      select: { id: true },
+    });
+    if (workout) {
+      await parseMatchedActivityToSegmentExecution(rowId);
+    }
+  } catch (lapErr) {
+    console.warn("activity-to-segment pipeline:", lapErr);
   }
 }
 

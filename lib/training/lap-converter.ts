@@ -1,9 +1,10 @@
 /**
- * Build derived lap stats from parsed lap start times + per-second/period samples.
+ * Build derived lap stats from parsed lap rows + optional per-second samples.
  * Pure: no DB.
  */
 
 import type { LapRow, SampleRow } from "./detail-data-parser";
+import { lapsHaveFlatSummaries, parseDetailData } from "./detail-data-parser";
 
 const METERS_PER_MILE = 1609.34;
 
@@ -19,9 +20,45 @@ export type DerivedLap = {
 
 function mean(nums: number[]): number | null {
   if (nums.length === 0) return null;
-  return Math.round(
-    nums.reduce((a, b) => a + b, 0) / nums.length
+  return Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
+}
+
+function derivedFromFlatLap(lap: LapRow, lapIndex: number): DerivedLap {
+  const durationSeconds = Math.max(
+    0,
+    Math.round(lap.durationSeconds ?? 0)
   );
+  const distanceMiles =
+    lap.distanceMeters != null && lap.distanceMeters > 0
+      ? Math.round((lap.distanceMeters / METERS_PER_MILE) * 100) / 100
+      : null;
+  let paceSec: number | null = null;
+  if (lap.avgSpeedMetersPerSecond != null && lap.avgSpeedMetersPerSecond > 0) {
+    paceSec = Math.round(METERS_PER_MILE / lap.avgSpeedMetersPerSecond);
+  } else if (distanceMiles != null && durationSeconds > 0) {
+    paceSec = Math.round(durationSeconds / distanceMiles);
+  }
+  const endTimeInSeconds =
+    durationSeconds > 0
+      ? lap.startTimeInSeconds + durationSeconds
+      : lap.startTimeInSeconds;
+  return {
+    lapIndex,
+    startTimeInSeconds: lap.startTimeInSeconds,
+    endTimeInSeconds,
+    avgPaceSecPerMile: paceSec,
+    avgHeartRate: lap.avgHeartRate ?? null,
+    distanceMiles,
+    durationSeconds,
+  };
+}
+
+/**
+ * Normalize raw Garmin detail into derived activity laps.
+ */
+export function normalizeActivityLapsFromDetail(blob: unknown): DerivedLap[] {
+  const parsed = parseDetailData(blob);
+  return convertLapsToDerived(parsed.laps, parsed.samples);
 }
 
 /**
@@ -33,6 +70,10 @@ export function convertLapsToDerived(
 ): DerivedLap[] {
   if (laps.length === 0) return [];
 
+  if (lapsHaveFlatSummaries(laps)) {
+    return laps.map((lap, i) => derivedFromFlatLap(lap, i));
+  }
+
   const sorted = [...samples].sort(
     (a, b) => a.startTimeInSeconds - b.startTimeInSeconds
   );
@@ -42,14 +83,17 @@ export function convertLapsToDerived(
       startTimeInSeconds: lap.startTimeInSeconds,
       endTimeInSeconds: lap.startTimeInSeconds,
       avgPaceSecPerMile: null,
-      avgHeartRate: null,
-      distanceMiles: null,
-      durationSeconds: 0,
+      avgHeartRate: lap.avgHeartRate ?? null,
+      distanceMiles:
+        lap.distanceMeters != null && lap.distanceMeters > 0
+          ? Math.round((lap.distanceMeters / METERS_PER_MILE) * 100) / 100
+          : null,
+      durationSeconds: Math.max(0, Math.round(lap.durationSeconds ?? 0)),
     }));
   }
 
   const lastSampleT = sorted[sorted.length - 1]!.startTimeInSeconds;
-  const endBuffer = 2; // same spirit as evaluate-lap-segments
+  const endBuffer = 2;
 
   const out: DerivedLap[] = [];
   for (let i = 0; i < laps.length; i++) {
@@ -60,9 +104,7 @@ export function convertLapsToDerived(
         : lastSampleT + endBuffer;
 
     const inWin = sorted.filter(
-      (s) =>
-        s.startTimeInSeconds >= t0 &&
-        s.startTimeInSeconds < t1
+      (s) => s.startTimeInSeconds >= t0 && s.startTimeInSeconds < t1
     );
     const dur = Math.max(0, t1 - t0);
 
@@ -96,7 +138,7 @@ export function convertLapsToDerived(
       startTimeInSeconds: t0,
       endTimeInSeconds: t1,
       avgPaceSecPerMile: paceSec,
-      avgHeartRate: mean(hrs),
+      avgHeartRate: mean(hrs) ?? laps[i]!.avgHeartRate ?? null,
       distanceMiles: distMiles,
       durationSeconds: Math.round(dur),
     });

@@ -354,6 +354,55 @@ export function displayGroupTitle(group: SegmentDisplayGroup): string {
   return group.work.title?.trim() || "Segment";
 }
 
+/** Athlete-facing segment title (avoid raw "Work" / "Segment" in UI). */
+export function humanizeSegmentTitle(
+  title: string | null | undefined,
+  workoutType?: string | null
+): string {
+  const raw = title?.trim() || "";
+  if (!raw) return "Step";
+  const lower = raw.toLowerCase();
+  if (lower === "work" || lower === "segment") {
+    switch (workoutType) {
+      case "Intervals":
+        return "Intervals";
+      case "Tempo":
+        return "Tempo";
+      case "LongRun":
+        return "Long run";
+      case "Easy":
+        return "Easy run";
+      case "Race":
+        return "Race";
+      default:
+        return "Main set";
+    }
+  }
+  if (lower.includes("warm")) return "Warm-up";
+  if (lower.includes("cool")) return "Cool-down";
+  if (isRecoveryTitle(raw)) return "Recovery";
+  if (lower.includes("interval")) return raw;
+  if (lower.includes("tempo")) return "Tempo";
+  return raw;
+}
+
+/** Group card title for plan-day / workout preview UI. */
+export function humanDisplayGroupTitle(
+  group: SegmentDisplayGroup,
+  workoutType?: string | null
+): string {
+  if (isMultiStepRepeatGroup(group)) return formatRepeatBlockLabel(group);
+  return humanizeSegmentTitle(group.work.title, workoutType);
+}
+
+/** Optional side tag for a plan step; null when redundant with the header. */
+export function humanPlanStepSideTag(title: string): string | null {
+  if (isRecoveryTitle(title)) return null;
+  const lower = title.toLowerCase();
+  if (lower.includes("warm") || lower.includes("cool")) return null;
+  return "Run";
+}
+
 /** Human-readable distance/duration for a grouped segment row (includes × N when collapsed). */
 export function formatGroupedSegmentDuration(group: SegmentDisplayGroup): string {
   if (isMultiStepRepeatGroup(group)) {

@@ -15,9 +15,7 @@ import {
 } from "@/lib/workout-generator/pace-calculator";
 import { normalizeGarminMatchText } from "./garmin-activity-match-helpers";
 import { ymdFromDate } from "./plan-utils";
-import { parseDetailData } from "./detail-data-parser";
-import { convertLapsToDerived } from "./lap-converter";
-import { writeLapsToWorkout } from "./lap-data-to-workout";
+import { parseActivityToSegmentExecution } from "./activity-to-segment-execution";
 /** Max sec/mi faster than prescribed easy pace before we skip aerobic HR credit (target − actual). */
 export const EASY_LONG_RUN_MAX_FAST_DRIFT_SEC_PER_MILE = 15;
 
@@ -254,17 +252,24 @@ async function syncActivityDetailToLinkedWorkout(activityId: string): Promise<vo
   });
   if (!activity?.detailData || typeof activity.detailData !== "object") return;
 
-  await prisma.workouts.updateMany({
+  const workout = await prisma.workouts.findFirst({
     where: { matchedActivityId: activity.id },
+    select: { id: true },
+  });
+  if (!workout) return;
+
+  await prisma.workouts.update({
+    where: { id: workout.id },
     data: { completedActivityDetailJson: activity.detailData as object },
   });
 
   try {
-    const parsed = parseDetailData(activity.detailData);
-    const derived = convertLapsToDerived(parsed.laps, parsed.samples);
-    await writeLapsToWorkout(activity.id, derived);
+    await parseActivityToSegmentExecution({
+      activityId: activity.id,
+      workoutId: workout.id,
+    });
   } catch (lapErr) {
-    console.warn("lap pipeline after activity match:", lapErr);
+    console.warn("activity-to-segment after activity match:", lapErr);
   }
 }
 

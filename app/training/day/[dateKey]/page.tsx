@@ -25,7 +25,9 @@ import {
   groupSegmentsForDisplay,
   formatGroupedSegmentDuration,
   formatBetweenRepeatsRecoveryLabel,
-  displayGroupTitle,
+  humanDisplayGroupTitle,
+  humanPlanStepSideTag,
+  humanizeSegmentTitle,
   isMultiStepRepeatGroup,
   type SegmentDisplayGroup,
 } from "@/lib/training/segment-summary";
@@ -47,8 +49,6 @@ import { metersToMiDisplay } from "@/lib/training/workout-preview-payload";
 import { buildRunResultStatus } from "@/lib/training/run-result-status";
 import {
   deriveSessionStatus,
-  sessionStatusBadgeClass,
-  sessionStatusLabel,
 } from "@/lib/training/session-status";
 
 function formatSecPerMile(sec: number | null | undefined): string | null {
@@ -151,16 +151,12 @@ function previewSegmentTargetSummary(
   return parts.length ? parts.join(" · ") : null;
 }
 
-function segmentHeaderClass(title: string): string {
-  const t = title.toLowerCase();
+function segmentHeaderClass(title: string, workoutType?: string): string {
+  const t = humanizeSegmentTitle(title, workoutType).toLowerCase();
   if (t.includes("warm") || t.includes("cool")) return "bg-gray-500 text-white";
   if (t.includes("recovery")) return "bg-teal-600 text-white";
   if (t.includes("tempo") || t.includes("interval")) return "bg-orange-500 text-white";
   return "bg-gray-400 text-white";
-}
-
-function segmentRunRestTag(title: string): "RUN" | "REST" {
-  return title.toLowerCase().includes("recovery") ? "REST" : "RUN";
 }
 
 function previewGroupedSegmentTargetSummary(
@@ -216,6 +212,7 @@ export default function TrainingPlanDayPreviewPage() {
     officialFinishTime: string | null;
   } | null>(null);
   const [logRaceOpen, setLogRaceOpen] = useState(false);
+  const [showMatchPanel, setShowMatchPanel] = useState(false);
   const [matchedActivityId, setMatchedActivityId] = useState<string | null>(null);
   const [skippedAt, setSkippedAt] = useState<string | null>(null);
   const [loggedActualDistanceMeters, setLoggedActualDistanceMeters] = useState<number | null>(
@@ -424,7 +421,7 @@ export default function TrainingPlanDayPreviewPage() {
     workout?.weekNumber != null && Number.isFinite(workout.weekNumber)
       ? workout.weekNumber
       : "—";
-  const isToday = dateKey != null && dateKey === localYmd(new Date());
+  const isCalendarToday = dateKey != null && dateKey === localYmd(new Date());
   const isPastPlanDay = dateKey != null && dateKey < localYmd(new Date());
   const planRace = planDetail?.race_registry;
   const showRaceResultCta = Boolean(
@@ -438,7 +435,7 @@ export default function TrainingPlanDayPreviewPage() {
       )
     : dateKey ?? "";
   const canOpenWorkout = workoutId != null;
-  const showInlineMatcher =
+  const canMatchWorkout =
     workoutId != null && !workoutLoading && !workoutError && matchedActivityId == null;
   const isLogged = matchedActivityId != null;
   const dayStatus =
@@ -451,6 +448,9 @@ export default function TrainingPlanDayPreviewPage() {
           title: workout?.title,
         })
       : null;
+  const isActionableWorkout = dayStatus === "today";
+  const showTodaysWorkoutHeader =
+    (sourceHome && isActionableWorkout) || isCalendarToday;
 
   const loggedRunStatus = buildRunResultStatus({
     plannedDistanceMeters: loggedPlannedDistanceMeters,
@@ -480,10 +480,13 @@ export default function TrainingPlanDayPreviewPage() {
     router,
   ]);
 
-  function scrollToMatchPanel() {
-    document.getElementById("match-garmin-panel")?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
+  function openMatchPanel() {
+    setShowMatchPanel(true);
+    requestAnimationFrame(() => {
+      document.getElementById("match-garmin-panel")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     });
   }
 
@@ -503,8 +506,8 @@ export default function TrainingPlanDayPreviewPage() {
     if (showSuccess) {
       setGarminPushMessage(
         data.scheduledDate
-          ? `Sent to Garmin for ${data.scheduledDate}. Sync your watch in Garmin Connect.`
-          : "Sent to Garmin. Sync your watch in Garmin Connect."
+          ? `Added to your Garmin Connect calendar for ${data.scheduledDate}. Sync your watch in Garmin Connect.`
+          : "Added to your Garmin Connect calendar. Sync your watch in Garmin Connect."
       );
     }
   }
@@ -599,11 +602,11 @@ export default function TrainingPlanDayPreviewPage() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
                   Workout logged
                 </p>
-              ) : isToday && sourceHome ? (
+              ) : showTodaysWorkoutHeader && sourceHome ? (
                 <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">
                   Today&apos;s workout
                 </p>
-              ) : isToday ? (
+              ) : showTodaysWorkoutHeader ? (
                 <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">
                   {"Here's your work for today"}
                 </p>
@@ -612,7 +615,7 @@ export default function TrainingPlanDayPreviewPage() {
                   Planned in your schedule
                 </p>
               )}
-              {planDetail.name?.trim() && !(sourceHome && isToday) ? (
+              {planDetail.name?.trim() && !(sourceHome && showTodaysWorkoutHeader) ? (
                 <p className="mt-0.5 text-xs text-gray-600 truncate">{planDetail.name}</p>
               ) : null}
               {isRaceDay ? (
@@ -668,7 +671,7 @@ export default function TrainingPlanDayPreviewPage() {
                 </div>
               ) : null}
               {workoutLoading && (
-                <p className="text-sm text-gray-500">Loading segments…</p>
+                <p className="text-sm text-gray-500">Loading workout details…</p>
               )}
               {workoutError && (
                 <p className="text-sm text-red-600" role="alert">
@@ -698,11 +701,9 @@ export default function TrainingPlanDayPreviewPage() {
               )}
               {!isLogged && !workoutLoading && workout && workout.segments.length > 0 && (
                 <div>
-                  {groupSegmentsForDisplay(workout.segments).length > 1 ? (
-                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500 mb-2">
-                      {"Today's plan"}
-                    </p>
-                  ) : null}
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500 mb-2">
+                    {showTodaysWorkoutHeader ? "Today's workout" : "Workout structure"}
+                  </p>
                   <ul className="space-y-1.5 list-none pl-0 m-0">
                     {groupSegmentsForDisplay(workout.segments).map((group, index) => {
                       const segment = group.work;
@@ -710,16 +711,17 @@ export default function TrainingPlanDayPreviewPage() {
                       const paceLine = previewGroupedSegmentTargetSummary(group);
                       const distanceLine = formatGroupedSegmentDuration(group);
                       const recoveryLine = previewGroupedRecoveryDistanceLine(group);
-                      const runRest = segmentRunRestTag(segment.title);
+                      const sideTag = humanPlanStepSideTag(segment.title);
+                      const groupTitle = humanDisplayGroupTitle(group, workout.workoutType);
                       return (
                         <li
                           key={`${segment.id}:${group.recovery?.id ?? ""}`}
                           className="overflow-hidden rounded-lg border border-gray-100"
                         >
                           <div
-                            className={`px-3 py-1 text-xs font-semibold uppercase tracking-wide ${multiStepRepeat ? "bg-orange-500 text-white" : segmentHeaderClass(segment.title)}`}
+                            className={`px-3 py-1 text-xs font-semibold uppercase tracking-wide ${multiStepRepeat ? "bg-orange-500 text-white" : segmentHeaderClass(segment.title, workout.workoutType)}`}
                           >
-                            {displayGroupTitle(group)}
+                            {groupTitle}
                           </div>
                           <div className="flex items-center gap-2.5 bg-white px-3 py-2">
                             <span className="w-4 shrink-0 text-sm font-bold tabular-nums text-gray-400">
@@ -759,9 +761,11 @@ export default function TrainingPlanDayPreviewPage() {
                                 </p>
                               ) : null}
                             </div>
-                            <span className="shrink-0 text-[10px] font-bold tracking-wider text-gray-400">
-                              {runRest}
-                            </span>
+                            {sideTag ? (
+                              <span className="shrink-0 text-[10px] font-semibold tracking-wide text-gray-400">
+                                {sideTag}
+                              </span>
+                            ) : null}
                           </div>
                         </li>
                       );
@@ -792,7 +796,7 @@ export default function TrainingPlanDayPreviewPage() {
                 </div>
               ) : null}
 
-              {!isLogged && showInlineMatcher && workoutId ? (
+              {!isLogged && showMatchPanel && canMatchWorkout && workoutId ? (
                 <div id="match-garmin-panel" className="space-y-4">
                   {dayStatus === "missed" || dayStatus === "skipped" ? (
                     <WorkoutSkipActions
@@ -809,8 +813,10 @@ export default function TrainingPlanDayPreviewPage() {
                   <WorkoutActivityMatchPanel
                     workoutId={workoutId}
                     workoutTitle={title}
+                    plannedDistanceMeters={workout?.estimatedDistanceInMeters ?? null}
                     compact
                     onMatched={load}
+                    onClose={() => setShowMatchPanel(false)}
                   />
                 </div>
               ) : null}
@@ -825,16 +831,16 @@ export default function TrainingPlanDayPreviewPage() {
                   Review run
                 </Link>
               ) : null}
-              {!isLogged && showInlineMatcher ? (
+              {!isLogged && canMatchWorkout ? (
                 <button
                   type="button"
-                  onClick={scrollToMatchPanel}
+                  onClick={openMatchPanel}
                   className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700"
                 >
                   I did this workout
                 </button>
               ) : null}
-              {!isLogged && isToday ? (
+              {!isLogged && isActionableWorkout ? (
                 <button
                   type="button"
                   onClick={() => void handlePushToGarmin()}
@@ -854,10 +860,10 @@ export default function TrainingPlanDayPreviewPage() {
                   {openingWorkout ? "Opening…" : "Open workout details"}
                 </button>
               ) : null}
-              {!isLogged && showInlineMatcher ? (
+              {!isLogged && canMatchWorkout ? (
                 <button
                   type="button"
-                  onClick={scrollToMatchPanel}
+                  onClick={openMatchPanel}
                   className="w-full rounded-xl border border-sky-200 bg-white py-3 text-sm font-semibold text-sky-800 hover:bg-sky-50"
                 >
                   Match Garmin activity

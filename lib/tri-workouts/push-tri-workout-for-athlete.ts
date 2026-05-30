@@ -33,6 +33,8 @@ export type PushTriWorkoutForAthleteResult =
 
 /**
  * Push each leg of a tri_workout to Garmin on the same calendar day (session date or today).
+ * Run and bike legs delegate to push helpers that use schedule-and-verify
+ * (see lib/garmin-workouts/garmin-schedule-service.ts).
  */
 export async function pushTriWorkoutToGarminForAthlete(
   athleteId: string,

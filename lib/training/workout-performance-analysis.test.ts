@@ -8,6 +8,7 @@ import {
   computeWorkoutPerformanceAnalysis,
   countWorkRepsOnTarget,
   formatCompletionOnlyMessage,
+  formatAlignmentFailedMessage,
   isWorkSegmentTitle,
   requiresDetailForTargetAnalysis,
   resolveTargetComparisonPace,
@@ -197,6 +198,53 @@ test("interval with detail but misaligned laps is completion_only", () => {
   assert.equal(analysis.canJudgeTargetPace, false);
   assert.equal(analysis.phaseAwareLaps.length, 0);
   assert.equal(analysis.workSegmentActual, null);
+});
+
+test("interval with detail and alignment failure shows explicit completion message", () => {
+  const analysis = computeWorkoutPerformanceAnalysis({
+    workoutType: "Intervals",
+    targetPaceSecPerMile: 420,
+    targetPaceSecPerMileHigh: 430,
+    paceDeltaSecPerMile: -30,
+    actualAvgPaceSecPerMile: 520,
+    actualDistanceMeters: 10000,
+    actualDurationSeconds: 2880,
+    completedActivityDetailJson: { laps: [{ startTimeInSeconds: 1 }] },
+    matchedActivityId: "act1",
+    matched_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
+    segmentExecutionStatus: "ALIGNMENT_FAILED",
+    segmentExecutionLapCount: 8,
+    segmentExecutionSegmentCount: 12,
+    segments: [
+      {
+        id: "s1",
+        title: "Warmup",
+        stepOrder: 1,
+        targets: null,
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: null,
+        actualDurationSeconds: null,
+        actualDistanceMiles: null,
+        segment_laps: [],
+      },
+    ],
+  });
+
+  assert.equal(analysis.analysisMode, "completion_only");
+  assert.match(analysis.completionOnlyMessage ?? "", /Garmin detail is available/);
+  assert.match(analysis.completionOnlyMessage ?? "", /8/);
+  assert.match(analysis.completionOnlyMessage ?? "", /12/);
+});
+
+test("formatAlignmentFailedMessage includes lap and segment counts", () => {
+  const msg = formatAlignmentFailedMessage({
+    lapCount: 8,
+    segmentCount: 12,
+    actualDistanceMeters: 10000,
+    actualDurationSeconds: 2880,
+  });
+  assert.match(msg, /activity laps \(8\)/);
+  assert.match(msg, /planned steps \(12\)/);
 });
 
 test("recovery laps are labeled recovery not slower", () => {

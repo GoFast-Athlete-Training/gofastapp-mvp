@@ -154,6 +154,9 @@ export type PerformanceAnalysisWorkoutInput = {
     detailData?: unknown;
     hydratedAt?: Date | null;
   } | null;
+  segmentExecutionStatus?: string | null;
+  segmentExecutionLapCount?: number | null;
+  segmentExecutionSegmentCount?: number | null;
   segments: PerformanceAnalysisSegmentInput[];
 };
 
@@ -439,6 +442,24 @@ export function formatCompletionOnlyMessage(params: {
     parts.push(`— ${detailParts.join(" ")}`);
   }
   return `${parts.join(" ")}.`;
+}
+
+export function formatAlignmentFailedMessage(params: {
+  lapCount?: number | null;
+  segmentCount?: number | null;
+  actualDistanceMeters?: number | null;
+  actualDurationSeconds?: number | null;
+}): string {
+  const base = formatCompletionOnlyMessage({
+    actualDistanceMeters: params.actualDistanceMeters,
+    actualDurationSeconds: params.actualDurationSeconds,
+  }).replace(/\.$/, "");
+  const lapCount = params.lapCount ?? null;
+  const segmentCount = params.segmentCount ?? null;
+  if (lapCount != null && segmentCount != null) {
+    return `${base}. Garmin detail is available, but activity laps (${lapCount}) did not match planned steps (${segmentCount}), so interval scoring is completion-only.`;
+  }
+  return `${base}. Garmin detail is available, but laps did not match the planned steps, so interval scoring is completion-only.`;
 }
 
 function formatStructuredExecutionHeadline(
@@ -730,10 +751,21 @@ export function computeWorkoutPerformanceAnalysis(
 
   const completionOnlyMessage =
     analysisMode === "completion_only"
-      ? formatCompletionOnlyMessage({
-          actualDistanceMeters: workout.actualDistanceMeters,
-          actualDurationSeconds: workout.actualDurationSeconds,
-        })
+      ? requiresDetail &&
+        hasActivityDetail &&
+        !segmentLapsAligned &&
+        (workout.segmentExecutionStatus === "ALIGNMENT_FAILED" ||
+          workout.segmentExecutionLapCount != null)
+        ? formatAlignmentFailedMessage({
+            lapCount: workout.segmentExecutionLapCount,
+            segmentCount: workout.segmentExecutionSegmentCount,
+            actualDistanceMeters: workout.actualDistanceMeters,
+            actualDurationSeconds: workout.actualDurationSeconds,
+          })
+        : formatCompletionOnlyMessage({
+            actualDistanceMeters: workout.actualDistanceMeters,
+            actualDurationSeconds: workout.actualDurationSeconds,
+          })
       : null;
 
   let executionHeadline: string | null = null;

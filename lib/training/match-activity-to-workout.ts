@@ -1,7 +1,7 @@
 /**
- * Promotion engine: raw athlete_activity → matched workouts row (source of truth).
- * Primary match: garminWorkoutId from webhook payload ↔ workouts.garminWorkoutId
- * Fallback: same athlete, same UTC calendar day, unmatched workout (plan or standalone)
+ * Webhook ingest: store athlete_activity and optionally auto-link to standalone pushed workouts.
+ * Planned workouts (planId set) are never auto-matched — athletes confirm via POST /match-activity.
+ * Primary auto-match: garminWorkoutId ↔ workouts.garminWorkoutId on standalone rows only.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -30,12 +30,21 @@ const workoutMatchInclude = {
   workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true } },
 };
 
+function isPlannedWorkout(workout: { planId: string | null }): boolean {
+  return workout.planId != null;
+}
+
+/** Webhook ingest must not mutate planned workouts — athletes confirm via POST /match-activity. */
+export function isManualMatchOnlyWorkout(workout: { planId: string | null }): boolean {
+  return isPlannedWorkout(workout);
+}
+
 /**
- * Match activity to at most one workout; promote summary fields onto workouts.
+ * Match activity to at most one standalone workout; planned workouts stay manual-only.
  */
 export async function tryMatchActivityToTrainingWorkout(
   athleteActivityId: string
-): Promise<{ matched: boolean; workoutId?: string }> {
+): Promise<{ matched: boolean; workoutId?: string; candidateWorkoutId?: string }> {
   const activity = await prisma.athlete_activities.findUnique({
     where: { id: athleteActivityId },
   });
@@ -99,7 +108,7 @@ export async function tryMatchActivityToTrainingWorkout(
     );
     if (titleMatches.length === 1) {
       candidate = titleMatches[0];
-      console.log("✅ matched Garmin activity by pushed title", {
+      console.log("ℹ️ planned workout title candidate found; awaiting manual match", {
         athleteActivityId,
         workoutId: candidate.id,
         activityName: activity.activityName,
@@ -119,6 +128,17 @@ export async function tryMatchActivityToTrainingWorkout(
   if (!candidate) {
     await setIngestion("UNMATCHED");
     return { matched: false };
+  }
+
+  if (isPlannedWorkout(candidate)) {
+    console.log("ℹ️ planned workout candidate found; awaiting manual match", {
+      athleteActivityId,
+      workoutId: candidate.id,
+      activityName: activity.activityName,
+      workoutTitle: candidate.title,
+    });
+    await setIngestion("RECEIVED");
+    return { matched: false, candidateWorkoutId: candidate.id };
   }
 
   const { workoutId } = await applyActivityToWorkout({

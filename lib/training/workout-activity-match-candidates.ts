@@ -8,7 +8,8 @@ import { ymdFromDate } from "@/lib/training/plan-utils";
 export type WorkoutActivityMatchReason =
   | "title_match"
   | "same_day"
-  | "distance_close";
+  | "distance_close"
+  | "distance_far_off";
 
 export const WORKOUT_ACTIVITY_MATCH_REASON_LABELS: Record<
   WorkoutActivityMatchReason,
@@ -17,6 +18,7 @@ export const WORKOUT_ACTIVITY_MATCH_REASON_LABELS: Record<
   title_match: "Title match",
   same_day: "Same day",
   distance_close: "Distance close",
+  distance_far_off: "Distance far off",
 };
 
 export type ActivityCandidateInput = {
@@ -69,6 +71,60 @@ function isDistanceClose(
   return deltaMi <= 1.5 || pct <= 0.2;
 }
 
+function isDistanceFarOff(
+  activityMeters: number | null,
+  workoutMeters: number | null | undefined
+): boolean {
+  if (
+    activityMeters == null ||
+    activityMeters <= 0 ||
+    workoutMeters == null ||
+    workoutMeters <= 0
+  ) {
+    return false;
+  }
+  const ratio = activityMeters / workoutMeters;
+  return ratio < 0.5 || ratio > 1.5;
+}
+
+/** True when the top candidate can be preselected without explicit athlete choice. */
+export function isHighConfidenceActivityCandidate(
+  candidate: Pick<ScoredActivityCandidate, "reasons">
+): boolean {
+  if (candidate.reasons.includes("distance_far_off")) return false;
+  if (candidate.reasons.includes("title_match")) return true;
+  if (
+    candidate.reasons.includes("distance_close") &&
+    candidate.reasons.includes("same_day")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function distanceMismatchWarning(params: {
+  activityMeters: number | null;
+  workoutMeters: number | null | undefined;
+}): string | null {
+  const { activityMeters, workoutMeters } = params;
+  if (
+    activityMeters == null ||
+    activityMeters <= 0 ||
+    workoutMeters == null ||
+    workoutMeters <= 0
+  ) {
+    return null;
+  }
+  const ratio = activityMeters / workoutMeters;
+  if (ratio < 0.5) {
+    return "This is much shorter than planned.";
+  }
+  if (ratio > 1.5) {
+    return "This is much longer than planned.";
+  }
+  return null;
+}
+
 /** Expand workout calendar day ±1 for candidate activity window. */
 export function workoutMatchCandidateDateRange(workoutDate: Date | null): {
   start: Date;
@@ -119,9 +175,18 @@ export function scoreActivityCandidateForWorkout(params: {
     score += 1000;
   }
 
+  const distanceFarOff = isDistanceFarOff(
+    activity.distance,
+    workout.estimatedDistanceInMeters
+  );
+  if (distanceFarOff) {
+    reasons.push("distance_far_off");
+    score -= 500;
+  }
+
   if (workoutYmd != null && activityYmd === workoutYmd) {
     reasons.push("same_day");
-    score += 100;
+    score += distanceFarOff ? 10 : 100;
   }
 
   if (isDistanceClose(activity.distance, workout.estimatedDistanceInMeters)) {
@@ -131,7 +196,7 @@ export function scoreActivityCandidateForWorkout(params: {
 
   if (reasons.length === 0 && workoutYmd != null && activityYmd === workoutYmd) {
     reasons.push("same_day");
-    score += 100;
+    score += distanceFarOff ? 10 : 100;
   } else if (reasons.length === 0) {
     score += 5;
   }

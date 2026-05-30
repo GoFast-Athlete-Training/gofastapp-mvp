@@ -115,6 +115,8 @@ interface MatchedActivitySummary {
   distance: number | null;
   duration: number | null;
   averageSpeed: number | null;
+  detailData?: unknown;
+  hydratedAt?: string | null;
 }
 
 interface WorkoutCatalogue {
@@ -161,6 +163,10 @@ interface Workout {
   hrDeltaBpm?: number | null;
   creditedFiveKPaceSecPerMile?: number | null;
   evaluationEligibleFlag?: boolean;
+  completedActivityDetailJson?: unknown;
+  segmentExecutionStatus?: string | null;
+  segmentExecutionLapCount?: number | null;
+  segmentExecutionSegmentCount?: number | null;
   matched_activity?: MatchedActivitySummary | null;
   planId?: string | null;
   weekNumber?: number | null;
@@ -917,6 +923,7 @@ export default function WorkoutDetailPage() {
   } | null>(null);
   const [showCreatedBanner, setShowCreatedBanner] = useState(false);
   const [garminToast, setGarminToast] = useState<string | null>(null);
+  const [showMatchPanel, setShowMatchPanel] = useState(false);
 
   const [isEditing, setIsEditing] = useState(false);
   const [savingEdits, setSavingEdits] = useState(false);
@@ -951,6 +958,19 @@ export default function WorkoutDetailPage() {
       actualDistanceMeters: workout.actualDistanceMeters ?? null,
       actualDurationSeconds: workout.actualDurationSeconds ?? null,
       estimatedDistanceInMeters: workout.estimatedDistanceInMeters ?? null,
+      completedActivityDetailJson: workout.completedActivityDetailJson,
+      matchedActivityId: workout.matchedActivityId ?? null,
+      matched_activity: workout.matched_activity
+        ? {
+            detailData: workout.matched_activity.detailData,
+            hydratedAt: workout.matched_activity.hydratedAt
+              ? new Date(workout.matched_activity.hydratedAt)
+              : null,
+          }
+        : null,
+      segmentExecutionStatus: workout.segmentExecutionStatus ?? null,
+      segmentExecutionLapCount: workout.segmentExecutionLapCount ?? null,
+      segmentExecutionSegmentCount: workout.segmentExecutionSegmentCount ?? null,
       segments: sortedSegments.map((s) => ({
         id: s.id,
         title: s.title,
@@ -1509,18 +1529,18 @@ export default function WorkoutDetailPage() {
       setPushStatus({
         success: true,
         message: dateLabel
-          ? `Pushed to Garmin and scheduled for ${dateLabel}. Sync your watch.`
-          : "Pushed to Garmin and added to your calendar. Sync your watch.",
+          ? `Added to Garmin Connect calendar for ${dateLabel}. Sync your watch in Garmin Connect.`
+          : "Added to your Garmin Connect calendar. Sync your watch in Garmin Connect.",
         garminWorkoutId,
         garminScheduleId,
         scheduledDate,
       });
       setGarminToast(
         dateLabel && garminWorkoutId != null
-          ? `Scheduled for ${dateLabel} — sync your watch for today’s planned run (workout #${garminWorkoutId}).`
+          ? `On Garmin Connect calendar for ${dateLabel} — sync your watch (workout #${garminWorkoutId}).`
           : garminWorkoutId != null
-            ? `Synced to Garmin (workout #${garminWorkoutId}). Sync your watch.`
-            : "Synced to Garmin. Sync your watch to load it on your device."
+            ? `Added to Garmin Connect (workout #${garminWorkoutId}). Sync your watch in Garmin Connect.`
+            : "Added to Garmin Connect. Sync your watch in Garmin Connect."
       );
       void fetchWorkout();
     } catch (error: unknown) {
@@ -1576,18 +1596,18 @@ export default function WorkoutDetailPage() {
       setPushStatus({
         success: true,
         message: dateLabel
-          ? `Copied workout, pushed to Garmin, scheduled for ${dateLabel}. Sync your watch.`
-          : "Copied workout and pushed to Garmin. Sync your watch.",
+          ? `Copied workout and added to Garmin Connect calendar for ${dateLabel}. Sync your watch in Garmin Connect.`
+          : "Copied workout and added to Garmin Connect calendar. Sync your watch in Garmin Connect.",
         garminWorkoutId,
         garminScheduleId,
         scheduledDate,
       });
       setGarminToast(
         dateLabel && garminWorkoutId != null
-          ? `Scheduled for ${dateLabel} — sync your watch for today’s planned run (workout #${garminWorkoutId}).`
+          ? `On Garmin Connect calendar for ${dateLabel} — sync your watch (workout #${garminWorkoutId}).`
           : garminWorkoutId != null
-            ? `Synced to Garmin (workout #${garminWorkoutId}). Sync your watch.`
-            : "Synced to Garmin. Sync your watch to load it on your device."
+            ? `Added to Garmin Connect (workout #${garminWorkoutId}). Sync your watch in Garmin Connect.`
+            : "Added to Garmin Connect. Sync your watch in Garmin Connect."
       );
       router.push(`/workouts/${newId}?created=1`);
     } catch (error: unknown) {
@@ -1772,8 +1792,15 @@ export default function WorkoutDetailPage() {
     );
   }
 
-  const alreadyOnGarmin =
-    workout.garminWorkoutId != null && workout.garminWorkoutId !== undefined;
+  const scheduledOnGarmin =
+    workout.garminWorkoutId != null &&
+    workout.garminWorkoutId !== undefined &&
+    workout.garminScheduleId != null &&
+    workout.garminScheduleId !== undefined;
+  const inGarminLibraryOnly =
+    workout.garminWorkoutId != null &&
+    workout.garminWorkoutId !== undefined &&
+    (workout.garminScheduleId == null || workout.garminScheduleId === undefined);
 
   const scheduleLabel = formatWorkoutScheduleLong(workout.date);
   const showGarminHeaderCard = !isLogged;
@@ -1960,7 +1987,30 @@ export default function WorkoutDetailPage() {
               showMissedPrompt
               onUpdated={fetchWorkout}
             />
-            <WorkoutActivityMatchPanel workoutId={workoutId} onMatched={fetchWorkout} />
+            {showMatchPanel ? (
+              <WorkoutActivityMatchPanel
+                workoutId={workoutId}
+                workoutTitle={workout.title}
+                plannedDistanceMeters={workout.estimatedDistanceInMeters ?? null}
+                onMatched={fetchWorkout}
+                onClose={() => setShowMatchPanel(false)}
+              />
+            ) : (
+              <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 space-y-3">
+                <p className="text-sm text-gray-700">
+                  When you finish this run on Garmin, match it here to log the workout and unlock
+                  performance analysis.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowMatchPanel(true)}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+                >
+                  <Watch className="h-4 w-4" />
+                  I did this workout / Match Garmin activity
+                </button>
+              </div>
+            )}
           </div>
         ) : null}
 
@@ -2250,13 +2300,15 @@ export default function WorkoutDetailPage() {
                   ? "Checking Garmin…"
                   : !garminConnected
                     ? "Connect Garmin to send workouts to your watch"
-                    : alreadyOnGarmin
-                      ? "On your watch calendar"
-                      : `Send to watch for ${scheduleLabel || "this day"}`}
+                    : scheduledOnGarmin
+                      ? "On Garmin Connect calendar — sync your watch"
+                      : inGarminLibraryOnly
+                        ? "In Garmin library — schedule again for this day"
+                        : `Send to Garmin Connect for ${scheduleLabel || "this day"}`}
               </span>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              {garminConnected === true && !alreadyOnGarmin && !isLogged && (
+              {garminConnected === true && !scheduledOnGarmin && !isLogged && (
                 <button
                   type="button"
                   onClick={handlePushToGarmin}
@@ -2276,7 +2328,7 @@ export default function WorkoutDetailPage() {
                   )}
                 </button>
               )}
-              {garminConnected === true && alreadyOnGarmin && (
+              {garminConnected === true && scheduledOnGarmin && (
                 <button
                   type="button"
                   onClick={handleCopyAndPushToGarmin}
@@ -3322,14 +3374,6 @@ export default function WorkoutDetailPage() {
               >
                 {pushStatus.message}
               </p>
-              {pushStatus.garminWorkoutId != null && pushStatus.success && (
-                <p className="text-sm text-green-700 mt-1">
-                  Garmin workout id: {pushStatus.garminWorkoutId}
-                  {pushStatus.garminScheduleId != null
-                    ? ` · schedule id: ${pushStatus.garminScheduleId}`
-                    : ""}
-                </p>
-              )}
             </div>
           </div>
         )}
