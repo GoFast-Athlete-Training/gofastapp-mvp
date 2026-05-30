@@ -411,9 +411,15 @@ export function prescribe(params: {
         sumSeg += m;
         const row = seg as { miles?: number; paceOffsetSecPerMile?: number | null };
         const p = secPerMile(anchorSecondsPerMile, row.paceOffsetSecPerMile);
+        const segTitle =
+          Math.abs(p - mpP) <= 8
+            ? "Goal marathon pace"
+            : Math.abs(p - longP) <= 8
+              ? "Long run"
+              : "Long run";
         out.push({
           stepOrder: order++,
-          title: "Long Run",
+          title: segTitle,
           durationType: "DISTANCE",
           durationValue: m,
           ...targetsOrOpen(p),

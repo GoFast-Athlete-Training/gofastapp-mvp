@@ -7,6 +7,7 @@ import { planScheduleDaysForWeek, collectCatalogueWorkoutIdsFromPlanSchedule } f
 import {
   currentTrainingWeekNumber,
   effectiveTrainingWeekCount,
+  localTodayKey,
   utcDateOnly,
   ymdFromDate,
 } from "@/lib/training/plan-utils";
@@ -21,6 +22,10 @@ function utcNextDayStartFromKey(dateKey: string): Date {
   const d = new Date(`${dateKey}T00:00:00.000Z`);
   d.setUTCDate(d.getUTCDate() + 1);
   return d;
+}
+
+function isValidTodayKey(value: string | null): value is string {
+  return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
 }
 
 export type UpcomingSessionJson = {
@@ -59,7 +64,10 @@ export async function GET(request: NextRequest) {
     );
 
     const now = new Date();
-    const todayKey = ymdFromDate(utcDateOnly(now));
+    const clientTodayKey = request.nextUrl.searchParams.get("todayKey");
+    const todayKey = isValidTodayKey(clientTodayKey?.trim() ?? null)
+      ? clientTodayKey!.trim()
+      : localTodayKey();
 
     const plan = await prisma.training_plans.findFirst({
       where: {

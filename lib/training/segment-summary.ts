@@ -351,10 +351,10 @@ export function formatRepeatBlockLabel(group: SegmentDisplayGroup): string {
 /** Primary title for a display group row/card. */
 export function displayGroupTitle(group: SegmentDisplayGroup): string {
   if (isMultiStepRepeatGroup(group)) return formatRepeatBlockLabel(group);
-  return group.work.title?.trim() || "Segment";
+  return group.work.title?.trim() || "Workout part";
 }
 
-/** Athlete-facing segment title (avoid raw "Work" / "Segment" in UI). */
+/** Athlete-facing workout-part title (avoid raw "Work" / "Segment" in UI). */
 export function humanizeSegmentTitle(
   title: string | null | undefined,
   workoutType?: string | null

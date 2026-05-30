@@ -689,6 +689,31 @@ export default function TrainingHubPage() {
                         onClick={() => setPlanMenuOpen(false)}
                       />
                       <div className="absolute right-0 z-50 mt-1 min-w-[11rem] rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                        <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                          Tools
+                        </p>
+                        <Link
+                          href="/training/schedule-run"
+                          className="block px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
+                          onClick={() => setPlanMenuOpen(false)}
+                        >
+                          Schedule a run
+                        </Link>
+                        <Link
+                          href="/build-a-run"
+                          className="block px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
+                          onClick={() => setPlanMenuOpen(false)}
+                        >
+                          Add my own run
+                        </Link>
+                        <Link
+                          href="/workouts"
+                          className="block px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
+                          onClick={() => setPlanMenuOpen(false)}
+                        >
+                          Workout log
+                        </Link>
+                        <div className="my-1 border-t border-gray-100" />
                         <Link
                           href={`/training-setup/${planDetail.id}`}
                           className="block px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
@@ -990,8 +1015,12 @@ export default function TrainingHubPage() {
               />
             </div>
 
-            {/* Secondary actions — always visible, not buried */}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 text-sm">
+            {/* Tools — schedule, custom workouts, log */}
+            <div className="px-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                Tools
+              </p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
               <Link
                 href="/training/schedule-run"
                 className="font-medium text-sky-800 hover:text-sky-950"
@@ -999,17 +1028,18 @@ export default function TrainingHubPage() {
                 Schedule a run
               </Link>
               <span className="text-gray-300" aria-hidden>·</span>
-              <Link href="/gorun" className="font-medium text-gray-600 hover:text-gray-900">
-                Find a run with others
+              <Link href="/build-a-run" className="font-medium text-gray-800 hover:text-gray-900">
+                Add my own run
               </Link>
               <span className="text-gray-300" aria-hidden>·</span>
-              <Link href="/build-a-run" className="font-medium text-gray-600 hover:text-gray-900">
-                Create a workout from scratch
+              <Link href="/gorun" className="font-medium text-gray-600 hover:text-gray-900">
+                Find a run with others
               </Link>
               <span className="text-gray-300" aria-hidden>·</span>
               <Link href="/workouts" className="font-medium text-gray-600 hover:text-gray-900">
                 Workout log
               </Link>
+              </div>
             </div>
           </div>
         )}
