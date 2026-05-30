@@ -1,3 +1,5 @@
+import { adminAuth } from './firebaseAdmin';
+import { disconnectGarmin } from './domain-garmin';
 import { prisma } from './prisma';
 import { normalizeAthleteMemberships } from './normalize-prisma';
 
@@ -344,5 +346,47 @@ export async function updateAthlete(athleteId: string, data: any) {
     where: { id: athleteId },
     data,
   });
+}
+
+/**
+ * Permanently delete an athlete account and associated personal data.
+ * Disconnects integrations, removes the DB athlete row (cascade), then deletes Firebase Auth user.
+ */
+export async function deleteAthleteAccount(athleteId: string): Promise<void> {
+  const athlete = await prisma.athlete.findUnique({
+    where: { id: athleteId },
+    select: {
+      firebaseId: true,
+      garmin_access_token: true,
+    },
+  });
+
+  if (!athlete) {
+    throw new Error('Athlete not found');
+  }
+
+  const { firebaseId } = athlete;
+
+  if (athlete.garmin_access_token?.trim()) {
+    try {
+      await disconnectGarmin(athleteId);
+    } catch {
+      // Continue with account deletion even if Garmin disconnect fails
+    }
+  }
+
+  await prisma.athlete.delete({
+    where: { id: athleteId },
+  });
+
+  try {
+    await adminAuth.deleteUser(firebaseId);
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code;
+    if (code === 'auth/user-not-found') {
+      return;
+    }
+    throw err;
+  }
 }
 
