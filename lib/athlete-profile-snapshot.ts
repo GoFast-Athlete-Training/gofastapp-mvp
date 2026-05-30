@@ -100,6 +100,91 @@ export async function derivePrimaryRaceForAthlete(
  * Copy active goal + primary race display values into Athlete snapshot columns.
  * Source of truth remains AthleteGoal / training_plans / race_registry relationships.
  */
+function snapshotNeedsRepair(params: {
+  athlete: {
+    primaryGoalNameSnapshot: string | null;
+    primaryGoalTimeSnapshot: string | null;
+    primaryGoalTargetByDateSnapshot: Date | null;
+    primaryGoalRaceNameSnapshot: string | null;
+    primaryRaceRegistryIdSnapshot: string | null;
+    primaryRaceSlugSnapshot: string | null;
+    primaryRaceNameSnapshot: string | null;
+    primaryRaceDateSnapshot: Date | null;
+    primaryRaceDistanceLabelSnapshot: string | null;
+    primaryRaceCitySnapshot: string | null;
+    primaryRaceStateSnapshot: string | null;
+  };
+  activeGoal: {
+    name: string | null;
+    goalTime: string | null;
+    targetByDate: Date;
+    race_registry: { name: string } | null;
+  } | null;
+  primaryRace: PrimaryRaceSnapshot | null;
+}): boolean {
+  const { athlete, activeGoal, primaryRace } = params;
+
+  if (activeGoal) {
+    const goalTime = activeGoal.goalTime?.trim() || null;
+    const snapTime = athlete.primaryGoalTimeSnapshot?.trim() || null;
+    if (goalTime !== snapTime) return true;
+    if ((activeGoal.name ?? null) !== (athlete.primaryGoalNameSnapshot ?? null)) return true;
+    if (
+      (activeGoal.race_registry?.name ?? null) !==
+      (athlete.primaryGoalRaceNameSnapshot ?? null)
+    ) {
+      return true;
+    }
+    if (
+      activeGoal.targetByDate.getTime() !==
+      (athlete.primaryGoalTargetByDateSnapshot?.getTime() ?? NaN)
+    ) {
+      return true;
+    }
+  } else if (
+    athlete.primaryGoalTimeSnapshot ||
+    athlete.primaryGoalNameSnapshot ||
+    athlete.primaryGoalRaceNameSnapshot ||
+    athlete.primaryGoalTargetByDateSnapshot
+  ) {
+    return true;
+  }
+
+  if (primaryRace) {
+    if ((primaryRace.id ?? null) !== (athlete.primaryRaceRegistryIdSnapshot ?? null)) {
+      return true;
+    }
+    if ((primaryRace.name ?? null) !== (athlete.primaryRaceNameSnapshot ?? null)) {
+      return true;
+    }
+    if ((primaryRace.slug ?? null) !== (athlete.primaryRaceSlugSnapshot ?? null)) {
+      return true;
+    }
+    if (
+      (primaryRace.date ? new Date(primaryRace.date).getTime() : null) !==
+      (athlete.primaryRaceDateSnapshot?.getTime() ?? null)
+    ) {
+      return true;
+    }
+    if (
+      (primaryRace.distanceLabel ?? null) !==
+      (athlete.primaryRaceDistanceLabelSnapshot ?? null)
+    ) {
+      return true;
+    }
+    if ((primaryRace.city ?? null) !== (athlete.primaryRaceCitySnapshot ?? null)) return true;
+    if ((primaryRace.state ?? null) !== (athlete.primaryRaceStateSnapshot ?? null)) return true;
+  } else if (
+    athlete.primaryRaceRegistryIdSnapshot ||
+    athlete.primaryRaceNameSnapshot ||
+    athlete.primaryRaceDateSnapshot
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 export async function syncAthleteProfileSnapshot(athleteId: string): Promise<void> {
   const [activeGoal, primaryRace] = await Promise.all([
     prisma.athleteGoal.findFirst({
@@ -129,6 +214,46 @@ export async function syncAthleteProfileSnapshot(athleteId: string): Promise<voi
       updatedAt: new Date(),
     },
   });
+}
+
+/**
+ * Self-heal athlete profile snapshots on read when null or stale vs source rows.
+ */
+export async function ensureAthleteProfileSnapshot(athleteId: string): Promise<boolean> {
+  const [athlete, activeGoal, primaryRace] = await Promise.all([
+    prisma.athlete.findUnique({
+      where: { id: athleteId },
+      select: {
+        primaryGoalNameSnapshot: true,
+        primaryGoalTimeSnapshot: true,
+        primaryGoalTargetByDateSnapshot: true,
+        primaryGoalRaceNameSnapshot: true,
+        primaryRaceRegistryIdSnapshot: true,
+        primaryRaceSlugSnapshot: true,
+        primaryRaceNameSnapshot: true,
+        primaryRaceDateSnapshot: true,
+        primaryRaceDistanceLabelSnapshot: true,
+        primaryRaceCitySnapshot: true,
+        primaryRaceStateSnapshot: true,
+      },
+    }),
+    prisma.athleteGoal.findFirst({
+      where: { athleteId, status: 'ACTIVE' },
+      orderBy: { targetByDate: 'asc' },
+      include: {
+        race_registry: { select: { name: true } },
+      },
+    }),
+    derivePrimaryRaceForAthlete(athleteId),
+  ]);
+
+  if (!athlete) return false;
+
+  const needsRepair = snapshotNeedsRepair({ athlete, activeGoal, primaryRace });
+  if (!needsRepair) return false;
+
+  await syncAthleteProfileSnapshot(athleteId);
+  return true;
 }
 
 /** @deprecated Use syncAthleteProfileSnapshot */

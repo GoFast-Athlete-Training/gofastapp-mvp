@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteById, updateAthlete } from '@/lib/domain-athlete';
 import { syncAthleteFiveKPaceToActivePlan } from '@/lib/training/plan-lifecycle';
+import { ensureAthleteProfileSnapshot } from '@/lib/athlete-profile-snapshot';
 
 export async function GET(
   request: Request,
@@ -44,8 +45,22 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    await ensureAthleteProfileSnapshot(id);
+
+    let athleteRow;
+    try {
+      athleteRow = await getAthleteById(id);
+    } catch (err) {
+      console.error('Prisma error:', err);
+      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    }
+
+    if (!athleteRow) {
+      return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
+    }
+
     // Never send OAuth bearer tokens to the client
-    const raw = athlete as Record<string, unknown>;
+    const raw = athleteRow as Record<string, unknown>;
     const {
       garmin_access_token: _ga,
       garmin_refresh_token: _gr,
@@ -56,7 +71,7 @@ export async function GET(
     const athleteForClient = {
       ...athleteSafe,
       garmin_connected: !!(
-        athlete.garmin_access_token && athlete.garmin_access_token.length > 0
+        athleteRow.garmin_access_token && athleteRow.garmin_access_token.length > 0
       ),
     };
 

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import {
   derivePrimaryRaceForAthlete,
+  ensureAthleteProfileSnapshot,
   type PrimaryRaceSnapshot,
 } from '@/lib/athlete-profile-snapshot';
 import { normalizeHandle } from '@/lib/server/load-public-athlete-page';
@@ -141,6 +142,8 @@ export async function loadAthleteProfileHydrationByHandle(
 export async function loadAthleteProfileHydrationById(
   athleteId: string
 ): Promise<AthleteProfileHydration | null> {
+  await ensureAthleteProfileSnapshot(athleteId);
+
   const athlete = await prisma.athlete.findUnique({
     where: { id: athleteId },
     select: profileSnapshotSelect,

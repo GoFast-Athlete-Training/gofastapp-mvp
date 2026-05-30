@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
 import { Prisma } from "@prisma/client";
 import { metersToMiles } from "@/lib/pace-utils";
-import { goalRacePaceDisplayString } from "@/lib/training/goal-pace-calculator";
+import { goalRacePaceDisplayString, resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import { assignWorkoutDays } from "@/lib/training/assign-workout-days";
 import { applyLongRunSchedule } from "@/lib/training/apply-long-run";
 import { applyTempoSchedule } from "@/lib/training/apply-tempo";
@@ -307,10 +307,19 @@ export async function executePlanGenerate(params: {
     planRow.goalRaceTime?.trim() ||
     planRow.athlete_goal?.goalTime?.trim() ||
     null;
+  const resolvedGoalPace = resolveGoalRacePace({
+    goalTime: mergedGoalTime,
+    dbGoalRacePaceSecPerMile: planRow.athlete_goal?.goalRacePace ?? null,
+    planGoalRacePace: planRow.goalRacePace ?? null,
+    distanceMeters: planRow.race_registry?.distanceMeters ?? null,
+    distanceLabel: planRow.race_registry?.distanceLabel ?? null,
+    goalDistance: planRow.athlete_goal?.distance ?? null,
+  });
   const imprintPace =
-    mergedGoalTime != null
+    resolvedGoalPace.goalPaceDisplay ??
+    (mergedGoalTime != null
       ? goalRacePaceDisplayString(mergedGoalTime, raceDistanceMiles)
-      : null;
+      : null);
 
   await prisma.training_plans.update({
     where: { id: plan.id },

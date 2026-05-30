@@ -7,7 +7,7 @@ import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { totalWeeksFromDates } from "@/lib/training/plan-utils";
 import { TrainingPlanLifecycle } from "@prisma/client";
 import { markOtherActivePlansAsUnused } from "@/lib/training/plan-lifecycle";
-import { goalRacePaceDisplayString } from "@/lib/training/goal-pace-calculator";
+import { goalRacePaceDisplayString, resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import { metersToMiles } from "@/lib/pace-utils";
 import {
   presetMatchesDistance,
@@ -119,7 +119,16 @@ export async function POST(request: NextRequest) {
       race.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
         ? metersToMiles(Number(race.distanceMeters))
         : 26.21875;
-    const imprintedGoalPace = goalRacePaceDisplayString(gt, raceDistanceMilesForPace);
+    const resolvedGoalPace = resolveGoalRacePace({
+      goalTime: gt,
+      dbGoalRacePaceSecPerMile: goal.goalRacePace ?? null,
+      distanceMeters: race.distanceMeters ?? null,
+      distanceLabel: race.distanceLabel ?? null,
+      goalDistance: goal.distance ?? null,
+    });
+    const imprintedGoalPace =
+      resolvedGoalPace.goalPaceDisplay ??
+      goalRacePaceDisplayString(gt, raceDistanceMilesForPace);
 
     const prefs = await prisma.trainingPreferences.findUnique({
       where: { athleteId: athlete.id },

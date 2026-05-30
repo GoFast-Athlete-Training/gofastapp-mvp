@@ -8,6 +8,7 @@ import { TrainingPlanLifecycle } from "@prisma/client";
 import { archiveOtherActivePlans, cascadeLinkedGoalAfterPlanArchived } from "@/lib/training/plan-lifecycle";
 import { validatePreferredTempoInterval } from "@/lib/training/preferred-tempo-interval";
 import { cleanupPlanWorkoutsBeforeDelete } from "@/lib/training/plan-delete-cleanup";
+import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -147,6 +148,20 @@ export async function GET(request: NextRequest, context: Ctx) {
         : null,
     };
 
+    const race = plan.race_registry;
+    const goalFinishTime =
+      plan.athlete_goal?.goalTime?.trim() ||
+      plan.goalRaceTime?.trim() ||
+      null;
+    const resolvedGoalPace = resolveGoalRacePace({
+      goalTime: goalFinishTime,
+      dbGoalRacePaceSecPerMile: plan.athlete_goal?.goalRacePace ?? null,
+      planGoalRacePace: plan.goalRacePace,
+      distanceMeters: race?.distanceMeters ?? null,
+      distanceLabel: race?.distanceLabel ?? null,
+      goalDistance: plan.athlete_goal?.distance ?? null,
+    });
+
     return NextResponse.json({
       plan: serialized,
       athleteFiveKPace: athleteRow?.fiveKPace ?? null,
@@ -155,6 +170,13 @@ export async function GET(request: NextRequest, context: Ctx) {
         Number.isFinite(Number(trainingPrefs.weeklyMileageTarget))
           ? Math.round(Number(trainingPrefs.weeklyMileageTarget))
           : null,
+      goalRacePaceResolved: {
+        goalFinishTime,
+        goalPaceSecPerMile: resolvedGoalPace.goalPaceSecPerMile,
+        goalPaceDisplay: resolvedGoalPace.goalPaceDisplay,
+        raceDistanceMiles: resolvedGoalPace.raceDistanceMiles,
+        source: resolvedGoalPace.source,
+      },
     });
   } catch (e: unknown) {
     console.error("GET /api/training-plan/[id]", e);

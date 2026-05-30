@@ -49,6 +49,14 @@ type PlanDetailHub = {
   race_registry: { name: string; raceDate?: string } | null;
 };
 
+type GoalRacePaceResolved = {
+  goalFinishTime: string | null;
+  goalPaceSecPerMile: number | null;
+  goalPaceDisplay: string | null;
+  raceDistanceMiles: number | null;
+  source: string | null;
+};
+
 function hasSchedule(p: PlanDetailHub): boolean {
   if (!Array.isArray(p.planSchedule) || (p.planSchedule as unknown[]).length === 0) {
     return false;
@@ -99,6 +107,7 @@ export default function TrainingHubPage() {
   const [authReady, setAuthReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [planDetail, setPlanDetail] = useState<PlanDetailHub | null>(null);
+  const [goalRacePaceResolved, setGoalRacePaceResolved] = useState<GoalRacePaceResolved | null>(null);
   const [athleteFiveKPace, setAthleteFiveKPace] = useState<string | null>(null);
   const [weekNumber, setWeekNumber] = useState(1);
   const [weekDays, setWeekDays] = useState<PlanDayCard[]>([]);
@@ -137,6 +146,16 @@ export default function TrainingHubPage() {
     return p || null;
   }, [planDetail, athleteFiveKPace]);
 
+  const goalPaceDisplay = useMemo(() => {
+    if (goalRacePaceResolved?.goalPaceDisplay?.trim()) {
+      return goalRacePaceResolved.goalPaceDisplay.trim();
+    }
+    if (goalRacePaceResolved?.goalPaceSecPerMile != null) {
+      return formatSecPerMile(goalRacePaceResolved.goalPaceSecPerMile).replace(/\/mi$/, "");
+    }
+    return null;
+  }, [goalRacePaceResolved]);
+
   const effectiveTotalWeeks = useMemo(
     () => (planDetail ? effectiveWeeksForPlanHub(planDetail) : 1),
     [planDetail]
@@ -169,12 +188,11 @@ export default function TrainingHubPage() {
         return;
       }
       const planId = (listData.plans[0] as { id: string }).id;
-      const { plan: raw, athleteFiveKPace: athPace } = await fetchTrainingPlanDetail(
-        planId,
-        token
-      );
+      const { plan: raw, athleteFiveKPace: athPace, goalRacePaceResolved: resolvedPace } =
+        await fetchTrainingPlanDetail(planId, token);
       const plan = raw as PlanDetailHub;
       setAthleteFiveKPace(athPace);
+      setGoalRacePaceResolved(resolvedPace ?? null);
 
       const planPhase = getRacePhase(plan.race_registry?.raceDate);
       if (planPhase !== "pre") {
@@ -631,9 +649,21 @@ export default function TrainingHubPage() {
                 {planDetail.race_registry?.name ? (
                   <p className="text-xs text-gray-500 mt-0.5">{planDetail.race_registry.name}</p>
                 ) : null}
+                {goalPaceDisplay ? (
+                  <p className="mt-1 text-xs text-emerald-900/80">
+                    Goal pace:{" "}
+                    <span className="font-mono tabular-nums">{goalPaceDisplay}</span>
+                    {goalRacePaceResolved?.goalFinishTime ? (
+                      <span className="text-emerald-800/70">
+                        {" "}
+                        · target {goalRacePaceResolved.goalFinishTime}
+                      </span>
+                    ) : null}
+                  </p>
+                ) : null}
                 {paceDisplay ? (
                   <p className="mt-1 text-xs text-emerald-900/80">
-                    5K pace:{" "}
+                    Current 5K pace:{" "}
                     <span className="font-mono tabular-nums">{paceDisplay}</span>
                   </p>
                 ) : null}

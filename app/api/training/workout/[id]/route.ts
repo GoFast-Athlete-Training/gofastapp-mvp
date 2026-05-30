@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { prescribe, type WorkoutStep } from "@/lib/training/prescription";
-import { resolveRacePaceSecondsPerMileForPlan } from "@/lib/training/goal-pace-calculator";
+import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import { cycleIndexFromScheduleForDay, dayNameToOurDow } from "@/lib/training/schedule-parser";
 import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 import { newEntityId } from "@/lib/training/new-entity-id";
@@ -151,8 +151,18 @@ export async function GET(request: NextRequest, context: Ctx) {
               lifecycleStatus: true,
               planSchedule: true,
               easyRunConfig: true,
+              athlete_goal: {
+                select: {
+                  goalTime: true,
+                  goalRacePace: true,
+                  distance: true,
+                },
+              },
               race_registry: {
-                select: { distanceMeters: true },
+                select: {
+                  distanceMeters: true,
+                  distanceLabel: true,
+                },
               },
             },
           },
@@ -214,15 +224,19 @@ export async function GET(request: NextRequest, context: Ctx) {
         });
 
         const dm = workout.training_plans?.race_registry?.distanceMeters;
-        const raceDistanceMiles =
-          dm != null && Number.isFinite(Number(dm))
-            ? metersToMiles(Number(dm))
-            : null;
-        const racePaceSecondsPerMile = resolveRacePaceSecondsPerMileForPlan({
-          goalRacePace: workout.training_plans?.goalRacePace ?? null,
-          goalRaceTime: workout.training_plans?.goalRaceTime ?? null,
-          raceDistanceMiles,
-        });
+        const linkedGoal = workout.training_plans?.athlete_goal ?? null;
+        const goalFinishTime =
+          linkedGoal?.goalTime?.trim() ||
+          workout.training_plans?.goalRaceTime?.trim() ||
+          null;
+        const racePaceSecondsPerMile = resolveGoalRacePace({
+          goalTime: goalFinishTime,
+          dbGoalRacePaceSecPerMile: linkedGoal?.goalRacePace ?? null,
+          planGoalRacePace: workout.training_plans?.goalRacePace ?? null,
+          distanceMeters: dm != null ? Number(dm) : null,
+          distanceLabel: workout.training_plans?.race_registry?.distanceLabel ?? null,
+          goalDistance: linkedGoal?.distance ?? null,
+        }).goalPaceSecPerMile;
 
         if (workout.catalogueWorkoutId && workout.workout_catalogue) {
           const easyCfg = parseEasyRunConfigJson(
@@ -318,7 +332,14 @@ export async function GET(request: NextRequest, context: Ctx) {
       })),
     });
 
-    return NextResponse.json({ workout, performanceAnalysis });
+    return NextResponse.json({
+      workout: {
+        ...workout,
+        catalogueName: workout.workout_catalogue?.name ?? null,
+        paceAnchor: workout.workout_catalogue?.paceAnchor ?? null,
+      },
+      performanceAnalysis,
+    });
   } catch (e: unknown) {
     console.error("GET /api/training/workout/[id]", e);
     return NextResponse.json({ error: "Failed to load workout" }, { status: 500 });

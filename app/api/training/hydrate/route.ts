@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { loadTrainingHydrateSnapshot } from "@/lib/training/training-hydrate-service";
 import { applyLightAdaptiveIfEligible } from "@/lib/training/light-adaptive-service";
+import { ensureAthleteProfileSnapshot } from "@/lib/athlete-profile-snapshot";
 
 /**
  * GET /api/training/hydrate
@@ -15,6 +16,8 @@ export async function GET(request: NextRequest) {
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+
+    await ensureAthleteProfileSnapshot(auth.athlete.id);
 
     const snapshot = await loadTrainingHydrateSnapshot(auth.athlete.id);
     return NextResponse.json({ ok: true, snapshot });

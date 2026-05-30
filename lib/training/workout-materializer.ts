@@ -22,7 +22,7 @@ import {
   segmentSnapshotDocumentFromApiSegments,
   type SegmentSnapshotSource,
 } from "./workout-segment-snapshot";
-import { resolveRacePaceSecondsPerMileForPlan } from "./goal-pace-calculator";
+import { resolveGoalRacePace } from "./goal-pace-calculator";
 import { EASY_RUN_NOT_CONFIGURED } from "./run-type-config-validation";
 import { ensureWorkoutPrescriptionNarrative } from "./prescription-narrative-service";
 
@@ -160,11 +160,19 @@ export async function materializeWorkoutForPlanDay(params: {
   const plan = await prisma.training_plans.findFirst({
     where: { id: planId, athleteId },
     include: {
+      athlete_goal: {
+        select: {
+          goalTime: true,
+          goalRacePace: true,
+          distance: true,
+        },
+      },
       race_registry: {
         select: {
           raceDate: true,
           name: true,
           distanceMeters: true,
+          distanceLabel: true,
         },
       },
     },
@@ -304,11 +312,18 @@ export async function materializeWorkoutForPlanDay(params: {
     const anchorSecPerMile = anchorSecondsPerMileFromPlanPace(
       plan.currentFiveKPace ?? null
     );
-    const racePaceSec = resolveRacePaceSecondsPerMileForPlan({
-      goalRacePace: plan.goalRacePace ?? null,
-      goalRaceTime: plan.goalRaceTime ?? null,
-      raceDistanceMiles,
-    });
+    const goalFinishTime =
+      plan.athlete_goal?.goalTime?.trim() ||
+      plan.goalRaceTime?.trim() ||
+      null;
+    const racePaceSec = resolveGoalRacePace({
+      goalTime: goalFinishTime,
+      dbGoalRacePaceSecPerMile: plan.athlete_goal?.goalRacePace ?? null,
+      planGoalRacePace: plan.goalRacePace ?? null,
+      distanceMeters: race?.distanceMeters ?? null,
+      distanceLabel: race?.distanceLabel ?? null,
+      goalDistance: plan.athlete_goal?.distance ?? null,
+    }).goalPaceSecPerMile;
     steps = prescribe({
       entry: catalogueEntryForDay,
       scheduleMiles: miles,
