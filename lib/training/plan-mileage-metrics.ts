@@ -134,22 +134,14 @@ export async function loadPlanMileageSnapshot(params: {
       ? Math.min(100, Math.round((completedMeters / plannedToDateMeters) * 100))
       : null;
 
-  const underPlanMeters = plannedToDateMeters - completedMeters;
-  const underPlanMiles =
-    underPlanMeters > 1609 ? roundMi(underPlanMeters / METERS_PER_MILE) : null;
-  const underPlanMessage =
-    underPlanMiles != null && underPlanMiles >= 0.5
-      ? `${underPlanMiles} mi under plan so far. Stay with the next scheduled week.`
-      : null;
-
   return {
     completedMiles,
     plannedToDateMiles,
     remainingScheduledMiles,
     totalScheduledMiles,
     completionPct,
-    underPlanMiles,
-    underPlanMessage,
+    underPlanMiles: null,
+    underPlanMessage: null,
     completedWorkouts,
     plannedWorkoutsToDate,
   };

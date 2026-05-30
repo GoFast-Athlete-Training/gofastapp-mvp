@@ -8,6 +8,7 @@ import { metersToMiles } from "@/lib/pace-utils";
 import { loadPlanMileageSnapshot, type PlanMileageSnapshot } from "@/lib/training/plan-mileage-metrics";
 import { evaluateLightAdaptive, type LightAdaptiveEvaluation } from "@/lib/training/light-adaptive-service";
 import { loadRecentLongEffortEvidence } from "@/lib/training/endurance-evidence";
+import { resolveRacePaceSecondsPerMileForPlan } from "@/lib/training/goal-pace-calculator";
 import {
   computeRaceReadiness,
   differenceToGoal as computeDifferenceToGoal,
@@ -247,7 +248,12 @@ export async function loadTrainingHydrateSnapshot(
     const current5k = athlete?.fiveKPace?.trim() || null;
     const current5kSecPerMile = parsePaceStringToSecPerMile(current5k);
     const goalFinishTime = goal?.goalTime?.trim() || null;
-    const goalPaceSecPerMile = goal?.goalRacePace ?? null;
+    const goalPaceSecPerMile =
+      resolveRacePaceSecondsPerMileForPlan({
+        goalRacePace: null,
+        goalRaceTime: goalFinishTime,
+        raceDistanceMiles: distanceMiles,
+      }) ?? goal?.goalRacePace ?? null;
     const goalPace5KSecPerMile = goal?.goalPace5K ?? null;
     const predictor = buildHydratePredictorFields({
       current5kSecPerMile,
@@ -300,9 +306,13 @@ export async function loadTrainingHydrateSnapshot(
     plan.goalRaceTime?.trim() ||
     null;
 
-  let goalPaceSecPerMile: number | null = linkedGoal?.goalRacePace ?? null;
-  if (goalPaceSecPerMile == null && plan.goalRacePace?.trim()) {
-    goalPaceSecPerMile = parsePaceStringToSecPerMile(plan.goalRacePace);
+  let goalPaceSecPerMile: number | null = resolveRacePaceSecondsPerMileForPlan({
+    goalRacePace: plan.goalRacePace,
+    goalRaceTime: goalFinishTime,
+    raceDistanceMiles: distanceMiles,
+  });
+  if (goalPaceSecPerMile == null && linkedGoal?.goalRacePace != null) {
+    goalPaceSecPerMile = linkedGoal.goalRacePace;
   }
 
   const current5k =

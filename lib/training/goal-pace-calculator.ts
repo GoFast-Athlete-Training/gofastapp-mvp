@@ -62,23 +62,46 @@ export function goalRacePaceDisplayString(
   return formatPaceMinSec(spm);
 }
 
-/** Prefer imprinted goalRacePace; else derive from goal time + race distance. */
+/** Rough bounds for per-mile goal pace (3:00–15:00 /mi). Rejects finish-time strings like "57:37". */
+const MIN_PLAUSIBLE_GOAL_PACE_SEC_PER_MILE = 180;
+const MAX_PLAUSIBLE_GOAL_PACE_SEC_PER_MILE = 900;
+
+export function isPlausibleGoalPaceSecPerMile(secPerMile: number): boolean {
+  return (
+    Number.isFinite(secPerMile) &&
+    secPerMile >= MIN_PLAUSIBLE_GOAL_PACE_SEC_PER_MILE &&
+    secPerMile <= MAX_PLAUSIBLE_GOAL_PACE_SEC_PER_MILE
+  );
+}
+
+/** Prefer imprinted goalRacePace when plausible; else derive from goal time + race distance. */
 export function resolveRacePaceSecondsPerMileForPlan(params: {
   goalRacePace: string | null | undefined;
   goalRaceTime: string | null | undefined;
   raceDistanceMiles: number | null | undefined;
 }): number | null {
+  const miles = params.raceDistanceMiles;
+  const derived =
+    miles != null && Number.isFinite(miles) && miles > 0
+      ? goalPaceSecondsPerMileFromPlan(params.goalRaceTime, miles)
+      : null;
+
   const paceStr = params.goalRacePace?.trim();
   if (paceStr) {
     try {
-      return parsePaceToSecondsPerMile(paceStr);
+      const parsed = parsePaceToSecondsPerMile(paceStr);
+      if (isPlausibleGoalPaceSecPerMile(parsed)) {
+        if (derived != null) {
+          const ratio = parsed / derived;
+          if (ratio >= 0.5 && ratio <= 2) return parsed;
+        } else {
+          return parsed;
+        }
+      }
     } catch {
-      /* fall through */
+      /* fall through to derived */
     }
   }
-  const miles = params.raceDistanceMiles;
-  if (miles != null && Number.isFinite(miles) && miles > 0) {
-    return goalPaceSecondsPerMileFromPlan(params.goalRaceTime, miles);
-  }
-  return null;
+
+  return derived;
 }
