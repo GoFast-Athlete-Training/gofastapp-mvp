@@ -21,6 +21,17 @@ export function getRunCrewJoinLink(handle: string): string {
   return `/join/runcrew/${handle}`;
 }
 
+/** Normalize crew name/handle lookup input for fuzzy matching. */
+export function normalizeCrewLookupText(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_\-./]+/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+const MIN_CREW_LOOKUP_LENGTH = 2;
+
 /**
  * Resolve RunCrew by handle (public-facing identifier)
  * Returns the runCrewId for internal use
@@ -400,6 +411,16 @@ export async function getDiscoverableRunCrews(options?: {
   raceCity?: string; // Filter by race city (for race filtering)
   raceState?: string; // Filter by race state (for race filtering)
 }) {
+  const searchRaw = options?.search?.trim() ?? '';
+  if (!searchRaw) {
+    return [];
+  }
+
+  const normalizedSearch = normalizeCrewLookupText(searchRaw);
+  if (normalizedSearch.length < MIN_CREW_LOOKUP_LENGTH) {
+    return [];
+  }
+
   const limit = options?.limit || 50;
 
   // Build where clause with optional filters
@@ -541,7 +562,18 @@ export async function getDiscoverableRunCrews(options?: {
 
   // Format response with public-safe data
   // Convert pace from seconds to MM:SS format for display
-  return crews.map((crew) => {
+  const normalizedMatches = crews.filter((crew) => {
+    const normalizedName = normalizeCrewLookupText(crew.name);
+    const normalizedHandle = normalizeCrewLookupText(crew.handle ?? '');
+    return (
+      normalizedName.includes(normalizedSearch) ||
+      normalizedHandle.includes(normalizedSearch) ||
+      normalizedName === normalizedSearch ||
+      normalizedHandle === normalizedSearch
+    );
+  });
+
+  return normalizedMatches.map((crew) => {
     const easyPaceFormatted = secondsToPace(crew.easyMilesPace);
     const crushingPaceFormatted = secondsToPace(crew.crushingItPace);
     
