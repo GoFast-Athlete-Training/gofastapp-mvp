@@ -57,7 +57,7 @@ export async function executePlanGenerate(params: {
     where: { id: plan.id, athleteId },
     include: {
       race_registry: true,
-      athlete_goal: { select: { goalTime: true } },
+      athlete_goal: { select: { goalTime: true, goalRacePace: true, distance: true } },
     },
   });
   if (!planRow?.race_registry) {

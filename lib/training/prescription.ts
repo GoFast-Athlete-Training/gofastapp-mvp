@@ -412,9 +412,9 @@ export function prescribe(params: {
         const row = seg as { miles?: number; paceOffsetSecPerMile?: number | null };
         const p = secPerMile(anchorSecondsPerMile, row.paceOffsetSecPerMile);
         const segTitle =
-          Math.abs(p - mpP) <= 8
+          p != null && Math.abs(p - mpP) <= 8
             ? "Goal marathon pace"
-            : Math.abs(p - longP) <= 8
+            : p != null && longP != null && Math.abs(p - longP) <= 8
               ? "Long run"
               : "Long run";
         out.push({

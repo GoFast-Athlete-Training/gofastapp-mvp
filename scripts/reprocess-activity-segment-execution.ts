@@ -7,6 +7,7 @@
  *   npx tsx scripts/reprocess-activity-segment-execution.ts --activity-id=<id>
  */
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { parseActivityToSegmentExecution } from "../lib/training/activity-to-segment-execution";
 
@@ -47,7 +48,7 @@ async function main() {
     where: {
       matchedActivityId: { not: null },
       matched_activity: {
-        detailData: { not: null },
+        detailData: { not: Prisma.JsonNull },
       },
     },
     select: {

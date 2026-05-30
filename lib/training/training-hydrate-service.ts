@@ -189,6 +189,7 @@ export async function loadTrainingHydrateSnapshot(
             goalTime: true,
             goalRacePace: true,
             goalPace5K: true,
+            distance: true,
             race_registry: {
               select: {
                 id: true,
