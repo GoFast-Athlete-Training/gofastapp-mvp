@@ -42,6 +42,8 @@ export type UpcomingSessionJson = {
   workoutId: string | null;
   isPlanSession: boolean;
   estimatedDistanceInMeters: number | null;
+  /** False for plan calendar days (date-only sentinel); true when date includes a real scheduled time. */
+  hasScheduledTime: boolean;
 };
 
 /**
@@ -236,6 +238,7 @@ export async function GET(request: NextRequest) {
         segments: row?.segments,
         workoutId,
         isPlanSession: true,
+        hasScheduledTime: false,
         estimatedDistanceInMeters:
           row?.estimatedDistanceInMeters ?? slot.estimatedDistanceInMeters,
       });
@@ -276,6 +279,7 @@ export async function GET(request: NextRequest) {
         })),
         workoutId: w.id,
         isPlanSession: false,
+        hasScheduledTime: true,
         estimatedDistanceInMeters: w.estimatedDistanceInMeters,
       });
     }
