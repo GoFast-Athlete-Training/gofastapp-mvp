@@ -7,7 +7,6 @@ import { prisma } from "@/lib/prisma";
 import { metersToMiles } from "@/lib/pace-utils";
 import { loadPlanMileageSnapshot, type PlanMileageSnapshot } from "@/lib/training/plan-mileage-metrics";
 import { evaluateLightAdaptive, type LightAdaptiveEvaluation } from "@/lib/training/light-adaptive-service";
-import { loadRecentLongEffortEvidence } from "@/lib/training/endurance-evidence";
 import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import {
   computeRaceReadiness,
@@ -15,9 +14,8 @@ import {
   formatSecPerMile,
   parseGoalTimeToSeconds,
   parsePaceStringToSecPerMile,
-  projectRaceFromFiveKSecPerMile,
   raceDistanceMilesFromRegistry,
-  requiresEnduranceEvidence,
+  type GoFastLongRunCapability,
   type RaceReadinessPrediction,
 } from "@/lib/training/race-projection";
 
@@ -73,7 +71,7 @@ function buildHydratePredictorFields(params: {
   goalPaceSecPerMile: number | null;
   goalPace5KSecPerMile: number | null;
   distanceMiles: number | null;
-  evidence: Awaited<ReturnType<typeof loadRecentLongEffortEvidence>>;
+  gofastLongRunCapability: GoFastLongRunCapability;
 }) {
   const {
     current5kSecPerMile,
@@ -81,7 +79,7 @@ function buildHydratePredictorFields(params: {
     goalPaceSecPerMile,
     goalPace5KSecPerMile,
     distanceMiles,
-    evidence,
+    gofastLongRunCapability,
   } = params;
 
   const raceReadiness = computeRaceReadiness({
@@ -90,67 +88,21 @@ function buildHydratePredictorFields(params: {
     goalPaceSecPerMile,
     goalPace5KSecPerMile,
     eventMiles: distanceMiles,
-    evidence,
+    evidence: null,
+    gofastLongRunCapability,
   });
 
-  const fiveKOnlyProjection =
-    current5kSecPerMile != null && distanceMiles != null
-      ? projectRaceFromFiveKSecPerMile(current5kSecPerMile, distanceMiles)
-      : null;
+  const currentProjectedFinish = raceReadiness.estimatedFinish;
+  const currentProjectedFinishSec = raceReadiness.estimatedFinishSec;
+  const currentRacePace = raceReadiness.estimatedPace;
+  const currentRacePaceSecPerMile = raceReadiness.estimatedPaceSecPerMile;
 
-  const useTriangulated =
-    distanceMiles != null &&
-    requiresEnduranceEvidence(distanceMiles) &&
-    raceReadiness.confidence !== "none";
-
-  const currentProjectedFinish = useTriangulated
-    ? raceReadiness.estimatedFinish
-    : raceReadiness.confidence === "none" && requiresEnduranceEvidence(distanceMiles ?? 0)
-      ? null
-      : raceReadiness.estimatedFinish ?? fiveKOnlyProjection?.projectedFinish ?? null;
-
-  const currentProjectedFinishSec = useTriangulated
-    ? raceReadiness.estimatedFinishSec
-    : raceReadiness.confidence === "none" && requiresEnduranceEvidence(distanceMiles ?? 0)
-      ? null
-      : raceReadiness.estimatedFinishSec ?? fiveKOnlyProjection?.projectedFinishSec ?? null;
-
-  const currentRacePace = useTriangulated
-    ? raceReadiness.estimatedPace
-    : raceReadiness.confidence === "none" && requiresEnduranceEvidence(distanceMiles ?? 0)
-      ? null
-      : raceReadiness.estimatedPace ?? fiveKOnlyProjection?.projectedPace ?? null;
-
-  const currentRacePaceSecPerMile = useTriangulated
-    ? raceReadiness.estimatedPaceSecPerMile
-    : raceReadiness.confidence === "none" && requiresEnduranceEvidence(distanceMiles ?? 0)
-      ? null
-      : raceReadiness.estimatedPaceSecPerMile ??
-        fiveKOnlyProjection?.projectedPaceSecPerMile ??
-        null;
-
-  const goalDifference = useTriangulated
-    ? {
-        finishDeltaSec: raceReadiness.finishDeltaSec,
-        finishDeltaLabel: raceReadiness.gapLabel,
-        paceDeltaSecPerMile: raceReadiness.fitnessGapSecPerMile,
-        paceDeltaLabel: raceReadiness.fitnessGapLabel,
-        onTrack: raceReadiness.onTrack,
-      }
-    : raceReadiness.requiresEnduranceEvidence && raceReadiness.confidence === "none"
-      ? {
-          finishDeltaSec: null,
-          finishDeltaLabel: null,
-          paceDeltaSecPerMile: raceReadiness.fitnessGapSecPerMile,
-          paceDeltaLabel: raceReadiness.fitnessGapLabel,
-          onTrack: null,
-        }
-      : computeDifferenceToGoal({
-          goalFinishSec: parseGoalTimeToSeconds(goalFinishTime),
-          projectedFinishSec: currentProjectedFinishSec,
-          goalPaceSecPerMile,
-          projectedPaceSecPerMile: currentRacePaceSecPerMile,
-        });
+  const goalDifference = computeDifferenceToGoal({
+    goalFinishSec: parseGoalTimeToSeconds(goalFinishTime),
+    projectedFinishSec: currentProjectedFinishSec,
+    goalPaceSecPerMile,
+    projectedPaceSecPerMile: currentRacePaceSecPerMile,
+  });
 
   return {
     raceReadiness,
@@ -158,7 +110,13 @@ function buildHydratePredictorFields(params: {
     currentProjectedFinishSec,
     currentRacePace,
     currentRacePaceSecPerMile,
-    differenceToGoal: goalDifference,
+    differenceToGoal: {
+      finishDeltaSec: raceReadiness.finishDeltaSec ?? goalDifference.finishDeltaSec,
+      finishDeltaLabel: raceReadiness.gapLabel ?? goalDifference.finishDeltaLabel,
+      paceDeltaSecPerMile: raceReadiness.fitnessGapSecPerMile ?? goalDifference.paceDeltaSecPerMile,
+      paceDeltaLabel: raceReadiness.fitnessGapLabel ?? goalDifference.paceDeltaLabel,
+      onTrack: raceReadiness.onTrack ?? goalDifference.onTrack,
+    },
   };
 }
 
@@ -168,7 +126,12 @@ export async function loadTrainingHydrateSnapshot(
   const [athlete, plan, goal] = await Promise.all([
     prisma.athlete.findUnique({
       where: { id: athleteId },
-      select: { fiveKPace: true },
+      select: {
+        fiveKPace: true,
+        longRunCapabilityMiles: true,
+        longRunCapabilityPaceSecPerMile: true,
+        longRunCapabilityDate: true,
+      },
     }),
     prisma.training_plans.findFirst({
       where: { athleteId, lifecycleStatus: TrainingPlanLifecycle.ACTIVE },
@@ -240,8 +203,10 @@ export async function loadTrainingHydrateSnapshot(
     lightAdaptive: null,
   };
 
-  const enduranceEvidence =
-    athlete != null ? await loadRecentLongEffortEvidence(athleteId) : null;
+  const gofastLongRunCapability: GoFastLongRunCapability = {
+    miles: athlete?.longRunCapabilityMiles ?? null,
+    paceSecPerMile: athlete?.longRunCapabilityPaceSecPerMile ?? null,
+  };
 
   if (!plan) {
     const raceReg = goal?.race_registry ?? null;
@@ -264,7 +229,7 @@ export async function loadTrainingHydrateSnapshot(
       goalPaceSecPerMile,
       goalPace5KSecPerMile,
       distanceMiles,
-      evidence: enduranceEvidence,
+      gofastLongRunCapability,
     });
 
     return {
@@ -332,7 +297,7 @@ export async function loadTrainingHydrateSnapshot(
     goalPaceSecPerMile,
     goalPace5KSecPerMile,
     distanceMiles,
-    evidence: enduranceEvidence,
+    gofastLongRunCapability,
   });
 
   const planMiles = await loadPlanMileageSnapshot({
