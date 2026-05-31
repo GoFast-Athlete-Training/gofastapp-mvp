@@ -5,16 +5,16 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /api/race-trainer
- * List all active race trainer groups, optionally filtered by ?raceId=
+ * List open/active training cohorts, optionally filtered by ?raceId=
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const raceId = searchParams.get("raceId");
 
-    const groups = await prisma.race_trainer_groups.findMany({
+    const cohorts = await prisma.training_cohorts.findMany({
       where: {
-        isActive: true,
+        status: { in: ["OPEN", "ACTIVE"] },
         ...(raceId ? { raceId } : {}),
       },
       include: {
@@ -29,17 +29,36 @@ export async function GET(request: NextRequest) {
           },
         },
         _count: {
-          select: { race_trainer_members: true },
+          select: { memberships: true },
         },
       },
       orderBy: { createdAt: "desc" },
     });
 
+    const groups = cohorts.map((c) => ({
+      id: c.id,
+      raceId: c.raceId,
+      companyRaceId: c.companyRaceId,
+      name: c.cohortName,
+      handle: c.handle,
+      description: c.description,
+      logo: c.logo,
+      joinCode: c.joinCode,
+      city: c.city,
+      state: c.state,
+      isActive: c.status === "OPEN" || c.status === "ACTIVE",
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+      race_registry: c.race_registry,
+      _count: { race_trainer_members: c._count.memberships },
+    }));
+
     return NextResponse.json({ success: true, groups });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("❌ RACE-TRAINER GET:", error);
+    const message = error instanceof Error ? error.message : "Failed to fetch trainer groups";
     return NextResponse.json(
-      { success: false, error: "Failed to fetch trainer groups", details: error?.message },
+      { success: false, error: "Failed to fetch trainer groups", details: message },
       { status: 500 }
     );
   }
@@ -47,17 +66,17 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/race-trainer
- * Create a new race trainer group for a specific race.
- * Body: { raceId, name, description?, city?, state?, companyRaceId? }
+ * Create a training cohort for a race.
+ * Body: { raceId, presetId, name, description?, city?, state?, companyRaceId? }
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { raceId, name, description, city, state, companyRaceId } = body;
+    const { raceId, presetId, name, description, city, state, companyRaceId } = body;
 
-    if (!raceId || !name?.trim()) {
+    if (!raceId || !presetId || !name?.trim()) {
       return NextResponse.json(
-        { success: false, error: "raceId and name are required" },
+        { success: false, error: "raceId, presetId, and name are required" },
         { status: 400 }
       );
     }
@@ -70,7 +89,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate handle from name + random suffix
+    const preset = await prisma.training_plan_preset.findUnique({ where: { id: presetId } });
+    if (!preset) {
+      return NextResponse.json(
+        { success: false, error: "Training preset not found" },
+        { status: 404 }
+      );
+    }
+
     const baseHandle = name
       .toLowerCase()
       .trim()
@@ -79,16 +105,18 @@ export async function POST(request: NextRequest) {
     const handle = `${baseHandle}-${Math.random().toString(36).slice(2, 6)}`;
     const joinCode = Math.random().toString(36).slice(2, 8).toUpperCase();
 
-    const group = await prisma.race_trainer_groups.create({
+    const cohort = await prisma.training_cohorts.create({
       data: {
         raceId,
+        presetId,
         companyRaceId: companyRaceId || null,
-        name: name.trim(),
+        cohortName: name.trim(),
         handle,
         joinCode,
         description: description?.trim() || null,
         city: city?.trim() || null,
         state: state?.trim() || null,
+        status: "DRAFT",
       },
       include: {
         race_registry: {
@@ -97,11 +125,25 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    const group = {
+      id: cohort.id,
+      raceId: cohort.raceId,
+      companyRaceId: cohort.companyRaceId,
+      name: cohort.cohortName,
+      handle: cohort.handle,
+      description: cohort.description,
+      city: cohort.city,
+      state: cohort.state,
+      isActive: false,
+      race_registry: cohort.race_registry,
+    };
+
     return NextResponse.json({ success: true, group }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("❌ RACE-TRAINER POST:", error);
+    const message = error instanceof Error ? error.message : "Failed to create trainer group";
     return NextResponse.json(
-      { success: false, error: "Failed to create trainer group", details: error?.message },
+      { success: false, error: "Failed to create trainer group", details: message },
       { status: 500 }
     );
   }

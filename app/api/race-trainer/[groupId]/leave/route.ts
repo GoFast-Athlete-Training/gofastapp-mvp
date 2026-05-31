@@ -5,34 +5,35 @@ export const dynamic = "force-dynamic";
 
 /**
  * POST /api/race-trainer/[groupId]/leave
- * Leave a race trainer group.
- * Body: { userId }
+ * Leave a training cohort.
+ * Body: { userId (athleteId) }
  */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
-    const { groupId } = await params;
+    const { groupId: cohortId } = await params;
     const body = await request.json();
-    const { userId } = body;
+    const athleteId = body.athleteId ?? body.userId;
 
-    if (!userId) {
+    if (!athleteId) {
       return NextResponse.json(
-        { success: false, error: "userId is required" },
+        { success: false, error: "athleteId (or userId) is required" },
         { status: 400 }
       );
     }
 
-    await prisma.race_trainer_members.deleteMany({
-      where: { groupId, userId },
+    await prisma.training_cohort_memberships.deleteMany({
+      where: { cohortId, athleteId },
     });
 
     return NextResponse.json({ success: true, message: "Left trainer group" });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("❌ RACE-TRAINER LEAVE POST:", error);
+    const message = error instanceof Error ? error.message : "Failed to leave trainer group";
     return NextResponse.json(
-      { success: false, error: "Failed to leave trainer group", details: error?.message },
+      { success: false, error: "Failed to leave trainer group", details: message },
       { status: 500 }
     );
   }

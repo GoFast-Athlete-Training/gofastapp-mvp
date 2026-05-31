@@ -1,56 +1,62 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { TrainingCohortRole } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
+const COHORT_ROLES = new Set<TrainingCohortRole>(["MEMBER", "PACER", "ADMIN"]);
+
 /**
  * POST /api/race-trainer/[groupId]/join
- * Join a race trainer group.
- * Body: { userId, role? }
+ * Join a training cohort.
+ * Body: { userId (athleteId), role? }
  */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
-    const { groupId } = await params;
+    const { groupId: cohortId } = await params;
     const body = await request.json();
-    const { userId, role } = body;
+    const athleteId = body.athleteId ?? body.userId;
+    const role: TrainingCohortRole =
+      COHORT_ROLES.has(body.role) ? body.role : "MEMBER";
 
-    if (!userId) {
+    if (!athleteId) {
       return NextResponse.json(
-        { success: false, error: "userId is required" },
+        { success: false, error: "athleteId (or userId) is required" },
         { status: 400 }
       );
     }
 
-    const group = await prisma.race_trainer_groups.findUnique({
-      where: { id: groupId },
+    const cohort = await prisma.training_cohorts.findUnique({
+      where: { id: cohortId },
     });
 
-    if (!group || !group.isActive) {
+    if (!cohort || (cohort.status !== "OPEN" && cohort.status !== "ACTIVE")) {
       return NextResponse.json(
-        { success: false, error: "Race trainer group not found or inactive" },
+        { success: false, error: "Training cohort not found or not joinable" },
         { status: 404 }
       );
     }
 
-    // Upsert membership (idempotent)
-    const member = await prisma.race_trainer_members.upsert({
-      where: { groupId_userId: { groupId, userId } },
+    const member = await prisma.training_cohort_memberships.upsert({
+      where: { cohortId_athleteId: { cohortId, athleteId } },
       update: {},
       create: {
-        groupId,
-        userId,
-        role: role || "MEMBER",
+        cohortId,
+        raceId: cohort.raceId,
+        athleteId,
+        role,
       },
     });
 
     return NextResponse.json({ success: true, member });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("❌ RACE-TRAINER JOIN POST:", error);
+    const message = error instanceof Error ? error.message : "Failed to join trainer group";
     return NextResponse.json(
-      { success: false, error: "Failed to join trainer group", details: error?.message },
+      { success: false, error: "Failed to join trainer group", details: message },
       { status: 500 }
     );
   }
