@@ -6,6 +6,9 @@ import { metersToMiles } from "@/lib/pace-utils";
 import { parsePaceToSecondsPerMile, parseRaceTimeToSeconds } from "@/lib/workout-generator/pace-calculator";
 
 export const MILES_5K_RIEGEL = 3.10686;
+/** GoFast linear pace-penalty: marathon pace = 5K pace + (eventMiles - 5K) × k */
+export const GOFAST_K_DEFAULT = 1.5;
+export const GOFAST_K_FLOOR = 1.0;
 /** Half marathon and longer — need sustained long-effort evidence before finish verdicts. */
 export const LONG_RACE_MILES_THRESHOLD = 13.109375;
 export const MIN_LONG_EFFORT_MILES = 10;
@@ -116,6 +119,70 @@ export function projectRaceFromFiveKPaceString(
   const sec = parsePaceStringToSecPerMile(fiveKPaceStr);
   if (sec == null) return null;
   return projectRaceFromFiveKSecPerMile(sec, eventMiles);
+}
+
+export type GoFastLongRunCapability = {
+  miles: number | null;
+  paceSecPerMile: number | null;
+};
+
+/** Derive k from persisted long-run capability; lower k = better endurance evidence. */
+export function deriveKCoefficient(
+  longRunMiles: number | null | undefined,
+  longRunPaceSec: number | null | undefined,
+  goalPaceSec: number | null | undefined
+): number {
+  if (longRunMiles == null || !Number.isFinite(longRunMiles) || longRunMiles < 10) {
+    return GOFAST_K_DEFAULT;
+  }
+
+  let bonus = 0;
+  const atGoalPace =
+    goalPaceSec == null ||
+    (longRunPaceSec != null && longRunPaceSec <= goalPaceSec + 10);
+
+  if (longRunMiles >= 18) bonus = 0.5;
+  else if (longRunMiles >= 15 && atGoalPace) bonus = 0.45;
+  else if (longRunMiles >= 12 && atGoalPace) bonus = 0.35;
+  else if (longRunMiles >= 10) bonus = 0.2;
+
+  return Math.max(GOFAST_K_FLOOR, GOFAST_K_DEFAULT - bonus);
+}
+
+/** GoFast linear race projection from current 5K fitness. */
+export function projectRaceGoFast(
+  fiveKSecPerMile: number,
+  eventMiles: number,
+  k = GOFAST_K_DEFAULT
+): {
+  projectedFinishSec: number;
+  projectedFinish: string;
+  projectedPaceSecPerMile: number;
+  projectedPace: string;
+  k: number;
+} | null {
+  if (!Number.isFinite(fiveKSecPerMile) || fiveKSecPerMile <= 0) return null;
+  if (!Number.isFinite(eventMiles) || eventMiles <= 0) return null;
+  if (!Number.isFinite(k) || k <= 0) return null;
+
+  const extraMiles = Math.max(0, eventMiles - MILES_5K_RIEGEL);
+  const paceSec = Math.round(fiveKSecPerMile + extraMiles * k);
+  const finishSec = Math.round(paceSec * eventMiles);
+
+  return {
+    projectedFinishSec: finishSec,
+    projectedFinish: formatFinishClock(finishSec),
+    projectedPaceSecPerMile: paceSec,
+    projectedPace: formatSecPerMile(paceSec) ?? "",
+    k,
+  };
+}
+
+function gofastConfidenceFromLongRunMiles(miles: number | null | undefined): RacePredictorConfidence {
+  if (miles == null || !Number.isFinite(miles) || miles < 10) return "low";
+  if (miles >= 18) return "high";
+  if (miles >= 12) return "medium";
+  return "low";
 }
 
 export function raceDistanceMilesFromRegistry(distanceMeters: number | null | undefined): number | null {
@@ -284,6 +351,9 @@ const EMPTY_READINESS: RaceReadinessPrediction = {
 /**
  * Endurance-aware race readiness: triangulates 5K fitness with recent long-effort evidence
  * for half+ distances; short races still use 5K projection only.
+ *
+ * When `gofastLongRunCapability` is set, uses GoFast linear projection (5K + distance × k)
+ * instead of Riegel triangulation.
  */
 export function computeRaceReadiness(params: {
   current5kSecPerMile: number | null;
@@ -292,6 +362,7 @@ export function computeRaceReadiness(params: {
   goalPace5KSecPerMile: number | null;
   eventMiles: number | null;
   evidence: LongEffortEvidenceSummary | null;
+  gofastLongRunCapability?: GoFastLongRunCapability | null;
 }): RaceReadinessPrediction {
   const {
     current5kSecPerMile,
@@ -300,6 +371,7 @@ export function computeRaceReadiness(params: {
     goalPace5KSecPerMile,
     eventMiles,
     evidence,
+    gofastLongRunCapability,
   } = params;
 
   if (eventMiles == null || !Number.isFinite(eventMiles) || eventMiles <= 0) {
@@ -307,7 +379,6 @@ export function computeRaceReadiness(params: {
   }
 
   const needsEndurance = requiresEnduranceEvidence(eventMiles);
-  const confidence = needsEndurance ? confidenceFromEvidence(evidence) : "high";
 
   let fitnessGapSecPerMile: number | null = null;
   let fitnessGapLabel: string | null = null;
@@ -327,6 +398,62 @@ export function computeRaceReadiness(params: {
 
   const modelFinishFrom5k = fiveKProjection?.projectedFinish ?? null;
   const modelFinishFrom5kSec = fiveKProjection?.projectedFinishSec ?? null;
+
+  if (gofastLongRunCapability !== undefined) {
+    if (current5kSecPerMile == null) {
+      return {
+        ...EMPTY_READINESS,
+        requiresEnduranceEvidence: needsEndurance,
+        modelFinishFrom5k,
+        modelFinishFrom5kSec,
+        fitnessGapSecPerMile,
+        fitnessGapLabel,
+      };
+    }
+
+    const k = deriveKCoefficient(
+      gofastLongRunCapability?.miles ?? null,
+      gofastLongRunCapability?.paceSecPerMile ?? null,
+      goalPaceSecPerMile
+    );
+    const gofastProjection = projectRaceGoFast(current5kSecPerMile, eventMiles, k);
+    const diff = differenceToGoal({
+      goalFinishSec,
+      projectedFinishSec: gofastProjection?.projectedFinishSec ?? null,
+      goalPaceSecPerMile,
+      projectedPaceSecPerMile: gofastProjection?.projectedPaceSecPerMile ?? null,
+    });
+
+    const longMiles = gofastLongRunCapability?.miles ?? null;
+    const confidence = needsEndurance
+      ? gofastConfidenceFromLongRunMiles(longMiles)
+      : "high";
+
+    let gapLabel = diff.finishDeltaLabel ?? diff.paceDeltaLabel ?? fitnessGapLabel;
+    if (needsEndurance && longMiles != null && longMiles >= 10 && gapLabel) {
+      gapLabel = `${confidencePrefix(confidence)} · ${gapLabel}`;
+    }
+
+    return {
+      confidence,
+      requiresEnduranceEvidence: needsEndurance,
+      readinessLabel: gapLabel,
+      gapLabel,
+      estimatedFinish: gofastProjection?.projectedFinish ?? null,
+      estimatedFinishSec: gofastProjection?.projectedFinishSec ?? null,
+      estimatedPace: gofastProjection?.projectedPace ?? null,
+      estimatedPaceSecPerMile: gofastProjection?.projectedPaceSecPerMile ?? null,
+      finishDeltaSec: diff.finishDeltaSec,
+      onTrack: diff.onTrack,
+      modelFinishFrom5k,
+      modelFinishFrom5kSec,
+      evidence: null,
+      fitnessGapSecPerMile,
+      fitnessGapLabel,
+    };
+  }
+
+  const confidence = needsEndurance ? confidenceFromEvidence(evidence) : "high";
 
   if (!needsEndurance) {
     const diff = differenceToGoal({

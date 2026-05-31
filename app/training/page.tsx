@@ -32,6 +32,7 @@ import {
   fetchTrainingPlanDetail,
   fetchPlanWeekSchedule,
   type PlanDayCard,
+  type RaceReadinessSummary,
 } from "@/lib/training/fetch-plan-week-client";
 import { planScheduleLooksStructured } from "@/lib/training/plan-schedule-schema";
 import { getRacePhase } from "@/lib/race-calendar-phase";
@@ -108,6 +109,7 @@ export default function TrainingHubPage() {
   const [loading, setLoading] = useState(true);
   const [planDetail, setPlanDetail] = useState<PlanDetailHub | null>(null);
   const [goalRacePaceResolved, setGoalRacePaceResolved] = useState<GoalRacePaceResolved | null>(null);
+  const [raceReadiness, setRaceReadiness] = useState<RaceReadinessSummary | null>(null);
   const [athleteFiveKPace, setAthleteFiveKPace] = useState<string | null>(null);
   const [weekNumber, setWeekNumber] = useState(1);
   const [weekDays, setWeekDays] = useState<PlanDayCard[]>([]);
@@ -173,6 +175,7 @@ export default function TrainingHubPage() {
     setLoading(true);
     setHubError(null);
     setPlanDetail(null);
+    setRaceReadiness(null);
     setPastRacePlan(null);
     setPastRaceResultStatus(null);
     setWeekDays([]);
@@ -188,11 +191,12 @@ export default function TrainingHubPage() {
         return;
       }
       const planId = (listData.plans[0] as { id: string }).id;
-      const { plan: raw, athleteFiveKPace: athPace, goalRacePaceResolved: resolvedPace } =
+      const { plan: raw, athleteFiveKPace: athPace, goalRacePaceResolved: resolvedPace, raceReadiness: readiness } =
         await fetchTrainingPlanDetail(planId, token);
       const plan = raw as PlanDetailHub;
       setAthleteFiveKPace(athPace);
       setGoalRacePaceResolved(resolvedPace ?? null);
+      setRaceReadiness(readiness ?? null);
 
       const planPhase = getRacePhase(plan.race_registry?.raceDate);
       if (planPhase !== "pre") {
@@ -665,6 +669,21 @@ export default function TrainingHubPage() {
                   <p className="mt-1 text-xs text-emerald-900/80">
                     Current 5K pace:{" "}
                     <span className="font-mono tabular-nums">{paceDisplay}</span>
+                  </p>
+                ) : null}
+                {raceReadiness?.projectedFinish ? (
+                  <p className="mt-1 text-xs text-emerald-900/80">
+                    Projected:{" "}
+                    <span className="font-mono tabular-nums">{raceReadiness.projectedFinish}</span>
+                    {raceReadiness.projectedPace ? (
+                      <span className="text-emerald-800/70">
+                        {" "}
+                        · {raceReadiness.projectedPace}/mi
+                      </span>
+                    ) : null}
+                    {raceReadiness.gapLabel ? (
+                      <span className="text-emerald-800/60"> · {raceReadiness.gapLabel}</span>
+                    ) : null}
                   </p>
                 ) : null}
               </div>

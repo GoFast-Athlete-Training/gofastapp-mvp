@@ -32,6 +32,16 @@ export type GoalRacePaceResolved = {
   source: string | null;
 };
 
+export type RaceReadinessSummary = {
+  projectedFinish: string | null;
+  projectedPace: string | null;
+  k: number | null;
+  gapLabel: string | null;
+  onTrack: boolean | null;
+  confidence: string | null;
+  longRunCapabilityMiles: number | null;
+};
+
 export async function fetchTrainingPlanDetail(
   planId: string,
   bearerToken: string
@@ -40,6 +50,7 @@ export async function fetchTrainingPlanDetail(
   athleteFiveKPace: string | null;
   weeklyMileageTargetPreference: number | null;
   goalRacePaceResolved: GoalRacePaceResolved | null;
+  raceReadiness: RaceReadinessSummary | null;
 }> {
   const res = await fetch(`/api/training-plan/${planId}`, {
     headers: athleteBearerFetchHeaders(bearerToken),
@@ -50,6 +61,7 @@ export async function fetchTrainingPlanDetail(
     athleteFiveKPace?: string | null;
     weeklyMileageTargetPreference?: number | null;
     goalRacePaceResolved?: GoalRacePaceResolved | null;
+    raceReadiness?: RaceReadinessSummary | null;
   };
   if (!res.ok) {
     throw new Error(typeof data.error === "string" ? data.error : "Failed to load plan");
@@ -61,6 +73,7 @@ export async function fetchTrainingPlanDetail(
     weeklyMileageTargetPreference:
       typeof pref === "number" && Number.isFinite(pref) ? Math.round(pref) : null,
     goalRacePaceResolved: data.goalRacePaceResolved ?? null,
+    raceReadiness: data.raceReadiness ?? null,
   };
 }
 

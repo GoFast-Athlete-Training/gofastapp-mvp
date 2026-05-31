@@ -114,3 +114,53 @@ test("short race still uses 5K projection directly", () => {
   assert.ok(readiness.estimatedFinish);
   assert.ok(readiness.gapLabel);
 });
+
+test("GoFast model: 6:26 5K projects marathon at k=1.5 without long run data", () => {
+  const current5kSecPerMile = parsePaceStringToSecPerMile("6:26");
+  assert.equal(current5kSecPerMile, 386);
+
+  const goalFinishSec = parseGoalTimeToSeconds("2:59:00");
+  const { goalPace5K, goalRacePace } = deriveGoalPaces({
+    distance: "marathon",
+    goalTime: "2:59:00",
+    distanceMiles: MILES_MARATHON,
+  });
+
+  const readiness = computeRaceReadiness({
+    current5kSecPerMile,
+    goalFinishSec,
+    goalPaceSecPerMile: goalRacePace,
+    goalPace5KSecPerMile: goalPace5K,
+    eventMiles: MILES_MARATHON,
+    evidence: null,
+    gofastLongRunCapability: { miles: null, paceSecPerMile: null },
+  });
+
+  assert.equal(readiness.confidence, "low");
+  assert.ok(readiness.estimatedFinish);
+  assert.ok(readiness.estimatedPace);
+  assert.ok(readiness.gapLabel?.includes("goal"));
+});
+
+test("GoFast model: peak long run lowers k toward goal", () => {
+  const current5kSecPerMile = parsePaceStringToSecPerMile("6:26");
+  const goalFinishSec = parseGoalTimeToSeconds("2:59:00");
+  const { goalPace5K, goalRacePace } = deriveGoalPaces({
+    distance: "marathon",
+    goalTime: "2:59:00",
+    distanceMiles: MILES_MARATHON,
+  });
+
+  const readiness = computeRaceReadiness({
+    current5kSecPerMile,
+    goalFinishSec,
+    goalPaceSecPerMile: goalRacePace,
+    goalPace5KSecPerMile: goalPace5K,
+    eventMiles: MILES_MARATHON,
+    evidence: null,
+    gofastLongRunCapability: { miles: 18, paceSecPerMile: goalRacePace ?? 410 },
+  });
+
+  assert.equal(readiness.confidence, "high");
+  assert.ok(readiness.estimatedFinish);
+});

@@ -72,6 +72,10 @@ model Athlete {
   thresholdPace           String?
   /// Estimated upper heart rate (bpm) for truly easy aerobic work; updated conservatively from Easy/LongRun completions.
   aerobicCeilingBpm       Int?
+  /// Best completed long run — adjusts GoFast race projection k-coefficient.
+  longRunCapabilityMiles          Float?
+  longRunCapabilityPaceSecPerMile   Int?
+  longRunCapabilityDate           DateTime?
   /// Functional threshold power (watts) — bike workout intensity anchor.
   ftpWatts                Int?
   weeklyMileage           Int?

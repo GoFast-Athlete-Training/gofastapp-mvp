@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 import { syncAthleteFiveKPaceToActivePlan } from "@/lib/training/plan-lifecycle";
 import { EASY_LONG_RUN_MAX_FAST_DRIFT_SEC_PER_MILE } from "@/lib/training/apply-activity-to-workout";
+import { applyLongRunCapabilityCreditFromWorkout } from "@/lib/training/apply-long-run-capability-credit";
 
 const METERS_PER_MILE = 1609.34;
 /** Long run distance considered "target met" when actual >= this fraction of planned. */
@@ -198,6 +199,17 @@ export async function applyLightAdaptiveIfEligible(params: {
   weekNumber?: number | null;
   workoutId?: string | null;
 }): Promise<LightAdaptiveApplyResult> {
+  if (params.workoutId) {
+    try {
+      await applyLongRunCapabilityCreditFromWorkout({
+        athleteId: params.athleteId,
+        workoutId: params.workoutId,
+      });
+    } catch (err) {
+      console.error("applyLongRunCapabilityCreditFromWorkout:", err);
+    }
+  }
+
   const evaluation = await evaluateLightAdaptive({
     athleteId: params.athleteId,
     planId: params.planId,

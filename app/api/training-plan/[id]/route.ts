@@ -9,6 +9,13 @@ import { archiveOtherActivePlans, cascadeLinkedGoalAfterPlanArchived } from "@/l
 import { validatePreferredTempoInterval } from "@/lib/training/preferred-tempo-interval";
 import { cleanupPlanWorkoutsBeforeDelete } from "@/lib/training/plan-delete-cleanup";
 import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
+import {
+  computeRaceReadiness,
+  deriveKCoefficient,
+  parseGoalTimeToSeconds,
+  parsePaceStringToSecPerMile,
+  projectRaceGoFast,
+} from "@/lib/training/race-projection";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -46,6 +53,7 @@ export async function GET(request: NextRequest, context: Ctx) {
             id: true,
             goalTime: true,
             goalRacePace: true,
+            goalPace5K: true,
             distance: true,
           },
         },
@@ -130,7 +138,12 @@ export async function GET(request: NextRequest, context: Ctx) {
 
     const athleteRow = await prisma.athlete.findUnique({
       where: { id: auth.athlete.id },
-      select: { fiveKPace: true },
+      select: {
+        fiveKPace: true,
+        longRunCapabilityMiles: true,
+        longRunCapabilityPaceSecPerMile: true,
+        longRunCapabilityDate: true,
+      },
     });
     const trainingPrefs = await prisma.trainingPreferences.findUnique({
       where: { athleteId: auth.athlete.id },
@@ -162,6 +175,30 @@ export async function GET(request: NextRequest, context: Ctx) {
       goalDistance: plan.athlete_goal?.distance ?? null,
     });
 
+    const fiveKSecPerMile = parsePaceStringToSecPerMile(athleteRow?.fiveKPace ?? null);
+    const gofastLongRunCapability = {
+      miles: athleteRow?.longRunCapabilityMiles ?? null,
+      paceSecPerMile: athleteRow?.longRunCapabilityPaceSecPerMile ?? null,
+    };
+    const k = deriveKCoefficient(
+      gofastLongRunCapability.miles,
+      gofastLongRunCapability.paceSecPerMile,
+      resolvedGoalPace.goalPaceSecPerMile
+    );
+    const gofastProjection =
+      fiveKSecPerMile != null && resolvedGoalPace.raceDistanceMiles != null
+        ? projectRaceGoFast(fiveKSecPerMile, resolvedGoalPace.raceDistanceMiles, k)
+        : null;
+    const raceReadinessComputed = computeRaceReadiness({
+      current5kSecPerMile: fiveKSecPerMile,
+      goalFinishSec: parseGoalTimeToSeconds(goalFinishTime),
+      goalPaceSecPerMile: resolvedGoalPace.goalPaceSecPerMile,
+      goalPace5KSecPerMile: plan.athlete_goal?.goalPace5K ?? null,
+      eventMiles: resolvedGoalPace.raceDistanceMiles,
+      evidence: null,
+      gofastLongRunCapability,
+    });
+
     return NextResponse.json({
       plan: serialized,
       athleteFiveKPace: athleteRow?.fiveKPace ?? null,
@@ -176,6 +213,17 @@ export async function GET(request: NextRequest, context: Ctx) {
         goalPaceDisplay: resolvedGoalPace.goalPaceDisplay,
         raceDistanceMiles: resolvedGoalPace.raceDistanceMiles,
         source: resolvedGoalPace.source,
+      },
+      raceReadiness: {
+        projectedFinish:
+          gofastProjection?.projectedFinish ?? raceReadinessComputed.estimatedFinish,
+        projectedPace:
+          gofastProjection?.projectedPace ?? raceReadinessComputed.estimatedPace,
+        k: gofastProjection?.k ?? k,
+        gapLabel: raceReadinessComputed.gapLabel,
+        onTrack: raceReadinessComputed.onTrack,
+        confidence: raceReadinessComputed.confidence,
+        longRunCapabilityMiles: gofastLongRunCapability.miles,
       },
     });
   } catch (e: unknown) {
@@ -399,6 +447,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
             id: true,
             goalTime: true,
             goalRacePace: true,
+            goalPace5K: true,
             distance: true,
           },
         },
