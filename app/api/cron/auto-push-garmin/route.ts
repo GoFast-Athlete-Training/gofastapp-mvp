@@ -11,7 +11,9 @@ export const maxDuration = 300;
 /**
  * GET /api/cron/auto-push-garmin
  * 1) Materialize today's plan workout into `workouts` (resolver / find-or-create).
- * 2) Push today's plan workouts (UTC `workouts.date`) to Garmin when not yet pushed.
+ * 2) Push today's plan workouts to Garmin Training Calendar when not yet scheduled.
+ *    - Already on calendar (garminScheduleId): refresh library definition only.
+ *    - Library-only (garminWorkoutId, no schedule): skip to avoid duplicate calendar entries.
  * Secured with Authorization: Bearer CRON_SECRET or ?secret= (Vercel Cron uses GET).
  */
 export async function GET(request: NextRequest) {
@@ -77,7 +79,12 @@ export async function GET(request: NextRequest) {
           garmin_user_id: { not: null },
         },
       },
-      select: { id: true, athleteId: true },
+      select: {
+        id: true,
+        athleteId: true,
+        garminWorkoutId: true,
+        garminScheduleId: true,
+      },
       take: 40,
     });
 
@@ -85,8 +92,11 @@ export async function GET(request: NextRequest) {
       workoutId: string;
       athleteId: string;
       ok: boolean;
+      skipped?: boolean;
+      action?: string;
       error?: string;
       scheduledDate?: string;
+      garminScheduleId?: number | null;
     }> = [];
 
     for (const w of candidates) {
@@ -103,19 +113,38 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      const r = await pushWorkoutToGarminForAthlete(w.athleteId, w.id);
+      if (w.garminWorkoutId != null && w.garminScheduleId == null) {
+        results.push({
+          workoutId: w.id,
+          athleteId: w.athleteId,
+          ok: true,
+          skipped: true,
+          action: "library_only_skip",
+          error:
+            "Garmin workout exists without calendar schedule id; use force-reschedule from GoFast to avoid duplicate calendar entries.",
+        });
+        continue;
+      }
+
+      const mode =
+        w.garminScheduleId != null ? ("update-library" as const) : ("schedule-today" as const);
+
+      const r = await pushWorkoutToGarminForAthlete(w.athleteId, w.id, { mode });
       if (r.ok) {
         results.push({
           workoutId: w.id,
           athleteId: w.athleteId,
           ok: true,
+          action: mode,
           scheduledDate: r.scheduledDate,
+          garminScheduleId: r.garminScheduleId,
         });
       } else {
         results.push({
           workoutId: w.id,
           athleteId: w.athleteId,
           ok: false,
+          action: mode,
           error: `${r.code}: ${r.message}`,
         });
       }

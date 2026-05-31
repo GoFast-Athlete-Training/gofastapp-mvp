@@ -493,7 +493,11 @@ export default function TrainingPlanDayPreviewPage() {
   async function pushWorkoutIdToGarmin(wid: string, token: string, showSuccess: boolean) {
     const res = await fetch(`/api/workouts/${encodeURIComponent(wid)}/push-to-garmin`, {
       method: "POST",
-      headers: athleteBearerFetchHeaders(token),
+      headers: {
+        ...athleteBearerFetchHeaders(token),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ mode: "schedule-today" }),
     });
     const data = (await res.json()) as {
       error?: string;
@@ -506,8 +510,8 @@ export default function TrainingPlanDayPreviewPage() {
     if (showSuccess) {
       setGarminPushMessage(
         data.scheduledDate
-          ? `Added to your Garmin Connect calendar for ${data.scheduledDate}. Sync your watch in Garmin Connect.`
-          : "Added to your Garmin Connect calendar. Sync your watch in Garmin Connect."
+          ? `Added to Garmin Training Calendar for ${data.scheduledDate}. Sync your watch, then press Run for today’s prompt.`
+          : "Added to Garmin Training Calendar. Sync your watch in Garmin Connect."
       );
     }
   }
@@ -847,7 +851,7 @@ export default function TrainingPlanDayPreviewPage() {
                   disabled={pushingGarmin || workoutLoading || !!workoutError}
                   className="w-full rounded-xl border border-orange-200 bg-white py-3 text-sm font-semibold text-orange-700 hover:bg-orange-50 disabled:opacity-50"
                 >
-                  {pushingGarmin ? "Sending to Garmin..." : "Send to Garmin"}
+                  {pushingGarmin ? "Adding to calendar…" : "Add to Garmin calendar"}
                 </button>
               ) : null}
               {!isLogged ? (

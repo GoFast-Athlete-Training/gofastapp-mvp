@@ -49,7 +49,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const pushed = await pushWorkoutToGarminForAthlete(athleteId, workoutId);
+  const pushed = await pushWorkoutToGarminForAthlete(athleteId, workoutId, {
+    mode: "schedule-today",
+  });
   if (!pushed.ok) {
     const status =
       pushed.code === "garmin_disconnected"
@@ -69,5 +71,7 @@ export async function POST(request: Request) {
     garminWorkoutId: pushed.garminWorkoutId,
     garminScheduleId: pushed.garminScheduleId,
     scheduledDate: pushed.scheduledDate,
+    mode: pushed.mode,
+    calendarState: pushed.calendarState,
   });
 }

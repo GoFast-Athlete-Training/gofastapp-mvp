@@ -340,8 +340,8 @@ export default function TrainingHubPage() {
       }
       setGarminPushMessage(
         data.scheduledDate
-          ? `Added to Garmin Connect calendar for ${data.scheduledDate}. Sync your watch in Garmin Connect.`
-          : "Added to your Garmin Connect calendar. Sync your watch in Garmin Connect."
+          ? `Added to Garmin Training Calendar for ${data.scheduledDate}. Sync your watch, then press Run — Garmin should prompt today’s workout.`
+          : "Added to Garmin Training Calendar. Sync your watch in Garmin Connect."
       );
       if (planDetail) {
         void fetchWeekDays(weekNumber);

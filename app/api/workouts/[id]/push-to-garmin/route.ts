@@ -5,6 +5,11 @@ import { GarminApiError } from "@/lib/garmin-workouts/garmin-training-api";
 import { GarminNotConnectedError } from "@/lib/domain-garmin";
 import { summarizeGarminTokenForLogs } from "@/lib/garmin-access-token-claims";
 import { pushWorkoutToGarminForAthlete } from "@/lib/garmin-workouts/push-workout-for-athlete";
+import {
+  defaultGarminPushModeForState,
+  garminCalendarSyncState,
+  parseGarminPushModeFromBody,
+} from "@/lib/garmin-workouts/garmin-calendar-state";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +31,26 @@ export async function POST(
 
     const { id } = await params;
 
-    const result = await pushWorkoutToGarminForAthlete(auth.athlete.id, id);
+    let body: Record<string, unknown> = {};
+    try {
+      body = (await request.json()) as Record<string, unknown>;
+    } catch {
+      /* empty body ok */
+    }
+
+    const existing = await prisma.workouts.findFirst({
+      where: { id, athleteId: auth.athlete.id },
+      select: { garminWorkoutId: true, garminScheduleId: true },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: "Workout not found" }, { status: 404 });
+    }
+
+    const calendarState = garminCalendarSyncState(existing);
+    const mode =
+      parseGarminPushModeFromBody(body) ?? defaultGarminPushModeForState(calendarState);
+
+    const result = await pushWorkoutToGarminForAthlete(auth.athlete.id, id, { mode });
 
     if (!result.ok) {
       if (result.code === "not_found") {
@@ -78,6 +102,8 @@ export async function POST(
       garminWorkoutId: result.garminWorkoutId,
       garminScheduleId: result.garminScheduleId,
       scheduledDate: result.scheduledDate,
+      mode: result.mode,
+      calendarState: result.calendarState,
     });
   } catch (error: unknown) {
     if (error instanceof GarminNotConnectedError) {
