@@ -13,6 +13,7 @@ import {
 import { auth } from "@/lib/firebase";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
+import { registrationOrganizerStatusLabel } from "@/lib/registration-status";
 
 const RACE_HUB_JOIN_INTENT_KEY = "raceHubJoinIntent";
 const RACE_HUB_JOIN_INTENT_SLUG_KEY = "raceHubJoinIntentSlug";
@@ -27,6 +28,9 @@ type PublicRace = {
   state: string | null;
   distanceLabel: string | null;
   registrationUrl: string | null;
+  registrationCloseDate: string | null;
+  registrationSoldOut?: boolean | null;
+  transferDeadline?: string | null;
 };
 
 /**
@@ -355,6 +359,12 @@ export default function RaceHubJoinSignupExplainerPage() {
     );
   }
 
+  const organizerRegistrationStatus = registrationOrganizerStatusLabel({
+    registrationUrl: race.registrationUrl,
+    registrationCloseDate: race.registrationCloseDate,
+    registrationSoldOut: race.registrationSoldOut,
+  });
+
   return (
     <div className="min-h-[100dvh] bg-gradient-to-br from-sky-50 to-orange-50 flex flex-col items-center justify-start sm:justify-center overflow-y-auto px-4 py-8 sm:py-10">
       <div className="max-w-md w-full">
@@ -388,6 +398,11 @@ export default function RaceHubJoinSignupExplainerPage() {
               This does not register you with the race organizer. After signup, you&apos;ll confirm that you&apos;re
               running this race.
             </p>
+            {organizerRegistrationStatus ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                {organizerRegistrationStatus} — you can still join the Race Hub on GoFast.
+              </p>
+            ) : null}
           </div>
 
           {error && (

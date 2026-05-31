@@ -348,6 +348,14 @@ export async function POST(request: NextRequest) {
       racePayload,
       "registrationDeadline"
     );
+    const registrationSoldOut = readOptionalBoolean(
+      racePayload,
+      "registrationSoldOut"
+    );
+    const transferDeadline = readOptionalDateTime(
+      racePayload,
+      "transferDeadline"
+    );
 
     let registrationFee: number | null | undefined = undefined;
     if ("priceCents" in racePayload) {
@@ -415,6 +423,8 @@ export async function POST(request: NextRequest) {
       ...(registrationCloseDate !== undefined
         ? { registrationCloseDate }
         : {}),
+      ...(registrationSoldOut !== undefined ? { registrationSoldOut } : {}),
+      ...(transferDeadline !== undefined ? { transferDeadline } : {}),
       ...(registrationFee !== undefined ? { registrationFee } : {}),
       ...(companyRegistrationId !== null
         ? { companyRegistrationId }

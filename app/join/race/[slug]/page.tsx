@@ -8,6 +8,10 @@ import { auth } from "@/lib/firebase";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import api from "@/lib/api";
 import { ExternalLink, MapPin, Trophy } from "lucide-react";
+import {
+  isRegistrationOrganizerCtaOpen,
+  registrationOrganizerStatusLabel,
+} from "@/lib/registration-status";
 
 const RACE_HUB_JOIN_INTENT_KEY = "raceHubJoinIntent";
 const RACE_HUB_JOIN_INTENT_SLUG_KEY = "raceHubJoinIntentSlug";
@@ -23,6 +27,9 @@ type PublicRace = {
   state: string | null;
   distanceLabel: string | null;
   registrationUrl: string | null;
+  registrationCloseDate: string | null;
+  registrationSoldOut?: boolean | null;
+  transferDeadline?: string | null;
 };
 
 function firstNameFromDisplayName(name: string | null | undefined): string | null {
@@ -177,7 +184,14 @@ export default function RaceHubJoinFrontDoorPage() {
       await api.post("/race-signups", { raceRegistryId: race.id });
       localStorage.removeItem(RACE_HUB_JOIN_INTENT_KEY);
       localStorage.removeItem(RACE_HUB_JOIN_INTENT_SLUG_KEY);
-      if (race.registrationUrl?.trim()) {
+      if (
+        race.registrationUrl?.trim() &&
+        isRegistrationOrganizerCtaOpen({
+          registrationUrl: race.registrationUrl,
+          registrationCloseDate: race.registrationCloseDate,
+          registrationSoldOut: race.registrationSoldOut,
+        })
+      ) {
         setRegistrationNudge(true);
       } else {
         router.replace(`/race-hub/${race.id}`);
@@ -258,8 +272,19 @@ export default function RaceHubJoinFrontDoorPage() {
   const locationText = [race.city, race.state].filter(Boolean).join(", ") || null;
   const firstName = athleteFirstName(firebaseUser);
   const registrationUrl = race.registrationUrl?.trim() || null;
+  const organizerRegistrationOpen = isRegistrationOrganizerCtaOpen({
+    registrationUrl: race.registrationUrl,
+    registrationCloseDate: race.registrationCloseDate,
+    registrationSoldOut: race.registrationSoldOut,
+  });
+  const activeRegistrationUrl = organizerRegistrationOpen ? registrationUrl : null;
+  const organizerRegistrationStatus = registrationOrganizerStatusLabel({
+    registrationUrl: race.registrationUrl,
+    registrationCloseDate: race.registrationCloseDate,
+    registrationSoldOut: race.registrationSoldOut,
+  });
 
-  if (showJoinConfirmation && firebaseUser && registrationNudge && registrationUrl) {
+  if (showJoinConfirmation && firebaseUser && registrationNudge && activeRegistrationUrl) {
     return (
       <div className={pageShell()}>
         <div className={cardShell()}>
@@ -270,7 +295,7 @@ export default function RaceHubJoinFrontDoorPage() {
               yet? Use the official link when you&apos;re ready.
             </p>
             <a
-              href={registrationUrl}
+              href={activeRegistrationUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="mb-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-orange-500 bg-white px-6 py-3 text-lg font-semibold text-orange-600 transition hover:bg-orange-50"
@@ -377,6 +402,11 @@ export default function RaceHubJoinFrontDoorPage() {
               If you&apos;re running, we&apos;ll add it to My Races, put it on your GoFast calendar, and open the Race
               Hub.
             </p>
+            {organizerRegistrationStatus ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
+                {organizerRegistrationStatus} — you can still join the Race Hub on GoFast.
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-3 text-left">
@@ -393,9 +423,9 @@ export default function RaceHubJoinFrontDoorPage() {
               </p>
             </div>
 
-            {registrationUrl ? (
+            {activeRegistrationUrl ? (
               <a
-                href={registrationUrl}
+                href={activeRegistrationUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full inline-flex items-center justify-center gap-2 rounded-xl border-2 border-orange-500 bg-white px-6 py-3 text-base sm:text-lg font-semibold text-orange-600 transition hover:bg-orange-50"
@@ -403,7 +433,7 @@ export default function RaceHubJoinFrontDoorPage() {
                 <ExternalLink className="w-5 h-5 shrink-0" />
                 I plan to, but need to register first
               </a>
-            ) : (
+            ) : organizerRegistrationStatus ? null : (
               <p className="text-center text-xs text-gray-500 py-2">
                 Official registration link not available for this race yet.
               </p>

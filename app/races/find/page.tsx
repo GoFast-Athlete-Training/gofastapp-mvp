@@ -14,6 +14,10 @@ import {
   raceSelectorDescription,
   raceSelectorTagline,
 } from "@/lib/race-selector-card";
+import {
+  isRegistrationOrganizerCtaOpen,
+  registrationOrganizerStatusLabel,
+} from "@/lib/registration-status";
 
 const BOSTON_TAG = "boston-qualifier";
 
@@ -31,6 +35,9 @@ type CatalogRace = {
   state: string | null;
   country?: string | null;
   registrationUrl: string | null;
+  registrationCloseDate?: string | null;
+  registrationSoldOut?: boolean | null;
+  transferDeadline?: string | null;
   tags?: string[];
   startTime?: string | null;
   logoUrl?: string | null;
@@ -209,6 +216,16 @@ export default function RacesFindPage() {
     const bq = race.tags?.includes(BOSTON_TAG);
     const isPast = variant === "past";
     const isFeatured = variant === "featured";
+    const registrationClosed = !isRegistrationOrganizerCtaOpen({
+      registrationUrl: race.registrationUrl,
+      registrationCloseDate: race.registrationCloseDate,
+      registrationSoldOut: race.registrationSoldOut,
+    });
+    const registrationStatusLabel = registrationOrganizerStatusLabel({
+      registrationUrl: race.registrationUrl,
+      registrationCloseDate: race.registrationCloseDate,
+      registrationSoldOut: race.registrationSoldOut,
+    });
     const tagline = raceSelectorTagline(race.summaryPhrase);
     const descriptionPreview = raceSelectorDescription(race.description, 140);
     const location = [race.city, race.state].filter(Boolean).join(", ");
@@ -319,7 +336,12 @@ export default function RacesFindPage() {
               {busy ? "Saving…" : "Add to my race calendar"}
             </button>
           )}
-          {race.registrationUrl ? (
+          {registrationClosed && registrationStatusLabel ? (
+            <span className="inline-flex items-center rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600">
+              {registrationStatusLabel}
+            </span>
+          ) : null}
+          {race.registrationUrl && !registrationClosed ? (
             <a
               href={race.registrationUrl}
               target="_blank"

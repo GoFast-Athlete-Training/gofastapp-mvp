@@ -7,6 +7,10 @@ import { auth } from "@/lib/firebase";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import api from "@/lib/api";
 import { ExternalLink } from "lucide-react";
+import {
+  isRegistrationOrganizerCtaOpen,
+  registrationOrganizerStatusLabel,
+} from "@/lib/registration-status";
 
 const RACE_HUB_JOIN_INTENT_KEY = "raceHubJoinIntent";
 const RACE_HUB_JOIN_INTENT_SLUG_KEY = "raceHubJoinIntentSlug";
@@ -21,6 +25,9 @@ type PublicRace = {
   state: string | null;
   distanceLabel: string | null;
   registrationUrl: string | null;
+  registrationCloseDate: string | null;
+  registrationSoldOut?: boolean | null;
+  transferDeadline?: string | null;
 };
 
 function pageShell(className = "") {
@@ -140,7 +147,11 @@ export default function RaceHubJoinConfirmPage() {
       localStorage.removeItem(RACE_HUB_JOIN_INTENT_KEY);
       localStorage.removeItem(RACE_HUB_JOIN_INTENT_SLUG_KEY);
 
-      if (race.registrationUrl?.trim()) {
+      if (race.registrationUrl?.trim() && isRegistrationOrganizerCtaOpen({
+        registrationUrl: race.registrationUrl,
+        registrationCloseDate: race.registrationCloseDate,
+        registrationSoldOut: race.registrationSoldOut,
+      })) {
         setRegistrationNudge(true);
       } else {
         router.replace(`/race-hub/${race.id}`);
@@ -229,8 +240,19 @@ export default function RaceHubJoinConfirmPage() {
   }
 
   const registrationUrl = race.registrationUrl?.trim() || null;
+  const organizerRegistrationOpen = isRegistrationOrganizerCtaOpen({
+    registrationUrl: race.registrationUrl,
+    registrationCloseDate: race.registrationCloseDate,
+    registrationSoldOut: race.registrationSoldOut,
+  });
+  const activeRegistrationUrl = organizerRegistrationOpen ? registrationUrl : null;
+  const organizerRegistrationStatus = registrationOrganizerStatusLabel({
+    registrationUrl: race.registrationUrl,
+    registrationCloseDate: race.registrationCloseDate,
+    registrationSoldOut: race.registrationSoldOut,
+  });
 
-  if (registrationNudge && registrationUrl) {
+  if (registrationNudge && activeRegistrationUrl) {
     return (
       <div className={pageShell()}>
         <div className={cardShell()}>
@@ -241,7 +263,7 @@ export default function RaceHubJoinConfirmPage() {
               yet? Use the official link when you&apos;re ready.
             </p>
             <a
-              href={registrationUrl}
+              href={activeRegistrationUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="mb-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-orange-500 bg-white px-6 py-3 text-lg font-semibold text-orange-600 transition hover:bg-orange-50"
@@ -274,6 +296,11 @@ export default function RaceHubJoinConfirmPage() {
           <p className="mt-3 text-xs text-gray-500">
             This does not register you with the race organizer.
           </p>
+          {organizerRegistrationStatus ? (
+            <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {organizerRegistrationStatus} — you can still join the Race Hub on GoFast.
+            </p>
+          ) : null}
         </div>
 
         {joinError ? (

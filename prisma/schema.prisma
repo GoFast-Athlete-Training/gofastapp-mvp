@@ -121,6 +121,8 @@ model Athlete {
   athlete_race_signups    athlete_race_signups[]
   athlete_race_results    athlete_race_results[]
   race_memberships        race_memberships[]
+  training_cohort_memberships training_cohort_memberships[]
+  training_cohort_messages training_cohort_messages[]
   race_messages           race_messages[]
   race_announcements      race_announcements[]
   race_events_organized   race_events[]            @relation("RaceEventOrganizer")
@@ -135,7 +137,7 @@ model Athlete {
   scheduled_runs                 scheduled_runs[]
 }
 
-/// Human coach — first-class entity (Firebase auth), parallel to Athlete. Used as userId in race_trainer_members when role = COACH.
+/// Human coach — first-class entity (Firebase auth), parallel to Athlete.
 model Coach {
   id         String   @id @default(cuid())
   firebaseId String   @unique
@@ -360,6 +362,10 @@ model race_registry {
   officialWebsiteUrl      String?
   raceDate                DateTime
   registrationCloseDate   DateTime?
+  /// Capacity closed before deadline (e.g. sold out); hides external registration CTA.
+  registrationSoldOut     Boolean                   @default(false)
+  /// Last calendar day for official bib transfers (separate from registration close).
+  transferDeadline        DateTime?
   registrationFee         Float?
   registrationOpenDate    DateTime?
   registrationOpenNow     Boolean                   @default(false)
@@ -392,7 +398,8 @@ model race_registry {
   run_crew_specific_races  run_crew_specific_races[]
   run_crews                run_crews[]
   training_plans           training_plans[]
-  race_trainer_groups      race_trainer_groups[]
+  training_cohorts         training_cohorts[]
+  training_cohort_memberships training_cohort_memberships[]
   athlete_goals            AthleteGoal[]
   athlete_race_signups     athlete_race_signups[]
   athlete_race_results     athlete_race_results[]
@@ -1084,6 +1091,7 @@ model training_plan_preset {
   /// JSON: standardMiles, minMiles, paceOffsetSecPerMile, weeklyTargetBufferMiles (easy-day defaults / pace vs 5K anchor)
   easyRunConfig     Json?
   training_plans  training_plans[]
+  training_cohorts training_cohorts[]
 }
 
 /// Long-run rotation: cycle positions map to catalogue; many presets can share one.
@@ -1216,6 +1224,8 @@ model training_plans {
   athleteId            String
   raceId               String?
   athleteGoalId        String?
+  /// Optional link to the training cohort this plan was created through
+  cohortId             String?
   /// Optional link to a training_plan_preset; null = generation uses hardcoded defaults
   presetId             String?
   name                 String
@@ -1267,10 +1277,13 @@ model training_plans {
   athlete_goal         AthleteGoal?           @relation(fields: [athleteGoalId], references: [id], onDelete: SetNull)
   pace_adjustment_logs pace_adjustment_log[]
   training_plan_preset training_plan_preset? @relation(fields: [presetId], references: [id])
+  training_cohort      training_cohorts?     @relation(fields: [cohortId], references: [id], onDelete: SetNull)
+  cohort_membership    training_cohort_memberships?
 
   @@index([athleteGoalId])
   @@index([athleteId, lifecycleStatus])
   @@index([presetId])
+  @@index([cohortId])
 }
 
 
@@ -1839,59 +1852,111 @@ enum RouteVibe {
   BEGINNER_FRIENDLY
 }
 
-// ─── RaceBuildTrainer ────────────────────────────────────────────────────────
+// ─── Training Cohorts ─────────────────────────────────────────────────────────
 //
-// A training group anchored to a specific race. Members "bolt to" this group
-// to train together for the event. Distinct from run_crews (organic/ongoing);
-// this is race-first and time-bounded (ends at race date).
-//
-// Race data source: race_registry (product catalog). The companyRaceId links
-// back to GoFastCompany's curated race content (races.id) for public page
-// cross-referencing.
+// Race-scoped virtual training cohort. Staff seed a preset + optional default
+// start date; athletes join and receive individual materialized training_plans.
 
-model race_trainer_groups {
-  id             String                    @id @default(cuid())
-  raceId         String                    // FK → race_registry (product catalog)
-  companyRaceId  String?                   // Optional reference to GoFastCompany races.id
-  name           String                    // e.g. "Training for Boston 2026"
-  handle         String                    @unique  // URL-safe slug
-  description    String?
-  logo           String?
-  joinCode       String                    @unique
-  city           String?
-  state          String?
-  isActive       Boolean                   @default(true)
-  createdAt      DateTime                  @default(now())
-  updatedAt      DateTime                  @updatedAt
+enum TrainingCohortStatus {
+  DRAFT
+  OPEN
+  ACTIVE
+  COMPLETE
+}
 
-  race_registry          race_registry              @relation(fields: [raceId], references: [id])
-  race_trainer_members   race_trainer_members[]
+enum TrainingCohortRole {
+  MEMBER
+  PACER
+  ADMIN
+}
+
+model training_cohorts {
+  id                   String               @id @default(cuid())
+  raceId               String
+  companyRaceId        String?
+  presetId             String
+  cohortName           String
+  handle               String               @unique
+  description          String?
+  logo                 String?
+  joinCode             String               @unique
+  defaultPlanStartDate DateTime?
+  status               TrainingCohortStatus @default(DRAFT)
+  companyStaffId       String?
+  city                 String?
+  state                String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  race_registry            race_registry                 @relation(fields: [raceId], references: [id])
+  training_plan_preset     training_plan_preset          @relation(fields: [presetId], references: [id])
+  memberships              training_cohort_memberships[]
+  training_plans           training_plans[]
+  messages                 training_cohort_messages[]
+  announcements            training_cohort_announcements[]
 
   @@index([raceId])
   @@index([companyRaceId])
-  @@map("race_trainer_groups")
+  @@index([presetId])
+  @@index([status])
+  @@map("training_cohorts")
 }
 
-model race_trainer_members {
-  id             String                    @id @default(cuid())
-  groupId        String
-  userId         String                    // FK → users (app user)
-  role           RaceTrainerRole           @default(MEMBER)
-  joinedAt       DateTime                  @default(now())
+/// Junction: athlete joined this cohort for this race; links to their built plan.
+model training_cohort_memberships {
+  id             String             @id @default(cuid())
+  cohortId       String
+  raceId         String
+  athleteId      String
+  trainingPlanId String?            @unique
+  role           TrainingCohortRole @default(MEMBER)
+  joinedAt       DateTime           @default(now())
 
-  race_trainer_groups    race_trainer_groups        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  cohort        training_cohorts @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  race_registry race_registry    @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  Athlete       Athlete          @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  training_plan training_plans?  @relation(fields: [trainingPlanId], references: [id], onDelete: SetNull)
 
-  @@unique([groupId, userId])
-  @@index([groupId])
-  @@index([userId])
-  @@map("race_trainer_members")
+  @@unique([cohortId, athleteId])
+  @@index([cohortId])
+  @@index([raceId, athleteId])
+  @@index([athleteId])
+  @@index([trainingPlanId])
+  @@map("training_cohort_memberships")
 }
 
-enum RaceTrainerRole {
-  MEMBER
-  PACER
-  COACH
-  ADMIN
+model training_cohort_messages {
+  id        String   @id @default(cuid())
+  cohortId  String
+  athleteId String
+  content   String
+  topic     String   @default("general")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cohort  training_cohorts @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  Athlete Athlete          @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@index([cohortId])
+  @@index([athleteId])
+  @@map("training_cohort_messages")
+}
+
+model training_cohort_announcements {
+  id               String   @id @default(cuid())
+  cohortId         String
+  title            String
+  content          String
+  staffGeneratedId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  archivedAt       DateTime?
+
+  cohort training_cohorts @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
+  @@index([cohortId])
+  @@index([staffGeneratedId])
+  @@map("training_cohort_announcements")
 }
 
 // Route/location catalogue. Created manually or auto-seeded from run meetUpPoint/title.

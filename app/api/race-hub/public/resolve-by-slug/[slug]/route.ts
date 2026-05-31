@@ -37,6 +37,9 @@ export async function GET(
         distanceLabel: true,
         distanceMeters: true,
         registrationUrl: true,
+        registrationCloseDate: true,
+        registrationSoldOut: true,
+        transferDeadline: true,
       },
     });
 
@@ -57,6 +60,9 @@ export async function GET(
           distanceLabel: true,
           distanceMeters: true,
           registrationUrl: true,
+          registrationCloseDate: true,
+          registrationSoldOut: true,
+          transferDeadline: true,
         },
       });
     }
@@ -78,6 +84,9 @@ export async function GET(
         distanceLabel: race.distanceLabel,
         distanceMeters: race.distanceMeters,
         registrationUrl: race.registrationUrl,
+        registrationCloseDate: race.registrationCloseDate?.toISOString() ?? null,
+        registrationSoldOut: race.registrationSoldOut,
+        transferDeadline: race.transferDeadline?.toISOString() ?? null,
       },
     });
   } catch (err) {
