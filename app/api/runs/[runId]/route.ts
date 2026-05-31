@@ -563,6 +563,9 @@ export async function PUT(
     if (body.igPostGraphic !== undefined) {
       updateData.igPostGraphic = body.igPostGraphic === null || body.igPostGraphic === '' ? null : String(body.igPostGraphic).trim();
     }
+    if (body.published !== undefined) {
+      updateData.published = body.published === true;
+    }
 
     // Core content (edit run)
     if (body.title !== undefined && body.title !== null && String(body.title).trim()) {
@@ -717,6 +720,7 @@ export async function PUT(
         mapImageUrl: updated.mapImageUrl,
         stravaMapUrl: updated.stravaMapUrl,
         staffNotes: updated.staffNotes,
+        published: updated.published,
       },
     });
   } catch (error: any) {

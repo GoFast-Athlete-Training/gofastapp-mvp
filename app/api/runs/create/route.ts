@@ -138,6 +138,7 @@ export async function POST(request: NextRequest) {
       runClubId: bodyRunClubId,
       /** Link instance to run_series (e.g. Company build-instance) */
       runSeriesId: bodyRunSeriesId,
+      published: bodyPublished,
     } = body;
 
     const hadExplicitCity = !!(
@@ -467,6 +468,10 @@ export async function POST(request: NextRequest) {
       !finalRunClubId &&
       !runCrewId?.trim();
 
+    const published =
+      bodyPublished === true ||
+      (isAthleteJoinMyWorkoutShare && bodyPublished !== false);
+
     const createData: Record<string, unknown> = {
       id: generateId(),
       gofastCity: finalCitySlug,
@@ -478,6 +483,7 @@ export async function POST(request: NextRequest) {
       athleteGeneratedId: athleteGeneratedId?.trim() || null,
       title: title.trim(),
       workflowStatus: isAthleteJoinMyWorkoutShare ? 'APPROVED' : 'DEVELOP',
+      published,
       dayOfWeek: toCanonicalDayOfWeek(dayOfWeek) ?? (dayOfWeek?.trim() || null) as string | null,
       date: runDateObj,
       startTimeHour: startTimeHour ? parseInt(startTimeHour) : null,

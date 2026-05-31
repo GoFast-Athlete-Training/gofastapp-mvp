@@ -895,6 +895,8 @@ model city_runs {
   slug                String?              @unique // URL-friendly slug: "title-of-run" (generated from title)
   dayOfWeek           String?
   workflowStatus      RunWorkflowStatus    @default(DEVELOP)
+  /// Public discoverability — independent of workflowStatus editorial pipeline.
+  published           Boolean              @default(false)
   endPoint            String?
   meetUpStreetAddress String?
   meetUpCity          String?

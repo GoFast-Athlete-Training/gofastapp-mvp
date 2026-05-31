@@ -1,7 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import type { RunWorkflowStatus } from '@prisma/client';
 
-const PUBLIC_RUN_WORKFLOW: RunWorkflowStatus[] = ['PENDING', 'SUBMITTED', 'APPROVED'];
 const METERS_PER_MILE = 1609.344;
 
 export type PublicAthletePayload = Awaited<ReturnType<typeof loadPublicAthletePage>>;
@@ -76,7 +74,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
       where: {
         athleteGeneratedId: athlete.id,
         date: { gte: now },
-        workflowStatus: { in: PUBLIC_RUN_WORKFLOW },
+        published: true,
       },
       orderBy: { date: 'asc' },
       take: 20,

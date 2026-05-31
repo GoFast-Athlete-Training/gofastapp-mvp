@@ -3,9 +3,6 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import type { DiscoverRunnerCard } from '@/lib/find-runners-types';
-import type { RunWorkflowStatus } from '@prisma/client';
-
-const PUBLIC_RUN_WORKFLOW: RunWorkflowStatus[] = ['PENDING', 'SUBMITTED', 'APPROVED'];
 
 function pickDisplayRace(
   plan: {
@@ -181,7 +178,7 @@ export async function GET(request: Request) {
             where: {
               athleteGeneratedId: { in: ids },
               date: { gte: now },
-              workflowStatus: { in: PUBLIC_RUN_WORKFLOW },
+              published: true,
             },
             orderBy: { date: 'asc' },
             select: {

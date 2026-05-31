@@ -89,10 +89,11 @@ export async function getRuns(filters: GetRunsFilters = {}) {
   
   // Day filter applied client-side from startDate (each city run is a single occurrence)
 
-  // Public run hydration: only show upcoming runs (startDate >= start of today UTC)
+  // Public run hydration: only show upcoming published runs (startDate >= start of today UTC)
   const startOfToday = new Date();
   startOfToday.setUTCHours(0, 0, 0, 0);
   where.date = { gte: startOfToday };
+  where.published = true;
 
   // First, get all runs matching filters with RunClub relation (FK)
   // Note: Prisma model `city_runs` maps to table `city_runs` (migrated from run_crew_runs)
@@ -127,6 +128,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
         description: true,
         stravaMapUrl: true,
         workflowStatus: true,
+        published: true,
         routeNeighborhood: true,
         runType: true,
         workoutDescription: true,
@@ -208,6 +210,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     description: run.description,
     stravaMapUrl: run.stravaMapUrl,
     workflowStatus: run.workflowStatus,
+    published: run.published,
     // Exclude sensitive fields:
     // runCrewId, athleteGeneratedId, staffGeneratedId
   }));
