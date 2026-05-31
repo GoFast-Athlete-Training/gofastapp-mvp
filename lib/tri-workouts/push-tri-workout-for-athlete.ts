@@ -81,7 +81,7 @@ export async function pushTriWorkoutToGarminForAthlete(
           sport: leg.sport,
           ok: true,
           garminWorkoutId: r.garminWorkoutId,
-          garminScheduleId: r.garminScheduleId,
+          garminScheduleId: r.garminScheduleId ?? undefined,
         });
       } else {
         legs.push({
@@ -106,18 +106,17 @@ export async function pushTriWorkoutToGarminForAthlete(
         });
         continue;
       }
-      const r = await pushWorkoutToGarminForAthlete(
-        athleteId,
-        leg.runWorkoutId,
-        scheduledDate
-      );
+      const r = await pushWorkoutToGarminForAthlete(athleteId, leg.runWorkoutId, {
+        scheduleDateYmdOverride: scheduledDate,
+        mode: "schedule-today",
+      });
       if (r.ok) {
         legs.push({
           legId: leg.id,
           sport: leg.sport,
           ok: true,
           garminWorkoutId: r.garminWorkoutId,
-          garminScheduleId: r.garminScheduleId,
+          garminScheduleId: r.garminScheduleId ?? undefined,
         });
       } else {
         legs.push({

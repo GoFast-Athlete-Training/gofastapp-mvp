@@ -17,6 +17,7 @@ import { segmentSnapshotDocumentFromDbRows } from "@/lib/training/workout-segmen
 import { materializeWorkoutForPlanDay } from "@/lib/training/workout-materializer";
 import { expandSegmentsForGarminPush } from "@/lib/training/segment-summary";
 import { garminTitleForWorkout } from "@/lib/training/garmin-activity-match-helpers";
+import { normalizePaceTargetEncodingVersion } from "@/lib/workout-generator/pace-calculator";
 import {
   type GarminPushMode,
   garminCalendarSyncState,
@@ -122,6 +123,8 @@ function segmentSnapshotFromWorkout(
     repeatCount: number | null;
     notes: string | null;
     paceTargetEncodingVersion: number | null;
+    recoveryDurationType?: string | null;
+    recoveryDurationValue?: number | null;
   }>
 ) {
   return segmentSnapshotDocumentFromDbRows(
@@ -133,7 +136,11 @@ function segmentSnapshotFromWorkout(
       targets: seg.targets,
       repeatCount: seg.repeatCount,
       notes: seg.notes,
-      paceTargetEncodingVersion: seg.paceTargetEncodingVersion,
+      paceTargetEncodingVersion: normalizePaceTargetEncodingVersion(
+        seg.paceTargetEncodingVersion
+      ),
+      recoveryDurationType: seg.recoveryDurationType ?? null,
+      recoveryDurationValue: seg.recoveryDurationValue ?? null,
     })),
     "garmin_push"
   );

@@ -2295,7 +2295,7 @@ export default function WorkoutDetailPage() {
               {showGarminRetryAction && (
                 <button
                   type="button"
-                  onClick={handlePushToGarmin}
+                  onClick={() => void handlePushToGarmin()}
                   disabled={pushing || copyRepushing || duplicatingWorkout}
                   className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-orange-300 bg-white px-3 py-1.5 text-sm font-semibold text-orange-900 hover:bg-orange-50 disabled:opacity-50"
                 >
