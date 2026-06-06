@@ -72,12 +72,12 @@ export async function materializeTodayPlanWorkoutForAthlete(
   }
 
   try {
-    const { workoutId } = await materializeWorkoutForPlanDay({
+    const result = await materializeWorkoutForPlanDay({
       planId: plan.id,
       athleteId,
       dateParam,
     });
-    return { status: "materialized", workoutId };
+    return { status: "materialized", workoutId: result.workoutId };
   } catch (e) {
     const message = e instanceof Error ? e.message : "materialize failed";
     return { status: "error", message };

@@ -1,6 +1,6 @@
 /**
- * Materialize one `workouts` row (+ segments) for a plan calendar day from `planSchedule`,
- * and stamp `workoutId` back onto the structured JSON day when applicable.
+ * Materialize one `workouts` row (+ segments) for a plan calendar day from `planSchedule`.
+ * Resolves existing rows by `(athleteId, planId, date)` — not JSON `workoutId` stamps.
  */
 
 import type { Prisma } from "@prisma/client";
@@ -10,8 +10,6 @@ import {
   planScheduleDayForDateKey,
   type PlanScheduleDay,
 } from "./plan-schedule";
-import { isStructuredPlanWeek } from "./plan-schedule-schema";
-import { dateForDayInWeek } from "./schedule-parser";
 import {
   prescribe,
   anchorSecondsPerMileFromPlanPace,
@@ -25,6 +23,20 @@ import {
 import { resolveGoalRacePace } from "./goal-pace-calculator";
 import { EASY_RUN_NOT_CONFIGURED } from "./run-type-config-validation";
 import { ensureWorkoutPrescriptionNarrative } from "./prescription-narrative-service";
+
+export class MaterializeWorkoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MaterializeWorkoutError";
+  }
+}
+
+export const NO_PRESCRIPTION_STEPS = "NO_PRESCRIPTION_STEPS";
+
+export type MaterializeWorkoutForPlanDayResult = {
+  workoutId: string;
+  status: "already_ready" | "materialized";
+};
 
 function enqueuePrescriptionNarrative(workoutId: string, athleteId: string): void {
   void ensureWorkoutPrescriptionNarrative({ workoutId, athleteId }).catch((e) =>
@@ -43,18 +55,14 @@ function utcDayBounds(d: Date): { gte: Date; lte: Date } {
 
 function parseDateParam(dateParam: string): Date {
   const s = dateParam.trim();
-  if (!s) throw new Error("date is required");
+  if (!s) throw new MaterializeWorkoutError("date is required");
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
     return new Date(`${s}T12:00:00.000Z`);
   }
   const hasTz = /Z$/i.test(s) || /[+-]\d{2}:?\d{2}$/.test(s);
   const d = new Date(hasTz ? s : `${s}Z`);
-  if (Number.isNaN(d.getTime())) throw new Error("Invalid date");
+  if (Number.isNaN(d.getTime())) throw new MaterializeWorkoutError("Invalid date");
   return d;
-}
-
-function dateKeyUtc(d: Date): string {
-  return utcDateOnly(d).toISOString().slice(0, 10);
 }
 
 function workoutNeedsRematerialize(params: {
@@ -81,14 +89,27 @@ function workoutNeedsRematerialize(params: {
   return false;
 }
 
+function assertPrescriptionSteps(
+  steps: WorkoutStep[],
+  scheduled: PlanScheduleDay,
+  dateKey: string
+): void {
+  if (steps.length > 0) return;
+  throw new MaterializeWorkoutError(
+    `${NO_PRESCRIPTION_STEPS}: Could not prescribe segments for ${scheduled.workoutType} on ${dateKey}. Check catalogue assignment and 5K pace.`
+  );
+}
+
 async function createSegmentsForWorkout(params: {
   tx: Prisma.TransactionClient;
   workoutId: string;
   steps: WorkoutStep[];
   snapshotSource: SegmentSnapshotSource;
+  scheduled: PlanScheduleDay;
+  dateKey: string;
 }): Promise<void> {
-  const { tx, workoutId, steps, snapshotSource } = params;
-  if (steps.length === 0) return;
+  const { tx, workoutId, steps, snapshotSource, scheduled, dateKey } = params;
+  assertPrescriptionSteps(steps, scheduled, dateKey);
   const segmentRows: Prisma.workout_segmentsCreateManyInput[] = steps.map((s) => ({
     workoutId,
     stepOrder: s.stepOrder,
@@ -112,37 +133,99 @@ async function createSegmentsForWorkout(params: {
   });
 }
 
-function stampWorkoutIdOnStructuredPlanSchedule(params: {
-  planSchedule: unknown;
-  planStartDate: Date;
-  dateKey: string;
+async function buildPrescriptionSteps(params: {
   scheduled: PlanScheduleDay;
-  workoutId: string;
-  raceDate: Date | null;
-}): unknown {
-  const { planSchedule, planStartDate, dateKey, scheduled, workoutId, raceDate } =
-    params;
-  if (!Array.isArray(planSchedule)) return planSchedule;
-  const raceUtc = raceDate ? utcDateOnly(raceDate) : null;
+  plan: Awaited<
+    ReturnType<
+      typeof prisma.training_plans.findFirst<{
+        include: {
+          athlete_goal: {
+            select: {
+              goalTime: true;
+              goalRacePace: true;
+              distance: true;
+            };
+          };
+        };
+      }>
+    >
+  >;
+  race: {
+    raceDate: Date;
+    name: string;
+    distanceMeters: number | null;
+    distanceLabel: string | null;
+  } | null;
+}): Promise<WorkoutStep[]> {
+  const { scheduled, plan, race } = params;
+  if (!plan) {
+    throw new MaterializeWorkoutError("Plan not found");
+  }
 
-  return planSchedule.map((weekRow) => {
-    if (!isStructuredPlanWeek(weekRow)) return weekRow;
-    const wn = weekRow.weekNumber;
-    let touched = false;
-    const nextDays = weekRow.days.map((d) => {
-      const date = dateForDayInWeek(planStartDate, wn, d.dow);
-      if (dateKeyUtc(date) !== dateKey) return d;
-      const typeMatches =
-        d.workoutType === scheduled.workoutType ||
-        (scheduled.workoutType === "Race" &&
-          d.workoutType === "LongRun" &&
-          raceUtc != null &&
-          utcDateOnly(date).getTime() === raceUtc.getTime());
-      if (!typeMatches) return d;
-      touched = true;
-      return { ...d, workoutId };
+  const needsCatalogueAnchoredIT =
+    (scheduled.workoutType === "Intervals" ||
+      scheduled.workoutType === "Tempo") &&
+    Boolean(scheduled.catalogueWorkoutId);
+  const needsCatalogueAnchoredEasy =
+    scheduled.workoutType === "Easy" && Boolean(scheduled.catalogueWorkoutId);
+  const needsPace =
+    scheduled.workoutType === "Easy" ||
+    scheduled.workoutType === "LongRun" ||
+    scheduled.workoutType === "Race" ||
+    needsCatalogueAnchoredIT ||
+    needsCatalogueAnchoredEasy;
+  if (needsPace && !plan.currentFiveKPace?.trim()) {
+    throw new MaterializeWorkoutError(
+      "training_plans.currentFiveKPace is missing; set 5K pace on your profile or plan."
+    );
+  }
+
+  let catalogueEntryForDay: Awaited<
+    ReturnType<typeof prisma.workout_catalogue.findUnique>
+  > = null;
+  if (scheduled.catalogueWorkoutId) {
+    catalogueEntryForDay = await prisma.workout_catalogue.findUnique({
+      where: { id: scheduled.catalogueWorkoutId },
     });
-    return touched ? { ...weekRow, days: nextDays } : weekRow;
+    if (!catalogueEntryForDay) {
+      throw new MaterializeWorkoutError(
+        `Catalogue workout ${scheduled.catalogueWorkoutId} not found for ${scheduled.workoutType}.`
+      );
+    }
+  }
+
+  const miles = scheduled.estimatedDistanceInMeters / 1609.34;
+
+  if (scheduled.workoutType === "Easy" && !scheduled.catalogueWorkoutId?.trim()) {
+    throw new MaterializeWorkoutError(EASY_RUN_NOT_CONFIGURED);
+  }
+
+  if (!catalogueEntryForDay || !plan.currentFiveKPace?.trim()) {
+    if (scheduled.workoutType === "Easy") {
+      throw new MaterializeWorkoutError(EASY_RUN_NOT_CONFIGURED);
+    }
+    return [];
+  }
+
+  const anchorSecPerMile = anchorSecondsPerMileFromPlanPace(plan.currentFiveKPace ?? null);
+  const goalFinishTime =
+    plan.athlete_goal?.goalTime?.trim() || plan.goalRaceTime?.trim() || null;
+  const racePaceSec = resolveGoalRacePace({
+    goalTime: goalFinishTime,
+    dbGoalRacePaceSecPerMile: plan.athlete_goal?.goalRacePace ?? null,
+    planGoalRacePace: plan.goalRacePace ?? null,
+    distanceMeters: race?.distanceMeters ?? null,
+    distanceLabel: race?.distanceLabel ?? null,
+    goalDistance: plan.athlete_goal?.distance ?? null,
+  }).goalPaceSecPerMile;
+
+  return prescribe({
+    entry: catalogueEntryForDay,
+    scheduleMiles: miles,
+    anchorSecondsPerMile: anchorSecPerMile,
+    racePaceSecondsPerMile: racePaceSec,
+    planCycleIndex: scheduled.planCycleIndex ?? null,
+    easyWorkPaceOffsetOverrideSecPerMile: null,
   });
 }
 
@@ -151,7 +234,7 @@ export async function materializeWorkoutForPlanDay(params: {
   athleteId: string;
   /** `YYYY-MM-DD` (UTC) or full ISO datetime */
   dateParam: string;
-}): Promise<{ workoutId: string }> {
+}): Promise<MaterializeWorkoutForPlanDayResult> {
   const { planId, athleteId, dateParam } = params;
   const anchor = parseDateParam(dateParam.trim());
   const { gte, lte } = utcDayBounds(anchor);
@@ -179,7 +262,7 @@ export async function materializeWorkoutForPlanDay(params: {
   });
 
   if (!plan) {
-    throw new Error("Plan not found");
+    throw new MaterializeWorkoutError("Plan not found");
   }
 
   const race = plan.race_registry;
@@ -201,64 +284,41 @@ export async function materializeWorkoutForPlanDay(params: {
   });
 
   if (!scheduled) {
-    throw new Error("No scheduled workout for this date");
+    throw new MaterializeWorkoutError("No scheduled workout for this date");
   }
 
-  const stampId = scheduled.workoutId?.trim();
-  let existing: {
-    id: string;
-    catalogueWorkoutId: string | null;
-    estimatedDistanceInMeters: number | null;
-    _count: { segments: number };
-  } | null = null;
-
-  if (stampId) {
-    existing = await prisma.workouts.findFirst({
-      where: {
-        id: stampId,
-        planId,
-        athleteId,
-      },
-      select: {
-        id: true,
-        catalogueWorkoutId: true,
-        estimatedDistanceInMeters: true,
-        _count: { select: { segments: true } },
-      },
-    });
-    if (
-      existing &&
-      existing._count.segments > 0 &&
-      !workoutNeedsRematerialize({ existing: { ...existing, segmentCount: existing._count.segments }, scheduled })
-    ) {
-      enqueuePrescriptionNarrative(existing.id, athleteId);
-      return { workoutId: existing.id };
-    }
+  if (scheduled.title === "Rest") {
+    throw new MaterializeWorkoutError("No scheduled workout for this date");
   }
 
-  if (!existing) {
-    existing = await prisma.workouts.findFirst({
-      where: {
-        planId,
-        athleteId,
-        date: { gte, lte },
-      },
-      select: {
-        id: true,
-        catalogueWorkoutId: true,
-        estimatedDistanceInMeters: true,
-        _count: { select: { segments: true } },
-      },
-    });
-    if (
-      existing &&
-      existing._count.segments > 0 &&
-      !workoutNeedsRematerialize({ existing: { ...existing, segmentCount: existing._count.segments }, scheduled })
-    ) {
-      enqueuePrescriptionNarrative(existing.id, athleteId);
-      return { workoutId: existing.id };
-    }
+  let existing = await prisma.workouts.findFirst({
+    where: {
+      planId,
+      athleteId,
+      date: { gte, lte },
+    },
+    select: {
+      id: true,
+      catalogueWorkoutId: true,
+      estimatedDistanceInMeters: true,
+      _count: { select: { segments: true } },
+    },
+  });
+
+  if (
+    existing &&
+    existing._count.segments > 0 &&
+    !workoutNeedsRematerialize({
+      existing: { ...existing, segmentCount: existing._count.segments },
+      scheduled,
+    })
+  ) {
+    enqueuePrescriptionNarrative(existing.id, athleteId);
+    return { workoutId: existing.id, status: "already_ready" };
   }
+
+  const steps = await buildPrescriptionSteps({ scheduled, plan, race });
+  assertPrescriptionSteps(steps, scheduled, dateKey);
 
   if (existing && existing._count.segments > 0) {
     await prisma.workout_segments.deleteMany({ where: { workoutId: existing.id } });
@@ -273,85 +333,20 @@ export async function materializeWorkoutForPlanDay(params: {
     });
   }
 
-  const needsCatalogueAnchoredIT =
-    (scheduled.workoutType === "Intervals" ||
-      scheduled.workoutType === "Tempo") &&
-    Boolean(scheduled.catalogueWorkoutId);
-  const needsCatalogueAnchoredEasy =
-    scheduled.workoutType === "Easy" &&
-    Boolean(scheduled.catalogueWorkoutId);
-  const needsPace =
-    scheduled.workoutType === "Easy" ||
-    scheduled.workoutType === "LongRun" ||
-    scheduled.workoutType === "Race" ||
-    needsCatalogueAnchoredIT ||
-    needsCatalogueAnchoredEasy;
-  if (needsPace && !plan.currentFiveKPace?.trim()) {
-    throw new Error(
-      "training_plans.currentFiveKPace is missing; set 5K pace on your profile or plan."
-    );
-  }
-
-  let catalogueEntryForDay: Awaited<
-    ReturnType<typeof prisma.workout_catalogue.findUnique>
-  > = null;
-  if (scheduled.catalogueWorkoutId) {
-    catalogueEntryForDay = await prisma.workout_catalogue.findUnique({
-      where: { id: scheduled.catalogueWorkoutId },
-    });
-  }
-
-  const miles = scheduled.estimatedDistanceInMeters / 1609.34;
-
-  if (scheduled.workoutType === "Easy" && !scheduled.catalogueWorkoutId?.trim()) {
-    throw new Error(EASY_RUN_NOT_CONFIGURED);
-  }
-
-  let steps: ReturnType<typeof prescribe> = [];
-  if (catalogueEntryForDay && plan.currentFiveKPace?.trim()) {
-    const anchorSecPerMile = anchorSecondsPerMileFromPlanPace(
-      plan.currentFiveKPace ?? null
-    );
-    const goalFinishTime =
-      plan.athlete_goal?.goalTime?.trim() ||
-      plan.goalRaceTime?.trim() ||
-      null;
-    const racePaceSec = resolveGoalRacePace({
-      goalTime: goalFinishTime,
-      dbGoalRacePaceSecPerMile: plan.athlete_goal?.goalRacePace ?? null,
-      planGoalRacePace: plan.goalRacePace ?? null,
-      distanceMeters: race?.distanceMeters ?? null,
-      distanceLabel: race?.distanceLabel ?? null,
-      goalDistance: plan.athlete_goal?.distance ?? null,
-    }).goalPaceSecPerMile;
-    steps = prescribe({
-      entry: catalogueEntryForDay,
-      scheduleMiles: miles,
-      anchorSecondsPerMile: anchorSecPerMile,
-      racePaceSecondsPerMile: racePaceSec,
-      planCycleIndex: scheduled.planCycleIndex ?? null,
-      easyWorkPaceOffsetOverrideSecPerMile: null,
-    });
-  } else if (scheduled.workoutType === "Easy") {
-    throw new Error(EASY_RUN_NOT_CONFIGURED);
-  }
-
   if (existing) {
     await prisma.$transaction(async (tx) => {
       await createSegmentsForWorkout({
         tx,
-        workoutId: existing.id,
+        workoutId: existing!.id,
         steps,
         snapshotSource: "plan_day_materialize_existing",
+        scheduled,
+        dateKey,
       });
     });
     enqueuePrescriptionNarrative(existing.id, athleteId);
-    return { workoutId: existing.id };
+    return { workoutId: existing.id, status: "materialized" };
   }
-
-  const planJson = plan.planSchedule;
-  const jsonLooksStructured =
-    Array.isArray(planJson) && planJson.some((w) => isStructuredPlanWeek(w));
 
   const workoutId = await prisma.$transaction(async (tx) => {
     const w = await tx.workouts.create({
@@ -376,29 +371,13 @@ export async function materializeWorkoutForPlanDay(params: {
       workoutId: w.id,
       steps,
       snapshotSource: "plan_day_materialize",
+      scheduled,
+      dateKey,
     });
-
-    if (jsonLooksStructured) {
-      const nextSchedule = stampWorkoutIdOnStructuredPlanSchedule({
-        planSchedule: planJson,
-        planStartDate: plan.startDate,
-        dateKey,
-        scheduled,
-        workoutId: w.id,
-        raceDate: race?.raceDate ?? null,
-      });
-      await tx.training_plans.update({
-        where: { id: planId },
-        data: {
-          planSchedule: nextSchedule as Prisma.InputJsonValue,
-          updatedAt: new Date(),
-        },
-      });
-    }
 
     return w.id;
   });
 
   enqueuePrescriptionNarrative(workoutId, athleteId);
-  return { workoutId };
+  return { workoutId, status: "materialized" };
 }

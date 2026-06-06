@@ -2,7 +2,10 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { materializeWorkoutForPlanDay } from "@/lib/training/workout-materializer";
+import {
+  MaterializeWorkoutError,
+  materializeWorkoutForPlanDay,
+} from "@/lib/training/workout-materializer";
 
 /**
  * GET /api/training/workout/day?planId=&date=
@@ -34,7 +37,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ workoutId });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "Failed to resolve workout";
+    const msg =
+      e instanceof MaterializeWorkoutError
+        ? e.message
+        : e instanceof Error
+          ? e.message
+          : "Failed to resolve workout";
     const lower = msg.toLowerCase();
     const status =
       lower.includes("not found") || lower.includes("no scheduled")
