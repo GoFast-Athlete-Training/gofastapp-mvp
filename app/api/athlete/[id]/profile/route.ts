@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { getAthleteById, updateAthlete } from '@/lib/domain-athlete';
+import { normalizeProfileGender, parseProfileBirthday } from '@/lib/profile-validation';
 import { syncAthleteFiveKPaceToActivePlan } from '@/lib/training/plan-lifecycle';
 
 /** GET /api/athlete/[id]/profile — same row as GET /api/athlete/[id] (auth: own athlete only) */
@@ -144,17 +145,32 @@ export async function PUT(
           { status: 400 }
         );
       }
-      data.birthday = new Date(body.birthday);
-    }
-    if (has('gender')) {
-      const v = trimReq(body.gender);
-      if (!v) {
+      const birthdayDate = parseProfileBirthday(body.birthday);
+      if (!birthdayDate) {
         return NextResponse.json(
-          { success: false, error: 'Invalid gender', message: 'Gender is required when provided' },
+          {
+            success: false,
+            error: 'Invalid birthday',
+            message: 'Enter a valid birthday in YYYY-MM-DD format',
+          },
           { status: 400 }
         );
       }
-      data.gender = v;
+      data.birthday = birthdayDate;
+    }
+    if (has('gender')) {
+      const normalizedGender = normalizeProfileGender(body.gender);
+      if (!normalizedGender) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Invalid gender',
+            message: 'Gender must be male or female',
+          },
+          { status: 400 }
+        );
+      }
+      data.gender = normalizedGender;
     }
     if (has('city')) {
       const v = trimReq(body.city);
