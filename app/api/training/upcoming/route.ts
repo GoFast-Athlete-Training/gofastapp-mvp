@@ -3,7 +3,9 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { planScheduleDaysForWeek, collectCatalogueWorkoutIdsFromPlanSchedule } from "@/lib/training/plan-schedule";
+import { planScheduleDaysForWeek } from "@/lib/training/plan-schedule";
+import { loadCatalogueTitleByIdFromPlanSchedule } from "@/lib/training/catalogue-title-map";
+import { mergePlanDayTitle } from "@/lib/training/workout-display-title";
 import {
   currentTrainingWeekNumber,
   effectiveTrainingWeekCount,
@@ -115,17 +117,9 @@ export async function GET(request: NextRequest) {
       planWeekNumber = startWeek;
       planTotalWeeks = effectiveWeeks;
 
-      const allCatIds = collectCatalogueWorkoutIdsFromPlanSchedule(plan.planSchedule);
-      let catalogueTitleById: Record<string, string> = {};
-      if (allCatIds.length > 0) {
-        const catRows = await prisma.workout_catalogue.findMany({
-          where: { id: { in: allCatIds } },
-          select: { id: true, name: true },
-        });
-        for (const r of catRows) {
-          catalogueTitleById[r.id] = r.name;
-        }
-      }
+      const catalogueTitleById = await loadCatalogueTitleByIdFromPlanSchedule(
+        plan.planSchedule
+      );
 
       for (
         let weekNum = startWeek;
@@ -226,10 +220,18 @@ export async function GET(request: NextRequest) {
       const slot = planByDate.get(dateKey)!;
       const row = materializedByKey.get(dateKey);
       const workoutId = row?.id ?? null;
+      const workoutType = row?.workoutType ?? slot.workoutType;
+      const estimatedDistanceInMeters =
+        row?.estimatedDistanceInMeters ?? slot.estimatedDistanceInMeters;
       merged.push({
         id: workoutId ?? `plan-${dateKey}`,
-        title: row?.title ?? slot.title,
-        workoutType: row?.workoutType ?? slot.workoutType,
+        title: mergePlanDayTitle({
+          rowTitle: row?.title,
+          scheduleTitle: slot.title,
+          workoutType,
+          estimatedDistanceInMeters,
+        }),
+        workoutType,
         date: `${dateKey}T12:00:00.000Z`,
         matchedActivityId: row?.matchedActivityId ?? null,
         skippedAt: row?.skippedAt ?? null,
@@ -239,8 +241,7 @@ export async function GET(request: NextRequest) {
         workoutId,
         isPlanSession: true,
         hasScheduledTime: false,
-        estimatedDistanceInMeters:
-          row?.estimatedDistanceInMeters ?? slot.estimatedDistanceInMeters,
+        estimatedDistanceInMeters,
       });
     }
 

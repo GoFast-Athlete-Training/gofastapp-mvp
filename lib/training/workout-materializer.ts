@@ -23,6 +23,7 @@ import {
 import { resolveGoalRacePace } from "./goal-pace-calculator";
 import { EASY_RUN_NOT_CONFIGURED } from "./run-type-config-validation";
 import { ensureWorkoutPrescriptionNarrative } from "./prescription-narrative-service";
+import { loadCatalogueTitleByIdFromPlanSchedule } from "./catalogue-title-map";
 
 export class MaterializeWorkoutError extends Error {
   constructor(message: string) {
@@ -272,6 +273,10 @@ export async function materializeWorkoutForPlanDay(params: {
       ? metersToMiles(Number(race.distanceMeters))
       : null;
 
+  const catalogueTitleById = await loadCatalogueTitleByIdFromPlanSchedule(
+    plan.planSchedule
+  );
+
   const scheduled = planScheduleDayForDateKey({
     planStartDate: plan.startDate,
     planSchedule: plan.planSchedule,
@@ -280,7 +285,7 @@ export async function materializeWorkoutForPlanDay(params: {
     raceDistanceMiles,
     dateKey,
     maxWeekNumber: plan.totalWeeks,
-    catalogueTitleById: {},
+    catalogueTitleById,
   });
 
   if (!scheduled) {

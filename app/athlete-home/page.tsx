@@ -1815,7 +1815,8 @@ export default function AthleteHomePage() {
                   </p>
                   {!lastSyncedActivity.linkedWorkoutId ? (
                     <p className="text-xs text-gray-600 mt-2">
-                      Not linked to a plan workout — open the activity to match when ready.
+                      Not linked to a plan workout yet — it should link automatically after Garmin
+                      sync. Open the activity only if you need to match it manually.
                     </p>
                   ) : null}
                 </div>

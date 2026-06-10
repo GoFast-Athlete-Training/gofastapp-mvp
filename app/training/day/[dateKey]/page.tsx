@@ -836,13 +836,10 @@ export default function TrainingPlanDayPreviewPage() {
                 </Link>
               ) : null}
               {!isLogged && canMatchWorkout ? (
-                <button
-                  type="button"
-                  onClick={openMatchPanel}
-                  className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700"
-                >
-                  I did this workout
-                </button>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  After your run, sync Garmin Connect — GoFast should link the activity to this
+                  workout automatically.
+                </p>
               ) : null}
               {!isLogged && isActionableWorkout ? (
                 <button
@@ -870,7 +867,7 @@ export default function TrainingPlanDayPreviewPage() {
                   onClick={openMatchPanel}
                   className="w-full rounded-xl border border-sky-200 bg-white py-3 text-sm font-semibold text-sky-800 hover:bg-sky-50"
                 >
-                  Match Garmin activity
+                  Find missing Garmin activity
                 </button>
               ) : null}
               <div className="flex gap-2">

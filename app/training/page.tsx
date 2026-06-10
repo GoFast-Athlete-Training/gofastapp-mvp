@@ -927,6 +927,12 @@ export default function TrainingHubPage() {
                         </p>
                         <div className="mt-5 flex flex-wrap items-center gap-3">
                           {focusPlanDay.workoutId && !focusPlanDay.matchedActivityId ? (
+                            <p className="w-full text-sm text-gray-700 leading-relaxed">
+                              After your run, sync Garmin Connect — GoFast should link the activity
+                              to this workout automatically.
+                            </p>
+                          ) : null}
+                          {focusPlanDay.workoutId && !focusPlanDay.matchedActivityId ? (
                             <button
                               type="button"
                               onClick={() => {
@@ -937,9 +943,9 @@ export default function TrainingHubPage() {
                                     ?.scrollIntoView({ behavior: "smooth", block: "start" });
                                 });
                               }}
-                              className="inline-flex justify-center rounded-xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-700"
+                              className="inline-flex justify-center rounded-xl border border-sky-200 bg-white px-6 py-3 text-sm font-semibold text-sky-800 hover:bg-sky-50"
                             >
-                              I did this workout
+                              Find missing Garmin activity
                             </button>
                           ) : null}
                           <button

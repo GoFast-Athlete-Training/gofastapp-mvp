@@ -180,6 +180,19 @@ interface Workout {
   analysisJson?: unknown | null;
   runContextTags?: string[] | null;
   runContextNote?: string | null;
+  catalogueName?: string | null;
+}
+
+function workoutListTitle(w: Pick<
+  Workout,
+  "title" | "workoutType" | "estimatedDistanceInMeters" | "workout_catalogue" | "catalogueName"
+>): string {
+  return displayWorkoutListTitle({
+    title: w.title,
+    workoutType: w.workoutType,
+    estimatedDistanceInMeters: w.estimatedDistanceInMeters ?? null,
+    catalogueName: w.catalogueName ?? w.workout_catalogue?.name ?? null,
+  });
 }
 
 function formatSecPerMile(sec: number | null | undefined): string | null {
@@ -1981,17 +1994,17 @@ export default function WorkoutDetailPage() {
               />
             ) : (
               <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 space-y-3">
-                <p className="text-sm text-gray-700">
-                  When you finish this run on Garmin, match it here to log the workout and unlock
-                  performance analysis.
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  After your run, sync Garmin Connect — GoFast should link the activity to this
+                  workout automatically. Use manual matching only if it does not show up.
                 </p>
                 <button
                   type="button"
                   onClick={() => setShowMatchPanel(true)}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-sky-200 bg-white px-4 py-2.5 text-sm font-semibold text-sky-800 hover:bg-sky-50"
                 >
                   <Watch className="h-4 w-4" />
-                  I did this workout / Match Garmin activity
+                  Find missing Garmin activity
                 </button>
               </div>
             )}
@@ -2006,11 +2019,7 @@ export default function WorkoutDetailPage() {
                   Scorecard
                 </p>
                 <h2 className="mt-1 text-xl sm:text-2xl font-bold text-gray-900">
-                  {displayWorkoutListTitle({
-                    title: workout.title,
-                    workoutType: workout.workoutType,
-                    estimatedDistanceInMeters: workout.estimatedDistanceInMeters ?? null,
-                  })}
+                  {workoutListTitle(workout)}
                 </h2>
                 {workout.matched_activity ? (
                   <p className="mt-2 text-sm text-gray-700">
@@ -2149,11 +2158,7 @@ export default function WorkoutDetailPage() {
             </summary>
             <div className="mt-4 space-y-3 text-sm text-gray-800">
               <p className="font-medium text-gray-900">
-                {displayWorkoutListTitle({
-                  title: workout.title,
-                  workoutType: workout.workoutType,
-                  estimatedDistanceInMeters: workout.estimatedDistanceInMeters ?? null,
-                })}
+                {workoutListTitle(workout)}
               </p>
               {weekAndDateLine ? (
                 <p className="text-gray-600">{weekAndDateLine}</p>
@@ -2209,11 +2214,7 @@ export default function WorkoutDetailPage() {
                 {detailEyebrow}
               </p>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 break-words">
-                {displayWorkoutListTitle({
-                  title: workout.title,
-                  workoutType: workout.workoutType,
-                  estimatedDistanceInMeters: workout.estimatedDistanceInMeters ?? null,
-                })}
+                {workoutListTitle(workout)}
               </h1>
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 {isLogged ? (

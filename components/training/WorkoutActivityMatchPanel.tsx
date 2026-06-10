@@ -461,7 +461,7 @@ export default function WorkoutActivityMatchPanel({
       <div className="px-4 pt-4 pb-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
           <Watch className="h-4 w-4 text-gray-400" />
-          <h2 className="font-semibold text-gray-900 text-sm">Match your Garmin run</h2>
+          <h2 className="font-semibold text-gray-900 text-sm">Find missing Garmin activity</h2>
         </div>
         {workoutTitle?.trim() ? (
           <p className="mt-1 text-xs text-gray-600 line-clamp-2">
@@ -477,7 +477,7 @@ export default function WorkoutActivityMatchPanel({
           </p>
         ) : (
           <p className="text-xs text-gray-600 leading-relaxed">
-            Choose a Garmin activity only if this workout is done.
+            Use this only if the run did not link automatically after Garmin sync.
           </p>
         )}
 

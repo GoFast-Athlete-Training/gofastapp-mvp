@@ -4,7 +4,9 @@
 
 import { prisma } from "@/lib/prisma";
 import { effectiveTrainingWeekCount, utcDateOnly } from "./plan-utils";
-import { planScheduleDaysForWeek, weekBoundsFromPlan, collectCatalogueWorkoutIdsForWeekSchedule } from "./plan-schedule";
+import { planScheduleDaysForWeek, weekBoundsFromPlan } from "./plan-schedule";
+import { loadCatalogueTitleByIdForWeekSchedule } from "./catalogue-title-map";
+import { mergePlanDayTitle } from "./workout-display-title";
 
 export type PlanDayCard = {
   /** Present once the athlete has opened this day (lazy materialization). */
@@ -56,21 +58,11 @@ export async function buildPlanWeekCards(params: {
   );
 
   const rawSchedule = params.planSchedule ?? params.planWeeks;
-  const catIds = collectCatalogueWorkoutIdsForWeekSchedule(
+  const catalogueTitleById = await loadCatalogueTitleByIdForWeekSchedule(
     rawSchedule,
     params.weekNumber,
     effectiveWeeks
   );
-  let catalogueTitleById: Record<string, string> = {};
-  if (catIds.length > 0) {
-    const rows = await prisma.workout_catalogue.findMany({
-      where: { id: { in: catIds } },
-      select: { id: true, name: true },
-    });
-    for (const r of rows) {
-      catalogueTitleById[r.id] = r.name;
-    }
-  }
 
   const scheduled = planScheduleDaysForWeek({
     planStartDate: params.planStartDate,
@@ -114,15 +106,22 @@ export async function buildPlanWeekCards(params: {
 
   return scheduled.map((s) => {
     const row = byDateKey.get(s.dateKey);
+    const workoutType = row?.workoutType ?? s.workoutType;
+    const estimatedDistanceInMeters =
+      row?.estimatedDistanceInMeters ?? s.estimatedDistanceInMeters;
     return {
       workoutId: row?.id ?? null,
       dateKey: s.dateKey,
       date: s.dateKey,
-      title: row?.title ?? s.title,
-      workoutType: row?.workoutType ?? s.workoutType,
+      title: mergePlanDayTitle({
+        rowTitle: row?.title,
+        scheduleTitle: s.title,
+        workoutType,
+        estimatedDistanceInMeters,
+      }),
+      workoutType,
       phase: s.phase,
-      estimatedDistanceInMeters:
-        row?.estimatedDistanceInMeters ?? s.estimatedDistanceInMeters,
+      estimatedDistanceInMeters,
       matchedActivityId: row?.matchedActivityId ?? null,
       skippedAt: row?.skippedAt?.toISOString() ?? null,
       skipReason: row?.skipReason ?? null,
