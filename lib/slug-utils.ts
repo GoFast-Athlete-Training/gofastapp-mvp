@@ -37,32 +37,72 @@ function dateToSlugCode(date: Date): string {
 }
 
 /**
- * Generate unique slug for CityRun
- * 
- * Uses title + optional date code (YYYY-MM-DD) so "Club Thursday" on different dates get unique slugs.
- * If slug exists, adds number suffix until unique.
- * 
- * @param title - Run title
- * @param options - Optional: excludeRunId (for updates), date (run date for uniqueness)
- * @returns Unique slug
- * 
- * Examples:
- * - "Club Thursday" + date 2026-02-21 → "club-thursday-2026-02-21"
- * - "Club Thursday" (no date) → "club-thursday"
- * - If "club-thursday-2026-02-21" exists → "club-thursday-2026-02-21-1"
+ * Strip noisy tokens from series instance titles before slugging.
+ * e.g. "Wednesday Run (6/10)" → "Wednesday"
  */
-export async function generateUniqueCityRunSlug(
+function compactTitleForSlug(title: string): string {
+  return title
+    .replace(/\(\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*\)/g, ' ')
+    .replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g, ' ')
+    .replace(/\b\d{1,2}-\d{1,2}(?:-\d{2,4})?\b/g, ' ')
+    .replace(
+      /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+runs?\b/gi,
+      ' '
+    )
+    .replace(/\bruns?\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Build the base slug for a CityRun before uniqueness probing.
+ *
+ * Prefer `{clubSlug}-{YYYY-MM-DD}` for club/series instances.
+ * Fall back to a compact title slug when no club slug is available.
+ */
+export function buildCityRunSlugBase(
   title: string,
-  options?: { excludeRunId?: string; date?: Date | string | null }
-): Promise<string> {
-  const excludeRunId = options?.excludeRunId;
+  options?: { clubSlug?: string | null; date?: Date | string | null }
+): string {
   const date = options?.date;
-  const titlePart = generateSlug(title);
   const dateCode =
     date != null && !Number.isNaN(new Date(date).getTime())
       ? dateToSlugCode(new Date(date))
       : '';
-  const baseSlug = dateCode ? `${titlePart}-${dateCode}` : titlePart;
+
+  const clubSlug = options?.clubSlug?.trim();
+  const sourcePart = clubSlug
+    ? generateSlug(clubSlug)
+    : generateSlug(compactTitleForSlug(title) || title);
+
+  return dateCode ? `${sourcePart}-${dateCode}` : sourcePart;
+}
+
+/**
+ * Generate unique slug for CityRun
+ *
+ * Uses club slug (when available) or compact title + optional date code (YYYY-MM-DD).
+ * If slug exists, adds number suffix until unique.
+ *
+ * @param title - Run title (fallback when clubSlug absent)
+ * @param options - excludeRunId, date, clubSlug
+ * @returns Unique slug
+ *
+ * Examples:
+ * - club "the-ballston-runaways" + date 2026-06-10 → "the-ballston-runaways-2026-06-10"
+ * - title "Morning Run" (no club) + date → "morning-2026-06-10"
+ * - collision → "the-ballston-runaways-2026-06-10-1"
+ */
+export async function generateUniqueCityRunSlug(
+  title: string,
+  options?: {
+    excludeRunId?: string;
+    date?: Date | string | null;
+    clubSlug?: string | null;
+  }
+): Promise<string> {
+  const excludeRunId = options?.excludeRunId;
+  const baseSlug = buildCityRunSlugBase(title, options);
   let slug = baseSlug;
   let counter = 1;
 

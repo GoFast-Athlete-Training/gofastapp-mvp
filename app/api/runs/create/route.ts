@@ -454,10 +454,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generate slug from title.
+    // Short public slug: prefer run club slug + date (not full instance title).
+    let resolvedClubSlug: string | null =
+      (runClub?.slug && String(runClub.slug).trim()) ||
+      (runClubSlug && String(runClubSlug).trim()) ||
+      null;
+    if (!resolvedClubSlug && finalRunClubId) {
+      const clubRow = await prisma.run_clubs.findUnique({
+        where: { id: finalRunClubId },
+        select: { slug: true },
+      });
+      resolvedClubSlug = clubRow?.slug?.trim() || null;
+    }
+
     let runSlug: string | null = null;
     try {
-      runSlug = await generateUniqueCityRunSlug(title, { date: runDateObj });
+      runSlug = await generateUniqueCityRunSlug(title, {
+        date: runDateObj,
+        clubSlug: resolvedClubSlug,
+      });
     } catch (error) {
       console.warn('Failed to generate slug for CityRun:', error);
       // Continue without slug - can be generated later

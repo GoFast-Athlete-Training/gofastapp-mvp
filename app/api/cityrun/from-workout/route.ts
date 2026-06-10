@@ -265,7 +265,10 @@ export async function POST(request: NextRequest) {
 
     let runSlug: string | null = null;
     try {
-      runSlug = await generateUniqueCityRunSlug(finalTitle, { date: runDateObj });
+      runSlug = await generateUniqueCityRunSlug(finalTitle, {
+        date: runDateObj,
+        clubSlug: null,
+      });
     } catch (e) {
       console.warn("[cityrun/from-workout] slug generation failed:", e);
     }
