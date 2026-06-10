@@ -5,6 +5,7 @@ import { saveRunClub } from "@/lib/save-runclub";
 import { normalizeWebsiteUrl, normalizeStravaUrl, normalizeInstagramUrl } from "@/lib/runclub-urls";
 import { generateUniqueCityRunSlug } from "@/lib/slug-utils";
 import { findExistingRun } from "@/lib/run-duplicate-check";
+import { parseRunTotalMiles } from "@/lib/parse-run-total-miles";
 import { toCanonicalDayOfWeek } from "@/lib/utils/dayOfWeekConverter";
 
 export const dynamic = "force-dynamic";
@@ -505,7 +506,7 @@ export async function POST(request: NextRequest) {
       endStreetAddress: endStreetAddress?.trim() || null,
       endCity: endCity?.trim() || null,
       endState: endState?.trim() || null,
-      totalMiles: totalMiles ? parseFloat(totalMiles) : null,
+      totalMiles: parseRunTotalMiles(totalMiles),
       pace: pace?.trim() || null,
       stravaMapUrl: stravaMapUrl?.trim() || null,
       description: description?.trim() || null,

@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { normalizeWebsiteUrl, normalizeStravaUrl, normalizeInstagramUrl } from '@/lib/runclub-urls';
 import { saveRunClub } from '@/lib/save-runclub';
+import { parseRunTotalMiles } from '@/lib/parse-run-total-miles';
 import { toCanonicalDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
 
@@ -572,7 +573,7 @@ export async function PUT(
       updateData.title = String(body.title).trim();
     }
     if (body.totalMiles !== undefined) {
-      updateData.totalMiles = body.totalMiles === null || body.totalMiles === '' ? null : parseFloat(body.totalMiles);
+      updateData.totalMiles = parseRunTotalMiles(body.totalMiles);
     }
     if (body.pace !== undefined) {
       updateData.pace = body.pace === null || body.pace === '' ? null : String(body.pace);
