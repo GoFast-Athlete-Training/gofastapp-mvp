@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
 import { prisma } from '@/lib/prisma';
 import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
+import { evaluateAthleteCtaTriggers } from '@/lib/cta-triggers';
 
 function generateId() {
   const timestamp = Date.now().toString(36);
@@ -97,6 +98,13 @@ export async function POST(
       include: {
         Athlete: { select: { id: true, firstName: true, lastName: true, photoURL: true } },
       },
+    });
+
+    void evaluateAthleteCtaTriggers({
+      athleteId: athlete.id,
+      source: 'city-run-checkin',
+    }).catch((err) => {
+      console.warn('evaluateAthleteCtaTriggers after checkin:', err);
     });
 
     return NextResponse.json({ success: true, checkin });

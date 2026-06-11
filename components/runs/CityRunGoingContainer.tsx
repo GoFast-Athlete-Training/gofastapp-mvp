@@ -3,12 +3,11 @@
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import CityRunChatSection from '@/components/runs/CityRunChatSection';
-import CityRunDetailsSection, {
-  CityRunCheckinCta,
-  CityRunGoingBanner,
-} from '@/components/runs/CityRunDetailsSection';
+import CityRunDetailsSection, { CityRunGoingBanner } from '@/components/runs/CityRunDetailsSection';
 import CityRunMobileTabs from '@/components/runs/CityRunMobileTabs';
 import CityRunPeopleSection from '@/components/runs/CityRunPeopleSection';
+import CityRunRunDayCompanion from '@/components/runs/CityRunRunDayCompanion';
+import CityRunWorkoutCard from '@/components/runs/CityRunWorkoutCard';
 import { isRunPast, type CityRunDetails, type CityRunRsvp } from '@/components/runs/city-run-types';
 
 interface Props {
@@ -18,30 +17,16 @@ interface Props {
 
 export default function CityRunGoingContainer({ run, onLeave }: Props) {
   const [rsvps, setRsvps] = useState<CityRunRsvp[]>(run.rsvps || []);
-  const [rsvpLoading, setRsvpLoading] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
   const [runIsPast, setRunIsPast] = useState(false);
 
   useEffect(() => {
+    setRsvps(run.rsvps || []);
+  }, [run.rsvps]);
+
+  useEffect(() => {
     setRunIsPast(isRunPast(run.date));
   }, [run.date]);
-
-  const handleRsvp = async (status: 'going' | 'not-going') => {
-    setRsvpLoading(true);
-    try {
-      await api.post(`/runs/${run.id}/rsvp`, { status });
-      if (status !== 'going') {
-        onLeave();
-        return;
-      }
-      const res = await api.get(`/runs/${run.id}`);
-      if (res.data.success) setRsvps(res.data.run.rsvps || []);
-    } catch (err) {
-      console.error('RSVP error:', err);
-    } finally {
-      setRsvpLoading(false);
-    }
-  };
 
   const handleCheckin = async () => {
     setCheckingIn(true);
@@ -55,6 +40,9 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
     }
   };
 
+  const hasWorkout =
+    Boolean(run.workoutId || run.workout) || Boolean(run.workoutDescription?.trim());
+
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-4 py-4 sm:py-6">
@@ -63,20 +51,26 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
           run={run}
           rsvps={rsvps}
           runIsPast={runIsPast}
-          rsvpLoading={rsvpLoading}
           checkingIn={checkingIn}
-          onLeave={() => void handleRsvp('not-going')}
           onCheckin={() => void handleCheckin()}
         />
 
         <div className="hidden lg:block space-y-4">
-          <CityRunGoingBanner
-            rsvpLoading={rsvpLoading}
-            onLeave={() => void handleRsvp('not-going')}
+          <CityRunGoingBanner />
+
+          <CityRunRunDayCompanion
+            run={run}
+            runIsPast={runIsPast}
+            onAddShout={runIsPast ? () => void handleCheckin() : undefined}
+            checkingIn={checkingIn}
           />
 
-          {runIsPast ? (
-            <CityRunCheckinCta checkingIn={checkingIn} onCheckin={() => void handleCheckin()} />
+          {hasWorkout ? (
+            <CityRunWorkoutCard
+              workoutId={run.workoutId}
+              workout={run.workout}
+              workoutDescription={run.workoutDescription}
+            />
           ) : null}
 
           <div className="grid grid-cols-3 items-start gap-6">

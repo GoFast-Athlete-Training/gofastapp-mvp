@@ -255,7 +255,7 @@ export function CityRunRsvpPanel({
           disabled={rsvpLoading}
           className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 disabled:opacity-50 transition"
         >
-          {rsvpLoading ? 'Loading…' : "See the crew's recap →"}
+          {rsvpLoading ? 'Loading…' : 'Were you there? →'}
         </button>
       </div>
     );
@@ -278,24 +278,10 @@ export function CityRunRsvpPanel({
   );
 }
 
-export function CityRunGoingBanner({
-  rsvpLoading,
-  onLeave,
-}: {
-  rsvpLoading: boolean;
-  onLeave: () => void;
-}) {
+export function CityRunGoingBanner() {
   return (
-    <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-3">
+    <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
       <span className="text-green-800 font-semibold text-sm">You&apos;re going</span>
-      <button
-        type="button"
-        onClick={onLeave}
-        disabled={rsvpLoading}
-        className="ml-auto text-sm text-gray-500 hover:text-red-500 transition disabled:opacity-50"
-      >
-        Can&apos;t make it
-      </button>
     </div>
   );
 }
@@ -310,9 +296,9 @@ export function CityRunCheckinCta({
   return (
     <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-4 flex items-center gap-3">
       <div className="min-w-0 flex-1">
-        <div className="font-semibold text-orange-900 text-sm">You ran this</div>
+        <div className="font-semibold text-orange-900 text-sm">Were you there?</div>
         <div className="text-xs text-orange-700">
-          Check in to share your shouts and see the crew&apos;s recap
+          Confirm you showed up to share shouts and see the crew&apos;s recap
         </div>
       </div>
       <button

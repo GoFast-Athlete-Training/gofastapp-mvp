@@ -68,6 +68,23 @@ export interface CityRunCheckin {
   };
 }
 
+export interface CityRunWorkoutSegment {
+  id: string;
+  stepOrder: number;
+  title: string;
+  durationType: string;
+  durationValue: number;
+  repeatCount?: number | null;
+}
+
+export interface CityRunWorkoutSummary {
+  id: string;
+  title: string;
+  workoutType: string | null;
+  description: string | null;
+  segments?: CityRunWorkoutSegment[];
+}
+
 export interface CityRunDetails {
   id: string;
   slug?: string | null;
@@ -93,6 +110,10 @@ export interface CityRunDetails {
   stravaMapUrl: string | null;
   routePhotos?: string[] | null;
   mapImageUrl?: string | null;
+  runType?: string | null;
+  workoutDescription?: string | null;
+  workoutId?: string | null;
+  workout?: CityRunWorkoutSummary | null;
   runClub?: RunClub | null;
   runCrew?: RunCrew | null;
   rsvps?: CityRunRsvp[];

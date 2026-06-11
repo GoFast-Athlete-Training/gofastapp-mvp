@@ -181,8 +181,28 @@ export async function GET(
         routeNeighborhood: true,
         runType: true,
         workoutDescription: true,
+        workoutId: true,
         locationId: true,
         location: { select: { id: true, name: true } },
+        workout: {
+          select: {
+            id: true,
+            title: true,
+            workoutType: true,
+            description: true,
+            segments: {
+              orderBy: { stepOrder: 'asc' as const },
+              select: {
+                id: true,
+                stepOrder: true,
+                title: true,
+                durationType: true,
+                durationValue: true,
+                repeatCount: true,
+              },
+            },
+          },
+        },
         city_run_rsvps: {
           select: {
             id: true,
@@ -414,6 +434,16 @@ export async function GET(
         routeNeighborhood: run.routeNeighborhood ?? null,
         runType: run.runType ?? null,
         workoutDescription: run.workoutDescription ?? null,
+        workoutId: run.workoutId ?? null,
+        workout: run.workout
+          ? {
+              id: run.workout.id,
+              title: run.workout.title,
+              workoutType: run.workout.workoutType ?? null,
+              description: run.workout.description ?? null,
+              segments: run.workout.segments ?? [],
+            }
+          : null,
         locationId: run.locationId ?? null,
         location: run.location ?? null,
         meetUpLat: run.meetUpLat,

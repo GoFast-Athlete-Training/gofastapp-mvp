@@ -5,13 +5,14 @@ import { ImagePlus, Info, MessageCircle, Users } from 'lucide-react';
 import MobileHubTabs from '@/components/shared/MobileHubTabs';
 import CityRunChatSection from '@/components/runs/CityRunChatSection';
 import CityRunDetailsSection, {
-  CityRunCheckinCta,
   CityRunGoingBanner,
   CityRunRsvpPanel,
   CityRunSeriesPanel,
 } from '@/components/runs/CityRunDetailsSection';
 import CityRunPeopleSection from '@/components/runs/CityRunPeopleSection';
 import CityRunRouteMedia from '@/components/runs/CityRunRouteMedia';
+import CityRunRunDayCompanion from '@/components/runs/CityRunRunDayCompanion';
+import CityRunWorkoutCard from '@/components/runs/CityRunWorkoutCard';
 import {
   CityRunPostRunCrewSection,
   CityRunPostRunDetailsSection,
@@ -40,9 +41,7 @@ type GoingMobileProps = {
   run: CityRunDetails;
   rsvps: CityRunRsvp[];
   runIsPast: boolean;
-  rsvpLoading: boolean;
   checkingIn: boolean;
-  onLeave: () => void;
   onCheckin: () => void;
 };
 
@@ -128,18 +127,32 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
   }
 
   if (props.mode === 'going') {
+    const hasWorkout =
+      Boolean(props.run.workoutId || props.run.workout) ||
+      Boolean(props.run.workoutDescription?.trim());
+
     return (
       <MobileHubTabs tabs={[...GOING_TABS]} activeTab={activeTab} onTabChange={setActiveTab}>
         {activeTab === 'chatter' ? (
           <div className="flex min-h-[calc(100dvh-11rem)] flex-col space-y-3">
-            <CityRunGoingBanner rsvpLoading={props.rsvpLoading} onLeave={props.onLeave} />
+            <CityRunGoingBanner />
             <CityRunChatSection runId={props.run.id} variant="mobile-hub" showHeading={false} />
           </div>
         ) : null}
         {activeTab === 'details' ? (
           <div className="space-y-4">
-            {props.runIsPast ? (
-              <CityRunCheckinCta checkingIn={props.checkingIn} onCheckin={props.onCheckin} />
+            <CityRunRunDayCompanion
+              run={props.run}
+              runIsPast={props.runIsPast}
+              onAddShout={props.runIsPast ? props.onCheckin : undefined}
+              checkingIn={props.checkingIn}
+            />
+            {hasWorkout ? (
+              <CityRunWorkoutCard
+                workoutId={props.run.workoutId}
+                workout={props.run.workout}
+                workoutDescription={props.run.workoutDescription}
+              />
             ) : null}
             <CityRunDetailsSection run={props.run} compact />
           </div>

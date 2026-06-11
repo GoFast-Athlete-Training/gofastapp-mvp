@@ -10,6 +10,7 @@ import { activityExists } from "./dedupe";
 import { normalizeActivityFields } from "./normalizeActivityFields";
 import { RUNNING_ACTIVITY_TYPES } from "../training/activity-type-sets";
 import { parseMatchedActivityToSegmentExecution } from "../training/activity-to-segment-execution";
+import { tryMatchActivityToCityRun } from "../cta-triggers/try-match-activity-to-city-run";
 
 export interface ActivityDetail {
   activityId?: string | number;
@@ -251,6 +252,9 @@ export async function handleActivityDetail(
         });
 
         await runDetailHydrationPipeline(created.id, detail as object);
+        await tryMatchActivityToCityRun(created.id).catch((cityRunErr) => {
+          console.warn("tryMatchActivityToCityRun (detail fallback):", cityRunErr);
+        });
         processed++;
       }
     } catch (error: any) {

@@ -8,6 +8,7 @@ import { getAthleteByGarminUserId } from '../domain-garmin';
 import { activityExists } from './dedupe';
 import { normalizeActivityFields } from './normalizeActivityFields';
 import { tryMatchActivityToTrainingWorkout } from '../training/match-activity-to-workout';
+import { tryMatchActivityToCityRun } from '../cta-triggers/try-match-activity-to-city-run';
 import { promoteUnmatchedRunningActivityToWorkout } from '../training/promote-activity-to-workout';
 import { tryMatchActivityToBikeWorkout } from '../training/match-activity-to-bike-workout';
 import { isCyclingActivityType } from '../training/activity-type-sets';
@@ -128,6 +129,9 @@ export async function handleActivitySummary(
             await promoteUnmatchedRunningActivityToWorkout(created.id);
           }
         }
+        await tryMatchActivityToCityRun(created.id).catch((cityRunErr) => {
+          console.warn('tryMatchActivityToCityRun:', cityRunErr);
+        });
         console.log("✅ match attempt complete", {
           id: created.id,
           sourceActivityId,

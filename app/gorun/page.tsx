@@ -253,9 +253,9 @@ function GoRunPageContent() {
           <section aria-labelledby="did-you-run-heading" className="min-w-0 flex flex-col">
             <h2 id="did-you-run-heading" className="text-lg font-bold text-orange-900 mb-1 flex items-center gap-2">
               <HelpCircle className="h-5 w-5 text-orange-600 shrink-0" aria-hidden />
-              Did you run this?
+              Did you show up?
             </h2>
-            <p className="text-sm text-gray-600 mb-3">You RSVPed — tap when you actually showed up so we can open the crew recap.</p>
+            <p className="text-sm text-gray-600 mb-3">You RSVPed — confirm you were there to unlock the crew recap.</p>
             {myPastRuns.length > 0 ? (
               <div className="space-y-4 flex-1">
                 {myPastRuns.map((r) => (
@@ -279,7 +279,7 @@ function GoRunPageContent() {
                       onClick={() => void confirmIRan(r.id)}
                       className="inline-flex shrink-0 items-center justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-60"
                     >
-                      {confirmingRunId === r.id ? 'Saving…' : 'Yes, I ran it!'}
+                      {confirmingRunId === r.id ? 'Saving…' : 'Were you there? →'}
                     </button>
                   </div>
                 ))}
@@ -325,7 +325,7 @@ function GoRunPageContent() {
               <div className="rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/40 p-6 text-center flex-1 flex flex-col justify-center">
                 <p className="text-gray-700 font-medium">No confirmed runs yet</p>
                 <p className="text-sm text-gray-600 mt-1">
-                  After you tap &quot;Yes, I ran it!&quot; in the middle column, your recap lands here for good.
+                  After you confirm you were there in the middle column, your recap lands here for good.
                 </p>
               </div>
             )}
