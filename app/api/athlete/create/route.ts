@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { GOFAST_COMPANY_ID } from '@/lib/goFastCompanyConfig';
+import { fireCompanyNotificationTrigger } from '@/lib/company-notification-trigger';
 
 export async function POST(request: Request) {
   try {
@@ -265,6 +266,16 @@ export async function POST(request: Request) {
         data: { role: 'CLUB_LEADER' },
       });
       console.log('✅ ATHLETE CREATE: Role set to CLUB_LEADER for athlete:', athlete.id);
+    }
+
+    // New athlete only — fire transactional email trigger on Company stack
+    if (!existingAthlete) {
+      fireCompanyNotificationTrigger('athlete.created', {
+        athleteId: athlete.id,
+        email: athlete.email,
+        firstName: athlete.firstName,
+        lastName: athlete.lastName,
+      });
     }
 
     // Return athlete id + firebase mapping for the client bootstrap flow
