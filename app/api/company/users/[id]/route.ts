@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { getAthleteById } from '@/lib/domain-athlete';
+import { formatCompanyUser } from '@/lib/format-company-user';
 
 // CORS headers for GoFastCompany HQ
 const corsHeaders = {
@@ -65,20 +66,15 @@ export async function GET(
 
     if (!athlete) {
       return NextResponse.json(
-        { 
-          success: false,
-          error: 'User not found' 
-        },
+        { success: false, error: 'User not found' },
         { status: 404, headers: corsHeaders }
       );
     }
 
-    // Format athlete to match GoFastCompany expected structure
-    const formattedAthlete = {
-      athleteId: athlete.id,
+    const formattedAthlete = formatCompanyUser({
       id: athlete.id,
       firebaseId: athlete.firebaseId,
-      email: athlete.email || '',
+      email: athlete.email,
       firstName: athlete.firstName,
       lastName: athlete.lastName,
       gofastHandle: athlete.gofastHandle,
@@ -90,25 +86,14 @@ export async function GET(
       photoURL: athlete.photoURL,
       bio: athlete.bio,
       instagram: athlete.instagram,
-      status: 'active',
       createdAt: athlete.createdAt,
       updatedAt: athlete.updatedAt,
-      fullName: athlete.firstName && athlete.lastName
-        ? `${athlete.firstName} ${athlete.lastName}`
-        : undefined,
-      profileComplete: !!(athlete.firstName && athlete.lastName),
-      garmin: {
-        connected: !!(athlete.garmin_access_token && athlete.garmin_access_token.length > 0),
-        userId: athlete.garmin_user_id || undefined,
-        connectedAt: athlete.garmin_connected_at || undefined,
-        lastSyncAt: athlete.garmin_last_sync_at || undefined,
-        hasTokens: !!(athlete.garmin_user_id),
-        tokenStatus:
-          athlete.garmin_access_token && athlete.garmin_access_token.length > 0
-            ? 'active'
-            : 'disconnected',
-      },
-    };
+      lastSeenAt: (athlete as { lastSeenAt?: Date | null }).lastSeenAt ?? null,
+      garmin_access_token: athlete.garmin_access_token,
+      garmin_user_id: athlete.garmin_user_id,
+      garmin_connected_at: athlete.garmin_connected_at,
+      garmin_last_sync_at: athlete.garmin_last_sync_at,
+    });
 
     return NextResponse.json(
       {

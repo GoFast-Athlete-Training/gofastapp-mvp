@@ -96,6 +96,8 @@ model Athlete {
   runClubId               String?
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
+  /// Last app bootstrap (GET /api/athlete/me or POST /api/athlete/create)
+  lastSeenAt              DateTime?
   go_fast_companies       go_fast_companies        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   runClub                 run_clubs?               @relation(fields: [runClubId], references: [id], onDelete: SetNull)
   ambassador_credits      ambassador_credits[]
@@ -106,6 +108,10 @@ model Athlete {
   run_crew_events         run_crew_events[]
   run_crew_memberships    run_crew_memberships[]
   run_crew_messages       run_crew_messages[]
+  run_club_memberships    run_club_memberships[]
+  run_club_announcements  run_club_announcements[]
+  run_club_events         run_club_events[]
+  run_club_event_rsvps    run_club_event_rsvps[]
   city_run_rsvps          city_run_rsvps[]
   city_run_messages       city_run_messages[]
   city_run_checkins       city_run_checkins[]
@@ -709,13 +715,91 @@ model run_clubs {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  runs         city_runs[]
-  clubLeaders  Athlete[]          // Reverse relation for Athlete.runClubId
-  runSeries    run_series[]       // Recurring series this club owns (run_series.runClubId → run_clubs)
+  runs                  city_runs[]
+  clubLeaders           Athlete[]                  // Reverse relation for Athlete.runClubId
+  runSeries             run_series[]               // Recurring series this club owns (run_series.runClubId → run_clubs)
+  run_club_memberships  run_club_memberships[]
+  run_club_announcements run_club_announcements[]
+  run_club_events       run_club_events[]
 
   @@index([brandId])
   @@index([city])
   @@index([slug])
+}
+
+/// Club-level membership — join/follow the run club (separate from per-run RSVPs).
+model run_club_memberships {
+  id        String    @id @default(cuid())
+  runClubId String
+  athleteId String
+  role      String    @default("member") // member | admin | owner
+  status    String    @default("active") // active | left | blocked
+  joinedAt  DateTime  @default(now())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  run_clubs run_clubs @relation(fields: [runClubId], references: [id], onDelete: Cascade)
+  Athlete   Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([runClubId, athleteId])
+  @@index([runClubId])
+  @@index([athleteId])
+  @@map("run_club_memberships")
+}
+
+/// Club broadcast content — announcements visible to members (and optionally public).
+model run_club_announcements {
+  id          String    @id @default(cuid())
+  runClubId   String
+  authorId    String
+  title       String?
+  body        String
+  visibility  String    @default("members") // public | members
+  publishedAt DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  run_clubs   run_clubs @relation(fields: [runClubId], references: [id], onDelete: Cascade)
+  Athlete     Athlete   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([runClubId, publishedAt])
+  @@map("run_club_announcements")
+}
+
+/// Non-run club events: socials, clinics, sponsor activations, etc.
+model run_club_events {
+  id                   String                 @id @default(cuid())
+  runClubId            String
+  creatorId            String
+  title                String
+  description          String?
+  eventType            String                 @default("social") // social | clinic | sponsor | volunteer | race | other
+  startsAt             DateTime
+  endsAt               DateTime?
+  location             String?
+  visibility           String                 @default("public") // public | members
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  run_clubs            run_clubs              @relation(fields: [runClubId], references: [id], onDelete: Cascade)
+  Athlete              Athlete                @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  run_club_event_rsvps run_club_event_rsvps[]
+
+  @@index([runClubId, startsAt])
+  @@map("run_club_events")
+}
+
+/// RSVPs for club events (separate from city_run_rsvps).
+model run_club_event_rsvps {
+  id              String          @id @default(cuid())
+  eventId         String
+  athleteId       String
+  status          String          @default("going") // going | maybe | not-going
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  run_club_events run_club_events @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  Athlete         Athlete         @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, athleteId])
+  @@index([athleteId])
+  @@map("run_club_event_rsvps")
 }
 
 model run_crew_announcements {

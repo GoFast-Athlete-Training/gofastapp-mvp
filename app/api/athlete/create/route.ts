@@ -5,6 +5,11 @@ import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { GOFAST_COMPANY_ID } from '@/lib/goFastCompanyConfig';
 import { fireCompanyNotificationTrigger } from '@/lib/company-notification-trigger';
+import {
+  emailContactability,
+  isExternallyContactableEmail,
+} from '@/lib/athlete-contact-email';
+import { touchAthleteLastSeen } from '@/lib/touch-athlete-last-seen';
 
 export async function POST(request: Request) {
   try {
@@ -246,6 +251,8 @@ export async function POST(request: Request) {
     }
     // companyId is always derived from GoFastCompany (ultra container)
     updateData.companyId = company.id;
+    updateData.lastSeenAt = new Date();
+    createData.lastSeenAt = new Date();
 
     let athlete = await prisma.athlete.upsert({
       where: { firebaseId },
@@ -270,12 +277,18 @@ export async function POST(request: Request) {
 
     // New athlete only — fire transactional email trigger on Company stack
     if (!existingAthlete) {
+      const contactEmail = isExternallyContactableEmail(athlete.email) ? athlete.email : null;
       fireCompanyNotificationTrigger('athlete.created', {
         athleteId: athlete.id,
-        email: athlete.email,
+        email: contactEmail,
+        contactEmail,
         firstName: athlete.firstName,
         lastName: athlete.lastName,
+        isPrivateRelayEmail: emailContactability(athlete.email) === 'apple_relay',
+        profileComplete: !!(athlete.firstName && athlete.lastName),
       });
+    } else {
+      void touchAthleteLastSeen(athlete.id);
     }
 
     // Return athlete id + firebase mapping for the client bootstrap flow

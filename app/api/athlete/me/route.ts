@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebaseAdmin";
 import { deleteAthleteAccount, getAthleteByFirebaseId } from "@/lib/domain-athlete";
+import { touchAthleteLastSeen } from "@/lib/touch-athlete-last-seen";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 
 /** GET /api/athlete/me — resolve Firebase token to DB athlete id (welcome gate) */
@@ -18,6 +19,7 @@ export async function GET(request: Request) {
     if (!athlete) {
       return NextResponse.json({ success: false, error: "Athlete not found" }, { status: 404 });
     }
+    void touchAthleteLastSeen(athlete.id);
     return NextResponse.json({ success: true, athleteId: athlete.id });
   } catch {
     return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 });
