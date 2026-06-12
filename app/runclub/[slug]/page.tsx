@@ -8,7 +8,11 @@ import api from '@/lib/api';
 import TopNav from '@/components/shared/TopNav';
 import UpcomingRunsList, { UpcomingRun } from '@/components/runclub/UpcomingRunsList';
 import RecentRunsStrip, { RecentRun } from '@/components/runclub/RecentRunsStrip';
-import { Globe, Instagram, Route, MapPin, ArrowLeft } from 'lucide-react';
+import ClubAnnouncementsList, {
+  ClubAnnouncement,
+} from '@/components/runclub/ClubAnnouncementsList';
+import ClubEventsList, { ClubEvent } from '@/components/runclub/ClubEventsList';
+import { Globe, Instagram, Route, MapPin, ArrowLeft, Users, UserPlus, UserCheck } from 'lucide-react';
 
 interface RunClub {
   id: string;
@@ -25,8 +29,19 @@ interface RunClub {
   stravaUrl: string | null;
 }
 
+interface MembershipState {
+  isMember: boolean;
+  role: string | null;
+  status: string | null;
+  joinedAt: string | null;
+}
+
 interface ContainerData {
   club: RunClub;
+  memberCount: number;
+  membership: MembershipState | null;
+  announcements: ClubAnnouncement[];
+  upcomingEvents: ClubEvent[];
   upcomingRuns: UpcomingRun[];
   recentRuns: RecentRun[];
 }
@@ -38,13 +53,13 @@ export default function RunClubContainerPage() {
 
   const [data, setData] = useState<ContainerData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [joinLoading, setJoinLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       unsubscribe();
       if (!user) {
-        // Redirect unauthenticated users to sign in, preserving destination
         router.replace(`/signup?redirect=/runclub/${slug}`);
         return;
       }
@@ -59,6 +74,10 @@ export default function RunClubContainerPage() {
       if (res.data.success) {
         setData({
           club: res.data.club,
+          memberCount: res.data.memberCount ?? 0,
+          membership: res.data.membership ?? null,
+          announcements: res.data.announcements ?? [],
+          upcomingEvents: res.data.upcomingEvents ?? [],
           upcomingRuns: res.data.upcomingRuns,
           recentRuns: res.data.recentRuns,
         });
@@ -73,6 +92,25 @@ export default function RunClubContainerPage() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleJoinToggle = async () => {
+    if (!data) return;
+
+    try {
+      setJoinLoading(true);
+      const isMember = data.membership?.isMember ?? false;
+      const endpoint = isMember ? `/runclub/${slug}/leave` : `/runclub/${slug}/join`;
+      const res = await api.post(endpoint);
+
+      if (res.data.success) {
+        await fetchClub();
+      }
+    } catch (err) {
+      console.error('Failed to update club membership:', err);
+    } finally {
+      setJoinLoading(false);
     }
   };
 
@@ -101,7 +139,9 @@ export default function RunClubContainerPage() {
     );
   }
 
-  const { club, upcomingRuns, recentRuns } = data;
+  const { club, memberCount, membership, announcements, upcomingEvents, upcomingRuns, recentRuns } =
+    data;
+  const isMember = membership?.isMember ?? false;
   const locationParts = [club.neighborhood, club.city, club.state].filter(Boolean);
   const locationText = locationParts.join(', ');
 
@@ -116,9 +156,8 @@ export default function RunClubContainerPage() {
       {/* Club Banner */}
       <div className="bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {/* Logo */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4 min-w-0">
               {club.logoUrl ? (
                 <div className="bg-white rounded-xl p-2 shadow-lg flex-shrink-0">
                   <img
@@ -133,8 +172,7 @@ export default function RunClubContainerPage() {
                 </div>
               )}
 
-              {/* Name + location */}
-              <div>
+              <div className="min-w-0">
                 <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight">
                   {club.name}
                 </h1>
@@ -144,11 +182,20 @@ export default function RunClubContainerPage() {
                     <span>{locationText}</span>
                   </div>
                 )}
-                {/* Social links */}
+                <div className="mt-2 flex items-center gap-2 text-orange-100 text-sm">
+                  <Users className="w-4 h-4" />
+                  <span>
+                    {memberCount} member{memberCount === 1 ? '' : 's'}
+                  </span>
+                </div>
                 <div className="flex items-center gap-4 mt-2 flex-wrap">
                   {club.websiteUrl && (
                     <a
-                      href={club.websiteUrl.startsWith('http') ? club.websiteUrl : `https://${club.websiteUrl}`}
+                      href={
+                        club.websiteUrl.startsWith('http')
+                          ? club.websiteUrl
+                          : `https://${club.websiteUrl}`
+                      }
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
@@ -186,29 +233,46 @@ export default function RunClubContainerPage() {
               </div>
             </div>
 
-            {/* GoFast branding */}
-            <div className="hidden sm:flex items-center gap-2">
-              <img
-                src="/logo.jpg"
-                alt="GoFast"
-                className="h-10 w-10 rounded-full object-cover border-2 border-white"
-              />
-              <span className="text-white font-semibold text-sm">GoFast</span>
+            <div className="flex flex-col items-end gap-3">
+              <button
+                onClick={handleJoinToggle}
+                disabled={joinLoading}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${
+                  isMember
+                    ? 'bg-white/15 text-white border border-white/30 hover:bg-white/25'
+                    : 'bg-white text-orange-600 hover:bg-orange-50'
+                }`}
+              >
+                {isMember ? (
+                  <>
+                    <UserCheck className="h-4 w-4" />
+                    Joined
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="h-4 w-4" />
+                    Join Club
+                  </>
+                )}
+              </button>
+              <div className="hidden sm:flex items-center gap-2">
+                <img
+                  src="/logo.jpg"
+                  alt="GoFast"
+                  className="h-10 w-10 rounded-full object-cover border-2 border-white"
+                />
+                <span className="text-white font-semibold text-sm">GoFast</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main content */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
-
-        {/* About */}
         {(club.description || club.allRunsDescription) && (
           <div>
             {club.description && (
-              <p className="text-gray-600 leading-relaxed whitespace-pre-line">
-                {club.description}
-              </p>
+              <p className="text-gray-600 leading-relaxed whitespace-pre-line">{club.description}</p>
             )}
             {club.allRunsDescription && club.allRunsDescription !== club.description && (
               <p className="text-gray-500 text-sm mt-2 leading-relaxed whitespace-pre-line">
@@ -218,13 +282,36 @@ export default function RunClubContainerPage() {
           </div>
         )}
 
-        {/* Upcoming Runs */}
         <section>
-          <h2 className="text-lg font-bold text-gray-900 mb-4">Upcoming Runs</h2>
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-gray-900">Announcements</h2>
+            <p className="text-sm text-gray-500">
+              Club updates for members. Join the club to see member-only posts.
+            </p>
+          </div>
+          <ClubAnnouncementsList announcements={announcements} />
+        </section>
+
+        <section>
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-gray-900">Club Events</h2>
+            <p className="text-sm text-gray-500">
+              Socials, clinics, and sponsor activations beyond weekly runs.
+            </p>
+          </div>
+          <ClubEventsList events={upcomingEvents} />
+        </section>
+
+        <section>
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-gray-900">Upcoming Runs</h2>
+            <p className="text-sm text-gray-500">
+              RSVP to individual runs separately — joining the club does not auto-RSVP you.
+            </p>
+          </div>
           <UpcomingRunsList runs={upcomingRuns} />
         </section>
 
-        {/* Recent Runs */}
         {recentRuns.length > 0 && (
           <section>
             <h2 className="text-lg font-bold text-gray-900 mb-4">Recent Runs</h2>
@@ -232,7 +319,6 @@ export default function RunClubContainerPage() {
           </section>
         )}
 
-        {/* Back link */}
         <div className="pt-4 border-t border-gray-200">
           <button
             onClick={() => router.push('/gorun')}

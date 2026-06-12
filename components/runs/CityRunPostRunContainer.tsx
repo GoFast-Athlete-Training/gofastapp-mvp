@@ -1,15 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Calendar, MapPin, Trophy } from 'lucide-react';
+import { Calendar, Trophy } from 'lucide-react';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import TopNav from '@/components/shared/TopNav';
 import CityRunMobileTabs from '@/components/runs/CityRunMobileTabs';
-import CityRunRouteMedia from '@/components/runs/CityRunRouteMedia';
 import {
   CityRunPostRunCrewSection,
-  CityRunPostRunDetailsSection,
   CityRunPostRunPhotosSection,
   CityRunPostRunShoutsSection,
 } from '@/components/runs/CityRunPostRunSections';
@@ -89,10 +87,6 @@ export default function CityRunPostRunContainer({
     (a, b) => new Date(a.checkedInAt).getTime() - new Date(b.checkedInAt).getTime()
   );
 
-  const hasRouteMedia =
-    Boolean(run.mapImageUrl) ||
-    (Array.isArray(run.routePhotos) && run.routePhotos.some((u) => typeof u === 'string' && u.trim()));
-
   const shoutsProps = {
     myCheckin,
     othersWithShouts,
@@ -151,12 +145,6 @@ export default function CityRunPostRunContainer({
                   <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                   <span className="truncate">{formatRunDate(run.date)}</span>
                 </span>
-                {run.meetUpCity ? (
-                  <span className="inline-flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                    {run.meetUpCity}
-                  </span>
-                ) : null}
               </div>
               <p className="mt-1 sm:mt-2 text-sm text-orange-700 font-medium">
                 {checkins.length} {checkins.length === 1 ? 'runner' : 'runners'} showed up
@@ -192,12 +180,6 @@ export default function CityRunPostRunContainer({
           onFileChange={handleFileChange}
         />
 
-        {hasRouteMedia ? (
-          <div className="hidden lg:block pt-2 pb-6 space-y-4">
-            <CityRunRouteMedia routePhotos={run.routePhotos} mapImageUrl={run.mapImageUrl} />
-          </div>
-        ) : null}
-
         <div className="hidden lg:grid grid-cols-12 gap-6 lg:gap-8">
           <div className="lg:col-span-6 space-y-6 min-w-0 order-1">
             <CityRunPostRunShoutsSection {...shoutsProps} />
@@ -205,7 +187,6 @@ export default function CityRunPostRunContainer({
           </div>
 
           <aside className="lg:col-span-6 space-y-6 min-w-0 order-2">
-            <CityRunPostRunDetailsSection run={run} />
             <CityRunPostRunCrewSection
               sortedCrew={sortedCrew}
               athleteId={athleteId}

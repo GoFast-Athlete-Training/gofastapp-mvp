@@ -10,12 +10,10 @@ import CityRunDetailsSection, {
   CityRunSeriesPanel,
 } from '@/components/runs/CityRunDetailsSection';
 import CityRunPeopleSection from '@/components/runs/CityRunPeopleSection';
-import CityRunRouteMedia from '@/components/runs/CityRunRouteMedia';
 import CityRunRunDayCompanion from '@/components/runs/CityRunRunDayCompanion';
 import CityRunWorkoutCard from '@/components/runs/CityRunWorkoutCard';
 import {
   CityRunPostRunCrewSection,
-  CityRunPostRunDetailsSection,
   CityRunPostRunPhotosSection,
   CityRunPostRunShoutsSection,
 } from '@/components/runs/CityRunPostRunSections';
@@ -83,7 +81,6 @@ const GOING_TABS = [
 const POST_RUN_TABS = [
   { id: 'shouts', label: 'Shouts', icon: <MessageCircle className="h-5 w-5" /> },
   { id: 'photos', label: 'Photos', icon: <ImagePlus className="h-5 w-5" /> },
-  { id: 'details', label: 'Details', icon: <Info className="h-5 w-5" /> },
   { id: 'crew', label: 'Crew', icon: <Users className="h-5 w-5" /> },
 ] as const;
 
@@ -164,11 +161,6 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
     );
   }
 
-  const hasRouteMedia =
-    Boolean(props.run.mapImageUrl) ||
-    (Array.isArray(props.run.routePhotos) &&
-      props.run.routePhotos.some((u) => typeof u === 'string' && u.trim()));
-
   return (
     <MobileHubTabs tabs={[...POST_RUN_TABS]} activeTab={activeTab} onTabChange={setActiveTab}>
       {activeTab === 'shouts' ? (
@@ -194,14 +186,6 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
           uploadError={props.uploadError}
           onFileChange={props.onFileChange}
         />
-      ) : null}
-      {activeTab === 'details' ? (
-        <div className="space-y-4">
-          {hasRouteMedia ? (
-            <CityRunRouteMedia routePhotos={props.run.routePhotos} mapImageUrl={props.run.mapImageUrl} />
-          ) : null}
-          <CityRunPostRunDetailsSection run={props.run} />
-        </div>
       ) : null}
       {activeTab === 'crew' ? (
         <CityRunPostRunCrewSection

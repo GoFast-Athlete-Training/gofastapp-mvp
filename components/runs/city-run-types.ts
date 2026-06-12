@@ -124,14 +124,6 @@ export interface PostRunRun {
   id: string;
   title: string;
   date: string;
-  meetUpPoint: string;
-  meetUpCity: string | null;
-  meetUpStreetAddress: string | null;
-  totalMiles: number | null;
-  pace: string | null;
-  stravaMapUrl: string | null;
-  routePhotos?: string[] | null;
-  mapImageUrl?: string | null;
   runClub?: { name: string; logoUrl: string | null } | null;
 }
 

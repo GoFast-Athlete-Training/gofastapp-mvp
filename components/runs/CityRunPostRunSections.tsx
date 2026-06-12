@@ -5,12 +5,9 @@ import {
   Calendar,
   ChevronDown,
   ChevronRight,
-  ExternalLink,
   ImagePlus,
   Info,
   Loader2,
-  Map,
-  MapPin,
   MessageSquare,
 } from 'lucide-react';
 import type { CityRunCheckin, PostRunRun } from '@/components/runs/city-run-types';
@@ -250,58 +247,18 @@ export function CityRunPostRunPhotosSection({
   );
 }
 
+/** Date-only recap card — not mounted in post-run container; kept for optional reuse. */
 export function CityRunPostRunDetailsSection({ run }: { run: PostRunRun }) {
-  const locationLine = [run.meetUpStreetAddress, run.meetUpCity].filter(Boolean).join(', ') || null;
-
   return (
     <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6">
       <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
         <Info className="w-5 h-5 text-orange-600 shrink-0" />
-        At a glance
+        When
       </h2>
-      <div className="space-y-3 text-sm">
-        <div className="flex gap-2">
-          <Calendar className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold text-gray-900">When</p>
-            <p className="text-gray-700">{formatRunDate(run.date)}</p>
-          </div>
-        </div>
-        {run.meetUpPoint ? (
-          <div className="flex gap-2">
-            <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-gray-900">Meet-up</p>
-              <p className="text-gray-700">{run.meetUpPoint}</p>
-              {locationLine ? <p className="text-gray-500 text-xs mt-0.5">{locationLine}</p> : null}
-            </div>
-          </div>
-        ) : null}
-        {run.totalMiles != null && Number.isFinite(Number(run.totalMiles)) ? (
-          <div>
-            <p className="font-semibold text-gray-900">Distance</p>
-            <p className="text-gray-700">{run.totalMiles} mi</p>
-          </div>
-        ) : null}
-        {run.pace?.trim() ? (
-          <div>
-            <p className="font-semibold text-gray-900">Pace</p>
-            <p className="text-gray-700">{run.pace}</p>
-          </div>
-        ) : null}
+      <div className="flex gap-2 text-sm">
+        <Calendar className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+        <p className="text-gray-700">{formatRunDate(run.date)}</p>
       </div>
-      {run.stravaMapUrl ? (
-        <a
-          href={run.stravaMapUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800 hover:bg-gray-50 transition-colors"
-        >
-          <Map className="w-4 h-4 shrink-0" />
-          View route on Strava
-          <ExternalLink className="w-4 h-4 shrink-0" />
-        </a>
-      ) : null}
     </section>
   );
 }

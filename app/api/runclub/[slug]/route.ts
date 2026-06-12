@@ -5,12 +5,18 @@ import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteById } from '@/lib/domain-athlete';
 import { ATHLETE_ID_HEADER } from '@/lib/gofast-request-headers';
 import { prisma } from '@/lib/prisma';
+import {
+  getActiveMemberCount,
+  getViewerMembership,
+} from '@/lib/domain-runclub';
 
 /**
  * GET /api/runclub/[slug]
  *
  * Authenticated. Returns the RunClub container data:
  *  - club identity (name, logo, city, social links)
+ *  - membership count + current viewer membership status
+ *  - announcements and club events (non-run programming)
  *  - upcoming city_runs with per-run RSVP status for the current athlete
  *  - recent city_runs with check-in count, photos, and shouts
  */
@@ -66,8 +72,79 @@ export async function GET(
     }
 
     const now = new Date();
+    const membership = await getViewerMembership(club.id, athlete?.id ?? null);
+    const isMember = membership?.isMember ?? false;
 
-    const [upcomingRuns, recentRuns] = await Promise.all([
+    const announcementVisibility = isMember
+      ? ['public', 'members']
+      : ['public'];
+
+    const eventVisibility = isMember
+      ? ['public', 'members']
+      : ['public'];
+
+    const [
+      memberCount,
+      announcements,
+      upcomingEvents,
+      upcomingRuns,
+      recentRuns,
+    ] = await Promise.all([
+      getActiveMemberCount(club.id),
+      prisma.run_club_announcements.findMany({
+        where: {
+          runClubId: club.id,
+          visibility: { in: announcementVisibility },
+        },
+        orderBy: { publishedAt: 'desc' },
+        take: 5,
+        select: {
+          id: true,
+          title: true,
+          body: true,
+          visibility: true,
+          publishedAt: true,
+          Athlete: {
+            select: {
+              firstName: true,
+              lastName: true,
+              photoURL: true,
+            },
+          },
+        },
+      }),
+      prisma.run_club_events.findMany({
+        where: {
+          runClubId: club.id,
+          visibility: { in: eventVisibility },
+          startsAt: { gte: now },
+        },
+        orderBy: { startsAt: 'asc' },
+        take: 10,
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          eventType: true,
+          startsAt: true,
+          endsAt: true,
+          location: true,
+          visibility: true,
+          run_club_event_rsvps: athlete
+            ? {
+                where: { athleteId: athlete.id },
+                select: { status: true },
+              }
+            : false,
+          _count: {
+            select: {
+              run_club_event_rsvps: {
+                where: { status: 'going' },
+              },
+            },
+          },
+        },
+      }),
       // Upcoming: today and future, soonest first
       prisma.city_runs.findMany({
         where: { runClubId: club.id, date: { gte: now } },
@@ -126,6 +203,35 @@ export async function GET(
       }),
     ]);
 
+    const announcementsFormatted = announcements.map((item) => ({
+      id: item.id,
+      title: item.title,
+      body: item.body,
+      visibility: item.visibility,
+      publishedAt: item.publishedAt.toISOString(),
+      author: {
+        firstName: item.Athlete?.firstName ?? null,
+        lastName: item.Athlete?.lastName ?? null,
+        photoURL: item.Athlete?.photoURL ?? null,
+      },
+    }));
+
+    const upcomingEventsFormatted = upcomingEvents.map((event) => ({
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      eventType: event.eventType,
+      startsAt: event.startsAt.toISOString(),
+      endsAt: event.endsAt?.toISOString() ?? null,
+      location: event.location,
+      visibility: event.visibility,
+      rsvpCount: event._count.run_club_event_rsvps,
+      myRsvpStatus:
+        Array.isArray(event.run_club_event_rsvps) && event.run_club_event_rsvps.length > 0
+          ? event.run_club_event_rsvps[0].status
+          : null,
+    }));
+
     const upcomingFormatted = upcomingRuns.map((run) => {
       const goingRsvps = run.city_run_rsvps.filter((r) => r.status === 'going');
       const myRsvp = athlete
@@ -179,6 +285,10 @@ export async function GET(
     return NextResponse.json({
       success: true,
       club,
+      memberCount,
+      membership,
+      announcements: announcementsFormatted,
+      upcomingEvents: upcomingEventsFormatted,
       upcomingRuns: upcomingFormatted,
       recentRuns: recentFormatted,
     });

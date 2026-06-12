@@ -5,6 +5,7 @@ import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { getAthleteById, updateAthlete } from '@/lib/domain-athlete';
 import { normalizeProfileGender, parseProfileBirthday } from '@/lib/profile-validation';
+import { isExternallyContactableEmail, isApplePrivateRelayEmail } from '@/lib/athlete-contact-email';
 import { syncAthleteFiveKPaceToActivePlan } from '@/lib/training/plan-lifecycle';
 
 /** GET /api/athlete/[id]/profile — same row as GET /api/athlete/[id] (auth: own athlete only) */
@@ -200,7 +201,18 @@ export async function PUT(
           { status: 400 }
         );
       }
-      data.email = raw;
+      if (raw && isApplePrivateRelayEmail(raw)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Invalid email',
+            message:
+              'Apple private relay addresses cannot be saved as your contact email. Add a real email you check.',
+          },
+          { status: 400 }
+        );
+      }
+      data.email = raw && isExternallyContactableEmail(raw) ? raw : null;
     }
     if (has('phoneNumber')) {
       data.phoneNumber =
