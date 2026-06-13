@@ -5,6 +5,10 @@
       "schedule": "0 4 * * 1"
     },
     {
+      "path": "/api/cron/weekly-push-garmin",
+      "schedule": "0 4 * * 1"
+    },
+    {
       "path": "/api/cron/auto-push-garmin",
       "schedule": "0 5 * * *"
     },
