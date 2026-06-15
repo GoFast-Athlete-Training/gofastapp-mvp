@@ -20,6 +20,9 @@ interface Run {
   date: string;
   endDate: string | null;
   runClubSlug: string | null;
+  runClubId: string | null;
+  runClub?: { id: string; slug: string; name: string; logoUrl: string | null; city: string | null } | null;
+  cityRunType?: string | null;
   runCrewId: string | null;
   meetUpPoint: string;
   meetUpStreetAddress: string | null;
@@ -255,7 +258,7 @@ function GoRunPageContent() {
               <HelpCircle className="h-5 w-5 text-orange-600 shrink-0" aria-hidden />
               Did you show up?
             </h2>
-            <p className="text-sm text-gray-600 mb-3">You RSVPed — confirm you were there to unlock the crew recap.</p>
+            <p className="text-sm text-gray-600 mb-3">You RSVPed — confirm you were there to unlock your run look back.</p>
             {myPastRuns.length > 0 ? (
               <div className="space-y-4 flex-1">
                 {myPastRuns.map((r) => (
@@ -295,9 +298,9 @@ function GoRunPageContent() {
           <section aria-labelledby="your-recaps-heading" className="min-w-0 flex flex-col">
             <h2 id="your-recaps-heading" className="text-lg font-bold text-emerald-900 mb-1 flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-emerald-600 shrink-0" aria-hidden />
-              Your recaps
+              Run look backs
             </h2>
-            <p className="text-sm text-gray-600 mb-3">Runs you&apos;ve checked into — jump back in anytime.</p>
+            <p className="text-sm text-gray-600 mb-3">Club runs you joined — jump back in anytime.</p>
             {myRunRecaps.length > 0 ? (
               <div className="space-y-4 flex-1">
                 {myRunRecaps.map((r) => (
@@ -316,7 +319,7 @@ function GoRunPageContent() {
                       href={`/gorun/${r.id}`}
                       className="inline-flex shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-700"
                     >
-                      Open recap →
+                      Open run look back →
                     </Link>
                   </div>
                 ))}
@@ -325,7 +328,7 @@ function GoRunPageContent() {
               <div className="rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/40 p-6 text-center flex-1 flex flex-col justify-center">
                 <p className="text-gray-700 font-medium">No confirmed runs yet</p>
                 <p className="text-sm text-gray-600 mt-1">
-                  After you confirm you were there in the middle column, your recap lands here for good.
+                  After you confirm you were there in the middle column, your run look back lands here.
                 </p>
               </div>
             )}
@@ -362,8 +365,8 @@ function GoRunPageContent() {
 
         <div id="discover" className="scroll-mt-24">
           <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Discover runs</h2>
-            <p className="text-gray-600">Select your city and see what&apos;s happening</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Discover club runs</h2>
+            <p className="text-gray-600">Find a run club near you — every card shows the club and the run</p>
           </div>
 
         {/* Filters */}
@@ -419,8 +422,28 @@ function GoRunPageContent() {
                   onClick={() => router.push(`/gorun/${run.id}`)}
                   className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all cursor-pointer border border-gray-200 hover:border-orange-300"
                 >
+                  {run.runClub?.name ? (
+                    <div className="flex items-center gap-3 mb-3">
+                      {run.runClub.logoUrl ? (
+                        <img
+                          src={run.runClub.logoUrl}
+                          alt=""
+                          className="h-10 w-10 rounded-full object-cover border border-gray-200"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-full bg-sky-100 flex items-center justify-center text-sky-700 font-bold text-sm">
+                          {run.runClub.name.charAt(0)}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-sky-700 truncate">{run.runClub.name}</p>
+                        <p className="text-xs text-gray-500">Club run</p>
+                      </div>
+                    </div>
+                  ) : null}
+
                   {/* Run Name */}
-                  <h3 className="text-xl font-bold text-gray-900 mb-4 line-clamp-2">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3 line-clamp-2">
                     {run.title}
                   </h3>
 
@@ -499,7 +522,7 @@ function GoRunPageContent() {
             <p className="text-gray-600">
               {cityFilter || dayFilter
                 ? 'Try adjusting your filters to see more runs.'
-                : 'No upcoming runs in your area yet — check back soon or try another city. Past runs you confirm appear in Your recaps above.'}
+                : 'No upcoming club runs in your area yet — check back soon or try another city. Past club runs you confirm appear in Run look backs above.'}
             </p>
           </div>
         )}

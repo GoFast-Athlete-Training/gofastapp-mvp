@@ -28,6 +28,7 @@ import { SignupRaceDayBeforeBanner } from '@/components/races/RaceDayBanner';
 import type { RaceCompleteAnalysis } from '@/components/athlete/RaceCompleteModal';
 import Image from 'next/image';
 import api from '@/lib/api';
+import { buildPostRunCtaCopy } from '@/lib/city-run-copy';
 import Link from 'next/link';
 import {
   formatPaceTargetRangeForDisplay,
@@ -154,7 +155,13 @@ function normalizeGoalDistanceLabel(raw: unknown): string {
 }
 
 type ActivePlanSummary = { name: string; hasSchedule: boolean };
-type GoingRunRow = { id: string; title: string; date: string; city: string };
+type GoingRunRow = {
+  id: string;
+  title: string;
+  date: string;
+  city: string;
+  runClub?: { name: string; logoUrl?: string | null; city?: string | null } | null;
+};
 
 /** From GET /api/race-signups — athlete self-declared races + registry snapshot */
 type RaceSignupWithRegistry = {
@@ -816,14 +823,14 @@ export default function AthleteHomePage() {
 
   const cityRecapRun =
     myPastRuns.find((r) => !dismissedRecapRunIds.has(r.id)) ?? null;
-  const cityRecapDayLabel =
-    cityRecapRun?.date != null
-      ? new Date(cityRecapRun.date).toLocaleDateString('en-US', {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-        })
-      : null;
+  const cityRecapCopy = cityRecapRun
+    ? buildPostRunCtaCopy({
+        runClub: cityRecapRun.runClub,
+        runTitle: cityRecapRun.title,
+        runDate: cityRecapRun.date,
+        ctaTarget: 'checkin',
+      })
+    : null;
 
   const dismissCityRecapBanner = (runId: string) => {
     setDismissedRecapRunIds((prev) => {
@@ -1212,20 +1219,13 @@ export default function AthleteHomePage() {
                     />
                     <div className="min-w-0">
                       <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-900/90">
-                        Post-run recap
+                        Run look back
                       </p>
                       <p className="mt-1 text-sm font-semibold text-gray-900 leading-snug">
-                        You ran &ldquo;{cityRecapRun.title}&rdquo;
-                        {cityRecapDayLabel ? (
-                          <>
-                            {' '}
-                            · {cityRecapDayLabel}
-                          </>
-                        ) : null}
-                        {cityRecapRun.city ? ` · ${cityRecapRun.city}` : null}
+                        {cityRecapCopy?.headline ?? 'Were you at your run?'}
                       </p>
                       <p className="text-sm text-gray-600 mt-1">
-                        Add your shouts and see the crew&apos;s recap.
+                        {cityRecapCopy?.subline ?? 'See who showed up and share how it felt.'}
                       </p>
                     </div>
                   </div>
@@ -1240,7 +1240,7 @@ export default function AthleteHomePage() {
                       type="button"
                       onClick={() => dismissCityRecapBanner(cityRecapRun.id)}
                       className="inline-flex items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-amber-900/80 hover:bg-amber-100/80"
-                      aria-label="Dismiss recap nudge"
+                      aria-label="Dismiss run look back nudge"
                     >
                       <X className="h-4 w-4" aria-hidden />
                       Dismiss

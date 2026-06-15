@@ -11,6 +11,11 @@ import { saveRunClub } from '@/lib/save-runclub';
 import { parseRunTotalMiles } from '@/lib/parse-run-total-miles';
 import { toCanonicalDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
+import {
+  cityRunTypeFromSnapshot,
+  mergeRelationshipSnapshot,
+  relationshipPatchFromBody,
+} from '@/lib/city-run-type';
 
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
@@ -151,6 +156,7 @@ export async function GET(
           dayOfWeek: true,
           date: true,
           runClubId: true,
+          cityRunType: true,
           runCrewId: true,
           meetUpPoint: true,
           meetUpStreetAddress: true,
@@ -265,6 +271,7 @@ export async function GET(
           dayOfWeek: true,
           date: true,
           runClubId: true,
+          cityRunType: true,
           runCrewId: true,
           meetUpPoint: true,
           meetUpStreetAddress: true,
@@ -424,6 +431,7 @@ export async function GET(
         runSeries: run.runSeries ? { id: run.runSeries.id, dayOfWeek: run.runSeries.dayOfWeek, name: run.runSeries.name, meetUpPoint: run.runSeries.meetUpPoint, startTimeHour: run.runSeries.startTimeHour, startTimeMinute: run.runSeries.startTimeMinute, startTimePeriod: run.runSeries.startTimePeriod, description: run.runSeries.description } : null,
         date: run.date.toISOString(),
         runClubId: run.runClubId,
+        cityRunType: run.cityRunType,
         runClubSlug: run.runClub?.slug || null, // For backward compatibility
         runCrewId: run.runCrewId,
         meetUpPoint: run.meetUpPoint,
@@ -521,7 +529,16 @@ export async function PUT(
 
     const run = await prisma.city_runs.findUnique({
       where: { id: resolvedId },
-      select: { id: true, runClubId: true, gofastCity: true },
+      select: {
+        id: true,
+        runClubId: true,
+        runCrewId: true,
+        athleteGeneratedId: true,
+        shakeoutDedupeKey: true,
+        raceRegistryId: true,
+        cityRunType: true,
+        gofastCity: true,
+      },
     });
 
     if (!run) {
@@ -682,6 +699,57 @@ export async function PUT(
       }
     }
 
+    // Relationship FKs that determine cityRunType
+    const relationshipPatch = relationshipPatchFromBody(body as Record<string, unknown>);
+    if (relationshipPatch.runClubId !== undefined) {
+      updateData.runClubId = relationshipPatch.runClubId;
+    }
+    if (relationshipPatch.runCrewId !== undefined) {
+      updateData.runCrewId = relationshipPatch.runCrewId;
+    }
+    if (relationshipPatch.athleteGeneratedId !== undefined) {
+      updateData.athleteGeneratedId = relationshipPatch.athleteGeneratedId;
+    }
+    if (relationshipPatch.shakeoutDedupeKey !== undefined) {
+      updateData.shakeoutDedupeKey = relationshipPatch.shakeoutDedupeKey;
+    }
+    if (relationshipPatch.raceRegistryId !== undefined) {
+      updateData.raceRegistryId = relationshipPatch.raceRegistryId;
+    }
+    if (body.runSeriesId !== undefined) {
+      updateData.runSeriesId =
+        body.runSeriesId === null || body.runSeriesId === ''
+          ? null
+          : String(body.runSeriesId).trim() || null;
+    }
+
+    const mergedRelationships = mergeRelationshipSnapshot(run, {
+      ...relationshipPatch,
+      runClubId:
+        relationshipPatch.runClubId !== undefined
+          ? relationshipPatch.runClubId
+          : (updateData.runClubId as string | null | undefined) ?? run.runClubId,
+      runCrewId:
+        relationshipPatch.runCrewId !== undefined
+          ? relationshipPatch.runCrewId
+          : (updateData.runCrewId as string | null | undefined) ?? run.runCrewId,
+      athleteGeneratedId:
+        relationshipPatch.athleteGeneratedId !== undefined
+          ? relationshipPatch.athleteGeneratedId
+          : (updateData.athleteGeneratedId as string | null | undefined) ??
+            run.athleteGeneratedId,
+      shakeoutDedupeKey:
+        relationshipPatch.shakeoutDedupeKey !== undefined
+          ? relationshipPatch.shakeoutDedupeKey
+          : (updateData.shakeoutDedupeKey as string | null | undefined) ??
+            run.shakeoutDedupeKey,
+      raceRegistryId:
+        relationshipPatch.raceRegistryId !== undefined
+          ? relationshipPatch.raceRegistryId
+          : (updateData.raceRegistryId as string | null | undefined) ?? run.raceRegistryId,
+    });
+    updateData.cityRunType = cityRunTypeFromSnapshot(mergedRelationships);
+
     const runClubUpdateData: Record<string, string | null> = {};
     if (body.runClubWebsiteUrl !== undefined) {
       runClubUpdateData.websiteUrl = body.runClubWebsiteUrl === null || body.runClubWebsiteUrl === '' ? null : String(body.runClubWebsiteUrl).trim();
@@ -724,13 +792,19 @@ export async function PUT(
     }
 
     if (run.runClubId && Object.keys(runClubUpdateData).length > 0) {
+      const clubId =
+        (updateData.runClubId as string | null | undefined) ?? run.runClubId;
+      if (!clubId) {
+        // club was cleared — skip run_clubs metadata update
+      } else {
       try {
         await prisma.run_clubs.update({
-          where: { id: run.runClubId },
+          where: { id: clubId },
           data: runClubUpdateData,
         });
       } catch (runClubError: any) {
         console.error('[PUT /api/runs/[runId]] Failed updating run club sources:', runClubError?.message || runClubError);
+      }
       }
     }
 
@@ -752,6 +826,9 @@ export async function PUT(
         stravaMapUrl: updated.stravaMapUrl,
         staffNotes: updated.staffNotes,
         published: updated.published,
+        runClubId: updated.runClubId,
+        runCrewId: updated.runCrewId,
+        cityRunType: updated.cityRunType,
       },
     });
   } catch (error: any) {

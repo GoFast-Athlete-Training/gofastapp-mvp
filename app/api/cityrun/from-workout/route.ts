@@ -320,6 +320,7 @@ export async function POST(request: NextRequest) {
       runClubId: null,
       staffGeneratedId: null,
       athleteGeneratedId: athlete.id,
+      cityRunType: 'INDIVIDUAL',
       title: finalTitle,
       workflowStatus: "APPROVED",
       dayOfWeek: null,

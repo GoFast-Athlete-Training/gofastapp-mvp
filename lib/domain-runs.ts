@@ -95,6 +95,9 @@ export async function getRuns(filters: GetRunsFilters = {}) {
   where.date = { gte: startOfToday };
   where.published = true;
 
+  // MVP1: discovery is club runs only
+  where.cityRunType = 'CLUB';
+
   // First, get all runs matching filters with RunClub relation (FK)
   // Note: Prisma model `city_runs` maps to table `city_runs` (migrated from run_crew_runs)
   // Use select to only fetch fields that exist (avoiding migration issues)
@@ -112,6 +115,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
         runSeriesId: true,
         date: true,
         runClubId: true,
+        cityRunType: true,
         meetUpPoint: true,
         meetUpStreetAddress: true,
         meetUpCity: true,
@@ -192,6 +196,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     runSeries: run.runSeries ? { id: run.runSeries.id, dayOfWeek: run.runSeries.dayOfWeek, name: run.runSeries.name } : null,
     date: run.date,
     runClubId: run.runClubId, // ✅ FK field
+    cityRunType: run.cityRunType,
     runClub: run.runClub || null, // ✅ FK relation
     runClubSlug: run.runClub?.slug || null, // For backward compatibility
     meetUpPoint: run.meetUpPoint,

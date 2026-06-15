@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { isClubRun } from '@/lib/city-run-type';
 
 const RUN_PAST_BUFFER_MS = 4 * 60 * 60 * 1000;
 const LOOKBACK_MS = 14 * 24 * 60 * 60 * 1000;
@@ -7,11 +8,26 @@ function isRunPast(date: Date): boolean {
   return date.getTime() + RUN_PAST_BUFFER_MS < Date.now();
 }
 
+const RUN_CLUB_SELECT = {
+  id: true,
+  slug: true,
+  name: true,
+  logoUrl: true,
+  city: true,
+} as const;
+
 export type CityRunPostRunShoutCta = {
   type: 'cityRunPostRunShoutCta';
   runId: string;
   runTitle: string;
   runDate: string;
+  runClub: {
+    id: string;
+    slug: string;
+    name: string;
+    logoUrl: string | null;
+    city: string | null;
+  } | null;
   hasCheckin: boolean;
   hasShout: boolean;
   garminLinked: boolean;
@@ -40,6 +56,9 @@ export async function findCityRunPostRunShoutCta(
           id: true,
           title: true,
           date: true,
+          cityRunType: true,
+          runClubId: true,
+          runClub: { select: RUN_CLUB_SELECT },
         },
       },
     },
@@ -48,7 +67,7 @@ export async function findCityRunPostRunShoutCta(
 
   for (const checkin of checkins) {
     const run = checkin.city_runs;
-    if (!run || !isRunPast(run.date)) continue;
+    if (!run || !isClubRun(run) || !isRunPast(run.date)) continue;
     if (checkin.runShouts?.trim()) continue;
 
     const link = await prisma.city_run_activity_links.findUnique({
@@ -70,6 +89,7 @@ export async function findCityRunPostRunShoutCta(
       runId: run.id,
       runTitle: run.title,
       runDate: run.date.toISOString(),
+      runClub: run.runClub,
       hasCheckin: true,
       hasShout: false,
       garminLinked: Boolean(link?.activityId),
@@ -99,6 +119,9 @@ export async function findCityRunPostRunShoutCta(
           id: true,
           title: true,
           date: true,
+          cityRunType: true,
+          runClubId: true,
+          runClub: { select: RUN_CLUB_SELECT },
         },
       },
     },
@@ -110,7 +133,7 @@ export async function findCityRunPostRunShoutCta(
 
   for (const rsvp of sortedGoingRsvps) {
     const run = rsvp.city_runs;
-    if (!run || !isRunPast(run.date)) continue;
+    if (!run || !isClubRun(run) || !isRunPast(run.date)) continue;
 
     const existingCheckin = await prisma.city_run_checkins.findUnique({
       where: { runId_athleteId: { runId: run.id, athleteId } },
@@ -122,6 +145,7 @@ export async function findCityRunPostRunShoutCta(
       runId: run.id,
       runTitle: run.title,
       runDate: run.date.toISOString(),
+      runClub: run.runClub,
       hasCheckin: false,
       hasShout: false,
       garminLinked: false,

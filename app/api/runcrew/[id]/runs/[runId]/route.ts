@@ -99,11 +99,14 @@ export async function PUT(
       updateData.description = body.description?.trim() || null;
     }
 
-    // Update the run
+    // Update the run — preserve RUN_CREW type for crew-owned runs
     if (Object.keys(updateData).length > 0) {
       const updated = await prisma.city_runs.update({
         where: { id: runId },
-        data: updateData,
+        data: {
+          ...updateData,
+          cityRunType: 'RUN_CREW',
+        },
         include: {
           city_run_rsvps: {
             include: {

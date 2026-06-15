@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 import { normalizeCrewResponse } from './normalize-prisma';
 import { secondsToPace } from '@/utils/formatPace';
+import { sendPushToAthlete } from '@/lib/push-notification';
 
 /**
  * Generate a shareable invite link for a RunCrew using handle
@@ -1047,6 +1048,7 @@ export async function createRun(data: {
       gofastCity,
       runCrewId: data.runCrewId,
       athleteGeneratedId: data.athleteId,
+      cityRunType: 'RUN_CREW' as const,
       title: data.title,
       workflowStatus: 'DEVELOP',
       date: data.date,
@@ -1184,7 +1186,62 @@ export async function postAnnouncement(data: {
     },
   });
 
+  void notifyCrewAnnouncementMembers({
+    runCrewId: data.runCrewId,
+    authorId: data.authorId,
+    announcementId: announcement.id,
+    title: data.title,
+    content: data.content,
+  }).catch((err) => {
+    console.error('crew announcement push:', err);
+  });
+
   return announcement;
+}
+
+async function notifyCrewAnnouncementMembers(params: {
+  runCrewId: string;
+  authorId: string;
+  announcementId: string;
+  title: string;
+  content: string;
+}) {
+  const crew = await prisma.run_crews.findUnique({
+    where: { id: params.runCrewId },
+    select: { name: true },
+  });
+  if (!crew) return;
+
+  const members = await prisma.run_crew_memberships.findMany({
+    where: {
+      runCrewId: params.runCrewId,
+      athleteId: { not: params.authorId },
+    },
+    select: { athleteId: true },
+  });
+
+  const body =
+    params.content.trim().length > 120
+      ? `${params.content.trim().slice(0, 117)}...`
+      : params.content.trim();
+
+  await Promise.all(
+    members.map((member) =>
+      sendPushToAthlete({
+        athleteId: member.athleteId,
+        type: 'crew_announcement',
+        title: crew.name,
+        body: params.title || body,
+        dedupeKey: `crew_announcement:${params.announcementId}:${member.athleteId}`,
+        deeplink: `/crew/${params.runCrewId}`,
+        payload: {
+          runCrewId: params.runCrewId,
+          announcementId: params.announcementId,
+          screen: 'crew',
+        },
+      })
+    )
+  );
 }
 
 /** Ambassador credit per qualified run: RSVP going + at least one photo */

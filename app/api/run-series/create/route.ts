@@ -328,7 +328,7 @@ export async function POST(request: NextRequest) {
     }
     await prisma.city_runs.updateMany({
       where: orphanWhere,
-      data: { runSeriesId: setup.id },
+      data: { runSeriesId: setup.id, cityRunType: 'CLUB' },
     });
 
     // Series-only path: no city_run row when createFirstRun is false.
@@ -391,6 +391,7 @@ export async function POST(request: NextRequest) {
         workoutDescription: setup.workoutDescription || null,
         postRunActivity: setup.postRunActivity || null,
         stravaUrl: setup.stravaUrl || null,
+        cityRunType: 'CLUB',
         updatedAt: new Date(),
       },
     });

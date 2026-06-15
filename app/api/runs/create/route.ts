@@ -7,6 +7,7 @@ import { generateUniqueCityRunSlug } from "@/lib/slug-utils";
 import { findExistingRun } from "@/lib/run-duplicate-check";
 import { parseRunTotalMiles } from "@/lib/parse-run-total-miles";
 import { toCanonicalDayOfWeek } from "@/lib/utils/dayOfWeekConverter";
+import { resolveCityRunType } from "@/lib/city-run-type";
 
 export const dynamic = "force-dynamic";
 
@@ -537,6 +538,11 @@ export async function POST(request: NextRequest) {
       igPostGraphic: igPostGraphic?.trim() || null,
       routeId: resolvedRouteId,
       workoutId: resolvedWorkoutId,
+      cityRunType: resolveCityRunType({
+        runClubId: finalRunClubId,
+        runCrewId: runCrewId?.trim() || null,
+        athleteGeneratedId: athleteGeneratedId?.trim() || null,
+      }),
       updatedAt: new Date(),
     };
 

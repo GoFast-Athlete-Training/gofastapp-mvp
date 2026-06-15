@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
+import { buildPostRunCtaCopy } from '@/lib/city-run-copy';
 import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
 import { evaluateAthleteCtaTriggers } from '@/lib/cta-triggers';
 
@@ -26,19 +27,27 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, cta: null });
     }
 
+    const copy = buildPostRunCtaCopy({
+      runClub: cta.runClub,
+      runTitle: cta.runTitle,
+      runDate: cta.runDate,
+      ctaTarget: cta.ctaTarget,
+    });
+
     return NextResponse.json({
       success: true,
       cta: {
         runId: cta.runId,
         runTitle: cta.runTitle,
         runDate: cta.runDate,
+        runClub: cta.runClub,
         hasCheckin: cta.hasCheckin,
         garminLinked: cta.garminLinked,
         activitySummary: cta.activitySummary,
         ctaTarget: cta.ctaTarget,
-        headline: `Congrats on your city run: ${cta.runTitle}`,
-        subline: 'Tell your running mates how it went',
-        buttonLabel: 'Add a shout-out',
+        headline: copy.headline,
+        subline: copy.subline,
+        buttonLabel: copy.buttonLabel,
       },
     });
   } catch (err) {

@@ -141,6 +141,8 @@ model Athlete {
   container_messages_as_host     gofast_container_messages[]    @relation("ContainerMessages")
   container_messages_as_author   gofast_container_messages[]    @relation("ContainerMessageAuthor")
   scheduled_runs                 scheduled_runs[]
+  athlete_push_tokens            athlete_push_tokens[]
+  athlete_notifications        athlete_notifications[]
 }
 
 /// Human coach — first-class entity (Firebase auth), parallel to Athlete.
@@ -1011,6 +1013,8 @@ model city_runs {
   locationId          String?              // FK to run_locations (auto-seeded or manually linked)
   routeId             String?              // Optional saved route (reference path + media)
   workoutId           String?              // Optional structured workout for join-my-workout
+  /// Product behavior unlock: CLUB enables check-in, look-back, reminders.
+  cityRunType         CityRunType          @default(OTHER)
   city_run_rsvps      city_run_rsvps[]
   city_run_messages   city_run_messages[]
   city_run_checkins   city_run_checkins[]
@@ -1038,8 +1042,44 @@ model city_runs {
   @@index([locationId])
   @@index([routeId])
   @@index([workoutId])
+  @@index([cityRunType])
   // Table name is city_runs (migrated from run_crew_runs). Explicit map so deployed builds never use old name.
   @@map("city_runs")
+}
+
+model athlete_push_tokens {
+  id            String   @id @default(cuid())
+  athleteId     String
+  expoPushToken String   @unique
+  platform      String?
+  deviceId      String?
+  enabled       Boolean  @default(true)
+  lastSeenAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  Athlete       Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@index([athleteId])
+}
+
+model athlete_notifications {
+  id           String    @id @default(cuid())
+  athleteId    String
+  type         String
+  title        String
+  body         String
+  deeplink     String?
+  scheduledFor DateTime?
+  sentAt       DateTime?
+  readAt       DateTime?
+  dedupeKey    String    @unique
+  payload      Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  Athlete      Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@index([athleteId, readAt])
+  @@index([scheduledFor, sentAt])
 }
 
 model run_series {
@@ -1877,6 +1917,14 @@ enum RunWorkflowStatus {
   PENDING
   SUBMITTED
   APPROVED
+}
+
+enum CityRunType {
+  CLUB
+  INDIVIDUAL
+  RACE_SHAKEOUT
+  RUN_CREW
+  OTHER
 }
 
 /// Synced from GoFastCompany acq_brands (slug bridge).

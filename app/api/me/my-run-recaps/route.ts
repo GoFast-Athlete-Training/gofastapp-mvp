@@ -14,7 +14,10 @@ export async function GET(request: Request) {
 
   try {
     const checkins = await prisma.city_run_checkins.findMany({
-      where: { athleteId: athlete.id },
+      where: {
+        athleteId: athlete.id,
+        city_runs: { cityRunType: 'CLUB' },
+      },
       include: {
         city_runs: {
           select: {

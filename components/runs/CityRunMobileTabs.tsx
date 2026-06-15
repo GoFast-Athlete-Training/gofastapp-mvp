@@ -23,6 +23,7 @@ import type {
   CityRunRsvp,
   PostRunRun,
 } from '@/components/runs/city-run-types';
+import { isClubRun } from '@/lib/city-run-copy';
 
 type PreRsvpMobileProps = {
   mode: 'pre-rsvp';
@@ -32,6 +33,7 @@ type PreRsvpMobileProps = {
   onRsvp: (status: 'going' | 'not-going') => void;
   onCheckin: () => void;
   onBack: () => void;
+  allowCheckin?: boolean;
 };
 
 type GoingMobileProps = {
@@ -113,6 +115,8 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
               rsvpLoading={props.rsvpLoading}
               onRsvp={props.onRsvp}
               onCheckin={props.onCheckin}
+              runClub={props.run.runClub}
+              allowCheckin={props.allowCheckin ?? true}
             />
           </div>
         ) : null}
@@ -127,6 +131,7 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
     const hasWorkout =
       Boolean(props.run.workoutId || props.run.workout) ||
       Boolean(props.run.workoutDescription?.trim());
+    const clubRun = isClubRun(props.run);
 
     return (
       <MobileHubTabs tabs={[...GOING_TABS]} activeTab={activeTab} onTabChange={setActiveTab}>
@@ -141,7 +146,7 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
             <CityRunRunDayCompanion
               run={props.run}
               runIsPast={props.runIsPast}
-              onAddShout={props.runIsPast ? props.onCheckin : undefined}
+              onAddShout={clubRun && props.runIsPast ? props.onCheckin : undefined}
               checkingIn={props.checkingIn}
             />
             {hasWorkout ? (

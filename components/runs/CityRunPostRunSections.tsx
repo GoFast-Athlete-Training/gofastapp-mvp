@@ -2,18 +2,16 @@
 
 import { useRef } from 'react';
 import {
-  Calendar,
   ChevronDown,
   ChevronRight,
   ImagePlus,
-  Info,
   Loader2,
   MessageSquare,
+  Users,
 } from 'lucide-react';
-import type { CityRunCheckin, PostRunRun } from '@/components/runs/city-run-types';
-import { formatRunDate } from '@/components/runs/city-run-types';
+import type { CityRunCheckin } from '@/components/runs/city-run-types';
 
-function Avatar({
+export function RunnerAvatar({
   athlete,
   className = 'w-10 h-10',
 }: {
@@ -45,6 +43,9 @@ type ShoutsSectionProps = {
   editingShouts: boolean;
   shoutsInput: string;
   savingShouts: boolean;
+  clubName?: string;
+  showMine?: boolean;
+  showOthers?: boolean;
   onStartEdit: () => void;
   onCancelEdit: () => void;
   onShoutsInputChange: (value: string) => void;
@@ -57,90 +58,109 @@ export function CityRunPostRunShoutsSection({
   editingShouts,
   shoutsInput,
   savingShouts,
+  clubName,
+  showMine = true,
+  showOthers = true,
   onStartEdit,
   onCancelEdit,
   onShoutsInputChange,
   onSaveShouts,
 }: ShoutsSectionProps) {
+  const isCommunityOnly = !showMine && showOthers;
+
   return (
     <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="px-4 sm:px-5 pt-4 pb-3 border-b border-gray-100 flex items-center gap-2">
         <MessageSquare className="h-5 w-5 text-orange-600 shrink-0" />
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Shout-outs</h2>
+          <h2 className="text-lg font-bold text-gray-900">
+            {isCommunityOnly ? 'What others are saying' : 'How did it feel?'}
+          </h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            Give the crew some love — good job, great pace, thanks for showing up.
+            {isCommunityOnly
+              ? clubName
+                ? `Shout-outs from ${clubName}`
+                : 'Shout-outs from the crew'
+              : clubName
+                ? `Give ${clubName} a shout-out`
+                : 'Tell the crew how it went'}
           </p>
         </div>
       </div>
 
       <div className="divide-y divide-gray-100">
-        {othersWithShouts.length === 0 && !myCheckin.runShouts ? (
-          <p className="px-4 sm:px-5 py-8 text-sm text-gray-500 text-center">
-            Be the first to shout out the crew.
+        {showOthers && othersWithShouts.length === 0 && !showMine ? (
+          <p className="px-4 sm:px-5 py-6 text-sm text-gray-500 text-center">
+            No crew shout-outs yet.
           </p>
         ) : null}
 
-        {othersWithShouts.map((c) => (
-          <div key={c.id} className="flex gap-3 px-4 sm:px-5 py-4">
-            <Avatar athlete={c.Athlete} />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-gray-900">
-                {c.Athlete?.firstName} {c.Athlete?.lastName}
-              </p>
-              <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{c.runShouts}</p>
-            </div>
-          </div>
-        ))}
-
-        <div className="px-4 sm:px-5 py-4 bg-orange-50/40">
-          <div className="flex gap-3">
-            <Avatar athlete={myCheckin.Athlete} />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-orange-800 mb-2">Your shout-out</p>
-              {editingShouts ? (
-                <div className="space-y-2">
-                  <textarea
-                    value={shoutsInput}
-                    onChange={(e) => onShoutsInputChange(e.target.value)}
-                    placeholder="e.g. Great job everyone — see you next week!"
-                    rows={3}
-                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
-                    autoFocus
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void onSaveShouts()}
-                      disabled={savingShouts}
-                      className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-semibold hover:bg-orange-700 disabled:opacity-50"
-                    >
-                      {savingShouts ? 'Saving…' : 'Post'}
-                    </button>
-                    <button type="button" onClick={onCancelEdit} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
-                      Cancel
-                    </button>
-                  </div>
+        {showOthers
+          ? othersWithShouts.map((c) => (
+              <div key={c.id} className="flex gap-3 px-4 sm:px-5 py-4">
+                <RunnerAvatar athlete={c.Athlete} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-gray-900">
+                    {c.Athlete?.firstName} {c.Athlete?.lastName}
+                  </p>
+                  <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{c.runShouts}</p>
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onStartEdit}
-                  className="w-full text-left rounded-xl border border-dashed border-orange-200 bg-white px-3 py-3 hover:border-orange-300 transition"
-                >
-                  {myCheckin.runShouts ? (
-                    <p className="text-sm text-gray-800">
-                      <span className="font-semibold text-gray-900">{myCheckin.Athlete?.firstName}</span>{' '}
-                      {myCheckin.runShouts}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">Add your shout-out…</p>
-                  )}
-                </button>
-              )}
+              </div>
+            ))
+          : null}
+
+        {showMine ? (
+          <div className="px-4 sm:px-5 py-4 bg-orange-50/40">
+            <div className="flex gap-3">
+              <RunnerAvatar athlete={myCheckin.Athlete} />
+              <div className="flex-1 min-w-0">
+                {editingShouts ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={shoutsInput}
+                      onChange={(e) => onShoutsInputChange(e.target.value)}
+                      placeholder="e.g. Great job everyone — see you next week!"
+                      rows={3}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+                      autoFocus
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void onSaveShouts()}
+                        disabled={savingShouts}
+                        className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-semibold hover:bg-orange-700 disabled:opacity-50"
+                      >
+                        {savingShouts ? 'Saving…' : 'Post'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onCancelEdit}
+                        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onStartEdit}
+                    className="w-full text-left rounded-xl border border-dashed border-orange-200 bg-white px-3 py-3 hover:border-orange-300 transition"
+                  >
+                    {myCheckin.runShouts ? (
+                      <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                        {myCheckin.runShouts}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-500 italic">Add your shout-out…</p>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </section>
   );
@@ -153,6 +173,7 @@ type PhotosSectionProps = {
   othersCount: number;
   uploading: boolean;
   uploadError: string | null;
+  clubName?: string;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 };
 
@@ -163,6 +184,7 @@ export function CityRunPostRunPhotosSection({
   othersCount,
   uploading,
   uploadError,
+  clubName,
   onFileChange,
 }: PhotosSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -170,19 +192,16 @@ export function CityRunPostRunPhotosSection({
   return (
     <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="px-4 sm:px-5 pt-4 pb-3 border-b border-gray-100 flex items-center gap-2">
-        <ImagePlus className="h-5 w-5 text-gray-500 shrink-0" />
-        <h2 className="text-lg font-bold text-gray-900">Run photos</h2>
+        <ImagePlus className="h-5 w-5 text-orange-600 shrink-0" />
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Photos</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {clubName ? `From ${clubName}` : 'From the run'}
+          </p>
+        </div>
       </div>
 
       <div className="p-4 sm:p-5 border-b border-gray-100">
-        <div className="flex items-center gap-3 mb-3">
-          <Avatar athlete={myCheckin.Athlete} />
-          <span className="text-sm font-medium text-gray-700">
-            {myCheckin.Athlete?.firstName}{' '}
-            <span className="text-orange-600 text-xs font-semibold">you</span>
-          </span>
-        </div>
-
         {myCheckin.runPhotoUrl ? (
           <div className="relative rounded-xl overflow-hidden">
             <img src={myCheckin.runPhotoUrl} alt="Your run" className="w-full max-h-80 object-cover" />
@@ -247,28 +266,13 @@ export function CityRunPostRunPhotosSection({
   );
 }
 
-/** Date-only recap card — not mounted in post-run container; kept for optional reuse. */
-export function CityRunPostRunDetailsSection({ run }: { run: PostRunRun }) {
-  return (
-    <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6">
-      <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-        <Info className="w-5 h-5 text-orange-600 shrink-0" />
-        When
-      </h2>
-      <div className="flex gap-2 text-sm">
-        <Calendar className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
-        <p className="text-gray-700">{formatRunDate(run.date)}</p>
-      </div>
-    </section>
-  );
-}
-
 type CrewSectionProps = {
   sortedCrew: CityRunCheckin[];
   athleteId: string | null;
   crewExpanded: boolean;
   onToggleExpanded: () => void;
   expanded?: boolean;
+  clubName?: string;
 };
 
 export function CityRunPostRunCrewSection({
@@ -277,27 +281,29 @@ export function CityRunPostRunCrewSection({
   crewExpanded,
   onToggleExpanded,
   expanded = false,
+  clubName,
 }: CrewSectionProps) {
   const showExpanded = expanded || crewExpanded;
+  const title = clubName ? `Who was at ${clubName}?` : 'Who else was here';
 
   if (expanded) {
     return (
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900">Who showed up</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            {sortedCrew.length === 0
-              ? 'No one checked in yet.'
-              : `${sortedCrew.length} runner${sortedCrew.length === 1 ? '' : 's'} checked in`}
-          </p>
+      <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-4 sm:px-5 pt-4 pb-3 border-b border-gray-100 flex items-center gap-2">
+          <Users className="h-5 w-5 text-orange-600 shrink-0" />
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {sortedCrew.length === 0
+                ? 'No one checked in yet.'
+                : `${sortedCrew.length} runner${sortedCrew.length === 1 ? '' : 's'} checked in`}
+            </p>
+          </div>
         </div>
-        <ul className="space-y-2">
+        <ul className="divide-y divide-gray-100">
           {sortedCrew.map((m) => (
-            <li
-              key={m.id}
-              className="flex items-center gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2"
-            >
-              <Avatar athlete={m.Athlete} className="w-9 h-9" />
+            <li key={m.id} className="flex items-center gap-3 px-4 sm:px-5 py-3">
+              <RunnerAvatar athlete={m.Athlete} className="w-9 h-9" />
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
                   {m.Athlete?.firstName} {m.Athlete?.lastName}
@@ -322,7 +328,7 @@ export function CityRunPostRunCrewSection({
       >
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-xs font-medium text-gray-500 uppercase tracking-wide shrink-0">
-            Who showed up
+            {title}
           </span>
           {sortedCrew.length > 0 ? (
             <div className="flex items-center -space-x-2">
@@ -362,7 +368,7 @@ export function CityRunPostRunCrewSection({
               key={m.id}
               className="flex items-center gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2"
             >
-              <Avatar athlete={m.Athlete} className="w-9 h-9" />
+              <RunnerAvatar athlete={m.Athlete} className="w-9 h-9" />
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
                   {m.Athlete?.firstName} {m.Athlete?.lastName}
@@ -374,26 +380,7 @@ export function CityRunPostRunCrewSection({
             </li>
           ))}
         </ul>
-      ) : (
-        <ul className="mt-3 space-y-1.5">
-          {sortedCrew.slice(0, 4).map((m) => (
-            <li key={m.id} className="flex items-center gap-2 text-sm text-gray-700">
-              <Avatar athlete={m.Athlete} className="w-7 h-7" />
-              <span className="truncate">
-                {m.Athlete?.firstName} {m.Athlete?.lastName}
-                {m.athleteId === athleteId ? (
-                  <span className="text-orange-600 font-medium"> · you</span>
-                ) : null}
-              </span>
-            </li>
-          ))}
-          {sortedCrew.length > 4 ? (
-            <li className="text-xs text-gray-500 pl-9 pt-1">
-              +{sortedCrew.length - 4} more — tap header to expand
-            </li>
-          ) : null}
-        </ul>
-      )}
+      ) : null}
     </section>
   );
 }

@@ -16,6 +16,7 @@ import {
 import { normalizeGarminMatchText } from "./garmin-activity-match-helpers";
 import { ymdFromDate } from "./plan-utils";
 import { parseActivityToSegmentExecution } from "./activity-to-segment-execution";
+import { sendPushToAthlete } from "@/lib/push-notification";
 /** Max sec/mi faster than prescribed easy pace before we skip aerobic HR credit (target − actual). */
 export const EASY_LONG_RUN_MAX_FAST_DRIFT_SEC_PER_MILE = 15;
 
@@ -202,6 +203,7 @@ function pickMainHrTargetBpm(
 
 export type WorkoutForActivityApply = {
   id: string;
+  title: string;
   planId: string | null;
   weekNumber: number | null;
   workoutType: string;
@@ -400,6 +402,20 @@ export async function applyActivityToWorkout(params: {
     } catch (err) {
       console.error("pace_adjustment_log WORKOUT_MATCH insert:", err);
     }
+  }
+
+  try {
+    await sendPushToAthlete({
+      athleteId: activity.athleteId,
+      type: "workout_complete",
+      title: "Great workout!",
+      body: `${workout.title} complete — check your pace breakdown.`,
+      dedupeKey: `workout_complete:${workout.id}`,
+      deeplink: `/workouts/${workout.id}`,
+      payload: { workoutId: workout.id, screen: "workout" },
+    });
+  } catch (err) {
+    console.error("workout_complete push:", err);
   }
 
   if (creditedFiveKPaceSecPerMile != null) {

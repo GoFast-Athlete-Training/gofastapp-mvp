@@ -19,6 +19,7 @@ import {
   type CityRunCheckin,
   type CityRunDetails,
 } from '@/components/runs/city-run-types';
+import { isClubRun, buildClubRsvpCopy } from '@/lib/city-run-copy';
 
 export default function GoRunPage() {
   const params = useParams();
@@ -156,7 +157,7 @@ export default function GoRunPage() {
   // 2. RSVP status "going" →  going container    (you're planning to)
   // 3. Anything else        →  pre-RSVP view      (public)
 
-  if (myCheckin) {
+  if (myCheckin && isClubRun(run)) {
     return (
       <CityRunPostRunContainer
         run={{
@@ -180,7 +181,7 @@ export default function GoRunPage() {
     );
   }
 
-  return <CityRunPreRSVP run={run} onRsvp={handleRsvp} onCheckin={handleCheckin} rsvpLoading={rsvpLoading} onBack={() => router.push('/gorun')} />;
+  return <CityRunPreRSVP run={run} onRsvp={handleRsvp} onCheckin={handleCheckin} rsvpLoading={rsvpLoading} onBack={() => router.push('/gorun')} allowCheckin={isClubRun(run)} />;
 }
 
 // ─── Pre-RSVP Container ────────────────────────────────────────────────────────
@@ -191,12 +192,14 @@ function CityRunPreRSVP({
   onCheckin,
   rsvpLoading,
   onBack,
+  allowCheckin,
 }: {
   run: CityRunDetails;
   onRsvp: (status: 'going' | 'not-going') => void;
   onCheckin: () => void;
   rsvpLoading: boolean;
   onBack: () => void;
+  allowCheckin: boolean;
 }) {
   const going = (run.rsvps || []).filter((r) => r.status === 'going');
   const [runIsPast, setRunIsPast] = useState(false);
@@ -219,6 +222,7 @@ function CityRunPreRSVP({
           onRsvp={onRsvp}
           onCheckin={onCheckin}
           onBack={onBack}
+          allowCheckin={allowCheckin}
         />
 
         <div className="hidden lg:grid grid-cols-3 gap-6">
@@ -232,6 +236,8 @@ function CityRunPreRSVP({
                   rsvpLoading={rsvpLoading}
                   onRsvp={onRsvp}
                   onCheckin={onCheckin}
+                  runClub={run.runClub}
+                  allowCheckin={allowCheckin}
                 />
               </>
             ) : null}
@@ -248,6 +254,8 @@ function CityRunPreRSVP({
                   rsvpLoading={rsvpLoading}
                   onRsvp={onRsvp}
                   onCheckin={onCheckin}
+                  runClub={run.runClub}
+                  allowCheckin={allowCheckin}
                 />
               </>
             )}

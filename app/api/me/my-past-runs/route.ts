@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { prisma } from "@/lib/prisma";
 
-/** Same window as CityRunGoingContainer: run.date + 4h before we treat as "past" for check-in / recap. */
+/** Same window as CityRunGoingContainer: run.date + 4h before we treat as "past" for check-in / look-back. */
 function pastRunsCutoff(): Date {
   return new Date(Date.now() - 4 * 60 * 60 * 1000);
 }
@@ -33,6 +33,7 @@ export async function GET(request: Request) {
         athleteId: athlete.id,
         status: "going",
         city_runs: {
+          cityRunType: 'CLUB',
           date: { lt: pastEnoughForRecap, gt: oldest },
           city_run_checkins: {
             none: { athleteId: athlete.id },
@@ -46,6 +47,15 @@ export async function GET(request: Request) {
             title: true,
             date: true,
             gofastCity: true,
+            runClub: {
+              select: {
+                id: true,
+                slug: true,
+                name: true,
+                logoUrl: true,
+                city: true,
+              },
+            },
           },
         },
       },
@@ -58,6 +68,7 @@ export async function GET(request: Request) {
       title: r.city_runs.title,
       date: r.city_runs.date.toISOString(),
       city: r.city_runs.gofastCity,
+      runClub: r.city_runs.runClub,
     }));
 
     return NextResponse.json({ runs });

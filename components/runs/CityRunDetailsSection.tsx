@@ -9,6 +9,7 @@ import {
   type RunClub,
   type RunSeries,
 } from '@/components/runs/city-run-types';
+import { buildClubPastCheckinCopy, buildClubRsvpCopy } from '@/lib/city-run-copy';
 
 type CityRunDetailsSectionProps = {
   run: CityRunDetails;
@@ -239,23 +240,31 @@ export function CityRunRsvpPanel({
   rsvpLoading,
   onRsvp,
   onCheckin,
+  runClub,
+  allowCheckin = true,
 }: {
   runIsPast: boolean;
   rsvpLoading: boolean;
   onRsvp: (status: 'going' | 'not-going') => void;
   onCheckin: () => void;
+  runClub?: { name: string } | null;
+  allowCheckin?: boolean;
 }) {
+  const pastCopy = buildClubPastCheckinCopy(runClub);
+  const rsvpCopy = buildClubRsvpCopy(runClub);
+
   if (runIsPast) {
+    if (!allowCheckin) return null;
     return (
       <div className="bg-white rounded-xl shadow-sm p-6">
-        <p className="text-sm text-gray-500 mb-4">This run already happened. Were you there?</p>
+        <p className="text-sm text-gray-500 mb-4">{pastCopy.prompt}</p>
         <button
           type="button"
           onClick={onCheckin}
           disabled={rsvpLoading}
           className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 disabled:opacity-50 transition"
         >
-          {rsvpLoading ? 'Loading…' : 'Were you there? →'}
+          {rsvpLoading ? 'Loading…' : pastCopy.buttonLabel}
         </button>
       </div>
     );
@@ -263,16 +272,14 @@ export function CityRunRsvpPanel({
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
-      <p className="text-sm text-gray-500 mb-4">
-        RSVP to join the run chat and see who&apos;s going.
-      </p>
+      <p className="text-sm text-gray-500 mb-4">{rsvpCopy.prompt}</p>
       <button
         type="button"
         onClick={() => onRsvp('going')}
         disabled={rsvpLoading}
         className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 disabled:opacity-50 transition"
       >
-        {rsvpLoading ? 'Saving…' : "I'm going"}
+        {rsvpLoading ? 'Saving…' : rsvpCopy.goingLabel}
       </button>
     </div>
   );
@@ -289,17 +296,18 @@ export function CityRunGoingBanner() {
 export function CityRunCheckinCta({
   checkingIn,
   onCheckin,
+  runClub,
 }: {
   checkingIn: boolean;
   onCheckin: () => void;
+  runClub?: { name: string } | null;
 }) {
+  const copy = buildClubPastCheckinCopy(runClub);
   return (
     <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-4 flex items-center gap-3">
       <div className="min-w-0 flex-1">
-        <div className="font-semibold text-orange-900 text-sm">Were you there?</div>
-        <div className="text-xs text-orange-700">
-          Confirm you showed up to share shouts and see the crew&apos;s recap
-        </div>
+        <div className="font-semibold text-orange-900 text-sm">{copy.ctaHeadline}</div>
+        <div className="text-xs text-orange-700">{copy.ctaSubline}</div>
       </div>
       <button
         type="button"

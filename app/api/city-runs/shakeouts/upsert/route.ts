@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { resolveCityRunType } from "@/lib/city-run-type";
 
 export const dynamic = "force-dynamic";
 
@@ -180,6 +181,11 @@ export async function POST(request: NextRequest) {
           runSeriesId: null,
           workflowStatus: "DEVELOP" as const,
           shakeoutDedupeKey: dedupeKey,
+          cityRunType: resolveCityRunType({
+            runClubId,
+            shakeoutDedupeKey: dedupeKey,
+            raceRegistryId: reg.id,
+          }),
           updatedAt: new Date(),
         };
 

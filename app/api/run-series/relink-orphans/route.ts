@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
 
     const result = await prisma.city_runs.updateMany({
       where,
-      data: { runSeriesId: series.id },
+      data: { runSeriesId: series.id, cityRunType: 'CLUB' },
     });
 
     const res = NextResponse.json({
