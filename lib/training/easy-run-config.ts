@@ -9,6 +9,8 @@
 export type EasyRunConfigResolved = {
   standardMiles: number;
   minMiles: number;
+  /** Per easy-day ceiling during plan generation fill/trim. */
+  maxMiles: number;
   paceOffsetSecPerMile: number;
   weeklyTargetBufferMiles: number;
 };
@@ -16,6 +18,7 @@ export type EasyRunConfigResolved = {
 export const EASY_RUN_CONFIG_DEFAULTS: EasyRunConfigResolved = {
   standardMiles: 6,
   minMiles: 4,
+  maxMiles: 10,
   paceOffsetSecPerMile: 90,
   weeklyTargetBufferMiles: 0,
 };
@@ -51,10 +54,13 @@ export function parseEasyRunConfigJson(
   const o = json as Record<string, unknown>;
   const standardMiles = finitePositive(o.standardMiles, EASY_RUN_CONFIG_DEFAULTS.standardMiles);
   let minMiles = finitePositive(o.minMiles, EASY_RUN_CONFIG_DEFAULTS.minMiles);
+  let maxMiles = finitePositive(o.maxMiles, EASY_RUN_CONFIG_DEFAULTS.maxMiles);
   if (minMiles > standardMiles) minMiles = standardMiles;
+  if (maxMiles < minMiles) maxMiles = minMiles;
   return {
-    standardMiles,
+    standardMiles: Math.min(standardMiles, maxMiles),
     minMiles,
+    maxMiles,
     paceOffsetSecPerMile: finiteOffset(
       o.paceOffsetSecPerMile,
       EASY_RUN_CONFIG_DEFAULTS.paceOffsetSecPerMile
@@ -73,6 +79,7 @@ export function easyRunConfigToSnapshot(
   return {
     standardMiles: c.standardMiles,
     minMiles: c.minMiles,
+    maxMiles: c.maxMiles,
     paceOffsetSecPerMile: c.paceOffsetSecPerMile,
     weeklyTargetBufferMiles: c.weeklyTargetBufferMiles,
   };

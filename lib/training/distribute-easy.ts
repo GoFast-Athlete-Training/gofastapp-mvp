@@ -1,7 +1,7 @@
 /**
  * Pass 4c: race miles, standard easy miles per slot (from preset), trim when week
  * exceeds target + buffer, and fill easy days toward weeklyMileageTarget when below
- * target (pre-taper weeks only).
+ * target (pre-taper weeks only). Easy days never exceed `easyRunConfig.maxMiles`.
  */
 
 import type { PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";
@@ -14,6 +14,9 @@ import {
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+/** Matches week-summary deload heuristic: >12% drop vs prior week total. */
+export const DELOAD_WEEK_VOLUME_RATIO = 0.88;
 
 export type DistributeEasyInput = {
   planSchedule: PlanWeekSchedule[];
@@ -29,6 +32,31 @@ export type DistributeEasyInput = {
   taperStartWeekNumber?: number | null;
 };
 
+type EasySlot = { miles: number };
+
+/** Remaining headroom across easy slots before per-day max is hit. */
+export function easyFillCapacityMiles(
+  easySlots: readonly EasySlot[],
+  maxMiles: number
+): number {
+  return round2(
+    easySlots.reduce((s, d) => s + Math.max(0, maxMiles - d.miles), 0)
+  );
+}
+
+export function isDeloadStyleWeek(params: {
+  weekTotalMiles: number;
+  previousWeekTotalMiles: number | null;
+}): boolean {
+  const prev = params.previousWeekTotalMiles;
+  if (prev == null || prev <= 0 || params.weekTotalMiles <= 0) return false;
+  return params.weekTotalMiles < prev * DELOAD_WEEK_VOLUME_RATIO;
+}
+
+function capEasyMiles(miles: number, cfg: EasyRunConfigResolved): number {
+  return round2(Math.min(cfg.maxMiles, Math.max(0, miles)));
+}
+
 /** Mutates planSchedule in-place */
 export function distributeEasyMiles(input: DistributeEasyInput): void {
   const {
@@ -37,6 +65,8 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
     taperStartWeekNumber,
   } = input;
   const typicalWeekPreferredCount = Math.max(1, Math.floor(prefCountRaw));
+
+  let previousWeekTotalMiles: number | null = null;
 
   for (const week of input.planSchedule) {
     const weekNum = week.weekNumber;
@@ -57,7 +87,7 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
     const trimThreshold =
       Math.min(100, weeklyCap + cfg.weeklyTargetBufferMiles) + 0.05;
     const fillTarget = weeklyCap;
-    const shouldFillTowardTarget =
+    const beforeTaper =
       taperStartWeekNumber == null ||
       !Number.isFinite(Number(taperStartWeekNumber)) ||
       weekNum < Number(taperStartWeekNumber);
@@ -67,18 +97,23 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
     }
 
     if (week.days.length > 0 && week.days.every((d) => d.workoutType === "Race")) {
+      previousWeekTotalMiles = week.days.reduce((s, d) => s + d.miles, 0);
       continue;
     }
 
     const easySlots = week.days.filter((d) => d.workoutType === "Easy");
-    if (easySlots.length === 0) continue;
+    if (easySlots.length === 0) {
+      previousWeekTotalMiles = week.days.reduce((s, d) => s + d.miles, 0);
+      continue;
+    }
 
     for (const ep of easySlots) {
       const row = ep.catalogueWorkoutId
         ? input.catalogueRowsById.get(ep.catalogueWorkoutId)
         : undefined;
-      const milesPerEasy = round2(
-        estimateCatalogueWorkoutMiles(row ?? null, "Easy", cfg.standardMiles) * w1Scale
+      const milesPerEasy = capEasyMiles(
+        estimateCatalogueWorkoutMiles(row ?? null, "Easy", cfg.standardMiles) * w1Scale,
+        cfg
       );
       ep.miles = milesPerEasy > 0 ? milesPerEasy : 0;
     }
@@ -99,6 +134,12 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
       if (!hit) break;
     }
 
+    const deloadWeek = isDeloadStyleWeek({
+      weekTotalMiles: weekSum(),
+      previousWeekTotalMiles,
+    });
+    const shouldFillTowardTarget = beforeTaper && !deloadWeek;
+
     if (shouldFillTowardTarget) {
       const increment = 0.25;
       let safety = 0;
@@ -106,11 +147,16 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
         let progressed = false;
         for (const d of easySlots) {
           if (weekSum() >= fillTarget - 0.05) break;
-          d.miles = round2(d.miles + increment);
+          const room = cfg.maxMiles - d.miles;
+          if (room <= 0) continue;
+          const add = Math.min(increment, room);
+          d.miles = round2(d.miles + add);
           progressed = true;
         }
         if (!progressed) break;
       }
     }
+
+    previousWeekTotalMiles = weekSum();
   }
 }
