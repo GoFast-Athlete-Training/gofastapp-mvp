@@ -82,6 +82,7 @@ export interface CityRunWorkoutSummary {
   title: string;
   workoutType: string | null;
   description: string | null;
+  scope?: string | null;
   segments?: CityRunWorkoutSegment[];
 }
 

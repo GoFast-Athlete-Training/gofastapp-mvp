@@ -59,13 +59,14 @@ export async function GET(
           gofastCity: true,
         },
       },
-      workout: {
-        select: {
-          id: true,
-          title: true,
-          workoutType: true,
-          description: true,
-          segments: {
+        workout: {
+          select: {
+            id: true,
+            title: true,
+            workoutType: true,
+            description: true,
+            scope: true,
+            segments: {
             orderBy: { stepOrder: "asc" as const },
             select: {
               id: true,
@@ -140,6 +141,7 @@ export async function GET(
               title: run.workout.title,
               workoutType: run.workout.workoutType,
               description: run.workout.description,
+              scope: run.workout.scope,
               segments: run.workout.segments ?? [],
             }
           : null,

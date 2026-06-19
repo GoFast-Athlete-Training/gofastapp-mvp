@@ -98,6 +98,10 @@ model Athlete {
   updatedAt               DateTime                 @updatedAt
   /// Last app bootstrap (GET /api/athlete/me or POST /api/athlete/create)
   lastSeenAt              DateTime?
+  /// Rolling 90d avg weekly miles from athlete_activities — populated by cron, not computed on read.
+  avgWeeklyMilesSnapshot  Float?
+  /// When avgWeeklyMilesSnapshot was last written by the mileage cron.
+  mileageSnapshotUpdatedAt DateTime?
   go_fast_companies       go_fast_companies        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   runClub                 run_clubs?               @relation(fields: [runClubId], references: [id], onDelete: SetNull)
   ambassador_credits      ambassador_credits[]
@@ -718,6 +722,7 @@ model run_clubs {
   updatedAt DateTime @updatedAt
 
   runs                  city_runs[]
+  groupWorkouts         workouts[]
   clubLeaders           Athlete[]                  // Reverse relation for Athlete.runClubId
   runSeries             run_series[]               // Recurring series this club owns (run_series.runClubId → run_clubs)
   run_club_memberships  run_club_memberships[]
@@ -1477,7 +1482,13 @@ model workouts {
   title                     String
   workoutType               WorkoutType
   description               String?
-  athleteId                 String
+  /// Null for GROUP-scope club workouts created from Company run builder.
+  athleteId                 String?
+  /// Prod run_clubs.id when scope = GROUP.
+  runClubId                 String?
+  /// Company company_staff.id when staff created the group workout.
+  createdByStaffId          String?
+  scope                     WorkoutScope          @default(ATHLETE)
   /// Training plan this workout belongs to (null = standalone)
   planId                    String?
   /// Selected catalogue prescription when materialized from plan schedule
@@ -1550,7 +1561,8 @@ model workouts {
   slug                      String?             @unique
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
-  Athlete                   Athlete             @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  Athlete                   Athlete?            @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  runClub                   run_clubs?          @relation(fields: [runClubId], references: [id], onDelete: SetNull)
   training_plans            training_plans?     @relation(fields: [planId], references: [id], onDelete: SetNull)
   workout_catalogue         workout_catalogue?  @relation(fields: [catalogueWorkoutId], references: [id], onDelete: SetNull)
   matched_activity          athlete_activities? @relation("WorkoutMatchedActivity", fields: [matchedActivityId], references: [id], onDelete: SetNull)
@@ -1560,6 +1572,8 @@ model workouts {
   tri_workout_leg           tri_workout_leg?
 
   @@index([athleteId])
+  @@index([runClubId])
+  @@index([scope])
   @@index([workoutType])
   @@index([planId])
   @@index([planId, date])
@@ -1910,6 +1924,12 @@ enum WorkoutType {
   Intervals
   LongRun
   Race
+}
+
+/// ATHLETE = personal/plan workout; GROUP = club track prescription (no athlete 5K anchor).
+enum WorkoutScope {
+  ATHLETE
+  GROUP
 }
 
 enum RunWorkflowStatus {

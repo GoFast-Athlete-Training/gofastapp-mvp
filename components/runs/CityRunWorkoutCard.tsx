@@ -17,6 +17,7 @@ export default function CityRunWorkoutCard({
 }: CityRunWorkoutCardProps) {
   const linkedId = workoutId || workout?.id || null;
   const textOnly = workoutDescription?.trim() || workout?.description?.trim() || null;
+  const isGroupWorkout = workout?.scope === "GROUP";
 
   if (linkedId) {
     return (
@@ -54,12 +55,14 @@ export default function CityRunWorkoutCard({
         ) : textOnly ? (
           <p className="mt-2 text-sm text-gray-600 whitespace-pre-wrap">{textOnly}</p>
         ) : null}
+        {!isGroupWorkout ? (
         <Link
           href={`/workouts/${linkedId}`}
           className="mt-4 inline-flex items-center justify-center rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-sky-700"
         >
           See workout →
         </Link>
+        ) : null}
       </div>
     );
   }
