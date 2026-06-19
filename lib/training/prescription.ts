@@ -60,6 +60,16 @@ function targetsOrOpen(paceSecPerMile: number | null): Pick<WorkoutStep, "target
   return { targets: [paceTargetFromSecondsPerMile(paceSecPerMile)] };
 }
 
+/** Warmup / cooldown: distance-only bookends — never prescribe pace (Garmin OPEN). */
+function openBookendStepFields(): Pick<WorkoutStep, "targets"> | object {
+  return {};
+}
+
+function isBookendSegmentTitle(title: string): boolean {
+  const t = (title || "").toLowerCase();
+  return t.includes("warm") || t.includes("cool");
+}
+
 function appendBetweenRepRecoveryStep(
   out: WorkoutStep[],
   stepOrder: number,
@@ -277,8 +287,6 @@ function buildSustainedWorkoutBlock(params: {
       : Math.max(0.25, totalMiles - warmupM - cooldownM),
     2
   );
-  const warmupPace = secPerMile(anchorSecondsPerMile, entry.warmupPaceOffsetSecPerMile);
-  const cooldownPace = secPerMile(anchorSecondsPerMile, entry.cooldownPaceOffsetSecPerMile);
   const workPace = secPerMile(anchorSecondsPerMile, entry.workPaceOffsetSecPerMile);
   let order = 1;
   const out: WorkoutStep[] = [];
@@ -288,7 +296,7 @@ function buildSustainedWorkoutBlock(params: {
       title: "Warmup",
       durationType: "DISTANCE",
       durationValue: warmupM,
-      ...targetsOrOpen(warmupPace),
+      ...openBookendStepFields(),
     });
   }
   out.push({
@@ -304,7 +312,7 @@ function buildSustainedWorkoutBlock(params: {
       title: "Cooldown",
       durationType: "DISTANCE",
       durationValue: cooldownM,
-      ...targetsOrOpen(cooldownPace),
+      ...openBookendStepFields(),
     });
   }
   return out;
@@ -354,7 +362,7 @@ export function prescribe(params: {
         title: "Warmup",
         durationType: "DISTANCE",
         durationValue: warmupM,
-        ...targetsOrOpen(secPerMile(anchorSecondsPerMile, entry.warmupPaceOffsetSecPerMile)),
+        ...openBookendStepFields(),
       });
     }
     if (workM > 0) {
@@ -372,14 +380,13 @@ export function prescribe(params: {
         title: "Cooldown",
         durationType: "DISTANCE",
         durationValue: cooldownM,
-        ...targetsOrOpen(secPerMile(anchorSecondsPerMile, entry.cooldownPaceOffsetSecPerMile)),
+        ...openBookendStepFields(),
       });
     }
     return out;
   }
 
   if (type === "LongRun") {
-    const easyP = secPerMile(anchorSecondsPerMile, entry.recoveryPaceOffsetSecPerMile);
     const longP = secPerMile(anchorSecondsPerMile, entry.workPaceOffsetSecPerMile);
     const mpP = mpPaceSecPerMile({
       entry,
@@ -395,13 +402,12 @@ export function prescribe(params: {
       let order = 1;
       const out: WorkoutStep[] = [];
       if (warmupM > 0) {
-        const wp = secPerMile(anchorSecondsPerMile, entry.warmupPaceOffsetSecPerMile);
         out.push({
           stepOrder: order++,
           title: "Warmup",
           durationType: "DISTANCE",
           durationValue: warmupM,
-          ...targetsOrOpen(wp),
+          ...openBookendStepFields(),
         });
       }
       let sumSeg = 0;
@@ -439,13 +445,12 @@ export function prescribe(params: {
         });
       }
       if (cooldownM > 0) {
-        const cp = secPerMile(anchorSecondsPerMile, entry.cooldownPaceOffsetSecPerMile);
         out.push({
           stepOrder: order++,
           title: "Cooldown",
           durationType: "DISTANCE",
           durationValue: cooldownM,
-          ...targetsOrOpen(cp),
+          ...openBookendStepFields(),
         });
       }
       if (out.length > 0) return out;
@@ -484,7 +489,7 @@ export function prescribe(params: {
           title: "Warmup",
           durationType: "DISTANCE",
           durationValue: warmupM,
-          ...targetsOrOpen(easyP),
+          ...openBookendStepFields(),
         });
       }
       out.push({
@@ -500,7 +505,7 @@ export function prescribe(params: {
           title: "Cooldown",
           durationType: "DISTANCE",
           durationValue: cooldownM,
-          ...targetsOrOpen(easyP),
+          ...openBookendStepFields(),
         });
       }
       if (out.length > 0) return out;
@@ -523,7 +528,7 @@ export function prescribe(params: {
           title: "Warmup",
           durationType: "DISTANCE",
           durationValue: wM,
-          ...targetsOrOpen(easyP),
+          ...openBookendStepFields(),
         });
       }
       if (workM > 0.05) {
@@ -550,7 +555,7 @@ export function prescribe(params: {
           title: "Cooldown",
           durationType: "DISTANCE",
           durationValue: cM,
-          ...targetsOrOpen(easyP),
+          ...openBookendStepFields(),
         });
       }
       if (out.length > 0) return out;
@@ -635,7 +640,6 @@ export function prescribe(params: {
         entry.warmupMiles != null && entry.warmupMiles > 0 ? round(entry.warmupMiles, 2) : 0;
       const cooldownM =
         entry.cooldownMiles != null && entry.cooldownMiles > 0 ? round(entry.cooldownMiles, 2) : 0;
-      const easyP = secPerMile(anchorSecondsPerMile, entry.warmupPaceOffsetSecPerMile);
       const recPace = secPerMile(anchorSecondsPerMile, entry.recoveryPaceOffsetSecPerMile);
       const repeatCount = Math.max(1, tempoBlockRepeat.repeatCount);
       const recSec = tempoBlockRepeat.recoveryBetweenCyclesSeconds;
@@ -650,7 +654,7 @@ export function prescribe(params: {
           title: "Warmup",
           durationType: "DISTANCE",
           durationValue: warmupM,
-          ...targetsOrOpen(easyP),
+          ...openBookendStepFields(),
         });
       }
       for (let c = 0; c < repeatCount; c++) {
@@ -675,13 +679,12 @@ export function prescribe(params: {
         }
       }
       if (cooldownM > 0) {
-        const cp = secPerMile(anchorSecondsPerMile, entry.cooldownPaceOffsetSecPerMile);
         out.push({
           stepOrder: order++,
           title: "Cooldown",
           durationType: "DISTANCE",
           durationValue: cooldownM,
-          ...targetsOrOpen(cp),
+          ...openBookendStepFields(),
         });
       }
       if (out.length > 0) return out;
@@ -691,7 +694,6 @@ export function prescribe(params: {
       const warmupM = entry.warmupMiles != null && entry.warmupMiles > 0 ? round(entry.warmupMiles, 2) : 0;
       const cooldownM =
         entry.cooldownMiles != null && entry.cooldownMiles > 0 ? round(entry.cooldownMiles, 2) : 0;
-      const easyP = secPerMile(anchorSecondsPerMile, entry.warmupPaceOffsetSecPerMile);
       let order = 1;
       const out: WorkoutStep[] = [];
       if (warmupM > 0) {
@@ -700,7 +702,7 @@ export function prescribe(params: {
           title: "Warmup",
           durationType: "DISTANCE",
           durationValue: warmupM,
-          ...targetsOrOpen(easyP),
+          ...openBookendStepFields(),
         });
       }
       let sumSeg = 0;
@@ -739,13 +741,12 @@ export function prescribe(params: {
         });
       }
       if (cooldownM > 0) {
-        const cp = secPerMile(anchorSecondsPerMile, entry.cooldownPaceOffsetSecPerMile);
         out.push({
           stepOrder: order++,
           title: "Cooldown",
           durationType: "DISTANCE",
           durationValue: cooldownM,
-          ...targetsOrOpen(cp),
+          ...openBookendStepFields(),
         });
       }
       if (out.length > 0) return out;
@@ -765,7 +766,6 @@ export function prescribe(params: {
       const warmupM = entry.warmupMiles ?? round(totalMiles * 0.15, 2);
       const cooldownM = entry.cooldownMiles ?? round(totalMiles * 0.15, 2);
       const recPace = secPerMile(anchorSecondsPerMile, entry.recoveryPaceOffsetSecPerMile);
-      const easyP = secPerMile(anchorSecondsPerMile, entry.warmupPaceOffsetSecPerMile);
       const repeatCount = Math.max(1, blockRepeat.repeatCount);
       const recSec = blockRepeat.recoveryBetweenCyclesSeconds;
       const recMinutes =
@@ -779,7 +779,7 @@ export function prescribe(params: {
           title: "Warmup",
           durationType: "DISTANCE",
           durationValue: warmupM,
-          ...targetsOrOpen(easyP),
+          ...openBookendStepFields(),
         });
       }
       for (let c = 0; c < repeatCount; c++) {
@@ -804,13 +804,12 @@ export function prescribe(params: {
         }
       }
       if (cooldownM > 0) {
-        const cp = secPerMile(anchorSecondsPerMile, entry.cooldownPaceOffsetSecPerMile);
         out.push({
           stepOrder: order++,
           title: "Cooldown",
           durationType: "DISTANCE",
           durationValue: cooldownM,
-          ...targetsOrOpen(cp),
+          ...openBookendStepFields(),
         });
       }
       if (out.length > 0) return out;
@@ -824,7 +823,6 @@ export function prescribe(params: {
       const warmupM = entry.warmupMiles ?? round(totalMiles * 0.15, 2);
       const cooldownM = entry.cooldownMiles ?? round(totalMiles * 0.15, 2);
       const recPace = secPerMile(anchorSecondsPerMile, entry.recoveryPaceOffsetSecPerMile);
-      const easyP = secPerMile(anchorSecondsPerMile, entry.warmupPaceOffsetSecPerMile);
       const flat: { dm: number; off: number | null | undefined }[] = [];
       for (const seg of ij) {
         const n = Math.max(1, Math.round(seg.reps ?? 1));
@@ -841,7 +839,7 @@ export function prescribe(params: {
           title: "Warmup",
           durationType: "DISTANCE",
           durationValue: warmupM,
-          ...targetsOrOpen(easyP),
+          ...openBookendStepFields(),
         });
       }
       for (let i = 0; i < flat.length; i++) {
@@ -858,13 +856,12 @@ export function prescribe(params: {
         });
       }
       if (cooldownM > 0) {
-        const cp = secPerMile(anchorSecondsPerMile, entry.cooldownPaceOffsetSecPerMile);
         out.push({
           stepOrder: order++,
           title: "Cooldown",
           durationType: "DISTANCE",
           durationValue: cooldownM,
-          ...targetsOrOpen(cp),
+          ...openBookendStepFields(),
         });
       }
       return out;
@@ -894,7 +891,6 @@ export function prescribe(params: {
   const cooldownM = entry.cooldownMiles ?? round(totalMiles * 0.15, 2);
   const intPace = secPerMile(anchorSecondsPerMile, entry.workBasePaceOffsetSecPerMile);
   const recPace = secPerMile(anchorSecondsPerMile, entry.recoveryPaceOffsetSecPerMile);
-  const easyP = secPerMile(anchorSecondsPerMile, entry.warmupPaceOffsetSecPerMile);
 
   let order = 1;
   const out: WorkoutStep[] = [];
@@ -904,7 +900,7 @@ export function prescribe(params: {
       title: "Warmup",
       durationType: "DISTANCE",
       durationValue: warmupM,
-      ...targetsOrOpen(easyP),
+      ...openBookendStepFields(),
     });
   }
   for (let i = 0; i < reps; i++) {
@@ -918,13 +914,12 @@ export function prescribe(params: {
     order = appendBetweenRepRecoveryStep(out, order, legacyRepRecovery, recPace);
   }
   if (cooldownM > 0) {
-    const cp = secPerMile(anchorSecondsPerMile, entry.cooldownPaceOffsetSecPerMile);
     out.push({
       stepOrder: order++,
       title: "Cooldown",
       durationType: "DISTANCE",
       durationValue: cooldownM,
-      ...targetsOrOpen(cp),
+      ...openBookendStepFields(),
     });
   }
   return out;
@@ -1139,15 +1134,21 @@ export function descriptorsToWorkoutSteps(
   };
 
   return descriptors.map((d, i) => {
-    const secPerMile = zoneToSecPerMile(d.paceZone);
-    const target = paceTargetFromSecondsPerMile(secPerMile);
-    return {
+    const base = {
       stepOrder: i + 1,
       title: d.title,
       durationType: d.durationType,
       durationValue: d.durationValue,
-      targets: [target],
       repeatCount: d.repeatCount,
+    };
+    if (isBookendSegmentTitle(d.title)) {
+      return base;
+    }
+    const secPerMile = zoneToSecPerMile(d.paceZone);
+    const target = paceTargetFromSecondsPerMile(secPerMile);
+    return {
+      ...base,
+      targets: [target],
     };
   });
 }
