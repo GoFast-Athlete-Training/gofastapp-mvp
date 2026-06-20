@@ -323,11 +323,14 @@ function expandStructuredDays(params: {
         cid && params.catalogueTitleById?.[cid]?.trim()
           ? params.catalogueTitleById[cid]!.trim()
           : null;
+      const dayAssigned = dayAssignedFromOurDow(opts.ourDow);
       title = catTitle
         ? catTitle
-        : formatPlannedWorkoutTitle(workoutType, estMeters);
+        : formatPlannedWorkoutTitle(workoutType, estMeters, { dayAssigned });
     } else {
-      title = formatPlannedWorkoutTitle(workoutType, estMeters);
+      title = formatPlannedWorkoutTitle(workoutType, estMeters, {
+        dayAssigned: dayAssignedFromOurDow(opts.ourDow),
+      });
     }
 
     const isRaceRow = workoutType === "Race";
@@ -474,12 +477,13 @@ function expandLegacyDays(params: {
         token.workoutType === "Intervals" ||
         token.workoutType === "Tempo"
       ) {
-        title = formatPlannedWorkoutTitle(
-          token.workoutType,
-          estMeters
-        );
+        title = formatPlannedWorkoutTitle(token.workoutType, estMeters, {
+          dayAssigned: dayAbbrToDayName(token.dayAbbr),
+        });
       } else {
-        title = formatPlannedWorkoutTitle(token.workoutType, estMeters);
+        title = formatPlannedWorkoutTitle(token.workoutType, estMeters, {
+          dayAssigned: dayAbbrToDayName(token.dayAbbr),
+        });
       }
 
       const phaseOffset = isRaceDay ? 0 : (weekNOffset ?? 0);

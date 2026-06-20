@@ -16,6 +16,7 @@ export type PlanDayCard = {
   title: string;
   workoutType: string;
   phase: string;
+  dayAssigned?: string | null;
   estimatedDistanceInMeters: number;
   matchedActivityId: string | null;
   skippedAt: string | null;
@@ -121,6 +122,7 @@ export async function buildPlanWeekCards(params: {
       }),
       workoutType,
       phase: s.phase,
+      dayAssigned: s.dayAssigned,
       estimatedDistanceInMeters,
       matchedActivityId: row?.matchedActivityId ?? null,
       skippedAt: row?.skippedAt?.toISOString() ?? null,

@@ -114,7 +114,7 @@ export async function planGeneratePostHandler(
       minWeeklyMiles,
     });
 
-    const clearedWorkouts = await cleanupFuturePlanWorkoutsAfterRegenerate({
+    const cleanup = await cleanupFuturePlanWorkoutsAfterRegenerate({
       planId: trainingPlanId,
       athleteId: athlete.id,
     });
@@ -123,7 +123,10 @@ export async function planGeneratePostHandler(
       success: true,
       planId: result.planId,
       weekCount: result.weekCount,
-      clearedFutureWorkouts: clearedWorkouts,
+      clearedFutureWorkouts: cleanup.clearedFutureWorkouts,
+      garminSchedulesDeleted: cleanup.garminSchedulesDeleted,
+      garminSchedulesStale: cleanup.garminSchedulesStale,
+      garminScheduleDeleteErrors: cleanup.garminScheduleDeleteErrors,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Plan generation failed";

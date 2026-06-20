@@ -1,8 +1,45 @@
 /**
- * Short, Runna-style titles for planned workouts: "Easy 6 miles", "Tempo work 5 miles".
+ * Short, Runna-style titles for planned workouts: "Monday Easy 6 miles", "Wednesday Tempo work 5 miles".
  */
 
 const MI_PER_M = 1609.34;
+
+const DAY_NAMES = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+] as const;
+
+export type PlannedWorkoutTitleOpts = {
+  isRace?: boolean;
+  raceName?: string;
+  /** Full day name, e.g. Monday — prefixed on generic planned titles. */
+  dayAssigned?: string | null;
+};
+
+function normalizeDayAssigned(dayAssigned: string | null | undefined): string | null {
+  const raw = dayAssigned?.trim();
+  if (!raw) return null;
+  const match = DAY_NAMES.find((d) => d.toLowerCase() === raw.toLowerCase());
+  return match ?? null;
+}
+
+/** Strip a leading weekday from titles like "Monday Easy 6 miles". */
+export function stripLeadingDayNameFromTitle(title: string): string {
+  const raw = title.trim();
+  if (!raw) return raw;
+  for (const day of DAY_NAMES) {
+    const prefix = `${day} `;
+    if (raw.toLowerCase().startsWith(prefix.toLowerCase())) {
+      return raw.slice(prefix.length).trim();
+    }
+  }
+  return raw;
+}
 
 export function formatMilesFromMeters(
   estimatedDistanceInMeters: number | null | undefined
@@ -20,10 +57,11 @@ export function formatMilesFromMeters(
   return `${rounded} ${unit}`;
 }
 
-export function formatPlannedWorkoutTitle(
+/** Core Runna-style title without weekday prefix. */
+export function formatCorePlannedWorkoutTitle(
   workoutType: string,
   estimatedDistanceInMeters: number | null | undefined,
-  opts?: { isRace?: boolean; raceName?: string }
+  opts?: Pick<PlannedWorkoutTitleOpts, "isRace" | "raceName">
 ): string {
   if (opts?.isRace && opts.raceName?.trim()) {
     return `Race — ${opts.raceName.trim()}`;
@@ -46,6 +84,19 @@ export function formatPlannedWorkoutTitle(
   }
 }
 
+export function formatPlannedWorkoutTitle(
+  workoutType: string,
+  estimatedDistanceInMeters: number | null | undefined,
+  opts?: PlannedWorkoutTitleOpts
+): string {
+  const core = formatCorePlannedWorkoutTitle(workoutType, estimatedDistanceInMeters, opts);
+  if (opts?.isRace) return core;
+
+  const day = normalizeDayAssigned(opts?.dayAssigned);
+  if (day) return `${day} ${core}`;
+  return core;
+}
+
 /** True when title matches Runna-style or AI fallback strings, not a custom/catalogue name. */
 export function isGeneratedGenericWorkoutTitle(
   title: string,
@@ -58,16 +109,25 @@ export function isGeneratedGenericWorkoutTitle(
     return true;
   }
 
-  const planned = formatPlannedWorkoutTitle(workoutType, estimatedDistanceInMeters);
-  if (raw === planned) return true;
+  const withoutDay = stripLeadingDayNameFromTitle(raw);
+  const planned = formatCorePlannedWorkoutTitle(workoutType, estimatedDistanceInMeters);
+  if (withoutDay === planned || raw === planned) return true;
 
   const miles = formatMilesFromMeters(estimatedDistanceInMeters);
   if (miles) {
     const miNum = miles.replace(/\s*miles?$/, "").trim();
-    if (new RegExp(`^${workoutType}\\s+${miNum.replace(".", "\\.")}\\s+Miles$`, "i").test(raw)) {
+    if (
+      new RegExp(`^${workoutType}\\s+${miNum.replace(".", "\\.")}\\s+Miles$`, "i").test(
+        withoutDay
+      )
+    ) {
       return true;
     }
-    if (new RegExp(`^${miNum.replace(".", "\\.")}\\s+Mile\\s+${workoutType}`, "i").test(raw)) {
+    if (
+      new RegExp(`^${miNum.replace(".", "\\.")}\\s+Mile\\s+${workoutType}`, "i").test(
+        withoutDay
+      )
+    ) {
       return true;
     }
   }
@@ -112,13 +172,14 @@ export function resolveWorkoutDisplayTitle(workout: {
   }
 
   if (/\b—\s*Week\s*\d+/i.test(raw) || /\bWeek\s*\d+\s*$/i.test(raw)) {
-    return formatPlannedWorkoutTitle(
+    return formatCorePlannedWorkoutTitle(
       workout.workoutType,
       workout.estimatedDistanceInMeters
     );
   }
+  if (genericStored && scheduleTitle) return scheduleTitle;
   if (raw.length > 0) return raw;
-  return formatPlannedWorkoutTitle(
+  return formatCorePlannedWorkoutTitle(
     workout.workoutType,
     workout.estimatedDistanceInMeters
   );

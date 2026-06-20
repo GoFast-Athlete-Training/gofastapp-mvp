@@ -14,6 +14,7 @@ export type PlanDayCard = {
   title: string;
   workoutType: string;
   phase: string;
+  dayAssigned?: string | null;
   estimatedDistanceInMeters: number;
   matchedActivityId: string | null;
   skippedAt: string | null;

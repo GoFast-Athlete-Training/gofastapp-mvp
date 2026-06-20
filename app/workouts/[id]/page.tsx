@@ -167,6 +167,7 @@ interface Workout {
   matched_activity?: MatchedActivitySummary | null;
   planId?: string | null;
   weekNumber?: number | null;
+  dayAssigned?: string | null;
   training_plans?: {
     id: string;
     name: string;
@@ -1144,7 +1145,8 @@ export default function WorkoutDetailPage() {
       if (editDistanceMi.trim() !== "" && Number.isFinite(mi) && mi >= 0) {
         titleForPatch = formatPlannedWorkoutTitle(
           workout.workoutType,
-          estimatedDistanceInMeters
+          estimatedDistanceInMeters,
+          { dayAssigned: workout.dayAssigned }
         );
       }
       const patchBody: Record<string, unknown> = {

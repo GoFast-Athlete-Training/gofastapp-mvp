@@ -965,7 +965,8 @@ export default function AthleteHomePage() {
     const rawT = todayPlanDay.title.trim();
     const plannedTitle = formatPlannedWorkoutTitle(
       todayPlanDay.workoutType,
-      todayPlanDay.estimatedDistanceInMeters
+      todayPlanDay.estimatedDistanceInMeters,
+      { dayAssigned: todayPlanDay.dayAssigned }
     );
     if (rawT && rawT !== plannedTitle) {
       todayStoredTitleSubtitle = rawT;
