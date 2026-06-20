@@ -81,6 +81,7 @@ export async function pushPlanWorkoutsInDateRange(
   const candidates = await prisma.workouts.findMany({
     where: {
       planId: { not: null },
+      athleteId: { not: null },
       date: { gte: dateStart, lte: dateEnd },
       Athlete: {
         garmin_access_token: { not: null },
@@ -105,6 +106,9 @@ export async function pushPlanWorkoutsInDateRange(
   let failed = 0;
 
   for (const w of candidates) {
+    const athleteId = w.athleteId;
+    if (!athleteId) continue;
+
     const segCount = await prisma.workout_segments.count({
       where: { workoutId: w.id },
     });
@@ -112,7 +116,7 @@ export async function pushPlanWorkoutsInDateRange(
       skipped++;
       results.push({
         workoutId: w.id,
-        athleteId: w.athleteId,
+        athleteId,
         ok: false,
         skipped: true,
         error: "no_segments_not_materialized",
@@ -130,7 +134,7 @@ export async function pushPlanWorkoutsInDateRange(
       skipped++;
       results.push({
         workoutId: w.id,
-        athleteId: w.athleteId,
+        athleteId,
         ok: true,
         skipped: true,
         action: "library_only_skip",
@@ -141,7 +145,7 @@ export async function pushPlanWorkoutsInDateRange(
     }
 
     const mode = modeOrSkip;
-    const r = await pushWorkoutToGarminForAthlete(w.athleteId, w.id, { mode });
+    const r = await pushWorkoutToGarminForAthlete(athleteId, w.id, { mode });
     if (r.ok) {
       if (mode === "update-library") {
         updated++;
@@ -150,7 +154,7 @@ export async function pushPlanWorkoutsInDateRange(
       }
       results.push({
         workoutId: w.id,
-        athleteId: w.athleteId,
+        athleteId,
         ok: true,
         action: mode,
         scheduledDate: r.scheduledDate,
@@ -160,7 +164,7 @@ export async function pushPlanWorkoutsInDateRange(
       failed++;
       results.push({
         workoutId: w.id,
-        athleteId: w.athleteId,
+        athleteId,
         ok: false,
         action: mode,
         error: `${r.code}: ${r.message}`,

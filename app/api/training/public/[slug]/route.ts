@@ -65,24 +65,26 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const primaryGoal = await prisma.athleteGoal.findFirst({
-      where: { athleteId: workout.athleteId, status: "ACTIVE" },
-      orderBy: { targetByDate: "asc" },
-      include: {
-        race_registry: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            raceDate: true,
-            city: true,
-            state: true,
-            distanceMeters: true,
-            distanceLabel: true,
+    const primaryGoal = workout.athleteId
+      ? await prisma.athleteGoal.findFirst({
+          where: { athleteId: workout.athleteId, status: "ACTIVE" },
+          orderBy: { targetByDate: "asc" },
+          include: {
+            race_registry: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                raceDate: true,
+                city: true,
+                state: true,
+                distanceMeters: true,
+                distanceLabel: true,
+              },
+            },
           },
-        },
-      },
-    });
+        })
+      : null;
 
     const now = new Date();
     const upcoming = workout.city_runs.find((r) => r.date >= now) ?? workout.city_runs[0] ?? null;

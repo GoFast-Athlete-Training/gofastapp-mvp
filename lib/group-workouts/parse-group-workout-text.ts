@@ -186,8 +186,8 @@ Rules:
   };
 
   const rawSegments = Array.isArray(parsed.segments) ? parsed.segments : [];
-  const segments: GroupWorkoutSegmentInput[] = rawSegments
-    .map((s: unknown, i: number) => {
+  const segments = rawSegments
+    .map((s: unknown, i: number): GroupWorkoutSegmentInput | null => {
       if (!s || typeof s !== "object") return null;
       const seg = s as Record<string, unknown>;
       const durationType = seg.durationType === "TIME" ? "TIME" : "DISTANCE";
@@ -219,7 +219,7 @@ Rules:
           typeof seg.recoveryDurationType === "string" ? seg.recoveryDurationType : null,
         recoveryDurationValue:
           typeof seg.recoveryDurationValue === "number" ? seg.recoveryDurationValue : null,
-      } satisfies GroupWorkoutSegmentInput;
+      };
     })
     .filter((s): s is GroupWorkoutSegmentInput => s !== null);
 

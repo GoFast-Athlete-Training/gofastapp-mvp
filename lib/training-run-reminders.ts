@@ -29,6 +29,7 @@ export async function processTrainingRunReminders(now = new Date()) {
   const [planWorkouts, scheduledRuns] = await Promise.all([
     prisma.workouts.findMany({
       where: {
+        athleteId: { not: null },
         date: { gte: tomorrowStart, lt: dayAfterTomorrow },
         matchedActivityId: null,
         skippedAt: null,
@@ -60,10 +61,13 @@ export async function processTrainingRunReminders(now = new Date()) {
   let pushesSent = 0;
 
   for (const workout of planWorkouts) {
+    const athleteId = workout.athleteId;
+    if (!athleteId) continue;
+
     const distanceMi = formatDistanceMi(workout.estimatedDistanceInMeters);
     const body = buildWorkoutReminderBody(workout.title, distanceMi);
     const result = await sendPushToAthlete({
-      athleteId: workout.athleteId,
+      athleteId,
       type: 'run_reminder',
       title: 'Your next run is coming',
       body,

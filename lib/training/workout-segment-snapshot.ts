@@ -28,7 +28,8 @@ export type SegmentSnapshotSource =
   | "plan_day_materialize_existing"
   | "segments_put"
   | "standalone_workout_post"
-  | "garmin_push";
+  | "garmin_push"
+  | "group_workout_create";
 
 /** Build JSON document for workouts.segmentSnapshotJson from materialized API segments. */
 export function segmentSnapshotDocumentFromApiSegments(

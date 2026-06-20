@@ -1,6 +1,12 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import type { Prisma as PrismaTypes } from "@prisma/client";
 import { segmentSnapshotDocumentFromDbRows } from "@/lib/training/workout-segment-snapshot";
 import type { GroupWorkoutSegmentInput } from "./types";
+
+type GroupWorkoutWithSegments = PrismaTypes.workoutsGetPayload<{
+  include: { segments: true };
+}>;
 
 function generateId(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
@@ -22,7 +28,9 @@ export type CreateGroupWorkoutInput = {
   segments: GroupWorkoutSegmentInput[];
 };
 
-export async function createGroupWorkout(input: CreateGroupWorkoutInput) {
+export async function createGroupWorkout(
+  input: CreateGroupWorkoutInput
+): Promise<GroupWorkoutWithSegments> {
   const runClubId = input.runClubId.trim();
   if (!runClubId) throw new Error("runClubId is required");
 
@@ -66,7 +74,8 @@ export async function createGroupWorkout(input: CreateGroupWorkoutInput) {
           title: seg.title,
           durationType: seg.durationType,
           durationValue: seg.durationValue,
-          targets: seg.targets ?? null,
+          targets:
+            seg.targets != null ? (seg.targets as Prisma.InputJsonValue) : Prisma.JsonNull,
           repeatCount: seg.repeatCount ?? null,
           notes: seg.notes ?? null,
           paceTargetEncodingVersion: 2,
