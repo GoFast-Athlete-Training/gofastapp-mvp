@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { formatRunTime } from '@/utils/formatTime';
 import { generateRunUrl } from '@/lib/run-url';
+import { formatCalendarDate } from '@/lib/calendar-date';
 
 interface CityRunCardProps {
   run: {
@@ -64,7 +65,7 @@ export default function CityRunCard({ run, gofastCity }: CityRunCardProps) {
       </div>
       <div className="space-y-1 text-sm text-gray-600">
         <div>
-          {new Date(run.date).toLocaleDateString()} {timeStr && `at ${timeStr}`}
+          {formatCalendarDate(run.date)} {timeStr && `at ${timeStr}`}
         </div>
         <div>{run.meetUpPoint}</div>
         {run.meetUpAddress && (

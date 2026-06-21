@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { formatRunTime } from '@/utils/formatTime';
+import { formatCalendarDate } from '@/lib/calendar-date';
 
 interface RunCardProps {
   run: {
@@ -39,7 +40,7 @@ export default function RunCard({ run, crewId }: RunCardProps) {
       </div>
       <div className="space-y-1 text-sm text-gray-600">
         <div>
-          {new Date(run.date).toLocaleDateString()} {timeStr && `at ${timeStr}`}
+          {formatCalendarDate(run.date)} {timeStr && `at ${timeStr}`}
         </div>
         <div>{run.meetUpPoint}</div>
         {run.totalMiles && <div>{run.totalMiles} miles</div>}

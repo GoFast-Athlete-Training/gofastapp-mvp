@@ -29,6 +29,7 @@ import type { RaceCompleteAnalysis } from '@/components/athlete/RaceCompleteModa
 import Image from 'next/image';
 import api from '@/lib/api';
 import { buildPostRunCtaCopy } from '@/lib/city-run-copy';
+import { formatCalendarDate } from '@/lib/calendar-date';
 import Link from 'next/link';
 import {
   formatPaceTargetRangeForDisplay,
@@ -743,7 +744,7 @@ export default function AthleteHomePage() {
   const nextGoingRun = myGoingRuns[0] ?? null;
   const nextGoingDay =
     nextGoingRun?.date != null
-      ? new Date(nextGoingRun.date).toLocaleDateString('en-US', {
+      ? formatCalendarDate(nextGoingRun.date, {
           weekday: 'short',
           month: 'short',
           day: 'numeric',

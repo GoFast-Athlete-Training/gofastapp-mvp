@@ -1,4 +1,10 @@
 import { Prisma } from "@prisma/client";
+import {
+  addCalendarDays,
+  dateKeyFromDate,
+  dateKeyToUtcNoonDate,
+  dateKeyToUtcStartOfDay,
+} from "@/lib/calendar-date";
 import { prisma } from "@/lib/prisma";
 import { generateUniqueCityRunSlug } from "@/lib/slug-utils";
 
@@ -43,26 +49,21 @@ export function getStartOfTodayUTC(): Date {
 }
 
 export function dateToYmd(date: Date): string {
-  const y = date.getUTCFullYear();
-  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return dateKeyFromDate(date);
 }
 
 export function parseYmd(ymd: string): Date {
-  const [y, mo, d] = ymd.split("-").map(Number);
-  return new Date(Date.UTC(y, mo - 1, d));
+  return dateKeyToUtcNoonDate(ymd);
 }
 
 export function addDaysUtc(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d;
+  return dateKeyToUtcNoonDate(addCalendarDays(date, days));
 }
 
 function dayRangeUtc(ymd: string): { start: Date; end: Date } {
-  const start = parseYmd(ymd);
-  const end = addDaysUtc(start, 1);
+  const start = dateKeyToUtcStartOfDay(ymd);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
   return { start, end };
 }
 

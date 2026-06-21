@@ -8,6 +8,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
+import { formatCalendarDate } from '@/lib/calendar-date';
 import TopNav from '@/components/shared/TopNav';
 
 /**
@@ -307,7 +308,7 @@ export default function RunDetailPage() {
             <div>
               <h2 className="text-sm font-medium text-gray-500">Date & Time</h2>
               <p className="text-lg text-gray-900">
-                {new Date(run.date).toLocaleDateString('en-US', {
+                {formatCalendarDate(run.date, {
                   weekday: 'long',
                   year: 'numeric',
                   month: 'long',

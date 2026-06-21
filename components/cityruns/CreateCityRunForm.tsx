@@ -24,6 +24,7 @@ import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import { parseGoogleAddress, generateCitySlugFromParts } from "@/lib/parse-google-address";
+import { formatCalendarDate } from "@/lib/calendar-date";
 
 export type CreateCityRunFormWorkout = {
   id: string;
@@ -72,9 +73,7 @@ function initialTotalMilesString(meters: number | null | undefined): string {
 
 function formatDateLabel(isoDate: string): string {
   if (!isoDate.trim()) return "";
-  const d = new Date(`${isoDate}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(undefined, {
+  return formatCalendarDate(isoDate, {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -815,7 +814,7 @@ export default function CreateCityRunForm({
                   <ExternalLink className="w-3.5 h-3.5 shrink-0" />
                   Open CityRun
                   {r.date
-                    ? ` · ${new Date(r.date).toLocaleDateString(undefined, {
+                    ? ` · ${formatCalendarDate(r.date, {
                         month: "short",
                         day: "numeric",
                         year: "numeric",

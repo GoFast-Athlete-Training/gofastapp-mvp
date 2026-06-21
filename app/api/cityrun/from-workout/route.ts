@@ -8,6 +8,7 @@ import {
   generateCityRunUrl,
 } from "@/lib/slug-utils";
 import { assignUniqueWorkoutShareSlug } from "@/lib/workout-public-slug";
+import { parseCalendarDateForWrite } from "@/lib/calendar-date";
 
 export const dynamic = "force-dynamic";
 
@@ -62,25 +63,6 @@ const UNSUPPORTED_CITY_RUN_FIELDS = [
   "igPostText",
   "igPostGraphic",
 ] as const;
-
-function parseRunDate(dateInput: string): Date {
-  const s = dateInput.trim();
-  const isoDay = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-  if (isoDay) {
-    const y = Number(isoDay[1]);
-    const m = Number(isoDay[2]);
-    const d = Number(isoDay[3]);
-    if (y < 1970 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) {
-      throw new Error("Invalid date");
-    }
-    return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-  }
-  const parsed = new Date(s);
-  if (Number.isNaN(parsed.getTime())) {
-    throw new Error("Invalid date");
-  }
-  return parsed;
-}
 
 function buildWorkoutDescriptionHydration(workout: {
   workoutType: string;
@@ -242,7 +224,7 @@ export async function POST(request: NextRequest) {
 
     let runDateObj: Date;
     try {
-      runDateObj = parseRunDate(date);
+      runDateObj = parseCalendarDateForWrite(date);
     } catch {
       return NextResponse.json({ error: "Invalid date" }, { status: 400 });
     }

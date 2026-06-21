@@ -1,6 +1,10 @@
 /**
  * Plan length and calendar-week helpers (Mon–Sun, UTC date-only).
  */
+import {
+  dateKeyFromDate,
+  formatCalendarDate,
+} from "@/lib/calendar-date";
 
 export function utcDateOnly(d: Date): Date {
   const x = new Date(d);
@@ -114,11 +118,7 @@ export function totalWeeksFromDates(planStartDate: Date, raceDate: Date): number
 
 /** Calendar date string from a UTC date-only `Date` (DB / generator). */
 export function ymdFromDate(d: Date): string {
-  const x = utcDateOnly(d);
-  const y = x.getUTCFullYear();
-  const m = String(x.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(x.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return dateKeyFromDate(utcDateOnly(d));
 }
 
 /** Local wall-clock calendar day (browser = user TZ). Use for "today" matching `dateKey` strings. */
@@ -146,16 +146,7 @@ export function formatPlanDateDisplay(
     year: "numeric",
   }
 ): string {
-  const raw = ymdOrIso.trim();
-  const base =
-    raw.length >= 10 && raw[4] === "-" && raw[7] === "-"
-      ? raw.slice(0, 10)
-      : raw;
-  const d = new Date(`${base}T12:00:00`);
-  if (Number.isNaN(d.getTime())) {
-    return raw;
-  }
-  return d.toLocaleDateString(undefined, options);
+  return formatCalendarDate(ymdOrIso, options);
 }
 
 /** preferredDays: 1=Monday .. 7=Sunday */

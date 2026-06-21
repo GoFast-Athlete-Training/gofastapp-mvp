@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Calendar, Clock, MapPin, Route, Users } from 'lucide-react';
 import api from '@/lib/api';
 import { formatRunTime } from '@/utils/formatTime';
+import { formatCalendarDate } from '@/lib/calendar-date';
 
 export interface UpcomingRun {
   id: string;
@@ -30,8 +31,7 @@ interface UpcomingRunsListProps {
 }
 
 function formatRunDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', {
+  return formatCalendarDate(dateStr, {
     weekday: 'short',
     month: 'short',
     day: 'numeric',

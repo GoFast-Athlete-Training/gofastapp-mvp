@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Users, Calendar, Clock, MapPin } from 'lucide-react';
+import { formatCalendarDate } from '@/lib/calendar-date';
 
 interface CrewHeroProps {
   crew: any;
@@ -99,7 +100,7 @@ export default function CrewHero({
                 <Clock className="w-4 h-4" />
                 <span className="font-medium">
                   {nextRun.date
-                    ? new Date(nextRun.date).toLocaleDateString('en-US', {
+                    ? formatCalendarDate(nextRun.date, {
                         weekday: 'long',
                         month: 'short',
                         day: 'numeric',

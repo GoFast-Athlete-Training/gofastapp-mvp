@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Calendar, Clock, MapPin, Route, User } from "lucide-react";
 import TopNav from "@/components/shared/TopNav";
+import { formatCalendarDate } from "@/lib/calendar-date";
 
 type Payload = {
   success: boolean;
@@ -31,9 +32,7 @@ type Payload = {
 };
 
 function formatRunDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, {
+  return formatCalendarDate(iso, {
     weekday: "long",
     month: "long",
     day: "numeric",

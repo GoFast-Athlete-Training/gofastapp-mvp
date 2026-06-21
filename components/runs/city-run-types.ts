@@ -1,3 +1,5 @@
+import { formatCalendarDate } from '@/lib/calendar-date';
+
 export interface RunClub {
   slug: string;
   name: string;
@@ -140,7 +142,7 @@ export function formatRunTime(
 }
 
 export function formatRunDate(d: string, includeYear = true): string {
-  return new Date(d).toLocaleDateString('en-US', {
+  return formatCalendarDate(d, {
     weekday: 'long',
     month: 'long',
     day: 'numeric',

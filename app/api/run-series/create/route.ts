@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { buildSeriesSlug } from '@/lib/seriesSlug';
 import { toCanonicalDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
+import { formatCalendarDate, parseCalendarDateForWrite } from '@/lib/calendar-date';
 
 export const dynamic = 'force-dynamic';
 
@@ -346,10 +347,10 @@ export async function POST(request: NextRequest) {
 
     // Create the first city_run stub seeded from setup (when createFirstRun !== false)
     const runDate = firstRunDate
-      ? new Date(firstRunDate)
+      ? parseCalendarDateForWrite(String(firstRunDate))
       : getNextOccurrence(canonicalDay);
 
-    const formattedDate = runDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const formattedDate = formatCalendarDate(runDate, { month: 'short', day: 'numeric' });
     const runTitle = `${setup.name} – ${formattedDate}`;
 
     if (!setup.gofastCity && !meetUpCity) {

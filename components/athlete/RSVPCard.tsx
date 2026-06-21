@@ -5,6 +5,7 @@
  */
 
 import { useRouter } from 'next/navigation';
+import { formatCalendarDate } from '@/lib/calendar-date';
 
 interface RSVPCardProps {
   nextRun: any;
@@ -37,7 +38,7 @@ export default function RSVPCard({ nextRun, crew, runCrewId, isCrewAdmin }: RSVP
           <p className="text-sm text-gray-600">
             {nextRun.title || 'Upcoming run'} on{' '}
             {nextRun.date
-              ? new Date(nextRun.date).toLocaleDateString('en-US', {
+              ? formatCalendarDate(nextRun.date, {
                   weekday: 'long',
                   month: 'long',
                   day: 'numeric',

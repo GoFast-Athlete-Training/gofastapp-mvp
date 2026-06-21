@@ -8,6 +8,7 @@ import { findExistingRun } from "@/lib/run-duplicate-check";
 import { parseRunTotalMiles } from "@/lib/parse-run-total-miles";
 import { toCanonicalDayOfWeek } from "@/lib/utils/dayOfWeekConverter";
 import { resolveCityRunType } from "@/lib/city-run-type";
+import { parseCalendarDateForWrite } from "@/lib/calendar-date";
 
 export const dynamic = "force-dynamic";
 
@@ -343,8 +344,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Parse date
-    const runDateObj = new Date(date);
+    // Parse date (date-only inputs anchor at UTC noon)
+    let runDateObj: Date;
+    try {
+      runDateObj = parseCalendarDateForWrite(String(date));
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid date" },
+        { status: 400, headers: corsHeaders }
+      );
+    }
 
     // If runClub object is provided, ensure RunClub exists in DB (dual save)
     // GoFastCompany sends full RunClub object when admin selects from dropdown
