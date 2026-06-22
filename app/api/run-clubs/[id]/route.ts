@@ -78,7 +78,6 @@ export async function GET(
             endStreetAddress: true,
             endCity: true,
             endState: true,
-            stravaUrl: true,
           },
           orderBy: { dayOfWeek: 'asc' },
         },

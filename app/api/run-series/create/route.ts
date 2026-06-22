@@ -391,7 +391,6 @@ export async function POST(request: NextRequest) {
         routeNeighborhood: setup.routeNeighborhood || null,
         workoutDescription: setup.workoutDescription || null,
         postRunActivity: setup.postRunActivity || null,
-        stravaUrl: setup.stravaUrl || null,
         cityRunType: 'CLUB',
         updatedAt: new Date(),
       },

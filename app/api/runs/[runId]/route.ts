@@ -51,7 +51,7 @@ function isMissingRunClubsColumn(error: any) {
 
 const UNSUPPORTED_CITY_RUN_FIELDS = [
   'postRunActivity',
-  'stravaUrl',
+  'stravaEventUrl',
   'stravaText',
   'webUrl',
   'webText',
@@ -71,7 +71,7 @@ function normalizeRoutePhotosForResponse(value: unknown): string[] | null {
 async function logCityRunsRuntimeDiagnostics(context: string) {
   try {
     const rows = (await prisma.$queryRawUnsafe(
-      "SELECT column_name FROM information_schema.columns WHERE table_name='city_runs' AND column_name IN ('postRunActivity','stravaUrl','stravaText','webUrl','webText','igPostText','igPostGraphic','routeNeighborhood','runType','workoutDescription') ORDER BY column_name"
+      "SELECT column_name FROM information_schema.columns WHERE table_name='city_runs' AND column_name IN ('postRunActivity','stravaEventUrl','stravaText','webUrl','webText','igPostText','igPostGraphic','routeNeighborhood','runType','workoutDescription') ORDER BY column_name"
     )) as Array<{ column_name: string }>;
     console.error(`[${context}] Runtime diagnostics`, {
       commitSha: RUNTIME_COMMIT_SHA,
@@ -176,7 +176,7 @@ export async function GET(
           routePhotos: true,
           mapImageUrl: true,
           staffNotes: true,
-          stravaUrl: true,
+          stravaEventUrl: true,
           stravaText: true,
           webUrl: true,
           webText: true,
@@ -468,7 +468,7 @@ export async function GET(
         routePhotos: normalizeRoutePhotosForResponse(run.routePhotos),
         mapImageUrl: run.mapImageUrl ?? null,
         staffNotes: run.staffNotes ?? null,
-        stravaUrl: run.stravaUrl ?? null,
+        stravaEventUrl: run.stravaEventUrl ?? null,
         stravaText: run.stravaText ?? null,
         webUrl: run.webUrl ?? null,
         webText: run.webText ?? null,
@@ -593,8 +593,15 @@ export async function PUT(
     }
     
     // Source tracking fields
-    if (body.stravaUrl !== undefined) {
-      updateData.stravaUrl = body.stravaUrl === null || body.stravaUrl === '' ? null : String(body.stravaUrl).trim();
+    const stravaEventFromBody =
+      body.stravaEventUrl !== undefined
+        ? body.stravaEventUrl
+        : body.stravaUrl;
+    if (stravaEventFromBody !== undefined) {
+      updateData.stravaEventUrl =
+        stravaEventFromBody === null || stravaEventFromBody === ''
+          ? null
+          : String(stravaEventFromBody).trim();
     }
     if (body.stravaText !== undefined) {
       updateData.stravaText = body.stravaText === null || body.stravaText === '' ? null : String(body.stravaText).trim();

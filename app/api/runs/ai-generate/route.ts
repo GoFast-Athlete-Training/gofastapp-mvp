@@ -30,7 +30,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const {
-      stravaUrl,
+      stravaEventUrl: bodyStravaEventUrl,
+      stravaUrl: bodyStravaUrlLegacy,
       stravaText,
       webUrl,
       webText,
@@ -38,6 +39,10 @@ export async function POST(request: NextRequest) {
       igPostGraphic,
       runClubId,
     } = body;
+    const stravaEventUrl =
+      (typeof bodyStravaEventUrl === "string" ? bodyStravaEventUrl.trim() : "") ||
+      (typeof bodyStravaUrlLegacy === "string" ? bodyStravaUrlLegacy.trim() : "") ||
+      null;
 
     // Fetch run club city if runClubId provided (for inference)
     let runClubCity: string | null = null;
@@ -59,7 +64,7 @@ export async function POST(request: NextRequest) {
     if (stravaText?.trim()) allTextSources.push(`[STRAVA TEXT]\n${stravaText.trim()}`);
     if (webText?.trim()) allTextSources.push(`[WEB TEXT]\n${webText.trim()}`);
     if (igPostText?.trim()) allTextSources.push(`[IG POST TEXT]\n${igPostText.trim()}`);
-    if (stravaUrl?.trim()) allTextSources.push(`[STRAVA URL]\n${stravaUrl.trim()}`);
+    if (stravaEventUrl) allTextSources.push(`[STRAVA EVENT URL]\n${stravaEventUrl}`);
     if (webUrl?.trim()) allTextSources.push(`[WEB URL]\n${webUrl.trim()}`);
     
     const combinedInput = allTextSources.join('\n\n---\n\n');
@@ -77,7 +82,7 @@ export async function POST(request: NextRequest) {
     
     // Try to extract Strava URL (from stravaUrl field or text)
     const stravaUrlFromText = combinedInput.match(/https?:\/\/(www\.)?strava\.com\/[^\s]+/i);
-    const extractedStravaUrl = stravaUrl?.trim() || (stravaUrlFromText ? stravaUrlFromText[0] : null);
+    const extractedStravaUrl = stravaEventUrl || (stravaUrlFromText ? stravaUrlFromText[0] : null);
     
     // Try to extract date (basic patterns) - check all sources
     const dateMatch = combinedInput.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{4}-\d{2}-\d{2})/);

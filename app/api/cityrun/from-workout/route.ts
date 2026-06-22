@@ -56,7 +56,7 @@ function isMissingCityRunsColumn(error: unknown) {
 }
 
 const UNSUPPORTED_CITY_RUN_FIELDS = [
-  "stravaUrl",
+  "stravaEventUrl",
   "stravaText",
   "webUrl",
   "webText",
@@ -337,7 +337,7 @@ export async function POST(request: NextRequest) {
           : Prisma.JsonNull,
       mapImageUrl: mapImageUrlBody?.trim() || null,
       staffNotes: null,
-      stravaUrl: null,
+      stravaEventUrl: null,
       stravaText: null,
       webUrl: null,
       webText: null,

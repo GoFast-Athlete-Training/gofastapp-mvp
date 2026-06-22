@@ -29,7 +29,7 @@ function isMissingCityRunsColumn(error: any) {
 
 const UNSUPPORTED_CITY_RUN_FIELDS = [
   'postRunActivity',
-  'stravaUrl',
+  'stravaEventUrl',
   'stravaText',
   'webUrl',
   'webText',
@@ -128,7 +128,8 @@ export async function POST(request: NextRequest) {
       routePhotos,
       mapImageUrl,
       staffNotes,
-      stravaUrl,
+      stravaEventUrl: bodyStravaEventUrl,
+      stravaUrl: bodyStravaUrlLegacy,
       stravaText,
       webUrl,
       webText,
@@ -143,6 +144,13 @@ export async function POST(request: NextRequest) {
       runSeriesId: bodyRunSeriesId,
       published: bodyPublished,
     } = body;
+
+    const stravaEventUrl =
+      bodyStravaEventUrl !== undefined && bodyStravaEventUrl !== null
+        ? String(bodyStravaEventUrl).trim() || null
+        : bodyStravaUrlLegacy !== undefined && bodyStravaUrlLegacy !== null
+          ? String(bodyStravaUrlLegacy).trim() || null
+          : null;
 
     const hadExplicitCity = !!(
       gofastCity?.trim() ||
@@ -539,7 +547,7 @@ export async function POST(request: NextRequest) {
       routePhotos: Array.isArray(routePhotos) && routePhotos.length > 0 ? routePhotos : Prisma.JsonNull,
       mapImageUrl: mapImageUrl?.trim() || null,
       staffNotes: staffNotes?.trim() || null,
-      stravaUrl: stravaUrl?.trim() || null,
+      stravaEventUrl,
       stravaText: stravaText?.trim() || null,
       webUrl: webUrl?.trim() || null,
       webText: webText?.trim() || null,
@@ -558,7 +566,6 @@ export async function POST(request: NextRequest) {
     if (resolvedRouteId) {
       const routeRow = await prisma.routes.findUnique({ where: { id: resolvedRouteId } });
       if (routeRow) {
-        if (!createData.stravaUrl && routeRow.stravaUrl) createData.stravaUrl = routeRow.stravaUrl;
         if (createData.totalMiles == null && routeRow.distanceMiles != null) {
           createData.totalMiles = routeRow.distanceMiles;
         }

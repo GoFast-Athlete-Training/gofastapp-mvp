@@ -972,15 +972,15 @@ model city_runs {
   meetUpLng           Float?
   totalMiles          Float?
   pace                String?
-  stravaMapUrl        String?
+  stravaMapUrl        String?              // Public Strava route URL shown on the run page
   description         String?
   postRunActivity     String?              // Post-run activity (e.g. "light social at X", "coffee at Y")
   routePhotos         Json?                // Array of photo URLs: ["url1", "url2", ...]
   mapImageUrl         String?              // Single map image URL (snip from Strava or uploaded)
   staffNotes          String?              // Data entry note for approver (e.g. "Couldn't get Strava URL")
   // Source inputs - capture ALL available sources for AI processing and traceability
-  stravaUrl           String?              // Strava route/activity URL
-  stravaText          String?              // Raw text blob from Strava (copy/paste)
+  stravaEventUrl      String?              // Optional Strava event URL for description context
+  stravaText          String?              // Optional pasted Strava event description
   webUrl              String?              // Web/website URL
   webText             String?              // Raw text blob from web (copy/paste)
   igPostText          String?              // Instagram post text (copy/paste)
@@ -1095,7 +1095,6 @@ model run_series {
   name                String?              // series label, e.g. "Tuesday Tempo"
   description         String?              // series blurb — seeds each new occurrence's description
   seriesRunRawText    String?              // series-specific raw text (neighborhood, meetup details, etc.) — persisted
-  stravaUrl           String?              // Specific run Strava URL (mirrors city_runs.stravaUrl) — auto-populates when set
   gofastCity          String?              // city slug (e.g. "dc", "arlington") — same for all occurrences
   meetUpPoint         String?              // canonical meeting location name (same corner every week)
   meetUpStreetAddress String?
