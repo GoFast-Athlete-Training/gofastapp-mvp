@@ -2,48 +2,43 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
+import { LocalStorageAPI } from '@/lib/localstorage';
 import TopNav from '@/components/shared/TopNav';
+import type { LeaderContextClub } from '@/lib/run-club-leader-context';
 
 /**
- * Welcome Run Club Leader – front door for users with CLUB_LEADER role
- *
- * Purpose: Different front door that checks role status and routes here from /welcome.
- * - Requires authentication
- * - Verifies role via hydrate; if not CLUB_LEADER, redirects to /welcome
- * - Shows "Welcome, Run Club Leader" UX and actions for club management
+ * Multi-club manager landing — uses leaderContext from athlete profile (one round trip).
  */
 export default function LeaderHubPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [clubName, setClubName] = useState<string | null>(null);
+  const [clubs, setClubs] = useState<LeaderContextClub[]>([]);
+  const [isClubLeaderPersona, setIsClubLeaderPersona] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        router.replace('/signup');
+        router.replace('/signup?redirect=/leader');
         return;
       }
-      setIsAuthenticated(true);
-      try {
-        const res = await api.post('/athlete/hydrate');
-        if (res.data?.success && res.data?.athlete) {
-          const a = res.data.athlete;
-          if (a.role !== 'CLUB_LEADER') {
-            router.replace('/welcome');
-            return;
-          }
-          if (a.runClub?.name) setClubName(a.runClub.name);
-        } else {
-          router.replace('/welcome');
-          return;
-        }
-      } catch {
+
+      const athleteId = LocalStorageAPI.getAthleteId();
+      if (!athleteId) {
         router.replace('/welcome');
         return;
+      }
+
+      try {
+        const profileRes = await api.get(`/athlete/${athleteId}`);
+        const athlete = profileRes.data?.athlete;
+        setIsClubLeaderPersona(athlete?.role === 'CLUB_LEADER' || athlete?.leaderContext?.isClubLeader);
+        setClubs(athlete?.leaderContext?.clubs ?? []);
+      } catch {
+        setClubs([]);
       } finally {
         setIsLoading(false);
       }
@@ -56,101 +51,97 @@ export default function LeaderHubPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-white text-lg">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4" />
+          <p className="text-white text-lg">Loading…</p>
         </div>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    return null;
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600">
       <TopNav />
-      <div className="max-w-6xl mx-auto px-6 py-12">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Welcome, Run Club Leader
-          </h1>
-          <p className="text-white text-xl opacity-90">
-            {clubName
-              ? `Manage ${clubName} and connect with your community`
-              : 'Manage your run club and connect with your community'}
+      <div className="max-w-4xl mx-auto px-6 py-12">
+        <div className="text-center mb-10">
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">Run club manager</h1>
+          <p className="text-white/90 text-lg max-w-xl mx-auto">
+            Manage clubs where you&apos;re an owner or admin. You&apos;re still a full GoFast athlete
+            — switch back to training anytime.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Manage Club Content */}
-          <div className="bg-white rounded-xl shadow-lg p-8 hover:shadow-xl transition-shadow">
-            <div className="text-5xl mb-4 text-center">📝</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-3 text-center">
-              Manage Club Content
-            </h2>
-            <p className="text-gray-600 mb-6 text-center">
-              Update your club's information, description, and branding
+        {clubs.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">No clubs to manage yet</h2>
+            <p className="text-gray-600 mb-6">
+              {isClubLeaderPersona
+                ? 'Your leader account is ready, but GoFast still needs to connect your club. Ask staff to grant owner or admin membership on your run club.'
+                : 'Ask GoFast staff to grant you owner or admin on your run club, or sign up as a club leader during onboarding.'}
             </p>
-            <button
-              onClick={() => {
-                // Placeholder - will navigate to content management
-                alert('Club content management coming soon!');
-              }}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition"
-            >
-              Manage Content
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                href="/gorun"
+                className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold"
+              >
+                Browse runs
+              </Link>
+              <Link
+                href="/athlete-home"
+                className="inline-block bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-semibold"
+              >
+                Athlete home
+              </Link>
+            </div>
           </div>
-
-          {/* Manage Runs */}
-          <div className="bg-white rounded-xl shadow-lg p-8 hover:shadow-xl transition-shadow">
-            <div className="text-5xl mb-4 text-center">🏃</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-3 text-center">
-              Manage Runs
-            </h2>
-            <p className="text-gray-600 mb-6 text-center">
-              Create and schedule runs for your club members
-            </p>
-            <button
-              onClick={() => {
-                // Placeholder - will navigate to run management
-                alert('Run management coming soon!');
-              }}
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition"
-            >
-              Manage Runs
-            </button>
+        ) : (
+          <div className="space-y-4">
+            {clubs.map((club) => (
+              <Link
+                key={club.runClubId}
+                href={`/leader/runclub/${club.runClubSlug ?? club.runClubId}`}
+                className="block bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow"
+              >
+                <div className="flex items-center gap-4">
+                  {club.logoUrl ? (
+                    <img
+                      src={club.logoUrl}
+                      alt=""
+                      className="w-14 h-14 rounded-lg object-contain bg-gray-50"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-lg bg-orange-100 flex items-center justify-center text-2xl">
+                      🏃
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-xl font-bold text-gray-900 truncate">{club.runClubName}</h2>
+                    <p className="text-sm text-gray-500">
+                      {[club.city, club.state].filter(Boolean).join(', ') || 'Location TBD'} ·{' '}
+                      <span className="capitalize">{club.role}</span>
+                    </p>
+                  </div>
+                  <span className="text-orange-600 font-semibold text-sm shrink-0">Manage →</span>
+                </div>
+              </Link>
+            ))}
           </div>
+        )}
 
-          {/* Start a Run Crew */}
-          <div className="bg-white rounded-xl shadow-lg p-8 hover:shadow-xl transition-shadow">
-            <div className="text-5xl mb-4 text-center">👥</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-3 text-center">
-              Start a Run Crew
-            </h2>
-            <p className="text-gray-600 mb-6 text-center">
-              Create a new run crew for your community
-            </p>
-            <button
-              onClick={() => {
-                router.push('/runcrew/create');
-              }}
-              className="w-full bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold transition"
-            >
-              Create Run Crew
-            </button>
-          </div>
-        </div>
-
-        {/* Additional Info */}
-        <div className="mt-12 bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20">
-          <h3 className="text-2xl font-bold text-white mb-4 text-center">
-            Your front door
-          </h3>
-          <p className="text-white/90 text-center max-w-2xl mx-auto">
-            You’re signed in as a run club leader. Use the options above to manage your club’s content, organize runs, and build your running community.
-          </p>
+        <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Link
+            href="/runcrew/create"
+            className="bg-white/15 backdrop-blur border border-white/25 rounded-xl p-5 text-white hover:bg-white/20 transition"
+          >
+            <p className="font-bold text-lg mb-1">Start a run crew</p>
+            <p className="text-sm text-white/80">Build a smaller community inside GoFast</p>
+          </Link>
+          <Link
+            href="/athlete-home"
+            className="bg-white/15 backdrop-blur border border-white/25 rounded-xl p-5 text-white hover:bg-white/20 transition"
+          >
+            <p className="font-bold text-lg mb-1">Back to athlete mode</p>
+            <p className="text-sm text-white/80">Training, goals, and your personal runs</p>
+          </Link>
         </div>
       </div>
     </div>

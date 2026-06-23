@@ -6,6 +6,7 @@ import { getAthleteById, updateAthlete } from '@/lib/domain-athlete';
 import { syncAthleteFiveKPaceToActivePlan } from '@/lib/training/plan-lifecycle';
 import { ensureAthleteProfileSnapshot } from '@/lib/athlete-profile-snapshot';
 import { buildAthleteForClient } from '@/lib/athlete-for-client';
+import { buildLeaderContext } from '@/lib/run-club-leader-context';
 
 export async function GET(
   request: Request,
@@ -64,7 +65,18 @@ export async function GET(
       athleteRow as Record<string, unknown> & { id: string; garmin_access_token?: string | null }
     );
 
-    return NextResponse.json({ success: true, athlete: athleteForClient });
+    const leaderContext = await buildLeaderContext(
+      id,
+      athleteRow.role as string | null | undefined
+    );
+
+    return NextResponse.json({
+      success: true,
+      athlete: {
+        ...athleteForClient,
+        ...(leaderContext ? { leaderContext } : {}),
+      },
+    });
   } catch (err) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }

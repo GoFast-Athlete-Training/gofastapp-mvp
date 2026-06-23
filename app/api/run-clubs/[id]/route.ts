@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminAuth } from '@/lib/firebaseAdmin';
+import { ATHLETE_ID_HEADER } from '@/lib/gofast-request-headers';
+import {
+  leaderAuthFailureResponse,
+  requireRunClubLeaderForClubId,
+} from '@/lib/run-club-leader-auth';
+import { updateRunClubAsLeader } from '@/lib/domain-runclub-leader';
 
 export const dynamic = 'force-dynamic';
 
@@ -132,6 +138,27 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
+
+    // Athlete session → club leader scope (Company staff calls omit x-athlete-id).
+    const athleteSession = request.headers.get(ATHLETE_ID_HEADER)?.trim();
+    if (athleteSession) {
+      const leaderAuth = await requireRunClubLeaderForClubId(request, id);
+      if ('error' in leaderAuth) {
+        return leaderAuthFailureResponse(leaderAuth);
+      }
+      try {
+        const runClub = await updateRunClubAsLeader(id, body as Record<string, unknown>);
+        const response = NextResponse.json({ success: true, runClub });
+        Object.entries(corsHeaders).forEach(([k, v]) => response.headers.set(k, v));
+        return response;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to update run club';
+        return NextResponse.json(
+          { success: false, error: message },
+          { status: message.includes('No allowed fields') ? 400 : 500, headers: corsHeaders }
+        );
+      }
+    }
 
     // Extract fields to update
     const updateData: any = {};

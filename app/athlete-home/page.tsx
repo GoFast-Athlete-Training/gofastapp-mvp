@@ -25,6 +25,7 @@ import RaceCompleteModal, {
 } from '@/components/athlete/RaceCompleteModal';
 import { PaceContextCard } from '@/components/athlete/PaceContextCard';
 import { SignupRaceDayBeforeBanner } from '@/components/races/RaceDayBanner';
+import RunClubLeaderHomeCard from '@/components/runclub/leader/RunClubLeaderHomeCard';
 import type { RaceCompleteAnalysis } from '@/components/athlete/RaceCompleteModal';
 import Image from 'next/image';
 import api from '@/lib/api';
@@ -998,6 +999,10 @@ export default function AthleteHomePage() {
               <h1 className="text-2xl font-bold text-gray-900 mb-1">Welcome back, {athlete.firstName}!</h1>
               <p className="text-gray-600 text-sm">Here&apos;s your training at a glance</p>
             </div>
+
+            {athlete.leaderContext?.isClubLeader ? (
+              <RunClubLeaderHomeCard leaderContext={athlete.leaderContext} />
+            ) : null}
 
             {primaryGoal &&
             goalPhase === 'race_day' &&
