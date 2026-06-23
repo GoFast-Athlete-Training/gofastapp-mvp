@@ -32,6 +32,28 @@ test("activityNameContainsPushedWorkoutTitle matches core title after normalizat
   );
 });
 
+test("activityNameContainsPushedWorkoutTitle matches despite extra spaces and casing", () => {
+  assert.equal(
+    activityNameContainsPushedWorkoutTitle({
+      activityName: "Arlington County -  GF  W1:  LONG RUN 12.3 MILES",
+      workoutTitle: "Long run 12.3 miles",
+      weekNumber: 1,
+    }),
+    true
+  );
+});
+
+test("activityNameContainsPushedWorkoutTitle matches when workout title already has GF prefix", () => {
+  assert.equal(
+    activityNameContainsPushedWorkoutTitle({
+      activityName: "GF W2: Tempo Work - 6 Miles",
+      workoutTitle: "GF W2: Tempo Work - 6 Miles",
+      weekNumber: 2,
+    }),
+    true
+  );
+});
+
 test("activityLocalYmdFromSummary uses Garmin local offset when present", () => {
   assert.equal(
     activityLocalYmdFromSummary(new Date("2026-05-23T02:00:00.000Z"), {

@@ -1,7 +1,8 @@
 /**
- * Webhook ingest: store athlete_activity and optionally auto-link to standalone pushed workouts.
- * Planned workouts (planId set) are never auto-matched — athletes confirm via POST /match-activity.
- * Primary auto-match: garminWorkoutId ↔ workouts.garminWorkoutId on standalone rows only.
+ * Webhook ingest: store athlete_activity and optionally auto-link to workouts.
+ * Standalone pushed workouts: auto-match via garminWorkoutId.
+ * Planned workouts: auto-match only when a single high-confidence candidate is found
+ * (title match or same-day close distance); otherwise athletes confirm via POST /match-activity.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -12,6 +13,11 @@ import {
   activityNameContainsPushedWorkoutTitle,
   utcDayRangeFromYmd,
 } from "@/lib/training/garmin-activity-match-helpers";
+import {
+  isHighConfidenceActivityCandidate,
+  scoreActivityCandidateForWorkout,
+  type ScoredActivityCandidate,
+} from "@/lib/training/workout-activity-match-candidates";
 import { applyActivityToWorkout } from "./apply-activity-to-workout";
 
 export {
@@ -34,13 +40,49 @@ function isPlannedWorkout(workout: { planId: string | null }): boolean {
   return workout.planId != null;
 }
 
-/** Webhook ingest must not mutate planned workouts — athletes confirm via POST /match-activity. */
+/** Planned workouts support manual match; ingest may still auto-link high-confidence candidates. */
 export function isManualMatchOnlyWorkout(workout: { planId: string | null }): boolean {
   return isPlannedWorkout(workout);
 }
 
+/** True when a single planned-workout candidate is safe to auto-link on ingest. */
+export function canAutoMatchPlannedWorkout(params: {
+  scored: Pick<ScoredActivityCandidate, "reasons"> | null;
+  titleMatchCount: number;
+}): boolean {
+  if (params.titleMatchCount !== 1) return false;
+  if (!params.scored) return false;
+  return isHighConfidenceActivityCandidate(params.scored);
+}
+
+function activityCandidateInput(activity: {
+  id: string;
+  activityName: string | null;
+  activityType: string | null;
+  startTime: Date;
+  duration: number | null;
+  distance: number | null;
+  averageSpeed: number | null;
+  ingestionStatus: string;
+  summaryData: unknown;
+}) {
+  return {
+    id: activity.id,
+    activityName: activity.activityName,
+    activityType: activity.activityType,
+    startTime: activity.startTime,
+    duration: activity.duration,
+    distance: activity.distance,
+    averageSpeed: activity.averageSpeed,
+    ingestionStatus: activity.ingestionStatus,
+    summaryData: activity.summaryData,
+    matchedWorkoutId: null,
+    matchedWorkoutTitle: null,
+  };
+}
+
 /**
- * Match activity to at most one standalone workout; planned workouts stay manual-only.
+ * Match activity to at most one workout; planned workouts auto-link only when high-confidence.
  */
 export async function tryMatchActivityToTrainingWorkout(
   athleteActivityId: string
@@ -108,13 +150,6 @@ export async function tryMatchActivityToTrainingWorkout(
     );
     if (titleMatches.length === 1) {
       candidate = titleMatches[0];
-      console.log("ℹ️ planned workout title candidate found; awaiting manual match", {
-        athleteActivityId,
-        workoutId: candidate.id,
-        activityName: activity.activityName,
-        workoutTitle: candidate.title,
-        activityYmd,
-      });
     } else if (titleMatches.length > 1) {
       console.warn("⚠️ ambiguous Garmin title match; leaving activity unmatched", {
         athleteActivityId,
@@ -131,11 +166,68 @@ export async function tryMatchActivityToTrainingWorkout(
   }
 
   if (isPlannedWorkout(candidate)) {
+    const titleMatchCount = activityNameContainsPushedWorkoutTitle({
+      activityName: activity.activityName,
+      workoutTitle: candidate.title,
+      weekNumber: candidate.weekNumber,
+    })
+      ? 1
+      : 0;
+
+    const scored = scoreActivityCandidateForWorkout({
+      workout: {
+        id: candidate.id,
+        title: candidate.title,
+        weekNumber: candidate.weekNumber,
+        date: candidate.date,
+        estimatedDistanceInMeters: candidate.estimatedDistanceInMeters,
+      },
+      activity: activityCandidateInput({
+        ...activity,
+        startTime: activity.startTime!,
+      }),
+    });
+
+    const autoMatchEligible =
+      titleMatchCount === 1
+        ? canAutoMatchPlannedWorkout({ scored, titleMatchCount })
+        : scored != null && isHighConfidenceActivityCandidate(scored);
+
+    if (autoMatchEligible && scored) {
+      const existingLink = await prisma.workouts.findFirst({
+        where: { matchedActivityId: activity.id },
+        select: { id: true },
+      });
+      if (existingLink && existingLink.id !== candidate.id) {
+        console.warn("⚠️ activity already linked to another workout; skipping auto-match", {
+          athleteActivityId,
+          existingWorkoutId: existingLink.id,
+          candidateWorkoutId: candidate.id,
+        });
+        await setIngestion("RECEIVED");
+        return { matched: false, candidateWorkoutId: candidate.id };
+      }
+
+      console.log("✅ auto-matching high-confidence planned workout", {
+        athleteActivityId,
+        workoutId: candidate.id,
+        activityName: activity.activityName,
+        workoutTitle: candidate.title,
+        reasonLabels: scored.reasonLabels,
+      });
+      const { workoutId } = await applyActivityToWorkout({
+        workout: candidate,
+        activity,
+      });
+      return { matched: true, workoutId };
+    }
+
     console.log("ℹ️ planned workout candidate found; awaiting manual match", {
       athleteActivityId,
       workoutId: candidate.id,
       activityName: activity.activityName,
       workoutTitle: candidate.title,
+      reasonLabels: scored?.reasonLabels ?? [],
     });
     await setIngestion("RECEIVED");
     return { matched: false, candidateWorkoutId: candidate.id };
