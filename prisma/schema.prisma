@@ -114,6 +114,7 @@ model Athlete {
   run_crew_memberships    run_crew_memberships[]
   run_crew_messages       run_crew_messages[]
   run_club_memberships    run_club_memberships[]
+  run_club_leader_claims    run_club_leader_claims[]
   run_club_announcements  run_club_announcements[]
   run_club_events         run_club_events[]
   run_club_event_rsvps    run_club_event_rsvps[]
@@ -745,6 +746,7 @@ model run_clubs {
   clubLeaders           Athlete[]                  // Reverse relation for Athlete.runClubId
   runSeries             run_series[]               // Recurring series this club owns (run_series.runClubId → run_clubs)
   run_club_memberships  run_club_memberships[]
+  run_club_leader_claims  run_club_leader_claims[]
   run_club_announcements run_club_announcements[]
   run_club_events       run_club_events[]
 
@@ -770,6 +772,29 @@ model run_club_memberships {
   @@index([runClubId])
   @@index([athleteId])
   @@map("run_club_memberships")
+}
+
+/// Pre-seeded club-owner slots from Company — athlete claims by verified email match.
+model run_club_leader_claims {
+  id                 String    @id @default(cuid())
+  runClubId          String
+  email              String
+  membershipRole     String    @default("admin") // admin | owner
+  status             String    @default("unclaimed") // unclaimed | claimed | revoked
+  acqClubLeaderId    String?
+  acqRunClubId       String?
+  claimedByAthleteId String?
+  claimedAt          DateTime?
+  source             String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  run_clubs          run_clubs @relation(fields: [runClubId], references: [id], onDelete: Cascade)
+  Athlete            Athlete?  @relation(fields: [claimedByAthleteId], references: [id], onDelete: SetNull)
+
+  @@unique([runClubId, email])
+  @@index([email, status])
+  @@index([runClubId])
+  @@map("run_club_leader_claims")
 }
 
 /// Club broadcast content — announcements visible to members (and optionally public).

@@ -1000,8 +1000,11 @@ export default function AthleteHomePage() {
               <p className="text-gray-600 text-sm">Here&apos;s your training at a glance</p>
             </div>
 
-            {athlete.leaderContext?.isClubLeader ? (
-              <RunClubLeaderHomeCard leaderContext={athlete.leaderContext} />
+            {(athlete.leaderContext?.isClubLeader || (athlete.pendingClubLeaderClaims?.length ?? 0) > 0) ? (
+              <RunClubLeaderHomeCard
+                leaderContext={athlete.leaderContext}
+                pendingClaims={athlete.pendingClubLeaderClaims}
+              />
             ) : null}
 
             {primaryGoal &&

@@ -4,20 +4,43 @@ import Link from 'next/link';
 import { Building2, ChevronRight } from 'lucide-react';
 import type { LeaderContext } from '@/lib/run-club-leader-context';
 
+export type PendingClubLeaderClaim = {
+  claimId: string;
+  runClubId: string;
+  runClubSlug: string | null;
+  runClubName: string;
+};
+
 interface RunClubLeaderHomeCardProps {
-  leaderContext: LeaderContext;
+  leaderContext?: LeaderContext | null;
+  pendingClaims?: PendingClubLeaderClaim[];
 }
 
-export default function RunClubLeaderHomeCard({ leaderContext }: RunClubLeaderHomeCardProps) {
-  const { clubs } = leaderContext;
+export default function RunClubLeaderHomeCard({
+  leaderContext,
+  pendingClaims = [],
+}: RunClubLeaderHomeCardProps) {
+  const clubs = leaderContext?.clubs ?? [];
   const clubCount = clubs.length;
+  const pendingCount = pendingClaims.length;
 
   let href = '/leader';
   let title = 'Manage your run clubs';
   let description = 'Open the run club manager to update your club profile and weekly runs.';
   let cta = 'Open manager';
 
-  if (clubCount === 0) {
+  if (clubCount === 0 && pendingCount === 1) {
+    const pending = pendingClaims[0]!;
+    title = `Claim ${pending.runClubName}`;
+    description = 'GoFast has a club-owner setup waiting for your email. Finish connecting your manager access.';
+    cta = 'Claim club';
+    href = '/welcome-club-owner';
+  } else if (clubCount === 0 && pendingCount > 1) {
+    title = 'Claim your run clubs';
+    description = `${pendingCount} clubs are ready for you to claim with this email.`;
+    cta = 'Choose club';
+    href = '/welcome-club-owner';
+  } else if (clubCount === 0) {
     title = 'Your leader account is ready';
     description =
       'GoFast still needs to connect your club. Ask staff to link your owner or admin membership.';
@@ -35,7 +58,7 @@ export default function RunClubLeaderHomeCard({ leaderContext }: RunClubLeaderHo
     <div className="mb-4 rounded-2xl border-2 border-sky-300 bg-gradient-to-br from-sky-50 via-white to-cyan-50 p-5 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex gap-4 min-w-0">
-          {clubCount === 1 && clubs[0].logoUrl ? (
+          {clubCount === 1 && clubs[0]?.logoUrl ? (
             <img
               src={clubs[0].logoUrl}
               alt=""

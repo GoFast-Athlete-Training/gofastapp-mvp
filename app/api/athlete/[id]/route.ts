@@ -7,6 +7,7 @@ import { syncAthleteFiveKPaceToActivePlan } from '@/lib/training/plan-lifecycle'
 import { ensureAthleteProfileSnapshot } from '@/lib/athlete-profile-snapshot';
 import { buildAthleteForClient } from '@/lib/athlete-for-client';
 import { buildLeaderContext } from '@/lib/run-club-leader-context';
+import { findUnclaimedClaimsForEmail } from '@/lib/domain-runclub-leader-claim';
 
 export async function GET(
   request: Request,
@@ -70,11 +71,26 @@ export async function GET(
       athleteRow.role as string | null | undefined
     );
 
+    const pendingClubLeaderClaims =
+      !leaderContext?.clubs.length
+        ? await findUnclaimedClaimsForEmail(athleteRow.email)
+        : [];
+
     return NextResponse.json({
       success: true,
       athlete: {
         ...athleteForClient,
         ...(leaderContext ? { leaderContext } : {}),
+        ...(pendingClubLeaderClaims.length > 0
+          ? {
+              pendingClubLeaderClaims: pendingClubLeaderClaims.map((c) => ({
+                claimId: c.id,
+                runClubId: c.runClubId,
+                runClubSlug: c.runClubSlug,
+                runClubName: c.runClubName,
+              })),
+            }
+          : {}),
       },
     });
   } catch (err) {

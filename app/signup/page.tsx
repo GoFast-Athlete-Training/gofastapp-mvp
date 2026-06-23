@@ -9,7 +9,7 @@ import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 
-type SignupMode = 'default' | 'join-crew';
+type SignupMode = 'default' | 'join-crew' | 'club-owner';
 
 async function loadOrCreateAthlete(opts?: { onboardingIntent?: string }) {
   try {
@@ -41,7 +41,7 @@ async function loadOrCreateAthlete(opts?: { onboardingIntent?: string }) {
  * - Front door will show explicit confirmation UI
  * - Only then will membership be created
  */
-function redirectToFrontDoorIfIntent(router: any): boolean {
+function redirectToFrontDoorIfIntent(router: ReturnType<typeof useRouter>): boolean {
   const handle = LocalStorageAPI.getRunCrewJoinIntentHandle();
   if (!handle) return false;
   
@@ -50,16 +50,56 @@ function redirectToFrontDoorIfIntent(router: any): boolean {
   return true;
 }
 
+function routeAfterAthleteResolved(
+  router: ReturnType<typeof useRouter>,
+  athlete: { data?: { gofastHandle?: string | null } },
+  opts: { mode: SignupMode; runCrewHandle: string | null }
+) {
+  if (redirectToFrontDoorIfIntent(router)) return;
+
+  if (opts.mode === 'join-crew' && opts.runCrewHandle) {
+    router.replace(`/join/runcrew/${opts.runCrewHandle}`);
+    return;
+  }
+
+  if (opts.mode === 'club-owner') {
+    LocalStorageAPI.setClubOwnerMode(true);
+    if (athlete.data?.gofastHandle) {
+      router.replace('/welcome-club-owner');
+    } else {
+      router.replace('/athlete-create-profile');
+    }
+    return;
+  }
+
+  if (athlete.data?.gofastHandle) {
+    router.replace('/welcome');
+  } else {
+    router.replace('/athlete-create-profile');
+  }
+}
+
 function SignupPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
   // Detect signup mode from URL params
-  const mode: SignupMode = (searchParams?.get('mode') === 'join-crew') ? 'join-crew' : 'default';
+  const mode: SignupMode =
+    searchParams?.get('mode') === 'join-crew'
+      ? 'join-crew'
+      : searchParams?.get('mode') === 'club-owner'
+        ? 'club-owner'
+        : 'default';
   const runCrewHandle = searchParams?.get('handle') || null;
   
   // Detect club leader intent from URL param (passed from splash page)
   const isClubLeaderIntent = searchParams?.get('intent') === 'club-leader';
+
+  useEffect(() => {
+    if (mode === 'club-owner') {
+      LocalStorageAPI.setClubOwnerMode(true);
+    }
+  }, [mode]);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -115,13 +155,7 @@ function SignupPageContent() {
 
               if (redirectToFrontDoorIfIntent(router)) return;
 
-              if (mode === 'join-crew' && runCrewHandle) {
-                router.push(`/join/runcrew/${runCrewHandle}`);
-              } else if (athlete.data?.gofastHandle) {
-                router.push('/welcome');
-              } else {
-                router.replace('/athlete-create-profile');
-              }
+              routeAfterAthleteResolved(router, athlete, { mode, runCrewHandle });
               return;
             }
           } catch (authCheckErr: any) {
@@ -178,17 +212,7 @@ function SignupPageContent() {
       // Check for pending crew join intent - redirect to front door (NO auto-join)
       if (redirectToFrontDoorIfIntent(router)) return;
 
-      // Join-crew mode: redirect to front door, default: route to welcome (which checks role)
-      if (mode === 'join-crew' && runCrewHandle) {
-        router.replace(`/join/runcrew/${runCrewHandle}`);
-      } else if (athlete.data?.gofastHandle) {
-        // Existing athlete with profile - route to welcome (will check role and route accordingly)
-        console.log('✅ SIGNUP: Existing athlete with profile → Welcome (role-aware routing)');
-        router.replace('/welcome');
-      } else {
-        console.log('✅ SIGNUP: New athlete or incomplete profile → Create Profile');
-        router.replace('/athlete-create-profile');
-      }
+      routeAfterAthleteResolved(router, athlete, { mode, runCrewHandle });
     } catch (err: any) {
       console.error('❌ SIGNUP: Google signup error:', err);
       
@@ -271,18 +295,7 @@ function SignupPageContent() {
 
       if (redirectToFrontDoorIfIntent(router)) return;
 
-      if (mode === 'join-crew' && runCrewHandle) {
-        router.replace(`/join/runcrew/${runCrewHandle}`);
-      } else if (athlete.data?.gofastHandle) {
-        console.log('✅ SIGNUP: Existing athlete with profile → Welcome (role-aware routing)');
-        router.replace('/welcome');
-      } else {
-        // No profile - go to profile creation
-        // DON'T store athlete data - localStorage is already cleared above
-        // Profile creation page will only use Firebase data (email, displayName) as fallback
-        console.log('✅ SIGNUP: New athlete or incomplete profile → Create Profile');
-        router.replace('/athlete-create-profile');
-      }
+      routeAfterAthleteResolved(router, athlete, { mode, runCrewHandle });
     } catch (err: any) {
       console.error('❌ SIGNUP: Email signup error:', err);
       
@@ -349,18 +362,7 @@ function SignupPageContent() {
 
       if (redirectToFrontDoorIfIntent(router)) return;
 
-      if (mode === 'join-crew' && runCrewHandle) {
-        router.replace(`/join/runcrew/${runCrewHandle}`);
-      } else if (athlete.data?.gofastHandle) {
-        console.log('✅ SIGNIN: Existing athlete with profile → Welcome (role-aware routing)');
-        router.replace('/welcome');
-      } else {
-        // No profile - go to profile creation
-        // DON'T store athlete data - localStorage is already cleared above
-        // Profile creation page will only use Firebase data (email, displayName) as fallback
-        console.log('✅ SIGNIN: New athlete or incomplete profile → Create Profile');
-        router.replace('/athlete-create-profile');
-      }
+      routeAfterAthleteResolved(router, athlete, { mode, runCrewHandle });
     } catch (err: any) {
       console.error('❌ SIGNIN: Email sign-in error:', err);
       

@@ -203,20 +203,24 @@ export default function AthleteCreateProfilePage() {
       });
 
       let nextPath = '/welcome';
-      const createCrewIntent = LocalStorageAPI.getRunCrewCreateIntent();
-      if (createCrewIntent) {
-        LocalStorageAPI.removeRunCrewCreateIntent();
-        nextPath = '/runcrew/create';
+      if (LocalStorageAPI.getClubOwnerMode()) {
+        nextPath = '/welcome-club-owner';
       } else {
-        const raceHubJoinIntent = localStorage.getItem('raceHubJoinIntent');
-        const raceHubJoinIntentSlug = localStorage.getItem('raceHubJoinIntentSlug');
-        if (raceHubJoinIntent && raceHubJoinIntentSlug) {
-          nextPath = `/join/race/${encodeURIComponent(raceHubJoinIntentSlug)}/confirm`;
+        const createCrewIntent = LocalStorageAPI.getRunCrewCreateIntent();
+        if (createCrewIntent) {
+          LocalStorageAPI.removeRunCrewCreateIntent();
+          nextPath = '/runcrew/create';
         } else {
-          const joinIntent = localStorage.getItem('runCrewJoinIntent');
-          const joinIntentHandle = localStorage.getItem('runCrewJoinIntentHandle');
-          if (joinIntent && joinIntentHandle) {
-            nextPath = `/join/runcrew/${joinIntentHandle}/confirm`;
+          const raceHubJoinIntent = localStorage.getItem('raceHubJoinIntent');
+          const raceHubJoinIntentSlug = localStorage.getItem('raceHubJoinIntentSlug');
+          if (raceHubJoinIntent && raceHubJoinIntentSlug) {
+            nextPath = `/join/race/${encodeURIComponent(raceHubJoinIntentSlug)}/confirm`;
+          } else {
+            const joinIntent = localStorage.getItem('runCrewJoinIntent');
+            const joinIntentHandle = localStorage.getItem('runCrewJoinIntentHandle');
+            if (joinIntent && joinIntentHandle) {
+              nextPath = `/join/runcrew/${joinIntentHandle}/confirm`;
+            }
           }
         }
       }

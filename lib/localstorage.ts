@@ -4,6 +4,7 @@
 export const RUNCREW_JOIN_INTENT_KEY = 'runCrewJoinIntent';
 export const RUNCREW_JOIN_INTENT_HANDLE_KEY = 'runCrewJoinIntentHandle';
 export const RUNCREW_CREATE_INTENT_KEY = 'runCrewCreateIntent';
+export const CLUB_OWNER_MODE_KEY = 'clubOwnerMode';
 
 const ATHLETE_ID_KEY = 'athleteId';
 const COACH_ID_KEY = 'coachId';
@@ -84,6 +85,29 @@ export const LocalStorageAPI = {
   removeRunCrewCreateIntent() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(RUNCREW_CREATE_INTENT_KEY);
+    }
+  },
+
+  setClubOwnerMode(enabled: boolean) {
+    if (typeof window !== 'undefined') {
+      if (enabled) {
+        localStorage.setItem(CLUB_OWNER_MODE_KEY, '1');
+      } else {
+        localStorage.removeItem(CLUB_OWNER_MODE_KEY);
+      }
+    }
+  },
+
+  getClubOwnerMode() {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(CLUB_OWNER_MODE_KEY) === '1';
+    }
+    return false;
+  },
+
+  clearClubOwnerMode() {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(CLUB_OWNER_MODE_KEY);
     }
   },
 
