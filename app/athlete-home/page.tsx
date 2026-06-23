@@ -66,6 +66,7 @@ import {
   parseGoalTimeToSeconds,
   parsePaceStringToSecPerMile,
 } from '@/lib/training/race-projection';
+import { resolveGoalRacePace } from '@/lib/training/goal-pace-calculator';
 
 function homeSessionPaceLabel(
   segments:
@@ -906,6 +907,18 @@ export default function AthleteHomePage() {
 
   const current5kSecPerMile = fiveKPaceStr ? parsePaceStringToSecPerMile(fiveKPaceStr) : null;
 
+  const resolvedGoalRacePace =
+    primaryGoal != null
+      ? resolveGoalRacePace({
+          goalTime: primaryGoal.goalTime,
+          dbGoalRacePaceSecPerMile:
+            typeof primaryGoal.goalRacePace === 'number' ? primaryGoal.goalRacePace : null,
+          distanceMeters: primaryGoal.race_registry?.distanceMeters ?? null,
+          distanceLabel: primaryGoal.race_registry?.distanceLabel ?? null,
+          goalDistance: primaryGoal.distance ?? null,
+        })
+      : null;
+
   const raceReadiness =
     eventMilesForProjection != null && eventMilesForProjection > 0
       ? computeRaceReadiness({
@@ -913,8 +926,7 @@ export default function AthleteHomePage() {
           goalFinishSec: primaryGoal?.goalTime?.trim()
             ? parseGoalTimeToSeconds(primaryGoal.goalTime.trim())
             : null,
-          goalPaceSecPerMile:
-            typeof primaryGoal?.goalRacePace === 'number' ? primaryGoal.goalRacePace : null,
+          goalPaceSecPerMile: resolvedGoalRacePace?.goalPaceSecPerMile ?? null,
           goalPace5KSecPerMile:
             typeof primaryGoal?.goalPace5K === 'number' ? primaryGoal.goalPace5K : null,
           eventMiles: eventMilesForProjection,
@@ -1484,8 +1496,8 @@ export default function AthleteHomePage() {
                       <div>
                         <dt className="text-gray-500 text-xs">Goal pace</dt>
                         <dd className="font-semibold text-gray-900 tabular-nums">
-                          {primaryGoal.goalRacePace != null
-                            ? formatSecPerMile(primaryGoal.goalRacePace)
+                          {resolvedGoalRacePace?.goalPaceSecPerMile != null
+                            ? formatSecPerMile(resolvedGoalRacePace.goalPaceSecPerMile)
                             : '—'}
                         </dd>
                       </div>

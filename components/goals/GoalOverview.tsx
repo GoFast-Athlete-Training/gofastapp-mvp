@@ -3,12 +3,15 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
+import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 
 type RaceRegistry = {
   id: string;
   name: string;
   raceType: string;
   distanceMiles: number;
+  distanceLabel?: string | null;
+  distanceMeters?: number | null;
   raceDate: string;
   city?: string | null;
   state?: string | null;
@@ -162,6 +165,13 @@ export default function GoalOverview({ variant }: GoalOverviewProps) {
   }
 
   const displayTitle = draftName.trim() || "Your goal";
+  const resolvedGoalRacePace = resolveGoalRacePace({
+    goalTime: goal.goalTime,
+    dbGoalRacePaceSecPerMile: goal.goalRacePace,
+    distanceMeters: goal.race_registry?.distanceMeters ?? null,
+    distanceLabel: goal.race_registry?.distanceLabel ?? null,
+    goalDistance: goal.distance,
+  });
 
   return (
     <div className="max-w-xl">
@@ -241,8 +251,11 @@ export default function GoalOverview({ variant }: GoalOverviewProps) {
                   {goal.goalTime?.trim() ? (
                     <p>
                       Goal time: <span className="font-medium">{goal.goalTime.trim()}</span>
-                      {goal.goalRacePace != null ? (
-                        <span className="text-gray-600"> ({formatSecPerMile(goal.goalRacePace)} avg)</span>
+                      {resolvedGoalRacePace.goalPaceSecPerMile != null ? (
+                        <span className="text-gray-600">
+                          {" "}
+                          ({formatSecPerMile(resolvedGoalRacePace.goalPaceSecPerMile)} avg)
+                        </span>
                       ) : null}
                     </p>
                   ) : (

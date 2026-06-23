@@ -9,6 +9,7 @@ import {
   RACE_DISTANCES_MILES,
   parseRaceTimeToSeconds,
 } from "@/lib/workout-generator/pace-calculator";
+import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 
 export type PacingStrategy = "even" | "negative" | "positive";
 
@@ -89,10 +90,18 @@ export function RacePlanSection({ race, goal, onGoalSaved }: Props) {
     }
   }, [goal?.goalTime, race.distanceLabel, race.distanceMeters]);
 
-  const goalRacePace =
-    goal?.goalRacePace != null && goal.goalRacePace > 0
-      ? goal.goalRacePace
-      : derived?.goalRacePace ?? null;
+  const resolvedGoalRacePace = useMemo(() => {
+    const gTime = goal?.goalTime?.trim();
+    if (!gTime) return null;
+    return resolveGoalRacePace({
+      goalTime: gTime,
+      dbGoalRacePaceSecPerMile: goal?.goalRacePace ?? null,
+      distanceMeters: race.distanceMeters ?? null,
+      distanceLabel: race.distanceLabel ?? null,
+    });
+  }, [goal?.goalTime, goal?.goalRacePace, race.distanceLabel, race.distanceMeters]);
+
+  const goalRacePace = resolvedGoalRacePace?.goalPaceSecPerMile ?? null;
 
   const goalPace5K =
     goal?.goalPace5K != null && goal.goalPace5K > 0

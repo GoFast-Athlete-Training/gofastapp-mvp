@@ -24,6 +24,7 @@ import {
   getPublicCoursePageUrl,
   getPublicRacePageUrl,
 } from "@/lib/public-race-url";
+import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 
 type ResolvedRace = {
   id: string;
@@ -376,7 +377,13 @@ export default function MyRacePage() {
   );
   const hasSignup = Boolean(signup);
   const goalTimeDisplay = goal?.goalTime?.trim() || null;
-  const goalPaceDisplay = formatSecPerMile(goal?.goalRacePace);
+  const resolvedGoalRacePace = resolveGoalRacePace({
+    goalTime: goal?.goalTime,
+    dbGoalRacePaceSecPerMile: goal?.goalRacePace ?? null,
+    distanceMeters: race.distanceMeters,
+    distanceLabel: race.distanceLabel,
+  });
+  const goalPaceDisplay = formatSecPerMile(resolvedGoalRacePace.goalPaceSecPerMile);
   const courseTipsUrl = getPublicCoursePageUrl(raceExtras?.courseSlug);
   const publicRaceUrl = getPublicRacePageUrl(race.slug);
   const hasCourseSection = Boolean(
