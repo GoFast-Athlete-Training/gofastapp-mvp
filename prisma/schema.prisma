@@ -145,9 +145,9 @@ model Athlete {
   member_container_memberships   gofast_container_memberships[] @relation("ContainerMember")
   container_messages_as_host     gofast_container_messages[]    @relation("ContainerMessages")
   container_messages_as_author   gofast_container_messages[]    @relation("ContainerMessageAuthor")
-  scheduled_runs                 scheduled_runs[]
-  athlete_push_tokens            athlete_push_tokens[]
-  athlete_notifications        athlete_notifications[]
+  scheduled_runs                      scheduled_runs[]
+  athlete_appnotification_devices     athlete_appnotification_devices[]
+  appnotification_deliveries          appnotification_deliveries[]
 }
 
 /// Human coach — first-class entity (Firebase auth), parallel to Athlete.
@@ -1026,6 +1026,7 @@ model city_runs {
   routeNeighborhood String?              // Neighborhood/area route goes through (e.g. "Arlington Heights", "Back Bay") - gives run flavor
   runType             String?              // Type of run location: "track", "trail", "neighborhood", "park"
   workoutDescription  String?              // Workout focus/description (e.g. "emphasizes speed training for those want to increase threshold")
+  directionsText        String?              // Staff pasted route directions — copies forward on series advance
   endStreetAddress    String?
   endCity             String?
   endState            String?
@@ -1071,7 +1072,8 @@ model city_runs {
   @@map("city_runs")
 }
 
-model athlete_push_tokens {
+/// Expo push token per device — app notification delivery endpoints only (not inbox content).
+model athlete_appnotification_devices {
   id            String   @id @default(cuid())
   athleteId     String
   expoPushToken String   @unique
@@ -1086,24 +1088,24 @@ model athlete_push_tokens {
   @@index([athleteId])
 }
 
-model athlete_notifications {
-  id           String    @id @default(cuid())
-  athleteId    String
-  type         String
-  title        String
-  body         String
-  deeplink     String?
-  scheduledFor DateTime?
-  sentAt       DateTime?
-  readAt       DateTime?
-  dedupeKey    String    @unique
-  payload      Json?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  Athlete      Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+/// Delivery/idempotency log for template-driven app notifications (content rendered from templates + source objects).
+model appnotification_deliveries {
+  id          String    @id @default(cuid())
+  athleteId   String
+  templateKey String
+  objectType  String
+  objectId    String
+  dedupeKey   String    @unique
+  deeplink    String?
+  payload     Json?
+  sentAt      DateTime?
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  Athlete     Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
   @@index([athleteId, readAt])
-  @@index([scheduledFor, sentAt])
+  @@index([templateKey, objectType, objectId])
 }
 
 model run_series {

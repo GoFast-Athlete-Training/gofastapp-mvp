@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
+import { markAppNotificationRead } from '@/lib/app-notifications/feed';
 import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
-import { prisma } from '@/lib/prisma';
 
 /** POST /api/me/notifications/[id]/read */
 export async function POST(
@@ -15,17 +15,13 @@ export async function POST(
   }
 
   const { id } = await params;
-  const row = await prisma.athlete_notifications.findFirst({
-    where: { id, athleteId: auth.athlete.id },
+  const ok = await markAppNotificationRead({
+    athleteId: auth.athlete.id,
+    deliveryId: id,
   });
-  if (!row) {
+  if (!ok) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-
-  await prisma.athlete_notifications.update({
-    where: { id },
-    data: { readAt: new Date() },
-  });
 
   return NextResponse.json({ success: true });
 }

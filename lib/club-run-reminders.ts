@@ -1,9 +1,9 @@
 import { prisma } from '@/lib/prisma';
 import { buildClubRunReminderCopy } from '@/lib/city-run-copy';
-import { sendExpoPushBatch } from '@/lib/expo-push';
+import { sendAppNotification } from '@/lib/app-notifications/send';
+import type { NotificationTemplateKey } from '@/lib/app-notifications/types';
 
 const HOUR_MS = 60 * 60 * 1000;
-const DAY_MS = 24 * HOUR_MS;
 
 export type ClubRunReminderKind = 'tomorrow' | 'today';
 
@@ -40,15 +40,6 @@ export async function processClubRunReminders(now = new Date()) {
           },
         },
       },
-      Athlete: {
-        select: {
-          id: true,
-          athlete_push_tokens: {
-            where: { enabled: true },
-            select: { expoPushToken: true },
-          },
-        },
-      },
     },
   });
 
@@ -71,53 +62,25 @@ export async function processClubRunReminders(now = new Date()) {
     if (existingCheckin) continue;
 
     const copy = buildClubRunReminderCopy(run.runClub, kind);
-    const dedupeKey = `club_run_${kind}:${run.id}:${rsvp.athleteId}`;
+    const templateKey: NotificationTemplateKey =
+      kind === 'today' ? 'clubRun.today' : 'clubRun.tomorrow';
     const deeplink = `/gorun/${run.id}`;
 
-    await prisma.athlete_notifications.upsert({
-      where: { dedupeKey },
-      create: {
-        athleteId: rsvp.athleteId,
-        type: `club_run_${kind}`,
-        title: copy.title,
+    const result = await sendAppNotification({
+      athleteId: rsvp.athleteId,
+      templateKey,
+      objectType: 'city_run',
+      objectId: run.id,
+      deeplink,
+      payload: { runId: run.id, reminderKind: kind },
+      facts: {
+        clubName: run.runClub?.name ?? 'Club run',
         body: copy.body,
-        deeplink,
-        scheduledFor: now,
-        dedupeKey,
-        payload: { runId: run.id, reminderKind: kind },
-      },
-      update: {
-        title: copy.title,
-        body: copy.body,
-        deeplink,
-        scheduledFor: now,
-        payload: { runId: run.id, reminderKind: kind },
       },
     });
+
     notificationsUpserted += 1;
-
-    const tokens = rsvp.Athlete.athlete_push_tokens.map((t) => t.expoPushToken);
-    if (tokens.length === 0) continue;
-
-    const notification = await prisma.athlete_notifications.findUnique({
-      where: { dedupeKey },
-      select: { id: true, sentAt: true },
-    });
-    if (notification?.sentAt) continue;
-
-    const sent = await sendExpoPushBatch(tokens, {
-      title: copy.title,
-      body: copy.body,
-      data: { runId: run.id, deeplink },
-    });
-
-    if (sent > 0 && notification) {
-      await prisma.athlete_notifications.update({
-        where: { id: notification.id },
-        data: { sentAt: now },
-      });
-      pushesSent += sent;
-    }
+    pushesSent += result.pushesSent;
   }
 
   return { notificationsUpserted, pushesSent, candidates: rsvps.length };

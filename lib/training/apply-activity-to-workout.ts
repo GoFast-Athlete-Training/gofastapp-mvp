@@ -16,7 +16,7 @@ import {
 import { normalizeGarminMatchText } from "./garmin-activity-match-helpers";
 import { ymdFromDate } from "./plan-utils";
 import { parseActivityToSegmentExecution } from "./activity-to-segment-execution";
-import { sendPushToAthlete } from "@/lib/push-notification";
+import { sendAppNotification } from "@/lib/app-notifications/send";
 /** Max sec/mi faster than prescribed easy pace before we skip aerobic HR credit (target − actual). */
 export const EASY_LONG_RUN_MAX_FAST_DRIFT_SEC_PER_MILE = 15;
 
@@ -405,14 +405,14 @@ export async function applyActivityToWorkout(params: {
   }
 
   try {
-    await sendPushToAthlete({
+    await sendAppNotification({
       athleteId: activity.athleteId,
-      type: "workout_complete",
-      title: "Great workout!",
-      body: `${workout.title} complete — check your pace breakdown.`,
-      dedupeKey: `workout_complete:${workout.id}`,
+      templateKey: "workout.complete",
+      objectType: "workout",
+      objectId: workout.id,
       deeplink: `/workouts/${workout.id}`,
       payload: { workoutId: workout.id, screen: "workout" },
+      facts: { workoutTitle: workout.title },
     });
   } catch (err) {
     console.error("workout_complete push:", err);

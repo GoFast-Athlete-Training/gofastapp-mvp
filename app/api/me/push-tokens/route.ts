@@ -1,8 +1,11 @@
 export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
-import { prisma } from '@/lib/prisma';
+import {
+  disableAppNotificationDevice,
+  upsertAppNotificationDevice,
+} from '@/lib/app-notifications/devices';
 
 /** POST /api/me/push-tokens — upsert Expo push token for current athlete */
 export async function POST(request: Request) {
@@ -23,23 +26,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'expoPushToken is required' }, { status: 400 });
   }
 
-  const token = await prisma.athlete_push_tokens.upsert({
-    where: { expoPushToken },
-    create: {
-      athleteId: auth.athlete.id,
-      expoPushToken,
-      platform: body.platform?.trim() || null,
-      deviceId: body.deviceId?.trim() || null,
-      enabled: true,
-      lastSeenAt: new Date(),
-    },
-    update: {
-      athleteId: auth.athlete.id,
-      platform: body.platform?.trim() || null,
-      deviceId: body.deviceId?.trim() || null,
-      enabled: true,
-      lastSeenAt: new Date(),
-    },
+  const token = await upsertAppNotificationDevice({
+    athleteId: auth.athlete.id,
+    expoPushToken,
+    platform: body.platform,
+    deviceId: body.deviceId,
   });
 
   return NextResponse.json({ success: true, tokenId: token.id });
@@ -64,9 +55,9 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'expoPushToken is required' }, { status: 400 });
   }
 
-  await prisma.athlete_push_tokens.updateMany({
-    where: { athleteId: auth.athlete.id, expoPushToken },
-    data: { enabled: false },
+  await disableAppNotificationDevice({
+    athleteId: auth.athlete.id,
+    expoPushToken,
   });
 
   return NextResponse.json({ success: true });

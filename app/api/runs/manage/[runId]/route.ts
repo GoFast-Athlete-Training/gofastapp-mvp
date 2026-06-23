@@ -39,7 +39,7 @@ function isMissingRunClubsColumn(error: any) {
 async function logCityRunsRuntimeDiagnostics(context: string) {
   try {
     const rows = (await prisma.$queryRawUnsafe(
-      "SELECT column_name FROM information_schema.columns WHERE table_name='city_runs' AND column_name IN ('postRunActivity','stravaEventUrl','stravaText','webUrl','webText','igPostText','igPostGraphic','routeNeighborhood','runType','workoutDescription') ORDER BY column_name"
+      "SELECT column_name FROM information_schema.columns WHERE table_name='city_runs' AND column_name IN ('postRunActivity','stravaEventUrl','stravaText','webUrl','webText','igPostText','igPostGraphic','routeNeighborhood','runType','workoutDescription','directionsText') ORDER BY column_name"
     )) as Array<{ column_name: string }>;
     console.error(`[${context}] Runtime diagnostics`, {
       commitSha: RUNTIME_COMMIT_SHA,

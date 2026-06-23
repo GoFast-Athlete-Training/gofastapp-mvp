@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 import { normalizeCrewResponse } from './normalize-prisma';
 import { secondsToPace } from '@/utils/formatPace';
-import { sendPushToAthlete } from '@/lib/push-notification';
+import { sendAppNotification } from '@/lib/app-notifications/send';
 
 /**
  * Generate a shareable invite link for a RunCrew using handle
@@ -1227,17 +1227,21 @@ async function notifyCrewAnnouncementMembers(params: {
 
   await Promise.all(
     members.map((member) =>
-      sendPushToAthlete({
+      sendAppNotification({
         athleteId: member.athleteId,
-        type: 'crew_announcement',
-        title: crew.name,
-        body: params.title || body,
-        dedupeKey: `crew_announcement:${params.announcementId}:${member.athleteId}`,
+        templateKey: 'crew.announcement',
+        objectType: 'run_crew_announcement',
+        objectId: params.announcementId,
         deeplink: `/crew/${params.runCrewId}`,
         payload: {
           runCrewId: params.runCrewId,
           announcementId: params.announcementId,
           screen: 'crew',
+        },
+        facts: {
+          crewName: crew.name,
+          announcementTitle: params.title,
+          excerpt: body,
         },
       })
     )

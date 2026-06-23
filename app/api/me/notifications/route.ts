@@ -1,10 +1,10 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
+import { getAppNotificationFeed } from '@/lib/app-notifications/feed';
 import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
-import { prisma } from '@/lib/prisma';
 
-/** GET /api/me/notifications — recent in-app notifications */
+/** GET /api/me/notifications — derived in-app feed from template deliveries + source objects */
 export async function GET(request: Request) {
   const auth = await requireAthleteFromBearer(request);
   if ('error' in auth) {
@@ -14,13 +14,9 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const unreadOnly = url.searchParams.get('unread') === '1';
 
-  const notifications = await prisma.athlete_notifications.findMany({
-    where: {
-      athleteId: auth.athlete.id,
-      ...(unreadOnly ? { readAt: null } : {}),
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 30,
+  const notifications = await getAppNotificationFeed({
+    athleteId: auth.athlete.id,
+    unreadOnly,
   });
 
   return NextResponse.json({ notifications });

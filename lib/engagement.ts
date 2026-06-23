@@ -1,3 +1,4 @@
+import { countReadAppNotificationsSince, countUnreadAppNotifications } from '@/lib/app-notifications/feed';
 import { prisma } from './prisma';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -128,15 +129,8 @@ export async function getAthleteEngagement(athleteId: string): Promise<AthleteEn
         startTime: { gte: thirtyDaysAgo },
       },
     }),
-    prisma.athlete_notifications.count({
-      where: { athleteId, readAt: null },
-    }),
-    prisma.athlete_notifications.count({
-      where: {
-        athleteId,
-        readAt: { gte: thirtyDaysAgo },
-      },
-    }),
+    countUnreadAppNotifications(athleteId),
+    countReadAppNotificationsSince(athleteId, thirtyDaysAgo),
   ]);
 
   return {

@@ -17,7 +17,13 @@ export async function sendExpoPushBatch(
   tokens: string[],
   message: { title: string; body: string; data?: Record<string, unknown> }
 ): Promise<number> {
-  const unique = [...new Set(tokens.filter((t) => t.startsWith('ExponentPushToken')))];
+  const unique = [
+    ...new Set(
+      tokens.filter(
+        (t) => t.startsWith('ExponentPushToken') || t.startsWith('ExpoPushToken')
+      )
+    ),
+  ];
   if (unique.length === 0) return 0;
 
   const payload: ExpoPushMessage[] = unique.map((to) => ({
@@ -48,6 +54,11 @@ export async function sendExpoPushBatch(
 
     const json = (await res.json()) as { data?: ExpoPushTicket[] };
     const tickets = json.data ?? [];
+    for (const ticket of tickets) {
+      if (ticket.status === 'error') {
+        console.error('Expo push ticket error', ticket.message, ticket.details);
+      }
+    }
     return tickets.filter((t) => t.status === 'ok').length;
   } catch (err) {
     console.error('Expo push send failed', err);

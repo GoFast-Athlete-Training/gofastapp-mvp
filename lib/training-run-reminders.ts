@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { sendPushToAthlete } from '@/lib/push-notification';
+import { sendAppNotification } from '@/lib/app-notifications/send';
 
 function startOfUtcDay(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -14,11 +14,6 @@ function addUtcDays(d: Date, days: number): Date {
 function formatDistanceMi(meters: number | null | undefined): string | null {
   if (meters == null || meters <= 0) return null;
   return `${(meters / 1609.34).toFixed(1)} mi`;
-}
-
-function buildWorkoutReminderBody(title: string, distanceMi: string | null): string {
-  if (distanceMi) return `Tomorrow: ${title} · ${distanceMi}`;
-  return `Tomorrow: ${title}`;
 }
 
 export async function processTrainingRunReminders(now = new Date()) {
@@ -40,6 +35,7 @@ export async function processTrainingRunReminders(now = new Date()) {
         athleteId: true,
         title: true,
         estimatedDistanceInMeters: true,
+        Athlete: { select: { firstName: true } },
       },
     }),
     prisma.scheduled_runs.findMany({
@@ -65,15 +61,18 @@ export async function processTrainingRunReminders(now = new Date()) {
     if (!athleteId) continue;
 
     const distanceMi = formatDistanceMi(workout.estimatedDistanceInMeters);
-    const body = buildWorkoutReminderBody(workout.title, distanceMi);
-    const result = await sendPushToAthlete({
+    const result = await sendAppNotification({
       athleteId,
-      type: 'run_reminder',
-      title: 'Your next run is coming',
-      body,
-      dedupeKey: `run_reminder:workout:${workout.id}:${tomorrowStart.toISOString().slice(0, 10)}`,
+      templateKey: 'workout.tomorrow',
+      objectType: 'workout',
+      objectId: workout.id,
       deeplink: `/workouts/${workout.id}`,
       payload: { workoutId: workout.id, screen: 'workout', reminderKind: 'tomorrow' },
+      facts: {
+        firstName: workout.Athlete?.firstName ?? 'there',
+        workoutTitle: workout.title,
+        distanceMi,
+      },
     });
     notificationsUpserted += 1;
     pushesSent += result.pushesSent;
@@ -81,25 +80,25 @@ export async function processTrainingRunReminders(now = new Date()) {
 
   for (const run of scheduledRuns) {
     const distancePart =
-      run.estimatedDistanceMi != null
-        ? `${run.estimatedDistanceMi.toFixed(1)} mi`
-        : null;
+      run.estimatedDistanceMi != null ? `${run.estimatedDistanceMi.toFixed(1)} mi` : null;
     const timePart = run.startTimeLabel?.trim() || null;
     const detail = [distancePart, timePart].filter(Boolean).join(' · ');
-    const body = detail ? `Tomorrow: ${run.title} · ${detail}` : `Tomorrow: ${run.title}`;
 
-    const result = await sendPushToAthlete({
+    const result = await sendAppNotification({
       athleteId: run.athleteId,
-      type: 'run_reminder',
-      title: 'Your next run is coming',
-      body,
-      dedupeKey: `run_reminder:scheduled:${run.id}:${tomorrowStart.toISOString().slice(0, 10)}`,
+      templateKey: 'scheduledRun.tomorrow',
+      objectType: 'scheduled_run',
+      objectId: run.id,
       deeplink: run.workoutId ? `/workouts/${run.workoutId}` : '/(tabs)/train',
       payload: {
         scheduledRunId: run.id,
         workoutId: run.workoutId,
         screen: run.workoutId ? 'workout' : 'train',
         reminderKind: 'tomorrow',
+      },
+      facts: {
+        runTitle: run.title,
+        detail: detail || undefined,
       },
     });
     notificationsUpserted += 1;
