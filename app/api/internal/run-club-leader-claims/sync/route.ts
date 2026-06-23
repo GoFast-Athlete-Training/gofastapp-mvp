@@ -1,13 +1,13 @@
 export const dynamic = 'force-dynamic';
 
-import { NextResponse } from 'next/server';
-import { verifyInternalApiKey } from '@/lib/verify-internal-api-key';
+import { NextRequest, NextResponse } from 'next/server';
 import {
   mapAcqRoleToMembershipRole,
   normalizeLeaderEmail,
   revokeLeaderClaim,
   syncLeaderClaim,
 } from '@/lib/domain-runclub-leader-claim';
+import { assertStaffBearerAuth } from '@/lib/training/training-engine-auth';
 
 type SyncBody = {
   runClubId: string;
@@ -25,10 +25,9 @@ type SyncBody = {
  * POST /api/internal/run-club-leader-claims/sync
  * Company → Product: seed/update unclaimed club-owner slots by email.
  */
-export async function POST(request: Request) {
-  if (!verifyInternalApiKey(request)) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
+export async function POST(request: NextRequest) {
+  const authError = await assertStaffBearerAuth(request);
+  if (authError) return authError;
 
   try {
     const body = (await request.json()) as SyncBody;
