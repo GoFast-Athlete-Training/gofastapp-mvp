@@ -8,7 +8,6 @@ import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import Link from 'next/link';
 import MissingPaceBanner from '@/components/profile/MissingPaceBanner';
-import GarminHealthPanel from '@/components/profile/GarminHealthPanel';
 
 const RUNNER_BASE =
   process.env.NEXT_PUBLIC_RUNNER_PHOTO_URL?.replace(/\/$/, '') ||
@@ -149,9 +148,6 @@ export default function ProfilePage() {
   const phoneNumber = athleteProfile.phoneNumber as string | undefined;
   const email = athleteProfile.email as string | undefined;
   const fiveKPace = athleteProfile.fiveKPace as string | undefined;
-  const garminConnected = !!athleteProfile.garmin_connected;
-  const garminSleepRaw = athleteProfile.garmin_user_sleep;
-  const garminDailyRaw = athleteProfile.garmin_user_daily;
 
   const calculateAge = (b: string | Date | null | undefined) => {
     if (!b) return null;
@@ -384,13 +380,18 @@ export default function ProfilePage() {
           )}
         </section>
 
-        {garminConnected ? (
-          <GarminHealthPanel
-            garminConnected={garminConnected}
-            garminSleepRaw={garminSleepRaw}
-            garminDailyRaw={garminDailyRaw}
-          />
-        ) : null}
+        <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-gray-900 mb-2">Recovery &amp; sleep</h2>
+          <p className="text-sm text-gray-600 mb-3">
+            Body Battery, sleep stages, and resting heart rate from Garmin live on the Health page.
+          </p>
+          <Link
+            href="/health"
+            className="inline-flex text-sm font-semibold text-orange-600 hover:text-orange-700"
+          >
+            Open Health →
+          </Link>
+        </section>
 
         {/* Account (private) */}
         <section className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 p-6">

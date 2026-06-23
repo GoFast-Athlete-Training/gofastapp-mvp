@@ -33,7 +33,7 @@ flowchart LR
 | Endpoint | Garmin portal config | Handles |
 |----------|---------------------|---------|
 | `POST/PUT /api/garmin/webhook` | Activity Summary, Activity Details, Activity Files | Training ingest only |
-| `POST/PUT /api/garmin/health-webhook` | **Sleeps**, **Dailies** (body battery) | `garmin_user_sleep`, `garmin_user_daily` |
+| `POST/PUT /api/garmin/health-webhook` | **Sleeps**, **Dailies** (body battery) | `athlete_health_records` (`sleep`, `daily`) |
 
 **Disable or leave blank** in portal (for now): epochs, stressDetails, hrv, pulseOx, respiration, bodyComps, userMetrics — we don't store these yet.
 
@@ -76,21 +76,21 @@ GARMIN_HEALTH_WEBHOOK_URI="https://pr.gofastcrushgoals.com/api/garmin/health-web
 |------|--------|
 | `app/api/garmin/health-webhook/route.ts` | New health-only webhook |
 | `lib/garmin-events/process-health-webhook.ts` | Shared sleep + daily dispatch |
-| `lib/garmin-events/handleDailySummary.ts` | Store latest daily → `garmin_user_daily` |
+| `lib/garmin-events/handleDailySummary.ts` | Upsert daily → `athlete_health_records` |
 | `app/api/garmin/webhook/route.ts` | Remove sleep handling; log hint if health keys arrive |
 | `lib/garmin-oauth.ts` | `getGarminHealthWebhookUri()` |
-| `prisma/schema.prisma` | `garmin_user_daily Json?` |
-| `components/profile/GarminHealthPanel.tsx` | Sleep + Body Battery test UI |
-| `app/profile/page.tsx` | Use health panel |
+| `prisma/schema.prisma` | `athlete_health_records` table |
+| `components/health/HealthDashboard.tsx` | Sleep + Body Battery on `/health` |
+| `app/health/page.tsx` | Health nav hydrate |
 
 ## Storage model
 
-| Field | Source | Display |
+| Field / table | Source | Display |
 |-------|--------|---------|
-| `Athlete.garmin_user_sleep` | `sleeps[]` push/ping | Sleep stages, calendar date |
-| `Athlete.garmin_user_daily` | `dailies[]` push/ping | Body battery high/low/recent, calendar date |
+| `athlete_health_records` (`healthType=sleep`) | `sleeps[]` push/ping | Sleep stages, calendar date |
+| `athlete_health_records` (`healthType=daily`) | `dailies[]` push/ping | Body battery high/low/recent, calendar date |
 
-Full JSON blobs are kept for debugging; profile UI reads normalized keys with fallbacks for Garmin field name variants.
+Raw Garmin JSON lives on health rows (`summaryData`). Profile API returns compact derived objects only (`garmin_user_daily`, `garmin_user_sleep` on the client payload).
 
 ## Follow-ups (not in scope)
 

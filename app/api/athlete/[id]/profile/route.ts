@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { getAthleteById, updateAthlete } from '@/lib/domain-athlete';
+import { buildAthleteForClient } from '@/lib/athlete-for-client';
 import { normalizeProfileGender, parseProfileBirthday } from '@/lib/profile-validation';
 import { isExternallyContactableEmail, isApplePrivateRelayEmail } from '@/lib/athlete-contact-email';
 import { syncAthleteFiveKPaceToActivePlan } from '@/lib/training/plan-lifecycle';
@@ -39,7 +40,11 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    return NextResponse.json({ success: true, athlete });
+    const athleteForClient = await buildAthleteForClient(
+      athlete as Record<string, unknown> & { id: string; garmin_access_token?: string | null }
+    );
+
+    return NextResponse.json({ success: true, athlete: athleteForClient });
   } catch {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
@@ -263,11 +268,15 @@ export async function PUT(
       await syncAthleteFiveKPaceToActivePlan(athleteId);
     }
 
+    const athleteForClient = await buildAthleteForClient(
+      updated as Record<string, unknown> & { id: string; garmin_access_token?: string | null }
+    );
+
     return NextResponse.json({
       success: true,
       message: 'Profile updated successfully',
       athleteId: updated.id,
-      athlete: updated,
+      athlete: athleteForClient,
     });
   } catch (err: any) {
     console.error('❌ PROFILE UPDATE: Error:', err);

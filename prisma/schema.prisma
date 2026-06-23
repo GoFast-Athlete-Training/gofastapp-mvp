@@ -107,6 +107,7 @@ model Athlete {
   ambassador_credits      ambassador_credits[]
   ambassador_payouts      ambassador_payouts[]
   athlete_activities      athlete_activities[]
+  athlete_health_records  athlete_health_records[]
   run_crew_announcements  run_crew_announcements[]
   run_crew_event_rsvps    run_crew_event_rsvps[]
   run_crew_events         run_crew_events[]
@@ -289,6 +290,24 @@ model athlete_activities {
   workout_segment_laps workout_segment_laps[]
 
   @@index([athleteId, ingestionStatus])
+}
+
+/// Garmin Health API summaries (dailies, sleeps) — off Athlete row to avoid profile bloat.
+model athlete_health_records {
+  id              String    @id @default(cuid())
+  athleteId       String
+  source          String    @default("garmin")
+  /// "daily" | "sleep" — matches Garmin Health webhook keys (dailies, sleeps)
+  healthType      String
+  sourceSummaryId String?
+  calendarDate    DateTime?
+  summaryData     Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  Athlete         Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([source, healthType, sourceSummaryId])
+  @@index([athleteId, healthType, calendarDate])
 }
 
 /// Athlete linked a synced activity (or attendance-only) to a city run for credit / history.

@@ -1,11 +1,14 @@
 /**
  * Handle Garmin wellness sleep push / fetch results.
- * Stores the latest night on Athlete.garmin_user_sleep (by calendarDate).
+ * Upserts into athlete_health_records (healthType = sleep).
  */
 
-import { Prisma } from '@prisma/client';
-import { prisma } from '../prisma';
 import { getAthleteByGarminUserId } from '../domain-garmin';
+import {
+  HEALTH_TYPE_SLEEP,
+  upsertGarminHealthRecord,
+  parseGarminCalendarDate,
+} from '../garmin-health/athlete-health-records';
 
 export interface SleepSummary {
   userId?: string;
@@ -35,12 +38,9 @@ function coerceSleepSummary(raw: unknown): SleepSummary | null {
   return raw as SleepSummary;
 }
 
-/** Lexicographic compare works for YYYY-MM-DD; fallback to startTimeInSeconds. */
 function sleepSortKey(s: SleepSummary): number {
-  const cd = s.calendarDate;
-  if (typeof cd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(cd)) {
-    return Date.parse(`${cd}T12:00:00Z`);
-  }
+  const cd = parseGarminCalendarDate(s.calendarDate);
+  if (cd) return cd.getTime();
   const sec = s.startTimeInSeconds;
   if (typeof sec === 'number' && Number.isFinite(sec)) {
     return sec * 1000;
@@ -48,23 +48,6 @@ function sleepSortKey(s: SleepSummary): number {
   return 0;
 }
 
-function readStoredCalendarDateMs(stored: unknown): number {
-  if (!isRecord(stored)) return 0;
-  const cd = stored.calendarDate;
-  if (typeof cd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(cd)) {
-    const t = Date.parse(`${cd}T12:00:00Z`);
-    return Number.isFinite(t) ? t : 0;
-  }
-  const sec = stored.startTimeInSeconds;
-  if (typeof sec === 'number' && Number.isFinite(sec)) {
-    return sec * 1000;
-  }
-  return 0;
-}
-
-/**
- * Pick the latest sleep row from a batch for one Garmin user id.
- */
 function latestSleepInBatch(items: SleepSummary[]): SleepSummary | null {
   let best: SleepSummary | null = null;
   let bestKey = -Infinity;
@@ -78,9 +61,6 @@ function latestSleepInBatch(items: SleepSummary[]): SleepSummary | null {
   return best;
 }
 
-/**
- * Process sleep summaries from webhook inline payload or fetched JSON array.
- */
 export async function handleSleepSummary(
   sleepItems: unknown[],
   userId?: string
@@ -126,26 +106,13 @@ export async function handleSleepSummary(
         continue;
       }
 
-      const incomingMs = sleepSortKey(winner);
-      const storedMs = readStoredCalendarDateMs(athlete.garmin_user_sleep);
+      await upsertGarminHealthRecord(athlete.id, HEALTH_TYPE_SLEEP, winner as Record<string, unknown>);
 
-      if (incomingMs < storedMs) {
-        skipped += batch.length;
-        continue;
-      }
-
-      await prisma.athlete.update({
-        where: { id: athlete.id },
-        data: {
-          garmin_user_sleep: winner as unknown as Prisma.InputJsonValue,
-          garmin_last_sync_at: new Date(),
-        },
-      });
-
-      console.log('✅ garmin_user_sleep updated', {
+      console.log('✅ athlete_health_records sleep upserted', {
         athleteId: athlete.id,
         garminUserId,
         calendarDate: winner.calendarDate ?? null,
+        summaryId: winner.summaryId ?? null,
       });
 
       processed++;

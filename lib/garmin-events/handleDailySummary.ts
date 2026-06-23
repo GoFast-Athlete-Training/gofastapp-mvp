@@ -1,12 +1,14 @@
 /**
  * Handle Garmin wellness daily push / fetch results.
- * Stores the latest day on Athlete.garmin_user_daily (by calendarDate).
- * Body battery fields live on the daily summary blob.
+ * Upserts into athlete_health_records (healthType = daily).
  */
 
-import { Prisma } from '@prisma/client';
-import { prisma } from '../prisma';
 import { getAthleteByGarminUserId } from '../domain-garmin';
+import {
+  HEALTH_TYPE_DAILY,
+  upsertGarminHealthRecord,
+  parseGarminCalendarDate,
+} from '../garmin-health/athlete-health-records';
 
 export interface DailySummary {
   userId?: string;
@@ -38,20 +40,8 @@ function coerceDailySummary(raw: unknown): DailySummary | null {
 }
 
 function dailySortKey(d: DailySummary): number {
-  const cd = d.calendarDate;
-  if (typeof cd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(cd)) {
-    return Date.parse(`${cd}T12:00:00Z`);
-  }
-  return 0;
-}
-
-function readStoredCalendarDateMs(stored: unknown): number {
-  if (!isRecord(stored)) return 0;
-  const cd = stored.calendarDate;
-  if (typeof cd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(cd)) {
-    const t = Date.parse(`${cd}T12:00:00Z`);
-    return Number.isFinite(t) ? t : 0;
-  }
+  const cd = parseGarminCalendarDate(d.calendarDate);
+  if (cd) return cd.getTime();
   return 0;
 }
 
@@ -113,26 +103,13 @@ export async function handleDailySummary(
         continue;
       }
 
-      const incomingMs = dailySortKey(winner);
-      const storedMs = readStoredCalendarDateMs(athlete.garmin_user_daily);
+      await upsertGarminHealthRecord(athlete.id, HEALTH_TYPE_DAILY, winner as Record<string, unknown>);
 
-      if (incomingMs < storedMs) {
-        skipped += batch.length;
-        continue;
-      }
-
-      await prisma.athlete.update({
-        where: { id: athlete.id },
-        data: {
-          garmin_user_daily: winner as unknown as Prisma.InputJsonValue,
-          garmin_last_sync_at: new Date(),
-        },
-      });
-
-      console.log('✅ garmin_user_daily updated', {
+      console.log('✅ athlete_health_records daily upserted', {
         athleteId: athlete.id,
         garminUserId,
         calendarDate: winner.calendarDate ?? null,
+        summaryId: winner.summaryId ?? null,
       });
 
       processed++;

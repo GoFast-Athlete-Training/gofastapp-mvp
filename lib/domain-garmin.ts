@@ -123,6 +123,10 @@ export async function clearGarminProductionAfterPlatformRevoke(athleteId: string
 }
 
 async function wipeGarminProductionFields(athleteId: string) {
+  await prisma.athlete_health_records.deleteMany({
+    where: { athleteId, source: 'garmin' },
+  });
+
   return prisma.athlete.update({
     where: { id: athleteId },
     data: {

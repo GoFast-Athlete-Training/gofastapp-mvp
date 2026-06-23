@@ -5,6 +5,7 @@ import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteById, updateAthlete } from '@/lib/domain-athlete';
 import { syncAthleteFiveKPaceToActivePlan } from '@/lib/training/plan-lifecycle';
 import { ensureAthleteProfileSnapshot } from '@/lib/athlete-profile-snapshot';
+import { buildAthleteForClient } from '@/lib/athlete-for-client';
 
 export async function GET(
   request: Request,
@@ -59,21 +60,9 @@ export async function GET(
       return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
     }
 
-    // Never send OAuth bearer tokens to the client
-    const raw = athleteRow as Record<string, unknown>;
-    const {
-      garmin_access_token: _ga,
-      garmin_refresh_token: _gr,
-      garmin_is_connected: _gic,
-      ...athleteSafe
-    } = raw;
-
-    const athleteForClient = {
-      ...athleteSafe,
-      garmin_connected: !!(
-        athleteRow.garmin_access_token && athleteRow.garmin_access_token.length > 0
-      ),
-    };
+    const athleteForClient = await buildAthleteForClient(
+      athleteRow as Record<string, unknown> & { id: string; garmin_access_token?: string | null }
+    );
 
     return NextResponse.json({ success: true, athlete: athleteForClient });
   } catch (err) {
@@ -131,22 +120,13 @@ export async function PUT(
       return NextResponse.json({ error: 'DB error' }, { status: 500 });
     }
 
-    const raw = updated as Record<string, unknown>;
-    const {
-      garmin_access_token: _ga,
-      garmin_refresh_token: _gr,
-      garmin_is_connected: _gic,
-      ...athleteSafe
-    } = raw;
+    const athleteForClient = await buildAthleteForClient(
+      updated as Record<string, unknown> & { id: string; garmin_access_token?: string | null }
+    );
 
     return NextResponse.json({
       success: true,
-      athlete: {
-        ...athleteSafe,
-        garmin_connected: !!(
-          updated.garmin_access_token && updated.garmin_access_token.length > 0
-        ),
-      },
+      athlete: athleteForClient,
     });
   } catch (err) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
