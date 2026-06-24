@@ -5,6 +5,7 @@ export const RUNCREW_JOIN_INTENT_KEY = 'runCrewJoinIntent';
 export const RUNCREW_JOIN_INTENT_HANDLE_KEY = 'runCrewJoinIntentHandle';
 export const RUNCREW_CREATE_INTENT_KEY = 'runCrewCreateIntent';
 export const CLUB_OWNER_MODE_KEY = 'clubOwnerMode';
+export const CLUB_OWNER_INVITE_TOKEN_KEY = 'clubOwnerInviteToken';
 
 const ATHLETE_ID_KEY = 'athleteId';
 const COACH_ID_KEY = 'coachId';
@@ -108,6 +109,25 @@ export const LocalStorageAPI = {
   clearClubOwnerMode() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(CLUB_OWNER_MODE_KEY);
+    }
+  },
+
+  setClubOwnerInviteToken(token: string) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(CLUB_OWNER_INVITE_TOKEN_KEY, token);
+    }
+  },
+
+  getClubOwnerInviteToken() {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(CLUB_OWNER_INVITE_TOKEN_KEY);
+    }
+    return null;
+  },
+
+  clearClubOwnerInviteToken() {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(CLUB_OWNER_INVITE_TOKEN_KEY);
     }
   },
 

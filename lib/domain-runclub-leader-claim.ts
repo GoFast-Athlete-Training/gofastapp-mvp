@@ -2,6 +2,12 @@ import { prisma } from '@/lib/prisma';
 import { listLeaderMemberships } from '@/lib/run-club-leader-auth';
 import type { RunClubLeaderRole } from '@/lib/run-club-leader-scope';
 import { mapAcqRoleToMembershipRole, normalizeLeaderEmail } from '@/lib/run-club-leader-role-map';
+import {
+  buildClubOwnerInviteUrl,
+  generateInviteToken,
+  getInviteExpiryDate,
+  hashInviteToken,
+} from '@/lib/run-club-leader-invite-token';
 
 function generateMembershipId(): string {
   const timestamp = Date.now().toString(36);
@@ -34,7 +40,9 @@ export type AttachClaimErrorCode =
   | 'CLAIM_NOT_FOUND'
   | 'CLAIM_ALREADY_USED'
   | 'CLAIM_REVOKED'
-  | 'EMAIL_MISMATCH';
+  | 'EMAIL_MISMATCH'
+  | 'INVITE_EXPIRED'
+  | 'INVITE_INVALID';
 
 export class AttachClubLeaderClaimError extends Error {
   code: AttachClaimErrorCode;
@@ -78,6 +86,7 @@ export async function syncLeaderClaim(input: {
   membershipRole?: RunClubLeaderRole;
   acqClubLeaderId?: string | null;
   acqRunClubId?: string | null;
+  managerAssignmentId?: string | null;
   source?: string;
 }) {
   const normalizedEmail = normalizeLeaderEmail(input.email);
@@ -111,6 +120,7 @@ export async function syncLeaderClaim(input: {
         membershipRole: role,
         acqClubLeaderId: input.acqClubLeaderId ?? undefined,
         acqRunClubId: input.acqRunClubId ?? undefined,
+        managerAssignmentId: input.managerAssignmentId ?? undefined,
         source: input.source ?? undefined,
         ...(existing.status === 'revoked' ? { status: 'unclaimed' } : {}),
       },
@@ -126,6 +136,7 @@ export async function syncLeaderClaim(input: {
       status: 'unclaimed',
       acqClubLeaderId: input.acqClubLeaderId ?? null,
       acqRunClubId: input.acqRunClubId ?? null,
+      managerAssignmentId: input.managerAssignmentId ?? null,
       source: input.source ?? 'company-sync',
     },
     include: claimInclude,
@@ -155,6 +166,124 @@ export async function listClaimsForRunClub(runClubId: string) {
     orderBy: { createdAt: 'asc' },
   });
   return rows.map(mapClaimRow);
+}
+
+export type ManagerInviteClaimResult = {
+  claimId: string;
+  email: string;
+  membershipRole: string;
+  status: ClubLeaderClaimStatus;
+  runClubId: string;
+  runClubSlug: string | null;
+  runClubName: string;
+  inviteToken: string;
+  inviteUrl: string;
+  inviteExpiresAt: Date;
+};
+
+/**
+ * Create or refresh a manager invite claim with a secure token.
+ * Returns the plain token once — only the hash is stored.
+ */
+export async function createOrRefreshManagerInviteClaim(input: {
+  runClubId: string;
+  email: string;
+  membershipRole?: RunClubLeaderRole;
+  acqRunClubId?: string | null;
+  acqClubLeaderId?: string | null;
+  managerAssignmentId?: string | null;
+  source?: string;
+}): Promise<ManagerInviteClaimResult> {
+  const row = await syncLeaderClaim({
+    runClubId: input.runClubId,
+    email: input.email,
+    membershipRole: input.membershipRole,
+    acqRunClubId: input.acqRunClubId,
+    acqClubLeaderId: input.acqClubLeaderId,
+    managerAssignmentId: input.managerAssignmentId,
+    source: input.source ?? 'company-manager-assignment',
+  });
+
+  const inviteToken = generateInviteToken();
+  const inviteExpiresAt = getInviteExpiryDate();
+  const now = new Date();
+
+  const updated = await prisma.run_club_leader_claims.update({
+    where: { id: row.id },
+    data: {
+      inviteTokenHash: hashInviteToken(inviteToken),
+      inviteExpiresAt,
+      lastInviteSentAt: now,
+      ...(row.status === 'revoked' ? { status: 'unclaimed' } : {}),
+    },
+    include: claimInclude,
+  });
+
+  return {
+    claimId: updated.id,
+    email: updated.email,
+    membershipRole: updated.membershipRole,
+    status: updated.status as ClubLeaderClaimStatus,
+    runClubId: updated.runClubId,
+    runClubSlug: updated.run_clubs.slug,
+    runClubName: updated.run_clubs.name,
+    inviteToken,
+    inviteUrl: buildClubOwnerInviteUrl(inviteToken),
+    inviteExpiresAt,
+  };
+}
+
+export type ResolvedInviteClaim = ClubLeaderClaimRow & {
+  claimId: string;
+  inviteExpiresAt: Date | null;
+};
+
+export async function resolveInviteByToken(token: string): Promise<ResolvedInviteClaim> {
+  const trimmed = token?.trim();
+  if (!trimmed) {
+    throw new AttachClubLeaderClaimError('INVITE_INVALID', 'Invite link is invalid');
+  }
+
+  const row = await prisma.run_club_leader_claims.findUnique({
+    where: { inviteTokenHash: hashInviteToken(trimmed) },
+    include: claimInclude,
+  });
+
+  if (!row) {
+    throw new AttachClubLeaderClaimError('INVITE_INVALID', 'Invite link is invalid or expired');
+  }
+
+  if (row.status === 'revoked') {
+    throw new AttachClubLeaderClaimError('CLAIM_REVOKED', 'This manager invite was revoked', {
+      clubName: row.run_clubs.name,
+    });
+  }
+
+  if (row.status === 'claimed') {
+    throw new AttachClubLeaderClaimError('CLAIM_ALREADY_USED', 'This manager invite was already claimed', {
+      clubName: row.run_clubs.name,
+    });
+  }
+
+  if (row.inviteExpiresAt && row.inviteExpiresAt < new Date()) {
+    throw new AttachClubLeaderClaimError('INVITE_EXPIRED', 'This invite link has expired');
+  }
+
+  const mapped = mapClaimRow(row);
+  return {
+    ...mapped,
+    claimId: row.id,
+    inviteExpiresAt: row.inviteExpiresAt,
+  };
+}
+
+export async function attachClubLeaderClaimByInviteToken(
+  athleteId: string,
+  athleteEmail: string | null | undefined,
+  inviteToken: string
+) {
+  const resolved = await resolveInviteByToken(inviteToken);
+  return attachClubLeaderClaim(athleteId, athleteEmail, resolved.claimId);
 }
 
 export async function findUnclaimedClaimsForEmail(email: string | null | undefined) {
@@ -230,6 +359,10 @@ export async function attachClubLeaderClaim(athleteId: string, athleteEmail: str
     throw new AttachClubLeaderClaimError('CLAIM_ALREADY_USED', 'This club-owner setup was already claimed', {
       clubName: claim.run_clubs.name,
     });
+  }
+
+  if (claim.inviteExpiresAt && claim.inviteExpiresAt < new Date()) {
+    throw new AttachClubLeaderClaimError('INVITE_EXPIRED', 'This invite link has expired');
   }
 
   if (claim.email !== normalizedEmail) {

@@ -204,7 +204,9 @@ export default function AthleteCreateProfilePage() {
 
       let nextPath = '/welcome';
       if (LocalStorageAPI.getClubOwnerMode()) {
-        nextPath = '/welcome-club-owner';
+        nextPath = LocalStorageAPI.getClubOwnerInviteToken()
+          ? '/clubowner/invite'
+          : '/welcome-club-owner';
       } else {
         const createCrewIntent = LocalStorageAPI.getRunCrewCreateIntent();
         if (createCrewIntent) {

@@ -64,8 +64,9 @@ function routeAfterAthleteResolved(
 
   if (opts.mode === 'club-owner') {
     LocalStorageAPI.setClubOwnerMode(true);
+    const inviteToken = LocalStorageAPI.getClubOwnerInviteToken();
     if (athlete.data?.gofastHandle) {
-      router.replace('/welcome-club-owner');
+      router.replace(inviteToken ? '/clubowner/invite' : '/welcome-club-owner');
     } else {
       router.replace('/athlete-create-profile');
     }

@@ -5,6 +5,7 @@ import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
 import {
   AttachClubLeaderClaimError,
   attachClubLeaderClaim,
+  attachClubLeaderClaimByInviteToken,
 } from '@/lib/domain-runclub-leader-claim';
 
 /**
@@ -18,13 +19,24 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = (await request.json()) as { claimId?: string };
+    const body = (await request.json()) as { claimId?: string; inviteToken?: string };
     const claimId = body.claimId?.trim();
-    if (!claimId) {
-      return NextResponse.json({ success: false, error: 'claimId is required' }, { status: 400 });
+    const inviteToken = body.inviteToken?.trim();
+
+    if (!claimId && !inviteToken) {
+      return NextResponse.json(
+        { success: false, error: 'claimId or inviteToken is required' },
+        { status: 400 }
+      );
     }
 
-    const result = await attachClubLeaderClaim(auth.athlete.id, auth.athlete.email, claimId);
+    const result = inviteToken
+      ? await attachClubLeaderClaimByInviteToken(
+          auth.athlete.id,
+          auth.athlete.email,
+          inviteToken
+        )
+      : await attachClubLeaderClaim(auth.athlete.id, auth.athlete.email, claimId!);
     return NextResponse.json({ success: true, ...result });
   } catch (err: unknown) {
     if (err instanceof AttachClubLeaderClaimError) {
