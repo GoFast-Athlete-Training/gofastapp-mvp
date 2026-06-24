@@ -2,10 +2,21 @@ import { adminAuth } from "@/lib/firebaseAdmin";
 import { getAthleteById } from "@/lib/domain-athlete";
 import { ATHLETE_ID_HEADER } from "@/lib/gofast-request-headers";
 
+export type RequireAthleteFromBearerSuccess = {
+  athlete: NonNullable<Awaited<ReturnType<typeof getAthleteById>>>;
+};
+
+export type RequireAthleteFromBearerFailure = {
+  error: string;
+  status: 400 | 401 | 403 | 404;
+};
+
 /**
  * Resolve the signed-in athlete: Firebase JWT proves identity; x-athlete-id is PK lookup (no firebaseId scan).
  */
-export async function requireAthleteFromBearer(request: Request) {
+export async function requireAthleteFromBearer(
+  request: Request
+): Promise<RequireAthleteFromBearerSuccess | RequireAthleteFromBearerFailure> {
   const athleteId = request.headers.get(ATHLETE_ID_HEADER)?.trim();
   if (!athleteId) {
     return {

@@ -42,6 +42,7 @@ export async function GET(request: Request) {
         runDate: cta.runDate,
         runClub: cta.runClub,
         hasCheckin: cta.hasCheckin,
+        checkedInAt: cta.checkedInAt,
         garminLinked: cta.garminLinked,
         activitySummary: cta.activitySummary,
         ctaTarget: cta.ctaTarget,
