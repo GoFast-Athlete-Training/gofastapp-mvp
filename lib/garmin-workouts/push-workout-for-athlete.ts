@@ -17,6 +17,7 @@ import { segmentSnapshotDocumentFromDbRows } from "@/lib/training/workout-segmen
 import { materializeWorkoutForPlanDay } from "@/lib/training/workout-materializer";
 import { expandSegmentsForGarminPush } from "@/lib/training/segment-summary";
 import { garminTitleForWorkout } from "@/lib/training/garmin-activity-match-helpers";
+import { canonicalPlannedWorkoutTitle } from "@/lib/training/workout-display-title";
 import { normalizePaceTargetEncodingVersion } from "@/lib/workout-generator/pace-calculator";
 import {
   type GarminPushMode,
@@ -226,8 +227,16 @@ export async function pushWorkoutToGarminForAthlete(
 
     const token = await requireGarminTokenFresh(athleteId);
 
+    const pushTitle =
+      canonicalPlannedWorkoutTitle({
+        title: workout.title,
+        workoutType: workout.workoutType,
+        dayAssigned: workout.dayAssigned,
+        planId: workout.planId,
+      }) ?? workout.title;
+
     const garminTitle = garminTitleForWorkout({
-      title: workout.title,
+      title: pushTitle,
       weekNumber: workout.weekNumber,
     });
 

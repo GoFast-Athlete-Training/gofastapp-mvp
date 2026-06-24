@@ -17,6 +17,12 @@ import {
   betweenRepRecoveryForMaterialization,
   type CatalogueBetweenRepRecovery,
 } from "@/lib/training/catalogue-interval-recovery";
+import {
+  parsePaceProfileFromJson,
+  resolveCataloguePaceSecPerMile,
+  type PaceResolutionContext,
+} from "@/lib/training/pace-key-resolver";
+import type { PaceProfile } from "@/lib/training/preset-strategy";
 
 /** One materialized segment step (matches legacy API / DB segment row shape). */
 export type WorkoutStep = {
@@ -130,11 +136,37 @@ function mpPaceSecPerMile(params: {
   return off != null ? Math.max(1, fitnessAnchorSec + off) : paces.marathon;
 }
 
-function isMilesWorkSegmentList(v: unknown): v is { miles: number; paceOffsetSecPerMile: number; reps?: number }[] {
+function buildPaceResolutionContext(params: {
+  anchorSecondsPerMile: number;
+  racePaceSecondsPerMile: number | null;
+  paceProfile: PaceProfile | null;
+}): PaceResolutionContext {
+  return {
+    fitnessAnchorSecPerMile: params.anchorSecondsPerMile,
+    racePaceSecPerMile: params.racePaceSecondsPerMile,
+    paceProfile: params.paceProfile,
+  };
+}
+
+function resolveSegmentPaceSecPerMile(
+  row: { paceKey?: unknown; paceOffsetSecPerMile?: number | null },
+  ctx: PaceResolutionContext
+): number | null {
+  const paceKey = typeof row.paceKey === "string" ? row.paceKey : null;
+  return resolveCataloguePaceSecPerMile({
+    paceKey,
+    legacyOffsetSecPerMile: row.paceOffsetSecPerMile,
+    ctx,
+  });
+}
+
+function isMilesWorkSegmentList(
+  v: unknown
+): v is Array<{ miles: number; paceOffsetSecPerMile?: number | null; paceKey?: string | null; reps?: number }> {
   if (!Array.isArray(v) || v.length === 0) return false;
   for (const row of v) {
     if (row == null || typeof row !== "object" || Array.isArray(row)) return false;
-    const o = row as { miles?: unknown; paceOffsetSecPerMile?: unknown };
+    const o = row as { miles?: unknown; paceOffsetSecPerMile?: unknown; paceKey?: unknown };
     const m = o.miles;
     if (m == null || !Number.isFinite(Number(m)) || Number(m) <= 0) return false;
   }
@@ -171,7 +203,11 @@ function isIntervalWorkSegmentList(
  */
 type IntervalBlockRepeatPayload = {
   layout: "blockRepeat";
-  segments: Array<{ distanceMeters: number; paceOffsetSecPerMile: number | null }>;
+  segments: Array<{
+    distanceMeters: number;
+    paceOffsetSecPerMile: number | null;
+    paceKey?: string | null;
+  }>;
   repeatCount: number;
   recoveryBetweenCyclesSeconds?: number;
 };
@@ -185,7 +221,11 @@ function parseIntervalBlockRepeatPayload(v: unknown): IntervalBlockRepeatPayload
   const parsedSegs: IntervalBlockRepeatPayload["segments"] = [];
   for (const row of segments) {
     if (row == null || typeof row !== "object" || Array.isArray(row)) return null;
-    const r = row as { distanceMeters?: unknown; paceOffsetSecPerMile?: unknown };
+    const r = row as {
+      distanceMeters?: unknown;
+      paceOffsetSecPerMile?: unknown;
+      paceKey?: unknown;
+    };
     const dm = Number(r.distanceMeters);
     if (!Number.isFinite(dm) || dm <= 0) return null;
     let paceOffsetSecPerMile: number | null = null;
@@ -200,6 +240,7 @@ function parseIntervalBlockRepeatPayload(v: unknown): IntervalBlockRepeatPayload
     parsedSegs.push({
       distanceMeters: Math.round(dm),
       paceOffsetSecPerMile,
+      paceKey: typeof r.paceKey === "string" ? r.paceKey : null,
     });
   }
   const rc = Number(o.repeatCount);
@@ -224,7 +265,11 @@ function parseIntervalBlockRepeatPayload(v: unknown): IntervalBlockRepeatPayload
  */
 type TempoBlockRepeatPayload = {
   layout: "blockRepeat";
-  segments: Array<{ miles: number; paceOffsetSecPerMile: number | null }>;
+  segments: Array<{
+    miles: number;
+    paceOffsetSecPerMile: number | null;
+    paceKey?: string | null;
+  }>;
   repeatCount: number;
   recoveryBetweenCyclesSeconds?: number;
 };
@@ -238,7 +283,7 @@ function parseTempoBlockRepeatPayload(v: unknown): TempoBlockRepeatPayload | nul
   const parsedSegs: TempoBlockRepeatPayload["segments"] = [];
   for (const row of segments) {
     if (row == null || typeof row !== "object" || Array.isArray(row)) return null;
-    const r = row as { miles?: unknown; paceOffsetSecPerMile?: unknown };
+    const r = row as { miles?: unknown; paceOffsetSecPerMile?: unknown; paceKey?: unknown };
     const mi = Number(r.miles);
     if (!Number.isFinite(mi) || mi <= 0) return null;
     let paceOffsetSecPerMile: number | null = null;
@@ -253,6 +298,7 @@ function parseTempoBlockRepeatPayload(v: unknown): TempoBlockRepeatPayload | nul
     parsedSegs.push({
       miles: round(mi, 4),
       paceOffsetSecPerMile,
+      paceKey: typeof r.paceKey === "string" ? r.paceKey : null,
     });
   }
   const rc = Number(o.repeatCount);
@@ -276,8 +322,9 @@ function buildSustainedWorkoutBlock(params: {
   totalMiles: number;
   anchorSecondsPerMile: number;
   title: string;
+  paceCtx: PaceResolutionContext;
 }): WorkoutStep[] {
-  const { entry, totalMiles, anchorSecondsPerMile, title } = params;
+  const { entry, totalMiles, anchorSecondsPerMile, title, paceCtx } = params;
   const warmupM = entry.warmupMiles ?? round(totalMiles * 0.15, 2);
   const cooldownM = entry.cooldownMiles ?? round(totalMiles * 0.15, 2);
   const prescribedMain = entry.workBaseMiles;
@@ -287,7 +334,11 @@ function buildSustainedWorkoutBlock(params: {
       : Math.max(0.25, totalMiles - warmupM - cooldownM),
     2
   );
-  const workPace = secPerMile(anchorSecondsPerMile, entry.workPaceOffsetSecPerMile);
+  const workPace = resolveCataloguePaceSecPerMile({
+    paceKey: null,
+    legacyOffsetSecPerMile: entry.workPaceOffsetSecPerMile,
+    ctx: paceCtx,
+  });
   let order = 1;
   const out: WorkoutStep[] = [];
   if (warmupM > 0) {
@@ -324,8 +375,10 @@ export function prescribe(params: {
   anchorSecondsPerMile: number;
   racePaceSecondsPerMile?: number | null;
   planCycleIndex?: number | null;
-  /** When set (e.g. plan easyRunConfig), overrides catalogue work pace offset for Easy type only. */
+  /** When set (e.g. plan easyRunConfig), overrides catalogue work pace offset for Easy type only. Legacy fallback when no paceKey. */
   easyWorkPaceOffsetOverrideSecPerMile?: number | null;
+  /** Preset pace profile — catalogue paceKeys resolve through this before legacy offsets. */
+  paceProfile?: PaceProfile | null;
 }): WorkoutStep[] {
   const {
     entry,
@@ -334,17 +387,30 @@ export function prescribe(params: {
     racePaceSecondsPerMile = null,
     planCycleIndex = null,
     easyWorkPaceOffsetOverrideSecPerMile = null,
+    paceProfile = null,
   } = params;
   const totalMiles = scheduleMiles;
+  const paceCtx = buildPaceResolutionContext({
+    anchorSecondsPerMile,
+    racePaceSecondsPerMile,
+    paceProfile: paceProfile ?? null,
+  });
 
   const type = entry.workoutType as WorkoutType;
 
   if (type === "Easy") {
-    const workOffset =
-      easyWorkPaceOffsetOverrideSecPerMile != null &&
-      Number.isFinite(easyWorkPaceOffsetOverrideSecPerMile)
-        ? easyWorkPaceOffsetOverrideSecPerMile
-        : entry.workPaceOffsetSecPerMile;
+    const legacyWorkOffset =
+      paceProfile != null
+        ? entry.workPaceOffsetSecPerMile
+        : easyWorkPaceOffsetOverrideSecPerMile != null &&
+            Number.isFinite(easyWorkPaceOffsetOverrideSecPerMile)
+          ? easyWorkPaceOffsetOverrideSecPerMile
+          : entry.workPaceOffsetSecPerMile;
+    const workPaceSec = resolveCataloguePaceSecPerMile({
+      paceKey: null,
+      legacyOffsetSecPerMile: legacyWorkOffset,
+      ctx: paceCtx,
+    });
     const warmupM = entry.warmupMiles != null && entry.warmupMiles > 0 ? round(entry.warmupMiles, 2) : 0;
     const cooldownM =
       entry.cooldownMiles != null && entry.cooldownMiles > 0 ? round(entry.cooldownMiles, 2) : 0;
@@ -371,7 +437,7 @@ export function prescribe(params: {
         title: "Work",
         durationType: "DISTANCE",
         durationValue: round(workM, 2),
-        ...targetsOrOpen(secPerMile(anchorSecondsPerMile, workOffset)),
+        ...targetsOrOpen(workPaceSec),
       });
     }
     if (cooldownM > 0) {
@@ -387,7 +453,11 @@ export function prescribe(params: {
   }
 
   if (type === "LongRun") {
-    const longP = secPerMile(anchorSecondsPerMile, entry.workPaceOffsetSecPerMile);
+    const longP = resolveCataloguePaceSecPerMile({
+      paceKey: null,
+      legacyOffsetSecPerMile: entry.workPaceOffsetSecPerMile,
+      ctx: paceCtx,
+    });
     const mpP = mpPaceSecPerMile({
       entry,
       fitnessAnchorSec: anchorSecondsPerMile,
@@ -415,8 +485,12 @@ export function prescribe(params: {
         const m = round(Math.max(0, Number(seg.miles)), 2);
         if (m <= 0) continue;
         sumSeg += m;
-        const row = seg as { miles?: number; paceOffsetSecPerMile?: number | null };
-        const p = secPerMile(anchorSecondsPerMile, row.paceOffsetSecPerMile);
+        const row = seg as {
+          miles?: number;
+          paceOffsetSecPerMile?: number | null;
+          paceKey?: string | null;
+        };
+        const p = resolveSegmentPaceSecPerMile(row, paceCtx);
         const segTitle =
           p != null && Math.abs(p - mpP) <= 8
             ? "Goal marathon pace"
@@ -640,7 +714,11 @@ export function prescribe(params: {
         entry.warmupMiles != null && entry.warmupMiles > 0 ? round(entry.warmupMiles, 2) : 0;
       const cooldownM =
         entry.cooldownMiles != null && entry.cooldownMiles > 0 ? round(entry.cooldownMiles, 2) : 0;
-      const recPace = secPerMile(anchorSecondsPerMile, entry.recoveryPaceOffsetSecPerMile);
+      const recPace = resolveCataloguePaceSecPerMile({
+        paceKey: "recoveryJog",
+        legacyOffsetSecPerMile: entry.recoveryPaceOffsetSecPerMile,
+        ctx: paceCtx,
+      });
       const repeatCount = Math.max(1, tempoBlockRepeat.repeatCount);
       const recSec = tempoBlockRepeat.recoveryBetweenCyclesSeconds;
       const recMinutes =
@@ -659,7 +737,7 @@ export function prescribe(params: {
       }
       for (let c = 0; c < repeatCount; c++) {
         for (const seg of tempoBlockRepeat.segments) {
-          const tp = secPerMile(anchorSecondsPerMile, seg.paceOffsetSecPerMile);
+          const tp = resolveSegmentPaceSecPerMile(seg, paceCtx);
           out.push({
             stepOrder: order++,
             title: "Tempo",
@@ -711,9 +789,9 @@ export function prescribe(params: {
         if (m <= 0) continue;
         const repsRaw = (seg as { reps?: unknown }).reps;
         const reps = Math.max(1, Math.round(Number(repsRaw) || 1));
-        const tp = secPerMile(
-          anchorSecondsPerMile,
-          (seg as { paceOffsetSecPerMile?: number | null }).paceOffsetSecPerMile
+        const tp = resolveSegmentPaceSecPerMile(
+          seg as { paceKey?: string | null; paceOffsetSecPerMile?: number | null },
+          paceCtx
         );
         for (let r = 0; r < reps; r++) {
           sumSeg += m;
@@ -731,7 +809,11 @@ export function prescribe(params: {
         2
       );
       if (remain > 0.05) {
-        const mainP = secPerMile(anchorSecondsPerMile, entry.workPaceOffsetSecPerMile);
+        const mainP = resolveCataloguePaceSecPerMile({
+          paceKey: null,
+          legacyOffsetSecPerMile: entry.workPaceOffsetSecPerMile,
+          ctx: paceCtx,
+        });
         out.push({
           stepOrder: order++,
           title: "Tempo",
@@ -756,6 +838,7 @@ export function prescribe(params: {
       totalMiles,
       anchorSecondsPerMile,
       title: "Tempo",
+      paceCtx,
     });
   }
 
@@ -765,7 +848,11 @@ export function prescribe(params: {
     if (blockRepeat) {
       const warmupM = entry.warmupMiles ?? round(totalMiles * 0.15, 2);
       const cooldownM = entry.cooldownMiles ?? round(totalMiles * 0.15, 2);
-      const recPace = secPerMile(anchorSecondsPerMile, entry.recoveryPaceOffsetSecPerMile);
+      const recPace = resolveCataloguePaceSecPerMile({
+        paceKey: "recoveryJog",
+        legacyOffsetSecPerMile: entry.recoveryPaceOffsetSecPerMile,
+        ctx: paceCtx,
+      });
       const repeatCount = Math.max(1, blockRepeat.repeatCount);
       const recSec = blockRepeat.recoveryBetweenCyclesSeconds;
       const recMinutes =
@@ -784,7 +871,7 @@ export function prescribe(params: {
       }
       for (let c = 0; c < repeatCount; c++) {
         for (const seg of blockRepeat.segments) {
-          const intP = secPerMile(anchorSecondsPerMile, seg.paceOffsetSecPerMile);
+          const intP = resolveSegmentPaceSecPerMile(seg, paceCtx);
           out.push({
             stepOrder: order++,
             title: "Interval",
@@ -822,13 +909,21 @@ export function prescribe(params: {
       });
       const warmupM = entry.warmupMiles ?? round(totalMiles * 0.15, 2);
       const cooldownM = entry.cooldownMiles ?? round(totalMiles * 0.15, 2);
-      const recPace = secPerMile(anchorSecondsPerMile, entry.recoveryPaceOffsetSecPerMile);
-      const flat: { dm: number; off: number | null | undefined }[] = [];
+      const recPace = resolveCataloguePaceSecPerMile({
+        paceKey: "recoveryJog",
+        legacyOffsetSecPerMile: entry.recoveryPaceOffsetSecPerMile,
+        ctx: paceCtx,
+      });
+      const flat: { dm: number; off: number | null | undefined; paceKey?: string | null }[] = [];
       for (const seg of ij) {
         const n = Math.max(1, Math.round(seg.reps ?? 1));
         for (let r = 0; r < n; r++) {
-          const row = seg as { distanceMeters: number; paceOffsetSecPerMile?: number | null };
-          flat.push({ dm: row.distanceMeters, off: row.paceOffsetSecPerMile });
+          const row = seg as {
+            distanceMeters: number;
+            paceOffsetSecPerMile?: number | null;
+            paceKey?: string | null;
+          };
+          flat.push({ dm: row.distanceMeters, off: row.paceOffsetSecPerMile, paceKey: row.paceKey });
         }
       }
       let order = 1;
@@ -846,7 +941,10 @@ export function prescribe(params: {
         if (i > 0) {
           order = appendBetweenRepRecoveryStep(out, order, flatRepRecovery, recPace);
         }
-        const intP = secPerMile(anchorSecondsPerMile, flat[i]!.off);
+        const intP = resolveSegmentPaceSecPerMile(
+          { paceOffsetSecPerMile: flat[i]!.off, paceKey: flat[i]!.paceKey },
+          paceCtx
+        );
         out.push({
           stepOrder: order++,
           title: "Interval",
@@ -869,7 +967,11 @@ export function prescribe(params: {
   }
 
   if (type === "Race") {
-    const pace = secPerMile(anchorSecondsPerMile, entry.workPaceOffsetSecPerMile);
+    const pace = resolveCataloguePaceSecPerMile({
+      paceKey: "fiveKPace",
+      legacyOffsetSecPerMile: entry.workPaceOffsetSecPerMile,
+      ctx: paceCtx,
+    });
     return [
       {
         stepOrder: 1,
@@ -889,8 +991,16 @@ export function prescribe(params: {
   });
   const warmupM = entry.warmupMiles ?? round(totalMiles * 0.15, 2);
   const cooldownM = entry.cooldownMiles ?? round(totalMiles * 0.15, 2);
-  const intPace = secPerMile(anchorSecondsPerMile, entry.workBasePaceOffsetSecPerMile);
-  const recPace = secPerMile(anchorSecondsPerMile, entry.recoveryPaceOffsetSecPerMile);
+  const intPace = resolveCataloguePaceSecPerMile({
+    paceKey: "threshold",
+    legacyOffsetSecPerMile: entry.workBasePaceOffsetSecPerMile,
+    ctx: paceCtx,
+  });
+  const recPace = resolveCataloguePaceSecPerMile({
+    paceKey: "recoveryJog",
+    legacyOffsetSecPerMile: entry.recoveryPaceOffsetSecPerMile,
+    ctx: paceCtx,
+  });
 
   let order = 1;
   const out: WorkoutStep[] = [];

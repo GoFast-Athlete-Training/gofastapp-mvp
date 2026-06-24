@@ -61,6 +61,27 @@ function bookendSteps(steps: ReturnType<typeof prescribe>) {
   });
 }
 
+test("LongRun segment paceKey resolves through preset paceProfile", () => {
+  const steps = prescribe({
+    entry: baseCatalogue({
+      workoutType: "LongRun",
+      workPaceOffsetSecPerMile: 90,
+      segmentPaceDist: [
+        { miles: 3, paceKey: "steady" },
+        { miles: 2, paceKey: "moderate" },
+      ] as unknown as workout_catalogue["segmentPaceDist"],
+    }),
+    scheduleMiles: 8,
+    anchorSecondsPerMile: ANCHOR_SEC,
+    paceProfile: {
+      steady: { anchor: "current5k", offsetSecPerMile: 90 },
+      moderate: { anchor: "current5k", offsetSecPerMile: 60 },
+    },
+  });
+  const paced = steps.filter((s) => s.targets?.length);
+  assert.ok(paced.length >= 2, "expected paceKey-resolved segment targets");
+});
+
 test("sustained Tempo keeps bookend miles but omits pace targets even when offsets are set", () => {
   const steps = prescribe({
     entry: baseCatalogue({ workoutType: "Tempo", workPaceOffsetSecPerMile: 30 }),

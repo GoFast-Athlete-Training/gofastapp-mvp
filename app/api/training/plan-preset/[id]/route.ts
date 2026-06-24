@@ -11,6 +11,10 @@ import {
   parseEasyRunConfigJson,
 } from "@/lib/training/easy-run-config";
 import { validatePresetRotationConfigs } from "@/lib/training/run-type-config-validation";
+import {
+  parsePresetStrategyFromBody,
+  presetStrategyToPrismaJson,
+} from "@/lib/training/preset-strategy";
 
 function isDow1to7(n: number): boolean {
   return Number.isInteger(n) && n >= 1 && n <= 7;
@@ -194,6 +198,12 @@ export async function PATCH(
         ) as Prisma.InputJsonValue;
       }
     }
+
+    const strategyParsed = parsePresetStrategyFromBody(bodyRec);
+    if (!strategyParsed.ok) {
+      return NextResponse.json({ success: false, error: strategyParsed.error }, { status: 400 });
+    }
+    Object.assign(presetData, presetStrategyToPrismaJson(strategyParsed.value));
 
     type ConnectKey = "longRunConfig" | "intervalsConfig" | "tempoConfig" | "easyConfig";
     const connectFields: {

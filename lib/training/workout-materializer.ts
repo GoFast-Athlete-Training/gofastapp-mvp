@@ -24,6 +24,7 @@ import { resolveGoalRacePace } from "./goal-pace-calculator";
 import { EASY_RUN_NOT_CONFIGURED } from "./run-type-config-validation";
 import { ensureWorkoutPrescriptionNarrative } from "./prescription-narrative-service";
 import { loadCatalogueTitleByIdFromPlanSchedule } from "./catalogue-title-map";
+import { parsePaceProfileFromJson } from "./pace-key-resolver";
 
 export class MaterializeWorkoutError extends Error {
   constructor(message: string) {
@@ -220,6 +221,11 @@ async function buildPrescriptionSteps(params: {
     goalDistance: plan.athlete_goal?.distance ?? null,
   }).goalPaceSecPerMile;
 
+  const paceProfile = parsePaceProfileFromJson(
+    (plan as { training_plan_preset?: { paceProfile?: unknown } | null }).training_plan_preset
+      ?.paceProfile ?? null
+  );
+
   return prescribe({
     entry: catalogueEntryForDay,
     scheduleMiles: miles,
@@ -227,6 +233,7 @@ async function buildPrescriptionSteps(params: {
     racePaceSecondsPerMile: racePaceSec,
     planCycleIndex: scheduled.planCycleIndex ?? null,
     easyWorkPaceOffsetOverrideSecPerMile: null,
+    paceProfile,
   });
 }
 
@@ -258,6 +265,9 @@ export async function materializeWorkoutForPlanDay(params: {
           distanceMeters: true,
           distanceLabel: true,
         },
+      },
+      training_plan_preset: {
+        select: { paceProfile: true },
       },
     },
   });

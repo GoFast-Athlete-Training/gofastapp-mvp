@@ -119,6 +119,8 @@ export async function buildPlanWeekCards(params: {
         scheduleTitle: s.title,
         workoutType,
         estimatedDistanceInMeters,
+        dayAssigned: s.dayAssigned,
+        planId: params.planId,
       }),
       workoutType,
       phase: s.phase,

@@ -1230,6 +1230,21 @@ model run_crews {
 }
 
 /// Top-level generation preset (e.g. Elite Marathon, Basic, Marine Corps Marathon).
+enum AthletePersonaCapability {
+  NON_RUNNER
+  BEGINNER
+  RECREATIONAL
+  COMPETITIVE
+  ELITE
+}
+
+enum AthletePersonaDedication {
+  LOW
+  MODERATE
+  HIGH
+  ELITE
+}
+
 model training_plan_preset {
   id          String  @id @default(cuid())
   slug        String  @unique
@@ -1239,6 +1254,18 @@ model training_plan_preset {
   publicDescription String?
   /// Canonical distance label (e.g. "Marathon") from COMMON_RACE_DISTANCE_PRESETS; null = any distance.
   targetDistanceLabel String?
+
+  /// Staff/coach free-text intent that drove preset design (AI or manual).
+  coachIntent String?
+  /// What this plan is trying to achieve, e.g. "First 5K finish" or "Marathon BQ attempt".
+  objectiveOfPlan String?
+  athletePersonaCapability AthletePersonaCapability?
+  athletePersonaGoal String?
+  athletePersonaDedication AthletePersonaDedication?
+  /// Generation-useful overview: volume, composition, long-run / quality structure families.
+  coachPlanOverview Json?
+  /// Named pace keys → anchor + offset; catalogue segment paceKeys resolve through this at materialization.
+  paceProfile Json?
 
   /// Long-run rotation block: one long run per week for this many consecutive weeks (LR1…LRn) before the pattern repeats; drives pool stepping and placement.
   cycleLen           Int    @default(4)

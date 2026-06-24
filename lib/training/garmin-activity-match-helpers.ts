@@ -1,4 +1,5 @@
 import { ymdFromDate } from "@/lib/training/plan-utils";
+import { canonicalPlannedWorkoutTitle } from "@/lib/training/workout-display-title";
 
 /** Avoid double-prefixing when title already has GF W1: or W1: style week label. */
 export function garminTitleForWorkout(workout: {
@@ -66,7 +67,44 @@ export function utcDayRangeFromYmd(ymd: string): { start: Date; end: Date } {
   return { start, end };
 }
 
-export function activityNameContainsPushedWorkoutTitle(params: {
+/** UTC day range for ±1 day around activity local date (DB query window). */
+export function activityMatchCandidateUtcRange(activityYmd: string): {
+  start: Date;
+  end: Date;
+} {
+  const prev = new Date(`${activityYmd}T00:00:00.000Z`);
+  prev.setUTCDate(prev.getUTCDate() - 1);
+  const end = utcDayRangeFromYmd(activityYmd).end;
+  end.setUTCDate(end.getUTCDate() + 1);
+  return { start: prev, end };
+}
+
+/** Stored title plus canonical day/type alias for Garmin activity matching. */
+export function workoutTitleMatchVariants(params: {
+  workoutTitle: string;
+  weekNumber: number | null;
+  workoutType?: string | null;
+  dayAssigned?: string | null;
+  planId?: string | null;
+}): string[] {
+  const stored = params.workoutTitle.trim();
+  const variants = new Set<string>();
+  if (stored.length > 0) variants.add(stored);
+
+  if (params.workoutType?.trim()) {
+    const canonical = canonicalPlannedWorkoutTitle({
+      title: stored,
+      workoutType: params.workoutType.trim(),
+      dayAssigned: params.dayAssigned,
+      planId: params.planId,
+    });
+    if (canonical) variants.add(canonical);
+  }
+
+  return [...variants];
+}
+
+function activityNameContainsSingleWorkoutTitle(params: {
   activityName: string | null | undefined;
   workoutTitle: string;
   weekNumber: number | null;
@@ -88,4 +126,22 @@ export function activityNameContainsPushedWorkoutTitle(params: {
     return true;
   }
   return pushedTitle.length > 0 && activityName.includes(pushedTitle);
+}
+
+export function activityNameContainsPushedWorkoutTitle(params: {
+  activityName: string | null | undefined;
+  workoutTitle: string;
+  weekNumber: number | null;
+  workoutType?: string | null;
+  dayAssigned?: string | null;
+  planId?: string | null;
+}): boolean {
+  const variants = workoutTitleMatchVariants(params);
+  return variants.some((title) =>
+    activityNameContainsSingleWorkoutTitle({
+      activityName: params.activityName,
+      workoutTitle: title,
+      weekNumber: params.weekNumber,
+    })
+  );
 }

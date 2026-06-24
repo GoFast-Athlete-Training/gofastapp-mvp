@@ -186,13 +186,15 @@ interface Workout {
 
 function workoutListTitle(w: Pick<
   Workout,
-  "title" | "workoutType" | "estimatedDistanceInMeters" | "workout_catalogue" | "catalogueName"
+  "title" | "workoutType" | "estimatedDistanceInMeters" | "workout_catalogue" | "catalogueName" | "dayAssigned" | "planId"
 >): string {
   return displayWorkoutListTitle({
     title: w.title,
     workoutType: w.workoutType,
     estimatedDistanceInMeters: w.estimatedDistanceInMeters ?? null,
     catalogueName: w.catalogueName ?? w.workout_catalogue?.name ?? null,
+    dayAssigned: w.dayAssigned,
+    planId: w.planId,
   });
 }
 

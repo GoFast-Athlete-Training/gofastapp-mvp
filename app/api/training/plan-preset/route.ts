@@ -11,6 +11,10 @@ import {
 } from "@/lib/training/easy-run-config";
 import { Prisma } from "@prisma/client";
 import { validatePresetRotationConfigs } from "@/lib/training/run-type-config-validation";
+import {
+  parsePresetStrategyFromBody,
+  presetStrategyToPrismaJson,
+} from "@/lib/training/preset-strategy";
 
 function slugifyPresetTitle(title: string): string {
   const s = title
@@ -249,6 +253,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const strategyParsed = parsePresetStrategyFromBody(body as Record<string, unknown>);
+    if (!strategyParsed.ok) {
+      return NextResponse.json({ success: false, error: strategyParsed.error }, { status: 400 });
+    }
+    const strategyData = presetStrategyToPrismaJson(strategyParsed.value);
+
     const presetData: Prisma.training_plan_presetCreateInput = {
       slug,
       title: String(title).trim(),
@@ -293,6 +303,7 @@ export async function POST(request: NextRequest) {
       ...(easyRunConfigCreate !== undefined
         ? { easyRunConfig: easyRunConfigCreate }
         : {}),
+      ...strategyData,
     };
 
     const rotationPreset = {

@@ -192,6 +192,9 @@ export async function GET(request: NextRequest, ctx: Ctx) {
         weekNumber: workout.weekNumber,
         date: workout.date,
         estimatedDistanceInMeters: workout.estimatedDistanceInMeters,
+        workoutType: workout.workoutType,
+        dayAssigned: workout.dayAssigned,
+        planId: workout.planId,
       },
       activities: runningActivities.map((a) => ({
         id: a.id,

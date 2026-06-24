@@ -13,6 +13,7 @@ import type { Prisma, WorkoutType } from "@prisma/client";
 import { segmentSnapshotDocumentFromApiSegments } from "@/lib/training/workout-segment-snapshot";
 import { isStructuredPlanWeek } from "@/lib/training/plan-schedule-schema";
 import { parseEasyRunConfigJson } from "@/lib/training/easy-run-config";
+import { parsePaceProfileFromJson } from "@/lib/training/pace-key-resolver";
 import { ensureWorkoutPrescriptionNarrative } from "@/lib/training/prescription-narrative-service";
 import { computeWorkoutPerformanceAnalysis } from "@/lib/training/workout-performance-analysis";
 
@@ -164,6 +165,9 @@ export async function GET(request: NextRequest, context: Ctx) {
                   distanceLabel: true,
                 },
               },
+              training_plan_preset: {
+                select: { paceProfile: true },
+              },
             },
           },
           matched_activity: {
@@ -242,6 +246,9 @@ export async function GET(request: NextRequest, context: Ctx) {
           const easyCfg = parseEasyRunConfigJson(
             workout.training_plans?.easyRunConfig ?? null
           );
+          const paceProfile = parsePaceProfileFromJson(
+            workout.training_plans?.training_plan_preset?.paceProfile ?? null
+          );
           apiSegs = prescribe({
             entry: workout.workout_catalogue,
             scheduleMiles,
@@ -249,9 +256,10 @@ export async function GET(request: NextRequest, context: Ctx) {
             racePaceSecondsPerMile,
             planCycleIndex: planCycleIndex ?? workout.planCycleIndex ?? null,
             easyWorkPaceOffsetOverrideSecPerMile:
-              workout.workoutType === "Easy"
+              workout.workoutType === "Easy" && paceProfile == null
                 ? easyCfg.paceOffsetSecPerMile
                 : null,
+            paceProfile,
           });
         }
 

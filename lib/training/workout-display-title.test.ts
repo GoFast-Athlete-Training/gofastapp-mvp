@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  canonicalPlannedWorkoutTitle,
   displayWorkoutListTitle,
   formatPlannedWorkoutTitle,
   isGeneratedGenericWorkoutTitle,
@@ -73,6 +74,51 @@ test("isGeneratedGenericWorkoutTitle keeps catalogue-specific names", () => {
   );
 });
 
+test("canonicalPlannedWorkoutTitle returns day + type for planned workouts", () => {
+  assert.equal(
+    canonicalPlannedWorkoutTitle({
+      title: "2-1 Tempo",
+      workoutType: "Tempo",
+      dayAssigned: "Tuesday",
+      planId: "plan-1",
+    }),
+    "Tuesday Tempo"
+  );
+  assert.equal(
+    canonicalPlannedWorkoutTitle({
+      title: "Easy 6 miles",
+      workoutType: "Easy",
+      dayAssigned: "Friday",
+      planId: "plan-1",
+    }),
+    "Friday Easy"
+  );
+});
+
+test("canonicalPlannedWorkoutTitle returns null for standalone workouts", () => {
+  assert.equal(
+    canonicalPlannedWorkoutTitle({
+      title: "Morning jog",
+      workoutType: "Easy",
+      dayAssigned: "Tuesday",
+      planId: null,
+    }),
+    null
+  );
+});
+
+test("mergePlanDayTitle prefers canonical day/type over catalogue row title", () => {
+  const merged = mergePlanDayTitle({
+    rowTitle: "2-1 Tempo",
+    scheduleTitle: "2-1 Tempo",
+    workoutType: "Tempo",
+    estimatedDistanceInMeters: SIX_MILES_METERS,
+    dayAssigned: "Tuesday",
+    planId: "plan-1",
+  });
+  assert.equal(merged, "Tuesday Tempo");
+});
+
 test("mergePlanDayTitle prefers schedule catalogue title over generic row title", () => {
   const merged = mergePlanDayTitle({
     rowTitle: "Tempo work 6 miles",
@@ -103,7 +149,19 @@ test("mergePlanDayTitle keeps custom stored row title", () => {
   assert.equal(merged, "My custom tempo");
 });
 
-test("resolveWorkoutDisplayTitle prefers catalogue name on workout detail", () => {
+test("resolveWorkoutDisplayTitle prefers canonical title on planned workout detail", () => {
+  const title = resolveWorkoutDisplayTitle({
+    title: "2-1 Tempo",
+    workoutType: "Tempo",
+    estimatedDistanceInMeters: SIX_MILES_METERS,
+    catalogueName: "2-1 Tempo",
+    dayAssigned: "Tuesday",
+    planId: "plan-1",
+  });
+  assert.equal(title, "Tuesday Tempo");
+});
+
+test("resolveWorkoutDisplayTitle prefers catalogue name on workout detail without plan", () => {
   const title = resolveWorkoutDisplayTitle({
     title: "Tempo work 6 miles",
     workoutType: "Tempo",

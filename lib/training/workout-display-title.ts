@@ -28,6 +28,43 @@ function normalizeDayAssigned(dayAssigned: string | null | undefined): string | 
   return match ?? null;
 }
 
+function workoutTypeShortLabel(workoutType: string): string {
+  switch (workoutType) {
+    case "Easy":
+      return "Easy";
+    case "Tempo":
+      return "Tempo";
+    case "Intervals":
+      return "Intervals";
+    case "LongRun":
+      return "Long run";
+    case "Race":
+      return "Race";
+    default:
+      return "Workout";
+  }
+}
+
+/**
+ * Short day + type label for planned workouts, e.g. "Tuesday Tempo".
+ * Used for list display, Garmin push names, and activity title matching.
+ */
+export function canonicalPlannedWorkoutTitle(workout: {
+  title: string;
+  workoutType: string;
+  dayAssigned?: string | null;
+  planId?: string | null;
+}): string | null {
+  if (workout.planId == null) return null;
+  const raw = workout.title.trim();
+  if (/^Race\s*—/i.test(raw) || workout.workoutType === "Race") {
+    return raw.length > 0 ? raw : null;
+  }
+  const day = normalizeDayAssigned(workout.dayAssigned);
+  if (!day) return null;
+  return `${day} ${workoutTypeShortLabel(workout.workoutType)}`;
+}
+
 /** Strip a leading weekday from titles like "Monday Easy 6 miles". */
 export function stripLeadingDayNameFromTitle(title: string): string {
   const raw = title.trim();
@@ -142,9 +179,14 @@ export function resolveWorkoutDisplayTitle(workout: {
   estimatedDistanceInMeters: number | null;
   catalogueName?: string | null;
   scheduleTitle?: string | null;
+  dayAssigned?: string | null;
+  planId?: string | null;
 }): string {
   const raw = workout.title.trim();
   if (/^Race\s*—/i.test(raw)) return raw;
+
+  const canonical = canonicalPlannedWorkoutTitle(workout);
+  if (canonical) return canonical;
 
   const catalogueName = workout.catalogueName?.trim() || null;
   const scheduleTitle = workout.scheduleTitle?.trim() || null;
@@ -192,6 +234,8 @@ export function displayWorkoutListTitle(workout: {
   estimatedDistanceInMeters: number | null;
   catalogueName?: string | null;
   scheduleTitle?: string | null;
+  dayAssigned?: string | null;
+  planId?: string | null;
 }): string {
   return resolveWorkoutDisplayTitle(workout);
 }
@@ -202,7 +246,17 @@ export function mergePlanDayTitle(params: {
   scheduleTitle: string;
   workoutType: string;
   estimatedDistanceInMeters: number | null;
+  dayAssigned?: string | null;
+  planId?: string | null;
 }): string {
+  const canonical = canonicalPlannedWorkoutTitle({
+    title: params.rowTitle?.trim() || params.scheduleTitle,
+    workoutType: params.workoutType,
+    dayAssigned: params.dayAssigned,
+    planId: params.planId,
+  });
+  if (canonical) return canonical;
+
   const rowTitle = params.rowTitle?.trim() ?? "";
   if (
     rowTitle &&

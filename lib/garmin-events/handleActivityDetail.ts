@@ -8,9 +8,12 @@ import { prisma } from "../prisma";
 import { getAthleteByGarminUserId } from "../domain-garmin";
 import { activityExists } from "./dedupe";
 import { normalizeActivityFields } from "./normalizeActivityFields";
-import { RUNNING_ACTIVITY_TYPES } from "../training/activity-type-sets";
+import { isCyclingActivityType, RUNNING_ACTIVITY_TYPES } from "../training/activity-type-sets";
 import { parseMatchedActivityToSegmentExecution } from "../training/activity-to-segment-execution";
 import { tryMatchActivityToCityRun } from "../cta-triggers/try-match-activity-to-city-run";
+import { tryMatchActivityToTrainingWorkout } from "../training/match-activity-to-workout";
+import { tryMatchActivityToBikeWorkout } from "../training/match-activity-to-bike-workout";
+import { promoteUnmatchedRunningActivityToWorkout } from "../training/promote-activity-to-workout";
 
 export interface ActivityDetail {
   activityId?: string | number;
@@ -109,6 +112,30 @@ async function runDetailHydrationPipeline(rowId: string, detailData: object): Pr
   }
 }
 
+/** Same training/bike match + promote pipeline as activity summary ingest. */
+async function runPostIngestActivityMatching(params: {
+  activityId: string;
+  activityType: string | null | undefined;
+}): Promise<void> {
+  try {
+    if (isCyclingActivityType(params.activityType)) {
+      await tryMatchActivityToBikeWorkout(params.activityId);
+      return;
+    }
+
+    const matchResult = await tryMatchActivityToTrainingWorkout(params.activityId);
+    const ingestRow = await prisma.athlete_activities.findUnique({
+      where: { id: params.activityId },
+      select: { ingestionStatus: true },
+    });
+    if (!matchResult.matched && ingestRow?.ingestionStatus === "UNMATCHED") {
+      await promoteUnmatchedRunningActivityToWorkout(params.activityId);
+    }
+  } catch (matchErr) {
+    console.warn("runPostIngestActivityMatching:", matchErr);
+  }
+}
+
 /**
  * Process activity detail webhook
  */
@@ -169,6 +196,10 @@ export async function handleActivityDetail(
           },
         });
         if (row) {
+          await runPostIngestActivityMatching({
+            activityId: row.id,
+            activityType: row.activityType,
+          });
           await runDetailHydrationPipeline(row.id, detail as object);
         }
         processed++;
@@ -252,6 +283,10 @@ export async function handleActivityDetail(
         });
 
         await runDetailHydrationPipeline(created.id, detail as object);
+        await runPostIngestActivityMatching({
+          activityId: created.id,
+          activityType,
+        });
         await tryMatchActivityToCityRun(created.id).catch((cityRunErr) => {
           console.warn("tryMatchActivityToCityRun (detail fallback):", cityRunErr);
         });

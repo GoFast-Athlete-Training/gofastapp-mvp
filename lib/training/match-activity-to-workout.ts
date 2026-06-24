@@ -10,15 +10,18 @@ import { extractGarminWorkoutIdFromSummary } from "./extract-garmin-workout-id";
 import { RUNNING_ACTIVITY_TYPES } from "./activity-type-sets";
 import {
   activityLocalYmdFromSummary,
+  activityMatchCandidateUtcRange,
   activityNameContainsPushedWorkoutTitle,
-  utcDayRangeFromYmd,
 } from "@/lib/training/garmin-activity-match-helpers";
 import {
   isHighConfidenceActivityCandidate,
   scoreActivityCandidateForWorkout,
   type ScoredActivityCandidate,
 } from "@/lib/training/workout-activity-match-candidates";
-import { applyActivityToWorkout } from "./apply-activity-to-workout";
+import {
+  applyActivityToWorkout,
+  reassignActivityToWorkout,
+} from "./apply-activity-to-workout";
 
 export {
   computeMatchedWorkoutPaceCredits,
@@ -35,6 +38,11 @@ const workoutMatchInclude = {
   segments: { orderBy: { stepOrder: "asc" as const } },
   workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true } },
 };
+
+type WorkoutMatchRow = Awaited<
+  ReturnType<typeof prisma.workouts.findFirst<{ include: typeof workoutMatchInclude }>>
+> &
+  object;
 
 function isPlannedWorkout(workout: { planId: string | null }): boolean {
   return workout.planId != null;
@@ -81,6 +89,106 @@ function activityCandidateInput(activity: {
   };
 }
 
+function workoutScoreInput(workout: WorkoutMatchRow) {
+  return {
+    id: workout.id,
+    title: workout.title,
+    weekNumber: workout.weekNumber,
+    date: workout.date,
+    estimatedDistanceInMeters: workout.estimatedDistanceInMeters,
+    workoutType: workout.workoutType,
+    dayAssigned: workout.dayAssigned,
+    planId: workout.planId,
+  };
+}
+
+/** Pick a single planned workout from scored nearby candidates. */
+export function selectPlannedWorkoutCandidate(params: {
+  planCandidates: WorkoutMatchRow[];
+  activity: {
+    id: string;
+    activityName: string | null;
+    activityType: string | null;
+    startTime: Date;
+    duration: number | null;
+    distance: number | null;
+    averageSpeed: number | null;
+    ingestionStatus: string;
+    summaryData: unknown;
+  };
+  athleteActivityId?: string;
+}): {
+  candidate: WorkoutMatchRow | null;
+  scored: ScoredActivityCandidate | null;
+  titleMatchCount: number;
+} {
+  const activityInput = activityCandidateInput(params.activity);
+
+  const scoredRows = params.planCandidates
+    .map((workout) => ({
+      workout,
+      scored: scoreActivityCandidateForWorkout({
+        workout: workoutScoreInput(workout),
+        activity: activityInput,
+      }),
+    }))
+    .filter(
+      (
+        row
+      ): row is { workout: WorkoutMatchRow; scored: ScoredActivityCandidate } =>
+        row.scored != null
+    );
+
+  const highConfidence = scoredRows.filter(({ scored }) =>
+    isHighConfidenceActivityCandidate(scored)
+  );
+
+  if (highConfidence.length === 1) {
+    const { workout, scored } = highConfidence[0]!;
+    const titleMatchCount = scored.reasons.includes("title_match") ? 1 : 0;
+    return { candidate: workout, scored, titleMatchCount };
+  }
+
+  if (highConfidence.length > 1) {
+    const titleMatches = highConfidence.filter(({ scored }) =>
+      scored.reasons.includes("title_match")
+    );
+    if (titleMatches.length === 1) {
+      return {
+        candidate: titleMatches[0]!.workout,
+        scored: titleMatches[0]!.scored,
+        titleMatchCount: 1,
+      };
+    }
+    console.warn("⚠️ ambiguous high-confidence Garmin planned matches", {
+      athleteActivityId: params.athleteActivityId,
+      activityName: params.activity.activityName,
+      candidateWorkoutIds: highConfidence.map(({ workout }) => workout.id),
+    });
+    return { candidate: null, scored: null, titleMatchCount: 0 };
+  }
+
+  const titleMatches = scoredRows.filter(({ scored }) =>
+    scored.reasons.includes("title_match")
+  );
+  if (titleMatches.length === 1) {
+    return {
+      candidate: titleMatches[0]!.workout,
+      scored: titleMatches[0]!.scored,
+      titleMatchCount: 1,
+    };
+  }
+  if (titleMatches.length > 1) {
+    console.warn("⚠️ ambiguous Garmin title match; leaving activity unmatched", {
+      athleteActivityId: params.athleteActivityId,
+      activityName: params.activity.activityName,
+      candidateWorkoutIds: titleMatches.map(({ workout }) => workout.id),
+    });
+  }
+
+  return { candidate: null, scored: null, titleMatchCount: 0 };
+}
+
 /**
  * Match activity to at most one workout; planned workouts auto-link only when high-confidence.
  */
@@ -115,7 +223,9 @@ export async function tryMatchActivityToTrainingWorkout(
   const summaryBlob = activity.summaryData as Record<string, unknown> | null;
   const garminWorkoutId = extractGarminWorkoutIdFromSummary(summaryBlob);
 
-  let candidate = null;
+  let candidate: WorkoutMatchRow | null = null;
+  let precomputedScored: ScoredActivityCandidate | null = null;
+  let precomputedTitleMatchCount = 0;
 
   if (garminWorkoutId != null) {
     candidate = await prisma.workouts.findFirst({
@@ -130,8 +240,8 @@ export async function tryMatchActivityToTrainingWorkout(
 
   if (!candidate) {
     const activityYmd = activityLocalYmdFromSummary(activity.startTime, summaryBlob);
-    const { start, end } = utcDayRangeFromYmd(activityYmd);
-    const sameDayPlanCandidates = await prisma.workouts.findMany({
+    const { start, end } = activityMatchCandidateUtcRange(activityYmd);
+    const planCandidates = await prisma.workouts.findMany({
       where: {
         athleteId: activity.athleteId,
         planId: { not: null },
@@ -141,23 +251,18 @@ export async function tryMatchActivityToTrainingWorkout(
       include: workoutMatchInclude,
       orderBy: [{ garminWorkoutId: "desc" }, { updatedAt: "desc" }],
     });
-    const titleMatches = sameDayPlanCandidates.filter((workout) =>
-      activityNameContainsPushedWorkoutTitle({
-        activityName: activity.activityName,
-        workoutTitle: workout.title,
-        weekNumber: workout.weekNumber,
-      })
-    );
-    if (titleMatches.length === 1) {
-      candidate = titleMatches[0];
-    } else if (titleMatches.length > 1) {
-      console.warn("⚠️ ambiguous Garmin title match; leaving activity unmatched", {
-        athleteActivityId,
-        activityName: activity.activityName,
-        activityYmd,
-        candidateWorkoutIds: titleMatches.map((workout) => workout.id),
-      });
-    }
+
+    const selected = selectPlannedWorkoutCandidate({
+      planCandidates,
+      activity: {
+        ...activity,
+        startTime: activity.startTime,
+      },
+      athleteActivityId,
+    });
+    candidate = selected.candidate;
+    precomputedScored = selected.scored;
+    precomputedTitleMatchCount = selected.titleMatchCount;
   }
 
   if (!candidate) {
@@ -166,27 +271,29 @@ export async function tryMatchActivityToTrainingWorkout(
   }
 
   if (isPlannedWorkout(candidate)) {
-    const titleMatchCount = activityNameContainsPushedWorkoutTitle({
-      activityName: activity.activityName,
-      workoutTitle: candidate.title,
-      weekNumber: candidate.weekNumber,
-    })
-      ? 1
-      : 0;
+    const titleMatchCount =
+      precomputedTitleMatchCount > 0
+        ? precomputedTitleMatchCount
+        : activityNameContainsPushedWorkoutTitle({
+            activityName: activity.activityName,
+            workoutTitle: candidate.title,
+            weekNumber: candidate.weekNumber,
+            workoutType: candidate.workoutType,
+            dayAssigned: candidate.dayAssigned,
+            planId: candidate.planId,
+          })
+          ? 1
+          : 0;
 
-    const scored = scoreActivityCandidateForWorkout({
-      workout: {
-        id: candidate.id,
-        title: candidate.title,
-        weekNumber: candidate.weekNumber,
-        date: candidate.date,
-        estimatedDistanceInMeters: candidate.estimatedDistanceInMeters,
-      },
-      activity: activityCandidateInput({
-        ...activity,
-        startTime: activity.startTime!,
-      }),
-    });
+    const scored =
+      precomputedScored ??
+      scoreActivityCandidateForWorkout({
+        workout: workoutScoreInput(candidate),
+        activity: activityCandidateInput({
+          ...activity,
+          startTime: activity.startTime,
+        }),
+      });
 
     const autoMatchEligible =
       titleMatchCount === 1
@@ -196,9 +303,28 @@ export async function tryMatchActivityToTrainingWorkout(
     if (autoMatchEligible && scored) {
       const existingLink = await prisma.workouts.findFirst({
         where: { matchedActivityId: activity.id },
-        select: { id: true },
+        select: { id: true, planId: true },
       });
+
       if (existingLink && existingLink.id !== candidate.id) {
+        if (existingLink.planId == null) {
+          console.log("✅ reassigning activity from standalone ghost to planned workout", {
+            athleteActivityId,
+            ghostWorkoutId: existingLink.id,
+            plannedWorkoutId: candidate.id,
+            activityName: activity.activityName,
+            workoutTitle: candidate.title,
+          });
+          const reassignResult = await reassignActivityToWorkout({
+            activityId: activity.id,
+            targetWorkoutId: candidate.id,
+            athleteId: activity.athleteId,
+          });
+          if (reassignResult.success) {
+            return { matched: true, workoutId: reassignResult.workoutId };
+          }
+        }
+
         console.warn("⚠️ activity already linked to another workout; skipping auto-match", {
           athleteActivityId,
           existingWorkoutId: existingLink.id,
