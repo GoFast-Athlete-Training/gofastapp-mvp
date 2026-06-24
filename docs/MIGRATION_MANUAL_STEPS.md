@@ -52,14 +52,15 @@ Should return:
 
 ## Alternative: Using Prisma Migrate
 
-Once you have a stable connection, you can also run:
+Once you have a stable connection, use the safe deploy workflow (not bare `migrate dev` on shared DBs):
 
 ```bash
 cd /Users/adamcole/Documents/GoFast/gofastapp-mvp
-npx prisma migrate deploy --schema=packages/shared-db/prisma/schema.prisma
+npm run prisma:health
+npm run prisma:migrate
 ```
 
-**Note:** There's a failed migration in the database (`20241214220000_add_planning_days_to_weeks`). You may need to resolve that first or mark it as applied if it's already been manually fixed.
+See [MIGRATION_WORKFLOW.md](./MIGRATION_WORKFLOW.md) for active vs archive migration folders and legacy drift handling.
 
 
 
