@@ -3,7 +3,12 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { assignUniqueScheduledRunShareSlug } from "@/lib/scheduled-run-share-slug";
+import {
+  assignUniqueWorkoutScheduledShareSlug,
+  scheduleRunWorkoutWhere,
+  upsertScheduleRunWorkout,
+  workoutToScheduleRunRow,
+} from "@/lib/training/schedule-run-workout";
 import { buildStartTimeLabel } from "@/lib/training/schedule-run-estimated-finish";
 import { ymdFromDate, utcDateOnly } from "@/lib/training/plan-utils";
 
@@ -42,22 +47,7 @@ export type ScheduledRunJson = {
   updatedAt: string;
 };
 
-function toJson(row: {
-  id: string;
-  athleteId: string;
-  workoutId: string | null;
-  date: Date;
-  startTimeLabel: string | null;
-  title: string;
-  estimatedDistanceMi: number | null;
-  isTrack: boolean;
-  stravaRouteUrl: string | null;
-  meetupLocation: string | null;
-  routeDescription: string | null;
-  shareSlug: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}, shareUrl: string | null): ScheduledRunJson {
+function toJson(row: ReturnType<typeof workoutToScheduleRunRow> extends infer R ? NonNullable<R> : never, shareUrl: string | null): ScheduledRunJson {
   return {
     id: row.id,
     athleteId: row.athleteId,
@@ -80,7 +70,7 @@ function toJson(row: {
 
 /**
  * GET /api/training/schedule-run
- * List upcoming scheduled runs for the signed-in athlete.
+ * List upcoming scheduled workouts for the signed-in athlete.
  * ?days=7 (default 7, max 30)
  */
 export async function GET(request: NextRequest) {
@@ -98,20 +88,15 @@ export async function GET(request: NextRequest) {
     const end = new Date(start);
     end.setUTCDate(end.getUTCDate() + days);
 
-    const rows = await prisma.scheduled_runs.findMany({
-      where: {
-        athleteId: athlete.id,
-        date: { gte: start, lt: end },
-      },
+    const rows = await prisma.workouts.findMany({
+      where: scheduleRunWorkoutWhere(athlete.id, start, end),
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
     });
 
-    const scheduledRuns = rows.map((r) =>
-      toJson(
-        r,
-        r.shareSlug ? shareUrlForSlug(r.shareSlug, request) : null
-      )
-    );
+    const scheduledRuns = rows
+      .map((r) => workoutToScheduleRunRow(r))
+      .filter((r): r is NonNullable<typeof r> => r != null)
+      .map((r) => toJson(r, r.shareSlug ? shareUrlForSlug(r.shareSlug, request) : null));
 
     return NextResponse.json({ scheduledRuns });
   } catch (e: unknown) {
@@ -122,7 +107,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/training/schedule-run
- * Create a lightweight scheduled run. Optional invite generates shareSlug.
+ * Create or update a workout-backed scheduled run. Optional invite generates scheduledShareSlug.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -181,16 +166,6 @@ export async function POST(request: NextRequest) {
         ? body.workoutId.trim()
         : null;
 
-    if (workoutId) {
-      const owned = await prisma.workouts.findFirst({
-        where: { id: workoutId, athleteId: athlete.id },
-        select: { id: true },
-      });
-      if (!owned) {
-        return NextResponse.json({ error: "Workout not found" }, { status: 404 });
-      }
-    }
-
     const estimatedDistanceMi =
       typeof body.estimatedDistanceMi === "number" && Number.isFinite(body.estimatedDistanceMi)
         ? body.estimatedDistanceMi
@@ -198,15 +173,14 @@ export async function POST(request: NextRequest) {
           ? parseFloat(String(body.estimatedDistanceMi))
           : null;
 
-    const inviteFriend = body.inviteFriend === true || body.inviteFriend === "true";
-
-    const row = await prisma.scheduled_runs.create({
-      data: {
+    let upsertedWorkoutId: string;
+    try {
+      const result = await upsertScheduleRunWorkout({
         athleteId: athlete.id,
-        workoutId,
+        title,
         date,
         startTimeLabel,
-        title,
+        workoutId,
         estimatedDistanceMi:
           estimatedDistanceMi != null && Number.isFinite(estimatedDistanceMi)
             ? estimatedDistanceMi
@@ -224,25 +198,36 @@ export async function POST(request: NextRequest) {
           typeof body.routeDescription === "string" && body.routeDescription.trim()
             ? body.routeDescription.trim()
             : null,
-      },
-    });
+      });
+      upsertedWorkoutId = result.workoutId;
+    } catch (e: unknown) {
+      if (e instanceof Error && e.message === "WORKOUT_NOT_FOUND") {
+        return NextResponse.json({ error: "Workout not found" }, { status: 404 });
+      }
+      throw e;
+    }
 
-    let shareSlug: string | null = null;
+    const inviteFriend = body.inviteFriend === true || body.inviteFriend === "true";
     if (inviteFriend) {
-      shareSlug = await assignUniqueScheduledRunShareSlug({
-        scheduledRunId: row.id,
+      await assignUniqueWorkoutScheduledShareSlug({
+        workoutId: upsertedWorkoutId,
         gofastHandle: athlete.gofastHandle,
       });
     }
 
-    const updated = await prisma.scheduled_runs.findUniqueOrThrow({
-      where: { id: row.id },
+    const updated = await prisma.workouts.findUniqueOrThrow({
+      where: { id: upsertedWorkoutId },
     });
 
-    const shareUrl = shareSlug ? shareUrlForSlug(shareSlug, request) : null;
+    const row = workoutToScheduleRunRow(updated);
+    if (!row) {
+      return NextResponse.json({ error: "Failed to load scheduled workout" }, { status: 500 });
+    }
+
+    const shareUrl = row.shareSlug ? shareUrlForSlug(row.shareSlug, request) : null;
 
     return NextResponse.json({
-      scheduledRun: toJson(updated, shareUrl),
+      scheduledRun: toJson(row, shareUrl),
     });
   } catch (e: unknown) {
     console.error("POST /api/training/schedule-run", e);

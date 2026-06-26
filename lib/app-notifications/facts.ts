@@ -29,30 +29,40 @@ export async function loadNotificationFacts(params: {
     case 'workout.tomorrow': {
       const workout = await prisma.workouts.findFirst({
         where: { id: params.objectId, athleteId: params.athleteId },
-        select: { title: true, estimatedDistanceInMeters: true },
+        select: {
+          title: true,
+          estimatedDistanceInMeters: true,
+          scheduledStartTimeLabel: true,
+        },
       });
       if (!workout) return null;
+      const distanceMi = formatDistanceMi(workout.estimatedDistanceInMeters);
+      const timePart = workout.scheduledStartTimeLabel?.trim() || null;
+      const detail = [distanceMi, timePart].filter(Boolean).join(' · ');
       return {
         firstName,
         workoutTitle: workout.title,
-        distanceMi: formatDistanceMi(workout.estimatedDistanceInMeters),
+        distanceMi: detail || distanceMi,
       };
     }
     case 'scheduledRun.tomorrow': {
-      const run = await prisma.scheduled_runs.findFirst({
+      const workout = await prisma.workouts.findFirst({
         where: { id: params.objectId, athleteId: params.athleteId },
         select: {
           title: true,
-          estimatedDistanceMi: true,
-          startTimeLabel: true,
+          estimatedDistanceInMeters: true,
+          scheduledStartTimeLabel: true,
         },
       });
-      if (!run) return null;
-      const distancePart =
-        run.estimatedDistanceMi != null ? `${run.estimatedDistanceMi.toFixed(1)} mi` : null;
-      const timePart = run.startTimeLabel?.trim() || null;
+      if (!workout) return null;
+      const distancePart = formatDistanceMi(workout.estimatedDistanceInMeters);
+      const timePart = workout.scheduledStartTimeLabel?.trim() || null;
       const detail = [distancePart, timePart].filter(Boolean).join(' · ');
-      return { firstName, runTitle: run.title, detail: detail || undefined };
+      return {
+        firstName,
+        runTitle: workout.title,
+        detail: detail || undefined,
+      };
     }
     case 'clubRun.today':
     case 'clubRun.tomorrow': {

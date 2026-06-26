@@ -6,10 +6,12 @@ import { ymdFromDate } from "@/lib/training/plan-utils";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
+/** Days ahead (inclusive) to create Garmin calendar schedules — today + this many future days. */
+const GARMIN_SCHEDULE_FORWARD_DAYS = 3;
+
 /**
  * GET /api/cron/auto-push-garmin
- * Push today's already-materialized plan workouts to Garmin Training Calendar.
- * Does not materialize from planSchedule JSON — athletes build the horizon by opening Home/Train.
+ * Push materialized plan workouts to Garmin Training Calendar for today through the next few days.
  * Secured with Authorization: Bearer CRON_SECRET or ?secret= (Vercel Cron uses GET).
  */
 export async function GET(request: NextRequest) {
@@ -19,23 +21,28 @@ export async function GET(request: NextRequest) {
   const now = new Date();
   const start = new Date(now);
   start.setUTCHours(0, 0, 0, 0);
-  const end = new Date(now);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + GARMIN_SCHEDULE_FORWARD_DAYS);
   end.setUTCHours(23, 59, 59, 999);
 
   const todayYmd = ymdFromDate(now);
-  console.info("[auto-push-garmin] cron start", { todayYmd });
+  const endYmd = ymdFromDate(end);
+  console.info("[auto-push-garmin] cron start", { todayYmd, endYmd, forwardDays: GARMIN_SCHEDULE_FORWARD_DAYS });
 
   try {
     const { results, summary } = await pushPlanWorkoutsInDateRange({
       dateStart: start,
       dateEnd: end,
-      candidateLimit: 40,
+      candidateLimit: 80,
       runLabel: "auto-push-garmin",
+      recoverLibraryOnly: true,
     });
 
     return NextResponse.json({
       ok: true,
       todayYmd,
+      endYmd,
+      forwardDays: GARMIN_SCHEDULE_FORWARD_DAYS,
       candidateCount: summary.candidateCount,
       summary,
       results,
