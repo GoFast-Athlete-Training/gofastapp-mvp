@@ -9,6 +9,7 @@ import {
 } from "@/lib/slug-utils";
 import { assignUniqueWorkoutShareSlug } from "@/lib/workout-public-slug";
 import { parseCalendarDateForWrite } from "@/lib/calendar-date";
+import { autoRsvpHostGoing, buildJoinRunSignupUrl } from "@/lib/host-run-rsvp";
 
 export const dynamic = "force-dynamic";
 
@@ -428,11 +429,16 @@ export async function POST(request: NextRequest) {
     const workoutPath = `/mytrainingruns/${workoutSlug}`;
     const workoutShareUrl = `${baseNorm}${workoutPath}`;
 
+    await autoRsvpHostGoing(run.id, athlete.id);
+
+    const joinSignupUrl = buildJoinRunSignupUrl(run.slug, baseNorm);
+
     return NextResponse.json({
       cityRunId: run.id,
       slug: run.slug,
       path,
       shareUrl,
+      joinSignupUrl,
       workoutSlug,
       workoutPath,
       workoutShareUrl,

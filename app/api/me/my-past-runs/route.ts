@@ -33,7 +33,7 @@ export async function GET(request: Request) {
         athleteId: athlete.id,
         status: "going",
         city_runs: {
-          cityRunType: 'CLUB',
+          cityRunType: { in: ['CLUB', 'INDIVIDUAL', 'RUN_CREW'] },
           date: { lt: pastEnoughForRecap, gt: oldest },
           city_run_checkins: {
             none: { athleteId: athlete.id },

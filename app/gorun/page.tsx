@@ -205,9 +205,17 @@ function GoRunPageContent() {
     <div className="min-h-screen bg-gray-50">
       <TopNav />
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Run hub</h1>
-          <p className="text-gray-600">Your meetups and runs near you</p>
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Run hub</h1>
+            <p className="text-gray-600">Your meetups and runs near you</p>
+          </div>
+          <Link
+            href="/host-a-run"
+            className="inline-flex items-center justify-center shrink-0 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
+          >
+            Host a run
+          </Link>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">

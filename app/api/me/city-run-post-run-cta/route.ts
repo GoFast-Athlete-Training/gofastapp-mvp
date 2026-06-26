@@ -28,6 +28,7 @@ export async function GET(request: Request) {
     }
 
     const copy = buildPostRunCtaCopy({
+      cityRunType: cta.cityRunType,
       runClub: cta.runClub,
       runTitle: cta.runTitle,
       runDate: cta.runDate,

@@ -35,7 +35,7 @@ function performanceHubMatch(p: string | null): boolean {
 }
 
 function gorunMatch(p: string | null): boolean {
-  return !!p && (p === "/gorun" || p.startsWith("/gorun/"));
+  return !!p && (p === "/gorun" || p.startsWith("/gorun/") || p === "/host-a-run");
 }
 
 const navItems: NavItem[] = [

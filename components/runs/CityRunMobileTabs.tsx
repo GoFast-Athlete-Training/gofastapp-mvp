@@ -23,7 +23,7 @@ import type {
   CityRunRsvp,
   PostRunRun,
 } from '@/components/runs/city-run-types';
-import { isClubRun } from '@/lib/city-run-copy';
+import { hasSocialRunLifecycle } from '@/lib/city-run-copy';
 
 type PreRsvpMobileProps = {
   mode: 'pre-rsvp';
@@ -116,6 +116,8 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
               onRsvp={props.onRsvp}
               onCheckin={props.onCheckin}
               runClub={props.run.runClub}
+              cityRunType={props.run.cityRunType}
+              runTitle={props.run.title}
               allowCheckin={props.allowCheckin ?? true}
             />
           </div>
@@ -131,7 +133,7 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
     const hasWorkout =
       Boolean(props.run.workoutId || props.run.workout) ||
       Boolean(props.run.workoutDescription?.trim());
-    const clubRun = isClubRun(props.run);
+    const socialRun = hasSocialRunLifecycle(props.run);
 
     return (
       <MobileHubTabs tabs={[...GOING_TABS]} activeTab={activeTab} onTabChange={setActiveTab}>
@@ -146,7 +148,7 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
             <CityRunRunDayCompanion
               run={props.run}
               runIsPast={props.runIsPast}
-              onAddShout={clubRun && props.runIsPast ? props.onCheckin : undefined}
+              onAddShout={socialRun && props.runIsPast ? props.onCheckin : undefined}
               checkingIn={props.checkingIn}
             />
             {hasWorkout ? (

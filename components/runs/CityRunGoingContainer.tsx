@@ -9,7 +9,7 @@ import CityRunPeopleSection from '@/components/runs/CityRunPeopleSection';
 import CityRunRunDayCompanion from '@/components/runs/CityRunRunDayCompanion';
 import CityRunWorkoutCard from '@/components/runs/CityRunWorkoutCard';
 import { isRunPast, type CityRunDetails, type CityRunRsvp } from '@/components/runs/city-run-types';
-import { isClubRun } from '@/lib/city-run-copy';
+import { hasSocialRunLifecycle } from '@/lib/city-run-copy';
 
 interface Props {
   run: CityRunDetails;
@@ -29,10 +29,10 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
     setRunIsPast(isRunPast(run.date));
   }, [run.date]);
 
-  const clubRun = isClubRun(run);
+  const socialRun = hasSocialRunLifecycle(run);
 
   const handleCheckin = async () => {
-    if (!clubRun) return;
+    if (!socialRun) return;
     setCheckingIn(true);
     try {
       await api.post(`/runs/${run.id}/checkin`, {});
@@ -65,7 +65,7 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
           <CityRunRunDayCompanion
             run={run}
             runIsPast={runIsPast}
-            onAddShout={clubRun && runIsPast ? () => void handleCheckin() : undefined}
+            onAddShout={socialRun && runIsPast ? () => void handleCheckin() : undefined}
             checkingIn={checkingIn}
           />
 

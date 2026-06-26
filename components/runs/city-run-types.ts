@@ -128,6 +128,7 @@ export interface PostRunRun {
   id: string;
   title: string;
   date: string;
+  cityRunType?: string | null;
   runClub?: { name: string; logoUrl: string | null } | null;
 }
 

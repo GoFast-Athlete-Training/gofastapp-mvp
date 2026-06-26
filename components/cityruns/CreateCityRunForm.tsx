@@ -49,6 +49,7 @@ export type CityRunFromWorkoutSuccess = {
   slug: string | null;
   path: string;
   shareUrl: string;
+  joinSignupUrl?: string | null;
   workoutSlug?: string | null;
   workoutPath?: string | null;
   workoutShareUrl?: string | null;
@@ -132,7 +133,7 @@ export default function CreateCityRunForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<CityRunFromWorkoutSuccess | null>(null);
-  const [copiedField, setCopiedField] = useState<"rsvp" | "share" | null>(null);
+  const [copiedField, setCopiedField] = useState<"rsvp" | "share" | "join" | null>(null);
 
   useEffect(() => {
     setTitle(workout.title);
@@ -284,7 +285,7 @@ export default function CreateCityRunForm({
     }
   };
 
-  const copyToClipboard = async (text: string, field: "rsvp" | "share") => {
+  const copyToClipboard = async (text: string, field: "rsvp" | "share" | "join") => {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedField(field);
@@ -299,11 +300,43 @@ export default function CreateCityRunForm({
       <div className={`space-y-5 bg-white rounded-xl border border-gray-200 p-5 shadow-sm ${className}`}>
         <p className="text-green-800 font-medium text-sm flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
-          You&apos;re set — copy the links below.
+          You&apos;re hosting — share the invite link so others can sign up and RSVP.
         </p>
+        {success.joinSignupUrl ? (
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+              Invite link (signup + RSVP)
+            </label>
+            <input
+              type="text"
+              readOnly
+              value={success.joinSignupUrl}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50"
+            />
+            <div className="flex gap-2 mt-2">
+              <button
+                type="button"
+                onClick={() => void copyToClipboard(success.joinSignupUrl!, "join")}
+                className="flex-1 inline-flex items-center justify-center gap-2 py-2 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg"
+              >
+                {copiedField === "join" ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    Copy invite link
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        ) : null}
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            RSVP / CityRun
+            Run hub (for people already on GoFast)
           </label>
           <input
             type="text"

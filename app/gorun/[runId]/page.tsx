@@ -19,7 +19,7 @@ import {
   type CityRunCheckin,
   type CityRunDetails,
 } from '@/components/runs/city-run-types';
-import { isClubRun, buildClubRsvpCopy } from '@/lib/city-run-copy';
+import { hasSocialRunLifecycle, resolveRunRsvpCopy } from '@/lib/city-run-copy';
 
 export default function GoRunPage() {
   const params = useParams();
@@ -157,13 +157,14 @@ export default function GoRunPage() {
   // 2. RSVP status "going" →  going container    (you're planning to)
   // 3. Anything else        →  pre-RSVP view      (public)
 
-  if (myCheckin && isClubRun(run)) {
+  if (myCheckin && hasSocialRunLifecycle(run)) {
     return (
       <CityRunPostRunContainer
         run={{
           id: run.id,
           title: run.title,
           date: run.date,
+          cityRunType: run.cityRunType,
           runClub: run.runClub,
         }}
         myCheckin={myCheckin}
@@ -181,7 +182,7 @@ export default function GoRunPage() {
     );
   }
 
-  return <CityRunPreRSVP run={run} onRsvp={handleRsvp} onCheckin={handleCheckin} rsvpLoading={rsvpLoading} onBack={() => router.push('/gorun')} allowCheckin={isClubRun(run)} />;
+  return <CityRunPreRSVP run={run} onRsvp={handleRsvp} onCheckin={handleCheckin} rsvpLoading={rsvpLoading} onBack={() => router.push('/gorun')} allowCheckin={hasSocialRunLifecycle(run)} />;
 }
 
 // ─── Pre-RSVP Container ────────────────────────────────────────────────────────
@@ -237,6 +238,8 @@ function CityRunPreRSVP({
                   onRsvp={onRsvp}
                   onCheckin={onCheckin}
                   runClub={run.runClub}
+                  cityRunType={run.cityRunType}
+                  runTitle={run.title}
                   allowCheckin={allowCheckin}
                 />
               </>
@@ -255,6 +258,8 @@ function CityRunPreRSVP({
                   onRsvp={onRsvp}
                   onCheckin={onCheckin}
                   runClub={run.runClub}
+                  cityRunType={run.cityRunType}
+                  runTitle={run.title}
                   allowCheckin={allowCheckin}
                 />
               </>

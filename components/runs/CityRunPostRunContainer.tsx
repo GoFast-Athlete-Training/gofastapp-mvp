@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Trophy } from 'lucide-react';
 import api from '@/lib/api';
-import { buildPostRunHeroHeadline, resolveRunClubLabel } from '@/lib/city-run-copy';
+import { buildPostRunHeroHeadline, isIndividualHostedRun, resolveRunClubLabel } from '@/lib/city-run-copy';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import TopNav from '@/components/shared/TopNav';
 import {
@@ -26,7 +26,15 @@ export default function CityRunPostRunContainer({
   allCheckins: initialCheckins,
 }: Props) {
   const athleteId = LocalStorageAPI.getAthleteId();
-  const clubLabel = resolveRunClubLabel(run.runClub, run.title);
+  const crewLabel = isIndividualHostedRun(run)
+    ? 'Hosted run'
+    : resolveRunClubLabel(run.runClub, run.title);
+  const heroHeadline = buildPostRunHeroHeadline({
+    cityRunType: run.cityRunType,
+    runClub: run.runClub,
+    runTitle: run.title,
+    runDate: run.date,
+  });
 
   const [myCheckin, setMyCheckin] = useState<CityRunCheckin>(initialCheckin);
   const [checkins, setCheckins] = useState<CityRunCheckin[]>(initialCheckins);
@@ -88,12 +96,6 @@ export default function CityRunPostRunContainer({
     (a, b) => new Date(a.checkedInAt).getTime() - new Date(b.checkedInAt).getTime()
   );
 
-  const heroHeadline = buildPostRunHeroHeadline({
-    runClub: run.runClub,
-    runTitle: run.title,
-    runDate: run.date,
-  });
-
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <TopNav showBack backUrl="/gorun" backLabel="Run hub" />
@@ -115,7 +117,7 @@ export default function CityRunPostRunContainer({
             )}
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">
-                {clubLabel}
+                {crewLabel}
               </p>
               <h1 className="mt-1 text-xl sm:text-2xl font-bold text-gray-900 leading-snug">
                 {heroHeadline}
@@ -147,7 +149,7 @@ export default function CityRunPostRunContainer({
           crewExpanded
           onToggleExpanded={() => undefined}
           expanded
-          clubName={clubLabel}
+          clubName={crewLabel}
         />
 
         <CityRunPostRunShoutsSection
@@ -156,7 +158,7 @@ export default function CityRunPostRunContainer({
           editingShouts={editingShouts}
           shoutsInput={shoutsInput}
           savingShouts={savingShouts}
-          clubName={clubLabel}
+          clubName={crewLabel}
           showOthers={false}
           onStartEdit={() => setEditingShouts(true)}
           onCancelEdit={() => {
@@ -174,7 +176,7 @@ export default function CityRunPostRunContainer({
             editingShouts={false}
             shoutsInput=""
             savingShouts={false}
-            clubName={clubLabel}
+            clubName={crewLabel}
             showMine={false}
             onStartEdit={() => undefined}
             onCancelEdit={() => undefined}
@@ -190,7 +192,7 @@ export default function CityRunPostRunContainer({
           othersCount={others.length}
           uploading={uploading}
           uploadError={uploadError}
-          clubName={clubLabel}
+          clubName={crewLabel}
           onFileChange={handleFileChange}
         />
       </main>

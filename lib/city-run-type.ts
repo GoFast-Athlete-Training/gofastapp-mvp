@@ -88,3 +88,27 @@ export function isClubRun(run: {
   if (run.cityRunType) return run.cityRunType === 'CLUB';
   return Boolean(run.runClubId || run.runClub?.name);
 }
+
+export function isIndividualHostedRun(run: {
+  cityRunType?: string | null;
+  athleteGeneratedId?: string | null;
+}): boolean {
+  if (run.cityRunType) return run.cityRunType === 'INDIVIDUAL';
+  return Boolean(run.athleteGeneratedId);
+}
+
+/** Runs that use the full GoRun RSVP → chatter → check-in → post-run lifecycle. */
+export function hasSocialRunLifecycle(run: {
+  cityRunType?: string | null;
+  runClubId?: string | null;
+  runClub?: { name?: string } | null;
+  runCrewId?: string | null;
+  athleteGeneratedId?: string | null;
+}): boolean {
+  if (run.cityRunType) {
+    return run.cityRunType === 'CLUB' || run.cityRunType === 'INDIVIDUAL' || run.cityRunType === 'RUN_CREW';
+  }
+  return (
+    isClubRun(run) || isIndividualHostedRun(run) || Boolean(run.runCrewId)
+  );
+}

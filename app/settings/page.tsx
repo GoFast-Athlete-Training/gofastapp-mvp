@@ -17,6 +17,11 @@ export default function SettingsPage() {
   const [athleteReady, setAthleteReady] = useState(false);
   const [copiedProfileUrl, setCopiedProfileUrl] = useState(false);
 
+  const [hostedStats, setHostedStats] = useState<{
+    completedHostedRuns: number;
+    stars: number;
+  } | null>(null);
+
   const [ambassadorCredits, setAmbassadorCredits] = useState<{
     ambassador: boolean;
     tally: number;
@@ -43,6 +48,20 @@ export default function SettingsPage() {
       })
       .catch(() => router.replace('/welcome'));
   }, [router]);
+
+  useEffect(() => {
+    api
+      .get('/me/hosted-runs-stats')
+      .then((res) => {
+        if (res.data?.success) {
+          setHostedStats({
+            completedHostedRuns: res.data.completedHostedRuns ?? 0,
+            stars: res.data.stars ?? 0,
+          });
+        }
+      })
+      .catch(() => setHostedStats({ completedHostedRuns: 0, stars: 0 }));
+  }, []);
 
   useEffect(() => {
     if (athlete?.role !== 'AMBASSADOR') return;
@@ -144,6 +163,50 @@ export default function SettingsPage() {
                 className="inline-block mt-3 text-sm text-sky-600 hover:text-sky-800"
               >
                 How ambassador credits work →
+              </Link>
+            </div>
+          )}
+
+          {hostedStats && hostedStats.completedHostedRuns > 0 ? (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-orange-500" />
+                Hosted runs
+              </h2>
+              <p className="text-gray-600 text-sm mb-4">
+                Runs you hosted where you checked in after run day.
+              </p>
+              <div className="flex items-center gap-4">
+                <div>
+                  <div className="text-2xl font-bold text-gray-900">{hostedStats.completedHostedRuns}</div>
+                  <div className="text-xs text-gray-500">completed hosts</div>
+                </div>
+                <div>
+                  <div className="text-2xl text-amber-500" aria-label={`${hostedStats.stars} stars`}>
+                    {'★'.repeat(hostedStats.stars)}
+                    {'☆'.repeat(Math.max(0, 5 - hostedStats.stars))}
+                  </div>
+                  <div className="text-xs text-gray-500">host rating</div>
+                </div>
+              </div>
+              <Link
+                href="/host-a-run"
+                className="inline-block mt-4 text-sm font-semibold text-orange-600 hover:text-orange-700"
+              >
+                Host another run →
+              </Link>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-1">Host a run</h2>
+              <p className="text-gray-600 text-sm mb-4">
+                Invite friends to a one-off run with chat, RSVP, and check-in.
+              </p>
+              <Link
+                href="/host-a-run"
+                className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
+              >
+                Host a run
               </Link>
             </div>
           )}

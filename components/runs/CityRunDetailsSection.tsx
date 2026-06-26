@@ -9,7 +9,7 @@ import {
   type RunClub,
   type RunSeries,
 } from '@/components/runs/city-run-types';
-import { buildClubPastCheckinCopy, buildClubRsvpCopy } from '@/lib/city-run-copy';
+import { buildClubPastCheckinCopy, resolveRunRsvpCopy, resolveRunPastCheckinCopy } from '@/lib/city-run-copy';
 
 type CityRunDetailsSectionProps = {
   run: CityRunDetails;
@@ -241,6 +241,8 @@ export function CityRunRsvpPanel({
   onRsvp,
   onCheckin,
   runClub,
+  cityRunType,
+  runTitle,
   allowCheckin = true,
 }: {
   runIsPast: boolean;
@@ -248,10 +250,13 @@ export function CityRunRsvpPanel({
   onRsvp: (status: 'going' | 'not-going') => void;
   onCheckin: () => void;
   runClub?: { name: string } | null;
+  cityRunType?: string | null;
+  runTitle?: string | null;
   allowCheckin?: boolean;
 }) {
-  const pastCopy = buildClubPastCheckinCopy(runClub);
-  const rsvpCopy = buildClubRsvpCopy(runClub);
+  const socialCtx = { cityRunType, runClub, title: runTitle };
+  const pastCopy = resolveRunPastCheckinCopy(socialCtx);
+  const rsvpCopy = resolveRunRsvpCopy(socialCtx);
 
   if (runIsPast) {
     if (!allowCheckin) return null;
