@@ -399,6 +399,7 @@ export function prescribe(params: {
   const type = entry.workoutType as WorkoutType;
 
   if (type === "Easy") {
+    const easyPaceKey = paceProfile != null ? "easy" : null;
     const legacyWorkOffset =
       paceProfile != null
         ? entry.workPaceOffsetSecPerMile
@@ -407,7 +408,7 @@ export function prescribe(params: {
           ? easyWorkPaceOffsetOverrideSecPerMile
           : entry.workPaceOffsetSecPerMile;
     const workPaceSec = resolveCataloguePaceSecPerMile({
-      paceKey: null,
+      paceKey: easyPaceKey,
       legacyOffsetSecPerMile: legacyWorkOffset,
       ctx: paceCtx,
     });

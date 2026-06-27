@@ -63,3 +63,31 @@ test("partial week 1 caps quality work at one hard session", () => {
     ["Tempo"]
   );
 });
+
+test("weeklyWorkoutComposition tempo:0 intervals:0 skips quality sessions", () => {
+  const { schedule } = assignWorkoutDays({
+    ...baseInput,
+    weeklyTempoSessions: 0,
+    weeklyIntervalSessions: 0,
+  });
+  const week2 = schedule.find((w) => w.weekNumber === 2);
+  assert.ok(week2);
+  const types = week2.days.map((d) => d.workoutType);
+  assert.ok(!types.includes("Tempo"));
+  assert.ok(!types.includes("Intervals"));
+  assert.ok(types.includes("LongRun"));
+  assert.ok(types.includes("Easy"));
+});
+
+test("weeklyWorkoutComposition tempo:0 still places intervals when configured", () => {
+  const { schedule } = assignWorkoutDays({
+    ...baseInput,
+    weeklyTempoSessions: 0,
+    weeklyIntervalSessions: 1,
+  });
+  const week2 = schedule.find((w) => w.weekNumber === 2);
+  assert.ok(week2);
+  const types = week2.days.map((d) => d.workoutType);
+  assert.ok(!types.includes("Tempo"));
+  assert.ok(types.includes("Intervals"));
+});

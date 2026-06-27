@@ -7,7 +7,7 @@ import {
   prescribe,
 } from "@/lib/training/prescription";
 import { PACE_ANCHOR_CURRENT_BUILDUP, PACE_ANCHOR_MP_SIMULATION } from "@/lib/training/goal-pace-calculator";
-import { getTrainingPaces } from "@/lib/workout-generator/pace-calculator";
+import { getTrainingPaces, paceTargetFromSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 
 const ANCHOR_SEC = 420; // 7:00/mi 5K anchor
 
@@ -80,6 +80,32 @@ test("LongRun segment paceKey resolves through preset paceProfile", () => {
   });
   const paced = steps.filter((s) => s.targets?.length);
   assert.ok(paced.length >= 2, "expected paceKey-resolved segment targets");
+});
+
+test("Easy workout uses paceProfile easy key when profile is set", () => {
+  const steps = prescribe({
+    entry: baseCatalogue({
+      workoutType: "Easy",
+      workPaceOffsetSecPerMile: 90,
+      warmupMiles: 0,
+      cooldownMiles: 0,
+      workBaseMiles: 5,
+    }),
+    scheduleMiles: 5,
+    anchorSecondsPerMile: ANCHOR_SEC,
+    easyWorkPaceOffsetOverrideSecPerMile: 150,
+    paceProfile: {
+      easy: { anchor: "current5k", offsetSecPerMile: 120 },
+    },
+  });
+  const work = steps.find((s) => s.title === "Work");
+  assert.ok(work?.targets?.length, "easy work should have pace targets");
+  const paceTarget = work!.targets!.find((t) => t.type === "PACE");
+  assert.ok(paceTarget);
+  const fromProfile = paceTargetFromSecondsPerMile(ANCHOR_SEC + 120);
+  const fromOverride = paceTargetFromSecondsPerMile(ANCHOR_SEC + 150);
+  assert.equal(paceTarget!.valueLow, fromProfile.valueLow);
+  assert.notEqual(paceTarget!.valueLow, fromOverride.valueLow);
 });
 
 test("sustained Tempo keeps bookend miles but omits pace targets even when offsets are set", () => {

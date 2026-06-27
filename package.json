@@ -27,6 +27,7 @@
     "smoke:fivek-pace": "tsx scripts/smoke-fivek-pace.ts",
     "smoke:garmin-minimal": "tsx scripts/garmin-minimal-workout-smoke.ts",
     "db:migrate-pace-targets": "tsx scripts/migrate-legacy-pace-targets.ts",
+    "db:migrate-catalogue-pace-keys": "node scripts/with-env-local.mjs tsx scripts/migrate-catalogue-pace-keys.ts",
     "db:fix-monday-race-totalweeks": "tsx scripts/fix-monday-race-totalweeks.ts",
     "verify:race-load-followups": "tsx scripts/verify-race-load-followups.ts",
     "reprocess:activity-segments": "tsx scripts/reprocess-activity-segment-execution.ts"

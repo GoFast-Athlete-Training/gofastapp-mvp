@@ -42,9 +42,13 @@ export type WorkoutDayInput = {
   intervalsPositions: readonly RunTypePosition[];
   tempoPositions: readonly RunTypePosition[];
   easyPositions: readonly RunTypePosition[];
+  /** From preset coachPlanOverview.weeklyWorkoutComposition; default 1 each (legacy). */
+  weeklyTempoSessions?: number;
+  weeklyIntervalSessions?: number;
 };
 
-const HARD_SESSION_SLOTS = 2;
+const DEFAULT_WEEKLY_TEMPO = 1;
+const DEFAULT_WEEKLY_INTERVALS = 1;
 
 const DAY_NAMES = [
   "Monday",
@@ -269,11 +273,23 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
     const tRotMod = Math.max(input.tempoPositions.length, 1);
     const iRotMod = Math.max(input.intervalsPositions.length, 1);
 
+    const weeklyTempo = Math.max(
+      0,
+      Math.min(1, Math.round(input.weeklyTempoSessions ?? DEFAULT_WEEKLY_TEMPO))
+    );
+    const weeklyIntervals = Math.max(
+      0,
+      Math.min(1, Math.round(input.weeklyIntervalSessions ?? DEFAULT_WEEKLY_INTERVALS))
+    );
+
+    const hardSlots: Array<{ kind: "tempo" | "interval"; idealDow: number }> = [];
+    if (weeklyTempo > 0) hardSlots.push({ kind: "tempo", idealDow: tempoDow1 });
+    if (weeklyIntervals > 0) hardSlots.push({ kind: "interval", idealDow: intervalDow2 });
+
     let hardSessionsPlacedThisWeek = 0;
-    for (let slot = 0; slot < HARD_SESSION_SLOTS; slot++) {
+    for (const slot of hardSlots) {
       if (partialWeek1 && hardSessionsPlacedThisWeek >= 1) break;
-      const idealDow = slot === 0 ? tempoDow1 : intervalDow2;
-      const isTempo = slot === 0;
+      const isTempo = slot.kind === "tempo";
       const ordBefore = isTempo ? tempoSessionOrdinal : intervalSessionOrdinal;
       const rotMod = isTempo ? tRotMod : iRotMod;
       const pci = ordBefore % (rotMod > 0 ? rotMod : 4);
@@ -281,18 +297,18 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
         isTempo ? input.tempoPositions : input.intervalsPositions,
         ordBefore
       );
-      const kind = isTempo ? "tempo" : ("interval" as const);
+      const kind = slot.kind;
       const placed = partialWeek1
-        ? preferred.includes(idealDow) &&
-          tryPlaceEntrySkeleton(idealDow, { kind, catalogueWorkoutId: posId, planCycleIndex: pci })
+        ? preferred.includes(slot.idealDow) &&
+          tryPlaceEntrySkeleton(slot.idealDow, { kind, catalogueWorkoutId: posId, planCycleIndex: pci })
         : tryPlaceSessionEntry(
-            idealDow,
+            slot.idealDow,
             { kind, catalogueWorkoutId: posId, planCycleIndex: pci },
             false
           );
       if (placed) {
         hardSessionsPlacedThisWeek++;
-        if (slot === 0) tempoSessionOrdinal++;
+        if (isTempo) tempoSessionOrdinal++;
         else intervalSessionOrdinal++;
       }
     }

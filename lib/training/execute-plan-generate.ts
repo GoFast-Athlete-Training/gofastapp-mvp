@@ -32,6 +32,7 @@ import {
   assertScheduleEasyDaysHaveCatalogue,
   rotationMissingCatalogueWorkout,
 } from "@/lib/training/run-type-config-validation";
+import { parseCoachPlanOverview } from "@/lib/training/preset-strategy";
 
 export async function executePlanGenerate(params: {
   athleteId: string;
@@ -179,6 +180,13 @@ export async function executePlanGenerate(params: {
 
   const cLen = macroCycleLen();
 
+  const coachOverview = parseCoachPlanOverview(rawPreset.coachPlanOverview);
+  const composition = coachOverview?.weeklyWorkoutComposition;
+  const weeklyTempoSessions =
+    composition != null ? Math.max(0, Math.round(composition.tempo)) : undefined;
+  const weeklyIntervalSessions =
+    composition != null ? Math.max(0, Math.round(composition.intervals)) : undefined;
+
   const placement = assignWorkoutDays({
     planStartDate: plan.startDate,
     raceDate: race.raceDate,
@@ -198,6 +206,8 @@ export async function executePlanGenerate(params: {
     intervalsPositions,
     tempoPositions,
     easyPositions,
+    weeklyTempoSessions,
+    weeklyIntervalSessions,
   });
 
   const schedule = placement.schedule;
