@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
-      gofastCity, // City slug (e.g., "boston", "new-york") - extracted from Google Maps or user input
+      citySlug, // City slug (e.g., "boston", "new-york") - extracted from Google Maps or user input
       cityName, // Optional: City name for slug generation if slug not provided
       state, // Optional: State abbreviation for slug generation
       runCrewId,
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
           : null;
 
     const hadExplicitCity = !!(
-      gofastCity?.trim() ||
+      citySlug?.trim() ||
       cityName?.trim() ||
       meetUpCity?.trim() ||
       meetUpStreetAddress?.trim()
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
         routePhotos?: unknown[];
         routeNeighborhood?: string;
         runType?: string;
-        gofastCity?: string;
+        citySlug?: string;
       };
       if (!nr.name?.trim()) {
         return NextResponse.json(
@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
               : Prisma.JsonNull,
           routeNeighborhood: nr.routeNeighborhood?.trim() || null,
           runType: nr.runType?.trim() || null,
-          gofastCity: nr.gofastCity?.trim() || null,
+          citySlug: nr.citySlug?.trim() || null,
           createdByAthleteId: athleteGeneratedId.trim(),
           updatedAt: new Date(),
         },
@@ -234,13 +234,13 @@ export async function POST(request: NextRequest) {
     if (resolvedRouteId) {
       const rc = await prisma.routes.findUnique({
         where: { id: resolvedRouteId },
-        select: { gofastCity: true },
+        select: { citySlug: true },
       });
-      routeCityFallback = rc?.gofastCity?.trim() || null;
+      routeCityFallback = rc?.citySlug?.trim() || null;
     }
 
     if (
-      !gofastCity?.trim() &&
+      !citySlug?.trim() &&
       !cityName?.trim() &&
       !meetUpCity?.trim() &&
       !meetUpStreetAddress?.trim() &&
@@ -250,7 +250,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error:
-            "gofastCity, cityName, meetUpCity, meetUpStreetAddress, or a route with gofastCity is required to determine city",
+            "citySlug, cityName, meetUpCity, meetUpStreetAddress, or a route with citySlug is required to determine city",
         },
         { status: 400 }
       );
@@ -302,9 +302,9 @@ export async function POST(request: NextRequest) {
     // Generate city slug from various inputs
     let finalCitySlug: string;
 
-    if (gofastCity?.trim()) {
+    if (citySlug?.trim()) {
       // Use provided slug (normalize it)
-      finalCitySlug = slugifyCity(gofastCity);
+      finalCitySlug = slugifyCity(citySlug);
     } else if (routeCityFallback && !hadExplicitCity) {
       finalCitySlug = slugifyCity(routeCityFallback);
     } else {
@@ -509,7 +509,7 @@ export async function POST(request: NextRequest) {
 
     const createData: Record<string, unknown> = {
       id: generateId(),
-      gofastCity: finalCitySlug,
+      citySlug: finalCitySlug,
       slug: runSlug, // URL-friendly slug for better shareability
       runCrewId: runCrewId?.trim() || null,
       runClubId: finalRunClubId, // ✅ Use FK instead of runClubSlug

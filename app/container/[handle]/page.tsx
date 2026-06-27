@@ -17,7 +17,7 @@ type PublicPayload = {
     id: string;
     title: string;
     date: string;
-    gofastCity: string;
+    citySlug: string;
     meetUpPoint: string;
     gorunPath: string;
   }[];
@@ -273,7 +273,7 @@ export default function ContainerHubPage() {
                   >
                     <span className="font-medium text-gray-900">{r.title}</span>
                     <span className="block text-gray-500 mt-1">
-                      {new Date(r.date).toLocaleString()} · {r.gofastCity}
+                      {new Date(r.date).toLocaleString()} · {r.citySlug}
                     </span>
                   </Link>
                 </li>

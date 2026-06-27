@@ -122,7 +122,7 @@ export default function RunnerCard({ runner }: Props) {
               <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span>
                 {runner.nextRun.meetUpPoint}
-                {runner.nextRun.gofastCity ? ` · ${runner.nextRun.gofastCity}` : ''}
+                {runner.nextRun.citySlug ? ` · ${runner.nextRun.citySlug}` : ''}
               </span>
             </p>
             <Link

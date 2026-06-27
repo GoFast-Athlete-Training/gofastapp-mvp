@@ -3,7 +3,7 @@ import { getDayOfWeekFromDate } from '@/lib/utils/dayOfWeek';
 import { sameDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 
 export interface GetRunsFilters {
-  gofastCity?: string;
+  citySlug?: string;
   day?: string;
   runClubSlug?: string; // Filter by slug (for URL compatibility)
   runClubId?: string; // Filter by ID (preferred)
@@ -66,8 +66,8 @@ export async function getRuns(filters: GetRunsFilters = {}) {
   });
   
   // City filter
-  if (filters.gofastCity) {
-    where.gofastCity = filters.gofastCity;
+  if (filters.citySlug) {
+    where.citySlug = filters.citySlug;
   }
   
   // RunClub filter - support both slug (URL compatibility) and ID (preferred)
@@ -110,7 +110,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
         id: true,
         slug: true,
         title: true,
-        gofastCity: true,
+        citySlug: true,
         dayOfWeek: true,
         runSeriesId: true,
         date: true,
@@ -190,7 +190,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     id: run.id,
     slug: run.slug ?? null,
     title: run.title,
-    gofastCity: run.gofastCity,
+    citySlug: run.citySlug,
     dayOfWeek: run.runSeries?.dayOfWeek ?? run.dayOfWeek,
     runSeriesId: run.runSeriesId ?? null,
     runSeries: run.runSeries ? { id: run.runSeries.id, dayOfWeek: run.runSeries.dayOfWeek, name: run.runSeries.name } : null,

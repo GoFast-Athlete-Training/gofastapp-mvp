@@ -14,7 +14,7 @@ type UpcomingRun = {
   id: string;
   title: string;
   date: string;
-  gofastCity: string;
+  citySlug: string;
   meetUpPoint: string;
   startTimeHour: number | null;
   startTimeMinute: number | null;
@@ -168,7 +168,7 @@ export default function RunWithMe({ athleteId, firstName, handle, city, upcoming
                       <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0 text-stone-400" />
                       <span className="truncate">
                         {run.meetUpPoint}
-                        {run.gofastCity ? ` \u00b7 ${run.gofastCity}` : ''}
+                        {run.citySlug ? ` \u00b7 ${run.citySlug}` : ''}
                       </span>
                     </p>
                     {time && (

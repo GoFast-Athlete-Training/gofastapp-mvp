@@ -83,7 +83,7 @@ export async function GET(
       totalMiles: run.totalMiles,
       pace: run.pace,
       description: run.description,
-      gofastCity: run.gofastCity,
+      citySlug: run.citySlug,
       runClub: run.runClub
         ? {
             id: run.runClub.id,

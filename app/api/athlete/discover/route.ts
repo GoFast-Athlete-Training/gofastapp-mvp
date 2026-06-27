@@ -187,7 +187,7 @@ export async function GET(request: Request) {
               title: true,
               date: true,
               meetUpPoint: true,
-              gofastCity: true,
+              citySlug: true,
             },
           });
 
@@ -213,7 +213,7 @@ export async function GET(request: Request) {
           title: nr.title,
           date: nr.date.toISOString(),
           meetUpPoint: nr.meetUpPoint,
-          gofastCity: nr.gofastCity,
+          citySlug: nr.citySlug,
           gorunPath: `/gorun/${nr.id}`,
         };
       }

@@ -42,7 +42,7 @@ type Payload = {
     slug: string | null;
     title: string;
     date: string;
-    gofastCity: string;
+    citySlug: string;
     meetUpPoint: string;
     meetUpStreetAddress: string | null;
     meetUpCity: string | null;
@@ -222,8 +222,8 @@ export default function MyTrainingRunPublicPage() {
                 <MapPin className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>
                   {cityRun.meetUpPoint}
-                  {cityRun.meetUpCity || cityRun.gofastCity
-                    ? ` · ${cityRun.meetUpCity || cityRun.gofastCity}`
+                  {cityRun.meetUpCity || cityRun.citySlug
+                    ? ` · ${cityRun.meetUpCity || cityRun.citySlug}`
                     : ""}
                 </span>
               </p>

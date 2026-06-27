@@ -56,7 +56,7 @@ export async function GET(
           routePhotos: true,
           routeNeighborhood: true,
           runType: true,
-          gofastCity: true,
+          citySlug: true,
         },
       },
         workout: {
@@ -93,7 +93,7 @@ export async function GET(
         id: run.id,
         slug: run.slug ?? null,
         title: run.title,
-        gofastCity: run.gofastCity,
+        citySlug: run.citySlug,
         dayOfWeek: run.dayOfWeek,
         date: run.date.toISOString(),
         runClubId: run.runClubId,
@@ -132,7 +132,7 @@ export async function GET(
               routePhotos: run.route.routePhotos as string[] | null,
               routeNeighborhood: run.route.routeNeighborhood,
               runType: run.route.runType,
-              gofastCity: run.route.gofastCity,
+              citySlug: run.route.citySlug,
             }
           : null,
         workout: run.workout

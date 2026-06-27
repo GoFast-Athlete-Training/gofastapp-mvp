@@ -82,7 +82,7 @@ type FromWorkoutBody = {
   workoutId?: string;
   /** Public listing title (defaults to workout title server-side) */
   title?: string | null;
-  gofastCity?: string;
+  citySlug?: string;
   cityName?: string;
   state?: string;
   date?: string;
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
     const {
       workoutId,
       title: titleBody,
-      gofastCity,
+      citySlug,
       cityName,
       state,
       date,
@@ -189,22 +189,22 @@ export async function POST(request: NextRequest) {
     }
 
     if (
-      !gofastCity?.trim() &&
+      !citySlug?.trim() &&
       !cityName?.trim() &&
       !meetUpCity?.trim()
     ) {
       return NextResponse.json(
         {
           error:
-            "gofastCity, cityName, or meetUpCity is required so the run can be listed",
+            "citySlug, cityName, or meetUpCity is required so the run can be listed",
         },
         { status: 400 }
       );
     }
 
     let finalCitySlug: string;
-    if (gofastCity?.trim()) {
-      finalCitySlug = slugifyCity(gofastCity);
+    if (citySlug?.trim()) {
+      finalCitySlug = slugifyCity(citySlug);
     } else {
       const cityNameToUse = (cityName || meetUpCity || "").trim();
       if (!cityNameToUse) {
@@ -297,7 +297,7 @@ export async function POST(request: NextRequest) {
 
     const createData: Record<string, unknown> = {
       id: generateId(),
-      gofastCity: finalCitySlug,
+      citySlug: finalCitySlug,
       slug: runSlug,
       runCrewId: null,
       runClubId: null,

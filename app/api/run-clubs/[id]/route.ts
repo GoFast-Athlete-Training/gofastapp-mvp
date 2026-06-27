@@ -67,7 +67,7 @@ export async function GET(
             description: true,
             seriesRunRawText: true,
             workflowStatus: true,
-            gofastCity: true,
+            citySlug: true,
             startTimeHour: true,
             startTimeMinute: true,
             startTimePeriod: true,

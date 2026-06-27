@@ -108,7 +108,7 @@ const CLUB_RUN_SELECT = {
   workflowStatus: true,
   runSeriesId: true,
   runClubId: true,
-  gofastCity: true,
+  citySlug: true,
   slug: true,
   dayOfWeek: true,
   timezone: true,
@@ -287,7 +287,7 @@ async function duplicateRunForward(
 
   const createData: Record<string, unknown> = {
     id: generateId(),
-    gofastCity: prior.gofastCity,
+    citySlug: prior.citySlug,
     slug: runSlug,
     runClubId: prior.runClubId,
     runSeriesId: prior.runSeriesId,

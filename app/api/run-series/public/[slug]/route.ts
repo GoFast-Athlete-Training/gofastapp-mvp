@@ -98,7 +98,7 @@ export async function GET(
       name: series.name,
       description: series.description,
       dayOfWeek: series.dayOfWeek,
-      gofastCity: series.gofastCity,
+      citySlug: series.citySlug,
       meetUpPoint: series.meetUpPoint,
       meetUpStreetAddress: series.meetUpStreetAddress,
       meetUpCity: series.meetUpCity,

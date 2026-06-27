@@ -63,9 +63,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const gofastCity =
-      typeof body.gofastCity === "string" && body.gofastCity.trim()
-        ? body.gofastCity.trim().toLowerCase()
+    const citySlug =
+      typeof body.citySlug === "string" && body.citySlug.trim()
+        ? body.citySlug.trim().toLowerCase()
         : "unknown";
 
     const runClubIdRaw = body.runClubId;
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
           startTimeHour: hour,
           startTimeMinute: minute,
           startTimePeriod: period,
-          gofastCity,
+          citySlug,
           raceRegistryId: reg.id,
           runClubId,
           runSeriesId: null,

@@ -74,7 +74,7 @@ export async function GET(
         seriesRunRawText: series.seriesRunRawText,
         runClubId: series.runClubId,
         workflowStatus: series.workflowStatus,
-        gofastCity: series.gofastCity,
+        citySlug: series.citySlug,
         meetUpPoint: series.meetUpPoint,
         meetUpStreetAddress: series.meetUpStreetAddress,
         meetUpCity: series.meetUpCity,
@@ -157,7 +157,7 @@ export async function PUT(
     }
 
     const allowed = [
-      'name', 'description', 'runType', 'totalMiles', 'routeNeighborhood', 'workoutDescription', 'postRunActivity', 'seriesRunRawText', 'gofastCity', 'meetUpPoint', 'meetUpStreetAddress',
+      'name', 'description', 'runType', 'totalMiles', 'routeNeighborhood', 'workoutDescription', 'postRunActivity', 'seriesRunRawText', 'citySlug', 'meetUpPoint', 'meetUpStreetAddress',
       'meetUpCity', 'meetUpState', 'meetUpPlaceId', 'meetUpLat', 'meetUpLng',
       'endPoint', 'endStreetAddress', 'endCity', 'endState',
       'startTimeHour', 'startTimeMinute', 'startTimePeriod', 'startDate', 'endDate', 'slug',
@@ -213,7 +213,7 @@ export async function PUT(
         seriesRunRawText: series.seriesRunRawText,
         runClubId: series.runClubId,
         workflowStatus: series.workflowStatus,
-        gofastCity: series.gofastCity,
+        citySlug: series.citySlug,
         meetUpPoint: series.meetUpPoint,
         meetUpStreetAddress: series.meetUpStreetAddress,
         meetUpCity: series.meetUpCity,

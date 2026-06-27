@@ -29,7 +29,7 @@ export async function GET(
         routePhotos: true,
         routeNeighborhood: true,
         runType: true,
-        gofastCity: true,
+        citySlug: true,
       },
     });
 

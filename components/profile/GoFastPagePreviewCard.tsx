@@ -76,7 +76,7 @@ export type GoFastPagePayload = {
     slug: string | null;
     title: string;
     date: string;
-    gofastCity: string;
+    citySlug: string;
     meetUpPoint: string;
     startTimeHour: number | null;
     startTimeMinute: number | null;
@@ -336,7 +336,7 @@ export default function GoFastPagePreviewCard({
                             {r.title}
                           </p>
                           <p className="text-sm text-zinc-400 mt-1">
-                            {formatWhen(r.date)} · {r.gofastCity}
+                            {formatWhen(r.date)} · {r.citySlug}
                           </p>
                           <p className="text-sm text-zinc-500 mt-0.5">{r.meetUpPoint}</p>
                         </div>

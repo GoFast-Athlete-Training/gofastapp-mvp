@@ -219,8 +219,8 @@ export default function CreateCityRunForm({
       return;
     }
 
-    const gofastCity = generateCitySlugFromParts(meetUpCity, meetUpState);
-    if (!gofastCity) {
+    const citySlug = generateCitySlugFromParts(meetUpCity, meetUpState);
+    if (!citySlug) {
       setError("We need a valid city for listings.");
       return;
     }
@@ -245,7 +245,7 @@ export default function CreateCityRunForm({
       const { data } = await api.post<CityRunFromWorkoutSuccess>("/cityrun/from-workout", {
         workoutId: workout.id,
         title: effectiveTitle,
-        gofastCity,
+        citySlug,
         cityName: meetUpCity.trim(),
         state: meetUpState.trim(),
         date: runDate,

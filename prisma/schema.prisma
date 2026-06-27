@@ -328,12 +328,17 @@ model city_run_activity_links {
 }
 
 model cities {
-  id        String   @id
-  slug      String   @unique
-  name      String
-  state     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime
+  id            String          @id
+  slug          String          @unique
+  name          String
+  state         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime
+  run_clubs     run_clubs[]
+  run_series    run_series[]
+  city_runs     city_runs[]
+  routes        routes[]
+  run_locations run_locations[]
 
   @@index([name])
   @@index([slug])
@@ -724,7 +729,17 @@ model run_clubs {
   logoUrl      String?
   city         String?
   /// Canonical city slug (dc, arlington) — synced from Company prodpush; computed from city when set.
-  gofastCity   String?
+  citySlug     String?
+  /// FK to cities — server-derived on save for city guide hydration.
+  cityId       String?
+  cities       cities?  @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  /// HQ / central office from Google Places (affiliation canon).
+  hqPlaceId          String?
+  hqFormattedAddress String?
+  hqStreet           String?
+  hqZip              String?
+  hqLat              Float?
+  hqLng              Float?
   /// Club runs in multiple municipalities; series rows need per-row city from Places.
   isMultiSite  Boolean  @default(false)
   state        String?
@@ -750,6 +765,8 @@ model run_clubs {
 
   @@index([brandId])
   @@index([city])
+  @@index([cityId])
+  @@index([citySlug])
   @@index([slug])
 }
 
@@ -993,15 +1010,18 @@ model routes {
   routePhotos        Json?
   routeNeighborhood  String?
   runType            String?
-  /// City slug for lookup (e.g. dc); city_runs.gofastCity remains source of truth for the event.
-  gofastCity         String?
+  /// City slug for lookup (e.g. dc); city_runs.citySlug remains source of truth for the event.
+  citySlug           String?
+  cityId             String?
+  cities             cities?  @relation(fields: [cityId], references: [id], onDelete: SetNull)
   createdByAthleteId String
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   createdBy          Athlete  @relation(fields: [createdByAthleteId], references: [id], onDelete: Cascade)
   city_runs          city_runs[]
 
-  @@index([gofastCity])
+  @@index([citySlug])
+  @@index([cityId])
   @@index([name])
   @@map("routes")
 }
@@ -1039,7 +1059,9 @@ model city_runs {
   runClubId           String?
   athleteGeneratedId  String?
   staffGeneratedId    String?
-  gofastCity          String
+  citySlug            String
+  cityId              String?
+  cities              cities?              @relation(fields: [cityId], references: [id], onDelete: SetNull)
   slug                String?              @unique // URL-friendly slug: "title-of-run" (generated from title)
   dayOfWeek           String?
   workflowStatus      RunWorkflowStatus    @default(DEVELOP)
@@ -1081,7 +1103,8 @@ model city_runs {
   workout             workouts?            @relation(fields: [workoutId], references: [id], onDelete: SetNull)
 
   @@index([athleteGeneratedId])
-  @@index([gofastCity])
+  @@index([citySlug])
+  @@index([cityId])
   @@index([slug])
   @@index([date])
   @@index([dayOfWeek])
@@ -1123,7 +1146,9 @@ model run_series {
   name                String?              // series label, e.g. "Tuesday Tempo"
   description         String?              // series blurb — seeds each new occurrence's description
   seriesRunRawText    String?              // series-specific raw text (neighborhood, meetup details, etc.) — persisted
-  gofastCity          String?              // city slug (e.g. "dc", "arlington") — same for all occurrences
+  citySlug            String?              // city slug (e.g. "dc", "arlington") — same for all occurrences
+  cityId              String?
+  cities              cities?              @relation(fields: [cityId], references: [id], onDelete: SetNull)
   meetUpPoint         String?              // canonical meeting location name (same corner every week)
   meetUpStreetAddress String?
   meetUpCity          String?
@@ -1152,7 +1177,8 @@ model run_series {
   runClub             run_clubs?           @relation(fields: [runClubId], references: [id], onDelete: SetNull)
 
   @@index([runClubId])
-  @@index([gofastCity])
+  @@index([citySlug])
+  @@index([cityId])
   @@index([dayOfWeek])
   @@index([workflowStatus])
   @@map("run_series")
@@ -2154,10 +2180,12 @@ model training_cohort_announcements {
 }
 
 // Route/location catalogue. Created manually or auto-seeded from run meetUpPoint/title.
-// Raw on creation (just name + gofastCity); attributes filled in over time.
+// Raw on creation (just name + citySlug); attributes filled in over time.
 model run_locations {
   id          String         @id @default(cuid())
-  gofastCity  String                               // "dc", "arlington" — same slug pattern as city_runs
+  citySlug    String                               // "dc", "arlington" — same slug pattern as city_runs
+  cityId      String?
+  cities      cities?        @relation(fields: [cityId], references: [id], onDelete: SetNull)
   name        String                               // "Haines Point", "Custis Trail"
   slug        String         @unique               // auto-generated from name
   runType     String?                              // "park" | "track" | "trail" | "neighborhood"
@@ -2176,7 +2204,8 @@ model run_locations {
   updatedAt   DateTime       @updatedAt
   city_runs   city_runs[]
 
-  @@index([gofastCity])
+  @@index([citySlug])
+  @@index([cityId])
   @@index([slug])
   @@map("run_locations")
 }

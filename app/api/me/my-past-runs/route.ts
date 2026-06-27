@@ -46,7 +46,7 @@ export async function GET(request: Request) {
             id: true,
             title: true,
             date: true,
-            gofastCity: true,
+            citySlug: true,
             runClub: {
               select: {
                 id: true,
@@ -67,7 +67,7 @@ export async function GET(request: Request) {
       id: r.city_runs.id,
       title: r.city_runs.title,
       date: r.city_runs.date.toISOString(),
-      city: r.city_runs.gofastCity,
+      city: r.city_runs.citySlug,
       runClub: r.city_runs.runClub,
     }));
 

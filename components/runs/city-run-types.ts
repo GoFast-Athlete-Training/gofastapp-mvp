@@ -26,7 +26,7 @@ export interface RunSeries {
   startTimeHour: number | null;
   startTimeMinute: number | null;
   startTimePeriod: string | null;
-  gofastCity: string | null;
+  citySlug: string | null;
 }
 
 export interface CityRunRsvp {
@@ -92,7 +92,7 @@ export interface CityRunDetails {
   id: string;
   slug?: string | null;
   title: string;
-  gofastCity?: string;
+  citySlug?: string;
   dayOfWeek: string | null;
   date: string;
   runSeriesId?: string | null;

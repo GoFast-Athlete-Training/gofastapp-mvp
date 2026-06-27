@@ -152,7 +152,7 @@ export async function GET(
           id: true,
           slug: true,
           title: true,
-          gofastCity: true,
+          citySlug: true,
           dayOfWeek: true,
           date: true,
           runClubId: true,
@@ -251,7 +251,7 @@ export async function GET(
             startTimeHour: true,
             startTimeMinute: true,
             startTimePeriod: true,
-            gofastCity: true,
+            citySlug: true,
           },
         },
       },
@@ -268,7 +268,7 @@ export async function GET(
           id: true,
           slug: true,
           title: true,
-          gofastCity: true,
+          citySlug: true,
           dayOfWeek: true,
           date: true,
           runClubId: true,
@@ -330,7 +330,7 @@ export async function GET(
               startTimeHour: true,
               startTimeMinute: true,
               startTimePeriod: true,
-              gofastCity: true,
+              citySlug: true,
             },
           },
         },
@@ -425,7 +425,7 @@ export async function GET(
         id: run.id,
         slug: run.slug ?? null,
         title: run.title,
-        gofastCity: run.gofastCity,
+        citySlug: run.citySlug,
         // For series: dayOfWeek from setup is source of truth; fallback to run.dayOfWeek (legacy)
         dayOfWeek: run.runSeries?.dayOfWeek ?? run.dayOfWeek,
         runSeriesId: run.runSeriesId ?? null,
@@ -539,7 +539,7 @@ export async function PUT(
         shakeoutDedupeKey: true,
         raceRegistryId: true,
         cityRunType: true,
-        gofastCity: true,
+        citySlug: true,
       },
     });
 
@@ -554,12 +554,12 @@ export async function PUT(
       const locationName = body.runLocationName === null || body.runLocationName === '' ? null : String(body.runLocationName).trim();
       if (locationName) {
         try {
-          const citySlug = run.gofastCity || 'unknown';
+          const citySlug = run.citySlug || 'unknown';
           const nameSlug = locationName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
           const slug = `${citySlug}-${nameSlug}`;
           const location = await prisma.run_locations.upsert({
             where: { slug },
-            create: { slug, name: locationName, gofastCity: citySlug },
+            create: { slug, name: locationName, citySlug: citySlug },
             update: {},
             select: { id: true },
           });

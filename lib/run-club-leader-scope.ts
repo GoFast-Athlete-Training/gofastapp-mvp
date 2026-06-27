@@ -26,7 +26,7 @@ export const STAFF_ONLY_RUN_CLUB_FIELDS = [
   'state',
   'neighborhood',
   'runUrl',
-  'gofastCity',
+  'citySlug',
   'isMultiSite',
   'brandId',
   'brandSlug',

@@ -20,7 +20,7 @@ export type DiscoverRunnerCard = {
     title: string;
     date: string;
     meetUpPoint: string;
-    gofastCity: string;
+    citySlug: string;
     gorunPath: string;
   } | null;
 };

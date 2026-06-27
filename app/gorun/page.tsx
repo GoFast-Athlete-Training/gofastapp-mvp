@@ -13,7 +13,7 @@ type HubRunRow = { id: string; title: string; date: string; city: string };
 interface Run {
   id: string;
   title: string;
-  gofastCity: string;
+  citySlug: string;
   isRecurring: boolean;
   dayOfWeek: string | null;
   startDate: string;
@@ -84,7 +84,7 @@ function GoRunPageContent() {
       setLoading(true);
       const params = new URLSearchParams();
       if (cityFilter && cityFilter !== 'All Cities') {
-        params.append('gofastCity', cityFilter);
+        params.append('citySlug', cityFilter);
       }
       if (dayFilter && dayFilter !== 'All Days') {
         params.append('day', dayFilter);
@@ -125,7 +125,7 @@ function GoRunPageContent() {
         const fetchedRuns = runsRes.value.data.runs || [];
         setRuns(fetchedRuns);
 
-        const cities: string[] = [...new Set(fetchedRuns.map((r: Run) => r.gofastCity))].sort() as string[];
+        const cities: string[] = [...new Set(fetchedRuns.map((r: Run) => r.citySlug))].sort() as string[];
         setAvailableCities(cities);
 
         const days = new Set<string>();
@@ -420,9 +420,9 @@ function GoRunPageContent() {
         {runs.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {runs.map((run) => {
-              // Format city name from gofastCity or use meetUpCity
+              // Format city name from citySlug or use meetUpCity
               const cityName = run.meetUpCity || 
-                run.gofastCity.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                run.citySlug.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
               
               return (
                 <div

@@ -45,7 +45,7 @@ interface Series {
   name: string | null;
   description: string | null;
   dayOfWeek: string;
-  gofastCity: string | null;
+  citySlug: string | null;
   meetUpPoint: string | null;
   meetUpStreetAddress: string | null;
   meetUpCity: string | null;

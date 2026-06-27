@@ -51,6 +51,10 @@ export async function POST(request: NextRequest) {
     });
 
     // Product app owns parse/validate/transform - all the magic happens here
+    /** Resolved from `brandSlug` for updates (relation) and creates (unchecked `brandId`). */
+    let brandIdPatch: string | null | undefined = undefined;
+    let cityIdPatch: string | null | undefined = undefined;
+
     const updateData: Prisma.run_clubsUpdateInput = {
       name: nameVal,
       slug: slugFinal,
@@ -71,18 +75,67 @@ export async function POST(request: NextRequest) {
       syncedAt: new Date(),
     };
 
-    if ("gofastCity" in rc) {
-      updateData.gofastCity =
-        rc.gofastCity != null && String(rc.gofastCity).trim() !== ""
-          ? String(rc.gofastCity).trim()
+    if ("citySlug" in rc || "gofastCity" in rc) {
+      const raw =
+        "citySlug" in rc ? rc.citySlug : rc.gofastCity;
+      updateData.citySlug =
+        raw != null && String(raw).trim() !== ""
+          ? String(raw).trim().toLowerCase()
+          : null;
+    }
+    if ("cityId" in rc) {
+      const raw = rc.cityId;
+      cityIdPatch =
+        raw != null && String(raw).trim() !== ""
+          ? String(raw).trim()
+          : null;
+      updateData.cities =
+        cityIdPatch === null
+          ? { disconnect: true }
+          : cityIdPatch
+            ? { connect: { id: cityIdPatch } }
+            : { disconnect: true };
+    }
+    if ("hqPlaceId" in rc) {
+      updateData.hqPlaceId =
+        rc.hqPlaceId != null && String(rc.hqPlaceId).trim() !== ""
+          ? String(rc.hqPlaceId).trim()
+          : null;
+    }
+    if ("hqFormattedAddress" in rc) {
+      updateData.hqFormattedAddress =
+        rc.hqFormattedAddress != null && String(rc.hqFormattedAddress).trim() !== ""
+          ? String(rc.hqFormattedAddress).trim()
+          : null;
+    }
+    if ("hqStreet" in rc) {
+      updateData.hqStreet =
+        rc.hqStreet != null && String(rc.hqStreet).trim() !== ""
+          ? String(rc.hqStreet).trim()
+          : null;
+    }
+    if ("hqZip" in rc) {
+      updateData.hqZip =
+        rc.hqZip != null && String(rc.hqZip).trim() !== ""
+          ? String(rc.hqZip).trim()
+          : null;
+    }
+    if ("hqLat" in rc) {
+      updateData.hqLat =
+        typeof rc.hqLat === "number" && Number.isFinite(rc.hqLat)
+          ? rc.hqLat
+          : null;
+    }
+    if ("hqLng" in rc) {
+      updateData.hqLng =
+        typeof rc.hqLng === "number" && Number.isFinite(rc.hqLng)
+          ? rc.hqLng
           : null;
     }
     if ("isMultiSite" in rc) {
       updateData.isMultiSite = rc.isMultiSite === true;
     }
 
-    /** Resolved from `brandSlug` for updates (relation) and creates (unchecked `brandId`). */
-    let brandIdPatch: string | null | undefined = undefined;
     if ("brandSlug" in rc) {
       const raw = rc.brandSlug;
       if (raw == null || (typeof raw === "string" && !raw.trim())) {
@@ -103,11 +156,12 @@ export async function POST(request: NextRequest) {
     const toUncheckedCreate = (
       extra: Record<string, unknown>
     ): Prisma.run_clubsUncheckedCreateInput => {
-      const { brands: _drop, ...rest } = updateData as Record<string, unknown>;
+      const { brands: _b, cities: _c, ...rest } = updateData as Record<string, unknown>;
       return {
         ...rest,
         ...extra,
         ...(brandIdPatch !== undefined ? { brandId: brandIdPatch } : {}),
+        ...(cityIdPatch !== undefined ? { cityId: cityIdPatch } : {}),
       } as Prisma.run_clubsUncheckedCreateInput;
     };
 

@@ -24,7 +24,7 @@ export async function GET(request: Request) {
             id: true,
             title: true,
             date: true,
-            gofastCity: true,
+            citySlug: true,
           },
         },
       },
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
       id: c.city_runs.id,
       title: c.city_runs.title,
       date: c.city_runs.date.toISOString(),
-      city: c.city_runs.gofastCity,
+      city: c.city_runs.citySlug,
     }));
 
     return NextResponse.json({ runs });

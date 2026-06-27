@@ -6,13 +6,13 @@ import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/routes?q=&gofastCity=
- * Search saved routes: authenticated user's routes OR routes in gofastCity (when city filter set).
+ * GET /api/routes?q=&citySlug=
+ * Search saved routes: authenticated user's routes OR routes in citySlug (when city filter set).
  */
 export async function GET(request: NextRequest) {
   try {
     const q = (request.nextUrl.searchParams.get("q") || "").trim();
-    const gofastCity = (request.nextUrl.searchParams.get("gofastCity") || "").trim();
+    const citySlug = (request.nextUrl.searchParams.get("citySlug") || "").trim();
 
     if (!q || q.length < 1) {
       return NextResponse.json(
@@ -39,19 +39,19 @@ export async function GET(request: NextRequest) {
         name: nameFilter,
         OR: [
           { createdByAthleteId: athleteId },
-          ...(gofastCity ? [{ gofastCity: gofastCity }] : []),
+          ...(citySlug ? [{ citySlug: citySlug }] : []),
         ],
       };
-    } else if (gofastCity) {
+    } else if (citySlug) {
       where = {
         name: nameFilter,
-        gofastCity: gofastCity,
+        citySlug: citySlug,
       };
     } else {
       return NextResponse.json(
         {
           success: false,
-          error: "Provide Authorization or gofastCity for route search",
+          error: "Provide Authorization or citySlug for route search",
         },
         { status: 400 }
       );
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
         routePhotos: true,
         routeNeighborhood: true,
         runType: true,
-        gofastCity: true,
+        citySlug: true,
       },
     });
 
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
         routeNeighborhood:
           typeof body.routeNeighborhood === "string" ? body.routeNeighborhood.trim() || null : null,
         runType: typeof body.runType === "string" ? body.runType.trim() || null : null,
-        gofastCity: typeof body.gofastCity === "string" ? body.gofastCity.trim() || null : null,
+        citySlug: typeof body.citySlug === "string" ? body.citySlug.trim() || null : null,
         createdByAthleteId: athlete.id,
         updatedAt: new Date(),
       },

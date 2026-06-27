@@ -36,7 +36,7 @@ export async function OPTIONS() {
  *   runClubSlug         string  (optional) — preferred lookup when runClub not provided
  *   name                string  (optional) — series label e.g. "Tuesday Tempo"
  *   description         string  (optional) — series blurb; seeds first run description
- *   gofastCity          string  (optional) — city slug
+ *   citySlug          string  (optional) — city slug
  *   meetUpPoint         string  (optional)
  *   meetUpStreetAddress string  (optional)
  *   meetUpCity          string  (optional)
@@ -68,7 +68,8 @@ export async function POST(request: NextRequest) {
       dayOfWeek,
       name,
       description,
-      gofastCity,
+      citySlug,
+      cityId,
       meetUpPoint,
       meetUpStreetAddress,
       meetUpCity,
@@ -263,7 +264,8 @@ export async function POST(request: NextRequest) {
       routeNeighborhood: routeNeighborhood?.trim() || null,
       workoutDescription: workoutDescription?.trim() || null,
       postRunActivity: postRunActivity?.trim() || null,
-      gofastCity: gofastCity?.trim() || null,
+      citySlug: citySlug?.trim() || null,
+      cityId: cityId?.trim() ? String(cityId).trim() : null,
       meetUpPoint: meetUpPoint?.trim() || null,
       meetUpStreetAddress: meetUpStreetAddress?.trim() || null,
       meetUpCity: meetUpCity?.trim() || null,
@@ -294,7 +296,7 @@ export async function POST(request: NextRequest) {
     } else {
       const slugHint =
         seriesSlugTrim ||
-        buildSeriesSlug(runClub.slug || runClub.id, canonicalDay, gofastCity || meetUpCity);
+        buildSeriesSlug(runClub.slug || runClub.id, canonicalDay, citySlug || meetUpCity);
       const slug = await generateUniqueSeriesSlug(prisma, slugifyForSeries(slugHint));
       setup = await prisma.run_series.create({
         data: {
@@ -353,11 +355,11 @@ export async function POST(request: NextRequest) {
     const formattedDate = formatCalendarDate(runDate, { month: 'short', day: 'numeric' });
     const runTitle = `${setup.name} – ${formattedDate}`;
 
-    if (!setup.gofastCity && !meetUpCity) {
-      return NextResponse.json({ success: false, error: 'gofastCity or meetUpCity is required to create the first run' }, { status: 400 });
+    if (!setup.citySlug && !meetUpCity) {
+      return NextResponse.json({ success: false, error: 'citySlug or meetUpCity is required to create the first run' }, { status: 400 });
     }
 
-    const finalCitySlug = setup.gofastCity || slugify(meetUpCity || '');
+    const finalCitySlug = setup.citySlug || slugify(meetUpCity || '');
 
     const runId = generateId();
     const run = await prisma.city_runs.create({
@@ -370,7 +372,7 @@ export async function POST(request: NextRequest) {
         workflowStatus: 'DEVELOP',
         dayOfWeek: canonicalDay,
         date: runDate,
-        gofastCity: finalCitySlug,
+        citySlug: finalCitySlug,
         meetUpPoint: setup.meetUpPoint || '',
         meetUpStreetAddress: setup.meetUpStreetAddress || null,
         meetUpCity: setup.meetUpCity || null,

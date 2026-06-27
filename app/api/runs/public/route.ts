@@ -9,7 +9,7 @@ import { getRuns } from '@/lib/domain-runs';
  * PUBLIC endpoint to get runs with optional filters (no authentication required)
  * 
  * Query params:
- * - gofastCity (optional) - Filter by city slug
+ * - citySlug (optional) - Filter by city slug
  * - day (optional) - Filter by day of week ("Monday", "Tuesday", etc.)
  * - runClubSlug (optional) - Filter by RunClub slug
  * 
@@ -23,12 +23,12 @@ export async function GET(request: Request) {
   try {
     // Parse query params
     const { searchParams } = new URL(request.url);
-    const gofastCity = searchParams.get('gofastCity') || undefined;
+    const citySlug = searchParams.get('citySlug') || undefined;
     const day = searchParams.get('day') || undefined;
     const runClubSlug = searchParams.get('runClubSlug') || undefined;
 
     // Get runs with filters (public-safe data only)
-    const runs = await getRuns({ gofastCity, day, runClubSlug });
+    const runs = await getRuns({ citySlug, day, runClubSlug });
 
     return NextResponse.json({
       success: true,
