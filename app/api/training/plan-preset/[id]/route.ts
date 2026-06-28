@@ -15,6 +15,7 @@ import {
   parsePresetStrategyFromBody,
   presetStrategyToPrismaJson,
 } from "@/lib/training/preset-strategy";
+import { attachEntityFields } from "@/lib/training/plan-entity-serialize";
 
 function isDow1to7(n: number): boolean {
   return Number.isInteger(n) && n >= 1 && n <= 7;
@@ -69,6 +70,8 @@ const presetInclude = {
       },
     },
   },
+  persona: true,
+  goal: { include: { persona: true } },
 } as const;
 
 export async function GET(
@@ -86,7 +89,13 @@ export async function GET(
   if (!preset) {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json({ success: true, preset: serializePlanPresetForApi(preset) });
+  return NextResponse.json({
+    success: true,
+    preset: attachEntityFields(serializePlanPresetForApi(preset), {
+      persona: preset.persona ?? null,
+      goal: preset.goal ?? null,
+    }),
+  });
 }
 
 export async function PATCH(
@@ -310,7 +319,13 @@ export async function PATCH(
       include: presetInclude,
     });
 
-    return NextResponse.json({ success: true, preset: serializePlanPresetForApi(updated) });
+    return NextResponse.json({
+      success: true,
+      preset: attachEntityFields(serializePlanPresetForApi(updated), {
+        persona: updated.persona ?? null,
+        goal: updated.goal ?? null,
+      }),
+    });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Server error";
     console.error("PATCH /api/training/plan-preset/[id]", e);

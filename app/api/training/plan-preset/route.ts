@@ -15,6 +15,9 @@ import {
   parsePresetStrategyFromBody,
   presetStrategyToPrismaJson,
 } from "@/lib/training/preset-strategy";
+import { resolvePersonaAndGoalFromBody } from "@/lib/training/plan-persona-goal";
+import { attachEntityFields } from "@/lib/training/plan-entity-serialize";
+import { buildPresetSlug } from "@/lib/training/plan-entity-slugs";
 
 function slugifyPresetTitle(title: string): string {
   const s = title
@@ -78,6 +81,8 @@ const presetInclude = {
       },
     },
   },
+  persona: true,
+  goal: { include: { persona: true } },
 } as const;
 
 export async function GET(request: NextRequest) {
@@ -91,11 +96,18 @@ export async function GET(request: NextRequest) {
       intervalsConfig: { select: { id: true, name: true, description: true } },
       tempoConfig: { select: { id: true, name: true, description: true } },
       easyConfig: { select: { id: true, name: true, description: true } },
+      persona: true,
+      goal: { include: { persona: true } },
     },
   });
   return NextResponse.json({
     success: true,
-    presets: presets.map(serializePlanPresetForApi),
+    presets: presets.map((p) =>
+      attachEntityFields(serializePlanPresetForApi(p), {
+        persona: p.persona ?? null,
+        goal: p.goal ?? null,
+      })
+    ),
   });
 }
 
@@ -117,8 +129,47 @@ export async function POST(request: NextRequest) {
     const slugRaw =
       typeof slugBody === "string" && slugBody.trim()
         ? slugBody.trim().toLowerCase()
-        : slugifyPresetTitle(title);
-    const slug = slugRaw.replace(/[^a-z0-9-]/g, "").replace(/^-+|-+$/g, "") || slugifyPresetTitle(title);
+        : typeof body.presetSlug === "string" && body.presetSlug.trim()
+          ? body.presetSlug.trim().toLowerCase()
+          : slugifyPresetTitle(title);
+    let slug = slugRaw.replace(/[^a-z0-9-]/g, "").replace(/^-+|-+$/g, "") || slugifyPresetTitle(title);
+
+    let personaGoalLink: Awaited<ReturnType<typeof resolvePersonaAndGoalFromBody>> = null;
+    const skipEntityLink = body.skipEntityLink === true;
+    const shouldLinkEntities =
+      !skipEntityLink &&
+      ("personaSlug" in body ||
+        "goalSlug" in body ||
+        "personaId" in body ||
+        "goalId" in body ||
+        ("planDurationWeeks" in body && "athletePersonaCapability" in body));
+
+    if (shouldLinkEntities) {
+      try {
+        personaGoalLink = await resolvePersonaAndGoalFromBody(body as Record<string, unknown>);
+        if (personaGoalLink && !slugBody && !body.presetSlug) {
+          const weeks =
+            typeof body.planDurationWeeks === "number"
+              ? body.planDurationWeeks
+              : 12;
+          slug =
+            buildPresetSlug({
+              targetDistanceLabel:
+                typeof body.targetDistanceLabel === "string"
+                  ? body.targetDistanceLabel
+                  : null,
+              goalKind:
+                body.goalKind === "TRAINING_BLOCK" || body.goalKind === "trainingBlock"
+                  ? "TRAINING_BLOCK"
+                  : "RACE",
+              planDurationWeeks: weeks,
+            }) || slug;
+        }
+      } catch (linkErr: unknown) {
+        const msg = linkErr instanceof Error ? linkErr.message : "Invalid persona/goal";
+        return NextResponse.json({ success: false, error: msg }, { status: 400 });
+      }
+    }
 
     const existing = await prisma.training_plan_preset.findUnique({ where: { slug } });
     if (existing) {
@@ -262,6 +313,12 @@ export async function POST(request: NextRequest) {
     const presetData: Prisma.training_plan_presetCreateInput = {
       slug,
       title: String(title).trim(),
+      ...(personaGoalLink
+        ? {
+            persona: { connect: { id: personaGoalLink.personaId } },
+            goal: { connect: { id: personaGoalLink.goalId } },
+          }
+        : {}),
       description:
         typeof description === "string" && description.trim()
           ? description.trim()
@@ -355,7 +412,19 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { success: true, preset: serializePlanPresetForApi(preset) },
+      {
+        success: true,
+        preset: attachEntityFields(serializePlanPresetForApi(preset), {
+          persona: preset.persona ?? null,
+          goal: preset.goal ?? null,
+        }),
+        ...(personaGoalLink
+          ? {
+              personaSlug: personaGoalLink.personaSlug,
+              goalSlug: personaGoalLink.goalSlug,
+            }
+          : {}),
+      },
       { status: 201 }
     );
   } catch (e: unknown) {

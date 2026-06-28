@@ -1253,6 +1253,66 @@ enum AthletePersonaDedication {
   ELITE
 }
 
+enum FitnessDelta {
+  SMALL
+  MODERATE
+  LARGE
+}
+
+enum ProgressionAggressiveness {
+  CONSERVATIVE
+  MODERATE
+  AMBITIOUS
+}
+
+enum TrainingPlanGoalKind {
+  RACE
+  TRAINING_BLOCK
+}
+
+/// Reusable athlete archetype — time-agnostic slug (e.g. new-5k-improve).
+model training_plan_persona {
+  id                  String                    @id @default(cuid())
+  slug                String                    @unique
+  title               String
+  capability          AthletePersonaCapability?
+  dedication          AthletePersonaDedication?
+  personaGoalLabel    String?
+  workoutFrequencyCap Int?
+  intentSummary       String?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+
+  goals   training_plan_goal[]
+  presets training_plan_preset[]
+
+  @@index([capability])
+}
+
+/// Bounded goal with time horizon — slug includes weeks (e.g. new-5k-improve-12w).
+model training_plan_goal {
+  id                        String                      @id @default(cuid())
+  slug                      String                      @unique
+  personaId                 String
+  persona                   training_plan_persona       @relation(fields: [personaId], references: [id], onDelete: Restrict)
+  targetDistanceLabel       String?
+  objectiveOfPlan           String?
+  planDurationWeeks         Int
+  timeHorizonLabel          String?
+  fitnessDelta              FitnessDelta?
+  progressionAggressiveness ProgressionAggressiveness?
+  intensityReasoning        String?
+  goalKind                  TrainingPlanGoalKind?
+  coachIntent               String?
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @updatedAt
+
+  presets training_plan_preset[]
+
+  @@index([personaId])
+  @@index([planDurationWeeks])
+}
+
 model training_plan_preset {
   id          String  @id @default(cuid())
   slug        String  @unique
@@ -1262,6 +1322,11 @@ model training_plan_preset {
   publicDescription String?
   /// Canonical distance label (e.g. "Marathon") from COMMON_RACE_DISTANCE_PRESETS; null = any distance.
   targetDistanceLabel String?
+
+  personaId String?
+  goalId    String?
+  persona   training_plan_persona? @relation(fields: [personaId], references: [id], onDelete: SetNull)
+  goal      training_plan_goal?    @relation(fields: [goalId], references: [id], onDelete: SetNull)
 
   /// Staff/coach free-text intent that drove preset design (AI or manual).
   coachIntent String?
