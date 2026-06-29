@@ -16,6 +16,7 @@ import {
   presetStrategyToPrismaJson,
 } from "@/lib/training/preset-strategy";
 import { attachEntityFields } from "@/lib/training/plan-entity-serialize";
+import { resolvePersonaAndGoalFromBody } from "@/lib/training/plan-persona-goal";
 
 function isDow1to7(n: number): boolean {
   return Number.isInteger(n) && n >= 1 && n <= 7;
@@ -308,6 +309,89 @@ export async function PATCH(
     const rotationCheck = validatePresetRotationConfigs(rotationPreset);
     if (!rotationCheck.ok) {
       return NextResponse.json({ success: false, error: rotationCheck.error }, { status: 400 });
+    }
+
+    if ("personaId" in body) {
+      const pid = typeof body.personaId === "string" ? body.personaId.trim() : "";
+      if (!pid) {
+        presetData.persona = { disconnect: true };
+      } else {
+        const persona = await prisma.training_plan_persona.findUnique({ where: { id: pid } });
+        if (!persona) {
+          return NextResponse.json({ success: false, error: "personaId is not valid" }, { status: 400 });
+        }
+        presetData.persona = { connect: { id: pid } };
+        if (existing.goalId) {
+          await prisma.training_plan_goal.update({
+            where: { id: existing.goalId },
+            data: { personaId: pid },
+          });
+        }
+      }
+    } else if ("goalId" in body) {
+      const gid = typeof body.goalId === "string" ? body.goalId.trim() : "";
+      if (!gid) {
+        presetData.goal = { disconnect: true };
+      } else {
+        const goal = await prisma.training_plan_goal.findUnique({ where: { id: gid } });
+        if (!goal) {
+          return NextResponse.json({ success: false, error: "goalId is not valid" }, { status: 400 });
+        }
+        presetData.goal = { connect: { id: gid } };
+        if (!("personaId" in body) && goal.personaId) {
+          presetData.persona = { connect: { id: goal.personaId } };
+        }
+      }
+    } else if (
+      "athletePersonaCapability" in body ||
+      "athletePersonaGoal" in body ||
+      "athletePersonaDedication" in body
+    ) {
+      const goalRow = existing.goalId
+        ? await prisma.training_plan_goal.findUnique({ where: { id: existing.goalId } })
+        : null;
+      try {
+        const link = await resolvePersonaAndGoalFromBody({
+          ...bodyRec,
+          title:
+            typeof body.title === "string" && body.title.trim()
+              ? body.title.trim()
+              : existing.title,
+          planDurationWeeks: goalRow?.planDurationWeeks ?? 12,
+          targetDistanceLabel:
+            goalRow?.targetDistanceLabel ??
+            (typeof body.targetDistanceLabel === "string" ? body.targetDistanceLabel : null),
+          goalKind: goalRow?.goalKind ?? body.goalKind,
+          coachIntent:
+            typeof body.coachIntent === "string" ? body.coachIntent : goalRow?.coachIntent,
+          objectiveOfPlan:
+            typeof body.objectiveOfPlan === "string"
+              ? body.objectiveOfPlan
+              : goalRow?.objectiveOfPlan,
+        });
+        if (link) {
+          presetData.persona = { connect: { id: link.personaId } };
+          presetData.goal = { connect: { id: link.goalId } };
+        }
+      } catch (linkErr: unknown) {
+        const msg = linkErr instanceof Error ? linkErr.message : "Invalid persona/goal";
+        return NextResponse.json({ success: false, error: msg }, { status: 400 });
+      }
+    }
+
+    if ("workoutStructure" in body) {
+      const v = bodyRec.workoutStructure;
+      if (v === null) {
+        presetData.workoutStructure = Prisma.JsonNull;
+      } else if (v !== undefined) {
+        if (typeof v !== "object" || v === null || Array.isArray(v)) {
+          return NextResponse.json(
+            { success: false, error: "workoutStructure must be an object or null" },
+            { status: 400 }
+          );
+        }
+        presetData.workoutStructure = v as Prisma.InputJsonValue;
+      }
     }
 
     const updated = await prisma.training_plan_preset.update({

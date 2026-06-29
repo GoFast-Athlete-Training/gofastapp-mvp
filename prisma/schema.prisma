@@ -1270,6 +1270,12 @@ enum TrainingPlanGoalKind {
   TRAINING_BLOCK
 }
 
+enum TrainingPlanGoalType {
+  RACE
+  GENERAL_FITNESS
+  MORE_ENDURANCE
+}
+
 /// Reusable athlete archetype — time-agnostic slug (e.g. new-5k-improve).
 model training_plan_persona {
   id                  String                    @id @default(cuid())
@@ -1280,6 +1286,21 @@ model training_plan_persona {
   personaGoalLabel    String?
   workoutFrequencyCap Int?
   intentSummary       String?
+  /// Text-first persona fields (canonical truth for matching).
+  runningHistory                  String?
+  runningHistorySummary           String?
+  currentCapability               String?
+  currentCapabilitySummary        String?
+  injuryAssessment                String?
+  injuryAssessmentSummary         String?
+  dedicationText                  String?
+  dedicationSummary               String?
+  abilityToTrain                  String?
+  abilityToTrainSummary           String?
+  estimated5kTimeSeconds          Int?
+  estimated5kPerformanceSummary   String?
+  estimated5kPerformanceRationale String?
+  athletePersonaSummary           String?
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
 
@@ -1303,6 +1324,7 @@ model training_plan_goal {
   progressionAggressiveness ProgressionAggressiveness?
   intensityReasoning        String?
   goalKind                  TrainingPlanGoalKind?
+  goalType                  TrainingPlanGoalType?
   coachIntent               String?
   createdAt                 DateTime                    @default(now())
   updatedAt                 DateTime                    @updatedAt
@@ -1339,6 +1361,8 @@ model training_plan_preset {
   coachPlanOverview Json?
   /// Named pace keys → anchor + offset; catalogue segment paceKeys resolve through this at materialization.
   paceProfile Json?
+  /// Enabled workout types, weekly counts, cadence — canonical structure snapshot.
+  workoutStructure Json?
 
   /// Long-run rotation block: one long run per week for this many consecutive weeks (LR1…LRn) before the pattern repeats; drives pool stepping and placement.
   cycleLen           Int    @default(4)

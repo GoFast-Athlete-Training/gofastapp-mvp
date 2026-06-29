@@ -13,6 +13,22 @@ export async function GET(request: NextRequest) {
   if (authErr) return authErr;
 
   try {
+    const slug = request.nextUrl.searchParams.get("slug")?.trim();
+    const workoutType = request.nextUrl.searchParams.get("workoutType")?.trim();
+    if (slug) {
+      const row = await prisma.workout_catalogue.findFirst({
+        where: {
+          slug,
+          ...(workoutType ? { workoutType: workoutType as import("@prisma/client").WorkoutType } : {}),
+        },
+      });
+      return NextResponse.json({
+        success: true,
+        item: row,
+        matched: Boolean(row),
+      });
+    }
+
     const items = await prisma.workout_catalogue.findMany({
       orderBy: [{ workoutType: "asc" }, { name: "asc" }],
     });

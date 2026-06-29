@@ -5,6 +5,7 @@ import type {
   Prisma,
   ProgressionAggressiveness,
   TrainingPlanGoalKind,
+  TrainingPlanGoalType,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
@@ -12,6 +13,8 @@ import {
   buildPersonaSlug,
   normalizeSlug,
 } from "@/lib/training/plan-entity-slugs";
+import { goalTypeToPrismaKind } from "@/lib/training/goal-type-map";
+import type { TrainingPlanGoalType as GoalTypeContract } from "@/lib/training/preset-realignment-types";
 
 export type PersonaUpsertInput = {
   slug?: string | null;
@@ -21,6 +24,20 @@ export type PersonaUpsertInput = {
   personaGoalLabel?: string | null;
   intentSummary?: string | null;
   workoutFrequencyCap?: number | null;
+  runningHistory?: string | null;
+  runningHistorySummary?: string | null;
+  currentCapability?: string | null;
+  currentCapabilitySummary?: string | null;
+  injuryAssessment?: string | null;
+  injuryAssessmentSummary?: string | null;
+  dedicationText?: string | null;
+  dedicationSummary?: string | null;
+  abilityToTrain?: string | null;
+  abilityToTrainSummary?: string | null;
+  estimated5kTimeSeconds?: number | null;
+  estimated5kPerformanceSummary?: string | null;
+  estimated5kPerformanceRationale?: string | null;
+  athletePersonaSummary?: string | null;
 };
 
 export type GoalUpsertInput = {
@@ -31,6 +48,7 @@ export type GoalUpsertInput = {
   planDurationWeeks: number;
   timeHorizonLabel?: string | null;
   goalKind?: TrainingPlanGoalKind | null;
+  goalType?: TrainingPlanGoalType | GoalTypeContract | null;
   coachIntent?: string | null;
   fitnessDelta?: FitnessDelta | null;
   progressionAggressiveness?: ProgressionAggressiveness | null;
@@ -67,11 +85,28 @@ export async function upsertPersonaBySlug(input: PersonaUpsertInput & { personaS
     capability: input.capability ?? null,
     dedication: input.dedication ?? null,
     personaGoalLabel: input.personaGoalLabel?.trim() || null,
-    intentSummary: input.intentSummary?.trim() || null,
+    intentSummary: input.intentSummary?.trim() || input.athletePersonaSummary?.trim() || null,
+    athletePersonaSummary: input.athletePersonaSummary?.trim() || input.intentSummary?.trim() || null,
     workoutFrequencyCap:
       input.workoutFrequencyCap != null && Number.isFinite(input.workoutFrequencyCap)
         ? Math.max(1, Math.round(input.workoutFrequencyCap))
         : null,
+    runningHistory: input.runningHistory?.trim() || null,
+    runningHistorySummary: input.runningHistorySummary?.trim() || null,
+    currentCapability: input.currentCapability?.trim() || null,
+    currentCapabilitySummary: input.currentCapabilitySummary?.trim() || null,
+    injuryAssessment: input.injuryAssessment?.trim() || null,
+    injuryAssessmentSummary: input.injuryAssessmentSummary?.trim() || null,
+    dedicationText: input.dedicationText?.trim() || null,
+    dedicationSummary: input.dedicationSummary?.trim() || null,
+    abilityToTrain: input.abilityToTrain?.trim() || null,
+    abilityToTrainSummary: input.abilityToTrainSummary?.trim() || null,
+    estimated5kTimeSeconds:
+      input.estimated5kTimeSeconds != null && Number.isFinite(input.estimated5kTimeSeconds)
+        ? Math.max(0, Math.round(input.estimated5kTimeSeconds))
+        : null,
+    estimated5kPerformanceSummary: input.estimated5kPerformanceSummary?.trim() || null,
+    estimated5kPerformanceRationale: input.estimated5kPerformanceRationale?.trim() || null,
   };
 
   return prisma.training_plan_persona.upsert({
@@ -106,6 +141,14 @@ export async function upsertGoalBySlug(
     throw new Error("goal slug is required");
   }
 
+  const goalType =
+    input.goalType ??
+    (input.goalKind === "RACE"
+      ? "RACE"
+      : input.goalKind === "TRAINING_BLOCK"
+        ? "GENERAL_FITNESS"
+        : null);
+
   const data: Prisma.training_plan_goalUpsertArgs["create"] = {
     slug,
     personaId: input.personaId,
@@ -113,7 +156,8 @@ export async function upsertGoalBySlug(
     objectiveOfPlan: input.objectiveOfPlan?.trim() || null,
     planDurationWeeks: weeks,
     timeHorizonLabel: input.timeHorizonLabel?.trim() || null,
-    goalKind: input.goalKind ?? null,
+    goalKind: input.goalKind ?? goalTypeToPrismaKind(goalType as GoalTypeContract),
+    goalType: goalType as TrainingPlanGoalType | null,
     coachIntent: input.coachIntent?.trim() || null,
     fitnessDelta: input.fitnessDelta ?? null,
     progressionAggressiveness: input.progressionAggressiveness ?? null,
@@ -130,6 +174,7 @@ export async function upsertGoalBySlug(
       planDurationWeeks: weeks,
       timeHorizonLabel: data.timeHorizonLabel,
       goalKind: data.goalKind,
+      goalType: data.goalType,
       coachIntent: data.coachIntent,
       ...(input.fitnessDelta !== undefined ? { fitnessDelta: input.fitnessDelta } : {}),
       ...(input.progressionAggressiveness !== undefined

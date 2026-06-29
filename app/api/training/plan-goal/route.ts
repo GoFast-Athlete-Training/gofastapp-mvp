@@ -10,7 +10,15 @@ import type {
   FitnessDelta,
   ProgressionAggressiveness,
   TrainingPlanGoalKind,
+  TrainingPlanGoalType,
 } from "@prisma/client";
+import { goalTypeToPrismaKind } from "@/lib/training/goal-type-map";
+import type { TrainingPlanGoalType as GoalTypeContract } from "@/lib/training/preset-realignment-types";
+
+function parseGoalType(v: unknown): TrainingPlanGoalType | null {
+  if (v === "RACE" || v === "GENERAL_FITNESS" || v === "MORE_ENDURANCE") return v;
+  return null;
+}
 
 function parseGoalKind(v: unknown): TrainingPlanGoalKind | null {
   if (v === "RACE" || v === "race") return "RACE";
@@ -89,7 +97,8 @@ export async function POST(request: NextRequest) {
       planDurationWeeks,
       timeHorizonLabel:
         typeof body.timeHorizonLabel === "string" ? body.timeHorizonLabel : null,
-      goalKind: parseGoalKind(body.goalKind),
+      goalKind: parseGoalKind(body.goalKind) ?? goalTypeToPrismaKind(parseGoalType(body.goalType) as GoalTypeContract),
+      goalType: parseGoalType(body.goalType),
       coachIntent: typeof body.coachIntent === "string" ? body.coachIntent : null,
       fitnessDelta:
         typeof body.fitnessDelta === "string"
@@ -164,6 +173,27 @@ export async function PATCH(request: NextRequest) {
     }
     if ("planDurationWeeks" in body && typeof body.planDurationWeeks === "number") {
       data.planDurationWeeks = Math.max(1, Math.round(body.planDurationWeeks));
+    }
+    if ("personaId" in body) {
+      const pid = typeof body.personaId === "string" ? body.personaId.trim() : "";
+      if (!pid) {
+        return NextResponse.json({ success: false, error: "personaId is required" }, { status: 400 });
+      }
+      const persona = await prisma.training_plan_persona.findUnique({ where: { id: pid } });
+      if (!persona) {
+        return NextResponse.json({ success: false, error: "persona not found" }, { status: 404 });
+      }
+      data.personaId = pid;
+    }
+
+    if ("targetDistanceLabel" in body) {
+      data.targetDistanceLabel =
+        typeof body.targetDistanceLabel === "string" ? body.targetDistanceLabel.trim() : null;
+    }
+    if ("goalType" in body) {
+      const gt = parseGoalType(body.goalType);
+      data.goalType = gt;
+      if (gt) data.goalKind = goalTypeToPrismaKind(gt as GoalTypeContract);
     }
 
     const row = await prisma.training_plan_goal.update({

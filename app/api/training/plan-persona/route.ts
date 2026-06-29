@@ -76,10 +76,42 @@ export async function POST(request: NextRequest) {
       capability,
       dedication,
       personaGoalLabel:
-        typeof body.personaGoalLabel === "string" ? body.personaGoalLabel : null,
+        typeof body.personaGoalLabel === "string"
+          ? body.personaGoalLabel
+          : typeof body.athletePersonaGoal === "string"
+            ? body.athletePersonaGoal
+            : null,
       intentSummary: typeof body.intentSummary === "string" ? body.intentSummary : null,
+      athletePersonaSummary:
+        typeof body.athletePersonaSummary === "string" ? body.athletePersonaSummary : null,
       workoutFrequencyCap:
         typeof body.workoutFrequencyCap === "number" ? body.workoutFrequencyCap : null,
+      runningHistory: typeof body.runningHistory === "string" ? body.runningHistory : null,
+      runningHistorySummary:
+        typeof body.runningHistorySummary === "string" ? body.runningHistorySummary : null,
+      currentCapability:
+        typeof body.currentCapability === "string" ? body.currentCapability : null,
+      currentCapabilitySummary:
+        typeof body.currentCapabilitySummary === "string" ? body.currentCapabilitySummary : null,
+      injuryAssessment: typeof body.injuryAssessment === "string" ? body.injuryAssessment : null,
+      injuryAssessmentSummary:
+        typeof body.injuryAssessmentSummary === "string" ? body.injuryAssessmentSummary : null,
+      dedicationText: typeof body.dedicationText === "string" ? body.dedicationText : null,
+      dedicationSummary:
+        typeof body.dedicationSummary === "string" ? body.dedicationSummary : null,
+      abilityToTrain: typeof body.abilityToTrain === "string" ? body.abilityToTrain : null,
+      abilityToTrainSummary:
+        typeof body.abilityToTrainSummary === "string" ? body.abilityToTrainSummary : null,
+      estimated5kTimeSeconds:
+        typeof body.estimated5kTimeSeconds === "number" ? body.estimated5kTimeSeconds : null,
+      estimated5kPerformanceSummary:
+        typeof body.estimated5kPerformanceSummary === "string"
+          ? body.estimated5kPerformanceSummary
+          : null,
+      estimated5kPerformanceRationale:
+        typeof body.estimated5kPerformanceRationale === "string"
+          ? body.estimated5kPerformanceRationale
+          : null,
     });
 
     return NextResponse.json(
