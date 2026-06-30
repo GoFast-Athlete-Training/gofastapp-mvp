@@ -16,8 +16,7 @@ import { ymdFromDate } from "@/lib/training/plan-utils";
 import { segmentSnapshotDocumentFromDbRows } from "@/lib/training/workout-segment-snapshot";
 import { materializeWorkoutForPlanDay } from "@/lib/training/workout-materializer";
 import { expandSegmentsForGarminPush } from "@/lib/training/segment-summary";
-import { garminTitleForWorkout } from "@/lib/training/garmin-activity-match-helpers";
-import { canonicalPlannedWorkoutTitle } from "@/lib/training/workout-display-title";
+import { garminPushTitleForPlannedWorkout, garminTitleForWorkout } from "@/lib/training/garmin-activity-match-helpers";
 import { normalizePaceTargetEncodingVersion } from "@/lib/workout-generator/pace-calculator";
 import {
   type GarminPushMode,
@@ -67,6 +66,95 @@ type WorkoutGarminLookup = {
   dayAssigned: string | null;
   garminWorkoutId: number | null;
 };
+
+type SiblingScheduleRow = {
+  id: string;
+  garminScheduleId: number | null;
+};
+
+/** All materialized rows for the same plan day (date or week+day). */
+async function loadSiblingPlanDayRows(
+  athleteId: string,
+  workout: WorkoutGarminLookup
+): Promise<SiblingScheduleRow[]> {
+  if (!workout.planId) {
+    return [];
+  }
+
+  if (workout.date) {
+    const byDate = await prisma.workouts.findMany({
+      where: { athleteId, planId: workout.planId, date: workout.date },
+      select: { id: true, garminScheduleId: true },
+    });
+    if (byDate.length > 0) return byDate;
+  }
+
+  if (workout.weekNumber != null && workout.dayAssigned?.trim()) {
+    return prisma.workouts.findMany({
+      where: {
+        athleteId,
+        planId: workout.planId,
+        weekNumber: workout.weekNumber,
+        dayAssigned: workout.dayAssigned.trim(),
+      },
+      select: { id: true, garminScheduleId: true },
+    });
+  }
+
+  return [];
+}
+
+/** Delete every known sibling schedule id before creating one calendar placement. */
+async function deleteSiblingGarminSchedules(
+  client: Parameters<typeof deleteGarminScheduleIfPresent>[0],
+  siblingRows: SiblingScheduleRow[]
+): Promise<void> {
+  const scheduleIds = [
+    ...new Set(
+      siblingRows
+        .map((r) => r.garminScheduleId)
+        .filter((id): id is number => id != null)
+    ),
+  ];
+
+  const staleRowIds: string[] = [];
+  for (const scheduleId of scheduleIds) {
+    const deleteResult = await deleteGarminScheduleIfPresent(client, scheduleId);
+    if (deleteResult.wasStaleOnGarmin) {
+      for (const row of siblingRows) {
+        if (row.garminScheduleId === scheduleId) {
+          staleRowIds.push(row.id);
+        }
+      }
+    }
+  }
+
+  if (staleRowIds.length > 0) {
+    await prisma.workouts.updateMany({
+      where: { id: { in: [...new Set(staleRowIds)] } },
+      data: { garminScheduleId: null },
+    });
+  }
+}
+
+async function persistGarminScheduleToSiblingRows(params: {
+  siblingRows: SiblingScheduleRow[];
+  garminWorkoutId: number;
+  garminScheduleId: number;
+  snapshot: ReturnType<typeof segmentSnapshotFromWorkout>;
+}): Promise<void> {
+  const ids = params.siblingRows.map((r) => r.id);
+  if (ids.length === 0) return;
+
+  await prisma.workouts.updateMany({
+    where: { id: { in: ids } },
+    data: {
+      garminWorkoutId: params.garminWorkoutId,
+      garminScheduleId: params.garminScheduleId,
+      segmentSnapshotJson: params.snapshot,
+    },
+  });
+}
 
 /** Reuse Garmin id from this row or a sibling plan-day row (prevents duplicate library entries). */
 async function resolveGarminWorkoutIdForPush(
@@ -169,6 +257,7 @@ export async function pushWorkoutToGarminForAthlete(
         include: {
           segments: { orderBy: { stepOrder: "asc" } },
           training_plans: { select: { id: true, startDate: true } },
+          workout_catalogue: { select: { name: true } },
         },
       });
 
@@ -227,18 +316,21 @@ export async function pushWorkoutToGarminForAthlete(
 
     const token = await requireGarminTokenFresh(athleteId);
 
-    const pushTitle =
-      canonicalPlannedWorkoutTitle({
-        title: workout.title,
-        workoutType: workout.workoutType,
-        dayAssigned: workout.dayAssigned,
-        planId: workout.planId,
-      }) ?? workout.title;
-
-    const garminTitle = garminTitleForWorkout({
-      title: pushTitle,
-      weekNumber: workout.weekNumber,
-    });
+    const garminTitle =
+      workout.planId != null
+        ? garminPushTitleForPlannedWorkout({
+            title: workout.title,
+            weekNumber: workout.weekNumber,
+            dayAssigned: workout.dayAssigned,
+            catalogueName: workout.workout_catalogue?.name ?? null,
+            planId: workout.planId,
+            workoutType: workout.workoutType,
+            estimatedDistanceInMeters: workout.estimatedDistanceInMeters,
+          })
+        : garminTitleForWorkout({
+            title: workout.title,
+            weekNumber: workout.weekNumber,
+          });
 
     const garminSegments = expandSegmentsForGarminPush(workout.segments);
 
@@ -331,16 +423,20 @@ export async function pushWorkoutToGarminForAthlete(
       workout.garminScheduleId != null;
 
     if (shouldReschedule) {
-      const deleteResult = await deleteGarminScheduleIfPresent(
-        client,
-        workout.garminScheduleId
-      );
-      if (deleteResult.wasStaleOnGarmin) {
-        await prisma.workouts.update({
-          where: { id: workout.id },
-          data: { garminScheduleId: null },
-        });
-      }
+      const siblingRows = await loadSiblingPlanDayRows(athleteId, {
+        id: workout.id,
+        planId: workout.planId,
+        date: workout.date,
+        weekNumber: workout.weekNumber,
+        dayAssigned: workout.dayAssigned,
+        garminWorkoutId: workout.garminWorkoutId,
+      });
+      const rowsForSchedule =
+        siblingRows.length > 0
+          ? siblingRows
+          : [{ id: workout.id, garminScheduleId: workout.garminScheduleId }];
+
+      await deleteSiblingGarminSchedules(client, rowsForSchedule);
 
       const scheduleResult = await scheduleAndVerifyWorkout(client, {
         garminWorkoutId,
@@ -357,13 +453,11 @@ export async function pushWorkoutToGarminForAthlete(
       }
       const garminScheduleId = scheduleResult.garminScheduleId;
 
-      await prisma.workouts.update({
-        where: { id: workout.id },
-        data: {
-          garminWorkoutId,
-          garminScheduleId,
-          segmentSnapshotJson: snapshot,
-        },
+      await persistGarminScheduleToSiblingRows({
+        siblingRows: rowsForSchedule,
+        garminWorkoutId,
+        garminScheduleId,
+        snapshot,
       });
 
       return {

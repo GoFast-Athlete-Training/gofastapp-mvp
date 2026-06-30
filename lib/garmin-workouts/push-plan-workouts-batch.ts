@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { pushWorkoutToGarminForAthlete } from "@/lib/garmin-workouts/push-workout-for-athlete";
 import type { GarminPushMode } from "@/lib/garmin-workouts/garmin-calendar-state";
+import { ymdFromDate } from "@/lib/training/plan-utils";
 
 export type GarminPlanWorkoutPushResult = {
   workoutId: string;
@@ -51,6 +52,59 @@ export function resolveGarminPushModeForBatch(
   return resolvePushMode(garminWorkoutId, garminScheduleId, recoverLibraryOnly);
 }
 
+export type BatchPushCandidate = {
+  id: string;
+  athleteId: string | null;
+  planId: string | null;
+  date: Date | null;
+  garminWorkoutId: number | null;
+  garminScheduleId: number | null;
+};
+
+function batchCandidateGroupKey(w: BatchPushCandidate): string | null {
+  if (!w.athleteId || !w.planId || !w.date) return null;
+  return `${w.athleteId}|${w.planId}|${ymdFromDate(w.date)}`;
+}
+
+function batchCandidateRank(w: BatchPushCandidate): number {
+  if (w.garminScheduleId != null) return 3;
+  if (w.garminWorkoutId != null) return 2;
+  return 1;
+}
+
+/** One canonical row per athlete + plan + scheduled date; duplicates are skipped. */
+export function dedupeBatchPushCandidates<T extends BatchPushCandidate>(
+  candidates: T[]
+): { toPush: T[]; duplicateSkips: T[] } {
+  const byKey = new Map<string, T[]>();
+  const withoutKey: T[] = [];
+
+  for (const w of candidates) {
+    const key = batchCandidateGroupKey(w);
+    if (!key) {
+      withoutKey.push(w);
+      continue;
+    }
+    const list = byKey.get(key) ?? [];
+    list.push(w);
+    byKey.set(key, list);
+  }
+
+  const toPush: T[] = [...withoutKey];
+  const duplicateSkips: T[] = [];
+
+  for (const group of byKey.values()) {
+    const sorted = [...group].sort(
+      (a, b) =>
+        batchCandidateRank(b) - batchCandidateRank(a) || a.id.localeCompare(b.id)
+    );
+    toPush.push(sorted[0]!);
+    duplicateSkips.push(...sorted.slice(1));
+  }
+
+  return { toPush, duplicateSkips };
+}
+
 /**
  * Push materialized plan workouts in a date range to Garmin Training Calendar.
  * Reuses the single-workout push primitive and existing calendar-state modes.
@@ -92,6 +146,8 @@ export async function pushPlanWorkoutsInDateRange(
     select: {
       id: true,
       athleteId: true,
+      planId: true,
+      date: true,
       garminWorkoutId: true,
       garminScheduleId: true,
     },
@@ -99,13 +155,27 @@ export async function pushPlanWorkoutsInDateRange(
     take: candidateLimit,
   });
 
+  const { toPush, duplicateSkips } = dedupeBatchPushCandidates(candidates);
+
   const results: GarminPlanWorkoutPushResult[] = [];
   let scheduled = 0;
   let updated = 0;
-  let skipped = 0;
+  let skipped = duplicateSkips.length;
   let failed = 0;
 
-  for (const w of candidates) {
+  for (const dup of duplicateSkips) {
+    if (!dup.athleteId) continue;
+    results.push({
+      workoutId: dup.id,
+      athleteId: dup.athleteId,
+      ok: true,
+      skipped: true,
+      action: "duplicate_plan_day_skip",
+      error: "Duplicate materialized row for same plan day; canonical row pushed instead.",
+    });
+  }
+
+  for (const w of toPush) {
     const athleteId = w.athleteId;
     if (!athleteId) continue;
 

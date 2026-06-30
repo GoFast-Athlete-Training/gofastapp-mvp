@@ -497,7 +497,7 @@ export default function TrainingPlanDayPreviewPage() {
         ...athleteBearerFetchHeaders(token),
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ mode: "schedule-today" }),
+      body: JSON.stringify({}),
     });
     const data = (await res.json()) as {
       error?: string;

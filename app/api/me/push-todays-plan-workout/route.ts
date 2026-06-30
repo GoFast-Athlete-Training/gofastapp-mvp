@@ -4,6 +4,10 @@ import { NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { materializeTodayPlanWorkoutForAthlete } from "@/lib/training/materialize-todays-plan-workout";
 import { pushWorkoutToGarminForAthlete } from "@/lib/garmin-workouts/push-workout-for-athlete";
+import {
+  defaultGarminPushModeForState,
+  garminCalendarSyncState,
+} from "@/lib/garmin-workouts/garmin-calendar-state";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -49,8 +53,18 @@ export async function POST(request: Request) {
     );
   }
 
+  const workoutRow = await prisma.workouts.findFirst({
+    where: { id: workoutId, athleteId },
+    select: { garminWorkoutId: true, garminScheduleId: true },
+  });
+
   const pushed = await pushWorkoutToGarminForAthlete(athleteId, workoutId, {
-    mode: "schedule-today",
+    mode: defaultGarminPushModeForState(
+      garminCalendarSyncState({
+        garminWorkoutId: workoutRow?.garminWorkoutId ?? null,
+        garminScheduleId: workoutRow?.garminScheduleId ?? null,
+      })
+    ),
   });
   if (!pushed.ok) {
     const status =

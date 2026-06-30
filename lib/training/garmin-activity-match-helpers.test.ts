@@ -4,9 +4,46 @@ import {
   activityLocalYmdFromSummary,
   activityMatchCandidateUtcRange,
   activityNameContainsPushedWorkoutTitle,
+  garminPushTitleForPlannedWorkout,
   garminTitleForWorkout,
   normalizeActivityNameForMatch,
 } from "./garmin-activity-match-helpers";
+
+test("garminPushTitleForPlannedWorkout uses catalogue name and short weekday", () => {
+  assert.equal(
+    garminPushTitleForPlannedWorkout({
+      title: "2-1 Tempo",
+      weekNumber: 7,
+      dayAssigned: "Tuesday",
+      catalogueName: "2-1 Tempo",
+      planId: "plan-1",
+      workoutType: "Tempo",
+    }),
+    "GF W7: 2-1 Tempo (Tue)"
+  );
+});
+
+test("normalizeActivityNameForMatch strips weekday marker from pushed title", () => {
+  assert.equal(
+    normalizeActivityNameForMatch("GF W7: 2-1 Tempo (Tue)"),
+    "2-1 tempo"
+  );
+});
+
+test("activityNameContainsPushedWorkoutTitle matches new weekday-suffixed push title", () => {
+  assert.equal(
+    activityNameContainsPushedWorkoutTitle({
+      activityName: "Falmouth - GF W7: 2-1 Tempo (Tue)",
+      workoutTitle: "2-1 Tempo",
+      weekNumber: 7,
+      workoutType: "Tempo",
+      dayAssigned: "Tuesday",
+      planId: "plan-1",
+      catalogueName: "2-1 Tempo",
+    }),
+    true
+  );
+});
 
 test("garminTitleForWorkout prefixes unlabelled plan workouts with GF week", () => {
   assert.equal(

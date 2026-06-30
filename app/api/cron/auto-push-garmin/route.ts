@@ -35,7 +35,6 @@ export async function GET(request: NextRequest) {
       dateEnd: end,
       candidateLimit: 80,
       runLabel: "auto-push-garmin",
-      recoverLibraryOnly: true,
     });
 
     return NextResponse.json({

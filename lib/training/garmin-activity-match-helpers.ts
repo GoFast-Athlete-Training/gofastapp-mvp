@@ -1,5 +1,68 @@
 import { ymdFromDate } from "@/lib/training/plan-utils";
-import { canonicalPlannedWorkoutTitle } from "@/lib/training/workout-display-title";
+import {
+  canonicalPlannedWorkoutTitle,
+} from "@/lib/training/workout-display-title";
+
+const FULL_DAY_NAMES = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+] as const;
+
+const SHORT_DAY_BY_FULL: Record<string, string> = {
+  Monday: "Mon",
+  Tuesday: "Tue",
+  Wednesday: "Wed",
+  Thursday: "Thu",
+  Friday: "Fri",
+  Saturday: "Sat",
+  Sunday: "Sun",
+};
+
+/** Short weekday marker for Garmin push titles, e.g. "Tue". */
+export function shortDayFromDayAssigned(
+  dayAssigned: string | null | undefined
+): string | null {
+  const raw = dayAssigned?.trim();
+  if (!raw) return null;
+  const match = FULL_DAY_NAMES.find((d) => d.toLowerCase() === raw.toLowerCase());
+  return match ? SHORT_DAY_BY_FULL[match] ?? null : null;
+}
+
+/** Strip trailing `(Mon|Tue|…)` weekday marker from pushed Garmin titles. */
+export function stripTrailingWeekdayMarkerFromTitle(title: string): string {
+  return title.replace(/\s*\((Mon|Tue|Wed|Thu|Fri|Sat|Sun)\)\s*$/i, "").trim();
+}
+
+/**
+ * Garmin push title for planned workouts: `GF W{n}: {actual name} ({Tue})`.
+ * Uses catalogue or stored title — not the canonical day/type display label.
+ */
+export function garminPushTitleForPlannedWorkout(workout: {
+  title: string;
+  weekNumber: number | null;
+  dayAssigned?: string | null;
+  catalogueName?: string | null;
+  planId?: string | null;
+  workoutType?: string;
+  estimatedDistanceInMeters?: number | null;
+}): string {
+  const catalogueName = workout.catalogueName?.trim() || null;
+  const storedTitle = workout.title.trim();
+  const actualName = catalogueName || storedTitle || "Workout";
+
+  const shortDay = shortDayFromDayAssigned(workout.dayAssigned);
+  const titleWithDay = shortDay ? `${actualName} (${shortDay})` : actualName;
+
+  return garminTitleForWorkout({
+    title: titleWithDay,
+    weekNumber: workout.weekNumber,
+  });
+}
 
 /** Avoid double-prefixing when title already has GF W1: or W1: style week label. */
 export function garminTitleForWorkout(workout: {
@@ -31,7 +94,7 @@ export function normalizeActivityNameForMatch(
     text = text.slice(gfMarker.index);
   }
   text = text.replace(/^gf\s+w\d+\s*:\s*/i, "");
-  return text.trim();
+  return stripTrailingWeekdayMarkerFromTitle(text);
 }
 
 /** True when Garmin activity title looks like a pushed planned workout (GF W#: …). */
@@ -86,12 +149,28 @@ export function workoutTitleMatchVariants(params: {
   workoutType?: string | null;
   dayAssigned?: string | null;
   planId?: string | null;
+  catalogueName?: string | null;
+  estimatedDistanceInMeters?: number | null;
 }): string[] {
   const stored = params.workoutTitle.trim();
   const variants = new Set<string>();
   if (stored.length > 0) variants.add(stored);
 
-  if (params.workoutType?.trim()) {
+  if (params.planId && params.workoutType?.trim()) {
+    const pushed = garminPushTitleForPlannedWorkout({
+      title: stored,
+      weekNumber: params.weekNumber,
+      dayAssigned: params.dayAssigned,
+      catalogueName: params.catalogueName,
+      planId: params.planId,
+      workoutType: params.workoutType.trim(),
+      estimatedDistanceInMeters: params.estimatedDistanceInMeters,
+    });
+    variants.add(pushed);
+    variants.add(stripTrailingWeekdayMarkerFromTitle(
+      pushed.replace(/^GF\s+W\d+\s*:\s*/i, "").trim()
+    ));
+
     const canonical = canonicalPlannedWorkoutTitle({
       title: stored,
       workoutType: params.workoutType.trim(),
@@ -135,6 +214,8 @@ export function activityNameContainsPushedWorkoutTitle(params: {
   workoutType?: string | null;
   dayAssigned?: string | null;
   planId?: string | null;
+  catalogueName?: string | null;
+  estimatedDistanceInMeters?: number | null;
 }): boolean {
   const variants = workoutTitleMatchVariants(params);
   return variants.some((title) =>
