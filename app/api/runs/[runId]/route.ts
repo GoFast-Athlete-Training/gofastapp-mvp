@@ -670,6 +670,18 @@ export async function PUT(
           ? null
           : String(body.directionsText).trim();
     }
+    if (body.workoutId !== undefined) {
+      if (body.workoutId === null || body.workoutId === '') {
+        updateData.workoutId = null;
+      } else {
+        const workoutIdTrimmed = String(body.workoutId).trim();
+        const w = await prisma.workouts.findUnique({ where: { id: workoutIdTrimmed } });
+        if (!w) {
+          return NextResponse.json({ success: false, error: 'workoutId not found' }, { status: 404 });
+        }
+        updateData.workoutId = w.id;
+      }
+    }
     if (body.meetUpPlaceId !== undefined) {
       updateData.meetUpPlaceId = body.meetUpPlaceId === null || body.meetUpPlaceId === '' ? null : String(body.meetUpPlaceId);
     }
