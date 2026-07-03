@@ -7,7 +7,7 @@ export type CatalogueWorkoutSummary = {
   slug: string;
   name: string;
   workoutType: WorkoutType;
-  trainingIntent: string | null;
+  trainingIntent: string[];
 };
 
 export type CatalogueSuggestResult = {
@@ -17,12 +17,17 @@ export type CatalogueSuggestResult = {
   similar: CatalogueWorkoutSummary[];
 };
 
+function matchesTrainingIntent(trainingIntent: string[], needle: string): boolean {
+  const normalized = needle.toLowerCase();
+  return trainingIntent.some((entry) => entry.toLowerCase().includes(normalized));
+}
+
 function toSummary(row: {
   id: string;
   slug: string | null;
   name: string;
   workoutType: WorkoutType;
-  trainingIntent: string | null;
+  trainingIntent: string[];
 }): CatalogueWorkoutSummary {
   return {
     id: row.id,
@@ -54,20 +59,28 @@ export async function suggestCatalogueWorkouts(opts: {
     ? await findCatalogueBySlug(conceptSlug, opts.workoutType)
     : null;
 
-  const similarRows = await prisma.workout_catalogue.findMany({
+  const slugPrefix = conceptSlug ? conceptSlug.slice(0, 8) : "";
+  const intentNeedle = opts.intentSummary?.trim() ?? "";
+
+  // trainingIntent is String[] — Prisma has no substring filter on array elements.
+  const pool = await prisma.workout_catalogue.findMany({
     where: {
       workoutType: opts.workoutType,
       ...(exactRow ? { id: { not: exactRow.id } } : {}),
-      OR: [
-        ...(conceptSlug ? [{ slug: { contains: conceptSlug.slice(0, 8) } }] : []),
-        ...(opts.intentSummary?.trim()
-          ? [{ trainingIntent: { contains: opts.intentSummary.trim(), mode: "insensitive" as const } }]
-          : []),
-      ],
     },
     orderBy: { updatedAt: "desc" },
-    take: 5,
+    take: 50,
   });
+
+  const similarRows = pool
+    .filter((row) => {
+      const slugHit = slugPrefix.length > 0 && (row.slug?.includes(slugPrefix) ?? false);
+      const intentHit =
+        intentNeedle.length > 0 && matchesTrainingIntent(row.trainingIntent, intentNeedle);
+      if (!slugPrefix && !intentNeedle) return false;
+      return slugHit || intentHit;
+    })
+    .slice(0, 5);
 
   return {
     conceptSlug,
