@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminAuth } from '@/lib/firebaseAdmin';
+import { fieldsWhenSettingWorkflowStatus } from '@/lib/runInstanceApprovalPublish';
 
 /**
  * POST /api/runs/manage/[runId]/approve
@@ -38,7 +39,7 @@ export async function POST(
     const updatedRun = await prisma.city_runs.update({
       where: { id: runId },
       data: {
-        workflowStatus: 'APPROVED',
+        ...fieldsWhenSettingWorkflowStatus('APPROVED'),
         updatedAt: new Date(),
       },
       include: {

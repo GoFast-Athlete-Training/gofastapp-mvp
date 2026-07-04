@@ -3,6 +3,10 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminAuth } from '@/lib/firebaseAdmin';
+import {
+  fieldsWhenSettingWorkflowStatus,
+  type RunWorkflowStatus,
+} from '@/lib/runInstanceApprovalPublish';
 
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
@@ -221,9 +225,18 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: 'CityRun not found' }, { status: 404 });
     }
 
-    const updateData: { workflowStatus: 'DEVELOP' | 'PENDING' | 'SUBMITTED' | 'APPROVED'; updatedAt: Date; staffNotes?: string | null } = {
-      workflowStatus: workflowStatus as 'DEVELOP' | 'PENDING' | 'SUBMITTED' | 'APPROVED',
+    const status = workflowStatus as RunWorkflowStatus;
+    const coupled = fieldsWhenSettingWorkflowStatus(status);
+
+    const updateData: {
+      workflowStatus: RunWorkflowStatus;
+      updatedAt: Date;
+      published?: boolean;
+      staffNotes?: string | null;
+    } = {
+      workflowStatus: coupled.workflowStatus,
       updatedAt: new Date(),
+      ...(coupled.published !== undefined ? { published: coupled.published } : {}),
     };
     if (staffNotes !== undefined) {
       updateData.staffNotes = staffNotes === null || staffNotes === '' ? null : String(staffNotes).trim();

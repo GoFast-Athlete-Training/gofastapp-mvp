@@ -3,6 +3,10 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminAuth } from '@/lib/firebaseAdmin';
+import {
+  bulkDataWhenSettingWorkflowStatus,
+  type RunWorkflowStatus,
+} from '@/lib/runInstanceApprovalPublish';
 
 const VALID_WORKFLOW_STATUSES = ['DEVELOP', 'PENDING', 'SUBMITTED', 'APPROVED'] as const;
 
@@ -42,12 +46,11 @@ export async function POST(request: Request) {
       );
     }
 
+    const status = workflowStatus as RunWorkflowStatus;
+
     const result = await prisma.city_runs.updateMany({
       where: { id: { in: runIds } },
-      data: {
-        workflowStatus: workflowStatus as (typeof VALID_WORKFLOW_STATUSES)[number],
-        updatedAt: new Date(),
-      },
+      data: bulkDataWhenSettingWorkflowStatus(status),
     });
 
     return NextResponse.json({

@@ -3,11 +3,15 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminAuth } from '@/lib/firebaseAdmin';
+import {
+  bulkDataWhenPublishing,
+  bulkDataWhenSettingWorkflowStatus,
+} from '@/lib/runInstanceApprovalPublish';
 
 /**
  * POST /api/runs/manage/bulk-publish
  *
- * Publish submitted run instances (sets published: true).
+ * Publish run instances live (sets published: true and workflowStatus: APPROVED).
  * Body: { runIds: string[] }
  */
 export async function POST(request: Request) {
@@ -36,13 +40,9 @@ export async function POST(request: Request) {
     const result = await prisma.city_runs.updateMany({
       where: {
         id: { in: runIds },
-        workflowStatus: 'SUBMITTED',
-        published: false,
+        OR: [{ published: false }, { workflowStatus: { not: 'APPROVED' } }],
       },
-      data: {
-        published: true,
-        updatedAt: new Date(),
-      },
+      data: bulkDataWhenPublishing(),
     });
 
     return NextResponse.json({

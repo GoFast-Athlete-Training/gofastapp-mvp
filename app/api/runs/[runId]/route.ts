@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma';
 import { normalizeWebsiteUrl, normalizeStravaUrl, normalizeInstagramUrl } from '@/lib/runclub-urls';
 import { saveRunClub } from '@/lib/save-runclub';
 import { parseRunTotalMiles } from '@/lib/parse-run-total-miles';
+import { fieldsWhenSettingPublished } from '@/lib/runInstanceApprovalPublish';
 import { toCanonicalDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
 import {
@@ -621,7 +622,8 @@ export async function PUT(
       updateData.igPostGraphic = body.igPostGraphic === null || body.igPostGraphic === '' ? null : String(body.igPostGraphic).trim();
     }
     if (body.published !== undefined) {
-      updateData.published = body.published === true;
+      const published = body.published === true;
+      Object.assign(updateData, fieldsWhenSettingPublished(published));
     }
 
     // Core content (edit run)
