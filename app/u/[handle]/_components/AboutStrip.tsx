@@ -43,7 +43,7 @@ export default function AboutStrip(props: Props) {
   const hasBio = Boolean(props.bio?.trim());
   const futureRaces = props.signedUpRaces.filter((r) => new Date(r.raceDate) >= new Date()).slice(0, 8);
   const hasRaces = futureRaces.length > 0;
-  const hasContainer = props.isGoFastContainer && props.containerMemberCount > 0;
+  const hasContainer = props.isGoFastContainer;
 
   if (!hasBio && !hasRaces && !hasContainer) return null;
 
@@ -106,38 +106,48 @@ export default function AboutStrip(props: Props) {
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="flex -space-x-2">
-              {props.containerRecentMembers.slice(0, 5).map((m) =>
-                m.photoURL ? (
-                  <Image
-                    key={m.id}
-                    src={m.photoURL}
-                    alt=""
-                    width={32}
-                    height={32}
-                    className="w-8 h-8 rounded-full ring-2 ring-white object-cover bg-stone-200"
-                    unoptimized
-                  />
-                ) : (
-                  <div
-                    key={m.id}
-                    className="w-8 h-8 rounded-full ring-2 ring-white bg-stone-300 flex items-center justify-center text-xs font-semibold text-white"
-                  >
-                    {initialFor(m.firstName, m.gofastHandle)}
-                  </div>
-                ),
+              {props.containerRecentMembers.length > 0 ? (
+                props.containerRecentMembers.slice(0, 5).map((m) =>
+                  m.photoURL ? (
+                    <Image
+                      key={m.id}
+                      src={m.photoURL}
+                      alt=""
+                      width={32}
+                      height={32}
+                      className="w-8 h-8 rounded-full ring-2 ring-white object-cover bg-stone-200"
+                      unoptimized
+                    />
+                  ) : (
+                    <div
+                      key={m.id}
+                      className="w-8 h-8 rounded-full ring-2 ring-white bg-stone-300 flex items-center justify-center text-xs font-semibold text-white"
+                    >
+                      {initialFor(m.firstName, m.gofastHandle)}
+                    </div>
+                  ),
+                )
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center">
+                  <Users className="w-4 h-4 text-violet-600" />
+                </div>
               )}
             </div>
             <div className="flex flex-col items-end gap-1">
-              <p className="text-sm text-stone-700">
-                <span className="font-semibold text-stone-900">{props.containerMemberCount}</span>{' '}
-                {props.containerMemberCount === 1 ? 'member' : 'members'}
-              </p>
+              {props.containerMemberCount > 0 ? (
+                <p className="text-sm text-stone-700">
+                  <span className="font-semibold text-stone-900">{props.containerMemberCount}</span>{' '}
+                  {props.containerMemberCount === 1 ? 'member' : 'members'}
+                </p>
+              ) : (
+                <p className="text-sm text-stone-600">Be the first to join</p>
+              )}
               {props.hostHandle && (
                 <Link
                   href={`/container/${props.hostHandle}`}
                   className="text-xs font-semibold text-orange-700 hover:text-orange-800"
                 >
-                  Open community &rarr;
+                  Join community &rarr;
                 </Link>
               )}
             </div>

@@ -9,6 +9,7 @@ import type { ScheduledRunJson } from "@/app/api/training/schedule-run/route";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
+import GroupTrainingHostPanel from "@/components/training/GroupTrainingHostPanel";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import PlanWeekCalendar from "@/components/training/PlanWeekCalendar";
 import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
@@ -642,6 +643,7 @@ export default function TrainingHubPage() {
 
         {showTrainingHub && planDetail && (
           <div className="space-y-4 mb-8">
+            <GroupTrainingHostPanel planId={planDetail.id} hasSchedule={hasSchedule(planDetail)} />
             {/* Goal strip — plan, race, week progress */}
             <div className="flex flex-col gap-3 rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 text-sm sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">

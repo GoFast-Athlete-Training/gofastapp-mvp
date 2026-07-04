@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { getJoinableCohortForHost } from '@/lib/training/cohort-service';
 
 const METERS_PER_MILE = 1609.344;
 
@@ -326,11 +327,29 @@ export async function loadPublicAthletePage(rawHandle: string) {
     }));
   }
 
+  const joinableGroupTrainingRaw = await getJoinableCohortForHost(athlete.id);
+  const joinableGroupTraining = joinableGroupTrainingRaw
+    ? {
+        id: joinableGroupTrainingRaw.id,
+        handle: joinableGroupTrainingRaw.handle,
+        cohortName: joinableGroupTrainingRaw.cohortName,
+        defaultPlanStartDate: joinableGroupTrainingRaw.defaultPlanStartDate,
+        currentWeekNumber: joinableGroupTrainingRaw.currentWeekNumber,
+        memberCount: joinableGroupTrainingRaw.memberCount,
+        race: {
+          name: joinableGroupTrainingRaw.race.name,
+          distanceLabel: joinableGroupTrainingRaw.race.distanceLabel,
+        },
+        hostFirstName: athlete.firstName,
+      }
+    : null;
+
   return {
     isGoFastContainer: athlete.isGoFastContainer,
     hostAthleteId: athlete.isGoFastContainer ? athlete.id : null,
     containerMemberCount,
     containerRecentMembers,
+    joinableGroupTraining,
     athlete: {
       id: athlete.id,
       gofastHandle: athlete.gofastHandle,

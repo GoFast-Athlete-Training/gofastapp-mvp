@@ -28,6 +28,13 @@ export async function GET(request: NextRequest) {
             slug: true,
           },
         },
+        hostAthlete: {
+          select: {
+            id: true,
+            firstName: true,
+            gofastHandle: true,
+          },
+        },
         _count: {
           select: { memberships: true },
         },
@@ -39,6 +46,7 @@ export async function GET(request: NextRequest) {
       id: c.id,
       raceId: c.raceId,
       companyRaceId: c.companyRaceId,
+      hostAthleteId: c.hostAthleteId,
       name: c.cohortName,
       handle: c.handle,
       description: c.description,

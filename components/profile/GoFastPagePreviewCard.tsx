@@ -11,8 +11,10 @@ import {
   Trophy,
   User,
   Footprints,
+  Users,
 } from "lucide-react";
 import { getGoFastAppPublicUrl } from "@/lib/gofast-app-public-url";
+import { formatCohortStartLabel } from "@/lib/training/cohort-display";
 
 export type GoFastPageAthlete = {
   gofastHandle: string | null;
@@ -86,6 +88,16 @@ export type GoFastPagePayload = {
   isGoFastContainer?: boolean;
   hostAthleteId?: string;
   containerMemberCount?: number;
+  joinableGroupTraining?: {
+    id: string;
+    handle: string;
+    cohortName: string;
+    defaultPlanStartDate: string | null;
+    currentWeekNumber: number | null;
+    memberCount: number;
+    race: { name: string; distanceLabel: string | null };
+    hostFirstName: string | null;
+  } | null;
   containerRecentMembers?: {
     id: string;
     firstName: string | null;
@@ -145,7 +157,7 @@ export default function GoFastPagePreviewCard({
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center px-4 text-zinc-100">
         <User className="w-12 h-12 text-zinc-600 mb-3" />
-        <p className="text-zinc-400 text-center">This GoFast Page is not available.</p>
+        <p className="text-zinc-400 text-center">This Run With Me page is not available.</p>
         <Link
           href="/"
           className="mt-4 text-amber-400 hover:text-amber-300 text-sm font-medium"
@@ -207,7 +219,7 @@ export default function GoFastPagePreviewCard({
         <div className="relative z-10 max-w-3xl mx-auto px-5 pb-10 pt-20 w-full">
           <div className="flex items-center gap-2 text-amber-400/90 text-xs font-semibold uppercase tracking-[0.2em] mb-3">
             <Sparkles className="w-3.5 h-3.5" aria-hidden />
-            GoFast Page
+            Run With Me
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-white drop-shadow-lg">
             {displayName}
@@ -238,7 +250,7 @@ export default function GoFastPagePreviewCard({
               href={signupUrl}
               className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-amber-500/25 hover:bg-amber-400 transition-colors"
             >
-              {data.isGoFastContainer ? "Join & train with GoFast" : "Train with GoFast"}
+              {data.isGoFastContainer ? "Join community & train" : "Run with them"}
               <ChevronRight className="w-4 h-4" />
             </a>
           </div>
@@ -250,7 +262,7 @@ export default function GoFastPagePreviewCard({
           <section className="rounded-2xl border border-violet-500/35 bg-zinc-900/85 p-5 shadow-lg shadow-violet-950/20">
             <h2 className="text-lg font-semibold text-white mb-1">Community</h2>
             <p className="text-sm text-zinc-400 mb-4">
-              Join {displayName}&apos;s GoFast Container — upcoming runs below, chatter in the app.
+              Join {displayName}&apos;s community — upcoming runs below, chatter in the app.
             </p>
             <div className="flex flex-wrap items-center gap-3 mb-4">
               <a
@@ -312,11 +324,36 @@ export default function GoFastPagePreviewCard({
           </section>
         ) : null}
 
+        {data.joinableGroupTraining ? (
+          <section className="rounded-2xl border border-orange-500/35 bg-zinc-900/85 p-5 shadow-lg">
+            <h2 className="text-lg font-semibold text-white mb-1">Group training</h2>
+            <p className="text-sm text-zinc-400 mb-2">
+              Train for {data.joinableGroupTraining.race.name} with {displayName}
+              {data.joinableGroupTraining.defaultPlanStartDate
+                ? ` — starts ${formatCohortStartLabel(data.joinableGroupTraining.defaultPlanStartDate)}`
+                : ""}
+              .
+            </p>
+            <p className="text-sm text-amber-200/90 font-medium mb-4">
+              Join week {data.joinableGroupTraining.currentWeekNumber ?? 1} ·{" "}
+              {data.joinableGroupTraining.memberCount} runner
+              {data.joinableGroupTraining.memberCount !== 1 ? "s" : ""}
+            </p>
+            <a
+              href={`${appBase.replace(/\/$/, "")}/join/training/${encodeURIComponent(data.joinableGroupTraining.handle)}`}
+              className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-400 transition-colors"
+            >
+              Join group training
+              <ChevronRight className="w-4 h-4" />
+            </a>
+          </section>
+        ) : null}
+
         {data.upcomingRuns.length > 0 ? (
           <section>
             <h2 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
               <CalendarDays className="w-5 h-5 text-amber-400" />
-              Join their run
+              Run with them
             </h2>
             <p className="text-sm text-zinc-500 mb-4">
               RSVP in the GoFast app — meet this runner on the road.

@@ -23,11 +23,13 @@ export async function GET(request: Request) {
   try {
     // Parse query params
     const { searchParams } = new URL(request.url);
-    const citySlug = searchParams.get('citySlug') || undefined;
+    const citySlug =
+      searchParams.get('citySlug')?.trim() ||
+      searchParams.get('gofastCity')?.trim() ||
+      undefined;
     const day = searchParams.get('day') || undefined;
     const runClubSlug = searchParams.get('runClubSlug') || undefined;
 
-    // Get runs with filters (public-safe data only)
     const runs = await getRuns({ citySlug, day, runClubSlug });
 
     return NextResponse.json({

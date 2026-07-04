@@ -8,6 +8,7 @@ import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import Link from 'next/link';
 import MissingPaceBanner from '@/components/profile/MissingPaceBanner';
+import PersonalCommunityCard from '@/components/profile/PersonalCommunityCard';
 
 const RUNNER_BASE =
   process.env.NEXT_PUBLIC_RUNNER_PHOTO_URL?.replace(/\/$/, '') ||
@@ -148,6 +149,8 @@ export default function ProfilePage() {
   const phoneNumber = athleteProfile.phoneNumber as string | undefined;
   const email = athleteProfile.email as string | undefined;
   const fiveKPace = athleteProfile.fiveKPace as string | undefined;
+  const athleteId = athleteProfile.id as string | undefined;
+  const isGoFastContainer = !!athleteProfile.isGoFastContainer;
 
   const calculateAge = (b: string | Date | null | undefined) => {
     if (!b) return null;
@@ -206,6 +209,9 @@ export default function ProfilePage() {
           <p className="text-gray-600 mt-1">
             @{handle || 'set_handle'} · {city || state ? [city, state].filter(Boolean).join(', ') : 'Add location'}
           </p>
+          <p className="text-xs text-gray-500 mt-2 max-w-md">
+            Your public profile — face, handle, and bio people see when they tap you in the app.
+          </p>
           {fiveKPace?.trim() ? (
             <p className="text-sm text-gray-500 mt-2">
               5K pace: <span className="font-semibold text-gray-800">{fiveKPace.trim()}</span>
@@ -222,9 +228,16 @@ export default function ProfilePage() {
             <button
               type="button"
               onClick={() => router.push('/athlete-edit-profile?tab=about-you')}
+              className="border border-gray-200 text-gray-800 px-4 py-2 rounded-lg font-semibold text-sm hover:bg-gray-50"
+            >
+              Edit about you
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push('/profile/gofast-page')}
               className="border border-orange-200 text-orange-800 px-4 py-2 rounded-lg font-semibold text-sm hover:bg-orange-50"
             >
-              Build GoFast Page
+              Build your Run With Me page
             </button>
             {liveGoFastUrl ? (
               <a
@@ -297,7 +310,30 @@ export default function ProfilePage() {
       </section>
 
       <div className="space-y-10">
-        {/* GoFast Page crosswalk */}
+        {/* Public profile summary */}
+        <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-gray-900">Public profile</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Basic identity — what people see when they click your name in chatter, run RSVPs, and member lists.
+          </p>
+          <div className="flex flex-wrap gap-2 mt-4">
+            {pill('Photo', !!photoURL)}
+            {pill('Handle', !!handle)}
+            {pill('Bio', !!(bio && bio.trim()))}
+            {pill('Instagram', !!(instagram && instagram.trim()))}
+            {pill('Location', !!(city || state))}
+            {pill('Sport', !!primarySport)}
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push('/athlete-edit-profile')}
+            className="mt-4 text-sm font-semibold text-orange-600 hover:text-orange-700"
+          >
+            Edit public profile →
+          </button>
+        </section>
+
+        {/* Run With Me */}
         <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-4">
             <div className="flex-shrink-0">
@@ -306,22 +342,19 @@ export default function ProfilePage() {
                   <img src={myBestRunPhotoURL} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-xs text-gray-400 px-2 text-center">
-                    No race moment photo yet
+                    No hero race photo yet
                   </div>
                 )}
               </div>
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-lg font-bold text-gray-900">On your GoFast Page</h2>
+              <h2 className="text-lg font-bold text-gray-900">Run With Me</h2>
               <p className="text-sm text-gray-600 mt-1">
-                These fields are visible on your public page. Everything under Account below stays in-app unless noted.
+                Your shareable page — races, plan, last runs, public runs, community, and group training.
               </p>
               <div className="flex flex-wrap gap-2 mt-3">
-                {pill('Race moment', !!myBestRunPhotoURL)}
-                {pill('Bio', !!(bio && bio.trim()))}
-                {pill('Sport', !!primarySport)}
-                {pill('Instagram', !!(instagram && instagram.trim()))}
-                {pill('Location', !!(city || state))}
+                {pill('Hero photo', !!myBestRunPhotoURL)}
+                {pill('Races & plan', !!(publicExtras?.trainingSummary || publicExtras?.primaryChasingGoal))}
               </div>
               <div className="flex flex-wrap gap-2 mt-4">
                 <button
@@ -329,12 +362,30 @@ export default function ProfilePage() {
                   onClick={() => router.push('/profile/gofast-page')}
                   className="text-sm font-semibold text-orange-600 hover:text-orange-700"
                 >
-                  In-app preview →
+                  Set up Run With Me →
                 </button>
+                {liveGoFastUrl ? (
+                  <a
+                    href={liveGoFastUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-semibold text-gray-600 hover:text-gray-800"
+                  >
+                    View live page →
+                  </a>
+                ) : null}
               </div>
             </div>
           </div>
         </section>
+
+        {athleteId ? (
+          <PersonalCommunityCard
+            athleteId={athleteId}
+            gofastHandle={handle || null}
+            initialEnabled={isGoFastContainer}
+          />
+        ) : null}
 
         {/* Goal / training (public API) */}
         <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -396,7 +447,7 @@ export default function ProfilePage() {
         {/* Account (private) */}
         <section className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 p-6">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-3">Account</h2>
-          <p className="text-xs text-gray-500 mb-3">Not shown on your public GoFast Page.</p>
+          <p className="text-xs text-gray-500 mb-3">Private account details — not shown on your public profile or Run With Me page.</p>
           <dl className="text-sm divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
             {handle ? (
               <div className="flex justify-between gap-4 px-4 py-2.5">

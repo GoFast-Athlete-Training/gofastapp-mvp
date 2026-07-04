@@ -1,63 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import type { TrainingCohortRole } from "@prisma/client";
+import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
+import { joinTrainingCohort } from "@/lib/training/cohort-service";
 
 export const dynamic = "force-dynamic";
 
-const COHORT_ROLES = new Set<TrainingCohortRole>(["MEMBER", "PACER", "ADMIN"]);
-
 /**
  * POST /api/race-trainer/[groupId]/join
- * Join a training cohort.
- * Body: { userId (athleteId), role? }
+ * Join a training cohort — creates membership + follower training plan.
+ * Body: { goalTime, replaceActivePlan? }
  */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
-    const { groupId: cohortId } = await params;
-    const body = await request.json();
-    const athleteId = body.athleteId ?? body.userId;
-    const role: TrainingCohortRole =
-      COHORT_ROLES.has(body.role) ? body.role : "MEMBER";
+    const auth = await requireAthleteFromBearer(request);
+    if ("error" in auth) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+    }
 
-    if (!athleteId) {
+    const { groupId: cohortId } = await params;
+    if (!cohortId?.trim()) {
       return NextResponse.json(
-        { success: false, error: "athleteId (or userId) is required" },
+        { success: false, error: "groupId required" },
         { status: 400 }
       );
     }
 
-    const cohort = await prisma.training_cohorts.findUnique({
-      where: { id: cohortId },
-    });
-
-    if (!cohort || (cohort.status !== "OPEN" && cohort.status !== "ACTIVE")) {
-      return NextResponse.json(
-        { success: false, error: "Training cohort not found or not joinable" },
-        { status: 404 }
-      );
+    let body: { goalTime?: string; replaceActivePlan?: boolean } = {};
+    try {
+      body = await request.json();
+    } catch {
+      /* empty */
     }
 
-    const member = await prisma.training_cohort_memberships.upsert({
-      where: { cohortId_athleteId: { cohortId, athleteId } },
-      update: {},
-      create: {
-        cohortId,
-        raceId: cohort.raceId,
-        athleteId,
-        role,
-      },
+    const result = await joinTrainingCohort({
+      cohortId: cohortId.trim(),
+      athleteId: auth.athlete.id,
+      goalTime: body.goalTime,
+      replaceActivePlan: body.replaceActivePlan === true,
     });
 
-    return NextResponse.json({ success: true, member });
+    return NextResponse.json({ success: true, ...result });
   } catch (error: unknown) {
     console.error("❌ RACE-TRAINER JOIN POST:", error);
     const message = error instanceof Error ? error.message : "Failed to join trainer group";
+    const status = message.includes("active training plan") ? 409 : 400;
     return NextResponse.json(
-      { success: false, error: "Failed to join trainer group", details: message },
-      { status: 500 }
+      { success: false, error: message },
+      { status }
     );
   }
 }

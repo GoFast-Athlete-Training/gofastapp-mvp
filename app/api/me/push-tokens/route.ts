@@ -33,6 +33,13 @@ export async function POST(request: Request) {
     deviceId: body.deviceId,
   });
 
+  console.info('[push-tokens] registered', {
+    athleteId: auth.athlete.id,
+    platform: body.platform ?? 'unknown',
+    tokenPrefix: `${expoPushToken.slice(0, 24)}…`,
+    tokenId: token.id,
+  });
+
   return NextResponse.json({ success: true, tokenId: token.id });
 }
 

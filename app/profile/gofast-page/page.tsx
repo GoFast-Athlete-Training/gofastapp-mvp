@@ -8,18 +8,28 @@ import { LocalStorageAPI } from "@/lib/localstorage";
 import GoFastPagePreviewCard, {
   type GoFastPagePayload,
 } from "@/components/profile/GoFastPagePreviewCard";
+import PersonalCommunityCard from "@/components/profile/PersonalCommunityCard";
 
 const RUNNER_BASE =
   process.env.NEXT_PUBLIC_RUNNER_PHOTO_URL?.replace(/\/$/, "") ||
   "https://runner.gofastcrushgoals.com";
 
+const RUN_WITH_ME_MODULES = [
+  "My races",
+  "My plan",
+  "Last run",
+  "Upcoming public runs",
+  "Community chatter",
+  "Group training",
+] as const;
+
 export default function GoFastPageStudioRoute() {
   const router = useRouter();
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const [athleteId, setAthleteId] = useState<string | null>(null);
+  const [gofastHandle, setGofastHandle] = useState<string | null>(null);
+  const [isGoFastContainer, setIsGoFastContainer] = useState(false);
   const [payload, setPayload] = useState<GoFastPagePayload | null>(null);
-  const [bio, setBio] = useState("");
-  const [instagram, setInstagram] = useState("");
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -49,25 +59,25 @@ export default function GoFastPageStudioRoute() {
           }
           return;
         }
+        setGofastHandle(handle);
+        setIsGoFastContainer(!!athlete?.isGoFastContainer);
         const pubRes = await fetch(`/api/athlete/public/${encodeURIComponent(handle)}`);
         const data = (await pubRes.json()) as GoFastPagePayload & { error?: string };
         if (!pubRes.ok || !data.success || !data.athlete) {
           if (!cancelled) {
-            setError(data.error || "Could not load your public page data.");
+            setError(data.error || "Could not load your Run With Me page data.");
             setLoading(false);
           }
           return;
         }
         if (!cancelled) {
           setPayload(data);
-          setBio(athlete.bio || "");
-          setInstagram(athlete.instagram || "");
           setBannerPreview(athlete.myBestRunPhotoURL || data.athlete.myBestRunPhotoURL || null);
           setLoading(false);
         }
       } catch {
         if (!cancelled) {
-          setError("Something went wrong loading the studio.");
+          setError("Something went wrong loading Run With Me.");
           setLoading(false);
         }
       }
@@ -116,8 +126,6 @@ export default function GoFastPageStudioRoute() {
       const bannerURL = bannerPreview || null;
       await api.put(`/athlete/${athleteId}/profile`, {
         myBestRunPhotoURL: bannerURL,
-        bio: bio.trim() || null,
-        instagram: instagram.trim() || null,
       });
       setPayload((prev) => {
         if (!prev?.athlete) return prev;
@@ -126,7 +134,6 @@ export default function GoFastPageStudioRoute() {
           athlete: {
             ...prev.athlete,
             myBestRunPhotoURL: bannerURL,
-            bio: bio.trim() || null,
           },
         };
       });
@@ -166,9 +173,9 @@ export default function GoFastPageStudioRoute() {
         >
           ← Back to profile
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">GoFast Page Studio</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Run With Me</h1>
         <p className="text-gray-700 text-sm">
-          Set your GoFast handle first — it becomes the web address for your public page.
+          Set your GoFast handle first — it becomes the web address for your shareable page.
         </p>
         <Link
           href="/athlete-edit-profile?tab=profile-info"
@@ -222,10 +229,9 @@ export default function GoFastPageStudioRoute() {
           >
             ← Back to profile
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">GoFast Page Studio</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Run With Me</h1>
           <p className="text-gray-600 text-sm mt-1 max-w-xl">
-            Your public GoFast Page is what friends and new runners see on the web. Edit here and watch
-            the preview update.
+            Create a shareable page where people can see your races, runs, training, and ways to join you.
           </p>
         </div>
         {liveUrl ? (
@@ -241,10 +247,9 @@ export default function GoFastPageStudioRoute() {
       </div>
 
       <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 sm:p-5">
-        <h2 className="text-sm font-semibold text-gray-900">Your public link</h2>
+        <h2 className="text-sm font-semibold text-gray-900">Your shareable link</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Anyone can open this URL — no app required. It pulls together your race-moment photo, bio,
-          location, sport,
+          Anyone can open this URL — no app required. It pulls together your hero race photo, races, plan,
           runs, and training highlights.
         </p>
         {liveUrl ? (
@@ -265,6 +270,24 @@ export default function GoFastPageStudioRoute() {
         ) : null}
       </div>
 
+      <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+        <h2 className="text-sm font-semibold text-gray-900">What can appear on your page</h2>
+        <p className="text-sm text-gray-600 mt-1">
+          Your Run With Me page fills in automatically as you train, RSVP to runs, and turn on community
+          features.
+        </p>
+        <ul className="mt-3 flex flex-wrap gap-2">
+          {RUN_WITH_ME_MODULES.map((label) => (
+            <li
+              key={label}
+              className="inline-flex rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700"
+            >
+              {label}
+            </li>
+          ))}
+        </ul>
+      </div>
+
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}
@@ -280,14 +303,14 @@ export default function GoFastPageStudioRoute() {
         <div className="w-full shrink-0 space-y-6 lg:w-96">
           <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 mb-4">
-              Edit your page
+              Page setup
             </h2>
 
             <div className="rounded-lg border border-orange-100 bg-orange-50/50 p-3 mb-5">
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Favorite race moment</h3>
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Add a hero race photo</h3>
               <p className="text-xs text-gray-600 mb-3">
-                A horizontal action shot you love — not a designed cover. Shows wide at the top of your
-                public page (separate from your profile circle).
+                A horizontal action shot you love from a race or run — not a designed cover. This is the
+                hero visual at the top of your Run With Me page, separate from your profile circle.
               </p>
               <button
                 type="button"
@@ -316,53 +339,36 @@ export default function GoFastPageStudioRoute() {
               />
             </div>
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Bio (public)</label>
-              <textarea
-                value={bio}
-                onChange={(e) => {
-                  setBio(e.target.value);
-                  setSuccess(null);
-                }}
-                maxLength={250}
-                rows={4}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                disabled={saving}
-              />
-              <p className="text-xs text-gray-500 mt-1">{bio.length}/250</p>
-            </div>
-
-            <div className="mb-5">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Instagram</label>
-              <input
-                type="text"
-                value={instagram}
-                onChange={(e) => {
-                  setInstagram(e.target.value);
-                  setSuccess(null);
-                }}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                disabled={saving}
-              />
-            </div>
-
             <button
               type="button"
               onClick={() => void handleSave()}
               disabled={saving}
               className="w-full rounded-lg bg-orange-500 py-3 font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
             >
-              {saving ? "Saving…" : "Save changes"}
+              {saving ? "Saving…" : "Save hero photo"}
             </button>
 
             <p className="text-xs text-gray-500 mt-3">
-              Location, sport, and profile photo are edited under{" "}
+              Bio, handle, location, and profile photo are edited under{" "}
               <Link href="/athlete-edit-profile" className="font-medium text-orange-600 hover:underline">
                 Edit profile
               </Link>
               .
             </p>
           </section>
+
+          {athleteId ? (
+            <PersonalCommunityCard
+              athleteId={athleteId}
+              gofastHandle={gofastHandle}
+              initialEnabled={isGoFastContainer}
+              compact
+              onEnabledChange={(enabled) => {
+                setIsGoFastContainer(enabled);
+                setPayload((prev) => (prev ? { ...prev, isGoFastContainer: enabled } : prev));
+              }}
+            />
+          ) : null}
         </div>
 
         <div className="min-w-0 flex-1">

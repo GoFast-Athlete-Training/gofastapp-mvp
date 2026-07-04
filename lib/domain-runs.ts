@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { isRunStillUpcomingForDiscover } from '@/lib/run-discover-freshness';
 import { getDayOfWeekFromDate } from '@/lib/utils/dayOfWeek';
 import { sameDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 
@@ -173,9 +174,21 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     throw error;
   }
 
-  let filteredRuns = allRuns;
+  const now = new Date();
+  let filteredRuns = allRuns.filter((run) =>
+    isRunStillUpcomingForDiscover(
+      {
+        date: run.date,
+        startTimeHour: run.startTimeHour,
+        startTimeMinute: run.startTimeMinute,
+        startTimePeriod: run.startTimePeriod,
+      },
+      now
+    )
+  );
+
   if (filters.day && filters.day !== 'All Days') {
-    filteredRuns = allRuns.filter((run) => {
+    filteredRuns = filteredRuns.filter((run) => {
       // If run has a parent series, day of week comes from the setup; otherwise derive from date
       const runDay = run.runSeriesId != null
         ? (run.runSeries?.dayOfWeek ?? run.dayOfWeek)

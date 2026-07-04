@@ -32,7 +32,6 @@ function AthleteEditProfileInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const bannerInputRef = useRef<HTMLInputElement>(null);
   const handleCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [activeTab, setActiveTab] = useState<ProfileTab>(() => tabFromParam(searchParams.get('tab')));
@@ -53,8 +52,6 @@ function AthleteEditProfileInner() {
     weeklyMileage: '',
     profilePhoto: null as File | null,
     profilePhotoPreview: null as string | null,
-    bannerFile: null as File | null,
-    bannerPreview: null as string | null,
   });
   const [athleteId, setAthleteId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,9 +60,6 @@ function AthleteEditProfileInner() {
   const [success, setSuccess] = useState('');
   const [handleStatus, setHandleStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [handleError, setHandleError] = useState('');
-  const [isGoFastContainer, setIsGoFastContainer] = useState(false);
-  const [containerMemberCount, setContainerMemberCount] = useState(0);
-  const [containerToggleLoading, setContainerToggleLoading] = useState(false);
 
   useEffect(() => {
     setActiveTab(tabFromParam(searchParams.get('tab')));
@@ -117,10 +111,7 @@ function AthleteEditProfileInner() {
               : '',
           profilePhoto: null,
           profilePhotoPreview: stored.photoURL || auth.currentUser?.photoURL || null,
-          bannerFile: null,
-          bannerPreview: stored.myBestRunPhotoURL || null,
         });
-        setIsGoFastContainer(!!stored.isGoFastContainer);
       })
       .catch(() => {
         setError('Error loading profile. Please try again.');
@@ -128,39 +119,6 @@ function AthleteEditProfileInner() {
       })
       .finally(() => setIsLoading(false));
   }, [router]);
-
-  useEffect(() => {
-    if (!athleteId || !isGoFastContainer) return;
-    api
-      .get(`/athlete/${athleteId}/container/members`)
-      .then((r) => setContainerMemberCount(r.data?.count ?? 0))
-      .catch(() => {});
-  }, [athleteId, isGoFastContainer]);
-
-  const handleContainerToggle = async () => {
-    if (!athleteId || containerToggleLoading) return;
-    setContainerToggleLoading(true);
-    setError('');
-    try {
-      const res = await api.post(`/athlete/${athleteId}/container/toggle`, {
-        value: !isGoFastContainer,
-      });
-      const next = !!res.data?.isGoFastContainer;
-      setIsGoFastContainer(next);
-      if (next) {
-        const m = await api.get(`/athlete/${athleteId}/container/members`);
-        setContainerMemberCount(m.data?.count ?? 0);
-      } else {
-        setContainerMemberCount(0);
-      }
-      setSuccess(next ? 'GoFast Container is on.' : 'GoFast Container is off.');
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string; error?: string } } };
-      setError(e.response?.data?.message || e.response?.data?.error || 'Could not update container setting.');
-    } finally {
-      setContainerToggleLoading(false);
-    }
-  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({
@@ -243,28 +201,6 @@ function AthleteEditProfileInner() {
 
   const handleImageClick = () => fileInputRef.current?.click();
 
-  const handleBannerUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        alert('Please select a valid image file');
-        return;
-      }
-      if (file.size > 8 * 1024 * 1024) {
-        alert('Image size must be less than 8MB');
-        return;
-      }
-      const previewUrl = URL.createObjectURL(file);
-      setFormData((prev) => ({
-        ...prev,
-        bannerFile: file,
-        bannerPreview: previewUrl,
-      }));
-    }
-  };
-
-  const handleBannerClick = () => bannerInputRef.current?.click();
-
   const beginSave = () => {
     setError('');
     setSuccess('');
@@ -333,9 +269,7 @@ function AthleteEditProfileInner() {
     beginSave();
     setLoading(true);
     try {
-      const bannerURL = formData.bannerPreview || null;
       await api.put(`/athlete/${athleteId}/profile`, {
-        myBestRunPhotoURL: bannerURL,
         bio: formData.bio || null,
         instagram: formData.instagram.trim() || null,
       });
@@ -399,7 +333,7 @@ function AthleteEditProfileInner() {
     'about-you': {
       title: 'About You',
       subtitle:
-        'Favorite race-moment photo, bio, Instagram, and optional GoFast Container. These fields shape how the world sees you on your public page.',
+        'Bio and social links people see when they click your name in the app — on run RSVPs, chatter, and member lists.',
     },
     'goal-perf': {
       title: 'Goal & Performance',
@@ -442,7 +376,7 @@ function AthleteEditProfileInner() {
               rel="noopener noreferrer"
               className="text-sm font-medium text-orange-600 hover:text-orange-700"
             >
-              See your GoFast Page →
+              See your public profile →
             </a>
           ) : null}
         </div>
@@ -455,7 +389,7 @@ function AthleteEditProfileInner() {
               </p>
               <nav className="flex flex-col gap-0.5" aria-label="Profile sections">
                 {sectionNavItem('profile-info', 'Profile Info', 'Photo, name & account')}
-                {sectionNavItem('about-you', 'About You', 'Race moment & public page')}
+                {sectionNavItem('about-you', 'About You', 'Bio & social links')}
                 {sectionNavItem('goal-perf', 'Goal & Performance', 'Sport, pace & mileage')}
               </nav>
             </div>
@@ -672,39 +606,14 @@ function AthleteEditProfileInner() {
 
           {activeTab === 'about-you' && (
             <div className="space-y-5">
-              <div className="rounded-xl border border-orange-100 bg-orange-50/50 p-4">
-                <h3 className="text-sm font-semibold text-gray-900 mb-1">Favorite race moment</h3>
-                <p className="text-xs text-gray-600 mb-3">
-                  Not a cover graphic — just a horizontal photo you love from a race or run (think 4×6
-                  landscape). It appears wide across the top of your public GoFast Page, separate from your
-                  profile circle.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleBannerClick}
-                  className="w-full aspect-[21/9] max-h-36 bg-gray-200 rounded-lg overflow-hidden flex items-center justify-center hover:bg-gray-300"
-                >
-                  {formData.bannerPreview ? (
-                    <img src={formData.bannerPreview} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-gray-500 text-sm">Tap to add a photo</span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleBannerClick}
-                  className="mt-2 text-orange-600 text-sm font-medium"
-                >
-                  {formData.bannerPreview ? 'Change photo' : 'Add photo'}
-                </button>
-                <input
-                  ref={bannerInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleBannerUpload}
-                  className="hidden"
-                />
-              </div>
+              <p className="text-sm text-gray-600 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                These are your basic public profile fields — what runners see when they tap your face or handle
+                anywhere in GoFast. For your shareable Run With Me page (races, runs, training), use{' '}
+                <Link href="/profile/gofast-page" className="font-semibold text-orange-600 hover:text-orange-700">
+                  Run With Me setup
+                </Link>
+                .
+              </p>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Bio (public)</label>
@@ -730,56 +639,21 @@ function AthleteEditProfileInner() {
                 />
               </div>
 
-              <div className="rounded-xl border border-violet-200/80 bg-violet-50/50 p-4">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isGoFastContainer}
-                    disabled={containerToggleLoading || !athleteId || loading}
-                    onChange={() => void handleContainerToggle()}
-                    className="mt-1 h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-                  />
-                  <span>
-                    <span className="font-semibold text-gray-900">GoFast Container</span>
-                    <p className="text-xs text-gray-600 mt-1">
-                      Optional: turn your public page into a small community — your upcoming runs appear automatically,
-                      and members can chat in one feed. You moderate as the host.
-                    </p>
-                  </span>
-                </label>
-                {isGoFastContainer ? (
-                  <div className="mt-3 pl-7 text-sm text-gray-700">
-                    <p>
-                      {containerMemberCount} member{containerMemberCount !== 1 ? 's' : ''}
-                      {containerToggleLoading ? '…' : ''}
-                    </p>
-                    {formData.gofastHandle ? (
-                      <Link
-                        href={`/container/${encodeURIComponent(formData.gofastHandle)}`}
-                        className="inline-block mt-2 font-semibold text-orange-600 hover:text-orange-700"
-                      >
-                        Open container hub →
-                      </Link>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-
               <div className="flex flex-wrap gap-2">
                 <Link
                   href="/profile/gofast-page"
-                  className="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                  className="inline-flex items-center px-4 py-2 rounded-lg border border-orange-200 text-sm font-semibold text-orange-800 hover:bg-orange-50"
                 >
-                  Preview in app
+                  Build Run With Me page →
                 </Link>
                 {liveGoFastUrl ? (
                   <a
                     href={liveGoFastUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center px-4 py-2 rounded-lg border border-orange-200 text-sm font-semibold text-orange-800 hover:bg-orange-50"
+                    className="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-800 hover:bg-gray-50"
                   >
-                    View live GoFast Page
+                    View live page
                   </a>
                 ) : null}
               </div>

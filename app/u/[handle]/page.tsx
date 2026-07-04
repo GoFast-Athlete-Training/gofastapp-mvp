@@ -6,6 +6,7 @@ import ProfileHero from './_components/ProfileHero';
 import GoalRaceCard from './_components/GoalRaceCard';
 import LastRunCard from './_components/LastRunCard';
 import RunWithMe from './_components/RunWithMe';
+import GroupTrainingCard from './_components/GroupTrainingCard';
 import AboutStrip from './_components/AboutStrip';
 
 export const dynamic = 'force-dynamic';
@@ -113,6 +114,10 @@ export default async function PublicAthletePage({
           trainingSummary={data.trainingSummary}
           primaryChasingGoal={data.primaryChasingGoal}
         />
+
+        {data.joinableGroupTraining ? (
+          <GroupTrainingCard cohort={data.joinableGroupTraining} />
+        ) : null}
 
         <LastRunCard
           lastRun={data.lastRun}
