@@ -46,7 +46,11 @@ interface ContainerData {
   recentRuns: RecentRun[];
 }
 
-export default function RunClubContainerPage() {
+/**
+ * Authenticated app club hub — membership, announcements, events, upcoming runs.
+ * Not the public SEO discovery page (see gofast-contentpublic ClubPublicDiscoveryView).
+ */
+export default function AuthenticatedRunClubHubPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params.slug as string;
