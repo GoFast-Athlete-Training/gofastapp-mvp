@@ -6,7 +6,7 @@ import { resolveClubOwnerState } from '@/lib/domain-runclub-leader-claim';
 
 /**
  * GET /api/me/club-leader-claims/resolve
- * Post-profile resolver state for /welcome-club-owner.
+ * Legacy email-matched resolver for /welcome-club-owner fallback (no activation token).
  */
 export async function GET(request: Request) {
   const auth = await requireAthleteFromBearer(request);

@@ -17,11 +17,16 @@ export function getInviteExpiryDate(from = new Date()): Date {
   return expires;
 }
 
-export function buildClubOwnerInviteUrl(token: string, baseUrl?: string): string {
+export function buildClubManagerActivateUrl(token: string, baseUrl?: string): string {
   const base =
     baseUrl ??
     process.env.NEXT_PUBLIC_GOFAST_APP_URL ??
     process.env.NEXT_PUBLIC_APP_URL ??
     'http://localhost:3001';
-  return `${base.replace(/\/$/, '')}/clubowner/invite?token=${encodeURIComponent(token)}`;
+  return `${base.replace(/\/$/, '')}/club-manager/activate?token=${encodeURIComponent(token)}`;
+}
+
+/** @deprecated Use buildClubManagerActivateUrl — kept for internal callers during rollout */
+export function buildClubOwnerInviteUrl(token: string, baseUrl?: string): string {
+  return buildClubManagerActivateUrl(token, baseUrl);
 }

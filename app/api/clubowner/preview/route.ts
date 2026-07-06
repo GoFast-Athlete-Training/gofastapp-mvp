@@ -9,10 +9,10 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   return NextResponse.json({
     success: true,
-    title: 'Manage your run club on GoFast',
+    title: 'Club Manager on GoFast',
     description:
-      'Sign up or sign in with the email GoFast has on file for your club. After your athlete profile is set up, we will connect you to your club manager tools.',
-    entryPath: '/clubowner',
-    signupPath: '/signup?mode=club-owner',
+      'Open your manager activation link or sign in with the email GoFast has on file for your club.',
+    entryPath: '/club-manager/activate',
+    signupPath: '/signup?mode=club-manager',
   });
 }

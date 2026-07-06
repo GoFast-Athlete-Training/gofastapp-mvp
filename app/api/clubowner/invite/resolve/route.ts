@@ -8,6 +8,7 @@ import {
 
 /**
  * GET /api/clubowner/invite/resolve?token=
+ * Public pre-auth activation context for Club Manager invite tokens.
  * Public: resolve invite token to club + expected email before auth.
  */
 export async function GET(request: NextRequest) {

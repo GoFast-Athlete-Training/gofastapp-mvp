@@ -8,8 +8,13 @@ import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, si
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import { clubManagerActivatePath, clubManagerHubPath } from '@/lib/club-manager-paths';
 
-type SignupMode = 'default' | 'join-crew' | 'club-owner';
+type SignupMode = 'default' | 'join-crew' | 'club-owner' | 'club-manager';
+
+function isClubManagerSignupMode(mode: SignupMode): boolean {
+  return mode === 'club-manager' || mode === 'club-owner';
+}
 
 async function loadOrCreateAthlete(opts?: { onboardingIntent?: string }) {
   try {
@@ -53,7 +58,7 @@ function redirectToFrontDoorIfIntent(router: ReturnType<typeof useRouter>): bool
 function routeAfterAthleteResolved(
   router: ReturnType<typeof useRouter>,
   athlete: { data?: { gofastHandle?: string | null } },
-  opts: { mode: SignupMode; runCrewHandle: string | null }
+  opts: { mode: SignupMode; runCrewHandle: string | null; redirect?: string | null }
 ) {
   if (redirectToFrontDoorIfIntent(router)) return;
 
@@ -62,11 +67,17 @@ function routeAfterAthleteResolved(
     return;
   }
 
-  if (opts.mode === 'club-owner') {
-    LocalStorageAPI.setClubOwnerMode(true);
-    const inviteToken = LocalStorageAPI.getClubOwnerInviteToken();
+  if (isClubManagerSignupMode(opts.mode)) {
+    LocalStorageAPI.setClubManagerMode(true);
+    const activationToken = LocalStorageAPI.getClubManagerActivationToken();
     if (athlete.data?.gofastHandle) {
-      router.replace(inviteToken ? '/clubowner/invite' : '/welcome-club-owner');
+      if (activationToken) {
+        router.replace(clubManagerActivatePath(activationToken));
+      } else if (opts.redirect) {
+        router.replace(opts.redirect);
+      } else {
+        router.replace('/welcome-club-owner');
+      }
     } else {
       router.replace('/athlete-create-profile');
     }
@@ -88,17 +99,20 @@ function SignupPageContent() {
   const mode: SignupMode =
     searchParams?.get('mode') === 'join-crew'
       ? 'join-crew'
-      : searchParams?.get('mode') === 'club-owner'
-        ? 'club-owner'
-        : 'default';
+      : searchParams?.get('mode') === 'club-manager'
+        ? 'club-manager'
+        : searchParams?.get('mode') === 'club-owner'
+          ? 'club-owner'
+          : 'default';
   const runCrewHandle = searchParams?.get('handle') || null;
+  const redirectParam = searchParams?.get('redirect');
   
   // Detect club leader intent from URL param (passed from splash page)
   const isClubLeaderIntent = searchParams?.get('intent') === 'club-leader';
 
   useEffect(() => {
-    if (mode === 'club-owner') {
-      LocalStorageAPI.setClubOwnerMode(true);
+    if (isClubManagerSignupMode(mode)) {
+      LocalStorageAPI.setClubManagerMode(true);
     }
   }, [mode]);
   
@@ -156,7 +170,7 @@ function SignupPageContent() {
 
               if (redirectToFrontDoorIfIntent(router)) return;
 
-              routeAfterAthleteResolved(router, athlete, { mode, runCrewHandle });
+              routeAfterAthleteResolved(router, athlete, { mode, runCrewHandle, redirect: redirectParam });
               return;
             }
           } catch (authCheckErr: any) {
@@ -213,7 +227,7 @@ function SignupPageContent() {
       // Check for pending crew join intent - redirect to front door (NO auto-join)
       if (redirectToFrontDoorIfIntent(router)) return;
 
-      routeAfterAthleteResolved(router, athlete, { mode, runCrewHandle });
+      routeAfterAthleteResolved(router, athlete, { mode, runCrewHandle, redirect: redirectParam });
     } catch (err: any) {
       console.error('❌ SIGNUP: Google signup error:', err);
       
@@ -296,7 +310,7 @@ function SignupPageContent() {
 
       if (redirectToFrontDoorIfIntent(router)) return;
 
-      routeAfterAthleteResolved(router, athlete, { mode, runCrewHandle });
+      routeAfterAthleteResolved(router, athlete, { mode, runCrewHandle, redirect: redirectParam });
     } catch (err: any) {
       console.error('❌ SIGNUP: Email signup error:', err);
       
@@ -363,7 +377,7 @@ function SignupPageContent() {
 
       if (redirectToFrontDoorIfIntent(router)) return;
 
-      routeAfterAthleteResolved(router, athlete, { mode, runCrewHandle });
+      routeAfterAthleteResolved(router, athlete, { mode, runCrewHandle, redirect: redirectParam });
     } catch (err: any) {
       console.error('❌ SIGNIN: Email sign-in error:', err);
       

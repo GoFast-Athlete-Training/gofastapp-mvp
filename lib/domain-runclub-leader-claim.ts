@@ -3,7 +3,7 @@ import { listLeaderMemberships } from '@/lib/run-club-leader-auth';
 import type { RunClubLeaderRole } from '@/lib/run-club-leader-scope';
 import { mapAcqRoleToMembershipRole, normalizeLeaderEmail } from '@/lib/run-club-leader-role-map';
 import {
-  buildClubOwnerInviteUrl,
+  buildClubManagerActivateUrl,
   generateInviteToken,
   getInviteExpiryDate,
   hashInviteToken,
@@ -228,7 +228,7 @@ export async function createOrRefreshManagerInviteClaim(input: {
     runClubSlug: updated.run_clubs.slug,
     runClubName: updated.run_clubs.name,
     inviteToken,
-    inviteUrl: buildClubOwnerInviteUrl(inviteToken),
+    inviteUrl: buildClubManagerActivateUrl(inviteToken),
     inviteExpiresAt,
   };
 }

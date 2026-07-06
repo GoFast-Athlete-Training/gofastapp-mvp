@@ -4,6 +4,11 @@
 export const RUNCREW_JOIN_INTENT_KEY = 'runCrewJoinIntent';
 export const RUNCREW_JOIN_INTENT_HANDLE_KEY = 'runCrewJoinIntentHandle';
 export const RUNCREW_CREATE_INTENT_KEY = 'runCrewCreateIntent';
+/** Canonical Club Manager activation context keys */
+export const CLUB_MANAGER_MODE_KEY = 'clubManagerMode';
+export const CLUB_MANAGER_ACTIVATION_TOKEN_KEY = 'clubManagerActivationToken';
+
+/** @deprecated Legacy keys — read for compatibility, prefer CLUB_MANAGER_* setters */
 export const CLUB_OWNER_MODE_KEY = 'clubOwnerMode';
 export const CLUB_OWNER_INVITE_TOKEN_KEY = 'clubOwnerInviteToken';
 
@@ -89,46 +94,87 @@ export const LocalStorageAPI = {
     }
   },
 
-  setClubOwnerMode(enabled: boolean) {
+  setClubManagerMode(enabled: boolean) {
     if (typeof window !== 'undefined') {
       if (enabled) {
+        localStorage.setItem(CLUB_MANAGER_MODE_KEY, '1');
         localStorage.setItem(CLUB_OWNER_MODE_KEY, '1');
       } else {
+        localStorage.removeItem(CLUB_MANAGER_MODE_KEY);
         localStorage.removeItem(CLUB_OWNER_MODE_KEY);
       }
     }
   },
 
-  getClubOwnerMode() {
+  getClubManagerMode() {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem(CLUB_OWNER_MODE_KEY) === '1';
+      return (
+        localStorage.getItem(CLUB_MANAGER_MODE_KEY) === '1' ||
+        localStorage.getItem(CLUB_OWNER_MODE_KEY) === '1'
+      );
     }
     return false;
   },
 
-  clearClubOwnerMode() {
+  clearClubManagerMode() {
     if (typeof window !== 'undefined') {
+      localStorage.removeItem(CLUB_MANAGER_MODE_KEY);
       localStorage.removeItem(CLUB_OWNER_MODE_KEY);
     }
   },
 
-  setClubOwnerInviteToken(token: string) {
+  setClubManagerActivationToken(token: string) {
     if (typeof window !== 'undefined') {
+      localStorage.setItem(CLUB_MANAGER_ACTIVATION_TOKEN_KEY, token);
       localStorage.setItem(CLUB_OWNER_INVITE_TOKEN_KEY, token);
     }
   },
 
-  getClubOwnerInviteToken() {
+  getClubManagerActivationToken() {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem(CLUB_OWNER_INVITE_TOKEN_KEY);
+      return (
+        localStorage.getItem(CLUB_MANAGER_ACTIVATION_TOKEN_KEY) ||
+        localStorage.getItem(CLUB_OWNER_INVITE_TOKEN_KEY)
+      );
     }
     return null;
   },
 
-  clearClubOwnerInviteToken() {
+  clearClubManagerActivationToken() {
     if (typeof window !== 'undefined') {
+      localStorage.removeItem(CLUB_MANAGER_ACTIVATION_TOKEN_KEY);
       localStorage.removeItem(CLUB_OWNER_INVITE_TOKEN_KEY);
     }
+  },
+
+  /** @deprecated Use setClubManagerMode */
+  setClubOwnerMode(enabled: boolean) {
+    LocalStorageAPI.setClubManagerMode(enabled);
+  },
+
+  /** @deprecated Use getClubManagerMode */
+  getClubOwnerMode() {
+    return LocalStorageAPI.getClubManagerMode();
+  },
+
+  /** @deprecated Use clearClubManagerMode */
+  clearClubOwnerMode() {
+    LocalStorageAPI.clearClubManagerMode();
+  },
+
+  /** @deprecated Use setClubManagerActivationToken */
+  setClubOwnerInviteToken(token: string) {
+    LocalStorageAPI.setClubManagerActivationToken(token);
+  },
+
+  /** @deprecated Use getClubManagerActivationToken */
+  getClubOwnerInviteToken() {
+    return LocalStorageAPI.getClubManagerActivationToken();
+  },
+
+  /** @deprecated Use clearClubManagerActivationToken */
+  clearClubOwnerInviteToken() {
+    LocalStorageAPI.clearClubManagerActivationToken();
   },
 
   clearAll() {

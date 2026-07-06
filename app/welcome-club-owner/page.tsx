@@ -7,37 +7,39 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import { clubManagerClubPath, clubManagerHubPath } from '@/lib/club-manager-paths';
 
 type ViewState =
   | { kind: 'loading' }
-  | { kind: 'attaching' }
+  | { kind: 'activating' }
   | { kind: 'unmatched'; athleteEmail: string | null }
   | { kind: 'alreadyActive'; clubs: Array<{ runClubSlug: string | null; runClubName: string }> }
   | { kind: 'chooser'; claims: Array<{ id: string; runClubName: string; runClubSlug: string | null }> }
   | { kind: 'error'; message: string };
 
-export default function WelcomeClubOwnerPage() {
+/** Legacy fallback when a manager record exists for email but no activation token was used. */
+export default function WelcomeClubOwnerFallbackPage() {
   const router = useRouter();
   const [view, setView] = useState<ViewState>({ kind: 'loading' });
   const [athleteEmail, setAthleteEmail] = useState<string | null>(null);
 
-  const attachClaim = useCallback(
+  const activateClaim = useCallback(
     async (claimId: string, runClubSlug: string | null) => {
-      setView({ kind: 'attaching' });
+      setView({ kind: 'activating' });
       try {
         const res = await api.post('/me/club-leader-claim/attach', { claimId });
         if (!res.data?.success) {
-          throw new Error(res.data?.error ?? 'Attach failed');
+          throw new Error(res.data?.error ?? 'Activation failed');
         }
-        LocalStorageAPI.clearClubOwnerMode();
+        LocalStorageAPI.clearClubManagerMode();
         const slug = res.data.runClubSlug ?? runClubSlug;
-        router.replace(slug ? `/leader/runclub/${slug}` : '/leader');
+        router.replace(slug ? clubManagerClubPath(slug) : clubManagerHubPath());
       } catch (err: unknown) {
         const code = (err as { response?: { data?: { code?: string; error?: string } } })?.response?.data
           ?.code;
         const message =
           (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-          'Could not connect your club';
+          'Could not activate manager access';
         if (code === 'NO_SEEDED_LEADER_FOR_EMAIL') {
           setView({ kind: 'unmatched', athleteEmail });
           return;
@@ -53,7 +55,7 @@ export default function WelcomeClubOwnerPage() {
     const res = await api.get('/me/club-leader-claims/resolve');
     const data = res.data;
     if (!data?.success) {
-      setView({ kind: 'error', message: 'Could not check club-owner setup' });
+      setView({ kind: 'error', message: 'Could not check manager setup' });
       return;
     }
     if (data.state === 'unmatched') {
@@ -64,14 +66,14 @@ export default function WelcomeClubOwnerPage() {
     if (data.state === 'alreadyActive') {
       const clubs = data.clubs ?? [];
       if (clubs.length === 1 && clubs[0]?.runClubSlug) {
-        router.replace(`/leader/runclub/${clubs[0].runClubSlug}`);
+        router.replace(clubManagerClubPath(clubs[0].runClubSlug));
         return;
       }
       setView({ kind: 'alreadyActive', clubs });
       return;
     }
     if (data.state === 'matchedOne' && data.claim?.id) {
-      await attachClaim(data.claim.id, data.claim.runClubSlug ?? null);
+      await activateClaim(data.claim.id, data.claim.runClubSlug ?? null);
       return;
     }
     if (data.state === 'matchedMany') {
@@ -86,18 +88,18 @@ export default function WelcomeClubOwnerPage() {
         ),
       });
     }
-  }, [attachClaim, router]);
+  }, [activateClaim, router]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        LocalStorageAPI.setClubOwnerMode(true);
-        router.replace('/signup?mode=club-owner');
+        LocalStorageAPI.setClubManagerMode(true);
+        router.replace('/signup?mode=club-manager');
         return;
       }
       const athleteId = LocalStorageAPI.getAthleteId();
       if (!athleteId) {
-        router.replace('/signup?mode=club-owner');
+        router.replace('/signup?mode=club-manager');
         return;
       }
       setAthleteEmail(user.email);
@@ -106,13 +108,13 @@ export default function WelcomeClubOwnerPage() {
     return () => unsub();
   }, [router, loadResolve]);
 
-  if (view.kind === 'loading' || view.kind === 'attaching') {
+  if (view.kind === 'loading' || view.kind === 'activating') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-sky-50 to-white flex items-center justify-center px-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-sky-600 mx-auto mb-4" />
           <p className="text-gray-600">
-            {view.kind === 'attaching' ? 'Connecting your club…' : 'Checking club-owner setup…'}
+            {view.kind === 'activating' ? 'Activating Club Manager access…' : 'Checking manager setup…'}
           </p>
         </div>
       </div>
@@ -123,22 +125,21 @@ export default function WelcomeClubOwnerPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-50 to-white flex items-center justify-center px-4">
         <div className="max-w-lg w-full bg-white rounded-2xl border border-amber-200 shadow-sm p-8">
-          <p className="text-xs font-bold uppercase tracking-wide text-amber-800">Club owner setup</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-800">Club Manager setup</p>
           <h1 className="mt-2 text-xl font-bold text-gray-900">
-            We could not find a club-owner setup for this email
+            We could not find manager access for this email
           </h1>
           <p className="mt-3 text-sm text-gray-600">
-            You signed in as <span className="font-medium">{athleteEmail ?? 'this account'}</span>. GoFast
-            could not find a club-owner setup for this email. Use the email GoFast has on file for your club,
-            or ask GoFast staff to update the leader contact.
+            You signed in as <span className="font-medium">{athleteEmail ?? 'this account'}</span>. Use
+            the activation link GoFast sent you, or ask staff to resend the invite.
           </p>
           <div className="mt-6 flex flex-col gap-3">
             <button
               type="button"
               onClick={async () => {
-                LocalStorageAPI.setClubOwnerMode(true);
+                LocalStorageAPI.setClubManagerMode(true);
                 await signOut(auth);
-                router.replace('/clubowner');
+                router.replace(clubManagerHubPath());
               }}
               className="w-full rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white hover:bg-sky-700"
             >
@@ -147,7 +148,7 @@ export default function WelcomeClubOwnerPage() {
             <button
               type="button"
               onClick={() => {
-                LocalStorageAPI.clearClubOwnerMode();
+                LocalStorageAPI.clearClubManagerMode();
                 router.replace('/athlete-home');
               }}
               className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
@@ -166,12 +167,12 @@ export default function WelcomeClubOwnerPage() {
       <div className="min-h-screen flex items-center justify-center px-4 bg-gray-50">
         <div className="max-w-md text-center">
           <h1 className="text-xl font-bold text-gray-900">You&apos;re already set up</h1>
-          <p className="mt-2 text-sm text-gray-600">Your club manager access is active.</p>
+          <p className="mt-2 text-sm text-gray-600">Your Club Manager access is active.</p>
           <Link
-            href={club?.runClubSlug ? `/leader/runclub/${club.runClubSlug}` : '/leader'}
+            href={club?.runClubSlug ? clubManagerClubPath(club.runClubSlug) : clubManagerHubPath()}
             className="mt-6 inline-block rounded-xl bg-orange-500 px-6 py-3 text-sm font-semibold text-white"
           >
-            Open club manager
+            Open Club Manager
           </Link>
         </div>
       </div>
@@ -191,7 +192,7 @@ export default function WelcomeClubOwnerPage() {
               <li key={claim.id}>
                 <button
                   type="button"
-                  onClick={() => attachClaim(claim.id, claim.runClubSlug)}
+                  onClick={() => activateClaim(claim.id, claim.runClubSlug)}
                   className="w-full text-left rounded-xl border border-gray-200 px-4 py-3 hover:border-sky-400 hover:bg-sky-50"
                 >
                   <span className="font-semibold text-gray-900">{claim.runClubName}</span>

@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import { clubManagerActivatePath } from '@/lib/club-manager-paths';
 
 type ProfileStep = 'intro' | 'form' | 'success';
 
@@ -203,10 +204,9 @@ export default function AthleteCreateProfilePage() {
       });
 
       let nextPath = '/welcome';
-      if (LocalStorageAPI.getClubOwnerMode()) {
-        nextPath = LocalStorageAPI.getClubOwnerInviteToken()
-          ? '/clubowner/invite'
-          : '/welcome-club-owner';
+      if (LocalStorageAPI.getClubManagerMode()) {
+        const activationToken = LocalStorageAPI.getClubManagerActivationToken();
+        nextPath = activationToken ? clubManagerActivatePath(activationToken) : '/welcome-club-owner';
       } else {
         const createCrewIntent = LocalStorageAPI.getRunCrewCreateIntent();
         if (createCrewIntent) {

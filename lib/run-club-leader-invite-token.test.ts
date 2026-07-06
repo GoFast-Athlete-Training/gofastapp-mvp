@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   generateInviteToken,
   hashInviteToken,
-  buildClubOwnerInviteUrl,
+  buildClubManagerActivateUrl,
 } from './run-club-leader-invite-token';
 
 describe('run-club-leader-invite-token', () => {
@@ -18,8 +18,8 @@ describe('run-club-leader-invite-token', () => {
     assert.notEqual(a, b);
   });
 
-  it('builds invite URL with encoded token', () => {
-    const url = buildClubOwnerInviteUrl('abc/def', 'https://app.example.com');
-    assert.match(url, /^https:\/\/app\.example\.com\/clubowner\/invite\?token=/);
+  it('builds activation URL with encoded token', () => {
+    const url = buildClubManagerActivateUrl('abc/def', 'https://app.example.com');
+    assert.match(url, /^https:\/\/app\.example\.com\/club-manager\/activate\?token=/);
   });
 });
