@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import {
+  findOrCreateCityBySlug,
+  resolveCityFieldsFromMeetUp,
+} from '@/lib/resolve-city';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,18 +87,40 @@ export async function POST(request: NextRequest) {
           ? String(raw).trim().toLowerCase()
           : null;
     }
-    if ("cityId" in rc) {
-      const raw = rc.cityId;
-      cityIdPatch =
-        raw != null && String(raw).trim() !== ""
-          ? String(raw).trim()
-          : null;
-      updateData.cities =
-        cityIdPatch === null
-          ? { disconnect: true }
-          : cityIdPatch
-            ? { connect: { id: cityIdPatch } }
-            : { disconnect: true };
+
+    // cityId is server-only in each DB — resolve from city slug/name, never trust cross-app UUIDs.
+    const cityName =
+      updateData.city != null ? String(updateData.city).trim() || null : null;
+    const stateVal =
+      updateData.state != null ? String(updateData.state).trim() || null : null;
+    const slugHint =
+      updateData.citySlug != null
+        ? String(updateData.citySlug).trim().toLowerCase() || null
+        : null;
+
+    let resolvedCityId: string | null = null;
+    let resolvedCitySlug: string | null = slugHint;
+    if (slugHint) {
+      const bySlug = await findOrCreateCityBySlug(slugHint, cityName);
+      if (bySlug) {
+        resolvedCityId = bySlug.cityId;
+        resolvedCitySlug = bySlug.citySlug;
+      }
+    } else if (cityName) {
+      const fields = await resolveCityFieldsFromMeetUp({
+        meetUpCity: cityName,
+        meetUpState: stateVal,
+      });
+      resolvedCityId = fields.cityId;
+      resolvedCitySlug = fields.citySlug;
+    }
+
+    if (resolvedCitySlug) {
+      updateData.citySlug = resolvedCitySlug;
+    }
+    if (resolvedCityId) {
+      cityIdPatch = resolvedCityId;
+      updateData.cities = { connect: { id: resolvedCityId } };
     }
     if ("hqPlaceId" in rc) {
       updateData.hqPlaceId =

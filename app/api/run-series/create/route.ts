@@ -3,6 +3,10 @@ import { prisma } from '@/lib/prisma';
 import { buildSeriesSlug } from '@/lib/seriesSlug';
 import { toCanonicalDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 import { formatCalendarDate, parseCalendarDateForWrite } from '@/lib/calendar-date';
+import {
+  findOrCreateCityBySlug,
+  resolveCityFieldsFromMeetUp,
+} from '@/lib/resolve-city';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,7 +73,6 @@ export async function POST(request: NextRequest) {
       name,
       description,
       citySlug,
-      cityId,
       meetUpPoint,
       meetUpStreetAddress,
       meetUpCity,
@@ -254,6 +257,26 @@ export async function POST(request: NextRequest) {
     const parsedTotalMiles =
       seriesTotalMiles != null && Number.isFinite(seriesTotalMiles) ? seriesTotalMiles : null;
 
+    const meetUpCityTrim = meetUpCity?.trim() || null;
+    const meetUpStateTrim = meetUpState?.trim() || null;
+    const citySlugTrim = citySlug?.trim().toLowerCase() || null;
+    let seriesCitySlug = citySlugTrim;
+    let seriesCityId: string | null = null;
+    if (citySlugTrim) {
+      const bySlug = await findOrCreateCityBySlug(citySlugTrim, meetUpCityTrim);
+      if (bySlug) {
+        seriesCityId = bySlug.cityId;
+        seriesCitySlug = bySlug.citySlug;
+      }
+    } else if (meetUpCityTrim) {
+      const fields = await resolveCityFieldsFromMeetUp({
+        meetUpCity: meetUpCityTrim,
+        meetUpState: meetUpStateTrim,
+      });
+      seriesCityId = fields.cityId;
+      seriesCitySlug = fields.citySlug;
+    }
+
     const setupData = {
       dayOfWeek: canonicalDay,
       runClubId: runClub.id, // FK: Links this series to run_clubs table - CRITICAL for hydration
@@ -264,12 +287,12 @@ export async function POST(request: NextRequest) {
       routeNeighborhood: routeNeighborhood?.trim() || null,
       workoutDescription: workoutDescription?.trim() || null,
       postRunActivity: postRunActivity?.trim() || null,
-      citySlug: citySlug?.trim() || null,
-      cityId: cityId?.trim() ? String(cityId).trim() : null,
+      citySlug: seriesCitySlug,
+      cityId: seriesCityId,
       meetUpPoint: meetUpPoint?.trim() || null,
       meetUpStreetAddress: meetUpStreetAddress?.trim() || null,
-      meetUpCity: meetUpCity?.trim() || null,
-      meetUpState: meetUpState?.trim() || null,
+      meetUpCity: meetUpCityTrim,
+      meetUpState: meetUpStateTrim,
       meetUpPlaceId: meetUpPlaceId?.trim() || null,
       meetUpLat: meetUpLat != null ? parseFloat(String(meetUpLat)) : null,
       meetUpLng: meetUpLng != null ? parseFloat(String(meetUpLng)) : null,
