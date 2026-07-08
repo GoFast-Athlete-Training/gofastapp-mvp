@@ -10,6 +10,56 @@ export interface GetRunsFilters {
   runClubId?: string; // Filter by ID (preferred)
 }
 
+type GetRunsMode = 'public' | 'discovery';
+
+const CITY_RUN_DISCOVER_SELECT = {
+  id: true,
+  slug: true,
+  title: true,
+  citySlug: true,
+  dayOfWeek: true,
+  runSeriesId: true,
+  date: true,
+  runClubId: true,
+  cityRunType: true,
+  meetUpPoint: true,
+  meetUpStreetAddress: true,
+  meetUpCity: true,
+  meetUpState: true,
+  meetUpZip: true,
+  meetUpLat: true,
+  meetUpLng: true,
+  startTimeHour: true,
+  startTimeMinute: true,
+  startTimePeriod: true,
+  timezone: true,
+  totalMiles: true,
+  pace: true,
+  description: true,
+  stravaMapUrl: true,
+  workflowStatus: true,
+  published: true,
+  routeNeighborhood: true,
+  runType: true,
+  workoutDescription: true,
+  runClub: {
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      logoUrl: true,
+      city: true,
+    },
+  },
+  runSeries: {
+    select: {
+      id: true,
+      dayOfWeek: true,
+      name: true,
+    },
+  },
+} as const;
+
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
   process.env.RENDER_GIT_COMMIT ||
@@ -53,165 +103,22 @@ async function logCityRunsRuntimeDiagnostics(context: string) {
   }
 }
 
-/**
- * Get runs with optional filters
- * Returns public-safe data (excludes sensitive fields)
- */
-export async function getRuns(filters: GetRunsFilters = {}) {
-  const where: any = {};
-  
-  // Debug: Log the filters being applied
-  console.log('[getRuns] Filters received:', filters, {
-    commitSha: RUNTIME_COMMIT_SHA,
-    dbHost: getDbHost(),
-  });
-  
-  // City filter
-  if (filters.citySlug) {
-    where.citySlug = filters.citySlug;
-  }
-  
-  // RunClub filter - support both slug (URL compatibility) and ID (preferred)
-  if (filters.runClubId) {
-    where.runClubId = filters.runClubId;
-  } else if (filters.runClubSlug) {
-    // If filtering by slug, need to look up ID first
-    const runClub = await prisma.run_clubs.findUnique({
-      where: { slug: filters.runClubSlug },
-      select: { id: true },
-    });
-    if (runClub) {
-      where.runClubId = runClub.id;
-    } else {
-      // No matching run club - return empty
-      return [];
-    }
-  }
-  
-  // Day filter applied client-side from startDate (each city run is a single occurrence)
-
-  // Public run hydration: only show upcoming published runs (startDate >= start of today UTC)
-  const startOfToday = new Date();
-  startOfToday.setUTCHours(0, 0, 0, 0);
-  where.date = { gte: startOfToday };
-  where.published = true;
-
-  // MVP1: discovery is club runs only
-  where.cityRunType = 'CLUB';
-
-  // First, get all runs matching filters with RunClub relation (FK)
-  // Note: Prisma model `city_runs` maps to table `city_runs` (migrated from run_crew_runs)
-  // Use select to only fetch fields that exist (avoiding migration issues)
-  let allRuns;
-  try {
-    allRuns = await prisma.city_runs.findMany({
-      where,
-      orderBy: { date: 'asc' },
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        citySlug: true,
-        dayOfWeek: true,
-        runSeriesId: true,
-        date: true,
-        runClubId: true,
-        cityRunType: true,
-        meetUpPoint: true,
-        meetUpStreetAddress: true,
-        meetUpCity: true,
-        meetUpState: true,
-        meetUpZip: true,
-        meetUpLat: true,
-        meetUpLng: true,
-        startTimeHour: true,
-        startTimeMinute: true,
-        startTimePeriod: true,
-        timezone: true,
-        totalMiles: true,
-        pace: true,
-        description: true,
-        stravaMapUrl: true,
-        workflowStatus: true,
-        published: true,
-        routeNeighborhood: true,
-        runType: true,
-        workoutDescription: true,
-        runClub: {
-          select: {
-            id: true,
-            slug: true,
-            name: true,
-            logoUrl: true,
-            city: true,
-          },
-        },
-        runSeries: {
-          select: {
-            id: true,
-            dayOfWeek: true,
-            name: true,
-          },
-        },
-      },
-    });
-    
-    // Debug logging to help troubleshoot
-    console.log(`[getRuns] Found ${allRuns.length} runs with filters:`, JSON.stringify(filters));
-    if (allRuns.length > 0) {
-      console.log(`[getRuns] Sample run IDs:`, allRuns.slice(0, 3).map(r => r.id));
-    } else {
-      // If no runs found, check total count in database for debugging
-      const totalCount = await prisma.city_runs.count();
-      console.log(`[getRuns] No runs found with filters, but total runs in DB: ${totalCount}`);
-    }
-  } catch (error: any) {
-    console.error('[getRuns] Error querying runs:', error);
-    console.error('[getRuns] Error details:', error?.message, error?.code);
-    if (isMissingCityRunsColumn(error)) {
-      await logCityRunsRuntimeDiagnostics('getRuns');
-    }
-    throw error;
-  }
-
-  const now = new Date();
-  let filteredRuns = allRuns.filter((run) =>
-    isRunStillUpcomingForDiscover(
-      {
-        date: run.date,
-        startTimeHour: run.startTimeHour,
-        startTimeMinute: run.startTimeMinute,
-        startTimePeriod: run.startTimePeriod,
-      },
-      now
-    )
-  );
-
-  if (filters.day && filters.day !== 'All Days') {
-    filteredRuns = filteredRuns.filter((run) => {
-      // If run has a parent series, day of week comes from the setup; otherwise derive from date
-      const runDay = run.runSeriesId != null
-        ? (run.runSeries?.dayOfWeek ?? run.dayOfWeek)
-        : getDayOfWeekFromDate(run.date);
-      return sameDayOfWeek(runDay, filters.day);
-    });
-  }
-  
-  // Return runs with RunClub relation (via FK)
-  // Filter to only return public-safe fields
-  return filteredRuns.map((run) => ({
+function mapCityRunForResponse(run: Awaited<ReturnType<typeof queryCityRunsForDiscover>>[number]) {
+  return {
     id: run.id,
     slug: run.slug ?? null,
     title: run.title,
     citySlug: run.citySlug,
     dayOfWeek: run.runSeries?.dayOfWeek ?? run.dayOfWeek,
     runSeriesId: run.runSeriesId ?? null,
-    runSeries: run.runSeries ? { id: run.runSeries.id, dayOfWeek: run.runSeries.dayOfWeek, name: run.runSeries.name } : null,
+    runSeries: run.runSeries
+      ? { id: run.runSeries.id, dayOfWeek: run.runSeries.dayOfWeek, name: run.runSeries.name }
+      : null,
     date: run.date,
-    runClubId: run.runClubId, // ✅ FK field
+    runClubId: run.runClubId,
     cityRunType: run.cityRunType,
-    runClub: run.runClub || null, // ✅ FK relation
-    runClubSlug: run.runClub?.slug || null, // For backward compatibility
+    runClub: run.runClub || null,
+    runClubSlug: run.runClub?.slug || null,
     meetUpPoint: run.meetUpPoint,
     meetUpStreetAddress: run.meetUpStreetAddress,
     meetUpCity: run.meetUpCity,
@@ -229,9 +136,119 @@ export async function getRuns(filters: GetRunsFilters = {}) {
     stravaMapUrl: run.stravaMapUrl,
     workflowStatus: run.workflowStatus,
     published: run.published,
-    // Exclude sensitive fields:
-    // runCrewId, athleteGeneratedId, staffGeneratedId
-  }));
+  };
+}
+
+async function buildCityRunDiscoverWhere(filters: GetRunsFilters) {
+  const where: Record<string, unknown> = {};
+
+  if (filters.citySlug) {
+    where.citySlug = filters.citySlug;
+  }
+
+  if (filters.runClubId) {
+    where.runClubId = filters.runClubId;
+  } else if (filters.runClubSlug) {
+    const runClub = await prisma.run_clubs.findUnique({
+      where: { slug: filters.runClubSlug },
+      select: { id: true },
+    });
+    if (runClub) {
+      where.runClubId = runClub.id;
+    } else {
+      return null;
+    }
+  }
+
+  const startOfToday = new Date();
+  startOfToday.setUTCHours(0, 0, 0, 0);
+  where.date = { gte: startOfToday };
+  where.cityRunType = 'CLUB';
+
+  return where;
+}
+
+async function queryCityRunsForDiscover(filters: GetRunsFilters, mode: GetRunsMode) {
+  const logLabel = mode === 'public' ? 'getRuns' : 'getDiscoveryRuns';
+
+  console.log(`[${logLabel}] Filters received:`, filters, {
+    commitSha: RUNTIME_COMMIT_SHA,
+    dbHost: getDbHost(),
+  });
+
+  const where = await buildCityRunDiscoverWhere(filters);
+  if (!where) {
+    return [];
+  }
+
+  if (mode === 'public') {
+    where.published = true;
+  }
+
+  let allRuns;
+  try {
+    allRuns = await prisma.city_runs.findMany({
+      where,
+      orderBy: { date: 'asc' },
+      select: CITY_RUN_DISCOVER_SELECT,
+    });
+
+    console.log(`[${logLabel}] Found ${allRuns.length} runs with filters:`, JSON.stringify(filters));
+    if (allRuns.length === 0) {
+      const totalCount = await prisma.city_runs.count();
+      console.log(`[${logLabel}] No runs found with filters, but total runs in DB: ${totalCount}`);
+    }
+  } catch (error: any) {
+    console.error(`[${logLabel}] Error querying runs:`, error);
+    console.error(`[${logLabel}] Error details:`, error?.message, error?.code);
+    if (isMissingCityRunsColumn(error)) {
+      await logCityRunsRuntimeDiagnostics(logLabel);
+    }
+    throw error;
+  }
+
+  const now = new Date();
+  let filteredRuns = allRuns.filter((run) =>
+    isRunStillUpcomingForDiscover(
+      {
+        date: run.date,
+        startTimeHour: run.startTimeHour,
+        startTimeMinute: run.startTimeMinute,
+        startTimePeriod: run.startTimePeriod,
+        timezone: run.timezone,
+      },
+      now
+    )
+  );
+
+  if (filters.day && filters.day !== 'All Days') {
+    filteredRuns = filteredRuns.filter((run) => {
+      const runDay =
+        run.runSeriesId != null
+          ? (run.runSeries?.dayOfWeek ?? run.dayOfWeek)
+          : getDayOfWeekFromDate(run.date);
+      return sameDayOfWeek(runDay, filters.day);
+    });
+  }
+
+  return filteredRuns;
+}
+
+/**
+ * SEO/public runs — requires published=true.
+ * Returns public-safe data (excludes sensitive fields).
+ */
+export async function getRuns(filters: GetRunsFilters = {}) {
+  const filteredRuns = await queryCityRunsForDiscover(filters, 'public');
+  return filteredRuns.map(mapCityRunForResponse);
+}
+
+/**
+ * Authenticated app discovery — Product club runs without SEO publish gating.
+ */
+export async function getDiscoveryRuns(filters: GetRunsFilters = {}) {
+  const filteredRuns = await queryCityRunsForDiscover(filters, 'discovery');
+  return filteredRuns.map(mapCityRunForResponse);
 }
 
 /**
