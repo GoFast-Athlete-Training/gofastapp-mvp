@@ -7,6 +7,7 @@ import GoalRaceCard from './_components/GoalRaceCard';
 import LastRunCard from './_components/LastRunCard';
 import RunWithMe from './_components/RunWithMe';
 import GroupTrainingCard from './_components/GroupTrainingCard';
+import PublishedPlansCard from './_components/PublishedPlansCard';
 import AboutStrip from './_components/AboutStrip';
 
 export const dynamic = 'force-dynamic';
@@ -117,6 +118,13 @@ export default async function PublicAthletePage({
 
         {data.joinableGroupTraining ? (
           <GroupTrainingCard cohort={data.joinableGroupTraining} />
+        ) : null}
+
+        {data.publishedPlans && data.publishedPlans.length > 0 ? (
+          <PublishedPlansCard
+            plans={data.publishedPlans}
+            hostFirstName={data.athlete.firstName}
+          />
         ) : null}
 
         <LastRunCard

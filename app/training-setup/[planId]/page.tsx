@@ -6,7 +6,7 @@ import Link from "next/link";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
-import PlanWeekCalendar from "@/components/training/PlanWeekCalendar";
+import PlanWeekViewer from "@/components/training/PlanWeekViewer";
 import {
   parsePhasesJson,
   phaseNameForWeek,
@@ -775,7 +775,7 @@ export default function TrainingSetupPlanPage({
                 </Link>
               </div>
 
-              <PlanWeekCalendar
+              <PlanWeekViewer
                 weekNumber={weekNumber}
                 totalWeeks={effectiveTotalWeeks}
                 days={weekDays}

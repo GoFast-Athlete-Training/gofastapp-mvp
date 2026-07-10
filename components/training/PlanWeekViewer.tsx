@@ -15,7 +15,7 @@ import {
   sessionStatusBadgeClass,
   sessionStatusLabel,
 } from "@/lib/training/session-status";
-import WeekStrip from "@/components/training/WeekStrip";
+import WeekWorkoutWidget from "@/components/training/WeekWorkoutWidget";
 
 type Props = {
   weekNumber: number;
@@ -39,7 +39,7 @@ type Props = {
   showCalendarRangeLabel?: boolean;
 };
 
-export default function PlanWeekCalendar({
+export default function PlanWeekViewer({
   weekNumber,
   totalWeeks,
   days,
@@ -133,7 +133,7 @@ export default function PlanWeekCalendar({
       ) : null}
 
       {days.length > 0 ? (
-        <WeekStrip
+        <WeekWorkoutWidget
           days={days}
           todayKey={todayKey}
           selectedDateKey={selectedDateKey}

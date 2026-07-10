@@ -10,8 +10,9 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import GroupTrainingHostPanel from "@/components/training/GroupTrainingHostPanel";
+import LeadTrainingPlanPanel from "@/components/training/LeadTrainingPlanPanel";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
-import PlanWeekCalendar from "@/components/training/PlanWeekCalendar";
+import PlanWeekViewer from "@/components/training/PlanWeekViewer";
 import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
 import WorkoutSkipActions from "@/components/training/WorkoutSkipActions";
 import { buildWeekSummary } from "@/lib/training/week-summary-service";
@@ -643,6 +644,7 @@ export default function TrainingHubPage() {
 
         {showTrainingHub && planDetail && (
           <div className="space-y-4 mb-8">
+            <LeadTrainingPlanPanel planId={planDetail.id} hasSchedule={hasSchedule(planDetail)} />
             <GroupTrainingHostPanel planId={planDetail.id} hasSchedule={hasSchedule(planDetail)} />
             {/* Goal strip — plan, race, week progress */}
             <div className="flex flex-col gap-3 rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 text-sm sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
@@ -840,7 +842,7 @@ export default function TrainingHubPage() {
 
             {/* Week calendar and selected workout */}
             <div id="training-section-this-week" className="scroll-mt-24">
-              <PlanWeekCalendar
+              <PlanWeekViewer
                 weekNumber={weekNumber}
                 totalWeeks={effectiveTotalWeeks}
                 days={weekDays}

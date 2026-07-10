@@ -48,7 +48,7 @@ function mondayOfWeekContaining(dateKey: string): Date {
 }
 
 /** Full Mon–Sun strip from scheduled workout days (inserts rest placeholders). */
-export function buildWeekStripDays(days: PlanDayCard[]): StripDayItem[] {
+export function buildWeekWorkoutWidgetDays(days: PlanDayCard[]): StripDayItem[] {
   if (!days.length) return [];
 
   const byKey = new Map<string, PlanDayCard>();
@@ -111,8 +111,8 @@ function stripCellClasses(params: {
     .join(" ");
 }
 
-export default function WeekStrip({ days, todayKey, selectedDateKey, onSelectDay }: Props) {
-  const stripDays = useMemo(() => buildWeekStripDays(days), [days]);
+export default function WeekWorkoutWidget({ days, todayKey, selectedDateKey, onSelectDay }: Props) {
+  const stripDays = useMemo(() => buildWeekWorkoutWidgetDays(days), [days]);
 
   if (!stripDays.length) return null;
 

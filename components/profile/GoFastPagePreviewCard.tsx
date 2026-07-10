@@ -98,6 +98,15 @@ export type GoFastPagePayload = {
     race: { name: string; distanceLabel: string | null };
     hostFirstName: string | null;
   } | null;
+  publishedPlans?: {
+    id: string;
+    slug: string;
+    title: string;
+    description: string | null;
+    targetDistanceLabel: string | null;
+    durationWeeks: number | null;
+    publishedAt: string | null;
+  }[];
   containerRecentMembers?: {
     id: string;
     firstName: string | null;
@@ -321,6 +330,38 @@ export default function GoFastPagePreviewCard({
                 Say hi in the app →
               </a>
             )}
+          </section>
+        ) : null}
+
+        {data.publishedPlans && data.publishedPlans.length > 0 ? (
+          <section className="rounded-2xl border border-violet-500/35 bg-zinc-900/85 p-5 shadow-lg">
+            <h2 className="text-lg font-semibold text-white mb-1">Published training plans</h2>
+            <p className="text-sm text-zinc-400 mb-4">
+              Follow {displayName}&apos;s training build — adopt into your own calendar.
+            </p>
+            <ul className="space-y-3">
+              {data.publishedPlans.map((p) => (
+                <li key={p.id}>
+                  <a
+                    href={`${appBase.replace(/\/$/, "")}/plans/${encodeURIComponent(p.slug)}`}
+                    className="block rounded-xl border border-violet-500/30 bg-zinc-900/70 px-4 py-4 hover:border-violet-400/60 hover:bg-zinc-900 transition-colors group"
+                  >
+                    <p className="font-medium text-zinc-100 group-hover:text-violet-200 transition-colors">
+                      {p.title}
+                    </p>
+                    <p className="text-sm text-zinc-500 mt-1">
+                      {p.durationWeeks ? `${p.durationWeeks} weeks` : null}
+                      {p.targetDistanceLabel
+                        ? `${p.durationWeeks ? " · " : ""}${p.targetDistanceLabel}`
+                        : null}
+                    </p>
+                    {p.description ? (
+                      <p className="text-sm text-zinc-400 mt-2 line-clamp-2">{p.description}</p>
+                    ) : null}
+                  </a>
+                </li>
+              ))}
+            </ul>
           </section>
         ) : null}
 

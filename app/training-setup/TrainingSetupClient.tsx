@@ -147,6 +147,13 @@ function planCreateFeedbackKind(
   return "generic";
 }
 
+function suggestPlanName(raceName: string, firstName: string | null): string {
+  const race = raceName.trim();
+  if (!race) return "My Training Plan";
+  if (firstName?.trim()) return `${firstName.trim()}'s ${race} Build`;
+  return `${race} Build`;
+}
+
 export default function TrainingSetupClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -168,6 +175,8 @@ export default function TrainingSetupClient() {
   const [paceMin, setPaceMin] = useState("");
   const [paceSec, setPaceSec] = useState("");
   const [baselineWeeklyMileage, setBaselineWeeklyMileage] = useState("");
+  const [planName, setPlanName] = useState("");
+  const [planNameTouched, setPlanNameTouched] = useState(false);
   const [athleteFirstName, setAthleteFirstName] = useState<string | null>(null);
   const [activePlans, setActivePlans] = useState<ActivePlanLite[]>([]);
   const [replaceGoalAcknowledged, setReplaceGoalAcknowledged] = useState(false);
@@ -401,9 +410,16 @@ export default function TrainingSetupClient() {
     setCreateFeedback((prev) => (prev === "dates" ? null : prev));
   }, [startDate]);
 
+  useEffect(() => {
+    if (planNameTouched || !wizardGoal?.race_registry?.name) return;
+    setPlanName(suggestPlanName(wizardGoal.race_registry.name, athleteFirstName));
+  }, [wizardGoal?.id, wizardGoal?.race_registry?.name, athleteFirstName, planNameTouched]);
+
   function beginWizardForGoal(g: GoalRow) {
     setWizardGoal(g);
     setSelectedPreset(null);
+    setPlanName("");
+    setPlanNameTouched(false);
     setFormError(null);
     setCreateFeedback(null);
     setReplaceGoalAcknowledged(false);
@@ -458,6 +474,12 @@ export default function TrainingSetupClient() {
       return;
     }
 
+    const trimmedPlanName = planName.trim();
+    if (!trimmedPlanName) {
+      setFormError("Give your plan a name — you'll use it when sharing publicly.");
+      return;
+    }
+
     const rawMw = baselineWeeklyMileage.trim();
     if (rawMw !== "") {
       const weeklyMi = Number(rawMw);
@@ -490,6 +512,7 @@ export default function TrainingSetupClient() {
         body: JSON.stringify({
           athleteGoalId: wizardGoal.id,
           raceRegistryId: wizardGoal.raceRegistryId,
+          name: trimmedPlanName,
           startDate: new Date(startDate).toISOString(),
           fiveKPace: fiveKPaceOut,
           currentWeeklyMileage:
@@ -724,6 +747,26 @@ export default function TrainingSetupClient() {
                   </div>
 
                   {rampBanner}
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-800">
+                      Plan name
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={120}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                      value={planName}
+                      onChange={(e) => {
+                        setPlanNameTouched(true);
+                        setPlanName(e.target.value);
+                        setFormError(null);
+                      }}
+                    />
+                    <p className="mt-1.5 text-xs text-gray-600">
+                      This is the title for your plan — used when you share it publicly.
+                    </p>
+                  </div>
 
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-800">

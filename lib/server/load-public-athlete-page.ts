@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getJoinableCohortForHost } from '@/lib/training/cohort-service';
+import { listPublicPlansForAthlete, mapPublishedPlanCard } from '@/lib/training/public-plan-service';
 
 const METERS_PER_MILE = 1609.344;
 
@@ -328,6 +329,10 @@ export async function loadPublicAthletePage(rawHandle: string) {
   }
 
   const joinableGroupTrainingRaw = await getJoinableCohortForHost(athlete.id);
+  const publishedPlanRows = await listPublicPlansForAthlete(athlete.id);
+  const publishedPlans = publishedPlanRows
+    .map(mapPublishedPlanCard)
+    .filter((p) => p.slug.length > 0);
   const joinableGroupTraining = joinableGroupTrainingRaw
     ? {
         id: joinableGroupTrainingRaw.id,
@@ -350,6 +355,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
     containerMemberCount,
     containerRecentMembers,
     joinableGroupTraining,
+    publishedPlans,
     athlete: {
       id: athlete.id,
       gofastHandle: athlete.gofastHandle,

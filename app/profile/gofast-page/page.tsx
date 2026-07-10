@@ -21,6 +21,7 @@ const RUN_WITH_ME_MODULES = [
   "Upcoming public runs",
   "Community chatter",
   "Group training",
+  "Published training plans",
 ] as const;
 
 export default function GoFastPageStudioRoute() {
@@ -369,6 +370,35 @@ export default function GoFastPageStudioRoute() {
               }}
             />
           ) : null}
+
+          <section className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 shadow-sm">
+            <h2 className="text-sm font-bold text-gray-900">Published training plans</h2>
+            <p className="text-xs text-gray-600 mt-1">
+              Distribution only — create and publish plans from the Training Hub builder.
+            </p>
+            {payload.publishedPlans && payload.publishedPlans.length > 0 ? (
+              <ul className="mt-3 space-y-2">
+                {payload.publishedPlans.map((p) => (
+                  <li key={p.id} className="text-sm text-gray-800">
+                    <Link
+                      href={`/plans/${encodeURIComponent(p.slug)}`}
+                      className="font-medium text-violet-800 hover:text-violet-900"
+                    >
+                      {p.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-gray-600">No published plans yet.</p>
+            )}
+            <Link
+              href="/training/lead"
+              className="mt-3 inline-flex rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700"
+            >
+              Open plan builder
+            </Link>
+          </section>
         </div>
 
         <div className="min-w-0 flex-1">

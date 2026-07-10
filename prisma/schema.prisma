@@ -28,6 +28,20 @@ enum CoachReviewStatus {
   PUBLISHED
 }
 
+/// Visibility for athlete-authored global training plan listings.
+enum PublicTrainingPlanVisibility {
+  DRAFT
+  PUBLIC
+  UNLISTED
+  ARCHIVED
+}
+
+/// Plan-scoped custom workouts — not catalogue items.
+enum PlanCustomWorkoutVisibility {
+  PRIVATE
+  PUBLIC_WITH_PLAN
+}
+
 model Athlete {
   id                      String                   @id @default(uuid())
   firebaseId              String                   @unique
@@ -147,6 +161,8 @@ model Athlete {
   container_messages_as_host     gofast_container_messages[]    @relation("ContainerMessages")
   container_messages_as_author   gofast_container_messages[]    @relation("ContainerMessageAuthor")
   hosted_training_cohorts      training_cohorts[]               @relation("TrainingCohortHost")
+  authored_public_training_plans public_training_plans[]        @relation("PublicPlanAuthor")
+  plan_custom_workouts         plan_custom_workouts[]
   athlete_appnotification_devices     athlete_appnotification_devices[]
 }
 
@@ -1391,6 +1407,7 @@ model training_plan_preset {
   easyRunConfig     Json?
   training_plans  training_plans[]
   training_cohorts training_cohorts[]
+  public_training_plans public_training_plans[]
 }
 
 /// Long-run rotation: cycle positions map to catalogue; many presets can share one.
@@ -1568,6 +1585,12 @@ model training_plans {
   preferredTempoDow    Int?
   /// Athlete interval day (1=Mon..7=Sun); null = preset default at generation.
   preferredIntervalDow Int?
+  /// Athlete-public share URL slug — derived from `name` when promoted public.
+  publicSlug           String?                  @unique
+  /// Athlete-authored public visibility (separate from coach `publishedAt`).
+  publicVisibility     PublicTrainingPlanVisibility?
+  publicPublishedAt    DateTime?
+  publicDescription    String?                  @db.Text
   createdAt            DateTime               @default(now())
   updatedAt            DateTime
   planned_workouts     workouts[]
@@ -1578,13 +1601,77 @@ model training_plans {
   training_plan_preset training_plan_preset? @relation(fields: [presetId], references: [id])
   training_cohort      training_cohorts?     @relation(fields: [cohortId], references: [id], onDelete: SetNull)
   cohort_membership    training_cohort_memberships?
+  public_training_plans_as_source public_training_plans[] @relation("PublicPlanSource")
+  plan_custom_workouts plan_custom_workouts[]
 
   @@index([athleteGoalId])
   @@index([athleteId, lifecycleStatus])
   @@index([presetId])
   @@index([cohortId])
+  @@index([publicVisibility, publicPublishedAt])
 }
 
+/// Athlete-authored global training plan — publish layer above a materialized training_plans row.
+model public_training_plans {
+  id                    String                       @id @default(cuid())
+  slug                  String                       @unique
+  title                 String
+  description           String?                      @db.Text
+  authorAthleteId       String
+  sourceTrainingPlanId  String
+  sourcePresetId        String?
+  visibility            PublicTrainingPlanVisibility @default(DRAFT)
+  targetDistanceLabel   String?
+  durationWeeks         Int?
+  publishedAt           DateTime?
+  /// High-level week/phase summary safe for public viewing
+  previewSnapshot       Json?
+  /// Public-safe summaries of athlete-created workouts included with the plan
+  customWorkoutSnapshot Json?
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+
+  author               Athlete                @relation("PublicPlanAuthor", fields: [authorAthleteId], references: [id], onDelete: Cascade)
+  sourceTrainingPlan   training_plans         @relation("PublicPlanSource", fields: [sourceTrainingPlanId], references: [id], onDelete: Cascade)
+  sourcePreset         training_plan_preset?  @relation(fields: [sourcePresetId], references: [id], onDelete: SetNull)
+  copiedCustomWorkouts plan_custom_workouts[] @relation("CustomWorkoutSourcePublicPlan")
+
+  @@index([authorAthleteId])
+  @@index([visibility, publishedAt])
+  @@index([sourceTrainingPlanId])
+  @@map("public_training_plans")
+}
+
+/// Athlete-created workout content attached to a specific plan/day — not a catalogue mutation.
+model plan_custom_workouts {
+  id                    String                      @id @default(cuid())
+  trainingPlanId        String
+  authorAthleteId       String
+  sourcePublicPlanId    String?
+  sourceCustomWorkoutId String?
+  weekNumber            Int
+  /// Training DOW convention: 1=Monday … 7=Sunday
+  dow                   Int
+  title                 String
+  description           String?                     @db.Text
+  workoutType           WorkoutType                 @default(Easy)
+  /// Structured workout content (segments, notes, etc.)
+  content               Json?
+  leaderNotes           String?                     @db.Text
+  visibility            PlanCustomWorkoutVisibility @default(PRIVATE)
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+
+  trainingPlan        training_plans          @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
+  author              Athlete                 @relation(fields: [authorAthleteId], references: [id], onDelete: Cascade)
+  sourcePublicPlan    public_training_plans?  @relation("CustomWorkoutSourcePublicPlan", fields: [sourcePublicPlanId], references: [id], onDelete: SetNull)
+  sourceCustomWorkout plan_custom_workouts?   @relation("CustomWorkoutCopy", fields: [sourceCustomWorkoutId], references: [id], onDelete: SetNull)
+  copiedFrom          plan_custom_workouts[]    @relation("CustomWorkoutCopy")
+
+  @@index([trainingPlanId, weekNumber])
+  @@index([authorAthleteId])
+  @@map("plan_custom_workouts")
+}
 
 /// Coach-curated prescriptions: segment-mirrored fields (warmup / work base / cooldown).
 /// Pace offsets are sec/mile vs current 5K fitness unless paceAnchor is mpSimulation.
