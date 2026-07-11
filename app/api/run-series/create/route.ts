@@ -222,9 +222,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (!setup) {
-      const whereClause: any = { runClubId: runClub.id, dayOfWeek: canonicalDay };
+      const whereClause: Record<string, unknown> = {
+        runClubId: runClub.id,
+        dayOfWeek: canonicalDay,
+      };
       if (meetUpCity?.trim()) {
         whereClause.meetUpCity = meetUpCity.trim();
+      }
+      if (startTimeHour != null && startTimeMinute != null) {
+        whereClause.startTimeHour = parseInt(String(startTimeHour), 10);
+        whereClause.startTimeMinute = parseInt(String(startTimeMinute), 10);
+        if (startTimePeriod?.trim()) {
+          whereClause.startTimePeriod = startTimePeriod.trim();
+        }
       }
       setup = await prisma.run_series.findFirst({
         where: whereClause,

@@ -328,21 +328,24 @@ test("countWorkRepsOnTarget ignores recovery segments", () => {
   assert.deepEqual(counts, { onTarget: 1, total: 2 });
 });
 
-test("easy run can judge pace from summary whole-run average", () => {
+test("easy run with matched activity is completion_only without pace judgement", () => {
   const analysis = computeWorkoutPerformanceAnalysis({
     workoutType: "Easy",
     targetPaceSecPerMile: 540,
     targetPaceSecPerMileHigh: null,
     paceDeltaSecPerMile: 10,
     actualAvgPaceSecPerMile: 530,
+    actualDistanceMeters: 10000,
+    actualDurationSeconds: 3000,
     completedActivityDetailJson: null,
     matchedActivityId: "act1",
     matched_activity: null,
     segments: [],
   });
 
-  assert.equal(analysis.analysisMode, "summary_only");
-  assert.equal(analysis.canJudgeTargetPace, true);
+  assert.equal(analysis.analysisMode, "completion_only");
+  assert.equal(analysis.canJudgeTargetPace, false);
+  assert.match(analysis.completionOnlyMessage ?? "", /Nice work/);
 
   const comparison = resolveTargetComparisonPace({
     analysis,
@@ -353,7 +356,7 @@ test("easy run can judge pace from summary whole-run average", () => {
     targetPaceSecPerMileHigh: null,
   });
 
-  assert.equal(comparison.actualPaceSecPerMile, 530);
+  assert.equal(comparison.actualPaceSecPerMile, null);
 });
 
 test("scorecard exposes total miles and work segment deltas", () => {
