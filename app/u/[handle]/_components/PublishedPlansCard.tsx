@@ -27,7 +27,7 @@ export default function PublishedPlansCard({ plans, hostFirstName }: Props) {
           Training plans
         </div>
         <h2 className="text-xl font-bold text-stone-900 leading-snug">
-          Follow {hostLabel}&apos;s training build
+          {hostLabel}&apos;s training plans
         </h2>
         <p className="text-sm text-stone-600 mt-2">
           Preview a published plan week-by-week, then start in GoFast with your race and paces.

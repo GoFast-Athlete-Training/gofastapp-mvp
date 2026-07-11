@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, Megaphone } from "lucide-react";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
+import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 
 type PlanDetail = {
   id: string;
@@ -91,57 +92,63 @@ export default function LeadTrainingPlanPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-600">Loading…</p>
-      </div>
-    );
-  }
-
-  if (!plan) {
-    return (
-      <div className="min-h-screen bg-gray-50 px-4 py-10">
-        <div className="max-w-lg mx-auto rounded-2xl border border-gray-200 bg-white p-8 text-center">
-          <Megaphone className="w-10 h-10 text-violet-500 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-gray-900">Share your training plan</h1>
-          <p className="mt-2 text-gray-600">
-            Create and generate a training plan first, then come back to publish it for others.
-          </p>
-          <Link
-            href="/training-setup"
-            className="mt-6 inline-flex rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
-          >
-            Build my plan
-          </Link>
+  const pageBody = (() => {
+    if (loading) {
+      return (
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <p className="text-gray-600">Loading…</p>
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
-  const hasSchedule =
-    Array.isArray(plan.planSchedule) && (plan.planSchedule as unknown[]).length > 0;
+    if (!plan) {
+      return (
+        <div className="max-w-lg mx-auto px-4 py-10">
+          <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center">
+            <Megaphone className="w-10 h-10 text-violet-500 mx-auto mb-4" />
+            <h1 className="text-xl font-bold text-gray-900">Share this plan</h1>
+            <p className="mt-2 text-gray-600">
+              Create and generate a training plan first, then come back to share it publicly.
+            </p>
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+              <Link
+                href="/training-setup"
+                className="inline-flex justify-center rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
+              >
+                Build my plan
+              </Link>
+              <Link
+                href="/profile/share"
+                className="inline-flex justify-center rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+              >
+                Back to Share hub
+              </Link>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-3">
-          <Link href="/training" className="text-gray-500 hover:text-gray-800">
+    const hasSchedule =
+      Array.isArray(plan.planSchedule) && (plan.planSchedule as unknown[]).length > 0;
+
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+        <div className="flex items-center gap-3">
+          <Link href="/profile/share" className="text-gray-500 hover:text-gray-800">
             <ChevronLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-lg font-bold text-gray-900">Share your training plan</h1>
+            <h1 className="text-xl font-bold text-gray-900">Share this plan</h1>
             <p className="text-xs text-gray-500">
-              Promote your generated schedule with a public link
+              Publish your generated schedule with a public preview link
             </p>
           </div>
         </div>
-      </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
         {!hasSchedule ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-            Generate your schedule in plan setup before publishing.
+            Generate your schedule in plan setup before sharing.
             <Link href={`/training-setup/${plan.id}`} className="ml-2 font-semibold underline">
               Continue setup
             </Link>
@@ -152,19 +159,19 @@ export default function LeadTrainingPlanPage() {
           <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
             <h2 className="text-lg font-semibold text-emerald-900">Your plan is live</h2>
             <p className="mt-2 text-sm text-emerald-800">
-              Share it from your Run With Me page or copy the public link.
+              Share the preview link from your Run With Me page or copy it below.
             </p>
             <Link
               href={`/plans/${encodeURIComponent(publishedSlug)}`}
               className="mt-4 inline-flex rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"
             >
-              View public plan
+              Preview this plan
             </Link>
           </section>
         ) : null}
 
         <section className="rounded-2xl border border-gray-200 bg-white p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">Plan to publish</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Plan to share</h2>
           <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-4">
             <p className="font-semibold text-gray-900">{plan.name}</p>
             <p className="text-sm text-gray-600 mt-1">
@@ -210,12 +217,14 @@ export default function LeadTrainingPlanPage() {
             onClick={() => void publish()}
             className="inline-flex rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
           >
-            {saving ? "Publishing…" : publishedSlug ? "Update visibility" : "Publish plan"}
+            {saving ? "Publishing…" : publishedSlug ? "Update visibility" : "Share plan"}
           </button>
         </section>
 
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      </main>
-    </div>
-  );
+      </div>
+    );
+  })();
+
+  return <AthleteAppShell>{pageBody}</AthleteAppShell>;
 }

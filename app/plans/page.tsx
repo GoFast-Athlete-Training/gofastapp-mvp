@@ -69,8 +69,8 @@ export default async function PublicPlansDiscoveryPage() {
           </ul>
         )}
         <p className="mt-8 text-center text-sm text-gray-500">
-          <Link href="/training/lead" className="text-violet-700 font-medium hover:underline">
-            Share your own plan
+          <Link href="/profile/share" className="text-violet-700 font-medium hover:underline">
+            Share with the Community
           </Link>
         </p>
       </main>

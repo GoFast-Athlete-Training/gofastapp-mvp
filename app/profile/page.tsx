@@ -350,7 +350,7 @@ export default function ProfilePage() {
             <div className="flex-1 min-w-0">
               <h2 className="text-lg font-bold text-gray-900">Run With Me</h2>
               <p className="text-sm text-gray-600 mt-1">
-                Your shareable page — races, plan, last runs, public runs, community, and group training.
+                Your public storefront — share plans, runs, and community links from one hub.
               </p>
               <div className="flex flex-wrap gap-2 mt-3">
                 {pill('Hero photo', !!myBestRunPhotoURL)}
@@ -359,10 +359,17 @@ export default function ProfilePage() {
               <div className="flex flex-wrap gap-2 mt-4">
                 <button
                   type="button"
+                  onClick={() => router.push('/profile/share')}
+                  className="text-sm font-semibold text-gray-900 hover:text-gray-700"
+                >
+                  Share with Community →
+                </button>
+                <button
+                  type="button"
                   onClick={() => router.push('/profile/gofast-page')}
                   className="text-sm font-semibold text-orange-600 hover:text-orange-700"
                 >
-                  Set up Run With Me →
+                  Run With Me studio →
                 </button>
                 {liveGoFastUrl ? (
                   <a

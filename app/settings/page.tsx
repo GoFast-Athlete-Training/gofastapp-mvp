@@ -198,7 +198,7 @@ export default function SettingsPage() {
             </div>
           ) : (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-1">Host a run</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-1">Host a public run</h2>
               <p className="text-gray-600 text-sm mb-4">
                 Invite friends to a one-off run with chat, RSVP, and check-in.
               </p>
@@ -206,7 +206,7 @@ export default function SettingsPage() {
                 href="/host-a-run"
                 className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
               >
-                Host a run
+                Host a public run
               </Link>
             </div>
           )}

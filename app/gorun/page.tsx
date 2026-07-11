@@ -214,7 +214,7 @@ function GoRunPageContent() {
             href="/host-a-run"
             className="inline-flex items-center justify-center shrink-0 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
           >
-            Host a run
+            Host a public run
           </Link>
         </div>
 

@@ -337,7 +337,8 @@ export default function GoFastPagePreviewCard({
           <section className="rounded-2xl border border-violet-500/35 bg-zinc-900/85 p-5 shadow-lg">
             <h2 className="text-lg font-semibold text-white mb-1">Published training plans</h2>
             <p className="text-sm text-zinc-400 mb-4">
-              Follow {displayName}&apos;s training build — adopt into your own calendar.
+              Preview {displayName}&apos;s training build week by week, then start a plan in GoFast
+              with your race and paces.
             </p>
             <ul className="space-y-3">
               {data.publishedPlans.map((p) => (

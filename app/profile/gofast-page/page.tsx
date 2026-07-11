@@ -232,19 +232,28 @@ export default function GoFastPageStudioRoute() {
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">Run With Me</h1>
           <p className="text-gray-600 text-sm mt-1 max-w-xl">
-            Create a shareable page where people can see your races, runs, training, and ways to join you.
+            Your public storefront — races, plans, runs, and community links appear here for
+            visitors after you share them from the creator hub.
           </p>
         </div>
-        {liveUrl ? (
-          <a
-            href={liveUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-800 hover:bg-orange-100"
+        <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+          <Link
+            href="/profile/share"
+            className="inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
           >
-            View live page →
-          </a>
-        ) : null}
+            Share with Community
+          </Link>
+          {liveUrl ? (
+            <a
+              href={liveUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex shrink-0 items-center justify-center rounded-lg border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-800 hover:bg-orange-100"
+            >
+              View live page →
+            </a>
+          ) : null}
+        </div>
       </div>
 
       <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 sm:p-5">
@@ -374,7 +383,7 @@ export default function GoFastPageStudioRoute() {
           <section className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 shadow-sm">
             <h2 className="text-sm font-bold text-gray-900">Published training plans</h2>
             <p className="text-xs text-gray-600 mt-1">
-              Distribution only — create and publish plans from the Training Hub builder.
+              Plans you share publicly appear here and on your Run With Me page as preview links.
             </p>
             {payload.publishedPlans && payload.publishedPlans.length > 0 ? (
               <ul className="mt-3 space-y-2">
@@ -393,10 +402,10 @@ export default function GoFastPageStudioRoute() {
               <p className="mt-2 text-sm text-gray-600">No published plans yet.</p>
             )}
             <Link
-              href="/training/lead"
+              href="/profile/share"
               className="mt-3 inline-flex rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700"
             >
-              Open plan builder
+              Share with Community
             </Link>
           </section>
         </div>

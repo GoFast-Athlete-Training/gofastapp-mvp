@@ -51,8 +51,26 @@ export default function ProfileCommunityPage() {
           </div>
         </Link>
         <Link
-          href="/profile/training"
+          href="/runcrew/create"
+          className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 bg-white hover:border-orange-200 hover:bg-orange-50/50 transition-colors"
+        >
+          <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center">
+            <Users className="h-6 w-6 text-violet-700" />
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900">Start a RunCrew</p>
+            <p className="text-sm text-gray-600">Create a persistent group for your training circle</p>
+          </div>
+        </Link>
+        <Link
+          href="/profile/share"
           className="block text-sm text-orange-600 font-medium hover:underline pt-2"
+        >
+          Share with the Community hub →
+        </Link>
+        <Link
+          href="/profile/training"
+          className="block text-sm text-orange-600 font-medium hover:underline"
         >
           Set training baseline pace →
         </Link>

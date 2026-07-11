@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Megaphone, Copy, Check, ExternalLink } from "lucide-react";
+import { Megaphone, Copy, Check } from "lucide-react";
 import api from "@/lib/api";
 
 type PublishedPlan = {
@@ -60,9 +60,9 @@ export default function LeadTrainingPlanPanel({ planId, hasSchedule }: Props) {
             <Megaphone className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-bold text-gray-900">Lead a Training Plan</h3>
+            <h3 className="text-sm font-bold text-gray-900">Share this plan</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Create a plan first, then publish it for others to follow your build.
+              Create a plan first, then share a public week-by-week preview link.
             </p>
             <Link
               href="/training-setup"
@@ -89,12 +89,12 @@ export default function LeadTrainingPlanPanel({ planId, hasSchedule }: Props) {
           <Megaphone className="w-5 h-5" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-bold text-gray-900">Lead a Training Plan</h3>
+          <h3 className="text-sm font-bold text-gray-900">Share this plan</h3>
           {published.length > 0 ? (
             <>
               <p className="text-sm text-gray-700 mt-1">
-                {published.length} published plan{published.length !== 1 ? "s" : ""} — share your
-                build with other runners.
+                {published.length} shared plan{published.length !== 1 ? "s" : ""} — preview links
+                are live on your Run With Me page.
               </p>
               <ul className="mt-3 space-y-2">
                 {published.slice(0, 3).map((p) => (
@@ -126,7 +126,7 @@ export default function LeadTrainingPlanPanel({ planId, hasSchedule }: Props) {
             </>
           ) : (
             <p className="text-sm text-gray-600 mt-1">
-              Publish your plan and share a link so other runners can preview and follow your build.
+              Share your active plan so other runners can preview your build week by week.
             </p>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
@@ -134,17 +134,14 @@ export default function LeadTrainingPlanPanel({ planId, hasSchedule }: Props) {
               href="/training/lead"
               className="inline-flex items-center rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
             >
-              {published.length > 0 ? "Manage plans" : "Start leading"}
+              {published.length > 0 ? "Manage shared plan" : "Share this plan"}
             </Link>
-            {published.length > 0 ? (
-              <Link
-                href="/training/lead"
-                className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm font-semibold text-violet-800 hover:bg-violet-50"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                Open builder
-              </Link>
-            ) : null}
+            <Link
+              href="/profile/share"
+              className="inline-flex items-center rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm font-semibold text-violet-800 hover:bg-violet-50"
+            >
+              Share hub
+            </Link>
           </div>
         </div>
       </div>
