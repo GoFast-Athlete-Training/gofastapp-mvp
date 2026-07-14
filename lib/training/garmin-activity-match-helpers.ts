@@ -1,6 +1,9 @@
 import { ymdFromDate } from "@/lib/training/plan-utils";
 import {
   canonicalPlannedWorkoutTitle,
+  formatCorePlannedWorkoutTitle,
+  isGeneratedGenericWorkoutTitle,
+  stripLeadingDayNameFromTitle,
 } from "@/lib/training/workout-display-title";
 
 const FULL_DAY_NAMES = [
@@ -38,9 +41,49 @@ export function stripTrailingWeekdayMarkerFromTitle(title: string): string {
   return title.replace(/\s*\((Mon|Tue|Wed|Thu|Fri|Sat|Sun)\)\s*$/i, "").trim();
 }
 
+/** Catalogue-first base name for Garmin push — avoids generic day/type display labels. */
+function garminPlannedWorkoutBaseName(workout: {
+  title: string;
+  catalogueName?: string | null;
+  workoutType?: string;
+  estimatedDistanceInMeters?: number | null;
+}): string {
+  const catalogueName = workout.catalogueName?.trim() || null;
+  if (catalogueName) return catalogueName;
+
+  const storedTitle = workout.title.trim();
+  if (!storedTitle) {
+    return formatCorePlannedWorkoutTitle(
+      workout.workoutType ?? "Easy",
+      workout.estimatedDistanceInMeters ?? null
+    );
+  }
+
+  const withoutGfWeek = storedTitle.replace(/^(GF\s+)?W\d+\s*:\s*/i, "").trim();
+  const withoutDay = stripTrailingWeekdayMarkerFromTitle(
+    stripLeadingDayNameFromTitle(withoutGfWeek)
+  );
+
+  if (
+    workout.workoutType &&
+    isGeneratedGenericWorkoutTitle(
+      withoutDay,
+      workout.workoutType,
+      workout.estimatedDistanceInMeters ?? null
+    )
+  ) {
+    return formatCorePlannedWorkoutTitle(
+      workout.workoutType,
+      workout.estimatedDistanceInMeters ?? null
+    );
+  }
+
+  return withoutDay || storedTitle;
+}
+
 /**
- * Garmin push title for planned workouts: `GF W{n}: {actual name} ({Tue})`.
- * Uses catalogue or stored title — not the canonical day/type display label.
+ * Garmin push title for planned workouts: `GF W{n}: {catalogue or clean name} ({Tue})`.
+ * Uses catalogue name when available — not the broad day/type display label.
  */
 export function garminPushTitleForPlannedWorkout(workout: {
   title: string;
@@ -51,9 +94,7 @@ export function garminPushTitleForPlannedWorkout(workout: {
   workoutType?: string;
   estimatedDistanceInMeters?: number | null;
 }): string {
-  const catalogueName = workout.catalogueName?.trim() || null;
-  const storedTitle = workout.title.trim();
-  const actualName = catalogueName || storedTitle || "Workout";
+  const actualName = garminPlannedWorkoutBaseName(workout);
 
   const shortDay = shortDayFromDayAssigned(workout.dayAssigned);
   const titleWithDay = shortDay ? `${actualName} (${shortDay})` : actualName;

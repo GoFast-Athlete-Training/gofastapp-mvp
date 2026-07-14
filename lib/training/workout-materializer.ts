@@ -343,6 +343,8 @@ export async function materializeWorkoutForPlanDay(params: {
         catalogueWorkoutId: scheduled.catalogueWorkoutId ?? null,
         estimatedDistanceInMeters: scheduled.estimatedDistanceInMeters,
         title: scheduled.title,
+        garminWorkoutId: null,
+        garminScheduleId: null,
         updatedAt: new Date(),
       },
     });

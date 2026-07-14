@@ -14,6 +14,24 @@ function addUtcDays(d: Date, days: number): Date {
   return next;
 }
 
+function formatWorkoutTypeLabel(workoutType: string | null | undefined): string | null {
+  if (!workoutType?.trim()) return null;
+  switch (workoutType) {
+    case 'Easy':
+      return 'easy run';
+    case 'LongRun':
+      return 'long run';
+    case 'Intervals':
+      return 'intervals';
+    case 'Tempo':
+      return 'tempo';
+    case 'Race':
+      return 'race';
+    default:
+      return workoutType.toLowerCase();
+  }
+}
+
 function formatDistanceMi(meters: number | null | undefined): string | null {
   if (meters == null || meters <= 0) return null;
   return `${(meters / 1609.34).toFixed(1)} mi`;
@@ -50,8 +68,10 @@ export async function sendPlannedWorkoutReminders(
       id: true,
       athleteId: true,
       title: true,
+      workoutType: true,
       estimatedDistanceInMeters: true,
       scheduledStartTimeLabel: true,
+      workout_catalogue: { select: { name: true } },
       Athlete: { select: { firstName: true } },
     },
   });
@@ -65,9 +85,13 @@ export async function sendPlannedWorkoutReminders(
     const athleteId = workout.athleteId;
     if (!athleteId) continue;
 
+    const displayTitle =
+      workout.workout_catalogue?.name?.trim() || workout.title?.trim() || 'Workout';
+
     const facts = {
       firstName: workout.Athlete?.firstName ?? 'there',
-      workoutTitle: workout.title,
+      workoutTitle: displayTitle,
+      workoutType: formatWorkoutTypeLabel(workout.workoutType),
       distanceMi: formatDistanceMi(workout.estimatedDistanceInMeters),
     };
 
@@ -93,6 +117,9 @@ export async function sendPlannedWorkoutReminders(
         templateKey: 'workout.tomorrow',
         screen: 'workout',
         reminderKind: 'tomorrow',
+        workoutTitle: displayTitle,
+        distanceMi: facts.distanceMi,
+        workoutType: facts.workoutType,
         deeplink: `/workouts/${workout.id}`,
       },
     });

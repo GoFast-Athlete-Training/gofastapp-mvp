@@ -7,8 +7,8 @@ export const maxDuration = 300;
 
 /**
  * GET /api/cron/weekly-push-garmin
- * Pre-push the current Mon–Sun training week to Garmin Training Calendar for connected athletes.
- * Uses the existing 14-day materialization horizon as a safety preflight.
+ * Materialize the 14-day workout horizon for connected athletes — no Garmin auto-push.
+ * Athletes verify workouts in-app and send to Garmin explicitly.
  * Secured with Authorization: Bearer CRON_SECRET or ?secret= (Vercel Cron uses GET).
  */
 export async function GET(request: NextRequest) {

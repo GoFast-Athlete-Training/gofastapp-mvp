@@ -7,10 +7,9 @@ import {
   utcDateOnly,
   ymdFromDate,
 } from "@/lib/training/plan-utils";
-import {
-  pushPlanWorkoutsInDateRange,
-  type GarminPlanWorkoutPushResult,
-  type PushPlanWorkoutsBatchSummary,
+import type {
+  GarminPlanWorkoutPushResult,
+  PushPlanWorkoutsBatchSummary,
 } from "@/lib/garmin-workouts/push-plan-workouts-batch";
 
 export type WeeklyGarminPushResult = {
@@ -34,9 +33,17 @@ function sundayEndUtc(monday: Date): Date {
   return end;
 }
 
+const EMPTY_PUSH_SUMMARY: PushPlanWorkoutsBatchSummary = {
+  candidateCount: 0,
+  scheduled: 0,
+  updated: 0,
+  skipped: 0,
+  failed: 0,
+};
+
 /**
- * Weekly Garmin pre-push: ensure the 14-day horizon, then push Mon–Sun plan workouts
- * for Garmin-connected athletes with active training plans.
+ * Weekly Garmin horizon preflight only — materialize upcoming plan workouts but do not
+ * auto-push to Garmin. Athletes verify and send explicitly from the app.
  */
 export async function runWeeklyGarminPushForActivePlans(
   now: Date = new Date()
@@ -76,13 +83,10 @@ export async function runWeeklyGarminPushForActivePlans(
     });
   }
 
-  const { results, summary } = await pushPlanWorkoutsInDateRange({
-    dateStart: weekStart,
-    dateEnd: weekEnd,
-    candidateLimit: 200,
-    runLabel: "weekly-push-garmin",
-    recoverLibraryOnly: true,
-    athleteIds,
+  console.info("[weekly-push-garmin] horizon preflight only — Garmin auto-push disabled", {
+    weekStartYmd,
+    weekEndYmd,
+    athleteCount: athleteIds.length,
   });
 
   return {
@@ -90,7 +94,7 @@ export async function runWeeklyGarminPushForActivePlans(
     weekEndYmd,
     athleteCount: athleteIds.length,
     horizonPreflight,
-    push: summary,
-    results,
+    push: EMPTY_PUSH_SUMMARY,
+    results: [] as GarminPlanWorkoutPushResult[],
   };
 }

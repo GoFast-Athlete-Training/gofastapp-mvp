@@ -9,6 +9,35 @@ import {
   normalizeActivityNameForMatch,
 } from "./garmin-activity-match-helpers";
 
+test("garminPushTitleForPlannedWorkout prefers catalogue over generic stored title", () => {
+  assert.equal(
+    garminPushTitleForPlannedWorkout({
+      title: "Tuesday Tempo work 6 miles",
+      weekNumber: 9,
+      dayAssigned: "Tuesday",
+      catalogueName: "2-1 Tempo",
+      planId: "plan-1",
+      workoutType: "Tempo",
+      estimatedDistanceInMeters: 6 * 1609.34,
+    }),
+    "GF W9: 2-1 Tempo (Tue)"
+  );
+});
+
+test("garminPushTitleForPlannedWorkout cleans generic stored title without catalogue", () => {
+  assert.equal(
+    garminPushTitleForPlannedWorkout({
+      title: "Friday Easy 6 miles",
+      weekNumber: 9,
+      dayAssigned: "Friday",
+      planId: "plan-1",
+      workoutType: "Easy",
+      estimatedDistanceInMeters: 6 * 1609.34,
+    }),
+    "GF W9: Easy 6 miles (Fri)"
+  );
+});
+
 test("garminPushTitleForPlannedWorkout uses catalogue name and short weekday", () => {
   assert.equal(
     garminPushTitleForPlannedWorkout({

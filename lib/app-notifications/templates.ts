@@ -13,13 +13,19 @@ type TemplateDefinition = {
  */
 const HARDCODED_TEMPLATES: Record<NotificationTemplateKey, TemplateDefinition> = {
   'workout.tomorrow': {
-    title: 'Tomorrow is locked in',
-    body: ({ firstName, workoutTitle, distanceMi }) => {
-      const name = typeof firstName === 'string' && firstName.trim() ? firstName.trim() : 'there';
-      const title = typeof workoutTitle === 'string' ? workoutTitle : 'your workout';
+    title: ({ workoutTitle, distanceMi }) => {
+      const title = typeof workoutTitle === 'string' && workoutTitle.trim() ? workoutTitle.trim() : 'Workout';
+      const dist =
+        typeof distanceMi === 'string' && distanceMi.trim() ? ` · ${distanceMi.trim()}` : '';
+      return `Tomorrow: ${title}${dist}`;
+    },
+    body: ({ workoutTitle, distanceMi, workoutType }) => {
+      const title = typeof workoutTitle === 'string' && workoutTitle.trim() ? workoutTitle.trim() : 'your workout';
       const dist =
         typeof distanceMi === 'string' && distanceMi.trim() ? ` (${distanceMi.trim()})` : '';
-      return `Hi ${name}, get ready for ${title}${dist} tomorrow. You'll crush it!`;
+      const type =
+        typeof workoutType === 'string' && workoutType.trim() ? ` ${workoutType.trim()}` : '';
+      return `Please verify${type} ${title}${dist} is correct in GoFast, then send it to your Garmin watch.`;
     },
   },
   'scheduledRun.tomorrow': {
