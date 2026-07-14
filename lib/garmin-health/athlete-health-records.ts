@@ -112,7 +112,24 @@ export function hasAnyBodyBatterySignal(raw: Record<string, unknown>): boolean {
   );
 }
 
-function buildDailyDto(raw: unknown): HealthDailyDto | null {
+/** Garmin daily Body Battery summary keys (compact fields only — not time-series samples). */
+export const BODY_BATTERY_SUMMARY_KEYS = [
+  'bodyBatteryMostRecentValue',
+  'bodyBatteryHighestValue',
+  'bodyBatteryHighValue',
+  'bodyBatteryLowestValue',
+  'bodyBatteryLowValue',
+  'bodyBatteryChargedValue',
+  'bodyBatteryDrainedValue',
+] as const;
+
+/** Which compact Body Battery summary fields are present on a daily record (for logging). */
+export function presentBodyBatterySummaryFields(raw: Record<string, unknown>): string[] {
+  return BODY_BATTERY_SUMMARY_KEYS.filter((key) => raw[key] != null);
+}
+
+/** Build compact daily DTO from stored or incoming Garmin daily summary JSON. */
+export function buildHealthDailyDto(raw: unknown): HealthDailyDto | null {
   if (!isRecord(raw)) return null;
   if (!hasAnyBodyBatterySignal(raw) && readNum(raw, 'steps') == null) return null;
 
@@ -216,7 +233,7 @@ export async function buildHealthHydration(athleteId: string): Promise<HealthHyd
   return {
     garminConnected,
     lastSyncAt: athlete?.garmin_last_sync_at?.toISOString() ?? null,
-    daily: buildDailyDto(dailyRow?.summaryData ?? null),
+    daily: buildHealthDailyDto(dailyRow?.summaryData ?? null),
     sleep: buildSleepDto(sleepRow?.summaryData ?? null),
   };
 }

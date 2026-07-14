@@ -8,6 +8,14 @@ function readRawBody(request: Request): Promise<string> {
 }
 
 /**
+ * GET /api/garmin/health-webhook — endpoint verification (Garmin portal / PING probes).
+ * Returns OK without processing payload data.
+ */
+export async function GET() {
+  return new Response('OK', { status: 200 });
+}
+
+/**
  * POST /api/garmin/health-webhook — Garmin Health API (sleeps, dailies).
  * Register this URL in Garmin Developer Portal for Health endpoints only.
  */

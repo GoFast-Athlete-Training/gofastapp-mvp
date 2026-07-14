@@ -138,7 +138,8 @@ export default function HealthDashboard({ daily, sleep, lastSyncAt }: Props) {
             </div>
           ) : daily.bodyBatteryCharged != null || daily.bodyBatteryDrained != null ? (
             <p className="text-sm text-gray-600 mb-4">
-              Today&apos;s energy changes — level syncs when Garmin sends a full daily summary.
+              Garmin has sent today&apos;s charge and drain so far. Level, high, and low appear
+              after Garmin sends the full daily Body Battery summary.
             </p>
           ) : null}
 

@@ -8,6 +8,7 @@ import {
   fetchGarminPingCallbacks,
   isGarminPingPayload,
 } from './fetch-garmin-ping-callbacks';
+import { presentBodyBatterySummaryFields } from '../garmin-health/athlete-health-records';
 
 const DEBUG = process.env.GARMIN_DEBUG === 'true';
 
@@ -33,6 +34,38 @@ function resolveGarminUserIdFromBody(body: Record<string, unknown>): string | nu
     }
   }
   return null;
+}
+
+function logDailyBodyBatteryFieldPresence(dailies: unknown[]): void {
+  for (const raw of dailies) {
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) continue;
+    const record = raw as Record<string, unknown>;
+    if (typeof record.callbackURL === 'string' && record.callbackURL.length > 0) continue;
+
+    const present = presentBodyBatterySummaryFields(record);
+    const strippedSampleKeys = [
+      'timeOffsetBodyBatteryValues',
+      'timeOffsetHeartRateSamples',
+      'timeOffsetStressLevelValues',
+    ].filter((key) => record[key] != null);
+
+    console.log('[GARMIN HEALTH] daily bodyBattery summary fields', {
+      calendarDate: record.calendarDate ?? null,
+      present,
+      strippedSampleKeys,
+      partialOnly:
+        present.length > 0 &&
+        !present.some((k) =>
+          [
+            'bodyBatteryMostRecentValue',
+            'bodyBatteryHighestValue',
+            'bodyBatteryHighValue',
+            'bodyBatteryLowestValue',
+            'bodyBatteryLowValue',
+          ].includes(k)
+        ),
+    });
+  }
 }
 
 async function handlePingOrPush<T extends { userId?: string }>(
@@ -120,6 +153,7 @@ export async function processGarminHealthWebhook(rawText: string): Promise<void>
 
     const dailies = body.dailies;
     if (Array.isArray(dailies) && dailies.length > 0) {
+      logDailyBodyBatteryFieldPresence(dailies);
       try {
         await handlePingOrPush(
           'daily',
