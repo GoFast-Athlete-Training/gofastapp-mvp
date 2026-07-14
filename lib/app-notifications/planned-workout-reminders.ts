@@ -115,12 +115,15 @@ export async function sendPlannedWorkoutReminders(
         workoutId: workout.id,
         type: mobileType,
         templateKey: 'workout.tomorrow',
+        objectType: 'workout',
+        objectId: workout.id,
         screen: 'workout',
         reminderKind: 'tomorrow',
         workoutTitle: displayTitle,
-        distanceMi: facts.distanceMi,
-        workoutType: facts.workoutType,
+        ...(facts.distanceMi ? { distanceMi: facts.distanceMi } : {}),
+        ...(facts.workoutType ? { workoutType: facts.workoutType } : {}),
         deeplink: `/workouts/${workout.id}`,
+        url: `/workouts/${workout.id}`,
       },
     });
 

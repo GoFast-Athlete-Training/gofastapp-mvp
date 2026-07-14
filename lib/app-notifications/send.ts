@@ -61,7 +61,14 @@ export async function sendAppNotification(
     objectType: params.objectType,
     objectId: params.objectId,
   };
-  if (params.deeplink) data.deeplink = params.deeplink;
+  if (params.deeplink) {
+    data.deeplink = params.deeplink;
+    data.url = params.deeplink;
+  }
+  if (params.objectType === 'workout') {
+    data.workoutId = params.objectId;
+    data.screen = 'workout';
+  }
 
   const pushesSent = await sendExpoPushBatch(tokens, {
     title: rendered.title,

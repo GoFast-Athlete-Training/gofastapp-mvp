@@ -92,6 +92,8 @@ model Athlete {
   longRunCapabilityDate           DateTime?
   /// Functional threshold power (watts) — bike workout intensity anchor.
   ftpWatts                Int?
+  /// 400m benchmark expressed as seconds per 100m (not raw 400m time). Swim pace anchor for plan materialization.
+  FourHunMSwPace          Int?
   weeklyMileage           Int?
   /// Profile hydration snapshot: copied from active goal for quick reads.
   primaryGoalNameSnapshot            String?
@@ -1323,6 +1325,7 @@ model training_plan_persona {
 
   goals   training_plan_goal[]
   presets training_plan_preset[]
+  swim_presets swim_plan_preset[]
 
   @@index([capability])
 }
@@ -1347,6 +1350,7 @@ model training_plan_goal {
   updatedAt                 DateTime                    @updatedAt
 
   presets training_plan_preset[]
+  swim_presets swim_plan_preset[]
 
   @@index([personaId])
   @@index([planDurationWeeks])
@@ -1408,6 +1412,135 @@ model training_plan_preset {
   training_plans  training_plans[]
   training_cohorts training_cohorts[]
   public_training_plans public_training_plans[]
+}
+
+/// Standalone swim training preset — separate from run `training_plan_preset`; future triathlon presets compose swim/bike/run.
+model swim_plan_preset {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  title       String
+  description String?
+  publicDescription String?
+  /// Race or benchmark swim distance in meters (e.g. 1900 Olympic, 3800 IM).
+  goalSwimDistanceMeters Int?
+
+  personaId String?
+  goalId    String?
+  persona   training_plan_persona? @relation(fields: [personaId], references: [id], onDelete: SetNull)
+  goal      training_plan_goal?    @relation(fields: [goalId], references: [id], onDelete: SetNull)
+
+  coachIntent String?
+  objectiveOfPlan String?
+  athletePersonaCapability AthletePersonaCapability?
+  athletePersonaGoal String?
+  athletePersonaDedication AthletePersonaDedication?
+  coachPlanOverview Json?
+  /// Named pace keys → offset from FourHunMSwPace; catalogue resolves through this at materialization.
+  paceProfile Json?
+  /// Enabled swim workout types, weekly counts, cadence — canonical structure snapshot.
+  workoutStructure Json?
+
+  /// Repeating cycle length for rotation configs (weeks).
+  cycleLen Int @default(4)
+  /// JSON: per-week multipliers within a cycle, e.g. { "weekMultipliers": [1, 1.05, 1.1, 0.85] }.
+  weeklyProgressionPattern Json?
+  /// recommendedWeeklyMeters = goalSwimDistanceMeters × recommendationMultiplier when goal is set.
+  recommendationMultiplier Float @default(4)
+  recommendedWeeklyMeters Int?
+  minWeeklyMeters Int @default(4000)
+  maxWeeklyMeters Int?
+
+  taperWeeks Int @default(2)
+  /// Fraction of normal weekly meters during taper (e.g. 0.5 ≈ 50% volume).
+  taperVolumeMultiplier Float @default(0.5)
+
+  /// Long swim derived from weekly total — not the volume anchor.
+  longSwimShareOfWeek Float?
+  longSwimMinMeters Int?
+  longSwimMaxMeters Int?
+
+  enduranceIdealDow  Int @default(2)
+  thresholdIdealDow Int @default(4)
+  powerIdealDow      Int @default(3)
+  longSwimIdealDow   Int @default(6)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  enduranceConfigId  String?
+  enduranceConfig    swim_rotation_config? @relation("SwimPresetEndurance", fields: [enduranceConfigId], references: [id], onDelete: SetNull)
+  thresholdConfigId  String?
+  thresholdConfig    swim_rotation_config? @relation("SwimPresetThreshold", fields: [thresholdConfigId], references: [id], onDelete: SetNull)
+  powerConfigId      String?
+  powerConfig        swim_rotation_config? @relation("SwimPresetPower", fields: [powerConfigId], references: [id], onDelete: SetNull)
+  longSwimConfigId   String?
+  longSwimConfig     swim_rotation_config? @relation("SwimPresetLongSwim", fields: [longSwimConfigId], references: [id], onDelete: SetNull)
+}
+
+/// Swim workout catalogue — first-class taxonomy (EnduranceSwim, ThresholdSwim, PowerSwim, LongSwim).
+model swim_workout_catalogue {
+  id          String          @id @default(cuid())
+  name        String
+  slug        String?         @unique
+  description String?
+  workoutType SwimWorkoutType
+  /// Total prescribed work distance when fixed (meters).
+  totalWorkDistanceMeters Int?
+  repDistanceMeters       Int?
+  repCount                Int?
+  recoverySeconds         Int?
+  recoveryMeters          Int?
+  warmupMeters            Int?
+  cooldownMeters          Int?
+  /// Offset from athlete FourHunMSwPace (sec/100m) for main work.
+  paceOffsetSecPer100m    Int?
+  /// Optional JSON segment ladder / block-repeat pattern.
+  segmentPattern          Json?
+  trainingIntent          String[] @default([])
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  rotationPositions swim_rotation_config_position[]
+
+  @@unique([name, workoutType])
+  @@index([workoutType])
+}
+
+/// Rotation block for one swim workout type; many presets can share one config.
+model swim_rotation_config {
+  id          String          @id @default(cuid())
+  name        String
+  description String?
+  workoutType SwimWorkoutType
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  positions swim_rotation_config_position[]
+
+  endurancePresets swim_plan_preset[] @relation("SwimPresetEndurance")
+  thresholdPresets swim_plan_preset[] @relation("SwimPresetThreshold")
+  powerPresets     swim_plan_preset[] @relation("SwimPresetPower")
+  longSwimPresets  swim_plan_preset[] @relation("SwimPresetLongSwim")
+
+  @@index([name])
+  @@index([workoutType])
+}
+
+model swim_rotation_config_position {
+  id                  String               @id @default(cuid())
+  swimRotationConfigId String
+  swim_rotation_config swim_rotation_config @relation(fields: [swimRotationConfigId], references: [id], onDelete: Cascade)
+
+  cyclePosition      Int
+  distributionWeight Float  @default(0.25)
+  catalogueWorkoutId String?
+  swim_workout_catalogue swim_workout_catalogue? @relation(fields: [catalogueWorkoutId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([swimRotationConfigId, cyclePosition])
+  @@index([swimRotationConfigId])
 }
 
 /// Long-run rotation: cycle positions map to catalogue; many presets can share one.
@@ -2007,8 +2140,14 @@ model swim_workout_step {
   durationSeconds    Int?
   paceSecPer100mLow  Int?
   paceSecPer100mHigh Int?
+  /// Human-readable pace for Garmin notes when structured pace targets are unsupported.
+  paceNote           String?
   strokeType         String?
   equipment          String?
+  drillType          String?
+  /// Rest between reps or after work (seconds).
+  restSeconds        Int?
+  targetZone         String?
   heartRateLow       Int?
   heartRateHigh      Int?
   notes              String?
@@ -2169,6 +2308,14 @@ enum WorkoutType {
   Intervals
   LongRun
   Race
+}
+
+/// Swim plan preset workout taxonomy — distinct from run WorkoutType.
+enum SwimWorkoutType {
+  EnduranceSwim
+  ThresholdSwim
+  PowerSwim
+  LongSwim
 }
 
 /// ATHLETE = personal/plan workout; GROUP = club track prescription (no athlete 5K anchor).

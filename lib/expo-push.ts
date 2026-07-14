@@ -2,9 +2,22 @@ type ExpoPushMessage = {
   to: string;
   title: string;
   body: string;
-  data?: Record<string, unknown>;
+  data?: Record<string, string>;
   sound?: 'default' | null;
 };
+
+/** Expo push data values must be strings (especially on iOS). */
+export function normalizeExpoPushData(
+  data: Record<string, unknown> | undefined
+): Record<string, string> | undefined {
+  if (!data) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value == null) continue;
+    out[key] = typeof value === 'string' ? value : String(value);
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
 
 type ExpoPushTicket = {
   status: 'ok' | 'error';
@@ -26,11 +39,12 @@ export async function sendExpoPushBatch(
   ];
   if (unique.length === 0) return 0;
 
+  const data = normalizeExpoPushData(message.data);
   const payload: ExpoPushMessage[] = unique.map((to) => ({
     to,
     title: message.title,
     body: message.body,
-    data: message.data,
+    ...(data ? { data } : {}),
     sound: 'default',
   }));
 
