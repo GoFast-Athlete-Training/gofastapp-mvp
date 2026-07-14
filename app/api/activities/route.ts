@@ -25,16 +25,9 @@ export async function GET(request: Request) {
     }
     const { athlete } = auth;
 
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-
     const activities = await prisma.athlete_activities.findMany({
       where: {
         athleteId: athlete.id,
-        OR: [
-          { startTime: null },
-          { startTime: { gte: ninetyDaysAgo } },
-        ],
       },
       orderBy: { startTime: 'desc' },
       take,

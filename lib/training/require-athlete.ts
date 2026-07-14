@@ -43,7 +43,10 @@ export async function requireAthleteFromBearer(
   }
 
   if (athlete.firebaseId !== decoded.uid) {
-    return { error: "Forbidden" as const, status: 403 as const };
+    return {
+      error: "Athlete session mismatch — sign out and back in" as const,
+      status: 403 as const,
+    };
   }
 
   return { athlete };
