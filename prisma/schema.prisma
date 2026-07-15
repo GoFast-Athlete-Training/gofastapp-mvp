@@ -134,6 +134,8 @@ model Athlete {
   run_club_announcements  run_club_announcements[]
   run_club_events         run_club_events[]
   run_club_event_rsvps    run_club_event_rsvps[]
+  run_club_messages       run_club_messages[]
+  chatter_channel_reads   chatter_channel_reads[]
   city_run_rsvps          city_run_rsvps[]
   city_run_messages       city_run_messages[]
   city_run_checkins       city_run_checkins[]
@@ -781,6 +783,7 @@ model run_clubs {
   run_club_leader_claims  run_club_leader_claims[]
   run_club_announcements run_club_announcements[]
   run_club_events       run_club_events[]
+  run_club_messages     run_club_messages[]
 
   @@index([brandId])
   @@index([city])
@@ -889,6 +892,41 @@ model run_club_event_rsvps {
   @@unique([eventId, athleteId])
   @@index([athleteId])
   @@map("run_club_event_rsvps")
+}
+
+/// Club-level chatter — persistent channel for members (not per-run silos).
+model run_club_messages {
+  id          String     @id @default(cuid())
+  runClubId   String
+  athleteId   String
+  content     String
+  linkedRunId String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  run_clubs   run_clubs  @relation(fields: [runClubId], references: [id], onDelete: Cascade)
+  Athlete     Athlete    @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  linkedRun   city_runs? @relation(fields: [linkedRunId], references: [id], onDelete: SetNull)
+
+  @@index([runClubId, createdAt])
+  @@index([athleteId])
+  @@index([linkedRunId])
+  @@map("run_club_messages")
+}
+
+/// Per-athlete read cursor for Universal Chatter inbox unread counts.
+model chatter_channel_reads {
+  id          String   @id @default(cuid())
+  athleteId   String
+  channelType String   // run_club | run_crew | race_hub
+  channelId   String
+  lastReadAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  Athlete     Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([athleteId, channelType, channelId])
+  @@index([athleteId])
+  @@map("chatter_channel_reads")
 }
 
 model run_crew_announcements {
@@ -1112,6 +1150,7 @@ model city_runs {
   city_run_messages   city_run_messages[]
   city_run_checkins   city_run_checkins[]
   city_run_activity_links city_run_activity_links[]
+  run_club_messages_linked run_club_messages[]
   Athlete             Athlete?             @relation(fields: [athleteGeneratedId], references: [id], onDelete: Cascade)
   run_crews           run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
   runClub             run_clubs?           @relation(fields: [runClubId], references: [id], onDelete: SetNull)

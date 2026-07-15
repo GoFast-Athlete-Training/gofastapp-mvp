@@ -46,6 +46,12 @@ const HARDCODED_TEMPLATES: Record<NotificationTemplateKey, TemplateDefinition> =
       typeof clubName === 'string' && clubName.trim() ? clubName.trim() : 'Club run tomorrow',
     body: ({ body }) => (typeof body === 'string' ? body : 'Your club run is tomorrow.'),
   },
+  'club.chatter': {
+    title: ({ clubName }) =>
+      typeof clubName === 'string' && clubName.trim() ? clubName.trim() : 'Run club',
+    body: ({ excerpt }) =>
+      typeof excerpt === 'string' && excerpt.trim() ? excerpt.trim() : 'said something in the club chat',
+  },
   'crew.announcement': {
     title: ({ crewName }) =>
       typeof crewName === 'string' && crewName.trim() ? crewName.trim() : 'Crew announcement',

@@ -4,6 +4,7 @@ export type NotificationTemplateKey =
   | 'scheduledRun.tomorrow'
   | 'clubRun.today'
   | 'clubRun.tomorrow'
+  | 'club.chatter'
   | 'crew.announcement'
   | 'workout.complete';
 
@@ -11,6 +12,7 @@ export type AppNotificationObjectType =
   | 'workout'
   | 'scheduled_run'
   | 'city_run'
+  | 'run_club'
   | 'run_crew_announcement';
 
 export type TemplateFacts = Record<string, unknown>;
@@ -51,6 +53,8 @@ export function templateKeyToMobileType(templateKey: NotificationTemplateKey): s
       return 'club_run_today';
     case 'clubRun.tomorrow':
       return 'club_run_tomorrow';
+    case 'club.chatter':
+      return 'club_chatter';
     case 'crew.announcement':
       return 'crew_announcement';
     case 'workout.complete':

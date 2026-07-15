@@ -82,6 +82,23 @@ export async function loadNotificationFacts(params: {
         body: copy.body,
       };
     }
+    case 'club.chatter': {
+      if (params.payload) {
+        return {
+          clubName: params.payload.clubName ?? 'Run club',
+          excerpt: params.payload.excerpt ?? 'said something',
+        };
+      }
+      const club = await prisma.run_clubs.findUnique({
+        where: { id: params.objectId },
+        select: { name: true },
+      });
+      if (!club) return null;
+      return {
+        clubName: club.name,
+        excerpt: 'said something in the club chat',
+      };
+    }
     case 'crew.announcement': {
       const announcement = await prisma.run_crew_announcements.findUnique({
         where: { id: params.objectId },
