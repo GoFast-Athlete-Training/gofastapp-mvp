@@ -9,6 +9,7 @@ import GoFastPagePreviewCard, {
   type GoFastPagePayload,
 } from "@/components/profile/GoFastPagePreviewCard";
 import PersonalCommunityCard from "@/components/profile/PersonalCommunityCard";
+import { AdvertisingEarningsPanel } from "@/components/advertising/AdvertisingEarningsPanel";
 
 const RUNNER_BASE =
   process.env.NEXT_PUBLIC_RUNNER_PHOTO_URL?.replace(/\/$/, "") ||
@@ -377,6 +378,13 @@ export default function GoFastPageStudioRoute() {
                 setIsGoFastContainer(enabled);
                 setPayload((prev) => (prev ? { ...prev, isGoFastContainer: enabled } : prev));
               }}
+            />
+          ) : null}
+
+          {athleteId ? (
+            <AdvertisingEarningsPanel
+              athleteId={athleteId}
+              isGoFastContainer={isGoFastContainer}
             />
           ) : null}
 

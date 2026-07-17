@@ -9,6 +9,7 @@ import RunWithMe from './_components/RunWithMe';
 import GroupTrainingCard from './_components/GroupTrainingCard';
 import PublishedPlansCard from './_components/PublishedPlansCard';
 import AboutStrip from './_components/AboutStrip';
+import { ProfileContainerAdSlot } from './_components/ProfileContainerAdSlot';
 
 export const dynamic = 'force-dynamic';
 
@@ -148,6 +149,13 @@ export default async function PublicAthletePage({
           containerRecentMembers={data.containerRecentMembers}
           hostHandle={data.athlete.gofastHandle}
         />
+
+        {data.isGoFastContainer && data.athlete.gofastHandle ? (
+          <ProfileContainerAdSlot
+            handle={data.athlete.gofastHandle}
+            isGoFastContainer={data.isGoFastContainer}
+          />
+        ) : null}
 
         <footer className="pt-4 text-center">
           <Link
