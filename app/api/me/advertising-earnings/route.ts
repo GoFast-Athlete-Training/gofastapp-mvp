@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 
     const decoded = await adminAuth.verifyIdToken(authHeader.substring(7));
     const athlete = await prisma.athlete.findFirst({
-      where: { firebaseUid: decoded.uid },
+      where: { firebaseId: decoded.uid },
       select: { id: true, isGoFastContainer: true, gofastHandle: true },
     });
 
