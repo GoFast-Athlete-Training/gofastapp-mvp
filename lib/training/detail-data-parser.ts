@@ -20,6 +20,8 @@ export type SampleRow = {
   speedMetersPerSecond?: number | null;
   heartRate?: number | null;
   totalDistanceInMeters?: number | null;
+  latitudeInDegree?: number | null;
+  longitudeInDegree?: number | null;
 };
 
 export type ParsedDetailData = {
@@ -120,11 +122,17 @@ export function parseDetailData(blob: unknown): ParsedDetailData {
       const speed = readSpeed(s);
       const hr = readHeartRate(s);
       const dist = readDistanceMeters(s);
+      const latitudeInDegree =
+        toNum(s.latitudeInDegree) ?? toNum(s.LatitudeInDegree);
+      const longitudeInDegree =
+        toNum(s.longitudeInDegree) ?? toNum(s.LongitudeInDegree);
       samples.push({
         startTimeInSeconds: Math.floor(t),
         speedMetersPerSecond: speed,
         heartRate: hr,
         totalDistanceInMeters: dist,
+        latitudeInDegree,
+        longitudeInDegree,
       });
     }
   }

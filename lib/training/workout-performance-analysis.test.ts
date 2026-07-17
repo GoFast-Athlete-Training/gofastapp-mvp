@@ -196,7 +196,8 @@ test("interval with detail but misaligned laps is completion_only", () => {
 
   assert.equal(analysis.analysisMode, "completion_only");
   assert.equal(analysis.canJudgeTargetPace, false);
-  assert.equal(analysis.phaseAwareLaps.length, 0);
+  assert.ok(analysis.phaseAwareLaps.length > 0);
+  assert.equal(analysis.lapSource, "step");
   assert.equal(analysis.workSegmentActual, null);
 });
 
@@ -328,35 +329,94 @@ test("countWorkRepsOnTarget ignores recovery segments", () => {
   assert.deepEqual(counts, { onTarget: 1, total: 2 });
 });
 
-test("easy run with matched activity is completion_only without pace judgement", () => {
+test("easy run with segment laps reaches detail with mile splits", () => {
+  const segments = [
+    {
+      id: "s1",
+      title: "Easy",
+      stepOrder: 1,
+      targets: [{ type: "PACE", valueLow: 335, valueHigh: 345 }],
+      paceTargetEncodingVersion: 2,
+      actualPaceSecPerMile: 513,
+      actualDurationSeconds: 480,
+      actualDistanceMiles: 1.0,
+      segment_laps: [{ lapIndex: 0, avgPaceSecPerMile: 510, avgHeartRate: 132 }],
+    },
+    {
+      id: "s2",
+      title: "Easy",
+      stepOrder: 2,
+      targets: [{ type: "PACE", valueLow: 335, valueHigh: 345 }],
+      paceTargetEncodingVersion: 2,
+      actualPaceSecPerMile: 516,
+      actualDurationSeconds: 480,
+      actualDistanceMiles: 1.0,
+      segment_laps: [{ lapIndex: 1, avgPaceSecPerMile: 518, avgHeartRate: 134 }],
+    },
+  ];
+
   const analysis = computeWorkoutPerformanceAnalysis({
     workoutType: "Easy",
     targetPaceSecPerMile: 540,
-    targetPaceSecPerMileHigh: null,
+    targetPaceSecPerMileHigh: 550,
     paceDeltaSecPerMile: 10,
-    actualAvgPaceSecPerMile: 530,
-    actualDistanceMeters: 10000,
+    actualAvgPaceSecPerMile: 513,
+    actualDistanceMeters: 4 * 1609.34,
     actualDurationSeconds: 3000,
-    completedActivityDetailJson: null,
+    completedActivityDetailJson: { laps: [] },
     matchedActivityId: "act1",
-    matched_activity: null,
-    segments: [],
+    matched_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
+    segments,
   });
 
-  assert.equal(analysis.analysisMode, "completion_only");
-  assert.equal(analysis.canJudgeTargetPace, false);
-  assert.match(analysis.completionOnlyMessage ?? "", /Nice work/);
+  assert.equal(analysis.analysisMode, "detail");
+  assert.equal(analysis.lapSource, "auto");
+  assert.ok(analysis.phaseAwareLaps.length >= 2);
+  assert.equal(analysis.canJudgeTargetPace, true);
+  assert.ok(analysis.executionHeadline?.includes("on target"));
 
   const comparison = resolveTargetComparisonPace({
     analysis,
     workoutType: "Easy",
-    actualAvgPaceSecPerMile: 530,
+    actualAvgPaceSecPerMile: 513,
     paceDeltaSecPerMile: 10,
     targetPaceSecPerMile: 540,
-    targetPaceSecPerMileHigh: null,
+    targetPaceSecPerMileHigh: 550,
   });
 
-  assert.equal(comparison.actualPaceSecPerMile, null);
+  assert.notEqual(comparison.actualPaceSecPerMile, null);
+});
+
+test("long run with segment laps uses auto lap source", () => {
+  const analysis = computeWorkoutPerformanceAnalysis({
+    workoutType: "LongRun",
+    targetPaceSecPerMile: 540,
+    targetPaceSecPerMileHigh: null,
+    paceDeltaSecPerMile: null,
+    actualAvgPaceSecPerMile: 530,
+    actualDistanceMeters: 12 * 1609.34,
+    actualDurationSeconds: 6000,
+    completedActivityDetailJson: { laps: [] },
+    matchedActivityId: "act1",
+    matched_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
+    segments: [
+      {
+        id: "s1",
+        title: "Long Run",
+        stepOrder: 1,
+        targets: [{ type: "PACE", valueLow: 335, valueHigh: 345 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: 530,
+        actualDurationSeconds: 6000,
+        actualDistanceMiles: 12,
+        segment_laps: [{ lapIndex: 0, avgPaceSecPerMile: 530 }],
+      },
+    ],
+  });
+
+  assert.equal(analysis.analysisMode, "detail");
+  assert.equal(analysis.lapSource, "auto");
+  assert.ok(analysis.phaseAwareLaps.length > 0);
 });
 
 test("scorecard exposes total miles and work segment deltas", () => {

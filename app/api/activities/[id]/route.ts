@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
+import { projectActivityDetailResponse } from "@/lib/training/activity-detail-projection";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -44,16 +45,22 @@ export async function GET(
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     }
 
-    const { matched_workout, ...activity } = row;
+    const { matched_workout, ...activityRow } = row;
+    const projected = projectActivityDetailResponse({
+      ...activityRow,
+      startTime: activityRow.startTime,
+    });
 
     return NextResponse.json({
       activity: {
-        ...activity,
-        startTime: activity.startTime?.toISOString() ?? null,
-        createdAt: activity.createdAt.toISOString(),
-        updatedAt: activity.updatedAt.toISOString(),
-        hydratedAt: activity.hydratedAt?.toISOString() ?? null,
+        ...projected.activity,
+        startTime: activityRow.startTime?.toISOString() ?? null,
+        createdAt: activityRow.createdAt.toISOString(),
+        updatedAt: activityRow.updatedAt.toISOString(),
+        hydratedAt: activityRow.hydratedAt?.toISOString() ?? null,
       },
+      derivedLaps: projected.derivedLaps,
+      hasDetail: projected.hasDetail,
       matchedWorkout: matched_workout
         ? {
             ...matched_workout,

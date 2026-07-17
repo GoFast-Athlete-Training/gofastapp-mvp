@@ -104,6 +104,8 @@ export type PhaseAwareLapRow = {
   vsPlanTone: "neutral" | "good" | "fast" | "slow";
 };
 
+export type LapSource = "step" | "auto" | null;
+
 export type WorkoutPerformanceAnalysis = {
   hasActivityDetail: boolean;
   hasSegmentActuals: boolean;
@@ -111,6 +113,7 @@ export type WorkoutPerformanceAnalysis = {
   analysisMode: AnalysisMode;
   requiresDetailForTargetAnalysis: boolean;
   canJudgeTargetPace: boolean;
+  lapSource: LapSource;
   workSegmentActual: WorkSegmentActual | null;
   workRepsOnTarget: WorkRepsOnTarget | null;
   completionOnlyMessage: string | null;
@@ -679,6 +682,14 @@ export function structuredSegmentLapsAligned(
   return sorted.every((s) => (s.segment_laps?.length ?? 0) === 1);
 }
 
+export function resolveLapSource(params: {
+  requiresDetail: boolean;
+  hasSegmentLaps: boolean;
+}): LapSource {
+  if (!params.hasSegmentLaps) return null;
+  return params.requiresDetail ? "step" : "auto";
+}
+
 export function computeWorkoutPerformanceAnalysis(
   workout: PerformanceAnalysisWorkoutInput
 ): WorkoutPerformanceAnalysis {
@@ -701,18 +712,11 @@ export function computeWorkoutPerformanceAnalysis(
     segmentLapsAligned &&
     hasWorkSegmentActuals;
 
-  const isCompletedEasyRun =
-    workout.workoutType === "Easy" &&
-    Boolean(
-      workout.matchedActivityId ||
-        (workout.actualDistanceMeters != null && workout.actualDistanceMeters > 0) ||
-        (workout.actualAvgPaceSecPerMile != null && workout.actualAvgPaceSecPerMile > 0)
-    );
+  const hasSegmentLaps = workout.segments.some((s) => (s.segment_laps?.length ?? 0) > 0);
+  const lapSource = resolveLapSource({ requiresDetail, hasSegmentLaps });
 
   let analysisMode: AnalysisMode;
-  if (isCompletedEasyRun) {
-    analysisMode = "completion_only";
-  } else if (requiresDetail) {
+  if (requiresDetail) {
     if (hasTrustworthyStructuredDetail) {
       analysisMode = "detail";
     } else {
@@ -724,39 +728,35 @@ export function computeWorkoutPerformanceAnalysis(
     analysisMode = "summary_only";
   }
 
-  const workSegmentActual = isCompletedEasyRun
-    ? null
-    : hasTrustworthyStructuredDetail
+  const workSegmentActual = hasTrustworthyStructuredDetail
+    ? computeWorkSegmentActual(
+        workout.segments,
+        workout.targetPaceSecPerMile,
+        workout.targetPaceSecPerMileHigh
+      )
+    : !requiresDetail && (hasWorkSegmentActuals || hasSegmentActuals)
       ? computeWorkSegmentActual(
           workout.segments,
           workout.targetPaceSecPerMile,
           workout.targetPaceSecPerMileHigh
         )
-      : !requiresDetail && (hasWorkSegmentActuals || hasSegmentActuals)
-        ? computeWorkSegmentActual(
-            workout.segments,
-            workout.targetPaceSecPerMile,
-            workout.targetPaceSecPerMileHigh
-          )
-        : null;
+      : null;
 
-  const canJudgeTargetPace = isCompletedEasyRun
-    ? false
-    : requiresDetail
-      ? analysisMode === "detail" &&
-        (workSegmentActual?.actualPaceSecPerMile != null ||
-          (workSegmentActual?.segments.some((s) => s.actualPaceSecPerMile != null) ?? false))
-      : analysisMode === "detail"
-        ? Boolean(
-            workSegmentActual?.actualPaceSecPerMile != null ||
-              buildPhaseAwareLapRows({
-                segments: workout.segments,
-                workoutTargetLow: workout.targetPaceSecPerMile,
-                workoutTargetHigh: workout.targetPaceSecPerMileHigh,
-              }).some((lap) => lap.phase === "work" && lap.paceSecPerMile != null)
-          )
-        : workout.actualAvgPaceSecPerMile != null ||
-          workSegmentActual?.actualPaceSecPerMile != null;
+  const canJudgeTargetPace = requiresDetail
+    ? analysisMode === "detail" &&
+      (workSegmentActual?.actualPaceSecPerMile != null ||
+        (workSegmentActual?.segments.some((s) => s.actualPaceSecPerMile != null) ?? false))
+    : analysisMode === "detail"
+      ? Boolean(
+          workSegmentActual?.actualPaceSecPerMile != null ||
+            buildPhaseAwareLapRows({
+              segments: workout.segments,
+              workoutTargetLow: workout.targetPaceSecPerMile,
+              workoutTargetHigh: workout.targetPaceSecPerMileHigh,
+            }).some((lap) => lap.phase === "work" && lap.paceSecPerMile != null)
+        )
+      : workout.actualAvgPaceSecPerMile != null ||
+        workSegmentActual?.actualPaceSecPerMile != null;
 
   const workRepsOnTarget =
     requiresDetail && canJudgeTargetPace
@@ -795,16 +795,13 @@ export function computeWorkoutPerformanceAnalysis(
     });
   }
 
-  const phaseAwareLaps =
-    isCompletedEasyRun
-      ? []
-      : !requiresDetail || segmentLapsAligned
-        ? buildPhaseAwareLapRows({
-            segments: workout.segments,
-            workoutTargetLow: workout.targetPaceSecPerMile,
-            workoutTargetHigh: workout.targetPaceSecPerMileHigh,
-          })
-        : [];
+  const phaseAwareLaps = hasSegmentLaps
+    ? buildPhaseAwareLapRows({
+        segments: workout.segments,
+        workoutTargetLow: workout.targetPaceSecPerMile,
+        workoutTargetHigh: workout.targetPaceSecPerMileHigh,
+      })
+    : [];
 
   const analysisWithoutScorecard = {
     hasActivityDetail,
@@ -813,6 +810,7 @@ export function computeWorkoutPerformanceAnalysis(
     analysisMode,
     requiresDetailForTargetAnalysis: requiresDetail,
     canJudgeTargetPace,
+    lapSource,
     workSegmentActual,
     workRepsOnTarget,
     completionOnlyMessage,

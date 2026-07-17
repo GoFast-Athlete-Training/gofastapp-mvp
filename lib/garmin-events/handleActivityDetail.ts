@@ -14,6 +14,20 @@ import { tryMatchActivityToCityRun } from "../cta-triggers/try-match-activity-to
 import { tryMatchActivityToTrainingWorkout } from "../training/match-activity-to-workout";
 import { tryMatchActivityToBikeWorkout } from "../training/match-activity-to-bike-workout";
 import { promoteUnmatchedRunningActivityToWorkout } from "../training/promote-activity-to-workout";
+import { extractActivityRouteFromDetail } from "../training/activity-route-from-detail";
+
+function detailPersistData(detail: object) {
+  const route = extractActivityRouteFromDetail(detail);
+  return {
+    detailData: detail,
+    hydratedAt: new Date(),
+    startLatitude: route.startLatitude,
+    startLongitude: route.startLongitude,
+    endLatitude: route.endLatitude,
+    endLongitude: route.endLongitude,
+    summaryPolyline: route.summaryPolyline,
+  };
+}
 
 export interface ActivityDetail {
   activityId?: string | number;
@@ -177,10 +191,7 @@ export async function handleActivityDetail(
           ...(athlete ? { athleteId: athlete.id } : {}),
           sourceActivityId: { in: ids },
         },
-        data: {
-          detailData: detail as object,
-          hydratedAt: new Date(),
-        },
+        data: detailPersistData(detail as object),
       });
 
       if (updateResult.count > 0) {
@@ -267,8 +278,7 @@ export async function handleActivityDetail(
             averagePower: norm.averagePower,
             steps: norm.steps,
             summaryData: summary ? (summary as object) : Prisma.DbNull,
-            detailData: detail as object,
-            hydratedAt: now,
+            ...detailPersistData(detail as object),
             updatedAt: now,
           },
         });
