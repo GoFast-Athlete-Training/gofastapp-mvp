@@ -410,8 +410,15 @@ export async function applyActivityToWorkout(params: {
       templateKey: "workout.complete",
       objectType: "workout",
       objectId: workout.id,
-      deeplink: `/workouts/${workout.id}`,
-      payload: { workoutId: workout.id, screen: "workout" },
+      deeplink: `/activities/${activity.id}`,
+      payload: {
+        workoutId: workout.id,
+        activityId: activity.id,
+        type: "workout_complete",
+        screen: "activity",
+        objectType: "workout",
+        objectId: workout.id,
+      },
       facts: { workoutTitle: workout.title },
     });
   } catch (err) {

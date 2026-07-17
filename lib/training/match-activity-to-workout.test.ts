@@ -135,6 +135,15 @@ test("selectPlannedWorkoutCandidate auto-match eligible for Falmouth tempo title
   );
 });
 
+test("same-day close distance without title does not qualify for auto-match", () => {
+  const scored = scoreActivityCandidateForWorkout({
+    workout: tempoWorkout,
+    activity: tempoActivity({ activityName: "Arlington County Running" }),
+  });
+  assert.ok(scored);
+  assert.equal(canAutoMatchPlannedWorkout({ scored, titleMatchCount: 0 }), false);
+});
+
 test("activityMatchCandidateUtcRange spans three UTC days around activity local date", () => {
   const range = activityMatchCandidateUtcRange("2026-06-17");
   assert.equal(range.start.toISOString(), "2026-06-16T00:00:00.000Z");

@@ -11,12 +11,6 @@ function startOfUtcDay(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
 
-function addUtcDays(d: Date, days: number): Date {
-  const next = new Date(d);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
-}
-
 function formatDistanceMi(meters: number | null | undefined): string | null {
   if (meters == null || meters <= 0) return null;
   return `${(meters / 1609.34).toFixed(1)} mi`;
@@ -32,8 +26,7 @@ export async function getAppNotificationFeed(params: {
 }): Promise<AppNotificationFeedRow[]> {
   const take = params.take ?? 30;
   const now = new Date();
-  const tomorrowStart = addUtcDays(startOfUtcDay(now), 1);
-  const dayAfterTomorrow = addUtcDays(startOfUtcDay(now), 2);
+  const todayStart = startOfUtcDay(now);
 
   const workouts = await prisma.workouts.findMany({
     where: {
@@ -57,12 +50,10 @@ export async function getAppNotificationFeed(params: {
   const rows: AppNotificationFeedRow[] = [];
 
   for (const workout of workouts) {
-    const isTomorrow =
-      workout.date != null &&
-      workout.date >= tomorrowStart &&
-      workout.date < dayAfterTomorrow;
-
-    if (!isTomorrow && params.unreadOnly) continue;
+    if (params.unreadOnly) {
+      if (workout.appnotificationReminderDeliveredAt != null) continue;
+      if (workout.date == null || workout.date < todayStart) continue;
+    }
 
     const facts = {
       firstName: workout.Athlete?.firstName ?? 'there',

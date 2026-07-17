@@ -5,7 +5,7 @@ import { processTrainingRunReminders } from '@/lib/training-run-reminders';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-/** GET /api/cron/run-reminders — tomorrow's plan workouts + scheduled runs */
+/** GET /api/cron/run-reminders — tomorrow's plan workouts (Vercel cron 23:00 UTC ≈ 7 PM Eastern) */
 export async function GET(request: NextRequest) {
   const authError = verifyCronSecret(request);
   if (authError) return authError;

@@ -1,8 +1,8 @@
 /**
  * Webhook ingest: store athlete_activity and optionally auto-link to workouts.
  * Standalone pushed workouts: auto-match via garminWorkoutId.
- * Planned workouts: auto-match only when a single high-confidence candidate is found
- * (title match or same-day close distance); otherwise athletes confirm via POST /match-activity.
+ * Planned workouts: auto-match only when a single high-confidence title match is found;
+ * otherwise athletes confirm via POST /match-activity.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -295,10 +295,7 @@ export async function tryMatchActivityToTrainingWorkout(
         }),
       });
 
-    const autoMatchEligible =
-      titleMatchCount === 1
-        ? canAutoMatchPlannedWorkout({ scored, titleMatchCount })
-        : scored != null && isHighConfidenceActivityCandidate(scored);
+    const autoMatchEligible = canAutoMatchPlannedWorkout({ scored, titleMatchCount });
 
     if (autoMatchEligible && scored) {
       const existingLink = await prisma.workouts.findFirst({
