@@ -8,6 +8,7 @@ import { buildAthleteForClient } from '@/lib/athlete-for-client';
 import { normalizeProfileGender, parseProfileBirthday } from '@/lib/profile-validation';
 import { isExternallyContactableEmail, isApplePrivateRelayEmail } from '@/lib/athlete-contact-email';
 import { syncAthleteFiveKPaceToActivePlan } from '@/lib/training/plan-lifecycle';
+import { ensureGoFastWithMeForAthlete } from '@/lib/gofast-with-me/gofast-with-me-service';
 
 /** GET /api/athlete/[id]/profile — same row as GET /api/athlete/[id] (auth: own athlete only) */
 export async function GET(
@@ -263,6 +264,25 @@ export async function PUT(
     }
 
     const updated = await updateAthlete(athleteId, data);
+
+    if (has('gofastHandle') && data.gofastHandle) {
+      try {
+        await ensureGoFastWithMeForAthlete(athleteId, String(data.gofastHandle), {
+          seedBioFromAthlete: updated.bio,
+        });
+      } catch (pageErr: unknown) {
+        const msg = pageErr instanceof Error ? pageErr.message : 'GoFast With Me sync failed';
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'GoFast With Me URL conflict',
+            field: 'gofastHandle',
+            message: msg,
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     if (has('fiveKPace')) {
       await syncAthleteFiveKPaceToActivePlan(athleteId);

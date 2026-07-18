@@ -168,6 +168,28 @@ model Athlete {
   authored_public_training_plans public_training_plans[]        @relation("PublicPlanAuthor")
   plan_custom_workouts         plan_custom_workouts[]
   athlete_appnotification_devices     athlete_appnotification_devices[]
+  gofast_with_me              gofast_with_me?
+}
+
+/// Athlete-scoped GoFast With Me — public invite identity (not the human Athlete profile).
+model gofast_with_me {
+  id                 String   @id @default(cuid())
+  athleteId          String   @unique
+  /// Public URL key for visitor lookup; may match gofastHandle or be custom.
+  gofastSlugSnapshot String   @unique
+  /// When true, slug follows Athlete.gofastHandle on handle change.
+  slugUsesHandle     Boolean  @default(true)
+  welcome            String?  @db.Text
+  gofastWithMeBio    String?  @db.Text
+  whatYoullSeeHere   String?  @db.Text
+  sportFocus         String?
+  modelFocus         String?
+  myAchievements     String?  @db.Text
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  athlete            Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@map("gofast_with_me")
 }
 
 /// Human coach — first-class entity (Firebase auth), parallel to Athlete.

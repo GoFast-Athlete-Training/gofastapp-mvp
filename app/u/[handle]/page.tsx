@@ -10,6 +10,7 @@ import GroupTrainingCard from './_components/GroupTrainingCard';
 import PublishedPlansCard from './_components/PublishedPlansCard';
 import AboutStrip from './_components/AboutStrip';
 import { ProfileContainerAdSlot } from './_components/ProfileContainerAdSlot';
+import GoFastWithMeIntro from './_components/GoFastWithMeIntro';
 
 export const dynamic = 'force-dynamic';
 
@@ -112,6 +113,11 @@ export default async function PublicAthletePage({
       />
 
       <main className="max-w-2xl mx-auto px-5 sm:px-6 pt-8 pb-16 space-y-8">
+        <GoFastWithMeIntro
+          gofastWithMe={data.gofastWithMe}
+          hostFirstName={data.athlete.firstName}
+        />
+
         <GoalRaceCard
           trainingSummary={data.trainingSummary}
           primaryChasingGoal={data.primaryChasingGoal}

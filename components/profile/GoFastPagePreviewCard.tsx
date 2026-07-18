@@ -120,6 +120,26 @@ export type GoFastPagePayload = {
     createdAt: string;
     authorDisplay: string;
   }[];
+  gofastWithMe?: {
+    welcome?: string | null;
+    gofastWithMeBio?: string | null;
+    whatYoullSeeHere?: string | null;
+    sportFocus?: string | null;
+    modelFocus?: string | null;
+    myAchievements?: string | null;
+    gofastSlugSnapshot?: string;
+  } | null;
+  nextRace?: {
+    source: 'plan' | 'goal' | 'signup';
+    name: string;
+    raceDate: string;
+    city?: string | null;
+    state?: string | null;
+    distanceLabel?: string | null;
+    planName?: string;
+    goalName?: string | null;
+    slug?: string | null;
+  } | null;
 };
 
 function formatWhen(iso: string): string {
@@ -267,6 +287,83 @@ export default function GoFastPagePreviewCard({
       </section>
 
       <div className="max-w-3xl mx-auto px-5 space-y-10 -mt-2 relative z-20">
+        {(data.gofastWithMe?.welcome?.trim() ||
+          data.gofastWithMe?.gofastWithMeBio?.trim() ||
+          data.gofastWithMe?.whatYoullSeeHere?.trim() ||
+          data.gofastWithMe?.sportFocus?.trim() ||
+          data.gofastWithMe?.modelFocus?.trim() ||
+          data.gofastWithMe?.myAchievements?.trim()) ? (
+          <section className="rounded-2xl border border-amber-500/30 bg-zinc-900/85 p-5 space-y-4">
+            {data.gofastWithMe?.welcome?.trim() ? (
+              <div>
+                <div className="text-amber-400/90 text-xs font-semibold uppercase tracking-wide mb-2">
+                  Welcome
+                </div>
+                <p className="text-sm text-zinc-200 leading-relaxed whitespace-pre-wrap">
+                  {data.gofastWithMe.welcome.trim()}
+                </p>
+              </div>
+            ) : null}
+            {[data.gofastWithMe?.sportFocus, data.gofastWithMe?.modelFocus]
+              .map((s) => s?.trim())
+              .filter(Boolean).length > 0 ? (
+              <p className="text-xs font-medium text-zinc-400">
+                {[data.gofastWithMe?.sportFocus, data.gofastWithMe?.modelFocus]
+                  .map((s) => s?.trim())
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            ) : null}
+            {data.gofastWithMe?.gofastWithMeBio?.trim() ? (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">
+                  About me on GoFast
+                </p>
+                <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">
+                  {data.gofastWithMe.gofastWithMeBio.trim()}
+                </p>
+              </div>
+            ) : null}
+            {data.gofastWithMe?.whatYoullSeeHere?.trim() ? (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">
+                  What you&apos;ll see here
+                </p>
+                <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">
+                  {data.gofastWithMe.whatYoullSeeHere.trim()}
+                </p>
+              </div>
+            ) : null}
+            {data.gofastWithMe?.myAchievements?.trim() ? (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">
+                  My achievements
+                </p>
+                <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">
+                  {data.gofastWithMe.myAchievements.trim()}
+                </p>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {data.nextRace ? (
+          <section className="rounded-2xl border border-emerald-500/30 bg-zinc-900/85 p-5">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-2">
+              <Trophy className="w-4 h-4 text-emerald-400" />
+              Next race
+            </h2>
+            <p className="font-semibold text-white">{data.nextRace.name}</p>
+            <p className="text-sm text-zinc-400 mt-1">
+              {formatDateOnly(data.nextRace.raceDate)}
+              {data.nextRace.distanceLabel ? ` · ${data.nextRace.distanceLabel}` : ""}
+              {[data.nextRace.city, data.nextRace.state].filter(Boolean).length > 0
+                ? ` · ${[data.nextRace.city, data.nextRace.state].filter(Boolean).join(", ")}`
+                : ""}
+            </p>
+          </section>
+        ) : null}
+
         {data.isGoFastContainer && athlete.gofastHandle ? (
           <section className="rounded-2xl border border-violet-500/35 bg-zinc-900/85 p-5 shadow-lg shadow-violet-950/20">
             <h2 className="text-lg font-semibold text-white mb-1">Community</h2>

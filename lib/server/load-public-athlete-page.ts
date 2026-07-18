@@ -1,15 +1,18 @@
 import { prisma } from '@/lib/prisma';
 import { getJoinableCohortForHost } from '@/lib/training/cohort-service';
 import { listPublicPlansForAthlete, mapPublishedPlanCard } from '@/lib/training/public-plan-service';
+import {
+  ensureGoFastWithMeForAthlete,
+  getGoFastWithMeBySlug,
+  normalizeGoFastWithMeSlug,
+} from '@/lib/gofast-with-me/gofast-with-me-service';
 
 const METERS_PER_MILE = 1609.344;
 
 export type PublicAthletePayload = Awaited<ReturnType<typeof loadPublicAthletePage>>;
 
 export function normalizeHandle(raw: string): string {
-  let h = (raw || '').trim().toLowerCase();
-  if (h.startsWith('@')) h = h.slice(1);
-  return h.replace(/[^a-z0-9_]/g, '');
+  return normalizeGoFastWithMeSlug(raw);
 }
 
 function startOfWeekMonday(now: Date): Date {
@@ -32,10 +35,31 @@ export async function loadPublicAthletePage(rawHandle: string) {
   const handle = normalizeHandle(rawHandle || '');
   if (!handle) return null;
 
-  const athlete = await prisma.athlete.findFirst({
-    where: { gofastHandle: { equals: handle, mode: 'insensitive' } },
-  });
-  if (!athlete) return null;
+  let gwmRow = await getGoFastWithMeBySlug(handle);
+  if (!gwmRow) {
+    const legacyAthlete = await prisma.athlete.findFirst({
+      where: { gofastHandle: { equals: handle, mode: 'insensitive' } },
+    });
+    if (!legacyAthlete?.gofastHandle?.trim()) return null;
+    await ensureGoFastWithMeForAthlete(legacyAthlete.id, legacyAthlete.gofastHandle, {
+      seedBioFromAthlete: legacyAthlete.bio,
+    });
+    gwmRow = await getGoFastWithMeBySlug(handle);
+    if (!gwmRow) return null;
+  }
+
+  const athlete = gwmRow.athlete;
+
+  const gofastWithMe = {
+    id: gwmRow.id,
+    gofastSlugSnapshot: gwmRow.gofastSlugSnapshot,
+    welcome: gwmRow.welcome,
+    gofastWithMeBio: gwmRow.gofastWithMeBio,
+    whatYoullSeeHere: gwmRow.whatYoullSeeHere,
+    sportFocus: gwmRow.sportFocus,
+    modelFocus: gwmRow.modelFocus,
+    myAchievements: gwmRow.myAchievements,
+  };
 
   const now = new Date();
   const startOfToday = new Date(now);
@@ -349,6 +373,50 @@ export async function loadPublicAthletePage(rawHandle: string) {
       }
     : null;
 
+  const nextRace = (() => {
+    if (trainingSummary?.raceName && trainingSummary.raceDate) {
+      const raceDate = new Date(trainingSummary.raceDate);
+      if (!Number.isNaN(raceDate.getTime()) && raceDate >= now) {
+        return {
+          source: 'plan' as const,
+          name: trainingSummary.raceName,
+          raceDate: trainingSummary.raceDate,
+          city: trainingSummary.raceCity,
+          state: trainingSummary.raceState,
+          distanceLabel: trainingSummary.raceDistanceLabel,
+          planName: trainingSummary.planName,
+        };
+      }
+    }
+    if (primaryChasingGoal?.raceName && primaryChasingGoal.raceDate) {
+      const raceDate = new Date(primaryChasingGoal.raceDate);
+      if (!Number.isNaN(raceDate.getTime()) && raceDate >= now) {
+        return {
+          source: 'goal' as const,
+          name: primaryChasingGoal.raceName,
+          raceDate: primaryChasingGoal.raceDate,
+          city: primaryChasingGoal.raceCity,
+          state: primaryChasingGoal.raceState,
+          distanceLabel: primaryChasingGoal.raceDistanceLabel,
+          goalName: primaryChasingGoal.name,
+        };
+      }
+    }
+    const upcomingSignup = signedUpRaces.find((race) => new Date(race.raceDate) >= now);
+    if (upcomingSignup) {
+      return {
+        source: 'signup' as const,
+        name: upcomingSignup.name,
+        raceDate: upcomingSignup.raceDate,
+        city: upcomingSignup.city,
+        state: upcomingSignup.state,
+        distanceLabel: upcomingSignup.distanceLabel,
+        slug: upcomingSignup.slug,
+      };
+    }
+    return null;
+  })();
+
   return {
     isGoFastContainer: athlete.isGoFastContainer,
     hostAthleteId: athlete.isGoFastContainer ? athlete.id : null,
@@ -356,6 +424,8 @@ export async function loadPublicAthletePage(rawHandle: string) {
     containerRecentMembers,
     joinableGroupTraining,
     publishedPlans,
+    gofastWithMe,
+    nextRace,
     athlete: {
       id: athlete.id,
       gofastHandle: athlete.gofastHandle,

@@ -8,7 +8,7 @@ Authenticated creator hub with four cards:
 
 | Card | Primary route | Public destination |
 |------|---------------|-------------------|
-| Public profile | `/profile/gofast-page` | `runner.gofastcrushgoals.com/{handle}` |
+| GoFast With Me | `/profile/gofast-page` | `runner.gofastcrushgoals.com/{slug}` via `gofastSlugSnapshot` |
 | Training plan | `/training/lead` | `/plans/{slug}` |
 | Public run | `/host-a-run` | Run With Me upcoming runs + GoRun |
 | RunCrew | `/runcrew/create` / `/my-runcrews` | Crew product (separate from Run With Me) |
@@ -16,6 +16,8 @@ Authenticated creator hub with four cards:
 Entry points: Profile sidebar, profile overview, Run With Me studio, Training hub panel, Community page.
 
 ## Mobile assessment (GoFast-mobile — not implemented)
+
+**GoFast With Me studio** (`/profile/gofast-page`) is the home for athlete invite identity + page preview. **Share hub** (`/profile/share`) remains deferred — do not port as primary mobile flow until GoFast With Me is stable on web.
 
 **Recommended first placement:** GoRun tab (`app/(tabs)/go-run.tsx`) — already the social hub with Discover runs, Build a run, My community runs.
 
