@@ -48,6 +48,29 @@ function normalizeCreatorType(value: string | null | undefined): GoFastWithMeCre
   return null;
 }
 
+type GoFastWithMeRow = {
+  id: string;
+  athleteId: string;
+  gofastSlugSnapshot: string;
+  slugUsesHandle: boolean;
+  welcome: string | null;
+  gofastWithMeBio: string | null;
+  whatYoullSeeHere: string | null;
+  sportFocus: string | null;
+  modelFocus: string | null;
+  myAchievements: string | null;
+  gofastWithMePhotoUrl: string | null;
+  creatorType: string | null;
+  coachSpecialty: string | null;
+};
+
+function toGoFastWithMeRecord(row: GoFastWithMeRow): GoFastWithMeRecord {
+  return {
+    ...row,
+    creatorType: normalizeCreatorType(row.creatorType),
+  };
+}
+
 export async function isGoFastWithMeSlugAvailable(
   slug: string,
   excludeAthleteId?: string
@@ -84,22 +107,24 @@ export async function ensureGoFastWithMeForAthlete(
   if (existingByAthlete) {
     const seedPhoto = trimOrNull(options?.seedPhotoFromAthlete ?? undefined);
     if (!existingByAthlete.gofastWithMePhotoUrl && seedPhoto) {
-      return prisma.gofast_with_me.update({
+      const updated = await prisma.gofast_with_me.update({
         where: { athleteId },
         data: { gofastWithMePhotoUrl: seedPhoto, updatedAt: new Date() },
       });
+      return toGoFastWithMeRecord(updated);
     }
     if (existingByAthlete.slugUsesHandle && existingByAthlete.gofastSlugSnapshot !== slug) {
       const available = await isGoFastWithMeSlugAvailable(slug, athleteId);
       if (!available) {
         throw new Error('GoFast With Me URL already taken');
       }
-      return prisma.gofast_with_me.update({
+      const updated = await prisma.gofast_with_me.update({
         where: { athleteId },
         data: { gofastSlugSnapshot: slug, updatedAt: new Date() },
       });
+      return toGoFastWithMeRecord(updated);
     }
-    return existingByAthlete;
+    return toGoFastWithMeRecord(existingByAthlete);
   }
 
   const available = await isGoFastWithMeSlugAvailable(slug, athleteId);
@@ -110,7 +135,7 @@ export async function ensureGoFastWithMeForAthlete(
   const seedBio = trimOrNull(options?.seedBioFromAthlete ?? undefined);
   const seedPhoto = trimOrNull(options?.seedPhotoFromAthlete ?? undefined);
 
-  return prisma.gofast_with_me.create({
+  const created = await prisma.gofast_with_me.create({
     data: {
       athleteId,
       gofastSlugSnapshot: slug,
@@ -120,6 +145,7 @@ export async function ensureGoFastWithMeForAthlete(
       updatedAt: new Date(),
     },
   });
+  return toGoFastWithMeRecord(created);
 }
 
 export async function getGoFastWithMeBySlug(slug: string) {
