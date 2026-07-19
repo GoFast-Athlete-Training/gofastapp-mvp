@@ -8,8 +8,8 @@ import {
 } from '@/lib/club-manager-resolve';
 
 /**
- * POST /api/me/club-leader-claim/attach
- * @deprecated Use POST /api/me/club-manager-resolve
+ * POST /api/me/club-manager-resolve
+ * Step 2 after athlete-link: attach pre-seeded manager grant (membership + role) to athlete.
  */
 export async function POST(request: Request) {
   const auth = await requireAthleteFromBearer(request);
@@ -23,20 +23,25 @@ export async function POST(request: Request) {
       grantId: body.grantId?.trim() || body.claimId?.trim(),
       inviteToken: body.inviteToken?.trim(),
     });
+
     return NextResponse.json({ success: true, ...result });
   } catch (err: unknown) {
     if (err instanceof AttachClubLeaderClaimError) {
       const legacy403 =
         err.code === 'NO_INVITE_FOR_EMAIL' || err.code === 'NO_SEEDED_LEADER_FOR_EMAIL';
       return NextResponse.json(
-        { success: false, code: err.code, error: err.message, ...err.details },
+        {
+          success: false,
+          code: err.code,
+          error: err.message,
+          ...err.details,
+        },
         { status: legacy403 || err.code === 'EMAIL_MISMATCH' ? 403 : 400 }
       );
     }
-    console.error('[POST /api/me/club-leader-claim/attach]', err);
-    return NextResponse.json(
-      { success: false, error: 'Failed to attach club owner access' },
-      { status: 500 }
-    );
+    const message = err instanceof Error ? err.message : 'Failed to activate manager access';
+    const status = message.includes('required') ? 400 : 500;
+    console.error('[POST /api/me/club-manager-resolve]', err);
+    return NextResponse.json({ success: false, error: message }, { status });
   }
 }

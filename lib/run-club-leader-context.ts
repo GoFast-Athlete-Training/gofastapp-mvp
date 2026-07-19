@@ -7,7 +7,7 @@ export type LeaderContextClub = {
   logoUrl: string | null;
   city: string | null;
   state: string | null;
-  role: 'owner' | 'admin';
+  role: 'manager' | 'admin';
 };
 
 export type LeaderContext = {
@@ -36,7 +36,7 @@ export async function buildLeaderContext(
     logoUrl: m.run_clubs.logoUrl,
     city: m.run_clubs.city,
     state: m.run_clubs.state,
-    role: m.role as 'owner' | 'admin',
+    role: m.role as 'manager' | 'admin',
   }));
 
   return { isClubLeader: true, clubs };

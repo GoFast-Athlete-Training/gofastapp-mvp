@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
-import { isRunClubLeaderRole, RUN_CLUB_LEADER_ROLES } from '@/lib/run-club-leader-scope';
+import { isClubManagerWriteRole } from '@/lib/run-club-leader-scope';
 
 export type RunClubLeaderAuthSuccess = {
   athlete: { id: string; firebaseId: string; role?: string | null };
@@ -22,7 +22,7 @@ export type RunClubLeaderAuthFailure = {
 };
 
 /**
- * Resolve club by slug or id and verify the signed-in athlete is owner/admin.
+ * Resolve club by slug or id and verify the signed-in athlete is a club manager/admin.
  */
 export async function requireRunClubLeader(
   request: Request,
@@ -64,8 +64,8 @@ export async function requireRunClubLeader(
     select: { id: true, role: true, status: true },
   });
 
-  if (!membership || membership.status !== 'active' || !isRunClubLeaderRole(membership.role)) {
-    return { error: 'Forbidden — club owner or admin required', status: 403 };
+  if (!membership || membership.status !== 'active' || !isClubManagerWriteRole(membership.role)) {
+    return { error: 'Forbidden — club manager access required', status: 403 };
   }
 
   return {
@@ -86,11 +86,11 @@ export async function requireRunClubLeaderForClubId(
 }
 
 export async function listLeaderMemberships(athleteId: string) {
-  return prisma.run_club_memberships.findMany({
+  const rows = await prisma.run_club_memberships.findMany({
     where: {
       athleteId,
       status: 'active',
-      role: { in: [...RUN_CLUB_LEADER_ROLES] },
+      role: { in: ['manager', 'admin', 'owner'] },
     },
     include: {
       run_clubs: {
@@ -106,6 +106,7 @@ export async function listLeaderMemberships(athleteId: string) {
     },
     orderBy: { joinedAt: 'desc' },
   });
+  return rows.filter((m) => isClubManagerWriteRole(m.role));
 }
 
 export function leaderAuthFailureResponse(failure: RunClubLeaderAuthFailure) {

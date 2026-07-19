@@ -7,8 +7,8 @@ import {
 } from '@/lib/club-manager-invite-resolve';
 
 /**
- * GET /api/clubowner/invite/resolve?token=
- * @deprecated Use /api/club-manager/invite/resolve
+ * GET /api/club-manager/invite/resolve?token=
+ * Public pre-auth: load complete invite grant (email + club + role) before athlete-link.
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -19,7 +19,12 @@ export async function GET(request: NextRequest) {
 
   try {
     const invite = await resolveClubManagerInviteToken(token);
-    return NextResponse.json({ success: true, invite, claim: invite });
+    return NextResponse.json({
+      success: true,
+      invite,
+      /** @deprecated Use invite */
+      claim: invite,
+    });
   } catch (err: unknown) {
     if (err instanceof AttachClubLeaderClaimError) {
       return NextResponse.json(
@@ -27,7 +32,7 @@ export async function GET(request: NextRequest) {
         { status: err.code === 'INVITE_INVALID' || err.code === 'INVITE_EXPIRED' ? 404 : 400 }
       );
     }
-    console.error('[GET /api/clubowner/invite/resolve]', err);
+    console.error('[GET /api/club-manager/invite/resolve]', err);
     return NextResponse.json({ success: false, error: 'Failed to resolve invite' }, { status: 500 });
   }
 }

@@ -21,7 +21,7 @@ type InviteBody = {
 
 /**
  * POST /api/internal/run-club-leader-claims/invite
- * Company → Product: create or refresh a manager invite claim with token.
+ * Company → Product: seed complete manager grant (email + club + role) and issue invite token.
  */
 export async function POST(request: NextRequest) {
   const authError = await assertStaffBearerAuth(request);

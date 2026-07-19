@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { isRunClubLeaderRole, pickLeaderFields } from './run-club-leader-scope';
+import { isClubManagerWriteRole, pickLeaderFields } from './run-club-leader-scope';
 
 describe('run-club-leader-scope', () => {
-  it('recognizes owner and admin as leader roles', () => {
-    expect(isRunClubLeaderRole('owner')).toBe(true);
-    expect(isRunClubLeaderRole('admin')).toBe(true);
-    expect(isRunClubLeaderRole('member')).toBe(false);
-    expect(isRunClubLeaderRole(null)).toBe(false);
+  it('recognizes manager, admin, and legacy owner as write roles', () => {
+    expect(isClubManagerWriteRole('manager')).toBe(true);
+    expect(isClubManagerWriteRole('admin')).toBe(true);
+    expect(isClubManagerWriteRole('owner')).toBe(true);
+    expect(isClubManagerWriteRole('member')).toBe(false);
+    expect(isClubManagerWriteRole(null)).toBe(false);
   });
 
   it('pickLeaderFields strips staff-only keys', () => {

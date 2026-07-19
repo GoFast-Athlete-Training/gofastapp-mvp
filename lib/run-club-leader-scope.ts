@@ -1,14 +1,28 @@
 /**
- * Run club leader write scope — club owners/admins (athletes) vs internal staff.
+ * Run club manager write scope — club managers/admins (athletes) vs internal staff.
  *
- * Authorization source: `run_club_memberships.role` in `owner` | `admin`.
+ * Authorization source: `run_club_memberships.role` in manager | admin (legacy owner | admin).
  * `Athlete.role = CLUB_LEADER` is onboarding/nav only; it does not grant writes.
  */
 
-export const RUN_CLUB_LEADER_ROLES = ['owner', 'admin'] as const;
-export type RunClubLeaderRole = (typeof RUN_CLUB_LEADER_ROLES)[number];
+import {
+  CLUB_MANAGER_WRITE_ROLES,
+  isClubManagerAdminRole,
+  isClubManagerWriteRole,
+  type ClubManagerWriteRole,
+} from '@/lib/club-manager-membership-roles';
 
-/** Fields club leaders may update on `run_clubs`. */
+export const RUN_CLUB_LEADER_ROLES = CLUB_MANAGER_WRITE_ROLES;
+export type RunClubLeaderRole = ClubManagerWriteRole;
+
+export { isClubManagerAdminRole, isClubManagerWriteRole };
+
+/** @deprecated Use isClubManagerWriteRole */
+export function isRunClubLeaderRole(role: string | null | undefined): role is RunClubLeaderRole {
+  return isClubManagerWriteRole(role);
+}
+
+/** Fields club managers may update on `run_clubs`. */
 export const LEADER_RUN_CLUB_UPDATABLE_FIELDS = [
   'description',
   'allRunsDescription',
@@ -18,7 +32,7 @@ export const LEADER_RUN_CLUB_UPDATABLE_FIELDS = [
   'logoUrl',
 ] as const;
 
-/** Staff-only / acquisition fields — never writable by club leaders. */
+/** Staff-only / acquisition fields — never writable by club managers. */
 export const STAFF_ONLY_RUN_CLUB_FIELDS = [
   'slug',
   'name',
@@ -33,7 +47,7 @@ export const STAFF_ONLY_RUN_CLUB_FIELDS = [
   'syncedAt',
 ] as const;
 
-/** Fields leaders may update on `run_series`. */
+/** Fields managers may update on `run_series`. */
 export const LEADER_RUN_SERIES_UPDATABLE_FIELDS = [
   'name',
   'description',
@@ -60,7 +74,7 @@ export const LEADER_RUN_SERIES_UPDATABLE_FIELDS = [
   'endDate',
 ] as const;
 
-/** Fields leaders may update on `city_runs`. */
+/** Fields managers may update on `city_runs`. */
 export const LEADER_CITY_RUN_UPDATABLE_FIELDS = [
   'title',
   'date',
@@ -109,7 +123,7 @@ export const STAFF_ONLY_CITY_RUN_FIELDS = [
   'igPostGraphic',
 ] as const;
 
-/** Workflow statuses leaders may set (submit for staff review; never APPROVED). */
+/** Workflow statuses managers may set (submit for staff review; never APPROVED). */
 export const LEADER_ALLOWED_WORKFLOW_STATUSES = ['DEVELOP', 'PENDING', 'SUBMITTED'] as const;
 
 export function pickLeaderFields<T extends Record<string, unknown>>(
@@ -123,8 +137,4 @@ export function pickLeaderFields<T extends Record<string, unknown>>(
     }
   }
   return out;
-}
-
-export function isRunClubLeaderRole(role: string | null | undefined): role is RunClubLeaderRole {
-  return role === 'owner' || role === 'admin';
 }

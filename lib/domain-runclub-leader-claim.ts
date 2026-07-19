@@ -1,6 +1,9 @@
 import { prisma } from '@/lib/prisma';
 import { listLeaderMemberships } from '@/lib/run-club-leader-auth';
 import type { RunClubLeaderRole } from '@/lib/run-club-leader-scope';
+import {
+  canonicalClubManagerRoleForStorage,
+} from '@/lib/club-manager-membership-roles';
 import { mapAcqRoleToMembershipRole, normalizeLeaderEmail } from '@/lib/run-club-leader-role-map';
 import {
   buildClubManagerActivateUrl,
@@ -36,13 +39,21 @@ export type ClubOwnerResolveState =
 
 export type AttachClaimErrorCode =
   | 'CLUB_NOT_FOUND'
-  | 'NO_SEEDED_LEADER_FOR_EMAIL'
-  | 'CLAIM_NOT_FOUND'
-  | 'CLAIM_ALREADY_USED'
-  | 'CLAIM_REVOKED'
+  | 'NO_INVITE_FOR_EMAIL'
+  | 'INVITE_NOT_FOUND'
+  | 'INVITE_ALREADY_USED'
+  | 'INVITE_REVOKED'
   | 'EMAIL_MISMATCH'
   | 'INVITE_EXPIRED'
-  | 'INVITE_INVALID';
+  | 'INVITE_INVALID'
+  /** @deprecated Use NO_INVITE_FOR_EMAIL */
+  | 'NO_SEEDED_LEADER_FOR_EMAIL'
+  /** @deprecated Use INVITE_NOT_FOUND */
+  | 'CLAIM_NOT_FOUND'
+  /** @deprecated Use INVITE_ALREADY_USED */
+  | 'CLAIM_ALREADY_USED'
+  /** @deprecated Use INVITE_REVOKED */
+  | 'CLAIM_REVOKED';
 
 export class AttachClubLeaderClaimError extends Error {
   code: AttachClaimErrorCode;
@@ -102,7 +113,7 @@ export async function syncLeaderClaim(input: {
     throw new Error(`Run club not found: ${input.runClubId}`);
   }
 
-  const role = input.membershipRole ?? 'admin';
+  const role = canonicalClubManagerRoleForStorage(input.membershipRole, 'manager');
 
   const existing = await prisma.run_club_leader_claims.findUnique({
     where: {
@@ -182,7 +193,8 @@ export type ManagerInviteClaimResult = {
 };
 
 /**
- * Create or refresh a manager invite claim with a secure token.
+ * Create or refresh a manager invite grant with a secure token.
+ * Grant is complete before token: email + club + role.
  * Returns the plain token once — only the hash is stored.
  */
 export async function createOrRefreshManagerInviteClaim(input: {
@@ -194,10 +206,15 @@ export async function createOrRefreshManagerInviteClaim(input: {
   managerAssignmentId?: string | null;
   source?: string;
 }): Promise<ManagerInviteClaimResult> {
+  const normalizedEmail = normalizeLeaderEmail(input.email);
+  if (!normalizedEmail) {
+    throw new Error('Invited email is required');
+  }
+
   const row = await syncLeaderClaim({
     runClubId: input.runClubId,
     email: input.email,
-    membershipRole: input.membershipRole,
+    membershipRole: canonicalClubManagerRoleForStorage(input.membershipRole, 'manager'),
     acqRunClubId: input.acqRunClubId,
     acqClubLeaderId: input.acqClubLeaderId,
     managerAssignmentId: input.managerAssignmentId,
@@ -254,13 +271,13 @@ export async function resolveInviteByToken(token: string): Promise<ResolvedInvit
   }
 
   if (row.status === 'revoked') {
-    throw new AttachClubLeaderClaimError('CLAIM_REVOKED', 'This manager invite was revoked', {
+    throw new AttachClubLeaderClaimError('INVITE_REVOKED', 'This manager invite was revoked', {
       clubName: row.run_clubs.name,
     });
   }
 
   if (row.status === 'claimed') {
-    throw new AttachClubLeaderClaimError('CLAIM_ALREADY_USED', 'This manager invite was already claimed', {
+    throw new AttachClubLeaderClaimError('INVITE_ALREADY_USED', 'This manager invite was already used', {
       clubName: row.run_clubs.name,
     });
   }
@@ -333,7 +350,7 @@ export async function attachClubLeaderClaim(athleteId: string, athleteEmail: str
   if (!normalizedEmail) {
     throw new AttachClubLeaderClaimError(
       'EMAIL_MISMATCH',
-      'A verified email is required to claim club-owner access'
+      'A verified email is required to activate manager access'
     );
   }
 
@@ -343,11 +360,11 @@ export async function attachClubLeaderClaim(athleteId: string, athleteEmail: str
   });
 
   if (!claim) {
-    throw new AttachClubLeaderClaimError('CLAIM_NOT_FOUND', 'Club-owner setup not found');
+    throw new AttachClubLeaderClaimError('INVITE_NOT_FOUND', 'Manager invite not found');
   }
 
   if (claim.status === 'revoked') {
-    throw new AttachClubLeaderClaimError('CLAIM_REVOKED', 'This club-owner setup was revoked', {
+    throw new AttachClubLeaderClaimError('INVITE_REVOKED', 'This manager invite was revoked', {
       clubName: claim.run_clubs.name,
     });
   }
@@ -356,7 +373,7 @@ export async function attachClubLeaderClaim(athleteId: string, athleteEmail: str
     if (claim.claimedByAthleteId === athleteId) {
       return getAttachResult(athleteId, claim.runClubId);
     }
-    throw new AttachClubLeaderClaimError('CLAIM_ALREADY_USED', 'This club-owner setup was already claimed', {
+    throw new AttachClubLeaderClaimError('INVITE_ALREADY_USED', 'This manager invite was already used', {
       clubName: claim.run_clubs.name,
     });
   }
@@ -367,13 +384,13 @@ export async function attachClubLeaderClaim(athleteId: string, athleteEmail: str
 
   if (claim.email !== normalizedEmail) {
     throw new AttachClubLeaderClaimError(
-      'NO_SEEDED_LEADER_FOR_EMAIL',
-      'We could not find a club-owner setup for this email',
+      'NO_INVITE_FOR_EMAIL',
+      'This invite is for a different email address',
       { athleteEmail: normalizedEmail }
     );
   }
 
-  const role = claim.membershipRole as RunClubLeaderRole;
+  const role = canonicalClubManagerRoleForStorage(claim.membershipRole, 'manager');
 
   await prisma.$transaction(async (tx) => {
     await tx.run_club_memberships.upsert({
@@ -435,8 +452,11 @@ async function getAttachResult(athleteId: string, runClubId: string) {
     runClubId: club.id,
     runClubSlug: club.slug,
     runClubName: club.name,
-    membershipRole: membership?.role ?? 'admin',
+    membershipRole: membership?.role ?? 'manager',
   };
 }
+
+/** @deprecated Use attachClubLeaderClaim — kept for legacy route aliases */
+export const resolveClubManagerInvite = attachClubLeaderClaimByInviteToken;
 
 export { mapAcqRoleToMembershipRole, normalizeLeaderEmail };

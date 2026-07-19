@@ -27,7 +27,7 @@ export default function WelcomeClubOwnerFallbackPage() {
     async (claimId: string, runClubSlug: string | null) => {
       setView({ kind: 'activating' });
       try {
-        const res = await api.post('/me/club-leader-claim/attach', { claimId });
+        const res = await api.post('/me/club-manager-resolve', { grantId: claimId });
         if (!res.data?.success) {
           throw new Error(res.data?.error ?? 'Activation failed');
         }
@@ -40,7 +40,7 @@ export default function WelcomeClubOwnerFallbackPage() {
         const message =
           (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
           'Could not activate manager access';
-        if (code === 'NO_SEEDED_LEADER_FOR_EMAIL') {
+        if (code === 'NO_INVITE_FOR_EMAIL' || code === 'NO_SEEDED_LEADER_FOR_EMAIL') {
           setView({ kind: 'unmatched', athleteEmail });
           return;
         }

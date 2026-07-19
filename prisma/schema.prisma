@@ -819,7 +819,7 @@ model run_club_memberships {
   id        String    @id @default(cuid())
   runClubId String
   athleteId String
-  role      String    @default("member") // member | admin | owner
+  role      String    @default("member") // member | manager | admin (legacy owner)
   status    String    @default("active") // active | left | blocked
   joinedAt  DateTime  @default(now())
   createdAt DateTime  @default(now())
@@ -838,7 +838,7 @@ model run_club_leader_claims {
   id                   String    @id @default(cuid())
   runClubId            String
   email                String
-  membershipRole       String    @default("admin") // admin | owner
+  membershipRole       String    @default("manager") // manager | admin
   status               String    @default("unclaimed") // unclaimed | claimed | revoked
   acqClubLeaderId      String?
   acqRunClubId         String?

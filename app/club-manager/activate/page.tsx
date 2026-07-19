@@ -8,6 +8,7 @@ import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import { clubManagerActivatePath, clubManagerClubPath, clubManagerHubPath } from '@/lib/club-manager-paths';
+import { formatClubManagerRoleLabel } from '@/lib/club-manager-membership-roles';
 
 type ActivationContext = {
   id: string;
@@ -39,11 +40,12 @@ function ClubManagerActivateContent() {
   const resolveActivation = useCallback(async (token: string) => {
     setView({ kind: 'loading' });
     try {
-      const res = await api.get(`/clubowner/invite/resolve?token=${encodeURIComponent(token)}`);
-      if (!res.data?.success || !res.data?.claim) {
+      const res = await api.get(`/club-manager/invite/resolve?token=${encodeURIComponent(token)}`);
+      const invite = (res.data?.invite ?? res.data?.claim) as ActivationContext | undefined;
+      if (!res.data?.success || !invite) {
         throw new Error(res.data?.error ?? 'Invalid activation link');
       }
-      const activation = res.data.claim as ActivationContext;
+      const activation = invite;
       setView({ kind: 'ready', activation });
       activationRef.current = activation;
     } catch (err: unknown) {
@@ -58,7 +60,7 @@ function ClubManagerActivateContent() {
     async (token: string) => {
       setView((v) => (v.kind === 'ready' ? { kind: 'activating' } : v));
       try {
-        const res = await api.post('/me/club-leader-claim/attach', { inviteToken: token });
+        const res = await api.post('/me/club-manager-resolve', { inviteToken: token });
         if (!res.data?.success) {
           throw new Error(res.data?.error ?? 'Could not activate manager access');
         }
@@ -71,7 +73,7 @@ function ClubManagerActivateContent() {
         const message =
           (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
           'Could not activate manager access';
-        if (code === 'NO_SEEDED_LEADER_FOR_EMAIL' || code === 'EMAIL_MISMATCH') {
+        if (code === 'NO_INVITE_FOR_EMAIL' || code === 'NO_SEEDED_LEADER_FOR_EMAIL' || code === 'EMAIL_MISMATCH') {
           setView((v) =>
             v.kind === 'ready' || v.kind === 'activating'
               ? {
@@ -192,7 +194,7 @@ function ClubManagerActivateContent() {
     );
   }
 
-  const roleLabel = view.activation.membershipRole === 'owner' ? 'Owner' : 'Club manager';
+  const roleLabel = formatClubManagerRoleLabel(view.activation.membershipRole);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center px-4">
