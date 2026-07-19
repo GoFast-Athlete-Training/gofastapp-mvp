@@ -138,7 +138,6 @@ export default function ProfilePage() {
   const firstName = String(athleteProfile.firstName ?? '');
   const lastName = String(athleteProfile.lastName ?? '');
   const photoURL = athleteProfile.photoURL as string | undefined;
-  const myBestRunPhotoURL = athleteProfile.myBestRunPhotoURL as string | undefined;
   const bio = athleteProfile.bio as string | undefined;
   const instagram = athleteProfile.instagram as string | undefined;
   const city = athleteProfile.city as string | undefined;
@@ -234,10 +233,10 @@ export default function ProfilePage() {
             </button>
             <button
               type="button"
-              onClick={() => router.push('/profile/gofast-page')}
+              onClick={() => router.push('/gofast-with-others')}
               className="border border-orange-200 text-orange-800 px-4 py-2 rounded-lg font-semibold text-sm hover:bg-orange-50"
             >
-              Build your Run With Me page
+              GoFast with Others
             </button>
             {liveGoFastUrl ? (
               <a
@@ -333,56 +332,30 @@ export default function ProfilePage() {
           </button>
         </section>
 
-        {/* Run With Me */}
-        <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-4">
-            <div className="flex-shrink-0">
-              <div className="w-full sm:w-40 aspect-[21/9] sm:aspect-[4/3] rounded-lg bg-gray-100 overflow-hidden border border-gray-100">
-                {myBestRunPhotoURL ? (
-                  <img src={myBestRunPhotoURL} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-xs text-gray-400 px-2 text-center">
-                    No hero race photo yet
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-lg font-bold text-gray-900">Run With Me</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                Your public storefront — share plans, runs, and community links from one hub.
-              </p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                {pill('Hero photo', !!myBestRunPhotoURL)}
-                {pill('Races & plan', !!(publicExtras?.trainingSummary || publicExtras?.primaryChasingGoal))}
-              </div>
-              <div className="flex flex-wrap gap-2 mt-4">
-                <button
-                  type="button"
-                  onClick={() => router.push('/profile/share')}
-                  className="text-sm font-semibold text-gray-900 hover:text-gray-700"
-                >
-                  Share with Community →
-                </button>
-                <button
-                  type="button"
-                  onClick={() => router.push('/profile/gofast-page')}
-                  className="text-sm font-semibold text-orange-600 hover:text-orange-700"
-                >
-                  Run With Me studio →
-                </button>
-                {liveGoFastUrl ? (
-                  <a
-                    href={liveGoFastUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm font-semibold text-gray-600 hover:text-gray-800"
-                  >
-                    View live page →
-                  </a>
-                ) : null}
-              </div>
-            </div>
+        <section className="rounded-2xl border border-orange-100 bg-orange-50/40 p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-gray-900">GoFast with Others</h2>
+          <p className="text-sm text-gray-600 mt-1 max-w-xl">
+            Your in-app profile is who you are. GoFastWithMe is how others find and join you — landing
+            copy, community, runs, and plans.
+          </p>
+          <div className="flex flex-wrap gap-2 mt-4">
+            <button
+              type="button"
+              onClick={() => router.push('/gofast-with-others')}
+              className="text-sm font-semibold text-orange-600 hover:text-orange-700"
+            >
+              Manage GoFastWithMe →
+            </button>
+            {liveGoFastUrl ? (
+              <a
+                href={liveGoFastUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-semibold text-gray-600 hover:text-gray-800"
+              >
+                View public page →
+              </a>
+            ) : null}
           </div>
         </section>
 
@@ -454,7 +427,7 @@ export default function ProfilePage() {
         {/* Account (private) */}
         <section className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 p-6">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-3">Account</h2>
-          <p className="text-xs text-gray-500 mb-3">Private account details — not shown on your public profile or Run With Me page.</p>
+          <p className="text-xs text-gray-500 mb-3">Private account details — not shown on your in-app profile or public GoFastWithMe page.</p>
           <dl className="text-sm divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
             {handle ? (
               <div className="flex justify-between gap-4 px-4 py-2.5">

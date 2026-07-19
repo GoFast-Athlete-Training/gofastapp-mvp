@@ -6,6 +6,8 @@ import {
 
 export { normalizeGoFastWithMeSlug, buildGoFastWithMeUrl };
 
+export type GoFastWithMeCreatorType = 'person' | 'coach';
+
 export type GoFastWithMeRecord = {
   id: string;
   athleteId: string;
@@ -17,6 +19,9 @@ export type GoFastWithMeRecord = {
   sportFocus: string | null;
   modelFocus: string | null;
   myAchievements: string | null;
+  gofastWithMePhotoUrl: string | null;
+  creatorType: GoFastWithMeCreatorType | null;
+  coachSpecialty: string | null;
 };
 
 export type GoFastWithMeIntroInput = {
@@ -26,12 +31,21 @@ export type GoFastWithMeIntroInput = {
   sportFocus?: string | null;
   modelFocus?: string | null;
   myAchievements?: string | null;
+  gofastWithMePhotoUrl?: string | null;
+  creatorType?: GoFastWithMeCreatorType | string | null;
+  coachSpecialty?: string | null;
 };
 
 function trimOrNull(value: string | null | undefined): string | null {
   if (value == null) return null;
   const trimmed = value.trim();
   return trimmed || null;
+}
+
+function normalizeCreatorType(value: string | null | undefined): GoFastWithMeCreatorType | null {
+  const v = trimOrNull(value);
+  if (v === 'person' || v === 'coach') return v;
+  return null;
 }
 
 export async function isGoFastWithMeSlugAvailable(
@@ -56,7 +70,7 @@ export async function isGoFastWithMeSlugAvailable(
 export async function ensureGoFastWithMeForAthlete(
   athleteId: string,
   gofastHandle: string,
-  options?: { seedBioFromAthlete?: string | null }
+  options?: { seedBioFromAthlete?: string | null; seedPhotoFromAthlete?: string | null }
 ): Promise<GoFastWithMeRecord> {
   const slug = normalizeGoFastWithMeSlug(gofastHandle);
   if (!slug) {
@@ -68,6 +82,13 @@ export async function ensureGoFastWithMeForAthlete(
   });
 
   if (existingByAthlete) {
+    const seedPhoto = trimOrNull(options?.seedPhotoFromAthlete ?? undefined);
+    if (!existingByAthlete.gofastWithMePhotoUrl && seedPhoto) {
+      return prisma.gofast_with_me.update({
+        where: { athleteId },
+        data: { gofastWithMePhotoUrl: seedPhoto, updatedAt: new Date() },
+      });
+    }
     if (existingByAthlete.slugUsesHandle && existingByAthlete.gofastSlugSnapshot !== slug) {
       const available = await isGoFastWithMeSlugAvailable(slug, athleteId);
       if (!available) {
@@ -87,6 +108,7 @@ export async function ensureGoFastWithMeForAthlete(
   }
 
   const seedBio = trimOrNull(options?.seedBioFromAthlete ?? undefined);
+  const seedPhoto = trimOrNull(options?.seedPhotoFromAthlete ?? undefined);
 
   return prisma.gofast_with_me.create({
     data: {
@@ -94,6 +116,7 @@ export async function ensureGoFastWithMeForAthlete(
       gofastSlugSnapshot: slug,
       slugUsesHandle: true,
       gofastWithMeBio: seedBio,
+      gofastWithMePhotoUrl: seedPhoto,
       updatedAt: new Date(),
     },
   });
@@ -135,6 +158,22 @@ export async function updateGoFastWithMeIntro(
   if (input.modelFocus !== undefined) data.modelFocus = trimOrNull(input.modelFocus);
   if (input.myAchievements !== undefined) {
     data.myAchievements = trimOrNull(input.myAchievements);
+  }
+  if (input.gofastWithMePhotoUrl !== undefined) {
+    data.gofastWithMePhotoUrl = trimOrNull(input.gofastWithMePhotoUrl);
+  }
+  if (input.creatorType !== undefined) {
+    const ct = normalizeCreatorType(input.creatorType);
+    if (input.creatorType != null && input.creatorType !== '' && !ct) {
+      throw new Error('creatorType must be "person" or "coach"');
+    }
+    data.creatorType = ct;
+    if (ct === 'person') {
+      data.coachSpecialty = null;
+    }
+  }
+  if (input.coachSpecialty !== undefined) {
+    data.coachSpecialty = trimOrNull(input.coachSpecialty);
   }
 
   return prisma.gofast_with_me.update({

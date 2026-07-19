@@ -1,4 +1,5 @@
 import type { ServedCampaignCreative } from "@/lib/advertising-inventory-types";
+import type { AthleteAdvertisingEarnings } from "@/lib/advertising/company-platform-client";
 
 function resolveAdvertiserAppUrl(): string | null {
   return (
@@ -45,22 +46,13 @@ export async function fetchServedCampaignForSurface(input: {
   }
 }
 
-export type SurfaceOwnerEarnings = {
-  ownerAthleteId: string;
-  revenueSharePercent: number;
-  totalQualifiedImpressions: number;
-  totalEstimatedEarningsCents: number;
-  daily: Array<{
-    date: string;
-    qualifiedImpressions: number;
-    estimatedEarningsCents: number;
-  }>;
-};
+/** @deprecated Prefer Company spend-based earnings via company-platform-client */
+export type SurfaceOwnerEarnings = AthleteAdvertisingEarnings;
 
 export async function fetchSurfaceOwnerEarnings(
   ownerAthleteId: string,
   days = 30
-): Promise<SurfaceOwnerEarnings | null> {
+): Promise<AthleteAdvertisingEarnings | null> {
   const base = resolveAdvertiserAppUrl();
   if (!base) return null;
 
@@ -72,9 +64,32 @@ export async function fetchSurfaceOwnerEarnings(
     if (!response.ok) return null;
     const payload = (await response.json()) as {
       success?: boolean;
-      earnings?: SurfaceOwnerEarnings;
+      earnings?: {
+        ownerAthleteId: string;
+        revenueSharePercent: number;
+        totalQualifiedImpressions: number;
+        totalEstimatedEarningsCents: number;
+        daily: Array<{
+          date: string;
+          qualifiedImpressions: number;
+          estimatedEarningsCents: number;
+        }>;
+      };
     };
-    return payload.earnings ?? null;
+    const earnings = payload.earnings;
+    if (!earnings) return null;
+
+    return {
+      source: "impressions",
+      revenueSharePercent: earnings.revenueSharePercent,
+      totalEstimatedEarningsCents: earnings.totalEstimatedEarningsCents,
+      totalQualifiedImpressions: earnings.totalQualifiedImpressions,
+      daily: earnings.daily.map((point) => ({
+        date: point.date,
+        estimatedEarningsCents: point.estimatedEarningsCents,
+        qualifiedImpressions: point.qualifiedImpressions,
+      })),
+    };
   } catch (error) {
     console.warn("[advertiser-platform-client] earnings failed", error);
     return null;

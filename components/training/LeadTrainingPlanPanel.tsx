@@ -94,7 +94,7 @@ export default function LeadTrainingPlanPanel({ planId, hasSchedule }: Props) {
             <>
               <p className="text-sm text-gray-700 mt-1">
                 {published.length} shared plan{published.length !== 1 ? "s" : ""} — preview links
-                are live on your Run With Me page.
+                are live on your GoFastWithMe page.
               </p>
               <ul className="mt-3 space-y-2">
                 {published.slice(0, 3).map((p) => (

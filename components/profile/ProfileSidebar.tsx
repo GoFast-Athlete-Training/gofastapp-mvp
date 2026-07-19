@@ -1,12 +1,11 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { User, Gauge, MapPin, Users, Pencil, Sparkles, Share2 } from "lucide-react";
+import { User, Gauge, MapPin, Users, Pencil, Share2 } from "lucide-react";
 
 const items: { label: string; href: string; icon: typeof User }[] = [
   { label: "Overview", href: "/profile", icon: User },
   { label: "Share with Community", href: "/profile/share", icon: Share2 },
-  { label: "GoFast With Me", href: "/profile/gofast-page", icon: Sparkles },
   { label: "Training & pace", href: "/profile/training", icon: Gauge },
   { label: "Findability", href: "/profile/discoverability", icon: MapPin },
   { label: "Community", href: "/profile/community", icon: Users },

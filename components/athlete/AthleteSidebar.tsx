@@ -3,7 +3,7 @@
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Activity, Heart, LayoutDashboard, MapPin, Trophy } from "lucide-react";
+import { Activity, Heart, LayoutDashboard, MapPin, Sparkles, Trophy } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 type NavItem = {
@@ -38,6 +38,10 @@ function gorunMatch(p: string | null): boolean {
   return !!p && (p === "/gorun" || p.startsWith("/gorun/") || p === "/host-a-run");
 }
 
+function goFastWithOthersMatch(p: string | null): boolean {
+  return !!p && (p === "/gofast-with-others" || p.startsWith("/gofast-with-others/"));
+}
+
 const navItems: NavItem[] = [
   {
     label: "Train",
@@ -58,6 +62,12 @@ const navItems: NavItem[] = [
     match: (path) =>
       !!path &&
       (path === "/races" || path.startsWith("/races/") || path.startsWith("/myrace/")),
+  },
+  {
+    label: "GoFast with Others",
+    href: "/gofast-with-others",
+    icon: Sparkles,
+    match: goFastWithOthersMatch,
   },
   {
     label: "Health",

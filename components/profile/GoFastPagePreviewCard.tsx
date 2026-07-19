@@ -15,6 +15,11 @@ import {
 } from "lucide-react";
 import { getGoFastAppPublicUrl } from "@/lib/gofast-app-public-url";
 import { formatCohortStartLabel } from "@/lib/training/cohort-display";
+import {
+  goFastWithPersonHeadline,
+  publicHeroPhotoUrl,
+  type PublicAction,
+} from "@/lib/gofast-with-me/resolve-public-actions";
 
 export type GoFastPageAthlete = {
   gofastHandle: string | null;
@@ -127,8 +132,12 @@ export type GoFastPagePayload = {
     sportFocus?: string | null;
     modelFocus?: string | null;
     myAchievements?: string | null;
+    gofastWithMePhotoUrl?: string | null;
+    creatorType?: string | null;
+    coachSpecialty?: string | null;
     gofastSlugSnapshot?: string;
   } | null;
+  publicActions?: PublicAction[];
   nextRace?: {
     source: 'plan' | 'goal' | 'signup';
     name: string;
@@ -186,7 +195,7 @@ export default function GoFastPagePreviewCard({
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center px-4 text-zinc-100">
         <User className="w-12 h-12 text-zinc-600 mb-3" />
-        <p className="text-zinc-400 text-center">This Run With Me page is not available.</p>
+        <p className="text-zinc-400 text-center">This GoFastWithMe page is not available.</p>
         <Link
           href="/"
           className="mt-4 text-amber-400 hover:text-amber-300 text-sm font-medium"
@@ -207,8 +216,13 @@ export default function GoFastPagePreviewCard({
       : athlete.city || athlete.state || null;
 
   const signupUrl = `${appBase.replace(/\/$/, "")}/signup`;
-  const heroSrc =
-    athlete.myBestRunPhotoURL?.trim() || athlete.photoURL?.trim() || null;
+  const heroSrc = publicHeroPhotoUrl(
+    data.gofastWithMe?.gofastWithMePhotoUrl,
+    athlete.myBestRunPhotoURL,
+    athlete.photoURL
+  );
+  const headline = goFastWithPersonHeadline(athlete.firstName, displayName);
+  const actions = data.publicActions ?? [];
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-20">
@@ -248,7 +262,7 @@ export default function GoFastPagePreviewCard({
         <div className="relative z-10 max-w-3xl mx-auto px-5 pb-10 pt-20 w-full">
           <div className="flex items-center gap-2 text-amber-400/90 text-xs font-semibold uppercase tracking-[0.2em] mb-3">
             <Sparkles className="w-3.5 h-3.5" aria-hidden />
-            Run With Me
+            {headline}
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-white drop-shadow-lg">
             {displayName}
@@ -275,13 +289,18 @@ export default function GoFastPagePreviewCard({
           ) : null}
 
           <div className="mt-8 flex flex-wrap gap-3">
-            <a
-              href={signupUrl}
-              className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-amber-500/25 hover:bg-amber-400 transition-colors"
-            >
-              {data.isGoFastContainer ? "Join community & train" : "Run with them"}
-              <ChevronRight className="w-4 h-4" />
-            </a>
+            {actions.length > 0 ? (
+              actions.map((action) => (
+                <a
+                  key={`${action.label}-${action.href}`}
+                  href={action.href}
+                  className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-amber-500/25 hover:bg-amber-400 transition-colors"
+                >
+                  {action.label}
+                  <ChevronRight className="w-4 h-4" />
+                </a>
+              ))
+            ) : null}
           </div>
         </div>
       </section>
@@ -292,8 +311,15 @@ export default function GoFastPagePreviewCard({
           data.gofastWithMe?.whatYoullSeeHere?.trim() ||
           data.gofastWithMe?.sportFocus?.trim() ||
           data.gofastWithMe?.modelFocus?.trim() ||
-          data.gofastWithMe?.myAchievements?.trim()) ? (
+          data.gofastWithMe?.myAchievements?.trim() ||
+          data.gofastWithMe?.coachSpecialty?.trim()) ? (
           <section className="rounded-2xl border border-amber-500/30 bg-zinc-900/85 p-5 space-y-4">
+            {data.gofastWithMe?.creatorType === "coach" &&
+            data.gofastWithMe?.coachSpecialty?.trim() ? (
+              <p className="text-xs font-semibold uppercase tracking-wide text-violet-300">
+                Coaching · {data.gofastWithMe.coachSpecialty.trim()}
+              </p>
+            ) : null}
             {data.gofastWithMe?.welcome?.trim() ? (
               <div>
                 <div className="text-amber-400/90 text-xs font-semibold uppercase tracking-wide mb-2">

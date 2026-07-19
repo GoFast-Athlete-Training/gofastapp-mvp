@@ -5,6 +5,8 @@ type GoFastWithMeFields = {
   sportFocus?: string | null;
   modelFocus?: string | null;
   myAchievements?: string | null;
+  creatorType?: string | null;
+  coachSpecialty?: string | null;
 };
 
 type Props = {
@@ -20,7 +22,8 @@ function hasContent(fields: GoFastWithMeFields | null | undefined): boolean {
       fields.whatYoullSeeHere?.trim() ||
       fields.sportFocus?.trim() ||
       fields.modelFocus?.trim() ||
-      fields.myAchievements?.trim()
+      fields.myAchievements?.trim() ||
+      fields.coachSpecialty?.trim()
   );
 }
 
@@ -37,6 +40,12 @@ export default function GoFastWithMeIntro({
 
   return (
     <section className="rounded-2xl border border-stone-200 bg-white px-5 py-5 shadow-sm space-y-4">
+      {gofastWithMe?.creatorType === 'coach' && gofastWithMe?.coachSpecialty?.trim() ? (
+        <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">
+          Coaching · {gofastWithMe.coachSpecialty.trim()}
+        </p>
+      ) : null}
+
       {gofastWithMe?.welcome?.trim() ? (
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-orange-700 mb-2">

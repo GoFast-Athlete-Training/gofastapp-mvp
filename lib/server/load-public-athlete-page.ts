@@ -6,6 +6,7 @@ import {
   getGoFastWithMeBySlug,
   normalizeGoFastWithMeSlug,
 } from '@/lib/gofast-with-me/gofast-with-me-service';
+import { resolvePublicActions } from '@/lib/gofast-with-me/resolve-public-actions';
 
 const METERS_PER_MILE = 1609.344;
 
@@ -43,6 +44,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
     if (!legacyAthlete?.gofastHandle?.trim()) return null;
     await ensureGoFastWithMeForAthlete(legacyAthlete.id, legacyAthlete.gofastHandle, {
       seedBioFromAthlete: legacyAthlete.bio,
+      seedPhotoFromAthlete: legacyAthlete.myBestRunPhotoURL,
     });
     gwmRow = await getGoFastWithMeBySlug(handle);
     if (!gwmRow) return null;
@@ -59,6 +61,12 @@ export async function loadPublicAthletePage(rawHandle: string) {
     sportFocus: gwmRow.sportFocus,
     modelFocus: gwmRow.modelFocus,
     myAchievements: gwmRow.myAchievements,
+    gofastWithMePhotoUrl:
+      gwmRow.gofastWithMePhotoUrl?.trim() ||
+      athlete.myBestRunPhotoURL?.trim() ||
+      null,
+    creatorType: gwmRow.creatorType,
+    coachSpecialty: gwmRow.coachSpecialty,
   };
 
   const now = new Date();
@@ -426,6 +434,14 @@ export async function loadPublicAthletePage(rawHandle: string) {
     publishedPlans,
     gofastWithMe,
     nextRace,
+    publicActions: resolvePublicActions({
+      isGoFastContainer: athlete.isGoFastContainer,
+      gofastHandle: athlete.gofastHandle,
+      hostFirstName: athlete.firstName,
+      upcomingRuns,
+      publishedPlans,
+      joinableGroupTraining,
+    }),
     athlete: {
       id: athlete.id,
       gofastHandle: athlete.gofastHandle,

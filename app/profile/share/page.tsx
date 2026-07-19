@@ -98,9 +98,9 @@ export default function ShareWithCommunityPage() {
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Share with the Community</h1>
           <p className="text-sm text-gray-600 mt-2 max-w-2xl leading-relaxed">
-            Choose what to make public — your profile storefront, training plan, hosted runs, or a
-            RunCrew. Each action is separate; your Run With Me page brings the live pieces together
-            for visitors.
+            Choose what to make public — your GoFastWithMe landing, training plan, hosted runs, or a
+            RunCrew. Each action is separate; GoFastWithMe brings the live pieces together for
+            visitors.
           </p>
         </div>
         {publicPageUrl ? (
@@ -116,16 +116,16 @@ export default function ShareWithCommunityPage() {
       </div>
 
       <section className="rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-5">
-        <h2 className="text-sm font-semibold text-gray-900">Your public storefront</h2>
+        <h2 className="text-sm font-semibold text-gray-900">GoFastWithMe</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Run With Me is where visitors see your profile, published plans, upcoming runs, group
-          training, and community links — after you turn each piece on below.
+          Where visitors see your landing copy, published plans, upcoming runs, group training, and
+          community links — after you turn each piece on below.
         </p>
         <Link
-          href="/profile/gofast-page"
+          href="/gofast-with-others"
           className="mt-3 inline-flex text-sm font-semibold text-orange-700 hover:text-orange-800"
         >
-          Open Run With Me studio →
+          Open GoFast with Others →
         </Link>
       </section>
 

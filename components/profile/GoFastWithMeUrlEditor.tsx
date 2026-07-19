@@ -50,9 +50,9 @@ export default function GoFastWithMeUrlEditor({
 
   return (
     <section className="rounded-xl border border-amber-100 bg-amber-50/60 p-4">
-      <h2 className="text-sm font-semibold text-gray-900">Your GoFast With Me link</h2>
+      <h2 className="text-sm font-semibold text-gray-900">Your public link</h2>
       <p className="text-sm text-gray-600 mt-1">
-        Use your GoFast handle by default, or set a custom GoFast With Me URL.
+        Use your GoFast handle by default, or set a custom GoFastWithMe URL.
       </p>
 
       <div className="mt-3 space-y-2">

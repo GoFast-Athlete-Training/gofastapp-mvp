@@ -1,4 +1,4 @@
-/** Public app URL for gorun / signup links on GoFast Page previews. */
+/** Public app URL for gorun / join links on GoFastWithMe previews. */
 export function getGoFastAppPublicUrl(): string {
   return (
     process.env.NEXT_PUBLIC_GOFAST_APP_URL?.replace(/\/$/, "") ||

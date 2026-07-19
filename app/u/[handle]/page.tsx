@@ -101,15 +101,17 @@ export default async function PublicAthletePage({
     <div className="min-h-screen bg-stone-50">
       <ProfileHero
         athleteId={data.athlete.id}
+        firstName={data.athlete.firstName}
         displayName={displayName}
         handle={data.athlete.gofastHandle}
         photoURL={data.athlete.photoURL}
-        myBestRunPhotoURL={data.athlete.myBestRunPhotoURL}
+        gofastWithMePhotoUrl={data.gofastWithMe?.gofastWithMePhotoUrl ?? null}
         city={data.athlete.city}
         state={data.athlete.state}
         primarySport={data.athlete.primarySport}
         fiveKPace={data.athlete.fiveKPace}
         weeklyMileage={data.athlete.weeklyMileage}
+        publicActions={data.publicActions}
       />
 
       <main className="max-w-2xl mx-auto px-5 sm:px-6 pt-8 pb-16 space-y-8">

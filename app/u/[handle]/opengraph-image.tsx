@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { loadPublicAthletePage } from '@/lib/server/load-public-athlete-page';
+import { publicHeroPhotoUrl } from '@/lib/gofast-with-me/resolve-public-actions';
 
 export const runtime = 'nodejs';
 export const contentType = 'image/png';
@@ -36,7 +37,13 @@ export default async function OgImage({
     data?.primaryChasingGoal?.name ??
     null;
   const upcomingCount = data?.upcomingRuns.length ?? 0;
-  const heroPhoto = data?.athlete.myBestRunPhotoURL ?? null;
+  const heroPhoto = data
+    ? publicHeroPhotoUrl(
+        data.gofastWithMe?.gofastWithMePhotoUrl,
+        data.athlete.myBestRunPhotoURL,
+        data.athlete.photoURL,
+      )
+    : null;
   const avatar = data?.athlete.photoURL ?? null;
 
   return new ImageResponse(

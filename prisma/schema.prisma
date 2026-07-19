@@ -185,6 +185,12 @@ model gofast_with_me {
   sportFocus         String?
   modelFocus         String?
   myAchievements     String?  @db.Text
+  /// Public landing hero / action image (not Athlete profile photo).
+  gofastWithMePhotoUrl String?
+  /// Hub creator framing: "person" or "coach" (not the separate Coach entity).
+  creatorType        String?
+  /// Coach positioning when creatorType = "coach".
+  coachSpecialty     String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   athlete            Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)

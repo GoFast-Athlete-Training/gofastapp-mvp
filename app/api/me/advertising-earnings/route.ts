@@ -3,11 +3,12 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebaseAdmin";
 import { fetchSurfaceOwnerEarnings } from "@/lib/advertising/advertiser-platform-client";
+import { fetchAthleteSpendEarningsFromCompany } from "@/lib/advertising/company-platform-client";
 import { prisma } from "@/lib/prisma";
 
 /**
  * GET /api/me/advertising-earnings
- * Money curve for the authenticated athlete's published profile container surface.
+ * Spend-based earnings from Company (primary); impression estimate from advertiser (fallback).
  */
 export async function GET(request: Request) {
   try {
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
       return NextResponse.json({
         success: true,
         eligible: false,
-        message: "Publish your GoFast profile container to appear in advertiser inventory.",
+        message: "Publish your GoFast profile container to earn from brand campaigns.",
         earnings: null,
       });
     }
@@ -38,11 +39,11 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const daysRaw = searchParams.get("days");
     const days = daysRaw ? Number.parseInt(daysRaw, 10) : 30;
+    const windowDays = Number.isFinite(days) ? days : 30;
 
-    const earnings = await fetchSurfaceOwnerEarnings(
-      athlete.id,
-      Number.isFinite(days) ? days : 30
-    );
+    const spendEarnings = await fetchAthleteSpendEarningsFromCompany(athlete.id, windowDays);
+    const earnings =
+      spendEarnings ?? (await fetchSurfaceOwnerEarnings(athlete.id, windowDays));
 
     return NextResponse.json({
       success: true,

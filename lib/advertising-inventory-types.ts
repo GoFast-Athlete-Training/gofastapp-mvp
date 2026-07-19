@@ -1,6 +1,6 @@
 /**
- * Approved-fields contract for public advertising inventory (prod export).
- * Mirror of gf-advertisingplatform/lib/inventory-types.ts — keep in sync.
+ * Shared advertising contract types (serve + destination stubs).
+ * Prod hydrates creative only — no live inventory export.
  */
 export type AdvertisingSurfaceType = "CLUB_PAGE" | "PROFILE_CONTAINER";
 

@@ -607,10 +607,10 @@ function AthleteEditProfileInner() {
           {activeTab === 'about-you' && (
             <div className="space-y-5">
               <p className="text-sm text-gray-600 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
-                These are your basic public profile fields — what runners see when they tap your face or handle
-                anywhere in GoFast. For your shareable Run With Me page (races, runs, training), use{' '}
-                <Link href="/profile/gofast-page" className="font-semibold text-orange-600 hover:text-orange-700">
-                  Run With Me setup
+                These are your in-app profile fields — who you are inside GoFast. For your public
+                GoFastWithMe landing (runs, plans, community), use{' '}
+                <Link href="/gofast-with-others" className="font-semibold text-orange-600 hover:text-orange-700">
+                  GoFast with Others
                 </Link>
                 .
               </p>
@@ -641,10 +641,10 @@ function AthleteEditProfileInner() {
 
               <div className="flex flex-wrap gap-2">
                 <Link
-                  href="/profile/gofast-page"
+                  href="/gofast-with-others"
                   className="inline-flex items-center px-4 py-2 rounded-lg border border-orange-200 text-sm font-semibold text-orange-800 hover:bg-orange-50"
                 >
-                  Build Run With Me page →
+                  Manage GoFastWithMe →
                 </Link>
                 {liveGoFastUrl ? (
                   <a

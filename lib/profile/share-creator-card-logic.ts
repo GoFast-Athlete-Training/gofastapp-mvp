@@ -60,7 +60,7 @@ function buildProfileCard(profile: ShareHubProfileStatus): ShareCreatorCardModel
     return {
       id: "profile",
       title: "Public profile",
-      description: "Set your handle and Run With Me page so runners can find you.",
+      description: "Set your handle, then manage GoFastWithMe so others can find and join you.",
       state: "setup",
       statusLine: "Handle not set yet",
       primaryLabel: "Set up profile",
@@ -87,12 +87,12 @@ function buildProfileCard(profile: ShareHubProfileStatus): ShareCreatorCardModel
 
   return {
     id: "profile",
-    title: "Public profile",
-    description: "Your Run With Me page is the public storefront for everything you share.",
+    title: "GoFastWithMe",
+    description: "How others find and join you — landing, runs, plans, and community.",
     state: "manage",
     statusLine,
-    primaryLabel: "Manage Run With Me",
-    primaryHref: "/profile/gofast-page",
+    primaryLabel: "GoFast with Others",
+    primaryHref: "/gofast-with-others",
     secondaryLabel: profile.publicPageUrl ? "View public page" : undefined,
     secondaryHref: profile.publicPageUrl ?? undefined,
   };
@@ -164,7 +164,7 @@ function buildRunCard(run: ShareHubRunStatus): ShareCreatorCardModel {
   return {
     id: "run",
     title: "Public run",
-    description: "Your hosted runs appear on your Run With Me page for others to join.",
+    description: "Your hosted runs appear on your GoFastWithMe page for others to join.",
     state: "manage",
     statusLine: `${run.upcomingHostedRuns} upcoming hosted run${run.upcomingHostedRuns === 1 ? "" : "s"}`,
     primaryLabel: "Host a public run",

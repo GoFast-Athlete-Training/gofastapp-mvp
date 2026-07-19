@@ -33,6 +33,7 @@ export async function GET(request: Request) {
     if (!gofastWithMe) {
       await ensureGoFastWithMeForAthlete(athlete.id, handle, {
         seedBioFromAthlete: athlete.bio,
+        seedPhotoFromAthlete: athlete.myBestRunPhotoURL,
       });
       gofastWithMe = await getGoFastWithMeForAthlete(athlete.id);
     }
@@ -60,6 +61,9 @@ const INTRO_FIELDS = [
   'sportFocus',
   'modelFocus',
   'myAchievements',
+  'gofastWithMePhotoUrl',
+  'creatorType',
+  'coachSpecialty',
 ] as const;
 
 /** PATCH /api/me/gofast-with-me — update intro fields and/or URL settings */
@@ -116,7 +120,7 @@ export async function PATCH(request: Request) {
         {
           success: false,
           error:
-            'Provide intro fields (welcome, gofastWithMeBio, whatYoullSeeHere, sportFocus, modelFocus, myAchievements), customSlug, or useGofastHandle',
+            'Provide intro fields (welcome, gofastWithMeBio, whatYoullSeeHere, sportFocus, modelFocus, myAchievements, gofastWithMePhotoUrl, creatorType, coachSpecialty), customSlug, or useGofastHandle',
         },
         { status: 400 }
       );

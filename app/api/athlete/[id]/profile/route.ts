@@ -269,6 +269,7 @@ export async function PUT(
       try {
         await ensureGoFastWithMeForAthlete(athleteId, String(data.gofastHandle), {
           seedBioFromAthlete: updated.bio,
+          seedPhotoFromAthlete: updated.myBestRunPhotoURL,
         });
       } catch (pageErr: unknown) {
         const msg = pageErr instanceof Error ? pageErr.message : 'GoFast With Me sync failed';

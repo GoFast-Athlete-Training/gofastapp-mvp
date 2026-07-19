@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { AdvertisingMoneyCurve } from "@/components/advertising/AdvertisingMoneyCurve";
-import type { SurfaceOwnerEarnings } from "@/lib/advertising/advertiser-platform-client";
+import type { AthleteAdvertisingEarnings } from "@/lib/advertising/company-platform-client";
 
 type AdvertisingEarningsPanelProps = {
   athleteId: string;
@@ -16,7 +16,7 @@ export function AdvertisingEarningsPanel({
 }: AdvertisingEarningsPanelProps) {
   const [loading, setLoading] = useState(true);
   const [eligible, setEligible] = useState(false);
-  const [earnings, setEarnings] = useState<SurfaceOwnerEarnings | null>(null);
+  const [earnings, setEarnings] = useState<AthleteAdvertisingEarnings | null>(null);
 
   useEffect(() => {
     if (!isGoFastContainer) {
@@ -62,16 +62,19 @@ export function AdvertisingEarningsPanel({
   if (!eligible || !earnings) {
     return (
       <section className="rounded-2xl border border-stone-200 bg-white p-5 text-sm text-stone-600">
-        Your profile container is live in advertiser inventory. Earnings will appear once brands
-        buy impressions on your page.
+        Your profile container is live for brand campaigns. Earnings will appear once brands
+        purchase campaigns targeting your page.
       </section>
     );
   }
 
   return (
     <AdvertisingMoneyCurve
+      source={earnings.source}
       revenueSharePercent={earnings.revenueSharePercent}
       totalQualifiedImpressions={earnings.totalQualifiedImpressions}
+      totalCampaignPurchases={earnings.totalCampaignPurchases}
+      totalAttributedSpendCents={earnings.totalAttributedSpendCents}
       totalEstimatedEarningsCents={earnings.totalEstimatedEarningsCents}
       daily={earnings.daily}
     />

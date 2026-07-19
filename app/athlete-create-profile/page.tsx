@@ -423,8 +423,8 @@ export default function AthleteCreateProfilePage() {
           />
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome to GoFast</h1>
           <p className="text-gray-600 text-sm">
-            Set up your athlete profile — handle, location, sport, and pace. Add bio and your public GoFast Page
-            later from Profile.
+            Set up your athlete profile — handle, location, sport, and pace. Add bio and your
+            GoFastWithMe landing later from GoFast with Others.
           </p>
         </div>
 

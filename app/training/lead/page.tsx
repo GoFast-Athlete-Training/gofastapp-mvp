@@ -159,7 +159,7 @@ export default function LeadTrainingPlanPage() {
           <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
             <h2 className="text-lg font-semibold text-emerald-900">Your plan is live</h2>
             <p className="mt-2 text-sm text-emerald-800">
-              Share the preview link from your Run With Me page or copy it below.
+              Share the preview link from GoFast with Others or copy it below.
             </p>
             <Link
               href={`/plans/${encodeURIComponent(publishedSlug)}`}
