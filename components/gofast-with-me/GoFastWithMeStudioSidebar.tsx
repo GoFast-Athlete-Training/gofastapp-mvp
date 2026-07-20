@@ -1,10 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { ExternalLink, Link2, Megaphone, PenLine, Route, Wallet } from "lucide-react";
+import { ExternalLink, Link2, PenLine, Settings, Users } from "lucide-react";
 import GoFastWithMeUrlEditor from "@/components/profile/GoFastWithMeUrlEditor";
+import {
+  STUDIO_SECTION_LABELS,
+  type StudioSection,
+} from "@/components/gofast-with-me/studio-sections";
 
 type Props = {
+  activeSection: StudioSection;
+  onSectionChange: (section: StudioSection) => void;
   liveUrl: string;
   appUrl: string;
   publicSlug: string;
@@ -17,6 +23,8 @@ type Props = {
 };
 
 export default function GoFastWithMeStudioSidebar({
+  activeSection,
+  onSectionChange,
   liveUrl,
   appUrl,
   publicSlug,
@@ -27,6 +35,8 @@ export default function GoFastWithMeStudioSidebar({
   onCopyAppUrl,
   onUrlUpdated,
 }: Props) {
+  const memberHubPath = `/container/${encodeURIComponent(publicSlug)}`;
+
   return (
     <aside className="w-full shrink-0 space-y-3 lg:w-72">
       <nav className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm space-y-1">
@@ -34,31 +44,23 @@ export default function GoFastWithMeStudioSidebar({
           Studio
         </p>
 
-        <div className="flex items-center gap-2 rounded-lg bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-900">
-          <PenLine className="h-4 w-4 shrink-0" />
-          Landing / identity
-        </div>
-
-        <SidebarRow
-          icon={<Link2 className="h-4 w-4" />}
-          title="Publish"
-          subtitle={isPublishReady ? "Ready to share" : "Add welcome + bio to publish"}
-          href={liveUrl}
-          external
+        <NavButton
+          active={activeSection === "setup"}
+          icon={<Settings className="h-4 w-4" />}
+          label={STUDIO_SECTION_LABELS.setup}
+          onClick={() => onSectionChange("setup")}
         />
-
-        <SidebarRow
-          icon={<Wallet className="h-4 w-4" />}
-          title="Earnings"
-          subtitle="Advertiser revenue when your page gets attention"
-          href="/gofast-with-others#earnings"
+        <NavButton
+          active={activeSection === "members"}
+          icon={<Users className="h-4 w-4" />}
+          label={STUDIO_SECTION_LABELS.members}
+          onClick={() => onSectionChange("members")}
         />
-
-        <SidebarRow
-          icon={<Route className="h-4 w-4" />}
-          title="Runs & plans"
-          subtitle="What visitors can join from your page"
-          href="/gofast-with-others#runs-plans"
+        <NavButton
+          active={activeSection === "content"}
+          icon={<PenLine className="h-4 w-4" />}
+          label={STUDIO_SECTION_LABELS.content}
+          onClick={() => onSectionChange("content")}
         />
       </nav>
 
@@ -96,6 +98,14 @@ export default function GoFastWithMeStudioSidebar({
           <ExternalLink className="h-3.5 w-3.5" />
         </a>
 
+        <Link
+          href={memberHubPath}
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800 hover:bg-orange-100"
+        >
+          Open member hub
+          <ExternalLink className="h-3.5 w-3.5" />
+        </Link>
+
         <GoFastWithMeUrlEditor
           gofastHandle={gofastHandle}
           publicSlug={publicSlug}
@@ -118,104 +128,33 @@ export default function GoFastWithMeStudioSidebar({
           </div>
         </div>
       </section>
-
-      <section
-        id="earnings"
-        className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
-      >
-        <div className="flex items-start gap-2">
-          <Megaphone className="h-4 w-4 text-violet-600 mt-0.5 shrink-0" />
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900">Earnings</h2>
-            <p className="text-xs text-gray-600 mt-1">
-              When people follow and engage with your public page, advertiser attention can convert
-              to revenue. Details live in your profile advertising settings for now.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section
-        id="runs-plans"
-        className="rounded-xl border border-violet-200 bg-violet-50/40 p-4 shadow-sm space-y-2"
-      >
-        <div className="flex items-start gap-2">
-          <Route className="h-4 w-4 text-violet-700 mt-0.5 shrink-0" />
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900">Runs & plans</h2>
-            <p className="text-xs text-gray-600 mt-1">
-              Publish these and they hydrate on your public page automatically.
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-col gap-2 pt-1">
-          <Link
-            href="/training-setup"
-            className="inline-flex justify-center rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700"
-          >
-            Connect training plan
-          </Link>
-          <Link
-            href="/training/lead"
-            className="inline-flex justify-center rounded-lg border border-violet-300 bg-white px-3 py-2 text-xs font-semibold text-violet-900 hover:bg-violet-50"
-          >
-            Publish training plan
-          </Link>
-          <Link
-            href="/build-a-run"
-            className="inline-flex justify-center rounded-lg border border-violet-300 bg-white px-3 py-2 text-xs font-semibold text-violet-900 hover:bg-violet-50"
-          >
-            Build a run
-          </Link>
-          <Link
-            href="/host-a-run"
-            className="inline-flex justify-center rounded-lg border border-violet-300 bg-white px-3 py-2 text-xs font-semibold text-violet-900 hover:bg-violet-50"
-          >
-            Host a public run
-          </Link>
-        </div>
-      </section>
     </aside>
   );
 }
 
-function SidebarRow({
+function NavButton({
+  active,
   icon,
-  title,
-  subtitle,
-  href,
-  external,
+  label,
+  onClick,
 }: {
+  active: boolean;
   icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  href: string;
-  external?: boolean;
+  label: string;
+  onClick: () => void;
 }) {
-  const className =
-    "flex items-start gap-2 rounded-lg px-3 py-2 text-left hover:bg-gray-50 transition-colors";
-
-  const content = (
-    <>
-      <span className="mt-0.5 text-gray-500 shrink-0">{icon}</span>
-      <span>
-        <span className="block text-sm font-medium text-gray-900">{title}</span>
-        <span className="block text-xs text-gray-500 mt-0.5">{subtitle}</span>
-      </span>
-    </>
-  );
-
-  if (external) {
-    return (
-      <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
-        {content}
-      </a>
-    );
-  }
-
   return (
-    <Link href={href} className={className}>
-      {content}
-    </Link>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-left transition ${
+        active
+          ? "bg-orange-50 text-orange-900 font-semibold"
+          : "text-gray-700 hover:bg-gray-50"
+      }`}
+    >
+      <span className="shrink-0">{icon}</span>
+      {label}
+    </button>
   );
 }

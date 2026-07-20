@@ -7,11 +7,13 @@ import { Pencil } from "lucide-react";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import type { GoFastWithMeCreatorType } from "@/lib/gofast-with-me/gofast-with-me-service";
-import GoFastWithMeLandingForm, {
-  type GoFastWithMeLandingValues,
-} from "@/components/gofast-with-me/GoFastWithMeLandingForm";
+import type { GoFastWithMeLandingValues } from "@/components/gofast-with-me/GoFastWithMeLandingForm";
 import GoFastWithMeHubOnboarding from "@/components/gofast-with-me/GoFastWithMeHubOnboarding";
 import GoFastWithMeStudioSidebar from "@/components/gofast-with-me/GoFastWithMeStudioSidebar";
+import GoFastWithMeSetupPanel from "@/components/gofast-with-me/GoFastWithMeSetupPanel";
+import GoFastWithMeMemberManagementPanel from "@/components/gofast-with-me/GoFastWithMeMemberManagementPanel";
+import GoFastWithMeContentPanel from "@/components/gofast-with-me/GoFastWithMeContentPanel";
+import type { StudioSection } from "@/components/gofast-with-me/studio-sections";
 
 const RUNNER_BASE =
   process.env.NEXT_PUBLIC_RUNNER_PHOTO_URL?.replace(/\/$/, "") ||
@@ -43,8 +45,16 @@ function ownerRowToLanding(row: OwnerGwmRow | null): GoFastWithMeLandingValues {
   };
 }
 
+function sectionFromHash(): StudioSection {
+  if (typeof window === "undefined") return "content";
+  const hash = window.location.hash.replace("#", "");
+  if (hash === "setup" || hash === "members" || hash === "content") return hash;
+  return "content";
+}
+
 export default function GoFastWithOthersDashboard() {
   const router = useRouter();
+  const [athleteId, setAthleteId] = useState<string | null>(null);
   const [gofastHandle, setGofastHandle] = useState<string | null>(null);
   const [firstName, setFirstName] = useState<string | null>(null);
   const [profileBio, setProfileBio] = useState<string | null>(null);
@@ -56,6 +66,19 @@ export default function GoFastWithOthersDashboard() {
   const [copyDone, setCopyDone] = useState(false);
   const [noHandle, setNoHandle] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [activeSection, setActiveSection] = useState<StudioSection>("content");
+
+  useEffect(() => {
+    setActiveSection(sectionFromHash());
+    const onHash = () => setActiveSection(sectionFromHash());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  const handleSectionChange = useCallback((section: StudioSection) => {
+    setActiveSection(section);
+    window.history.replaceState(null, "", `#${section}`);
+  }, []);
 
   useEffect(() => {
     const id = LocalStorageAPI.getAthleteId();
@@ -63,6 +86,7 @@ export default function GoFastWithOthersDashboard() {
       router.replace("/welcome");
       return;
     }
+    setAthleteId(id);
 
     let cancelled = false;
     (async () => {
@@ -176,7 +200,7 @@ export default function GoFastWithOthersDashboard() {
     );
   }
 
-  if (!gofastHandle || !publicSlug) {
+  if (!gofastHandle || !publicSlug || !athleteId) {
     return (
       <div className="max-w-lg space-y-4">
         <p className="text-gray-700">{error || "Studio unavailable."}</p>
@@ -203,8 +227,8 @@ export default function GoFastWithOthersDashboard() {
           </p>
           <h1 className="text-2xl font-bold text-gray-900">GoFastWithMe studio</h1>
           <p className="text-gray-600 text-sm mt-1 max-w-xl">
-            Edit your public landing identity. Use the sidebar to publish, connect runs and plans,
-            and track earnings.
+            Setup runs and plans, manage followers, and edit your public content — all from one
+            place.
           </p>
         </div>
         <a
@@ -241,8 +265,7 @@ export default function GoFastWithOthersDashboard() {
 
       {!isPublishReady ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Add a welcome and GoFastWithMe bio so visitors know how to join you — then publish from
-          the sidebar.
+          Add a welcome and GoFastWithMe bio in General content — then publish from the sidebar.
         </div>
       ) : null}
 
@@ -254,6 +277,8 @@ export default function GoFastWithOthersDashboard() {
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <GoFastWithMeStudioSidebar
+          activeSection={activeSection}
+          onSectionChange={handleSectionChange}
           liveUrl={liveUrl}
           appUrl={appUrl}
           publicSlug={publicSlug}
@@ -269,13 +294,24 @@ export default function GoFastWithOthersDashboard() {
         />
 
         <div className="min-w-0 flex-1">
-          <GoFastWithMeLandingForm
-            initial={landingValues}
-            profileBio={profileBio}
-            onSaved={(values) => {
-              setOwnerGwm((prev) => (prev ? { ...prev, ...values } : prev));
-            }}
-          />
+          {activeSection === "setup" ? (
+            <GoFastWithMeSetupPanel liveUrl={liveUrl} isPublishReady={isPublishReady} />
+          ) : null}
+          {activeSection === "members" ? (
+            <GoFastWithMeMemberManagementPanel athleteId={athleteId} publicSlug={publicSlug} />
+          ) : null}
+          {activeSection === "content" ? (
+            <GoFastWithMeContentPanel
+              publicSlug={publicSlug}
+              liveUrl={liveUrl}
+              appUrl={appUrl}
+              landingValues={landingValues}
+              profileBio={profileBio}
+              onSaved={(values) => {
+                setOwnerGwm((prev) => (prev ? { ...prev, ...values } : prev));
+              }}
+            />
+          ) : null}
         </div>
       </div>
     </div>

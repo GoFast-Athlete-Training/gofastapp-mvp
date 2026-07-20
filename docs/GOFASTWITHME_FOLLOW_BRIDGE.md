@@ -76,6 +76,21 @@ Hub boot: [`lib/gofast-with-me/container-hub-service.ts`](../lib/gofast-with-me/
 
 UI: [`components/gofast-with-me/GoFastWithMeHubFeed.tsx`](../components/gofast-with-me/GoFastWithMeHubFeed.tsx)
 
+## Owner studio (`/gofast-with-others`)
+
+The owner dashboard is forked into three areas:
+
+| Area | Component | Purpose |
+|---|---|---|
+| Setup | `GoFastWithMeSetupPanel` | Connect/publish training plan and runs via share-hub status cards |
+| Member management | `GoFastWithMeMemberManagementPanel` | Follower list, announcements (`updates` topic), link to member hub |
+| General content | `GoFastWithMeContentPanel` | Landing identity editor + public module stubs |
+
+Shell: [`GoFastWithOthersDashboard.tsx`](../components/gofast-with-me/GoFastWithOthersDashboard.tsx)  
+Sidebar nav: [`GoFastWithMeStudioSidebar.tsx`](../components/gofast-with-me/GoFastWithMeStudioSidebar.tsx)
+
+Setup status uses `GET /api/me/share-hub-status` and [`share-creator-card-logic.ts`](../lib/profile/share-creator-card-logic.ts).
+
 ## Next pass (deferred)
 
 - Rich “what you’ll experience” explainer (paid coaching).

@@ -103,7 +103,7 @@ export default function GoFastWithMeHubFeed({
   }
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-5 space-y-4">
+    <section id="feed" className="rounded-2xl border border-gray-200 bg-white p-5 space-y-4">
       <div>
         <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Feed</h2>
         <p className="text-xs text-gray-500 mt-1">
