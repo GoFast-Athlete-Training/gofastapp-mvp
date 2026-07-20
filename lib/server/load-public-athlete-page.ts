@@ -435,8 +435,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
     gofastWithMe,
     nextRace,
     publicActions: resolvePublicActions({
-      isGoFastContainer: athlete.isGoFastContainer,
-      gofastHandle: athlete.gofastHandle,
+      gofastSlugSnapshot: gofastWithMe?.gofastSlugSnapshot ?? null,
       hostFirstName: athlete.firstName,
       upcomingRuns,
       publishedPlans,

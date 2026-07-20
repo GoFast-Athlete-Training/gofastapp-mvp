@@ -55,6 +55,22 @@ function redirectToFrontDoorIfIntent(router: ReturnType<typeof useRouter>): bool
   return true;
 }
 
+function redirectToFollowExplainerIfIntent(
+  router: ReturnType<typeof useRouter>,
+  redirect?: string | null
+): boolean {
+  const handle = LocalStorageAPI.getGwmFollowIntentHandle();
+  if (handle) {
+    router.replace(`/follow/${handle}`);
+    return true;
+  }
+  if (redirect?.startsWith('/follow/')) {
+    router.replace(redirect);
+    return true;
+  }
+  return false;
+}
+
 function routeAfterAthleteResolved(
   router: ReturnType<typeof useRouter>,
   athlete: { data?: { gofastHandle?: string | null } },
@@ -83,6 +99,13 @@ function routeAfterAthleteResolved(
     }
     return;
   }
+
+  if (!athlete.data?.gofastHandle) {
+    router.replace('/athlete-create-profile');
+    return;
+  }
+
+  if (redirectToFollowExplainerIfIntent(router, opts.redirect)) return;
 
   if (athlete.data?.gofastHandle) {
     router.replace('/welcome');

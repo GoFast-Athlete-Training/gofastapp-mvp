@@ -6,8 +6,8 @@ export type PublicAction = {
 };
 
 type ResolvePublicActionsInput = {
-  isGoFastContainer: boolean;
-  gofastHandle: string | null;
+  /** Public GoFastWithMe slug — follow is available when this is set (page is live). */
+  gofastSlugSnapshot: string | null;
   hostFirstName: string | null;
   upcomingRuns: { gorunPath: string; title: string }[];
   publishedPlans: { slug: string; title: string }[];
@@ -43,10 +43,11 @@ export function resolvePublicActions(input: ResolvePublicActionsInput): PublicAc
     });
   }
 
-  if (input.isGoFastContainer && input.gofastHandle) {
+  const slug = input.gofastSlugSnapshot?.trim();
+  if (slug) {
     actions.push({
       label: `Follow ${name}`,
-      href: `${appBase}/container/${encodeURIComponent(input.gofastHandle)}`,
+      href: `${appBase}/follow/${encodeURIComponent(slug)}`,
     });
   }
 

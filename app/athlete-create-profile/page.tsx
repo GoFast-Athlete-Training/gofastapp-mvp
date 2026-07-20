@@ -222,6 +222,11 @@ export default function AthleteCreateProfilePage() {
             const joinIntentHandle = localStorage.getItem('runCrewJoinIntentHandle');
             if (joinIntent && joinIntentHandle) {
               nextPath = `/join/runcrew/${joinIntentHandle}/confirm`;
+            } else {
+              const followIntentHandle = LocalStorageAPI.getGwmFollowIntentHandle();
+              if (followIntentHandle) {
+                nextPath = `/follow/${encodeURIComponent(followIntentHandle)}`;
+              }
             }
           }
         }

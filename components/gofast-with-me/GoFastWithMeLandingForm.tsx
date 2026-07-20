@@ -111,7 +111,7 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
     <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-5">
       <div>
         <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 mb-1">
-          GoFastWithMe landing
+          Landing / identity
         </h2>
         <p className="text-xs text-gray-600">
           This is what visitors see on your public page — how do they join you? Your profile bio stays
@@ -120,9 +120,9 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
       </div>
 
       <div>
-        <h3 className="text-sm font-semibold text-gray-900 mb-1">Landing hero photo</h3>
+        <h3 className="text-sm font-semibold text-gray-900 mb-1">Landing image</h3>
         <p className="text-xs text-gray-500 mb-2">
-          Action shot for your public page — not your profile avatar.
+          Upload the image people see first on your public page.
         </p>
         <button
           type="button"
@@ -132,11 +132,11 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
           {photoPreview ? (
             <img src={photoPreview} alt="" className="w-full h-full object-cover" />
           ) : (
-            <span className="text-gray-500 text-sm">Add landing hero photo</span>
+            <span className="text-gray-500 text-sm">Upload landing image</span>
           )}
         </button>
         <button type="button" onClick={handlePhotoPick} className="mt-2 text-orange-600 text-sm font-medium">
-          {photoPreview ? 'Change photo' : 'Add photo'}
+          {photoPreview ? 'Change image' : 'Upload image'}
         </button>
         <input
           ref={photoInputRef}
@@ -199,7 +199,10 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
             />
           </label>
           <label className="block">
-            <span className="text-sm font-semibold text-gray-900">Model focus</span>
+            <span className="text-sm font-semibold text-gray-900">Specific focus (optional)</span>
+            <span className="block text-xs text-gray-500 mt-0.5">
+              Distance, specialty, or angle: 5K, marathon, trail, nutrition, beginner plans.
+            </span>
             <input
               value={values.modelFocus}
               onChange={(e) => setValues((v) => ({ ...v, modelFocus: e.target.value }))}
@@ -236,7 +239,7 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
         disabled={saving}
         className="w-full rounded-lg bg-orange-500 py-2.5 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
       >
-        {saving ? 'Saving…' : 'Save GoFastWithMe landing'}
+        {saving ? 'Saving…' : 'Save landing'}
       </button>
     </section>
   );

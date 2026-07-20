@@ -4,6 +4,7 @@
 export const RUNCREW_JOIN_INTENT_KEY = 'runCrewJoinIntent';
 export const RUNCREW_JOIN_INTENT_HANDLE_KEY = 'runCrewJoinIntentHandle';
 export const RUNCREW_CREATE_INTENT_KEY = 'runCrewCreateIntent';
+export const GWM_FOLLOW_INTENT_HANDLE_KEY = 'gwmFollowIntentHandle';
 /** Canonical Club Manager activation context keys */
 export const CLUB_MANAGER_MODE_KEY = 'clubManagerMode';
 export const CLUB_MANAGER_ACTIVATION_TOKEN_KEY = 'clubManagerActivationToken';
@@ -73,6 +74,25 @@ export const LocalStorageAPI = {
       return localStorage.getItem(RUNCREW_JOIN_INTENT_HANDLE_KEY);
     }
     return null;
+  },
+
+  setGwmFollowIntentHandle(handle: string) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(GWM_FOLLOW_INTENT_HANDLE_KEY, handle);
+    }
+  },
+
+  getGwmFollowIntentHandle() {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(GWM_FOLLOW_INTENT_HANDLE_KEY);
+    }
+    return null;
+  },
+
+  removeGwmFollowIntent() {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(GWM_FOLLOW_INTENT_HANDLE_KEY);
+    }
   },
 
   setRunCrewCreateIntent(value: string) {

@@ -268,11 +268,16 @@ model gofast_container_messages {
   containerAthleteId String
   authorAthleteId    String
   body               String
+  /// updates | tips | nutrition | routes | chatter
+  topic              String   @default("chatter")
+  routeId            String?
   createdAt          DateTime @default(now())
   containerAthlete   Athlete  @relation("ContainerMessages", fields: [containerAthleteId], references: [id], onDelete: Cascade)
   authorAthlete      Athlete  @relation("ContainerMessageAuthor", fields: [authorAthleteId], references: [id], onDelete: Cascade)
+  route              routes?  @relation(fields: [routeId], references: [id], onDelete: SetNull)
 
   @@index([containerAthleteId, createdAt])
+  @@index([containerAthleteId, topic, createdAt])
 }
 
 model ambassador_credits {
@@ -1104,6 +1109,7 @@ model routes {
   updatedAt          DateTime @updatedAt
   createdBy          Athlete  @relation(fields: [createdByAthleteId], references: [id], onDelete: Cascade)
   city_runs          city_runs[]
+  gofast_container_messages gofast_container_messages[]
 
   @@index([citySlug])
   @@index([cityId])

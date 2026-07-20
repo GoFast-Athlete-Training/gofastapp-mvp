@@ -6,44 +6,10 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import AthleteAppShell from '@/components/athlete/AthleteAppShell';
-
-type PublicPayload = {
-  success: boolean;
-  error?: string;
-  isGoFastContainer?: boolean;
-  hostAthleteId?: string;
-  athlete?: { gofastHandle: string | null; firstName: string | null; lastName: string | null } | null;
-  upcomingRuns?: {
-    id: string;
-    title: string;
-    date: string;
-    citySlug: string;
-    meetUpPoint: string;
-    gorunPath: string;
-  }[];
-};
-
-type ContainerMessage = {
-  id: string;
-  body: string;
-  createdAt: string;
-  author: {
-    id: string;
-    firstName: string | null;
-    lastName: string | null;
-    photoURL: string | null;
-    gofastHandle: string | null;
-  };
-};
-
-type MemberRow = {
-  id: string;
-  firstName: string | null;
-  lastName: string | null;
-  photoURL: string | null;
-  gofastHandle: string | null;
-  joinedAt: string;
-};
+import GoFastWithMeHubFeed from '@/components/gofast-with-me/GoFastWithMeHubFeed';
+import HubWeeklyRunStrip from '@/components/gofast-with-me/HubWeeklyRunStrip';
+import PublicPlanWeekViewer from '@/components/training/PublicPlanWeekViewer';
+import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
 
 export default function ContainerHubPage() {
   const router = useRouter();
@@ -52,27 +18,19 @@ export default function ContainerHubPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [pub, setPub] = useState<PublicPayload | null>(null);
+  const [hub, setHub] = useState<ContainerHubPayload | null>(null);
   const [hostId, setHostId] = useState<string | null>(null);
-  const [isHost, setIsHost] = useState(false);
-  const [isMember, setIsMember] = useState(false);
-  const [messages, setMessages] = useState<ContainerMessage[]>([]);
-  const [members, setMembers] = useState<MemberRow[]>([]);
-  const [memberCount, setMemberCount] = useState(0);
-  const [composer, setComposer] = useState('');
-  const [posting, setPosting] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
   const myId = LocalStorageAPI.getAthleteId();
 
-  const loadFeed = useCallback(async (hid: string) => {
-    const [msgRes, memRes] = await Promise.all([
-      api.get(`/athlete/${hid}/container/messages?limit=40`),
-      api.get(`/athlete/${hid}/container/members`),
-    ]);
-    if (msgRes.data?.messages) setMessages(msgRes.data.messages);
-    if (memRes.data?.members) setMembers(memRes.data.members);
-    if (typeof memRes.data?.count === 'number') setMemberCount(memRes.data.count);
+  const loadHub = useCallback(async (hid: string) => {
+    const res = await api.get(`/athlete/${hid}/container/hub`);
+    if (res.data?.success && res.data.hub) {
+      setHub(res.data.hub as ContainerHubPayload);
+    } else {
+      throw new Error(res.data?.error || 'Hub unavailable');
+    }
   }, []);
 
   useEffect(() => {
@@ -90,35 +48,26 @@ export default function ContainerHubPage() {
     (async () => {
       try {
         const pubRes = await fetch(`/api/athlete/public/${encodeURIComponent(handle)}`);
-        const data = (await pubRes.json()) as PublicPayload;
-        if (!pubRes.ok || !data.success || !data.athlete) {
-          if (!cancelled) setError(data.error || 'Page not found');
+        const pub = (await pubRes.json()) as {
+          success?: boolean;
+          error?: string;
+          hostAthleteId?: string;
+          isGoFastContainer?: boolean;
+        };
+        if (!pubRes.ok || !pub.success || !pub.hostAthleteId) {
+          if (!cancelled) setError(pub.error || 'Page not found');
           return;
         }
-        if (!data.isGoFastContainer || !data.hostAthleteId) {
-          if (!cancelled) setError('This athlete has not enabled a GoFast Container yet.');
+        if (!pub.isGoFastContainer) {
+          if (!cancelled) setError('This athlete has not opened their follower hub yet.');
           return;
         }
+        if (!cancelled) setHostId(pub.hostAthleteId);
+        await loadHub(pub.hostAthleteId);
+      } catch (err: unknown) {
         if (!cancelled) {
-          setPub(data);
-          setHostId(data.hostAthleteId);
+          setError(err instanceof Error ? err.message : 'Something went wrong.');
         }
-
-        const st = await api.get(`/athlete/${data.hostAthleteId}/container/status`);
-        if (!cancelled) {
-          setIsHost(!!st.data?.isHost);
-          setIsMember(!!st.data?.isMember);
-        }
-
-        if (st.data?.isHost || st.data?.isMember) {
-          try {
-            await loadFeed(data.hostAthleteId!);
-          } catch {
-            /* feed may 403 if race */
-          }
-        }
-      } catch {
-        if (!cancelled) setError('Something went wrong.');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -127,65 +76,46 @@ export default function ContainerHubPage() {
     return () => {
       cancelled = true;
     };
-  }, [handle, myId, router, loadFeed]);
+  }, [handle, myId, router, loadHub]);
 
-  const handleJoin = async () => {
-    if (!hostId) return;
+  const handleFollow = async () => {
+    if (!handle) return;
     setActionLoading(true);
     setError(null);
     try {
-      await api.post(`/athlete/${hostId}/container/join`);
-      setIsMember(true);
-      await loadFeed(hostId);
+      const res = await api.post(`/follow/${encodeURIComponent(handle)}`);
+      if (!res.data?.success) throw new Error(res.data?.error || 'Could not follow');
+      if (hostId) await loadHub(hostId);
+      else router.refresh();
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string; message?: string } } };
-      setError(e.response?.data?.message || e.response?.data?.error || 'Could not join.');
+      const e = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(e.response?.data?.error || e.message || 'Could not follow.');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleLeave = async () => {
-    if (!hostId || isHost) return;
+    if (!hostId || hub?.isHost) return;
     setActionLoading(true);
     setError(null);
     try {
       await api.post(`/athlete/${hostId}/container/leave`);
-      setIsMember(false);
-      setMessages([]);
+      setHub((prev) =>
+        prev
+          ? {
+              ...prev,
+              isMember: false,
+              canAccessFeed: false,
+              messages: [],
+            }
+          : prev
+      );
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      setError(e.response?.data?.error || 'Could not leave.');
+      setError(e.response?.data?.error || 'Could not unfollow.');
     } finally {
       setActionLoading(false);
-    }
-  };
-
-  const handlePost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!hostId || !composer.trim() || posting) return;
-    setPosting(true);
-    setError(null);
-    try {
-      await api.post(`/athlete/${hostId}/container/messages`, { body: composer.trim() });
-      setComposer('');
-      await loadFeed(hostId);
-    } catch (err: unknown) {
-      const ex = err as { response?: { data?: { error?: string } } };
-      setError(ex.response?.data?.error || 'Could not post.');
-    } finally {
-      setPosting(false);
-    }
-  };
-
-  const handleDeleteMessage = async (messageId: string) => {
-    if (!hostId || !isHost) return;
-    if (!confirm('Delete this message?')) return;
-    try {
-      await api.delete(`/athlete/${hostId}/container/messages/${messageId}`);
-      setMessages((prev) => prev.filter((m) => m.id !== messageId));
-    } catch {
-      setError('Could not delete message.');
     }
   };
 
@@ -199,7 +129,7 @@ export default function ContainerHubPage() {
     );
   }
 
-  if (error || !pub || !hostId) {
+  if (error && !hub) {
     return (
       <AthleteAppShell>
         <div className="max-w-lg mx-auto px-4 py-10">
@@ -207,144 +137,169 @@ export default function ContainerHubPage() {
             ← Home
           </Link>
           <p className="mt-6 text-gray-700">{error || 'Not available'}</p>
-          <button
-            type="button"
-            onClick={() => router.push('/profile')}
-            className="mt-4 text-orange-600 font-semibold"
-          >
-            Back to profile
-          </button>
+          <Link href={`/follow/${encodeURIComponent(handle)}`} className="mt-4 inline-block text-orange-600 font-semibold">
+            Follow {handle}
+          </Link>
+        </div>
+      </AthleteAppShell>
+    );
+  }
+
+  if (!hub || !hostId) {
+    return (
+      <AthleteAppShell>
+        <div className="max-w-lg mx-auto px-4 py-10">
+          <p className="text-gray-700">Hub unavailable.</p>
         </div>
       </AthleteAppShell>
     );
   }
 
   const displayName =
-    [pub.athlete?.firstName, pub.athlete?.lastName].filter(Boolean).join(' ') || `@${handle}`;
+    [hub.host.firstName, hub.host.lastName].filter(Boolean).join(' ') ||
+    (hub.host.gofastHandle ? `@${hub.host.gofastHandle}` : 'Athlete');
+  const firstName = hub.host.firstName?.trim() || displayName;
 
   return (
     <AthleteAppShell>
-      <div className="max-w-xl mx-auto px-4 py-6 pb-24">
+      <div className="max-w-2xl mx-auto px-4 py-6 pb-24 space-y-6">
         <Link href="/athlete-home" className="text-sm font-medium text-orange-600 hover:text-orange-700">
           ← Home
         </Link>
 
-        <div className="mt-4 rounded-2xl border border-violet-200 bg-violet-50/60 p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-violet-800">GoFast Container</p>
-          <h1 className="text-2xl font-bold text-gray-900 mt-1">{displayName}</h1>
+        <header className="rounded-2xl border border-orange-200 bg-orange-50/60 p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-orange-800">
+            GoFast with Others
+          </p>
+          <h1 className="text-2xl font-bold text-gray-900 mt-1">Following {firstName}</h1>
           <p className="text-sm text-gray-600 mt-1">@{handle}</p>
-          <p className="text-sm text-gray-600 mt-2">{memberCount} members</p>
+          <p className="text-sm text-gray-600 mt-2">
+            {hub.memberCount} follower{hub.memberCount === 1 ? '' : 's'}
+          </p>
 
-          {isHost ? (
-            <p className="mt-2 text-sm font-semibold text-violet-800">You are the host</p>
-          ) : isMember ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="text-sm text-green-800 font-medium">You&apos;re a member</span>
+          {hub.isHost ? (
+            <p className="mt-2 text-sm font-semibold text-orange-800">You are the host</p>
+          ) : hub.canAccessFeed ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-sm text-emerald-800 font-medium">You&apos;re following</span>
               <button
                 type="button"
                 disabled={actionLoading}
                 onClick={() => void handleLeave()}
                 className="text-sm text-gray-600 underline disabled:opacity-50"
               >
-                Leave
+                Unfollow
               </button>
             </div>
           ) : (
             <button
               type="button"
               disabled={actionLoading}
-              onClick={() => void handleJoin()}
-              className="mt-3 rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+              onClick={() => void handleFollow()}
+              className="mt-3 rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
             >
-              Join community
+              Follow {firstName}
             </button>
           )}
-        </div>
+        </header>
 
-        {pub.upcomingRuns && pub.upcomingRuns.length > 0 ? (
-          <section className="mt-8">
-            <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-2">Upcoming runs</h2>
-            <ul className="space-y-2">
-              {pub.upcomingRuns.map((r) => (
-                <li key={r.id}>
-                  <Link
-                    href={r.gorunPath.startsWith('/') ? r.gorunPath : `/${r.gorunPath}`}
-                    className="block rounded-xl border border-gray-200 bg-white p-3 text-sm hover:border-orange-300"
-                  >
-                    <span className="font-medium text-gray-900">{r.title}</span>
-                    <span className="block text-gray-500 mt-1">
-                      {new Date(r.date).toLocaleString()} · {r.citySlug}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
+        {error ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {error}
+          </div>
         ) : null}
 
-        {isHost || isMember ? (
-          <section className="mt-8">
-            <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-2">Chatter</h2>
-            <ul className="space-y-3 mb-4">
-              {messages.map((m) => (
-                <li key={m.id} className="rounded-lg border border-gray-100 bg-white p-3 text-sm">
-                  <div className="flex justify-between gap-2">
-                    <span className="font-medium text-gray-900">
-                      {[m.author.firstName, m.author.lastName].filter(Boolean).join(' ') ||
-                        (m.author.gofastHandle ? `@${m.author.gofastHandle}` : 'Member')}
-                    </span>
-                    {isHost ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleDeleteMessage(m.id)}
-                        className="text-xs text-red-600 hover:underline"
+        {hub.canAccessFeed ? (
+          <>
+            {hub.publishedPlan ? (
+              <section className="space-y-2">
+                <div className="px-1">
+                  <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                    Training week
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {hub.publishedPlan.name} ·{' '}
+                    <Link
+                      href={`/plans/${encodeURIComponent(hub.publishedPlan.slug)}`}
+                      className="text-orange-600 hover:underline"
+                    >
+                      View plan
+                    </Link>
+                  </p>
+                </div>
+                <PublicPlanWeekViewer
+                  weeks={hub.publishedPlan.weeks}
+                  totalWeeks={hub.publishedPlan.totalWeeks}
+                  ctaHref={`/plans/${encodeURIComponent(hub.publishedPlan.slug)}`}
+                  ctaLabel="Join this plan"
+                />
+              </section>
+            ) : (
+              <HubWeeklyRunStrip runs={hub.upcomingRuns} />
+            )}
+
+            <GoFastWithMeHubFeed
+              hostId={hostId}
+              isHost={hub.isHost}
+              canAccessFeed={hub.canAccessFeed}
+            />
+
+            {hub.upcomingRuns.length > 0 && hub.publishedPlan ? (
+              <section>
+                <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-2">
+                  Upcoming runs
+                </h2>
+                <ul className="space-y-2">
+                  {hub.upcomingRuns.map((r) => (
+                    <li key={r.id}>
+                      <Link
+                        href={r.gorunPath.startsWith('/') ? r.gorunPath : `/${r.gorunPath}`}
+                        className="block rounded-xl border border-gray-200 bg-white p-3 text-sm hover:border-orange-300"
                       >
-                        Remove
-                      </button>
-                    ) : null}
-                  </div>
-                  <p className="text-gray-700 mt-1 whitespace-pre-wrap">{m.body}</p>
-                  <p className="text-xs text-gray-400 mt-1">{new Date(m.createdAt).toLocaleString()}</p>
-                </li>
-              ))}
-            </ul>
-            <form onSubmit={(e) => void handlePost(e)} className="space-y-2">
-              <textarea
-                value={composer}
-                onChange={(e) => setComposer(e.target.value)}
-                rows={3}
-                maxLength={2000}
-                className="w-full rounded-lg border border-gray-300 p-3 text-sm"
-                placeholder="Say something to the group…"
-              />
-              <button
-                type="submit"
-                disabled={posting || !composer.trim()}
-                className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
-              >
-                {posting ? 'Posting…' : 'Post'}
-              </button>
-            </form>
-          </section>
-        ) : (
-          <p className="mt-8 text-sm text-gray-600">Join to read and post in the chatter feed.</p>
-        )}
+                        <span className="font-medium text-gray-900">{r.title}</span>
+                        <span className="block text-gray-500 mt-1">
+                          {new Date(r.date).toLocaleString()} · {r.citySlug}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
 
-        {members.length > 0 ? (
-          <section className="mt-8">
-            <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-2">Members</h2>
-            <ul className="flex flex-wrap gap-2">
-              {members.map((m) => (
-                <li
-                  key={m.id}
-                  className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-gray-800"
-                >
-                  {[m.firstName, m.lastName].filter(Boolean).join(' ') || m.gofastHandle || 'Member'}
-                </li>
-              ))}
-            </ul>
+            {hub.members.length > 0 ? (
+              <section>
+                <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-2">
+                  Followers
+                </h2>
+                <ul className="flex flex-wrap gap-2">
+                  {hub.members.map((m) => (
+                    <li
+                      key={m.id}
+                      className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-gray-800"
+                    >
+                      {[m.firstName, m.lastName].filter(Boolean).join(' ') ||
+                        m.gofastHandle ||
+                        'Follower'}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+          </>
+        ) : (
+          <section className="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
+            <p className="text-sm text-gray-700">
+              Follow {firstName} to see their training week, runs, updates, tips, and chatter.
+            </p>
+            <Link
+              href={`/follow/${encodeURIComponent(handle)}`}
+              className="inline-flex rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+            >
+              Learn more about following
+            </Link>
           </section>
-        ) : null}
+        )}
       </div>
     </AthleteAppShell>
   );
