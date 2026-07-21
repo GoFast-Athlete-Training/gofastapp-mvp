@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Calendar, ExternalLink, Route } from 'lucide-react';
+import { Calendar, Route } from 'lucide-react';
 import api from '@/lib/api';
 import {
   buildShareCreatorCards,
@@ -10,12 +10,7 @@ import {
 } from '@/lib/profile/share-creator-card-logic';
 import ShareCreatorCard from '@/components/profile/ShareCreatorCard';
 
-type Props = {
-  liveUrl: string;
-  isPublishReady: boolean;
-};
-
-export default function GoFastWithMeSetupPanel({ liveUrl, isPublishReady }: Props) {
+export default function GoFastWithMeSetupPanel() {
   const [status, setStatus] = useState<ShareHubStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +24,7 @@ export default function GoFastWithMeSetupPanel({ liveUrl, isPublishReady }: Prop
           setStatus(res.data.status as ShareHubStatus);
         }
       } catch {
-        if (!cancelled) setError('Could not load setup status.');
+        if (!cancelled) setError('Could not load configure status.');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -44,47 +39,16 @@ export default function GoFastWithMeSetupPanel({ liveUrl, isPublishReady }: Prop
   const runCard = cards.find((c) => c.id === 'run');
 
   return (
-    <section id="setup" className="space-y-6">
+    <section id="configure" className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">Setup</h2>
+        <h2 className="text-lg font-bold text-gray-900">Configure</h2>
         <p className="text-sm text-gray-600 mt-1">
           Connect training plans and runs — they hydrate your public page and member hub automatically.
         </p>
       </div>
 
-      <article className="rounded-2xl border border-orange-200 bg-orange-50/40 p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900">Public page readiness</h3>
-            <p className="text-xs text-gray-600 mt-1">
-              {isPublishReady
-                ? 'Landing copy is ready — share your public URL.'
-                : 'Add welcome + bio in General content before sharing widely.'}
-            </p>
-          </div>
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-              isPublishReady
-                ? 'bg-emerald-100 text-emerald-800'
-                : 'bg-amber-100 text-amber-900'
-            }`}
-          >
-            {isPublishReady ? 'Ready' : 'Draft'}
-          </span>
-        </div>
-        <a
-          href={liveUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
-        >
-          Open public page
-          <ExternalLink className="h-4 w-4" />
-        </a>
-      </article>
-
       {loading ? (
-        <p className="text-sm text-gray-500">Loading setup status…</p>
+        <p className="text-sm text-gray-500">Loading configure status…</p>
       ) : error ? (
         <p className="text-sm text-red-600">{error}</p>
       ) : (

@@ -67,9 +67,9 @@ export default function GoFastWithMeMemberManagementPanel({ athleteId, publicSlu
   };
 
   return (
-    <section id="members" className="space-y-6">
+    <section id="manage" className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">Member management</h2>
+        <h2 className="text-lg font-bold text-gray-900">Manage</h2>
         <p className="text-sm text-gray-600 mt-1">
           View followers, send announcements, and open your member hub to message the group.
         </p>

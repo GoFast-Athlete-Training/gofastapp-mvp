@@ -2,10 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ExternalLink, Globe, Users } from 'lucide-react';
-import GoFastWithMeLandingForm, {
-  type GoFastWithMeLandingValues,
-} from '@/components/gofast-with-me/GoFastWithMeLandingForm';
+import { ExternalLink, Globe, Lightbulb, Users } from 'lucide-react';
 
 type PublicModuleSnapshot = {
   publishedPlans: { slug: string; title: string }[];
@@ -17,9 +14,6 @@ type Props = {
   publicSlug: string;
   liveUrl: string;
   appUrl: string;
-  landingValues: GoFastWithMeLandingValues;
-  profileBio: string | null;
-  onSaved: (values: GoFastWithMeLandingValues) => void;
 };
 
 function ModuleStub({
@@ -61,14 +55,7 @@ function ModuleStub({
   );
 }
 
-export default function GoFastWithMeContentPanel({
-  publicSlug,
-  liveUrl,
-  appUrl,
-  landingValues,
-  profileBio,
-  onSaved,
-}: Props) {
+export default function GoFastWithMeContentPanel({ publicSlug, liveUrl, appUrl }: Props) {
   const [modules, setModules] = useState<PublicModuleSnapshot | null>(null);
 
   useEffect(() => {
@@ -99,26 +86,39 @@ export default function GoFastWithMeContentPanel({
   return (
     <section id="content" className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">General content</h2>
+        <h2 className="text-lg font-bold text-gray-900">General Content</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Edit your public landing identity and see how modules appear on your public page and member
-          hub.
+          Build out your page with insights, tips, and joinable modules that appear on your public
+          page and member hub.
         </p>
       </div>
 
-      <GoFastWithMeLandingForm
-        initial={landingValues}
-        profileBio={profileBio}
-        onSaved={onSaved}
-      />
+      <article className="rounded-2xl border border-violet-200 bg-violet-50/40 p-5 shadow-sm">
+        <div className="flex items-start gap-2">
+          <Lightbulb className="h-5 w-5 text-violet-700 mt-0.5 shrink-0" />
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Insights & tips</h3>
+            <p className="text-xs text-gray-600 mt-1">
+              Post tips, nutrition notes, and updates from Manage — they appear in your member hub
+              feed and help followers stay engaged.
+            </p>
+            <Link
+              href="/gofast-with-others#manage"
+              className="mt-3 inline-flex rounded-lg border border-violet-300 bg-white px-3 py-2 text-xs font-semibold text-violet-900 hover:bg-violet-50"
+            >
+              Open Manage to post content
+            </Link>
+          </div>
+        </div>
+      </article>
 
       <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
         <div className="flex items-start gap-2">
           <Globe className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Public module stubs</h3>
+            <h3 className="text-sm font-semibold text-gray-900">Public page modules</h3>
             <p className="text-xs text-gray-600 mt-1">
-              These hydrate from real data — setup lives in the Setup area.
+              These hydrate from real data — configure plans and runs in Configure.
             </p>
           </div>
         </div>
@@ -126,7 +126,7 @@ export default function GoFastWithMeContentPanel({
         <div className="grid gap-3 sm:grid-cols-2">
           <ModuleStub
             title="Public page"
-            status="Landing intro + hero from the form above"
+            status="Landing intro + page photo from Landing Page"
             primaryHref={appUrl}
             primaryLabel="View in app"
             secondaryHref={liveUrl}
@@ -142,8 +142,8 @@ export default function GoFastWithMeContentPanel({
             }
             primaryHref={firstPlan ? `/plans/${encodeURIComponent(firstPlan.slug)}` : '/training/lead'}
             primaryLabel={firstPlan ? 'View public plan' : 'Publish plan'}
-            secondaryHref="/gofast-with-others#setup"
-            secondaryLabel="Go to setup"
+            secondaryHref="/gofast-with-others#configure"
+            secondaryLabel="Go to Configure"
           />
 
           <ModuleStub
@@ -161,8 +161,8 @@ export default function GoFastWithMeContentPanel({
                 : '/host-a-run'
             }
             primaryLabel={firstRun ? 'View next run' : 'Host a run'}
-            secondaryHref="/gofast-with-others#setup"
-            secondaryLabel="Go to setup"
+            secondaryHref="/gofast-with-others#configure"
+            secondaryLabel="Go to Configure"
           />
 
           <article className="rounded-xl border border-gray-200 bg-gray-50 p-4">

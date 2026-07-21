@@ -13,7 +13,13 @@ import GoFastWithMeStudioSidebar from "@/components/gofast-with-me/GoFastWithMeS
 import GoFastWithMeSetupPanel from "@/components/gofast-with-me/GoFastWithMeSetupPanel";
 import GoFastWithMeMemberManagementPanel from "@/components/gofast-with-me/GoFastWithMeMemberManagementPanel";
 import GoFastWithMeContentPanel from "@/components/gofast-with-me/GoFastWithMeContentPanel";
-import type { StudioSection } from "@/components/gofast-with-me/studio-sections";
+import GoFastWithMeWelcomePanel from "@/components/gofast-with-me/GoFastWithMeWelcomePanel";
+import {
+  defaultStudioSection,
+  isWelcomeContentComplete,
+  parseStudioSectionFromHash,
+  type StudioSection,
+} from "@/components/gofast-with-me/studio-sections";
 
 const RUNNER_BASE =
   process.env.NEXT_PUBLIC_RUNNER_PHOTO_URL?.replace(/\/$/, "") ||
@@ -27,6 +33,7 @@ type OwnerGwmRow = {
   modelFocus: string | null;
   myAchievements: string | null;
   gofastWithMePhotoUrl: string | null;
+  gofastWithMePhotoType: GoFastWithMeLandingValues['gofastWithMePhotoType'];
   creatorType: GoFastWithMeCreatorType | null;
   coachSpecialty: string | null;
   gofastSlugSnapshot?: string;
@@ -42,14 +49,8 @@ function ownerRowToLanding(row: OwnerGwmRow | null): GoFastWithMeLandingValues {
     modelFocus: row?.modelFocus ?? null,
     myAchievements: row?.myAchievements ?? null,
     gofastWithMePhotoUrl: row?.gofastWithMePhotoUrl ?? null,
+    gofastWithMePhotoType: row?.gofastWithMePhotoType ?? null,
   };
-}
-
-function sectionFromHash(): StudioSection {
-  if (typeof window === "undefined") return "content";
-  const hash = window.location.hash.replace("#", "");
-  if (hash === "setup" || hash === "members" || hash === "content") return hash;
-  return "content";
 }
 
 export default function GoFastWithOthersDashboard() {
@@ -58,6 +59,7 @@ export default function GoFastWithOthersDashboard() {
   const [gofastHandle, setGofastHandle] = useState<string | null>(null);
   const [firstName, setFirstName] = useState<string | null>(null);
   const [profileBio, setProfileBio] = useState<string | null>(null);
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [ownerGwm, setOwnerGwm] = useState<OwnerGwmRow | null>(null);
   const [publicSlug, setPublicSlug] = useState<string | null>(null);
   const [slugUsesHandle, setSlugUsesHandle] = useState(true);
@@ -66,11 +68,34 @@ export default function GoFastWithOthersDashboard() {
   const [copyDone, setCopyDone] = useState(false);
   const [noHandle, setNoHandle] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [activeSection, setActiveSection] = useState<StudioSection>("content");
+  const [activeSection, setActiveSection] = useState<StudioSection>("welcome");
+  const [sectionInitialized, setSectionInitialized] = useState(false);
+
+  const landingValues = ownerRowToLanding(ownerGwm);
+  const isWelcomeComplete = isWelcomeContentComplete(landingValues);
+
+  const isPublishReady = Boolean(
+    landingValues.welcome?.trim() ||
+      landingValues.gofastWithMeBio?.trim() ||
+      landingValues.whatYoullSeeHere?.trim()
+  );
 
   useEffect(() => {
-    setActiveSection(sectionFromHash());
-    const onHash = () => setActiveSection(sectionFromHash());
+    if (sectionInitialized || loading || showOnboarding) return;
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    const section = defaultStudioSection(landingValues, hash || null);
+    setActiveSection(section);
+    if (!hash) {
+      window.history.replaceState(null, "", `#${section}`);
+    }
+    setSectionInitialized(true);
+  }, [landingValues, loading, showOnboarding, sectionInitialized]);
+
+  useEffect(() => {
+    const onHash = () => {
+      const parsed = parseStudioSectionFromHash(window.location.hash);
+      if (parsed) setActiveSection(parsed);
+    };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
@@ -107,6 +132,7 @@ export default function GoFastWithOthersDashboard() {
         setGofastHandle(handle);
         setFirstName(athlete?.firstName ?? null);
         setProfileBio(athlete?.bio ?? null);
+        setProfilePhotoUrl(athlete?.photoURL ?? null);
 
         const gwm = gwmRes.data?.gofastWithMe as OwnerGwmRow | null;
         setOwnerGwm(gwm);
@@ -138,14 +164,6 @@ export default function GoFastWithOthersDashboard() {
       setError("Could not copy to clipboard.");
     }
   }, []);
-
-  const landingValues = ownerRowToLanding(ownerGwm);
-
-  const isPublishReady = Boolean(
-    landingValues.welcome?.trim() ||
-      landingValues.gofastWithMeBio?.trim() ||
-      landingValues.whatYoullSeeHere?.trim()
-  );
 
   if (loading) {
     return (
@@ -190,11 +208,13 @@ export default function GoFastWithOthersDashboard() {
                   modelFocus: null,
                   myAchievements: null,
                   gofastWithMePhotoUrl: null,
+                  gofastWithMePhotoType: null,
                   creatorType,
                   coachSpecialty,
                 }
           );
           setShowOnboarding(false);
+          setSectionInitialized(false);
         }}
       />
     );
@@ -211,6 +231,8 @@ export default function GoFastWithOthersDashboard() {
   const liveUrl = `${RUNNER_BASE}/${publicSlug}`;
   const appUrl = `/u/${publicSlug}`;
   const visitorHeadline = firstName ? `GoFast with ${firstName}` : "Your public page";
+  const resolvedDisplayName =
+    firstName?.trim() || (gofastHandle ? `@${gofastHandle}` : "Your page");
   const creatorLabel =
     ownerGwm?.creatorType === "coach"
       ? "Coach"
@@ -227,8 +249,8 @@ export default function GoFastWithOthersDashboard() {
           </p>
           <h1 className="text-2xl font-bold text-gray-900">GoFastWithMe studio</h1>
           <p className="text-gray-600 text-sm mt-1 max-w-xl">
-            Setup runs and plans, manage followers, and edit your public content — all from one
-            place.
+            Start with your landing page, then configure plans and runs, add general content, and
+            manage followers.
           </p>
         </div>
         <a
@@ -263,9 +285,18 @@ export default function GoFastWithOthersDashboard() {
         </div>
       ) : null}
 
-      {!isPublishReady ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Add a welcome and GoFastWithMe bio in General content — then publish from the sidebar.
+      {!isWelcomeComplete ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-wrap items-center justify-between gap-2">
+          <span>Complete your landing page first — who you are is the foundation of your page.</span>
+          {activeSection !== "welcome" ? (
+            <button
+              type="button"
+              onClick={() => handleSectionChange("welcome")}
+              className="shrink-0 font-semibold text-amber-900 underline hover:no-underline"
+            >
+              Go to Landing Page
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -279,6 +310,7 @@ export default function GoFastWithOthersDashboard() {
         <GoFastWithMeStudioSidebar
           activeSection={activeSection}
           onSectionChange={handleSectionChange}
+          isWelcomeComplete={isWelcomeComplete}
           liveUrl={liveUrl}
           appUrl={appUrl}
           publicSlug={publicSlug}
@@ -294,23 +326,24 @@ export default function GoFastWithOthersDashboard() {
         />
 
         <div className="min-w-0 flex-1">
-          {activeSection === "setup" ? (
-            <GoFastWithMeSetupPanel liveUrl={liveUrl} isPublishReady={isPublishReady} />
-          ) : null}
-          {activeSection === "members" ? (
-            <GoFastWithMeMemberManagementPanel athleteId={athleteId} publicSlug={publicSlug} />
-          ) : null}
-          {activeSection === "content" ? (
-            <GoFastWithMeContentPanel
-              publicSlug={publicSlug}
-              liveUrl={liveUrl}
-              appUrl={appUrl}
+          {activeSection === "welcome" ? (
+            <GoFastWithMeWelcomePanel
               landingValues={landingValues}
               profileBio={profileBio}
+              profilePhotoUrl={profilePhotoUrl}
+              displayName={resolvedDisplayName}
+              gofastHandle={gofastHandle}
               onSaved={(values) => {
                 setOwnerGwm((prev) => (prev ? { ...prev, ...values } : prev));
               }}
             />
+          ) : null}
+          {activeSection === "configure" ? <GoFastWithMeSetupPanel /> : null}
+          {activeSection === "content" ? (
+            <GoFastWithMeContentPanel publicSlug={publicSlug} liveUrl={liveUrl} appUrl={appUrl} />
+          ) : null}
+          {activeSection === "manage" ? (
+            <GoFastWithMeMemberManagementPanel athleteId={athleteId} publicSlug={publicSlug} />
           ) : null}
         </div>
       </div>

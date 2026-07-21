@@ -62,6 +62,7 @@ const INTRO_FIELDS = [
   'modelFocus',
   'myAchievements',
   'gofastWithMePhotoUrl',
+  'gofastWithMePhotoType',
   'creatorType',
   'coachSpecialty',
 ] as const;
@@ -120,7 +121,7 @@ export async function PATCH(request: Request) {
         {
           success: false,
           error:
-            'Provide intro fields (welcome, gofastWithMeBio, whatYoullSeeHere, sportFocus, modelFocus, myAchievements, gofastWithMePhotoUrl, creatorType, coachSpecialty), customSlug, or useGofastHandle',
+            'Provide intro fields (welcome, gofastWithMeBio, whatYoullSeeHere, sportFocus, modelFocus, myAchievements, gofastWithMePhotoUrl, gofastWithMePhotoType, creatorType, coachSpecialty), customSlug, or useGofastHandle',
         },
         { status: 400 }
       );

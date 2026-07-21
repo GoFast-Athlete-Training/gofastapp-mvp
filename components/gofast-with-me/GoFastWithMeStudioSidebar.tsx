@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { ExternalLink, Link2, PenLine, Settings, Users } from "lucide-react";
+import { CheckCircle2, ExternalLink, Globe, PenLine, Settings, Users } from "lucide-react";
 import GoFastWithMeUrlEditor from "@/components/profile/GoFastWithMeUrlEditor";
 import {
   STUDIO_SECTION_LABELS,
+  STUDIO_SECTION_ORDER,
   type StudioSection,
 } from "@/components/gofast-with-me/studio-sections";
 
 type Props = {
   activeSection: StudioSection;
   onSectionChange: (section: StudioSection) => void;
+  isWelcomeComplete: boolean;
   liveUrl: string;
   appUrl: string;
   publicSlug: string;
@@ -22,9 +24,17 @@ type Props = {
   onUrlUpdated: (slug: string, usesHandle: boolean) => void;
 };
 
+const SECTION_ICONS: Record<StudioSection, React.ReactNode> = {
+  welcome: <PenLine className="h-4 w-4" />,
+  configure: <Settings className="h-4 w-4" />,
+  content: <Globe className="h-4 w-4" />,
+  manage: <Users className="h-4 w-4" />,
+};
+
 export default function GoFastWithMeStudioSidebar({
   activeSection,
   onSectionChange,
+  isWelcomeComplete,
   liveUrl,
   appUrl,
   publicSlug,
@@ -44,24 +54,17 @@ export default function GoFastWithMeStudioSidebar({
           Studio
         </p>
 
-        <NavButton
-          active={activeSection === "setup"}
-          icon={<Settings className="h-4 w-4" />}
-          label={STUDIO_SECTION_LABELS.setup}
-          onClick={() => onSectionChange("setup")}
-        />
-        <NavButton
-          active={activeSection === "members"}
-          icon={<Users className="h-4 w-4" />}
-          label={STUDIO_SECTION_LABELS.members}
-          onClick={() => onSectionChange("members")}
-        />
-        <NavButton
-          active={activeSection === "content"}
-          icon={<PenLine className="h-4 w-4" />}
-          label={STUDIO_SECTION_LABELS.content}
-          onClick={() => onSectionChange("content")}
-        />
+        {STUDIO_SECTION_ORDER.map((section) => (
+          <NavButton
+            key={section}
+            active={activeSection === section}
+            icon={SECTION_ICONS[section]}
+            label={STUDIO_SECTION_LABELS[section]}
+            complete={section === 'welcome' ? isWelcomeComplete : undefined}
+            needed={section === 'welcome' && !isWelcomeComplete}
+            onClick={() => onSectionChange(section)}
+          />
+        ))}
       </nav>
 
       <section
@@ -74,7 +77,7 @@ export default function GoFastWithMeStudioSidebar({
             <p className="text-xs text-gray-600 mt-0.5">
               {isPublishReady
                 ? "Your landing has copy — share your public page."
-                : "Add landing copy, then share your public URL."}
+                : "Finish your landing page, then share your public URL."}
             </p>
           </div>
           <span
@@ -136,11 +139,15 @@ function NavButton({
   active,
   icon,
   label,
+  complete,
+  needed,
   onClick,
 }: {
   active: boolean;
   icon: React.ReactNode;
   label: string;
+  complete?: boolean;
+  needed?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -154,7 +161,14 @@ function NavButton({
       }`}
     >
       <span className="shrink-0">{icon}</span>
-      {label}
+      <span className="flex-1 min-w-0">{label}</span>
+      {complete ? (
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-label="Complete" />
+      ) : needed ? (
+        <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-900">
+          Needed
+        </span>
+      ) : null}
     </button>
   );
 }

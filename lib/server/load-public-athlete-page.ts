@@ -65,6 +65,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
       gwmRow.gofastWithMePhotoUrl?.trim() ||
       athlete.myBestRunPhotoURL?.trim() ||
       null,
+    gofastWithMePhotoType: gwmRow.gofastWithMePhotoType,
     creatorType: gwmRow.creatorType,
     coachSpecialty: gwmRow.coachSpecialty,
   };

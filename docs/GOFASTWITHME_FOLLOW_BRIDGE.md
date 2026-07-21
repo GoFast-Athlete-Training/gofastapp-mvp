@@ -78,18 +78,22 @@ UI: [`components/gofast-with-me/GoFastWithMeHubFeed.tsx`](../components/gofast-w
 
 ## Owner studio (`/gofast-with-others`)
 
-The owner dashboard is forked into three areas:
+The owner dashboard is ordered:
 
-| Area | Component | Purpose |
-|---|---|---|
-| Setup | `GoFastWithMeSetupPanel` | Connect/publish training plan and runs via share-hub status cards |
-| Member management | `GoFastWithMeMemberManagementPanel` | Follower list, announcements (`updates` topic), link to member hub |
-| General content | `GoFastWithMeContentPanel` | Landing identity editor + public module stubs |
+| Order | Area | Component | Purpose |
+|---|---|---|---|
+| 1 | Welcome Content | `GoFastWithMeWelcomePanel` | Who You Are — landing identity; green when welcome, bio, whatYoullSee, and photo are filled |
+| 2 | Configure | `GoFastWithMeSetupPanel` | Connect/publish training plan and runs |
+| 3 | General Content | `GoFastWithMeContentPanel` | Public module stubs, insights/tips pointers |
+| 4 | Manage | `GoFastWithMeMemberManagementPanel` | Followers, announcements, member hub |
+
+First-time users with incomplete Welcome Content land on `#welcome` automatically.
 
 Shell: [`GoFastWithOthersDashboard.tsx`](../components/gofast-with-me/GoFastWithOthersDashboard.tsx)  
-Sidebar nav: [`GoFastWithMeStudioSidebar.tsx`](../components/gofast-with-me/GoFastWithMeStudioSidebar.tsx)
+Sidebar nav: [`GoFastWithMeStudioSidebar.tsx`](../components/gofast-with-me/GoFastWithMeStudioSidebar.tsx)  
+Section helpers: [`studio-sections.ts`](../components/gofast-with-me/studio-sections.ts)
 
-Setup status uses `GET /api/me/share-hub-status` and [`share-creator-card-logic.ts`](../lib/profile/share-creator-card-logic.ts).
+Configure status uses `GET /api/me/share-hub-status` and [`share-creator-card-logic.ts`](../lib/profile/share-creator-card-logic.ts).
 
 ## Next pass (deferred)
 
