@@ -33,8 +33,7 @@ export function isWelcomeContentComplete(values: GoFastWithMeLandingValues): boo
     values.welcome?.trim() &&
       values.gofastWithMeBio?.trim() &&
       values.whatYoullSeeHere?.trim() &&
-      values.gofastWithMePhotoUrl?.trim() &&
-      values.gofastWithMePhotoType
+      values.gofastWithMePhotoUrl?.trim()
   );
 }
 

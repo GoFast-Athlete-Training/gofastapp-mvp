@@ -187,8 +187,6 @@ model gofast_with_me {
   myAchievements     String?  @db.Text
   /// Public landing hero / action image (not Athlete profile photo).
   gofastWithMePhotoUrl String?
-  /// Intent for gofastWithMePhotoUrl: action, group, portrait, race, other.
-  gofastWithMePhotoType String?
   /// Hub creator framing: "person" or "coach" (not the separate Coach entity).
   creatorType        String?
   /// Coach positioning when creatorType = "coach".

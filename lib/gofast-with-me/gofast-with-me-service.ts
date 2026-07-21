@@ -3,10 +3,6 @@ import {
   buildGoFastWithMeUrl,
   normalizeGoFastWithMeSlug,
 } from '@/lib/gofast-with-me/gofast-with-me-url-service';
-import {
-  normalizeGoFastWithMePhotoType,
-  type GoFastWithMePhotoType,
-} from '@/lib/gofast-with-me/photo-type';
 
 export { normalizeGoFastWithMeSlug, buildGoFastWithMeUrl };
 
@@ -24,7 +20,6 @@ export type GoFastWithMeRecord = {
   modelFocus: string | null;
   myAchievements: string | null;
   gofastWithMePhotoUrl: string | null;
-  gofastWithMePhotoType: GoFastWithMePhotoType | null;
   creatorType: GoFastWithMeCreatorType | null;
   coachSpecialty: string | null;
 };
@@ -37,7 +32,6 @@ export type GoFastWithMeIntroInput = {
   modelFocus?: string | null;
   myAchievements?: string | null;
   gofastWithMePhotoUrl?: string | null;
-  gofastWithMePhotoType?: GoFastWithMePhotoType | string | null;
   creatorType?: GoFastWithMeCreatorType | string | null;
   coachSpecialty?: string | null;
 };
@@ -66,7 +60,6 @@ type GoFastWithMeRow = {
   modelFocus: string | null;
   myAchievements: string | null;
   gofastWithMePhotoUrl: string | null;
-  gofastWithMePhotoType: string | null;
   creatorType: string | null;
   coachSpecialty: string | null;
 };
@@ -75,7 +68,6 @@ function toGoFastWithMeRecord(row: GoFastWithMeRow): GoFastWithMeRecord {
   return {
     ...row,
     creatorType: normalizeCreatorType(row.creatorType),
-    gofastWithMePhotoType: normalizeGoFastWithMePhotoType(row.gofastWithMePhotoType),
   };
 }
 
@@ -195,13 +187,6 @@ export async function updateGoFastWithMeIntro(
   }
   if (input.gofastWithMePhotoUrl !== undefined) {
     data.gofastWithMePhotoUrl = trimOrNull(input.gofastWithMePhotoUrl);
-  }
-  if (input.gofastWithMePhotoType !== undefined) {
-    const pt = normalizeGoFastWithMePhotoType(input.gofastWithMePhotoType);
-    if (input.gofastWithMePhotoType != null && input.gofastWithMePhotoType !== '' && !pt) {
-      throw new Error('gofastWithMePhotoType must be action, group, portrait, race, or other');
-    }
-    data.gofastWithMePhotoType = pt;
   }
   if (input.creatorType !== undefined) {
     const ct = normalizeCreatorType(input.creatorType);

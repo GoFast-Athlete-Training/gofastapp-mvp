@@ -4,11 +4,6 @@ import { MapPin, User } from 'lucide-react';
 import HeroOwnerNudge from './HeroOwnerNudge';
 import ShareButton from './ShareButton';
 import type { PublicAction } from '@/lib/gofast-with-me/resolve-public-actions';
-import {
-  normalizeGoFastWithMePhotoType,
-  usesWideFeaturePhotoLayout,
-  type GoFastWithMePhotoType,
-} from '@/lib/gofast-with-me/photo-type';
 
 type Props = {
   athleteId: string;
@@ -17,7 +12,6 @@ type Props = {
   handle: string | null;
   photoURL: string | null;
   gofastWithMePhotoUrl: string | null;
-  gofastWithMePhotoType: GoFastWithMePhotoType | string | null;
   city: string | null;
   state: string | null;
   primarySport: string | null;
@@ -51,8 +45,6 @@ export default function ProfileHero(props: Props) {
     fiveKPace: props.fiveKPace,
   });
   const pagePhoto = props.gofastWithMePhotoUrl?.trim() || null;
-  const photoType = normalizeGoFastWithMePhotoType(props.gofastWithMePhotoType);
-  const wideFeature = usesWideFeaturePhotoLayout(pagePhoto, photoType);
   const actions = props.publicActions ?? [];
 
   return (
@@ -118,9 +110,9 @@ export default function ProfileHero(props: Props) {
         </div>
       </div>
 
-      {pagePhoto && wideFeature ? (
+      {pagePhoto ? (
         <div className="max-w-2xl mx-auto px-5 sm:px-6 pt-5">
-          <div className="w-full aspect-[16/7] rounded-2xl overflow-hidden shadow-md bg-sky-100">
+          <div className="w-full aspect-[16/9] rounded-2xl overflow-hidden shadow-md bg-sky-100">
             <Image
               src={pagePhoto}
               alt=""
@@ -131,19 +123,6 @@ export default function ProfileHero(props: Props) {
               priority
             />
           </div>
-        </div>
-      ) : null}
-
-      {pagePhoto && !wideFeature ? (
-        <div className="max-w-2xl mx-auto px-5 sm:px-6 pt-5 flex justify-center">
-          <Image
-            src={pagePhoto}
-            alt=""
-            width={160}
-            height={160}
-            className="w-32 h-32 rounded-2xl object-cover shadow-md border border-stone-200 bg-white"
-            unoptimized
-          />
         </div>
       ) : null}
     </header>

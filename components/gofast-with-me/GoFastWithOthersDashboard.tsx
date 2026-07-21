@@ -33,7 +33,6 @@ type OwnerGwmRow = {
   modelFocus: string | null;
   myAchievements: string | null;
   gofastWithMePhotoUrl: string | null;
-  gofastWithMePhotoType: GoFastWithMeLandingValues['gofastWithMePhotoType'];
   creatorType: GoFastWithMeCreatorType | null;
   coachSpecialty: string | null;
   gofastSlugSnapshot?: string;
@@ -49,7 +48,6 @@ function ownerRowToLanding(row: OwnerGwmRow | null): GoFastWithMeLandingValues {
     modelFocus: row?.modelFocus ?? null,
     myAchievements: row?.myAchievements ?? null,
     gofastWithMePhotoUrl: row?.gofastWithMePhotoUrl ?? null,
-    gofastWithMePhotoType: row?.gofastWithMePhotoType ?? null,
   };
 }
 
@@ -59,7 +57,6 @@ export default function GoFastWithOthersDashboard() {
   const [gofastHandle, setGofastHandle] = useState<string | null>(null);
   const [firstName, setFirstName] = useState<string | null>(null);
   const [profileBio, setProfileBio] = useState<string | null>(null);
-  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [ownerGwm, setOwnerGwm] = useState<OwnerGwmRow | null>(null);
   const [publicSlug, setPublicSlug] = useState<string | null>(null);
   const [slugUsesHandle, setSlugUsesHandle] = useState(true);
@@ -132,7 +129,6 @@ export default function GoFastWithOthersDashboard() {
         setGofastHandle(handle);
         setFirstName(athlete?.firstName ?? null);
         setProfileBio(athlete?.bio ?? null);
-        setProfilePhotoUrl(athlete?.photoURL ?? null);
 
         const gwm = gwmRes.data?.gofastWithMe as OwnerGwmRow | null;
         setOwnerGwm(gwm);
@@ -208,7 +204,6 @@ export default function GoFastWithOthersDashboard() {
                   modelFocus: null,
                   myAchievements: null,
                   gofastWithMePhotoUrl: null,
-                  gofastWithMePhotoType: null,
                   creatorType,
                   coachSpecialty,
                 }
@@ -231,8 +226,6 @@ export default function GoFastWithOthersDashboard() {
   const liveUrl = `${RUNNER_BASE}/${publicSlug}`;
   const appUrl = `/u/${publicSlug}`;
   const visitorHeadline = firstName ? `GoFast with ${firstName}` : "Your public page";
-  const resolvedDisplayName =
-    firstName?.trim() || (gofastHandle ? `@${gofastHandle}` : "Your page");
   const creatorLabel =
     ownerGwm?.creatorType === "coach"
       ? "Coach"
@@ -330,9 +323,6 @@ export default function GoFastWithOthersDashboard() {
             <GoFastWithMeWelcomePanel
               landingValues={landingValues}
               profileBio={profileBio}
-              profilePhotoUrl={profilePhotoUrl}
-              displayName={resolvedDisplayName}
-              gofastHandle={gofastHandle}
               onSaved={(values) => {
                 setOwnerGwm((prev) => (prev ? { ...prev, ...values } : prev));
               }}

@@ -8,18 +8,12 @@ import { isWelcomeContentComplete } from '@/components/gofast-with-me/studio-sec
 type Props = {
   landingValues: GoFastWithMeLandingValues;
   profileBio: string | null;
-  profilePhotoUrl: string | null;
-  displayName: string;
-  gofastHandle: string | null;
   onSaved: (values: GoFastWithMeLandingValues) => void;
 };
 
 export default function GoFastWithMeWelcomePanel({
   landingValues,
   profileBio,
-  profilePhotoUrl,
-  displayName,
-  gofastHandle,
   onSaved,
 }: Props) {
   const complete = isWelcomeContentComplete(landingValues);
@@ -44,8 +38,8 @@ export default function GoFastWithMeWelcomePanel({
 
       {!complete ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Add your welcome message, bio, what visitors will see, a page photo, and photo type to
-          finish your landing page.
+          Add your welcome message, bio, what visitors will see, and attach a run image to finish
+          your landing page.
         </div>
       ) : (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
@@ -56,9 +50,6 @@ export default function GoFastWithMeWelcomePanel({
       <GoFastWithMeLandingForm
         initial={landingValues}
         profileBio={profileBio}
-        profilePhotoUrl={profilePhotoUrl}
-        displayName={displayName}
-        gofastHandle={gofastHandle}
         onSaved={onSaved}
       />
     </section>
