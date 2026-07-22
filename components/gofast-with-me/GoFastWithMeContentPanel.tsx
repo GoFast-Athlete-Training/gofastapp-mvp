@@ -47,7 +47,7 @@ export default function GoFastWithMeCmsContentSection({ liveUrl }: Props) {
       <div className="grid gap-3 sm:grid-cols-3">
         <CmsCapabilityCard
           title="Tips"
-          modelName="gofast_with_me_tips"
+          modelName="athlete_tips"
           description="Short coaching insights and notes that appear on your public landing."
           status="Planned — athlete-scoped CMS model"
         />

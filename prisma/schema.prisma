@@ -169,6 +169,7 @@ model Athlete {
   plan_custom_workouts         plan_custom_workouts[]
   athlete_appnotification_devices     athlete_appnotification_devices[]
   gofast_with_me              gofast_with_me?
+  athlete_tips                athlete_tips[]
 }
 
 /// Athlete-scoped GoFast With Me — public invite identity (not the human Athlete profile).
@@ -196,6 +197,24 @@ model gofast_with_me {
   athlete            Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
   @@map("gofast_with_me")
+}
+
+/// Athlete-scoped durable public tips (CMS content — not container feed posts).
+model athlete_tips {
+  id          String    @id @default(cuid())
+  athleteId   String
+  title       String
+  body        String    @db.Text
+  sortOrder   Int       @default(0)
+  isPublished Boolean   @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  athlete     Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@index([athleteId, sortOrder])
+  @@index([athleteId, isPublished])
+  @@map("athlete_tips")
 }
 
 /// Human coach — first-class entity (Firebase auth), parallel to Athlete.

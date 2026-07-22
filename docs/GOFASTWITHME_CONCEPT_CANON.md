@@ -77,8 +77,8 @@ These content types should be owned by `Athlete.id`. They may link to `gofast_wi
 
 Naming matters:
 
-- Use `myRunRoutes` for athlete-authored running routes so it is not confused with Next.js/API routes.
-- Use GoFastWithMe-scoped table names such as `gofast_with_me_tips`, `gofast_with_me_my_run_routes`, and `gofast_with_me_blog_posts`.
+- Use short `athlete_*` table names for CMS content (e.g. `athlete_tips`, later `athlete_run_routes`, `athlete_blog_posts`).
+- Use `myRunRoutes` in product copy for athlete-authored running routes so it is not confused with Next.js/API routes.
 - Keep container feed topics separate from durable CMS content.
 
 ## MVP1 Studio Areas
@@ -90,7 +90,8 @@ Use names that match the fork:
    - Landing content: public copy, page photo, athlete intro, and athlete-scoped "who am I?" content.
    - Production CMS content types: Tips, myRunRoutes, and Blog.
    - CMS content can appear on the landing page and can also feed the container/member experience when explicitly designed.
-   - Historical note: `20260718120000_gofast_pages` introduced `athlete_tips` and `gofast_page_routes`, but `20260718140000_gofast_with_me_refactor` dropped those CMS tables when `gofast_pages` became `gofast_with_me`.
+   - Historical note: an early `20260718120000_gofast_pages` migration briefly had page-scoped `athlete_tips` and `gofast_page_routes`; `20260718140000_gofast_with_me_refactor` dropped those when `gofast_pages` became `gofast_with_me`.
+   - Current schema: `athlete_tips` is restored as athlete-owned CMS content (FK to `Athlete.id`, not `gofast_with_me`).
    - Current schema has `gofast_container_messages.topic = tips`, but that is a container feed post topic, not a CMS content model.
    - Important naming correction: old `gofast_page_routes` meant athlete/run routes attached to the GoFastWithMe page, not Next.js page routes. Future naming should be `myRunRoutes`.
 
@@ -154,13 +155,11 @@ Code areas:
 Current schema reality:
 
 - `gofast_with_me` exists for public identity/copy.
-- `athlete_tips` and `gofast_page_routes` existed briefly, then were intentionally dropped from v1 in the GoFastWithMe refactor.
-- `gofast_page_routes` was about running routes (`routes` model), not app/page routing.
-- `gofast_container_messages` supports a `tips` topic, but that belongs to the member container feed.
-- Blog does not appear as a current first-class GoFastWithMe CMS model in this repo.
-- Tips and myRunRoutes should be restored as GoFastWithMe CMS capability, but not under the old `athlete_tips` / `gofast_page_routes` naming.
-- CMS content should be modeled deliberately as GoFastWithMe child concepts, not resurrected under the old names by accident.
-- CMS content should FK to `Athlete.id` for ownership/authorship; optional links to `gofast_with_me` can describe placement on the public GoFastWithMe surface.
+- `athlete_tips` exists for durable athlete-owned CMS tips (`Athlete.id` FK).
+- `gofast_page_routes` existed briefly in the old page model, then was dropped; future run-route CMS should use a short name like `athlete_run_routes`.
+- `gofast_container_messages` supports a `tips` topic, but that belongs to the member container feed — not `athlete_tips`.
+- Blog and myRunRoutes tables are not in schema yet; add them later with the same short `athlete_*` style when needed.
+- CMS content FKs to `Athlete.id` for ownership/authorship; no requirement to also FK `gofast_with_me` for v1.
 
 ### Athlete Owns
 
@@ -340,8 +339,7 @@ Do not build these:
 - No separate vague `General Content` top-level item that competes with CMS.
 - No UI that highlights CMS content types before the required Landing Page basics.
 - No pretending current `gofast_container_messages.topic = tips` is the full CMS tips/blog/course system.
-- No restoring `athlete_tips` / `gofast_page_routes` under old names without revisiting the tightened GoFastWithMe model.
-- No treating Tips, myRunRoutes, and Blog as out-of-scope forever; they are the CMS capability that needs to come back.
+- No treating Tips, myRunRoutes, and Blog as out-of-scope forever; they are CMS capability — `athlete_tips` is the first table back.
 - No flow where the user is warned to finish Landing Page but shown another active panel.
 - No treating the public landing page as the real app container.
 
@@ -351,7 +349,7 @@ Use product language that matches the data:
 
 - "GoFastWithMe CMS" for the public landing page controls.
 - "GoFastWithMe Add My Plan" for attaching or publishing the athlete-owned active training plan.
-- "Tips", "myRunRoutes", and "Blog" for CMS content types.
+- "Tips", "myRunRoutes", and "Blog" for CMS content types (tables: `athlete_tips`, future `athlete_run_routes`, `athlete_blog_posts`).
 - "GoFastWithMe Member Manager" for owner controls, followers, announcements, and audience communication.
 - "View as member" for `/container/[handle]`.
 - "View public page" for the public landing route.
