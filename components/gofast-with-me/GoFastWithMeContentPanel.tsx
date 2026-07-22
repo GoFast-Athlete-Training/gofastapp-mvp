@@ -1,208 +1,107 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ExternalLink, Globe, Lightbulb, Users } from 'lucide-react';
-
-type PublicModuleSnapshot = {
-  publishedPlans: { slug: string; title: string }[];
-  upcomingRuns: { id: string; title: string; gorunPath: string }[];
-  isGoFastContainer: boolean;
-};
+import { BookOpen, ExternalLink, MapPin, Sparkles } from 'lucide-react';
 
 type Props = {
-  publicSlug: string;
   liveUrl: string;
-  appUrl: string;
 };
 
-function ModuleStub({
+function CmsCapabilityCard({
   title,
+  modelName,
+  description,
   status,
-  primaryHref,
-  primaryLabel,
-  secondaryHref,
-  secondaryLabel,
 }: {
   title: string;
+  modelName: string;
+  description: string;
   status: string;
-  primaryHref: string;
-  primaryLabel: string;
-  secondaryHref?: string;
-  secondaryLabel?: string;
 }) {
   return (
-    <article className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+    <article className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4">
       <h4 className="text-sm font-semibold text-gray-900">{title}</h4>
-      <p className="text-xs text-gray-600 mt-1">{status}</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Link
-          href={primaryHref}
-          className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
-        >
-          {primaryLabel}
-        </Link>
-        {secondaryHref && secondaryLabel ? (
-          <Link
-            href={secondaryHref}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50"
-          >
-            {secondaryLabel}
-          </Link>
-        ) : null}
-      </div>
+      <p className="text-[11px] font-mono text-gray-500 mt-1">{modelName}</p>
+      <p className="text-xs text-gray-600 mt-2">{description}</p>
+      <p className="mt-3 text-xs font-medium text-amber-800">{status}</p>
     </article>
   );
 }
 
-export default function GoFastWithMeContentPanel({ publicSlug, liveUrl, appUrl }: Props) {
-  const [modules, setModules] = useState<PublicModuleSnapshot | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/athlete/public/${encodeURIComponent(publicSlug)}`);
-        const data = await res.json();
-        if (!cancelled && res.ok && data.success) {
-          setModules({
-            publishedPlans: data.publishedPlans ?? [],
-            upcomingRuns: data.upcomingRuns ?? [],
-            isGoFastContainer: !!data.isGoFastContainer,
-          });
-        }
-      } catch {
-        /* optional snapshot */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [publicSlug]);
-
-  const firstPlan = modules?.publishedPlans?.[0];
-  const firstRun = modules?.upcomingRuns?.[0];
-
+export default function GoFastWithMeCmsContentSection({ liveUrl }: Props) {
   return (
-    <section id="content" className="space-y-6">
+    <section id="cms-content" className="space-y-4">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">General Content</h2>
+        <h3 className="text-sm font-semibold text-gray-900">CMS content</h3>
         <p className="text-sm text-gray-600 mt-1">
-          Build out your page with insights, tips, and joinable modules that appear on your public
-          page and member hub.
+          Athlete-scoped production content owned by your Athlete ID — durable public creator
+          surface, not container feed posts.
         </p>
       </div>
 
-      <article className="rounded-2xl border border-violet-200 bg-violet-50/40 p-5 shadow-sm">
+      <div className="rounded-lg border border-violet-200 bg-violet-50/50 px-4 py-3 text-xs text-violet-900">
+        Container feed tips (<code className="font-mono">gofast_container_messages.topic = tips</code>
+        ) are separate from CMS Tips. CMS models and editor flows are coming in a follow-up pass.
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <CmsCapabilityCard
+          title="Tips"
+          modelName="gofast_with_me_tips"
+          description="Short coaching insights and notes that appear on your public landing."
+          status="Planned — athlete-scoped CMS model"
+        />
+        <CmsCapabilityCard
+          title="myRunRoutes"
+          modelName="gofast_with_me_my_run_routes"
+          description="Running routes you recommend — not Next.js routes or page URLs."
+          status="Planned — athlete-scoped CMS model"
+        />
+        <CmsCapabilityCard
+          title="Blog"
+          modelName="gofast_with_me_blog_posts"
+          description="Longer posts to keep your landing page feeling like a live blog."
+          status="Planned — athlete-scoped CMS model"
+        />
+      </div>
+
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-3">
         <div className="flex items-start gap-2">
-          <Lightbulb className="h-5 w-5 text-violet-700 mt-0.5 shrink-0" />
+          <Sparkles className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Insights & tips</h3>
+            <h4 className="text-sm font-semibold text-gray-900">What hydrates today</h4>
             <p className="text-xs text-gray-600 mt-1">
-              Post tips, nutrition notes, and updates from Manage — they appear in your member hub
-              feed and help followers stay engaged.
+              Your landing intro, page photo, published training plan, and hosted runs hydrate from
+              real athlete-owned data — not fake CMS placeholders.
             </p>
-            <Link
-              href="/gofast-with-others#manage"
-              className="mt-3 inline-flex rounded-lg border border-violet-300 bg-white px-3 py-2 text-xs font-semibold text-violet-900 hover:bg-violet-50"
-            >
-              Open Manage to post content
-            </Link>
           </div>
         </div>
-      </article>
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
-        <div className="flex items-start gap-2">
-          <Globe className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900">Public page modules</h3>
-            <p className="text-xs text-gray-600 mt-1">
-              These hydrate from real data — configure plans and runs in Configure.
-            </p>
-          </div>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/gofast-with-others#configure"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-100"
+          >
+            <MapPin className="h-3.5 w-3.5" />
+            Add My Plan
+          </Link>
+          <Link
+            href="/gofast-with-others#manage"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-100"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            Member Manager
+          </Link>
+          <a
+            href={liveUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-orange-600 hover:text-orange-700"
+          >
+            View public page
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
         </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <ModuleStub
-            title="Public page"
-            status="Landing intro + page photo from Landing Page"
-            primaryHref={appUrl}
-            primaryLabel="View in app"
-            secondaryHref={liveUrl}
-            secondaryLabel="Live page"
-          />
-
-          <ModuleStub
-            title="Training plan"
-            status={
-              firstPlan
-                ? `${firstPlan.title} is live on your public page`
-                : 'No published plan yet'
-            }
-            primaryHref={firstPlan ? `/plans/${encodeURIComponent(firstPlan.slug)}` : '/training/lead'}
-            primaryLabel={firstPlan ? 'View public plan' : 'Publish plan'}
-            secondaryHref="/gofast-with-others#configure"
-            secondaryLabel="Go to Configure"
-          />
-
-          <ModuleStub
-            title="Public runs"
-            status={
-              modules?.upcomingRuns?.length
-                ? `${modules.upcomingRuns.length} upcoming hosted run${modules.upcomingRuns.length === 1 ? '' : 's'}`
-                : 'No upcoming public runs'
-            }
-            primaryHref={
-              firstRun
-                ? firstRun.gorunPath.startsWith('/')
-                  ? firstRun.gorunPath
-                  : `/${firstRun.gorunPath}`
-                : '/host-a-run'
-            }
-            primaryLabel={firstRun ? 'View next run' : 'Host a run'}
-            secondaryHref="/gofast-with-others#configure"
-            secondaryLabel="Go to Configure"
-          />
-
-          <article className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <div className="flex items-start gap-2">
-              <Users className="h-4 w-4 text-violet-600 mt-0.5 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <h4 className="text-sm font-semibold text-gray-900">Follow & member hub</h4>
-                <p className="text-xs text-gray-600 mt-1">
-                  {modules?.isGoFastContainer
-                    ? 'Followers can join your member hub after following'
-                    : 'Follow surface enables when someone follows you'}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Link
-                    href={`/follow/${encodeURIComponent(publicSlug)}`}
-                    className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
-                  >
-                    Follow explainer
-                  </Link>
-                  <Link
-                    href={`/container/${encodeURIComponent(publicSlug)}`}
-                    className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50"
-                  >
-                    Member hub
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </article>
-        </div>
-
-        <a
-          href={liveUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-orange-600 hover:text-orange-700"
-        >
-          Preview full public page
-          <ExternalLink className="h-3.5 w-3.5" />
-        </a>
       </div>
     </section>
   );

@@ -28,6 +28,11 @@ export type ShareHubPlanStatus = {
   hasSchedule: boolean;
   isPublished: boolean;
   publicSlug: string | null;
+  publicVisibility: "DRAFT" | "PUBLIC" | "UNLISTED" | "ARCHIVED" | null;
+  publicDescription: string | null;
+  raceName: string | null;
+  raceDistanceLabel: string | null;
+  goalRaceTime: string | null;
 };
 
 export type ShareHubRunStatus = {

@@ -3,28 +3,32 @@
 import GoFastWithMeLandingForm, {
   type GoFastWithMeLandingValues,
 } from '@/components/gofast-with-me/GoFastWithMeLandingForm';
+import GoFastWithMeCmsContentSection from '@/components/gofast-with-me/GoFastWithMeContentPanel';
 import { isWelcomeContentComplete } from '@/components/gofast-with-me/studio-sections';
 
 type Props = {
   landingValues: GoFastWithMeLandingValues;
   profileBio: string | null;
+  liveUrl: string;
   onSaved: (values: GoFastWithMeLandingValues) => void;
 };
 
 export default function GoFastWithMeWelcomePanel({
   landingValues,
   profileBio,
+  liveUrl,
   onSaved,
 }: Props) {
   const complete = isWelcomeContentComplete(landingValues);
 
   return (
-    <section id="welcome" className="space-y-6">
+    <section id="welcome" className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Landing Page</h2>
+          <h2 className="text-lg font-bold text-gray-900">GoFastWithMe CMS</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Who you are and how visitors should join you — get this right before configuring modules.
+            Your public landing page — who you are, what visitors see, and the content that makes
+            your page feel alive.
           </p>
         </div>
         <span
@@ -32,26 +36,32 @@ export default function GoFastWithMeWelcomePanel({
             complete ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'
           }`}
         >
-          {complete ? 'Complete' : 'Needed'}
+          {complete ? 'Complete' : 'Required first'}
         </span>
       </div>
 
       {!complete ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Add your welcome message, bio, what visitors will see, and attach a run image to finish
-          your landing page.
+          <strong>Required first step.</strong> Add your welcome message, bio, what visitors will
+          see, and attach a run image to finish your landing page. Plan and member tools stay locked
+          until this is done.
         </div>
       ) : (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          Landing page is complete — next, configure plans and runs.
+          Landing page is complete — next up: Add My Plan to publish your active training plan.
         </div>
       )}
 
-      <GoFastWithMeLandingForm
-        initial={landingValues}
-        profileBio={profileBio}
-        onSaved={onSaved}
-      />
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-gray-900">Landing page</h3>
+        <GoFastWithMeLandingForm
+          initial={landingValues}
+          profileBio={profileBio}
+          onSaved={onSaved}
+        />
+      </div>
+
+      <GoFastWithMeCmsContentSection liveUrl={liveUrl} />
     </section>
   );
 }

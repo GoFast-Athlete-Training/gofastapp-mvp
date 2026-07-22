@@ -2,11 +2,14 @@ import type { GoFastWithMeLandingValues } from '@/components/gofast-with-me/GoFa
 
 export type StudioSection = 'welcome' | 'configure' | 'content' | 'manage';
 
+/** Sidebar-visible sections (content is folded under CMS / welcome). */
+export const STUDIO_SIDEBAR_SECTIONS: StudioSection[] = ['welcome', 'configure', 'manage'];
+
 export const STUDIO_SECTION_LABELS: Record<StudioSection, string> = {
-  welcome: 'Landing Page',
-  configure: 'Configure',
-  content: 'General Content',
-  manage: 'Manage',
+  welcome: 'GoFastWithMe CMS',
+  configure: 'Add My Plan',
+  content: 'CMS Content',
+  manage: 'Member Manager',
 };
 
 export const STUDIO_SECTION_ORDER: StudioSection[] = [
@@ -37,11 +40,41 @@ export function isWelcomeContentComplete(values: GoFastWithMeLandingValues): boo
   );
 }
 
+/** Gate section selection: landing must be complete before plan/member tools. */
+export function resolveGatedStudioSection(
+  requested: StudioSection | null,
+  values: GoFastWithMeLandingValues
+): StudioSection {
+  const landingComplete = isWelcomeContentComplete(values);
+
+  if (!landingComplete) {
+    return 'welcome';
+  }
+
+  // General Content is folded under GoFastWithMe CMS (welcome).
+  if (requested === 'content') {
+    return 'welcome';
+  }
+
+  if (requested) {
+    return requested;
+  }
+
+  return 'configure';
+}
+
 export function defaultStudioSection(
   values: GoFastWithMeLandingValues,
   explicitHash: string | null
 ): StudioSection {
   const fromHash = explicitHash ? parseStudioSectionFromHash(explicitHash) : null;
-  if (fromHash) return fromHash;
-  return isWelcomeContentComplete(values) ? 'configure' : 'welcome';
+  return resolveGatedStudioSection(fromHash, values);
+}
+
+export function isStudioSectionLocked(
+  section: StudioSection,
+  values: GoFastWithMeLandingValues
+): boolean {
+  if (section === 'welcome' || section === 'content') return false;
+  return !isWelcomeContentComplete(values);
 }

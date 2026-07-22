@@ -69,9 +69,10 @@ export default function GoFastWithMeMemberManagementPanel({ athleteId, publicSlu
   return (
     <section id="manage" className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">Manage</h2>
+        <h2 className="text-lg font-bold text-gray-900">GoFastWithMe Member Manager</h2>
         <p className="text-sm text-gray-600 mt-1">
-          View followers, send announcements, and open your member hub to message the group.
+          Owner controls for your follower container — see who follows you, send announcements, and
+          preview the member experience.
         </p>
       </div>
 
@@ -106,7 +107,7 @@ export default function GoFastWithMeMemberManagementPanel({ athleteId, publicSlu
             href={hubPath}
             className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800 hover:bg-orange-100"
           >
-            Open member hub
+            View as member
             <ExternalLink className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -135,7 +136,7 @@ export default function GoFastWithMeMemberManagementPanel({ athleteId, publicSlu
           <div>
             <h3 className="text-sm font-semibold text-gray-900">Send announcement</h3>
             <p className="text-xs text-gray-600 mt-1">
-              Posts to the Updates channel in your member hub — visible to all followers.
+              Posts to the Updates channel in your member container — visible to all followers.
             </p>
           </div>
         </div>
@@ -161,13 +162,13 @@ export default function GoFastWithMeMemberManagementPanel({ athleteId, publicSlu
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <h3 className="text-sm font-semibold text-gray-900">Message members</h3>
         <p className="text-xs text-gray-600 mt-1">
-          Open your member hub to post in Chatter or reply to follower conversations.
+          Open your member container to post in Chatter or reply to follower conversations.
         </p>
         <Link
           href={`${hubPath}#feed`}
           className="mt-3 inline-flex rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100"
         >
-          Open hub feed
+          View as member — hub feed
         </Link>
       </div>
     </section>

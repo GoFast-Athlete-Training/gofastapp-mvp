@@ -12,12 +12,12 @@ import GoFastWithMeHubOnboarding from "@/components/gofast-with-me/GoFastWithMeH
 import GoFastWithMeStudioSidebar from "@/components/gofast-with-me/GoFastWithMeStudioSidebar";
 import GoFastWithMeSetupPanel from "@/components/gofast-with-me/GoFastWithMeSetupPanel";
 import GoFastWithMeMemberManagementPanel from "@/components/gofast-with-me/GoFastWithMeMemberManagementPanel";
-import GoFastWithMeContentPanel from "@/components/gofast-with-me/GoFastWithMeContentPanel";
 import GoFastWithMeWelcomePanel from "@/components/gofast-with-me/GoFastWithMeWelcomePanel";
 import {
   defaultStudioSection,
   isWelcomeContentComplete,
   parseStudioSectionFromHash,
+  resolveGatedStudioSection,
   type StudioSection,
 } from "@/components/gofast-with-me/studio-sections";
 
@@ -51,6 +51,10 @@ function ownerRowToLanding(row: OwnerGwmRow | null): GoFastWithMeLandingValues {
   };
 }
 
+function normalizeStudioHash(section: StudioSection) {
+  window.history.replaceState(null, "", `#${section}`);
+}
+
 export default function GoFastWithOthersDashboard() {
   const router = useRouter();
   const [athleteId, setAthleteId] = useState<string | null>(null);
@@ -77,30 +81,36 @@ export default function GoFastWithOthersDashboard() {
       landingValues.whatYoullSeeHere?.trim()
   );
 
+  const handleSectionChange = useCallback(
+    (section: StudioSection) => {
+      const resolved = resolveGatedStudioSection(section, landingValues);
+      setActiveSection(resolved);
+      normalizeStudioHash(resolved);
+    },
+    [landingValues]
+  );
+
   useEffect(() => {
     if (sectionInitialized || loading || showOnboarding) return;
     const hash = typeof window !== "undefined" ? window.location.hash : "";
     const section = defaultStudioSection(landingValues, hash || null);
     setActiveSection(section);
-    if (!hash) {
-      window.history.replaceState(null, "", `#${section}`);
-    }
+    normalizeStudioHash(section);
     setSectionInitialized(true);
   }, [landingValues, loading, showOnboarding, sectionInitialized]);
 
   useEffect(() => {
     const onHash = () => {
       const parsed = parseStudioSectionFromHash(window.location.hash);
-      if (parsed) setActiveSection(parsed);
+      const resolved = resolveGatedStudioSection(parsed, landingValues);
+      setActiveSection(resolved);
+      if (window.location.hash !== `#${resolved}`) {
+        normalizeStudioHash(resolved);
+      }
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
-  }, []);
-
-  const handleSectionChange = useCallback((section: StudioSection) => {
-    setActiveSection(section);
-    window.history.replaceState(null, "", `#${section}`);
-  }, []);
+  }, [landingValues]);
 
   useEffect(() => {
     const id = LocalStorageAPI.getAthleteId();
@@ -242,8 +252,9 @@ export default function GoFastWithOthersDashboard() {
           </p>
           <h1 className="text-2xl font-bold text-gray-900">GoFastWithMe studio</h1>
           <p className="text-gray-600 text-sm mt-1 max-w-xl">
-            Start with your landing page, then configure plans and runs, add general content, and
-            manage followers.
+            Start with GoFastWithMe CMS (your public landing), add your active training plan, then
+            manage your follower container. View the public page as a visitor or preview the member
+            experience.
           </p>
         </div>
         <a
@@ -252,7 +263,7 @@ export default function GoFastWithOthersDashboard() {
           rel="noopener noreferrer"
           className="inline-flex shrink-0 items-center justify-center rounded-lg border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-800 hover:bg-orange-100"
         >
-          View {visitorHeadline} →
+          View public page →
         </a>
       </div>
 
@@ -280,14 +291,17 @@ export default function GoFastWithOthersDashboard() {
 
       {!isWelcomeComplete ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-wrap items-center justify-between gap-2">
-          <span>Complete your landing page first — who you are is the foundation of your page.</span>
+          <span>
+            Finish GoFastWithMe CMS first — your landing page is the public door before plan and
+            member tools unlock.
+          </span>
           {activeSection !== "welcome" ? (
             <button
               type="button"
               onClick={() => handleSectionChange("welcome")}
               className="shrink-0 font-semibold text-amber-900 underline hover:no-underline"
             >
-              Go to Landing Page
+              Go to GoFastWithMe CMS
             </button>
           ) : null}
         </div>
@@ -323,15 +337,17 @@ export default function GoFastWithOthersDashboard() {
             <GoFastWithMeWelcomePanel
               landingValues={landingValues}
               profileBio={profileBio}
+              liveUrl={liveUrl}
               onSaved={(values) => {
+                const wasComplete = isWelcomeContentComplete(landingValues);
                 setOwnerGwm((prev) => (prev ? { ...prev, ...values } : prev));
+                if (!wasComplete && isWelcomeContentComplete(values)) {
+                  handleSectionChange("configure");
+                }
               }}
             />
           ) : null}
           {activeSection === "configure" ? <GoFastWithMeSetupPanel /> : null}
-          {activeSection === "content" ? (
-            <GoFastWithMeContentPanel publicSlug={publicSlug} liveUrl={liveUrl} appUrl={appUrl} />
-          ) : null}
           {activeSection === "manage" ? (
             <GoFastWithMeMemberManagementPanel athleteId={athleteId} publicSlug={publicSlug} />
           ) : null}
