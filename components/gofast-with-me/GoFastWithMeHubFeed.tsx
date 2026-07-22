@@ -96,7 +96,7 @@ export default function GoFastWithMeHubFeed({
       <section className="rounded-2xl border border-gray-200 bg-white p-5">
         <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Feed</h2>
         <p className="mt-2 text-sm text-gray-600">
-          Follow to read updates, tips, nutrition, routes, and chatter from this athlete.
+          GoFast with this athlete to read updates, tips, nutrition, routes, and chatter.
         </p>
       </section>
     );

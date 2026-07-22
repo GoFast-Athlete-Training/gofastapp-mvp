@@ -87,22 +87,41 @@ export default function ProfileHero(props: Props) {
                 {stats ? <p className="mt-1 text-sm text-sky-100">{stats}</p> : null}
 
                 {actions.length > 0 ? (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {actions.map((action) => (
-                      <Link
-                        key={`${action.label}-${action.href}`}
-                        href={action.href}
-                        className="inline-flex items-center rounded-xl bg-white px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50"
-                      >
-                        {action.label}
-                      </Link>
-                    ))}
+                  <div className="mt-4 space-y-2">
+                    <Link
+                      href={actions[0].href}
+                      className="inline-flex items-center rounded-xl bg-white px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50"
+                    >
+                      {actions[0].label}
+                    </Link>
+                    {actions.length > 1 ? (
+                      <div className="flex flex-wrap gap-x-3 gap-y-1">
+                        {actions.slice(1).map((action) => (
+                          <Link
+                            key={`${action.label}-${action.href}`}
+                            href={action.href}
+                            className="text-xs font-medium text-sky-100 hover:text-white underline-offset-2 hover:underline"
+                          >
+                            {action.label}
+                          </Link>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              <Link href="/welcome" className="hidden sm:block shrink-0" aria-label="GoFast home">
+                <Image
+                  src="/logo.png"
+                  alt="GoFast"
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 rounded-full object-cover border-2 border-white"
+                />
+              </Link>
               <HeroOwnerNudge athleteId={props.athleteId} hasHero={Boolean(pagePhoto)} />
               <ShareButton handle={props.handle} displayName={props.displayName} />
             </div>

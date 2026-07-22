@@ -392,22 +392,19 @@ export default function GoFastPagePreviewCard({
 
         {data.isGoFastContainer && athlete.gofastHandle ? (
           <section className="rounded-2xl border border-violet-500/35 bg-zinc-900/85 p-5 shadow-lg shadow-violet-950/20">
-            <h2 className="text-lg font-semibold text-white mb-1">Community</h2>
+            <h2 className="text-lg font-semibold text-white mb-1">GoFast with others</h2>
             <p className="text-sm text-zinc-400 mb-4">
-              Join {displayName}&apos;s community — upcoming runs below, chatter in the app.
+              {data.containerMemberCount ?? 0} runner
+              {(data.containerMemberCount ?? 0) !== 1 ? "s" : ""} GoFast with {displayName} in the app.
             </p>
             <div className="flex flex-wrap items-center gap-3 mb-4">
               <a
-                href={`${appBase.replace(/\/$/, "")}/container/${encodeURIComponent(athlete.gofastHandle)}`}
+                href={`${appBase.replace(/\/$/, "")}/gofast-with/${encodeURIComponent(data.gofastWithMe?.gofastSlugSnapshot || athlete.gofastHandle)}`}
                 className="inline-flex items-center gap-2 rounded-full bg-violet-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-400 transition-colors"
               >
-                Join community
+                {headline}
                 <ChevronRight className="w-4 h-4" />
               </a>
-              <span className="text-sm text-zinc-400">
-                {data.containerMemberCount ?? 0} member
-                {(data.containerMemberCount ?? 0) !== 1 ? "s" : ""}
-              </span>
             </div>
             {(data.containerRecentMembers?.length ?? 0) > 0 ? (
               <div className="flex flex-wrap gap-2 mb-4">

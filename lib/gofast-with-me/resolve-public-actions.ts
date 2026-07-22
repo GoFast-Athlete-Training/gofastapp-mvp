@@ -1,4 +1,8 @@
 import { getGoFastAppPublicUrl } from '@/lib/gofast-app-public-url';
+import {
+  goFastWithFrontDoorUrl,
+  resolvePublicSlug,
+} from '@/lib/gofast-with-me/gofast-with-bridge';
 
 export type PublicAction = {
   label: string;
@@ -6,8 +10,10 @@ export type PublicAction = {
 };
 
 type ResolvePublicActionsInput = {
-  /** Public GoFastWithMe slug — follow is available when this is set (page is live). */
+  /** Public GoFastWithMe slug — GoFast-with CTA when set (page is live). */
   gofastSlugSnapshot: string | null;
+  /** Fallback when slug snapshot is empty but page resolved by handle. */
+  gofastHandle?: string | null;
   hostFirstName: string | null;
   upcomingRuns: { gorunPath: string; title: string }[];
   publishedPlans: { slug: string; title: string }[];
@@ -17,8 +23,16 @@ type ResolvePublicActionsInput = {
 /** Derive join actions from real hydrated modules — no fake CTA config. */
 export function resolvePublicActions(input: ResolvePublicActionsInput): PublicAction[] {
   const appBase = getGoFastAppPublicUrl().replace(/\/$/, '');
-  const name = input.hostFirstName?.trim() || 'me';
+  const fallbackName = input.hostFirstName?.trim() || 'this runner';
   const actions: PublicAction[] = [];
+
+  const slug = resolvePublicSlug(input.gofastSlugSnapshot, input.gofastHandle);
+  if (slug) {
+    actions.push({
+      label: goFastWithPersonHeadline(input.hostFirstName, fallbackName),
+      href: goFastWithFrontDoorUrl(slug, appBase),
+    });
+  }
 
   if (input.upcomingRuns.length > 0) {
     const run = input.upcomingRuns[0];
@@ -40,14 +54,6 @@ export function resolvePublicActions(input: ResolvePublicActionsInput): PublicAc
     actions.push({
       label: 'Join group training',
       href: `${appBase}/join/training/${encodeURIComponent(input.joinableGroupTraining.handle)}`,
-    });
-  }
-
-  const slug = input.gofastSlugSnapshot?.trim();
-  if (slug) {
-    actions.push({
-      label: `Follow ${name}`,
-      href: `${appBase}/follow/${encodeURIComponent(slug)}`,
     });
   }
 

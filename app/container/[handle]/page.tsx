@@ -40,7 +40,8 @@ export default function ContainerHubPage() {
       return;
     }
     if (!myId) {
-      router.replace('/welcome');
+      LocalStorageAPI.setGwmFollowIntentHandle(handle);
+      router.replace(`/gofast-with/${encodeURIComponent(handle)}`);
       return;
     }
 
@@ -58,8 +59,8 @@ export default function ContainerHubPage() {
           if (!cancelled) setError(pub.error || 'Page not found');
           return;
         }
-        if (!pub.isGoFastContainer) {
-          if (!cancelled) setError('This athlete has not opened their follower hub yet.');
+          if (!pub.isGoFastContainer) {
+          if (!cancelled) setError('This athlete has not opened their GoFast hub yet.');
           return;
         }
         if (!cancelled) setHostId(pub.hostAthleteId);
@@ -137,8 +138,8 @@ export default function ContainerHubPage() {
             ← Home
           </Link>
           <p className="mt-6 text-gray-700">{error || 'Not available'}</p>
-          <Link href={`/follow/${encodeURIComponent(handle)}`} className="mt-4 inline-block text-orange-600 font-semibold">
-            Follow {handle}
+          <Link href={`/gofast-with/${encodeURIComponent(handle)}`} className="mt-4 inline-block text-orange-600 font-semibold">
+            GoFast with {handle}
           </Link>
         </div>
       </AthleteAppShell>
@@ -171,24 +172,26 @@ export default function ContainerHubPage() {
           <p className="text-xs font-semibold uppercase tracking-wide text-orange-800">
             GoFast with Others
           </p>
-          <h1 className="text-2xl font-bold text-gray-900 mt-1">Following {firstName}</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mt-1">GoFast with {firstName}</h1>
           <p className="text-sm text-gray-600 mt-1">@{handle}</p>
           <p className="text-sm text-gray-600 mt-2">
-            {hub.memberCount} follower{hub.memberCount === 1 ? '' : 's'}
+            {hub.memberCount} runner{hub.memberCount === 1 ? '' : 's'} GoFasting together
           </p>
 
           {hub.isHost ? (
             <p className="mt-2 text-sm font-semibold text-orange-800">You are the host</p>
           ) : hub.canAccessFeed ? (
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="text-sm text-emerald-800 font-medium">You&apos;re following</span>
+              <span className="text-sm text-emerald-800 font-medium">
+                You&apos;re GoFasting with {firstName}
+              </span>
               <button
                 type="button"
                 disabled={actionLoading}
                 onClick={() => void handleLeave()}
                 className="text-sm text-gray-600 underline disabled:opacity-50"
               >
-                Unfollow
+                Leave
               </button>
             </div>
           ) : (
@@ -198,7 +201,7 @@ export default function ContainerHubPage() {
               onClick={() => void handleFollow()}
               className="mt-3 rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
             >
-              Follow {firstName}
+              GoFast with {firstName}
             </button>
           )}
         </header>
@@ -270,7 +273,7 @@ export default function ContainerHubPage() {
             {hub.members.length > 0 ? (
               <section>
                 <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-2">
-                  Followers
+                  GoFast with others
                 </h2>
                 <ul className="flex flex-wrap gap-2">
                   {hub.members.map((m) => (
@@ -280,7 +283,7 @@ export default function ContainerHubPage() {
                     >
                       {[m.firstName, m.lastName].filter(Boolean).join(' ') ||
                         m.gofastHandle ||
-                        'Follower'}
+                        'Runner'}
                     </li>
                   ))}
                 </ul>
@@ -290,13 +293,13 @@ export default function ContainerHubPage() {
         ) : (
           <section className="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
             <p className="text-sm text-gray-700">
-              Follow {firstName} to see their training week, runs, updates, tips, and chatter.
+              GoFast with {firstName} to see their training week, runs, updates, tips, and chatter.
             </p>
             <Link
-              href={`/follow/${encodeURIComponent(handle)}`}
+              href={`/gofast-with/${encodeURIComponent(handle)}`}
               className="inline-flex rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
             >
-              Learn more about following
+              GoFast with {firstName}
             </Link>
           </section>
         )}

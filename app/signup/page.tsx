@@ -55,18 +55,25 @@ function redirectToFrontDoorIfIntent(router: ReturnType<typeof useRouter>): bool
   return true;
 }
 
-function redirectToFollowExplainerIfIntent(
+function redirectToGofastWithConfirmIfIntent(
   router: ReturnType<typeof useRouter>,
   redirect?: string | null
 ): boolean {
   const handle = LocalStorageAPI.getGwmFollowIntentHandle();
   if (handle) {
-    router.replace(`/follow/${handle}`);
+    router.replace(`/gofast-with/${encodeURIComponent(handle)}/confirm`);
+    return true;
+  }
+  if (redirect?.startsWith('/gofast-with/') && redirect.includes('/confirm')) {
+    router.replace(redirect);
     return true;
   }
   if (redirect?.startsWith('/follow/')) {
-    router.replace(redirect);
-    return true;
+    const slug = redirect.replace(/^\/follow\//, '').split('/')[0];
+    if (slug) {
+      router.replace(`/gofast-with/${encodeURIComponent(slug)}/confirm`);
+      return true;
+    }
   }
   return false;
 }
@@ -105,7 +112,7 @@ function routeAfterAthleteResolved(
     return;
   }
 
-  if (redirectToFollowExplainerIfIntent(router, opts.redirect)) return;
+  if (redirectToGofastWithConfirmIfIntent(router, opts.redirect)) return;
 
   if (athlete.data?.gofastHandle) {
     router.replace('/welcome');
@@ -137,7 +144,10 @@ function SignupPageContent() {
     if (isClubManagerSignupMode(mode)) {
       LocalStorageAPI.setClubManagerMode(true);
     }
-  }, [mode]);
+    if (searchParams?.get('mode') === 'signin') {
+      setAuthMode('signin');
+    }
+  }, [mode, searchParams]);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

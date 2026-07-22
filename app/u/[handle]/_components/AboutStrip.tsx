@@ -102,7 +102,7 @@ export default function AboutStrip(props: Props) {
         <div className="p-6">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-stone-500 tracking-wider uppercase mb-3">
             <Users className="w-3.5 h-3.5" />
-            Community
+            GoFast with others
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="flex -space-x-2">
@@ -137,17 +137,17 @@ export default function AboutStrip(props: Props) {
               {props.containerMemberCount > 0 ? (
                 <p className="text-sm text-stone-700">
                   <span className="font-semibold text-stone-900">{props.containerMemberCount}</span>{' '}
-                  {props.containerMemberCount === 1 ? 'member' : 'members'}
+                  {props.containerMemberCount === 1 ? 'runner' : 'runners'}
                 </p>
               ) : (
-                <p className="text-sm text-stone-600">Be the first to join</p>
+                <p className="text-sm text-stone-600">Be the first to GoFast together</p>
               )}
               {props.hostHandle && (
                 <Link
-                  href={`/container/${props.hostHandle}`}
+                  href={`/gofast-with/${props.hostHandle}`}
                   className="text-xs font-semibold text-orange-700 hover:text-orange-800"
                 >
-                  Join community &rarr;
+                  GoFast with them &rarr;
                 </Link>
               )}
             </div>

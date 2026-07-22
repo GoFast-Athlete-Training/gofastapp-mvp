@@ -225,7 +225,7 @@ export default function AthleteCreateProfilePage() {
             } else {
               const followIntentHandle = LocalStorageAPI.getGwmFollowIntentHandle();
               if (followIntentHandle) {
-                nextPath = `/follow/${encodeURIComponent(followIntentHandle)}`;
+                nextPath = `/gofast-with/${encodeURIComponent(followIntentHandle)}/confirm`;
               }
             }
           }
