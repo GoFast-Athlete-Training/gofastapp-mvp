@@ -1,4 +1,6 @@
 import { prisma } from '@/lib/prisma';
+import { clampPhotoFocus } from '@/lib/gofast-with-me/photo-focus';
+import { normalizeGoFastWithMePhotoType } from '@/lib/gofast-with-me/photo-type';
 import {
   buildGoFastWithMeUrl,
   normalizeGoFastWithMeSlug,
@@ -20,6 +22,9 @@ export type GoFastWithMeRecord = {
   modelFocus: string | null;
   myAchievements: string | null;
   gofastWithMePhotoUrl: string | null;
+  gofastWithMePhotoFocusX: number | null;
+  gofastWithMePhotoFocusY: number | null;
+  gofastWithMePhotoType: string | null;
   creatorType: GoFastWithMeCreatorType | null;
   coachSpecialty: string | null;
 };
@@ -32,6 +37,9 @@ export type GoFastWithMeIntroInput = {
   modelFocus?: string | null;
   myAchievements?: string | null;
   gofastWithMePhotoUrl?: string | null;
+  gofastWithMePhotoFocusX?: number | null;
+  gofastWithMePhotoFocusY?: number | null;
+  gofastWithMePhotoType?: string | null;
   creatorType?: GoFastWithMeCreatorType | string | null;
   coachSpecialty?: string | null;
 };
@@ -60,6 +68,9 @@ type GoFastWithMeRow = {
   modelFocus: string | null;
   myAchievements: string | null;
   gofastWithMePhotoUrl: string | null;
+  gofastWithMePhotoFocusX: number | null;
+  gofastWithMePhotoFocusY: number | null;
+  gofastWithMePhotoType: string | null;
   creatorType: string | null;
   coachSpecialty: string | null;
 };
@@ -187,6 +198,24 @@ export async function updateGoFastWithMeIntro(
   }
   if (input.gofastWithMePhotoUrl !== undefined) {
     data.gofastWithMePhotoUrl = trimOrNull(input.gofastWithMePhotoUrl);
+  }
+  if (input.gofastWithMePhotoFocusX !== undefined) {
+    data.gofastWithMePhotoFocusX =
+      input.gofastWithMePhotoFocusX == null
+        ? null
+        : clampPhotoFocus(input.gofastWithMePhotoFocusX);
+  }
+  if (input.gofastWithMePhotoFocusY !== undefined) {
+    data.gofastWithMePhotoFocusY =
+      input.gofastWithMePhotoFocusY == null
+        ? null
+        : clampPhotoFocus(input.gofastWithMePhotoFocusY);
+  }
+  if (input.gofastWithMePhotoType !== undefined) {
+    data.gofastWithMePhotoType =
+      input.gofastWithMePhotoType == null || input.gofastWithMePhotoType === ''
+        ? null
+        : normalizeGoFastWithMePhotoType(String(input.gofastWithMePhotoType));
   }
   if (input.creatorType !== undefined) {
     const ct = normalizeCreatorType(input.creatorType);

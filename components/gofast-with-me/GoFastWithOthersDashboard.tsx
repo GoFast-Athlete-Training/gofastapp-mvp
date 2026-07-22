@@ -33,6 +33,9 @@ type OwnerGwmRow = {
   modelFocus: string | null;
   myAchievements: string | null;
   gofastWithMePhotoUrl: string | null;
+  gofastWithMePhotoFocusX: number | null;
+  gofastWithMePhotoFocusY: number | null;
+  gofastWithMePhotoType: string | null;
   creatorType: GoFastWithMeCreatorType | null;
   coachSpecialty: string | null;
   gofastSlugSnapshot?: string;
@@ -48,6 +51,9 @@ function ownerRowToLanding(row: OwnerGwmRow | null): GoFastWithMeLandingValues {
     modelFocus: row?.modelFocus ?? null,
     myAchievements: row?.myAchievements ?? null,
     gofastWithMePhotoUrl: row?.gofastWithMePhotoUrl ?? null,
+    gofastWithMePhotoFocusX: row?.gofastWithMePhotoFocusX ?? null,
+    gofastWithMePhotoFocusY: row?.gofastWithMePhotoFocusY ?? null,
+    gofastWithMePhotoType: row?.gofastWithMePhotoType ?? null,
   };
 }
 
@@ -214,6 +220,9 @@ export default function GoFastWithOthersDashboard() {
                   modelFocus: null,
                   myAchievements: null,
                   gofastWithMePhotoUrl: null,
+                  gofastWithMePhotoFocusX: null,
+                  gofastWithMePhotoFocusY: null,
+                  gofastWithMePhotoType: null,
                   creatorType,
                   coachSpecialty,
                 }

@@ -106,6 +106,9 @@ export default async function PublicAthletePage({
         handle={data.athlete.gofastHandle}
         photoURL={data.athlete.photoURL}
         gofastWithMePhotoUrl={data.gofastWithMe?.gofastWithMePhotoUrl ?? null}
+        gofastWithMePhotoFocusX={data.gofastWithMe?.gofastWithMePhotoFocusX}
+        gofastWithMePhotoFocusY={data.gofastWithMe?.gofastWithMePhotoFocusY}
+        gofastWithMePhotoType={data.gofastWithMe?.gofastWithMePhotoType ?? null}
         city={data.athlete.city}
         state={data.athlete.state}
         primarySport={data.athlete.primarySport}

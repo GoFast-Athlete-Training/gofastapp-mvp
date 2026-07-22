@@ -20,6 +20,11 @@ import {
   publicHeroPhotoUrl,
   type PublicAction,
 } from "@/lib/gofast-with-me/resolve-public-actions";
+import { photoFocusStyle } from "@/lib/gofast-with-me/photo-focus";
+import {
+  portraitPhotoImageClass,
+  usesWideFeaturePhotoLayout,
+} from "@/lib/gofast-with-me/photo-type";
 
 export type GoFastPageAthlete = {
   gofastHandle: string | null;
@@ -133,6 +138,9 @@ export type GoFastPagePayload = {
     modelFocus?: string | null;
     myAchievements?: string | null;
     gofastWithMePhotoUrl?: string | null;
+    gofastWithMePhotoFocusX?: number | null;
+    gofastWithMePhotoFocusY?: number | null;
+    gofastWithMePhotoType?: string | null;
     creatorType?: string | null;
     coachSpecialty?: string | null;
     gofastSlugSnapshot?: string;
@@ -223,16 +231,26 @@ export default function GoFastPagePreviewCard({
   );
   const headline = goFastWithPersonHeadline(athlete.firstName, displayName);
   const actions = data.publicActions ?? [];
+  const photoPosition = photoFocusStyle(
+    data.gofastWithMe?.gofastWithMePhotoFocusX,
+    data.gofastWithMe?.gofastWithMePhotoFocusY
+  );
+  const gwmPhoto = data.gofastWithMe?.gofastWithMePhotoUrl?.trim() || null;
+  const heroUsesGwmPhoto = Boolean(gwmPhoto && heroSrc === gwmPhoto);
+  const wideHeroLayout =
+    !heroUsesGwmPhoto ||
+    usesWideFeaturePhotoLayout(gwmPhoto, data.gofastWithMe?.gofastWithMePhotoType);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-20">
       <section className="relative min-h-[48vh] md:min-h-[52vh] flex flex-col justify-end overflow-hidden isolate">
-        {heroSrc ? (
+        {heroSrc && wideHeroLayout ? (
           <>
             <img
               src={heroSrc}
               alt=""
-              className="absolute inset-0 w-full h-full object-cover object-center"
+              className="absolute inset-0 w-full h-full object-cover"
+              style={photoPosition}
               decoding="async"
               fetchPriority="high"
             />
@@ -248,6 +266,18 @@ export default function GoFastPagePreviewCard({
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 via-zinc-900 to-zinc-950" />
         )}
+
+        {heroSrc && !wideHeroLayout ? (
+          <div className="absolute top-16 left-1/2 z-10 -translate-x-1/2">
+            <img
+              src={heroSrc}
+              alt=""
+              className={portraitPhotoImageClass('previewHero')}
+              style={photoPosition}
+              decoding="async"
+            />
+          </div>
+        ) : null}
 
         {athlete.photoURL && heroSrc !== athlete.photoURL ? (
           <div className="absolute bottom-28 left-5 z-20 sm:bottom-32">

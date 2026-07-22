@@ -5,6 +5,15 @@ import HeroOwnerNudge from './HeroOwnerNudge';
 import ShareButton from './ShareButton';
 import type { PublicAction } from '@/lib/gofast-with-me/resolve-public-actions';
 
+import { photoFocusStyle } from '@/lib/gofast-with-me/photo-focus';
+import {
+  portraitPhotoImageClass,
+  portraitPhotoWrapClass,
+  usesWideFeaturePhotoLayout,
+  widePhotoFrameClass,
+  widePhotoFrameShellClass,
+} from '@/lib/gofast-with-me/photo-type';
+
 type Props = {
   athleteId: string;
   firstName: string | null;
@@ -12,6 +21,9 @@ type Props = {
   handle: string | null;
   photoURL: string | null;
   gofastWithMePhotoUrl: string | null;
+  gofastWithMePhotoFocusX?: number | null;
+  gofastWithMePhotoFocusY?: number | null;
+  gofastWithMePhotoType?: string | null;
   city: string | null;
   state: string | null;
   primarySport: string | null;
@@ -45,6 +57,11 @@ export default function ProfileHero(props: Props) {
     fiveKPace: props.fiveKPace,
   });
   const pagePhoto = props.gofastWithMePhotoUrl?.trim() || null;
+  const pagePhotoFocus = photoFocusStyle(
+    props.gofastWithMePhotoFocusX,
+    props.gofastWithMePhotoFocusY
+  );
+  const wideFeature = usesWideFeaturePhotoLayout(pagePhoto, props.gofastWithMePhotoType);
   const actions = props.publicActions ?? [];
 
   return (
@@ -129,19 +146,38 @@ export default function ProfileHero(props: Props) {
         </div>
       </div>
 
-      {pagePhoto ? (
+      {pagePhoto && wideFeature ? (
         <div className="max-w-2xl mx-auto px-5 sm:px-6 pt-5">
-          <div className="w-full aspect-[16/9] rounded-2xl overflow-hidden shadow-md bg-sky-100">
+          <div
+            className={`w-full ${widePhotoFrameClass('inAppProfile')} ${widePhotoFrameShellClass('inAppProfile')}`}
+          >
             <Image
               src={pagePhoto}
               alt=""
               width={1200}
-              height={525}
+              height={675}
               className="w-full h-full object-cover"
+              style={pagePhotoFocus}
               unoptimized
               priority
             />
           </div>
+        </div>
+      ) : null}
+
+      {pagePhoto && !wideFeature ? (
+        <div
+          className={`max-w-2xl mx-auto px-5 sm:px-6 pt-5 ${portraitPhotoWrapClass('inAppProfile')}`}
+        >
+          <Image
+            src={pagePhoto}
+            alt=""
+            width={160}
+            height={160}
+            className={portraitPhotoImageClass('inAppProfile')}
+            style={pagePhotoFocus}
+            unoptimized
+          />
         </div>
       ) : null}
     </header>

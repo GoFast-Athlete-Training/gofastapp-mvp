@@ -62,6 +62,9 @@ const INTRO_FIELDS = [
   'modelFocus',
   'myAchievements',
   'gofastWithMePhotoUrl',
+  'gofastWithMePhotoFocusX',
+  'gofastWithMePhotoFocusY',
+  'gofastWithMePhotoType',
   'creatorType',
   'coachSpecialty',
 ] as const;
@@ -107,12 +110,25 @@ export async function PATCH(request: Request) {
       });
     }
 
-    const introPatch: Record<string, string | null> = {};
-    for (const field of INTRO_FIELDS) {
+    const introPatch: Record<string, string | number | null> = {};
+    const stringFields = INTRO_FIELDS.filter(
+      (f) => f !== 'gofastWithMePhotoFocusX' && f !== 'gofastWithMePhotoFocusY'
+    );
+    for (const field of stringFields) {
       if (Object.prototype.hasOwnProperty.call(body, field)) {
         introPatch[field] =
           body[field] == null || body[field] === '' ? null : String(body[field]);
       }
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'gofastWithMePhotoFocusX')) {
+      const raw = body.gofastWithMePhotoFocusX;
+      introPatch.gofastWithMePhotoFocusX =
+        raw == null || raw === '' ? null : Number(raw);
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'gofastWithMePhotoFocusY')) {
+      const raw = body.gofastWithMePhotoFocusY;
+      introPatch.gofastWithMePhotoFocusY =
+        raw == null || raw === '' ? null : Number(raw);
     }
 
     if (Object.keys(introPatch).length === 0) {
@@ -120,7 +136,7 @@ export async function PATCH(request: Request) {
         {
           success: false,
           error:
-            'Provide intro fields (welcome, gofastWithMeBio, whatYoullSeeHere, sportFocus, modelFocus, myAchievements, gofastWithMePhotoUrl, creatorType, coachSpecialty), customSlug, or useGofastHandle',
+            'Provide intro fields (welcome, gofastWithMeBio, whatYoullSeeHere, sportFocus, modelFocus, myAchievements, gofastWithMePhotoUrl, gofastWithMePhotoFocusX, gofastWithMePhotoFocusY, gofastWithMePhotoType, creatorType, coachSpecialty), customSlug, or useGofastHandle',
         },
         { status: 400 }
       );

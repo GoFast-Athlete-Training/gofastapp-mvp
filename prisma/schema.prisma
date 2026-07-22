@@ -188,6 +188,11 @@ model gofast_with_me {
   myAchievements     String?  @db.Text
   /// Public landing hero / action image (not Athlete profile photo).
   gofastWithMePhotoUrl String?
+  /// Focal point for object-cover framing (0–100). Default center when null.
+  gofastWithMePhotoFocusX Int? @default(50)
+  gofastWithMePhotoFocusY Int? @default(50)
+  /// Layout hint: action, group, race, portrait, other — drives surface framing.
+  gofastWithMePhotoType String?
   /// Hub creator framing: "person" or "coach" (not the separate Coach entity).
   creatorType        String?
   /// Coach positioning when creatorType = "coach".

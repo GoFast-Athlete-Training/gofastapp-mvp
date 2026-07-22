@@ -4,6 +4,14 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { ImagePlus } from 'lucide-react';
 import api from '@/lib/api';
+import { DEFAULT_PHOTO_FOCUS, normalizePhotoFocus } from '@/lib/gofast-with-me/photo-focus';
+import {
+  GOFAST_WITH_ME_PHOTO_TYPE_OPTIONS,
+  normalizeGoFastWithMePhotoType,
+  photoTypeGuidance,
+  type GoFastWithMePhotoType,
+} from '@/lib/gofast-with-me/photo-type';
+import RunImageFocalPicker from '@/components/gofast-with-me/RunImageFocalPicker';
 
 export type GoFastWithMeLandingValues = {
   welcome: string | null;
@@ -13,6 +21,9 @@ export type GoFastWithMeLandingValues = {
   modelFocus: string | null;
   myAchievements: string | null;
   gofastWithMePhotoUrl: string | null;
+  gofastWithMePhotoFocusX: number | null;
+  gofastWithMePhotoFocusY: number | null;
+  gofastWithMePhotoType: GoFastWithMePhotoType | null;
 };
 
 type Props = {
@@ -21,16 +32,12 @@ type Props = {
   onSaved?: (values: GoFastWithMeLandingValues) => void;
 };
 
-function RunImagePreview({ src }: { src: string }) {
-  return (
-    <div className="w-full aspect-[16/9] rounded-xl overflow-hidden bg-sky-100 border border-gray-200">
-      <img src={src} alt="Run image preview" className="w-full h-full object-cover" />
-    </div>
-  );
-}
-
 export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }: Props) {
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const initialFocus = normalizePhotoFocus(
+    initial.gofastWithMePhotoFocusX,
+    initial.gofastWithMePhotoFocusY
+  );
   const [values, setValues] = useState({
     welcome: initial.welcome ?? '',
     gofastWithMeBio: initial.gofastWithMeBio ?? '',
@@ -41,6 +48,10 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
   });
   const [photoPreview, setPhotoPreview] = useState<string | null>(
     initial.gofastWithMePhotoUrl ?? null
+  );
+  const [photoFocus, setPhotoFocus] = useState(initialFocus);
+  const [photoType, setPhotoType] = useState<GoFastWithMePhotoType | null>(
+    normalizeGoFastWithMePhotoType(initial.gofastWithMePhotoType)
   );
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -64,6 +75,8 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
       if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
       return URL.createObjectURL(file);
     });
+    setPhotoFocus({ x: DEFAULT_PHOTO_FOCUS, y: DEFAULT_PHOTO_FOCUS });
+    if (!photoType) setPhotoType('action');
     setPendingPhotoFile(file);
   };
 
@@ -96,6 +109,9 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
         modelFocus: values.modelFocus.trim() || null,
         myAchievements: values.myAchievements.trim() || null,
         gofastWithMePhotoUrl: photoUrl,
+        gofastWithMePhotoFocusX: photoFocus.x,
+        gofastWithMePhotoFocusY: photoFocus.y,
+        gofastWithMePhotoType: photoType,
       };
       const res = await api.patch('/me/gofast-with-me', payload);
       if (!res.data?.success) {
@@ -156,7 +172,37 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
           className="hidden"
         />
 
-        {photoPreview ? <RunImagePreview src={photoPreview} /> : null}
+        {photoPreview ? (
+          <>
+            <label className="block">
+              <span className="text-sm font-semibold text-gray-900">Photo type</span>
+              <span className="block text-xs text-gray-500 mt-0.5">
+                {photoTypeGuidance(photoType)}
+              </span>
+              <select
+                value={photoType ?? ''}
+                onChange={(e) =>
+                  setPhotoType(normalizeGoFastWithMePhotoType(e.target.value) ?? null)
+                }
+                className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white"
+              >
+                <option value="">Choose type…</option>
+                {GOFAST_WITH_ME_PHOTO_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <RunImageFocalPicker
+              src={photoPreview}
+              focusX={photoFocus.x}
+              focusY={photoFocus.y}
+              photoType={photoType}
+              onFocusChange={setPhotoFocus}
+            />
+          </>
+        ) : null}
       </div>
 
       <div className="space-y-4">
