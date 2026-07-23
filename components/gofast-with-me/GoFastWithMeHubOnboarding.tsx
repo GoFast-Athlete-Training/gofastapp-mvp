@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import { Footprints, Sparkles, Users } from 'lucide-react';
 import api from '@/lib/api';
+import GoFastWithMeStudioCallout from '@/components/gofast-with-me/GoFastWithMeStudioCallout';
+import GoFastWithMeCommunityMissionBox from '@/components/gofast-with-me/GoFastWithMeCommunityMissionBox';
+import GoFastWithMeStudioExplainer from '@/components/gofast-with-me/GoFastWithMeStudioExplainer';
 import type { GoFastWithMeCreatorType } from '@/lib/gofast-with-me/gofast-with-me-service';
 
 type Props = {
@@ -49,22 +52,23 @@ export default function GoFastWithMeHubOnboarding({ onComplete }: Props) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-8 py-4">
-      <div className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">
-          GoFast with Others
-        </p>
-        <h1 className="text-3xl font-bold text-gray-900 leading-tight">
-          Set up your GoFast with Others public profile
-        </h1>
+      <div className="space-y-4">
+        <GoFastWithMeStudioCallout titleClassName="text-3xl font-bold text-gray-900 leading-tight" />
+        <GoFastWithMeCommunityMissionBox />
+        <GoFastWithMeStudioExplainer
+          hasStudioData={false}
+          onDismiss={() => {}}
+          onStartSetup={() => {
+            document.getElementById('gwm-creator-type')?.scrollIntoView({ behavior: 'smooth' });
+          }}
+        />
         <p className="text-gray-600 text-sm leading-relaxed max-w-xl">
-          This is how others see you beyond a simple in-app profile. Think of it as your landing
-          page — express yourself, share how you train, and build the audience that joins your
-          runs and plans. It&apos;s your creator studio: earn from advertiser attention as people
-          follow your hub and join what you publish.
+          Choose how you show up on your public landing — express yourself, share how you train,
+          and build the audience that joins your runs and plans.
         </p>
       </div>
 
-      <div className="space-y-3">
+      <div id="gwm-creator-type" className="space-y-3">
         <p className="text-sm font-semibold text-gray-900">Who is this page for?</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <button

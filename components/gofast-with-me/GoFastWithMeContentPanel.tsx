@@ -1,10 +1,11 @@
 'use client';
 
-import Link from 'next/link';
 import { BookOpen, ExternalLink, MapPin, Sparkles } from 'lucide-react';
 
 type Props = {
   liveUrl: string;
+  onOpenWorkouts?: () => void;
+  onOpenCommunity?: () => void;
 };
 
 function CmsCapabilityCard({
@@ -28,11 +29,15 @@ function CmsCapabilityCard({
   );
 }
 
-export default function GoFastWithMeCmsContentSection({ liveUrl }: Props) {
+export default function GoFastWithMeCmsContentSection({
+  liveUrl,
+  onOpenWorkouts,
+  onOpenCommunity,
+}: Props) {
   return (
-    <section id="cms-content" className="space-y-4">
+    <section id="content" className="space-y-6">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">CMS content</h3>
+        <h2 className="text-lg font-bold text-gray-900">Content</h2>
         <p className="text-sm text-gray-600 mt-1">
           Athlete-scoped production content owned by your Athlete ID — durable public creator
           surface, not container feed posts.
@@ -78,20 +83,26 @@ export default function GoFastWithMeCmsContentSection({ liveUrl }: Props) {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Link
-            href="/gofast-with-others#configure"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-100"
-          >
-            <MapPin className="h-3.5 w-3.5" />
-            Add My Plan
-          </Link>
-          <Link
-            href="/gofast-with-others#manage"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-100"
-          >
-            <BookOpen className="h-3.5 w-3.5" />
-            Member Manager
-          </Link>
+          {onOpenWorkouts ? (
+            <button
+              type="button"
+              onClick={onOpenWorkouts}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-100"
+            >
+              <MapPin className="h-3.5 w-3.5" />
+              My Workouts
+            </button>
+          ) : null}
+          {onOpenCommunity ? (
+            <button
+              type="button"
+              onClick={onOpenCommunity}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-100"
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              My Community
+            </button>
+          ) : null}
           <a
             href={liveUrl}
             target="_blank"

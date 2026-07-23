@@ -89,9 +89,9 @@ export default function GoFastWithMeSetupPanel() {
   const goalLine = plan?.goalRaceTime ? `Goal: ${plan.goalRaceTime}` : null;
 
   return (
-    <section id="configure" className="space-y-6">
+    <section id="workouts" className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">GoFastWithMe Add My Plan</h2>
+        <h2 className="text-lg font-bold text-gray-900">My Workouts</h2>
         <p className="text-sm text-gray-600 mt-1">
           Your active training plan hydrates from your Athlete ID. Publish it so followers can preview
           your build on your public page and container.

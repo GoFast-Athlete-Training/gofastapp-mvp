@@ -6,18 +6,30 @@ import Link from "next/link";
 import { Pencil } from "lucide-react";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
+import type { ShareHubStatus } from "@/lib/profile/share-creator-card-logic";
 import type { GoFastWithMeCreatorType } from "@/lib/gofast-with-me/gofast-with-me-service";
 import type { GoFastWithMeLandingValues } from "@/components/gofast-with-me/GoFastWithMeLandingForm";
+import { normalizeGoFastWithMePhotoType } from "@/lib/gofast-with-me/photo-type";
 import GoFastWithMeHubOnboarding from "@/components/gofast-with-me/GoFastWithMeHubOnboarding";
-import GoFastWithMeStudioSidebar from "@/components/gofast-with-me/GoFastWithMeStudioSidebar";
 import GoFastWithMeSetupPanel from "@/components/gofast-with-me/GoFastWithMeSetupPanel";
 import GoFastWithMeMemberManagementPanel from "@/components/gofast-with-me/GoFastWithMeMemberManagementPanel";
 import GoFastWithMeWelcomePanel from "@/components/gofast-with-me/GoFastWithMeWelcomePanel";
+import GoFastWithMeCmsContentSection from "@/components/gofast-with-me/GoFastWithMeContentPanel";
+import GoFastWithMeDashboardHome, {
+  type DashboardMetrics,
+} from "@/components/gofast-with-me/GoFastWithMeDashboardHome";
+import GoFastWithMeWorkspaceShell from "@/components/gofast-with-me/GoFastWithMeWorkspaceShell";
+import GoFastWithMeStudioCallout from "@/components/gofast-with-me/GoFastWithMeStudioCallout";
+import GoFastWithMeCommunityMissionBox from "@/components/gofast-with-me/GoFastWithMeCommunityMissionBox";
+import GoFastWithMeStudioExplainer from "@/components/gofast-with-me/GoFastWithMeStudioExplainer";
 import {
-  defaultStudioSection,
+  dismissStudioIntro,
+  hasGoFastWithMeStudioData,
+  readStudioIntroDismissed,
+  shouldShowStudioExplainer,
+} from "@/lib/gofast-with-me/studio-intro";
+import {
   isWelcomeContentComplete,
-  parseStudioSectionFromHash,
-  resolveGatedStudioSection,
   type StudioSection,
 } from "@/components/gofast-with-me/studio-sections";
 
@@ -53,12 +65,8 @@ function ownerRowToLanding(row: OwnerGwmRow | null): GoFastWithMeLandingValues {
     gofastWithMePhotoUrl: row?.gofastWithMePhotoUrl ?? null,
     gofastWithMePhotoFocusX: row?.gofastWithMePhotoFocusX ?? null,
     gofastWithMePhotoFocusY: row?.gofastWithMePhotoFocusY ?? null,
-    gofastWithMePhotoType: row?.gofastWithMePhotoType ?? null,
+    gofastWithMePhotoType: normalizeGoFastWithMePhotoType(row?.gofastWithMePhotoType),
   };
-}
-
-function normalizeStudioHash(section: StudioSection) {
-  window.history.replaceState(null, "", `#${section}`);
 }
 
 export default function GoFastWithOthersDashboard() {
@@ -75,11 +83,15 @@ export default function GoFastWithOthersDashboard() {
   const [copyDone, setCopyDone] = useState(false);
   const [noHandle, setNoHandle] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [activeSection, setActiveSection] = useState<StudioSection>("welcome");
-  const [sectionInitialized, setSectionInitialized] = useState(false);
+  const [activeSection, setActiveSection] = useState<StudioSection | null>(null);
+  const [followerCount, setFollowerCount] = useState<number | null>(null);
+  const [shareHubStatus, setShareHubStatus] = useState<ShareHubStatus | null>(null);
+  const [introDismissed, setIntroDismissed] = useState(false);
 
   const landingValues = ownerRowToLanding(ownerGwm);
   const isWelcomeComplete = isWelcomeContentComplete(landingValues);
+  const hasStudioData = hasGoFastWithMeStudioData(ownerGwm);
+  const showStudioExplainer = shouldShowStudioExplainer(ownerGwm, introDismissed);
 
   const isPublishReady = Boolean(
     landingValues.welcome?.trim() ||
@@ -87,36 +99,17 @@ export default function GoFastWithOthersDashboard() {
       landingValues.whatYoullSeeHere?.trim()
   );
 
-  const handleSectionChange = useCallback(
-    (section: StudioSection) => {
-      const resolved = resolveGatedStudioSection(section, landingValues);
-      setActiveSection(resolved);
-      normalizeStudioHash(resolved);
-    },
-    [landingValues]
-  );
-
-  useEffect(() => {
-    if (sectionInitialized || loading || showOnboarding) return;
-    const hash = typeof window !== "undefined" ? window.location.hash : "";
-    const section = defaultStudioSection(landingValues, hash || null);
+  const openWorkspace = useCallback((section: StudioSection) => {
     setActiveSection(section);
-    normalizeStudioHash(section);
-    setSectionInitialized(true);
-  }, [landingValues, loading, showOnboarding, sectionInitialized]);
+  }, []);
+
+  const backToDashboard = useCallback(() => {
+    setActiveSection(null);
+  }, []);
 
   useEffect(() => {
-    const onHash = () => {
-      const parsed = parseStudioSectionFromHash(window.location.hash);
-      const resolved = resolveGatedStudioSection(parsed, landingValues);
-      setActiveSection(resolved);
-      if (window.location.hash !== `#${resolved}`) {
-        normalizeStudioHash(resolved);
-      }
-    };
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
-  }, [landingValues]);
+    setIntroDismissed(readStudioIntroDismissed());
+  }, []);
 
   useEffect(() => {
     const id = LocalStorageAPI.getAthleteId();
@@ -129,9 +122,11 @@ export default function GoFastWithOthersDashboard() {
     let cancelled = false;
     (async () => {
       try {
-        const [profileRes, gwmRes] = await Promise.all([
+        const [profileRes, gwmRes, hubRes, hubStatusRes] = await Promise.all([
           api.get(`/athlete/${id}`),
           api.get("/me/gofast-with-me"),
+          api.get(`/athlete/${id}/container/hub`).catch(() => null),
+          api.get("/me/share-hub-status").catch(() => null),
         ]);
         const athlete = profileRes.data?.athlete;
         const handle = athlete?.gofastHandle?.trim();
@@ -153,10 +148,17 @@ export default function GoFastWithOthersDashboard() {
         setSlugUsesHandle(gwm?.slugUsesHandle ?? true);
         setShowOnboarding(!gwm?.creatorType);
 
+        if (hubRes?.data?.success && hubRes.data.hub) {
+          setFollowerCount(hubRes.data.hub.memberCount ?? 0);
+        }
+        if (hubStatusRes?.data?.status) {
+          setShareHubStatus(hubStatusRes.data.status as ShareHubStatus);
+        }
+
         if (!cancelled) setLoading(false);
       } catch {
         if (!cancelled) {
-          setError("Something went wrong loading GoFast with Others.");
+          setError("Something went wrong loading GoFastWithMe Studio.");
           setLoading(false);
         }
       }
@@ -166,6 +168,11 @@ export default function GoFastWithOthersDashboard() {
       cancelled = true;
     };
   }, [router]);
+
+  const handleDismissStudioIntro = useCallback(() => {
+    dismissStudioIntro();
+    setIntroDismissed(true);
+  }, []);
 
   const copyAppUrl = useCallback(async (url: string) => {
     try {
@@ -188,10 +195,9 @@ export default function GoFastWithOthersDashboard() {
   if (noHandle) {
     return (
       <div className="max-w-lg space-y-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">
-          GoFast with Others
-        </p>
-        <h1 className="text-2xl font-bold text-gray-900">GoFastWithMe studio</h1>
+        <GoFastWithMeStudioCallout />
+        <GoFastWithMeCommunityMissionBox compact />
+        <GoFastWithMeStudioExplainer hasStudioData={false} onDismiss={handleDismissStudioIntro} />
         <p className="text-gray-700 text-sm">
           Set your GoFast handle first — then you can build your public landing.
         </p>
@@ -228,7 +234,6 @@ export default function GoFastWithOthersDashboard() {
                 }
           );
           setShowOnboarding(false);
-          setSectionInitialized(false);
         }}
       />
     );
@@ -237,7 +242,7 @@ export default function GoFastWithOthersDashboard() {
   if (!gofastHandle || !publicSlug || !athleteId) {
     return (
       <div className="max-w-lg space-y-4">
-        <p className="text-gray-700">{error || "Studio unavailable."}</p>
+        <p className="text-gray-700">{error || "Dashboard unavailable."}</p>
       </div>
     );
   }
@@ -252,18 +257,77 @@ export default function GoFastWithOthersDashboard() {
         ? "Athlete"
         : null;
 
+  const dashboardMetrics: DashboardMetrics = {
+    followerCount,
+    landingComplete: isWelcomeComplete,
+    publishReady: isPublishReady,
+    planPublished: shareHubStatus?.plan.isPublished ?? null,
+    planName: shareHubStatus?.plan.planName ?? null,
+    liveUrl,
+  };
+
+  const renderWorkspacePanel = () => {
+    if (!activeSection) return null;
+
+    switch (activeSection) {
+      case "page":
+        return (
+          <GoFastWithMeWelcomePanel
+            landingValues={landingValues}
+            profileBio={profileBio}
+            liveUrl={liveUrl}
+            appUrl={appUrl}
+            publicSlug={publicSlug}
+            gofastHandle={gofastHandle}
+            slugUsesHandle={slugUsesHandle}
+            isPublishReady={isPublishReady}
+            copyDone={copyDone}
+            onCopyAppUrl={() => void copyAppUrl(`${window.location.origin}${appUrl}`)}
+            onUrlUpdated={(slug, usesHandle) => {
+              setPublicSlug(slug);
+              setSlugUsesHandle(usesHandle);
+            }}
+            onOpenCommunity={() => openWorkspace("community")}
+            onSaved={(values) => {
+              setOwnerGwm((prev) => (prev ? { ...prev, ...values } : prev));
+            }}
+          />
+        );
+      case "workouts":
+        return <GoFastWithMeSetupPanel />;
+      case "community":
+        return (
+          <GoFastWithMeMemberManagementPanel athleteId={athleteId} publicSlug={publicSlug} />
+        );
+      case "content":
+        return (
+          <GoFastWithMeCmsContentSection
+            liveUrl={liveUrl}
+            onOpenWorkouts={() => openWorkspace("workouts")}
+            onOpenCommunity={() => openWorkspace("community")}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="space-y-6 pb-8 max-w-6xl mx-auto">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600 mb-1">
-            GoFast with Others
-          </p>
-          <h1 className="text-2xl font-bold text-gray-900">GoFastWithMe studio</h1>
-          <p className="text-gray-600 text-sm mt-1 max-w-xl">
-            Start with GoFastWithMe CMS (your public landing), add your active training plan, then
-            manage your follower container. View the public page as a visitor or preview the member
-            experience.
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-4 min-w-0 flex-1">
+          <GoFastWithMeStudioCallout />
+          <GoFastWithMeCommunityMissionBox />
+          {showStudioExplainer ? (
+            <GoFastWithMeStudioExplainer
+              hasStudioData={hasStudioData}
+              onDismiss={handleDismissStudioIntro}
+            />
+          ) : null}
+          <p className="text-gray-600 text-sm max-w-xl">
+            {activeSection
+              ? "Focused workspace — use the header to switch bins or return home."
+              : "Overview of your public presence, community, workouts, and content."}
           </p>
         </div>
         <a
@@ -298,70 +362,27 @@ export default function GoFastWithOthersDashboard() {
         </div>
       ) : null}
 
-      {!isWelcomeComplete ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-wrap items-center justify-between gap-2">
-          <span>
-            Finish GoFastWithMe CMS first — your landing page is the public door before plan and
-            member tools unlock.
-          </span>
-          {activeSection !== "welcome" ? (
-            <button
-              type="button"
-              onClick={() => handleSectionChange("welcome")}
-              className="shrink-0 font-semibold text-amber-900 underline hover:no-underline"
-            >
-              Go to GoFastWithMe CMS
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-        <GoFastWithMeStudioSidebar
+      {activeSection ? (
+        <GoFastWithMeWorkspaceShell
           activeSection={activeSection}
-          onSectionChange={handleSectionChange}
-          isWelcomeComplete={isWelcomeComplete}
-          liveUrl={liveUrl}
-          appUrl={appUrl}
-          publicSlug={publicSlug}
-          gofastHandle={gofastHandle}
-          slugUsesHandle={slugUsesHandle}
-          isPublishReady={isPublishReady}
-          copyDone={copyDone}
-          onCopyAppUrl={() => void copyAppUrl(`${window.location.origin}${appUrl}`)}
-          onUrlUpdated={(slug, usesHandle) => {
-            setPublicSlug(slug);
-            setSlugUsesHandle(usesHandle);
-          }}
+          onSectionChange={openWorkspace}
+          onBackToDashboard={backToDashboard}
+        >
+          {renderWorkspacePanel()}
+        </GoFastWithMeWorkspaceShell>
+      ) : (
+        <GoFastWithMeDashboardHome
+          metrics={dashboardMetrics}
+          visitorHeadline={visitorHeadline}
+          onOpenWorkspace={openWorkspace}
         />
-
-        <div className="min-w-0 flex-1">
-          {activeSection === "welcome" ? (
-            <GoFastWithMeWelcomePanel
-              landingValues={landingValues}
-              profileBio={profileBio}
-              liveUrl={liveUrl}
-              onSaved={(values) => {
-                const wasComplete = isWelcomeContentComplete(landingValues);
-                setOwnerGwm((prev) => (prev ? { ...prev, ...values } : prev));
-                if (!wasComplete && isWelcomeContentComplete(values)) {
-                  handleSectionChange("configure");
-                }
-              }}
-            />
-          ) : null}
-          {activeSection === "configure" ? <GoFastWithMeSetupPanel /> : null}
-          {activeSection === "manage" ? (
-            <GoFastWithMeMemberManagementPanel athleteId={athleteId} publicSlug={publicSlug} />
-          ) : null}
-        </div>
-      </div>
+      )}
     </div>
   );
 }

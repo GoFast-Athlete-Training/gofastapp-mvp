@@ -67,9 +67,9 @@ export default function GoFastWithMeMemberManagementPanel({ athleteId, publicSlu
   };
 
   return (
-    <section id="manage" className="space-y-6">
+    <section id="community" className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">GoFastWithMe Member Manager</h2>
+        <h2 className="text-lg font-bold text-gray-900">My Community</h2>
         <p className="text-sm text-gray-600 mt-1">
           Owner controls for your follower container — see who follows you, send announcements, and
           preview the member experience.

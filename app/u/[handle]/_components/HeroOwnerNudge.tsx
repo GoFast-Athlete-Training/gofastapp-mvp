@@ -25,7 +25,7 @@ export default function HeroOwnerNudge({ athleteId, hasHero }: Props) {
 
   return (
     <Link
-      href="/gofast-with-others#welcome"
+      href="/gofast-with-others"
       className="inline-flex items-center gap-1.5 text-xs font-semibold bg-white/95 text-stone-800 hover:bg-white px-3 py-1.5 rounded-full shadow-sm backdrop-blur-sm transition-colors"
     >
       <ImagePlus className="w-3.5 h-3.5" />
