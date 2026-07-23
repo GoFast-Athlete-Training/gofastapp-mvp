@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { loadPublicAthletePage } from '@/lib/server/load-public-athlete-page';
 import { publicHeroPhotoUrl } from '@/lib/gofast-with-me/resolve-public-actions';
-import { photoFocusObjectPosition } from '@/lib/gofast-with-me/photo-focus';
+import { photoFocusStyle } from '@/lib/gofast-with-me/photo-focus';
 
 export const runtime = 'nodejs';
 export const contentType = 'image/png';
@@ -47,10 +47,10 @@ export default async function OgImage({
     : null;
   const avatar = data?.athlete.photoURL ?? null;
   const ogObjectPosition = data
-    ? photoFocusObjectPosition(
+    ? photoFocusStyle(
         data.gofastWithMe?.gofastWithMePhotoFocusX,
         data.gofastWithMe?.gofastWithMePhotoFocusY
-      )
+      ).objectPosition
     : '50% 50%';
 
   return new ImageResponse(
