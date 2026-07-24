@@ -18,7 +18,7 @@ import GoFastWithMeCmsContentSection from "@/components/gofast-with-me/GoFastWit
 import GoFastWithMeDashboardHome, {
   type DashboardMetrics,
 } from "@/components/gofast-with-me/GoFastWithMeDashboardHome";
-import GoFastWithMeStudioCallout from "@/components/gofast-with-me/GoFastWithMeStudioCallout";
+import GoFastWithMeStudioAppShell from "@/components/gofast-with-me/GoFastWithMeStudioAppShell";
 import GoFastWithMeStudioExplainer from "@/components/gofast-with-me/GoFastWithMeStudioExplainer";
 import {
   dismissStudioIntro,
@@ -28,7 +28,6 @@ import {
 } from "@/lib/gofast-with-me/studio-intro";
 import {
   isWelcomeContentComplete,
-  STUDIO_NAV_LABELS,
   type StudioSection,
   type StudioView,
 } from "@/components/gofast-with-me/studio-sections";
@@ -101,10 +100,6 @@ export default function GoFastWithOthersDashboard() {
 
   const openWorkspace = useCallback((section: StudioSection) => {
     setActiveView(section);
-  }, []);
-
-  const backToDashboard = useCallback(() => {
-    setActiveView("dashboard");
   }, []);
 
   useEffect(() => {
@@ -186,16 +181,31 @@ export default function GoFastWithOthersDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
-      </div>
+      <GoFastWithMeStudioAppShell
+        activeView={activeView}
+        onViewChange={setActiveView}
+        pageNeedsAction={!isWelcomeComplete}
+      >
+        <div className="flex items-center justify-center py-24">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
+        </div>
+      </GoFastWithMeStudioAppShell>
     );
   }
 
+  const studioShell = (content: React.ReactNode) => (
+    <GoFastWithMeStudioAppShell
+      activeView={activeView}
+      onViewChange={setActiveView}
+      pageNeedsAction={!isWelcomeComplete}
+    >
+      <div className="px-4 sm:px-6 py-6 max-w-6xl mx-auto">{content}</div>
+    </GoFastWithMeStudioAppShell>
+  );
+
   if (noHandle) {
-    return (
-      <div className="max-w-lg space-y-4">
-        <GoFastWithMeStudioCallout />
+    return studioShell(
+      <div className="space-y-4 max-w-lg">
         <GoFastWithMeStudioExplainer hasStudioData={false} onDismiss={handleDismissStudioIntro} />
         <p className="text-gray-700 text-sm">
           Set your GoFast handle first — then you can build your public landing.
@@ -211,7 +221,7 @@ export default function GoFastWithOthersDashboard() {
   }
 
   if (showOnboarding) {
-    return (
+    return studioShell(
       <GoFastWithMeHubOnboarding
         onComplete={({ creatorType, coachSpecialty }) => {
           setOwnerGwm((prev) =>
@@ -239,7 +249,7 @@ export default function GoFastWithOthersDashboard() {
   }
 
   if (!gofastHandle || !publicSlug || !athleteId) {
-    return (
+    return studioShell(
       <div className="max-w-lg space-y-4">
         <p className="text-gray-700">{error || "Dashboard unavailable."}</p>
       </div>
@@ -344,11 +354,10 @@ export default function GoFastWithOthersDashboard() {
     }
   };
 
-  return (
-    <div className="space-y-6 pb-8 max-w-6xl mx-auto">
+  return studioShell(
+    <div className="space-y-6 pb-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-4 min-w-0 flex-1">
-          <GoFastWithMeStudioCallout />
+        <div className="min-w-0 flex-1">
           {showStudioExplainer ? (
             <GoFastWithMeStudioExplainer
               hasStudioData={hasStudioData}
@@ -369,22 +378,6 @@ export default function GoFastWithOthersDashboard() {
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}
-        </div>
-      ) : null}
-
-      {activeView !== "dashboard" ? (
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={backToDashboard}
-            className="text-sm font-semibold text-orange-600 hover:text-orange-700"
-          >
-            ← Back to GoFast With Me Central
-          </button>
-          <span className="text-sm text-gray-400">·</span>
-          <span className="text-sm font-semibold text-gray-900">
-            {STUDIO_NAV_LABELS[activeView]}
-          </span>
         </div>
       ) : null}
 

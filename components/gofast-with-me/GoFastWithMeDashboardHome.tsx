@@ -1,21 +1,7 @@
 'use client';
 
-import {
-  BookOpen,
-  Calendar,
-  CheckCircle2,
-  ChevronRight,
-  Globe,
-  Layout,
-  Users,
-} from 'lucide-react';
-import {
-  STUDIO_BIN_DESCRIPTIONS,
-  STUDIO_BIN_LABELS,
-  STUDIO_BIN_ORDER,
-  STUDIO_CENTRAL_LABEL,
-  type StudioSection,
-} from '@/components/gofast-with-me/studio-sections';
+import { CheckCircle2, Globe } from 'lucide-react';
+import { STUDIO_CENTRAL_LABEL, type StudioSection } from '@/components/gofast-with-me/studio-sections';
 
 export type DashboardMetrics = {
   followerCount: number | null;
@@ -32,24 +18,17 @@ type Props = {
   onOpenWorkspace: (section: StudioSection) => void;
 };
 
-const BIN_ICONS: Record<StudioSection, React.ReactNode> = {
-  page: <Layout className="h-5 w-5" />,
-  workouts: <Calendar className="h-5 w-5" />,
-  community: <Users className="h-5 w-5" />,
-  content: <BookOpen className="h-5 w-5" />,
-};
-
 export default function GoFastWithMeDashboardHome({
   metrics,
   visitorHeadline,
   onOpenWorkspace,
 }: Props) {
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <h2 className="text-lg font-bold text-gray-900">{STUDIO_CENTRAL_LABEL}</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Your overview — health metrics and quick paths into each workspace.
+          Health metrics for your public presence — use the sidebar to open a workspace.
         </p>
       </div>
 
@@ -113,38 +92,6 @@ export default function GoFastWithMeDashboardHome({
           </button>
         </div>
       ) : null}
-
-      <div>
-        <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500 mb-3">
-          What do you want to work on?
-        </h3>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {STUDIO_BIN_ORDER.map((section) => (
-            <button
-              key={section}
-              type="button"
-              onClick={() => onOpenWorkspace(section)}
-              className="group rounded-2xl border border-gray-200 bg-white p-5 text-left shadow-sm hover:border-orange-200 hover:shadow-md transition"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="rounded-xl bg-orange-50 p-2.5 text-orange-600">
-                  {BIN_ICONS[section]}
-                </div>
-                <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-orange-500 shrink-0" />
-              </div>
-              <h4 className="mt-4 text-base font-bold text-gray-900">
-                {STUDIO_BIN_LABELS[section]}
-              </h4>
-              <p className="mt-1 text-sm text-gray-600">{STUDIO_BIN_DESCRIPTIONS[section]}</p>
-              {section === 'page' && !metrics.landingComplete ? (
-                <span className="mt-3 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-900">
-                  Action needed
-                </span>
-              ) : null}
-            </button>
-          ))}
-        </div>
-      </div>
 
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm text-gray-700">
