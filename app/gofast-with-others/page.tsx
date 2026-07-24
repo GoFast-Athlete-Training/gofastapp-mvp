@@ -1,14 +1,14 @@
-import AthleteAppShell from '@/components/athlete/AthleteAppShell';
+import GoFastWithMeStudioAppShell from '@/components/gofast-with-me/GoFastWithMeStudioAppShell';
 import GoFastWithOthersDashboard from '@/components/gofast-with-me/GoFastWithOthersDashboard';
 
 export const dynamic = 'force-dynamic';
 
 export default function GoFastWithOthersPage() {
   return (
-    <AthleteAppShell>
+    <GoFastWithMeStudioAppShell>
       <div className="px-4 sm:px-6 py-6">
         <GoFastWithOthersDashboard />
       </div>
-    </AthleteAppShell>
+    </GoFastWithMeStudioAppShell>
   );
 }

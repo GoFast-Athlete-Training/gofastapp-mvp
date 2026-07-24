@@ -30,6 +30,9 @@ export type ShareHubPlanStatus = {
   publicSlug: string | null;
   publicVisibility: "DRAFT" | "PUBLIC" | "UNLISTED" | "ARCHIVED" | null;
   publicDescription: string | null;
+  publicPublishedAt: string | null;
+  startDate: string | null;
+  totalWeeks: number | null;
   raceName: string | null;
   raceDistanceLabel: string | null;
   goalRaceTime: string | null;

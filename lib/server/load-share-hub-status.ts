@@ -25,9 +25,12 @@ export async function loadShareHubStatus(athleteId: string): Promise<ShareHubSta
           id: true,
           name: true,
           planSchedule: true,
+          startDate: true,
+          totalWeeks: true,
           publicSlug: true,
           publicVisibility: true,
           publicDescription: true,
+          publicPublishedAt: true,
           goalRaceTime: true,
           race_registry: {
             select: {
@@ -86,6 +89,9 @@ export async function loadShareHubStatus(athleteId: string): Promise<ShareHubSta
       publicSlug: activePlan?.publicSlug ?? null,
       publicVisibility: activePlan?.publicVisibility ?? null,
       publicDescription: activePlan?.publicDescription ?? null,
+      publicPublishedAt: activePlan?.publicPublishedAt?.toISOString() ?? null,
+      startDate: activePlan?.startDate?.toISOString() ?? null,
+      totalWeeks: activePlan?.totalWeeks ?? null,
       raceName: activePlan?.race_registry?.name ?? null,
       raceDistanceLabel:
         activePlan?.race_registry?.distanceLabel ??

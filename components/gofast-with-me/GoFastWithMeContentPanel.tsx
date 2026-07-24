@@ -37,10 +37,9 @@ export default function GoFastWithMeCmsContentSection({
   return (
     <section id="content" className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">Content</h2>
+        <h2 className="text-lg font-bold text-gray-900">Build Content</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Athlete-scoped production content owned by your Athlete ID — durable public creator
-          surface, not container feed posts.
+          Create posts, tips, routes, and supporting content that hydrates your public landing.
         </p>
       </div>
 

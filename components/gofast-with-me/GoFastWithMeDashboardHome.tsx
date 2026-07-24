@@ -13,6 +13,7 @@ import {
   STUDIO_BIN_DESCRIPTIONS,
   STUDIO_BIN_LABELS,
   STUDIO_BIN_ORDER,
+  STUDIO_CENTRAL_LABEL,
   type StudioSection,
 } from '@/components/gofast-with-me/studio-sections';
 
@@ -45,6 +46,13 @@ export default function GoFastWithMeDashboardHome({
 }: Props) {
   return (
     <div className="space-y-8">
+      <div>
+        <h2 className="text-lg font-bold text-gray-900">{STUDIO_CENTRAL_LABEL}</h2>
+        <p className="text-sm text-gray-600 mt-1">
+          Your overview — health metrics and quick paths into each workspace.
+        </p>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <HealthCard
           label="Total followers"
@@ -107,9 +115,9 @@ export default function GoFastWithMeDashboardHome({
       ) : null}
 
       <div>
-        <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 mb-3">
-          Workspaces
-        </h2>
+        <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500 mb-3">
+          What do you want to work on?
+        </h3>
         <div className="grid gap-4 sm:grid-cols-2">
           {STUDIO_BIN_ORDER.map((section) => (
             <button
@@ -124,9 +132,9 @@ export default function GoFastWithMeDashboardHome({
                 </div>
                 <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-orange-500 shrink-0" />
               </div>
-              <h3 className="mt-4 text-base font-bold text-gray-900">
+              <h4 className="mt-4 text-base font-bold text-gray-900">
                 {STUDIO_BIN_LABELS[section]}
-              </h3>
+              </h4>
               <p className="mt-1 text-sm text-gray-600">{STUDIO_BIN_DESCRIPTIONS[section]}</p>
               {section === 'page' && !metrics.landingComplete ? (
                 <span className="mt-3 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-900">

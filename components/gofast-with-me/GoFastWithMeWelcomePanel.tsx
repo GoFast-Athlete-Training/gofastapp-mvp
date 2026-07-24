@@ -1,5 +1,6 @@
 'use client';
 
+import { BookOpen } from 'lucide-react';
 import GoFastWithMeLandingForm, {
   type GoFastWithMeLandingValues,
 } from '@/components/gofast-with-me/GoFastWithMeLandingForm';
@@ -19,6 +20,7 @@ type Props = {
   onCopyAppUrl: () => void;
   onUrlUpdated: (slug: string, usesHandle: boolean) => void;
   onOpenCommunity: () => void;
+  onOpenContent: () => void;
   onSaved: (values: GoFastWithMeLandingValues) => void;
 };
 
@@ -35,6 +37,7 @@ export default function GoFastWithMeWelcomePanel({
   onCopyAppUrl,
   onUrlUpdated,
   onOpenCommunity,
+  onOpenContent,
   onSaved,
 }: Props) {
   const complete = isWelcomeContentComplete(landingValues);
@@ -45,7 +48,7 @@ export default function GoFastWithMeWelcomePanel({
         <div>
           <h2 className="text-lg font-bold text-gray-900">My Page</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Your public landing — who you are, run photo, and the URLs visitors use to find you.
+            Edit your public landing — welcome copy, run photo, and the story visitors see first.
           </p>
         </div>
         <span
@@ -68,25 +71,47 @@ export default function GoFastWithMeWelcomePanel({
         </div>
       )}
 
-      <GoFastWithMePageSurfacesCard
-        liveUrl={liveUrl}
-        appUrl={appUrl}
-        publicSlug={publicSlug}
-        gofastHandle={gofastHandle}
-        slugUsesHandle={slugUsesHandle}
-        isPublishReady={isPublishReady}
-        copyDone={copyDone}
-        onCopyAppUrl={onCopyAppUrl}
-        onUrlUpdated={onUrlUpdated}
-        onOpenCommunity={onOpenCommunity}
+      <GoFastWithMeLandingForm
+        initial={landingValues}
+        profileBio={profileBio}
+        onSaved={onSaved}
       />
 
+      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-gray-900">Supporting content</p>
+          <p className="text-xs text-gray-600 mt-0.5">
+            Tips, routes, and posts live in Build Content — they hydrate your public page over time.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onOpenContent}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-white px-3 py-2 text-xs font-semibold text-orange-800 hover:bg-orange-50"
+        >
+          <BookOpen className="h-3.5 w-3.5" />
+          Build content
+        </button>
+      </div>
+
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-gray-900">Landing page</h3>
-        <GoFastWithMeLandingForm
-          initial={landingValues}
-          profileBio={profileBio}
-          onSaved={onSaved}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">Public URLs</h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Share links and preview surfaces — secondary to your landing content above.
+          </p>
+        </div>
+        <GoFastWithMePageSurfacesCard
+          liveUrl={liveUrl}
+          appUrl={appUrl}
+          publicSlug={publicSlug}
+          gofastHandle={gofastHandle}
+          slugUsesHandle={slugUsesHandle}
+          isPublishReady={isPublishReady}
+          copyDone={copyDone}
+          onCopyAppUrl={onCopyAppUrl}
+          onUrlUpdated={onUrlUpdated}
+          onOpenCommunity={onOpenCommunity}
         />
       </div>
     </section>

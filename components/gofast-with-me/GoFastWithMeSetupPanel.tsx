@@ -4,16 +4,54 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Calendar, ExternalLink, Route } from 'lucide-react';
 import api from '@/lib/api';
-import type { ShareHubStatus } from '@/lib/profile/share-creator-card-logic';
+import type { ShareHubPlanStatus } from '@/lib/profile/share-creator-card-logic';
 
 type PlanVisibility = 'DRAFT' | 'PUBLIC' | 'UNLISTED' | 'ARCHIVED';
 
+const VISIBILITY_LABELS: Record<PlanVisibility, string> = {
+  DRAFT: 'Draft — hidden',
+  PUBLIC: 'Public — discoverable',
+  UNLISTED: 'Unlisted — link only',
+  ARCHIVED: 'Archived',
+};
+
+function formatPlanDate(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function visibilityBadgeClass(visibility: PlanVisibility | null | undefined): string {
+  switch (visibility) {
+    case 'PUBLIC':
+      return 'bg-emerald-100 text-emerald-800';
+    case 'UNLISTED':
+      return 'bg-sky-100 text-sky-800';
+    case 'ARCHIVED':
+      return 'bg-gray-100 text-gray-700';
+    default:
+      return 'bg-amber-100 text-amber-900';
+  }
+}
+
+function primaryActionLabel(
+  isPublished: boolean,
+  visibility: PlanVisibility,
+  saving: boolean
+): string {
+  if (saving) return 'Saving…';
+  if (!isPublished) return 'Publish plan';
+  if (visibility === 'DRAFT' || visibility === 'ARCHIVED') return 'Hide plan';
+  return 'Save sharing settings';
+}
+
 export default function GoFastWithMeSetupPanel() {
-  const [status, setStatus] = useState<ShareHubStatus | null>(null);
+  const [status, setStatus] = useState<{ plan: ShareHubPlanStatus } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [description, setDescription] = useState('');
-  const [visibility, setVisibility] = useState<PlanVisibility>('PUBLIC');
+  const [visibility, setVisibility] = useState<PlanVisibility>('DRAFT');
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -23,7 +61,7 @@ export default function GoFastWithMeSetupPanel() {
     try {
       const res = await api.get('/me/share-hub-status');
       if (res.data?.status) {
-        const next = res.data.status as ShareHubStatus;
+        const next = res.data.status as { plan: ShareHubPlanStatus };
         setStatus(next);
         setDescription(next.plan.publicDescription ?? '');
         setVisibility(next.plan.publicVisibility ?? 'DRAFT');
@@ -41,6 +79,7 @@ export default function GoFastWithMeSetupPanel() {
 
   const plan = status?.plan;
   const canPublish = !!plan?.hasActivePlan && !!plan?.hasSchedule;
+  const currentVisibility = plan?.publicVisibility ?? 'DRAFT';
 
   const handlePublish = async () => {
     if (!plan?.planId || saving) return;
@@ -85,16 +124,26 @@ export default function GoFastWithMeSetupPanel() {
     }
   };
 
+  const handleSave = () => {
+    if (plan?.isPublished) {
+      void handleUpdatePublished();
+    } else {
+      void handlePublish();
+    }
+  };
+
   const raceLine = [plan?.raceName, plan?.raceDistanceLabel].filter(Boolean).join(' · ');
-  const goalLine = plan?.goalRaceTime ? `Goal: ${plan.goalRaceTime}` : null;
+  const durationLine =
+    plan?.totalWeeks != null
+      ? `${plan.totalWeeks} week${plan.totalWeeks === 1 ? '' : 's'}`
+      : null;
 
   return (
     <section id="workouts" className="space-y-6">
       <div>
         <h2 className="text-lg font-bold text-gray-900">My Workouts</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Your active training plan hydrates from your Athlete ID. Publish it so followers can preview
-          your build on your public page and container.
+          Your active training plan and public sharing settings — plan basics first, visibility below.
         </p>
       </div>
 
@@ -133,17 +182,10 @@ export default function GoFastWithMeSetupPanel() {
                     label="Schedule"
                     value={plan.hasSchedule ? 'Generated' : 'Not generated yet'}
                   />
+                  <MetaRow label="Start date" value={formatPlanDate(plan.startDate)} />
+                  <MetaRow label="Duration" value={durationLine} />
                   <MetaRow label="Race" value={raceLine || 'No race linked'} />
-                  <MetaRow label="Goal" value={goalLine || '—'} />
-                  <MetaRow
-                    label="Public slug"
-                    value={plan.publicSlug ?? 'Not published yet'}
-                    mono={!!plan.publicSlug}
-                  />
-                  <MetaRow
-                    label="Visibility"
-                    value={plan.publicVisibility ?? 'DRAFT'}
-                  />
+                  <MetaRow label="Goal time" value={plan.goalRaceTime} />
                 </dl>
               </div>
             </div>
@@ -160,10 +202,31 @@ export default function GoFastWithMeSetupPanel() {
 
           {canPublish ? (
             <div className="rounded-2xl border border-violet-200 bg-violet-50/40 p-5 shadow-sm space-y-4">
-              <h3 className="text-sm font-semibold text-gray-900">Public sharing</h3>
-              <p className="text-xs text-gray-600">
-                Control how your active plan appears on your public landing and member container.
-              </p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Public sharing</h3>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Control how your active plan appears on your public landing and member container.
+                  </p>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${visibilityBadgeClass(currentVisibility)}`}
+                >
+                  {currentVisibility}
+                </span>
+              </div>
+
+              {plan.publicSlug ? (
+                <div className="rounded-lg border border-violet-100 bg-white px-3 py-2 text-xs">
+                  <p className="text-gray-500">Public slug</p>
+                  <p className="mt-0.5 font-mono text-[11px] text-gray-900 break-all">{plan.publicSlug}</p>
+                  {plan.publicPublishedAt ? (
+                    <p className="mt-1 text-gray-500">
+                      Published {formatPlanDate(plan.publicPublishedAt)}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className="space-y-2">
                 <label htmlFor="public-description" className="text-xs font-semibold text-gray-700">
@@ -190,32 +253,28 @@ export default function GoFastWithMeSetupPanel() {
                   onChange={(e) => setVisibility(e.target.value as PlanVisibility)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white"
                 >
-                  <option value="PUBLIC">Public — discoverable</option>
-                  <option value="UNLISTED">Unlisted — link only</option>
-                  <option value="DRAFT">Draft — hidden</option>
+                  <option value="PUBLIC">{VISIBILITY_LABELS.PUBLIC}</option>
+                  <option value="UNLISTED">{VISIBILITY_LABELS.UNLISTED}</option>
+                  <option value="DRAFT">{VISIBILITY_LABELS.DRAFT}</option>
+                  {currentVisibility === 'ARCHIVED' ? (
+                    <option value="ARCHIVED">{VISIBILITY_LABELS.ARCHIVED}</option>
+                  ) : null}
                 </select>
+                <p className="text-[11px] text-gray-500">
+                  Public plans are discoverable. Unlisted plans work via direct link only. Draft keeps
+                  the plan hidden.
+                </p>
               </div>
 
               <div className="flex flex-wrap gap-2">
-                {plan.isPublished ? (
-                  <button
-                    type="button"
-                    onClick={() => void handleUpdatePublished()}
-                    disabled={saving}
-                    className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
-                  >
-                    {saving ? 'Saving…' : 'Save sharing settings'}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void handlePublish()}
-                    disabled={saving}
-                    className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
-                  >
-                    {saving ? 'Publishing…' : 'Publish plan'}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => void handleSave()}
+                  disabled={saving}
+                  className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+                >
+                  {primaryActionLabel(!!plan.isPublished, visibility, saving)}
+                </button>
                 {plan.publicSlug ? (
                   <Link
                     href={`/plans/${encodeURIComponent(plan.publicSlug)}`}

@@ -18,9 +18,7 @@ import GoFastWithMeCmsContentSection from "@/components/gofast-with-me/GoFastWit
 import GoFastWithMeDashboardHome, {
   type DashboardMetrics,
 } from "@/components/gofast-with-me/GoFastWithMeDashboardHome";
-import GoFastWithMeWorkspaceShell from "@/components/gofast-with-me/GoFastWithMeWorkspaceShell";
 import GoFastWithMeStudioCallout from "@/components/gofast-with-me/GoFastWithMeStudioCallout";
-import GoFastWithMeCommunityMissionBox from "@/components/gofast-with-me/GoFastWithMeCommunityMissionBox";
 import GoFastWithMeStudioExplainer from "@/components/gofast-with-me/GoFastWithMeStudioExplainer";
 import {
   dismissStudioIntro,
@@ -30,7 +28,9 @@ import {
 } from "@/lib/gofast-with-me/studio-intro";
 import {
   isWelcomeContentComplete,
+  STUDIO_NAV_LABELS,
   type StudioSection,
+  type StudioView,
 } from "@/components/gofast-with-me/studio-sections";
 
 const RUNNER_BASE =
@@ -83,7 +83,7 @@ export default function GoFastWithOthersDashboard() {
   const [copyDone, setCopyDone] = useState(false);
   const [noHandle, setNoHandle] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [activeSection, setActiveSection] = useState<StudioSection | null>(null);
+  const [activeView, setActiveView] = useState<StudioView>("dashboard");
   const [followerCount, setFollowerCount] = useState<number | null>(null);
   const [shareHubStatus, setShareHubStatus] = useState<ShareHubStatus | null>(null);
   const [introDismissed, setIntroDismissed] = useState(false);
@@ -100,11 +100,11 @@ export default function GoFastWithOthersDashboard() {
   );
 
   const openWorkspace = useCallback((section: StudioSection) => {
-    setActiveSection(section);
+    setActiveView(section);
   }, []);
 
   const backToDashboard = useCallback(() => {
-    setActiveSection(null);
+    setActiveView("dashboard");
   }, []);
 
   useEffect(() => {
@@ -196,7 +196,6 @@ export default function GoFastWithOthersDashboard() {
     return (
       <div className="max-w-lg space-y-4">
         <GoFastWithMeStudioCallout />
-        <GoFastWithMeCommunityMissionBox compact />
         <GoFastWithMeStudioExplainer hasStudioData={false} onDismiss={handleDismissStudioIntro} />
         <p className="text-gray-700 text-sm">
           Set your GoFast handle first — then you can build your public landing.
@@ -266,10 +265,42 @@ export default function GoFastWithOthersDashboard() {
     liveUrl,
   };
 
-  const renderWorkspacePanel = () => {
-    if (!activeSection) return null;
+  const renderStudioContent = () => {
+    if (activeView === "dashboard") {
+      return (
+        <div className="space-y-6">
+          {creatorLabel ? (
+            <div className="rounded-xl border border-gray-200 bg-white p-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Creator type
+                </p>
+                <p className="text-sm font-semibold text-gray-900 mt-0.5">{creatorLabel}</p>
+                {ownerGwm?.creatorType === "coach" && ownerGwm.coachSpecialty?.trim() ? (
+                  <p className="text-sm text-gray-600 mt-1">{ownerGwm.coachSpecialty.trim()}</p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowOnboarding(true)}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-orange-600 hover:text-orange-700"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                Edit creator type
+              </button>
+            </div>
+          ) : null}
 
-    switch (activeSection) {
+          <GoFastWithMeDashboardHome
+            metrics={dashboardMetrics}
+            visitorHeadline={visitorHeadline}
+            onOpenWorkspace={openWorkspace}
+          />
+        </div>
+      );
+    }
+
+    switch (activeView) {
       case "page":
         return (
           <GoFastWithMeWelcomePanel
@@ -288,6 +319,7 @@ export default function GoFastWithOthersDashboard() {
               setSlugUsesHandle(usesHandle);
             }}
             onOpenCommunity={() => openWorkspace("community")}
+            onOpenContent={() => openWorkspace("content")}
             onSaved={(values) => {
               setOwnerGwm((prev) => (prev ? { ...prev, ...values } : prev));
             }}
@@ -317,18 +349,12 @@ export default function GoFastWithOthersDashboard() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-4 min-w-0 flex-1">
           <GoFastWithMeStudioCallout />
-          <GoFastWithMeCommunityMissionBox />
           {showStudioExplainer ? (
             <GoFastWithMeStudioExplainer
               hasStudioData={hasStudioData}
               onDismiss={handleDismissStudioIntro}
             />
           ) : null}
-          <p className="text-gray-600 text-sm max-w-xl">
-            {activeSection
-              ? "Focused workspace — use the header to switch bins or return home."
-              : "Overview of your public presence, community, workouts, and content."}
-          </p>
         </div>
         <a
           href={liveUrl}
@@ -340,49 +366,29 @@ export default function GoFastWithOthersDashboard() {
         </a>
       </div>
 
-      {creatorLabel ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Creator type
-            </p>
-            <p className="text-sm font-semibold text-gray-900 mt-0.5">{creatorLabel}</p>
-            {ownerGwm?.creatorType === "coach" && ownerGwm.coachSpecialty?.trim() ? (
-              <p className="text-sm text-gray-600 mt-1">{ownerGwm.coachSpecialty.trim()}</p>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowOnboarding(true)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-orange-600 hover:text-orange-700"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-            Edit creator type
-          </button>
-        </div>
-      ) : null}
-
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}
         </div>
       ) : null}
 
-      {activeSection ? (
-        <GoFastWithMeWorkspaceShell
-          activeSection={activeSection}
-          onSectionChange={openWorkspace}
-          onBackToDashboard={backToDashboard}
-        >
-          {renderWorkspacePanel()}
-        </GoFastWithMeWorkspaceShell>
-      ) : (
-        <GoFastWithMeDashboardHome
-          metrics={dashboardMetrics}
-          visitorHeadline={visitorHeadline}
-          onOpenWorkspace={openWorkspace}
-        />
-      )}
+      {activeView !== "dashboard" ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={backToDashboard}
+            className="text-sm font-semibold text-orange-600 hover:text-orange-700"
+          >
+            ← Back to GoFast With Me Central
+          </button>
+          <span className="text-sm text-gray-400">·</span>
+          <span className="text-sm font-semibold text-gray-900">
+            {STUDIO_NAV_LABELS[activeView]}
+          </span>
+        </div>
+      ) : null}
+
+      {renderStudioContent()}
     </div>
   );
 }

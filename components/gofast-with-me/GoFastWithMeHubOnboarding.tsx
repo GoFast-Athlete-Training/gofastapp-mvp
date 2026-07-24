@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Footprints, Sparkles, Users } from 'lucide-react';
 import api from '@/lib/api';
 import GoFastWithMeStudioCallout from '@/components/gofast-with-me/GoFastWithMeStudioCallout';
-import GoFastWithMeCommunityMissionBox from '@/components/gofast-with-me/GoFastWithMeCommunityMissionBox';
 import GoFastWithMeStudioExplainer from '@/components/gofast-with-me/GoFastWithMeStudioExplainer';
 import type { GoFastWithMeCreatorType } from '@/lib/gofast-with-me/gofast-with-me-service';
 
@@ -54,7 +53,6 @@ export default function GoFastWithMeHubOnboarding({ onComplete }: Props) {
     <div className="mx-auto max-w-2xl space-y-8 py-4">
       <div className="space-y-4">
         <GoFastWithMeStudioCallout titleClassName="text-3xl font-bold text-gray-900 leading-tight" />
-        <GoFastWithMeCommunityMissionBox />
         <GoFastWithMeStudioExplainer
           hasStudioData={false}
           onDismiss={() => {}}

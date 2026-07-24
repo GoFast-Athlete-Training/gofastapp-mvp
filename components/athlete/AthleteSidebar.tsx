@@ -3,7 +3,7 @@
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Activity, Heart, LayoutDashboard, MapPin, Sparkles, Trophy } from "lucide-react";
+import { Activity, Heart, LayoutDashboard, MapPin, Trophy, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 type NavItem = {
@@ -64,9 +64,9 @@ const navItems: NavItem[] = [
       (path === "/races" || path.startsWith("/races/") || path.startsWith("/myrace/")),
   },
   {
-    label: "GoFast with Others",
+    label: "Build Your Community",
     href: "/gofast-with-others",
-    icon: Sparkles,
+    icon: Users,
     match: goFastWithOthersMatch,
   },
   {
