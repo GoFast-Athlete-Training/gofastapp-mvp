@@ -3,8 +3,6 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
-  signInWithPopup,
-  GoogleAuthProvider,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile,
@@ -12,6 +10,7 @@ import {
   onAuthStateChanged,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { signInWithGoogle } from '@/lib/auth';
 import api from '@/lib/api';
 import { Calendar, Clock, MapPin } from 'lucide-react';
 
@@ -142,8 +141,8 @@ function JoinRunSignupContent() {
     setLoading(true);
     setError('');
     try {
-      const result = await signInWithPopup(auth, new GoogleAuthProvider());
-      await handlePostAuth(result.user);
+      const user = await signInWithGoogle();
+      await handlePostAuth(user);
     } catch (err: any) {
       console.error('Google auth error:', err);
       setError(err?.message || 'Google sign-in failed. Please try again.');

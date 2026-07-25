@@ -242,6 +242,7 @@ export default function WelcomePage() {
   async function handleBackToSignIn() {
     await signOut(auth);
     clearSessionGate();
+    LocalStorageAPI.clearAll();
     router.replace('/signup');
   }
 

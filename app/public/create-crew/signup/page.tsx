@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, updateProfile, reload } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, reload } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { signInWithGoogle } from '@/lib/auth';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 
@@ -43,11 +44,10 @@ export default function CreateCrewSignupExplainerPage() {
       // Store create intent
       localStorage.setItem(RUNCREW_CREATE_INTENT_KEY, 'true');
 
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
+      const user = await signInWithGoogle();
       
       // Get Firebase ID token for backend verification - force refresh to ensure latest profile data
-      const firebaseToken = await result.user.getIdToken(true);
+      const firebaseToken = await user.getIdToken(true);
       
       // Store Firebase token for API calls (Axios interceptor will use it)
       localStorage.setItem('firebaseToken', firebaseToken);
@@ -123,9 +123,9 @@ export default function CreateCrewSignupExplainerPage() {
         localStorage.removeItem('weeklyTotals');
         
         // Now store basic auth data
-        localStorage.setItem('firebaseId', result.user.uid);
+        localStorage.setItem('firebaseId', user.uid);
         localStorage.setItem('athleteId', athleteId);
-        localStorage.setItem('email', athleteData?.email || result.user.email || '');
+        localStorage.setItem('email', athleteData?.email || user.email || '');
         
         // Store create intent for profile creation page
         localStorage.setItem(RUNCREW_CREATE_INTENT_KEY, 'true');

@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
-  signInWithPopup,
-  GoogleAuthProvider,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile,
@@ -13,6 +11,7 @@ import {
   reload,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { signInWithGoogle } from '@/lib/auth';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 
@@ -98,11 +97,10 @@ export default function CoachSignupPage() {
       setLoading(true);
       setError('');
       setErrorMessage('');
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const firebaseToken = await result.user.getIdToken(true);
+      const user = await signInWithGoogle();
+      const firebaseToken = await user.getIdToken(true);
       localStorage.setItem('firebaseToken', firebaseToken);
-      await finishCoach(result.user);
+      await finishCoach(user);
     } catch (err: unknown) {
       const e = err as { response?: { status?: number }; message?: string };
       if (e?.response?.status === 401) {

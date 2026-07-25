@@ -7,8 +7,7 @@ export async function signInWithGoogle(): Promise<User> {
   try {
     console.log('🚀 signInWithGoogle: Starting Google sign-in popup...');
     const provider = new GoogleAuthProvider();
-    
-    // Add additional scopes if needed
+    provider.setCustomParameters({ prompt: 'select_account' });
     provider.addScope('profile');
     provider.addScope('email');
     

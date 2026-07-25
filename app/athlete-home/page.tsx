@@ -310,10 +310,6 @@ export default function AthleteHomePage() {
         router.replace('/welcome');
         return;
       }
-      if (!row.gofastHandle) {
-        router.replace('/athlete-create-profile');
-        return;
-      }
       setAthlete(row);
     } catch (profileErr: any) {
       const status = profileErr?.response?.status;

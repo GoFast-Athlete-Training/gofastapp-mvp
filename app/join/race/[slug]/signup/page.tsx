@@ -4,13 +4,12 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  signInWithPopup,
-  GoogleAuthProvider,
   createUserWithEmailAndPassword,
   updateProfile,
   reload,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { signInWithGoogle } from "@/lib/auth";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import { registrationOrganizerStatusLabel } from "@/lib/registration-status";
@@ -109,10 +108,9 @@ export default function RaceHubJoinSignupExplainerPage() {
       localStorage.setItem(RACE_HUB_JOIN_INTENT_KEY, race.id);
       localStorage.setItem(RACE_HUB_JOIN_INTENT_SLUG_KEY, slug.trim());
 
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
+      const user = await signInWithGoogle();
 
-      const firebaseToken = await result.user.getIdToken(true);
+      const firebaseToken = await user.getIdToken(true);
       localStorage.setItem("firebaseToken", firebaseToken);
 
       let athleteRes;
@@ -171,9 +169,9 @@ export default function RaceHubJoinSignupExplainerPage() {
         localStorage.removeItem("weeklyActivities");
         localStorage.removeItem("weeklyTotals");
 
-        localStorage.setItem("firebaseId", result.user.uid);
+        localStorage.setItem("firebaseId", user.uid);
         localStorage.setItem("athleteId", athleteId);
-        localStorage.setItem("email", athleteData?.email || result.user.email || "");
+        localStorage.setItem("email", athleteData?.email || user.email || "");
 
         localStorage.setItem(RACE_HUB_JOIN_INTENT_KEY, race.id);
         localStorage.setItem(RACE_HUB_JOIN_INTENT_SLUG_KEY, slug.trim());

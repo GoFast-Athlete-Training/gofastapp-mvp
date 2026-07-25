@@ -3,11 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  signInWithPopup,
-  GoogleAuthProvider,
-} from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { signInWithGoogle } from "@/lib/auth";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import { formatCohortStartLabel } from "@/lib/training/cohort-display";
@@ -109,9 +105,9 @@ export default function TrainingCohortSignupPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await signInWithPopup(auth, new GoogleAuthProvider());
-      const token = await result.user.getIdToken(true);
-      await afterAuth(result.user, token);
+      const user = await signInWithGoogle();
+      const token = await user.getIdToken(true);
+      await afterAuth(user, token);
     } catch (err: unknown) {
       setError((err as Error)?.message || "Sign up failed");
       setLoading(false);

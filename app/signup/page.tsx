@@ -4,8 +4,9 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, onAuthStateChanged, reload } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, onAuthStateChanged, reload } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { signInWithGoogle } from '@/lib/auth';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import { clubManagerActivatePath, clubManagerHubPath } from '@/lib/club-manager-paths';
@@ -90,10 +91,12 @@ function routeAfterAthleteResolved(
     return;
   }
 
+  const hasHandle = !!athlete.data?.gofastHandle?.trim();
+
   if (isClubManagerSignupMode(opts.mode)) {
     LocalStorageAPI.setClubManagerMode(true);
     const activationToken = LocalStorageAPI.getClubManagerActivationToken();
-    if (athlete.data?.gofastHandle) {
+    if (hasHandle) {
       if (activationToken) {
         router.replace(clubManagerActivatePath(activationToken));
       } else if (opts.redirect) {
@@ -107,18 +110,14 @@ function routeAfterAthleteResolved(
     return;
   }
 
-  if (!athlete.data?.gofastHandle) {
+  if (!hasHandle) {
     router.replace('/athlete-create-profile');
     return;
   }
 
   if (redirectToGofastWithConfirmIfIntent(router, opts.redirect)) return;
 
-  if (athlete.data?.gofastHandle) {
-    router.replace('/welcome');
-  } else {
-    router.replace('/athlete-create-profile');
-  }
+  router.replace('/welcome');
 }
 
 function SignupPageContent() {
@@ -229,12 +228,11 @@ function SignupPageContent() {
       setErrorMessage('');
 
       console.log('🚀 SIGNUP: Starting Google sign-in...');
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
+      const user = await signInWithGoogle();
       console.log('✅ SIGNUP: Google sign-in successful');
 
       // Get Firebase ID token for backend verification - force refresh to ensure latest profile data
-      const firebaseToken = await result.user.getIdToken(true);
+      const firebaseToken = await user.getIdToken(true);
       console.log('🔐 SIGNUP: Firebase token obtained (force refreshed)');
 
       // Store Firebase token for API calls (Axios interceptor will use it)
@@ -253,9 +251,9 @@ function SignupPageContent() {
       localStorage.removeItem('weeklyActivities');
       localStorage.removeItem('weeklyTotals');
 
-      localStorage.setItem('firebaseId', result.user.uid);
+      localStorage.setItem('firebaseId', user.uid);
       LocalStorageAPI.setAthleteId(athlete.athleteId);
-      localStorage.setItem('email', athlete.data?.email || result.user.email || '');
+      localStorage.setItem('email', athlete.data?.email || user.email || '');
 
       // Check for pending crew join intent - redirect to front door (NO auto-join)
       if (redirectToFrontDoorIfIntent(router)) return;

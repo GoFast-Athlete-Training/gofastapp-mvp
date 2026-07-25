@@ -5,13 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   createUserWithEmailAndPassword,
-  GoogleAuthProvider,
   onAuthStateChanged,
   reload,
-  signInWithPopup,
   updateProfile,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { signInWithGoogle } from '@/lib/auth';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import {
@@ -145,10 +144,10 @@ export default function GoFastWithSignupExplainerPage() {
       setLoading(true);
       setError(null);
       LocalStorageAPI.setGwmFollowIntentHandle(handle);
-      const result = await signInWithPopup(auth, new GoogleAuthProvider());
-      const token = await result.user.getIdToken(true);
+      const user = await signInWithGoogle();
+      const token = await user.getIdToken(true);
       localStorage.setItem('firebaseToken', token);
-      await afterAuth(result.user.uid, result.user.email);
+      await afterAuth(user.uid, user.email);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Sign up failed');
       setLoading(false);

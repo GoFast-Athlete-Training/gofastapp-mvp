@@ -207,16 +207,8 @@ function AthleteEditProfileInner() {
   };
 
   const saveProfileInfoTab = async () => {
-    if (
-      !formData.firstName ||
-      !formData.lastName ||
-      !formData.gofastHandle ||
-      !formData.birthday ||
-      !formData.gender ||
-      !formData.city ||
-      !formData.state
-    ) {
-      setError('Fill in all required fields on this tab.');
+    if (!formData.firstName || !formData.lastName || !formData.gofastHandle || !formData.city) {
+      setError('Fill in name, handle, and city on this tab.');
       return;
     }
     if (handleStatus === 'taken') {
@@ -242,10 +234,8 @@ function AthleteEditProfileInner() {
         lastName: formData.lastName,
         phoneNumber: formData.phoneNumber || null,
         gofastHandle: formData.gofastHandle.trim().toLowerCase(),
-        birthday: formData.birthday,
-        gender: formData.gender,
         city: formData.city,
-        state: formData.state,
+        state: formData.state || null,
         photoURL,
       });
       setSuccess('Profile Info — saved.');
@@ -291,6 +281,8 @@ function AthleteEditProfileInner() {
     setLoading(true);
     try {
       await api.put(`/athlete/${athleteId}/profile`, {
+        birthday: formData.birthday || null,
+        gender: formData.gender || null,
         primarySport: formData.primarySport.trim() || null,
         fiveKPace: formData.fiveKPace.trim() || null,
         weeklyMileage: (() => {
@@ -327,8 +319,7 @@ function AthleteEditProfileInner() {
   const sectionMeta: Record<ProfileTab, { title: string; subtitle: string }> = {
     'profile-info': {
       title: 'Profile Info',
-      subtitle:
-        'Profile photo, name, GoFast handle, birthday, gender, phone, and city. Save when you’re done with this section.',
+      subtitle: 'Profile photo, name, GoFast handle, phone, and city. Save when you’re done with this section.',
     },
     'about-you': {
       title: 'About You',
@@ -337,8 +328,7 @@ function AthleteEditProfileInner() {
     },
     'goal-perf': {
       title: 'Goal & Performance',
-      subtitle:
-        'Primary sport, 5K pace, and weekly mileage help tune workouts and pacing in the app.',
+      subtitle: 'We want to tailor the training plan to you — age, gender, sport, and pace help personalize targets.',
     },
   };
 
@@ -390,7 +380,7 @@ function AthleteEditProfileInner() {
               <nav className="flex flex-col gap-0.5" aria-label="Profile sections">
                 {sectionNavItem('profile-info', 'Profile Info', 'Photo, name & account')}
                 {sectionNavItem('about-you', 'About You', 'Bio & social links')}
-                {sectionNavItem('goal-perf', 'Goal & Performance', 'Sport, pace & mileage')}
+                {sectionNavItem('goal-perf', 'Goal & Performance', 'Age, gender, sport & pace')}
               </nav>
             </div>
           </aside>
@@ -510,51 +500,6 @@ function AthleteEditProfileInner() {
                 {handleError && <p className="text-xs text-red-600 mt-1">{handleError}</p>}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Birthday <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={formData.birthday}
-                  onChange={(e) => handleInputChange('birthday', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
-                  disabled={loading}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Gender <span className="text-red-500">*</span>
-                </label>
-                <div className="flex gap-4">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="gender"
-                      value="male"
-                      checked={formData.gender === 'male'}
-                      onChange={(e) => handleInputChange('gender', e.target.value)}
-                      className="mr-2"
-                      disabled={loading}
-                    />
-                    Male
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="gender"
-                      value="female"
-                      checked={formData.gender === 'female'}
-                      onChange={(e) => handleInputChange('gender', e.target.value)}
-                      className="mr-2"
-                      disabled={loading}
-                    />
-                    Female
-                  </label>
-                </div>
-              </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -569,9 +514,7 @@ function AthleteEditProfileInner() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    State <span className="text-red-500">*</span>
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
                   <input
                     type="text"
                     value={formData.state}
@@ -681,6 +624,58 @@ function AthleteEditProfileInner() {
 
           {activeTab === 'goal-perf' && (
             <div className="space-y-5">
+              {(!formData.birthday || !formData.gender) && (
+                <div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3">
+                  <p className="text-sm font-semibold text-orange-900">
+                    We want to tailor the training plan to you.
+                  </p>
+                  <p className="mt-1 text-xs text-orange-800">
+                    Age and gender help personalize pacing and targets.
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Birthday</label>
+                <input
+                  type="date"
+                  value={formData.birthday}
+                  onChange={(e) => handleInputChange('birthday', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  disabled={loading}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="gender"
+                      value="male"
+                      checked={formData.gender === 'male'}
+                      onChange={(e) => handleInputChange('gender', e.target.value)}
+                      className="mr-2"
+                      disabled={loading}
+                    />
+                    Male
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="gender"
+                      value="female"
+                      checked={formData.gender === 'female'}
+                      onChange={(e) => handleInputChange('gender', e.target.value)}
+                      className="mr-2"
+                      disabled={loading}
+                    />
+                    Female
+                  </label>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Primary sport <span className="text-gray-400 font-normal">(optional)</span>
