@@ -51,7 +51,7 @@ export default function AthleteCreateProfilePage() {
         let athleteId = LocalStorageAPI.getAthleteId();
         if (!athleteId) {
           const meRes = await api.get('/athlete/me');
-          athleteId = meRes.data?.athleteId as string | undefined;
+          athleteId = meRes.data?.athleteId || null;
           if (athleteId) LocalStorageAPI.setAthleteId(athleteId);
         }
         if (!athleteId || cancelled) return;
