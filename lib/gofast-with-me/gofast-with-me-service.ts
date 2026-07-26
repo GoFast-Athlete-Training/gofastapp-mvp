@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { clampPhotoFocus } from '@/lib/gofast-with-me/photo-focus';
+import { clampPhotoFocus, clampPhotoZoom } from '@/lib/gofast-with-me/photo-focus';
 import { normalizeGoFastWithMePhotoType } from '@/lib/gofast-with-me/photo-type';
 import {
   buildGoFastWithMeUrl,
@@ -24,6 +24,7 @@ export type GoFastWithMeRecord = {
   gofastWithMePhotoUrl: string | null;
   gofastWithMePhotoFocusX: number | null;
   gofastWithMePhotoFocusY: number | null;
+  gofastWithMePhotoZoom: number | null;
   gofastWithMePhotoType: string | null;
   creatorType: GoFastWithMeCreatorType | null;
   coachSpecialty: string | null;
@@ -39,6 +40,7 @@ export type GoFastWithMeIntroInput = {
   gofastWithMePhotoUrl?: string | null;
   gofastWithMePhotoFocusX?: number | null;
   gofastWithMePhotoFocusY?: number | null;
+  gofastWithMePhotoZoom?: number | null;
   gofastWithMePhotoType?: string | null;
   creatorType?: GoFastWithMeCreatorType | string | null;
   coachSpecialty?: string | null;
@@ -70,6 +72,7 @@ type GoFastWithMeRow = {
   gofastWithMePhotoUrl: string | null;
   gofastWithMePhotoFocusX: number | null;
   gofastWithMePhotoFocusY: number | null;
+  gofastWithMePhotoZoom: number | null;
   gofastWithMePhotoType: string | null;
   creatorType: string | null;
   coachSpecialty: string | null;
@@ -210,6 +213,10 @@ export async function updateGoFastWithMeIntro(
       input.gofastWithMePhotoFocusY == null
         ? null
         : clampPhotoFocus(input.gofastWithMePhotoFocusY);
+  }
+  if (input.gofastWithMePhotoZoom !== undefined) {
+    data.gofastWithMePhotoZoom =
+      input.gofastWithMePhotoZoom == null ? null : clampPhotoZoom(input.gofastWithMePhotoZoom);
   }
   if (input.gofastWithMePhotoType !== undefined) {
     data.gofastWithMePhotoType =

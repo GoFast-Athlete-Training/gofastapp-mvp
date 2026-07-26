@@ -25,7 +25,7 @@ export const GOFAST_WITH_ME_PHOTO_TYPE_OPTIONS: {
   {
     value: 'race',
     label: 'Race photo',
-    hint: 'Finish line or race day — wide banner-style framing.',
+    hint: 'Finish line or race day — wide feature on landing and in the app.',
   },
   {
     value: 'portrait',
@@ -73,13 +73,13 @@ export function usesWideFeaturePhotoLayout(
 export function widePhotoFrameClass(surface: GoFastWithMePhotoSurface): string {
   switch (surface) {
     case 'studioPreview':
-      return 'aspect-[16/7]';
+      return 'aspect-[16/9]';
     case 'inAppProfile':
       return 'aspect-[16/9]';
     case 'publicLanding':
-      return 'aspect-[4/3] sm:aspect-[16/7]';
+      return 'aspect-[16/9]';
     case 'previewHero':
-      return 'aspect-[16/9] sm:aspect-[16/7]';
+      return 'aspect-[16/9]';
     case 'openGraph':
       return 'aspect-[1200/630]';
     default:

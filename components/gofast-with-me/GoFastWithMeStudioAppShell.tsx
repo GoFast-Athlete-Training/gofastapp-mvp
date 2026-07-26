@@ -3,10 +3,10 @@
 import Link from 'next/link';
 import {
   ArrowLeft,
-  BookOpen,
-  Calendar,
   Layout,
   LayoutDashboard,
+  Megaphone,
+  Route,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -21,9 +21,9 @@ import {
 const NAV_ICONS: Record<StudioView, LucideIcon> = {
   dashboard: LayoutDashboard,
   page: Layout,
-  workouts: Calendar,
-  community: Users,
-  content: BookOpen,
+  plan: Route,
+  messages: Megaphone,
+  followers: Users,
 };
 
 type Props = {
@@ -45,8 +45,8 @@ export default function GoFastWithMeStudioAppShell({
       <div className="flex flex-1 overflow-hidden">
         <aside className="w-64 bg-white border-r-2 border-gray-200 flex flex-col shrink-0 overflow-y-auto">
           <div className="p-4 border-b border-gray-200">
-            <p className="text-lg font-bold text-gray-900">GoFastWithMe Studio</p>
-            <p className="text-xs text-gray-500 mt-1">Your public community hub</p>
+            <p className="text-lg font-bold text-gray-900">GoFast With Me</p>
+            <p className="text-xs text-gray-500 mt-1">Goal · Plan · Messages · Followers</p>
           </div>
 
           <nav className="flex-1 p-2 space-y-1" aria-label="Studio">

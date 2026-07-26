@@ -23,6 +23,7 @@ type Props = {
   gofastWithMePhotoUrl: string | null;
   gofastWithMePhotoFocusX?: number | null;
   gofastWithMePhotoFocusY?: number | null;
+  gofastWithMePhotoZoom?: number | null;
   gofastWithMePhotoType?: string | null;
   city: string | null;
   state: string | null;
@@ -59,7 +60,8 @@ export default function ProfileHero(props: Props) {
   const pagePhoto = props.gofastWithMePhotoUrl?.trim() || null;
   const pagePhotoFocus = photoFocusStyle(
     props.gofastWithMePhotoFocusX,
-    props.gofastWithMePhotoFocusY
+    props.gofastWithMePhotoFocusY,
+    props.gofastWithMePhotoZoom
   );
   const wideFeature = usesWideFeaturePhotoLayout(pagePhoto, props.gofastWithMePhotoType);
   const actions = props.publicActions ?? [];

@@ -23,6 +23,34 @@ CMS content is athlete-owned. Treat the athlete like a solo company/creator:
 - This keeps content portable across the public landing, member container, and future monetization surfaces.
 - Do not make content ownership depend only on a page/surface row.
 
+## Core Loop (GoFast With Me)
+
+Product name: **GoFast With Me** — not "athlete container," not short "GoFast" (company).
+
+```text
+What I'm training for (e.g. MCM)
+  → I'm a GoFast athlete with a goal
+  → I have a GoFast plan (planId / training_plans)
+  → I surface that plan (public visibility)
+  → Plan strip shows the week in the hub
+  → Others see the goal + the work → they follow / join the journey
+```
+
+Door (`/u/[handle]`) answers: **who am I training with / what are they chasing?**  
+Hub (`/container/[handle]`) answers: **what's their week look like — can I follow along?**
+
+| Priority | Surface | Where | Role |
+|----------|---------|-------|------|
+| **P0** | What I'm training for | Door + hub header | Goal/race identity via `GoalRaceCard` / plan goal hydrate |
+| **P0** | Plan strip | Hub (members); teaser on door if public | Week view of surfaced GoFast plan |
+| P1 | Messages | Hub | Journey announcements (`gofast_container_messages`) |
+| P1 | What I'm thinking about | Hub / door later | Tips / voice (`athlete_tips` etc.) |
+| **P2 v2** | My Runs | Hub (collapsed) | Manual `city_runs.athleteGeneratedId` — not primary loop |
+
+Boundary sentence:
+
+> Door surfaces What I'm training for. Hub surfaces Plan strip for that same plan. Others join the journey. My Runs is v2.
+
 ## The Crucial Product Fork
 
 The product must keep two surfaces clear:
@@ -33,11 +61,15 @@ The product must keep two surfaces clear:
    - It helps strangers understand the athlete and decide to follow/join.
    - It is not the monetizable relationship layer by itself.
 
-2. Container
-   - This is how the athlete engages fans/followers.
-   - This is where the audience relationship lives.
-   - This is where followers, member feed, announcements, training plan access, and future monetization belong.
-   - If the container is buried behind the landing page, the product loses the actual audience/monetizer layer.
+2. Container (GoFast With Me member hub)
+   - This is how the athlete engages fans/followers after they follow.
+   - This is where the audience relationship lives at `/container/[handle]`.
+   - **P0 surfaces (scroll layout, not tabs):**
+     - **What I'm training for** — goal/race identity in hub header (same signal as door `GoalRaceCard`).
+     - **Plan strip** — week view of the host's surfaced GoFast plan (`training_plans` public fields).
+   - **P1 surfaces:** Messages (journey announcements), What I'm thinking about (tips/voice — later).
+   - **P2 v2:** My Runs — manual hosted `city_runs`; not the primary loop.
+   - `gofast_with_me` holds door copy/photo only — no plan or goal config duplicated there.
 
 Do not overplay the public landing page and forsake the container. The landing page is the door. The container is the room.
 
@@ -251,7 +283,7 @@ Member container trace:
   -> public athlete lookup gets hostAthleteId
   -> GET /api/athlete/[hostAthleteId]/container/hub
   -> loadContainerHubForHost(hostAthleteId, callerAthleteId)
-  -> hydrate members, feed, hosted runs, first published public plan
+  -> hydrate members, messages, training-for context, first published public plan, optional hosted runs
 ```
 
 Plan trace inside the container:
@@ -287,46 +319,50 @@ host Athlete.id
 
 ## Studio Flow Canon
 
-The studio should lead the user through what actually matters:
+The studio (`/gofast-with-others`) should lead the user through what actually matters:
 
-1. `GoFastWithMe CMS`
+1. **My Page** (public door)
    - Required first.
-   - This includes the landing page and public content types.
-   - Landing is the public door.
-   - It edits the GoFastWithMe public copy/photo.
-   - It should grow to manage courses, tips, and blog content.
-   - It may display athlete-scoped context, but it does not own the container.
+   - Landing copy/photo via `gofast_with_me` + athlete profile context.
+   - Strangers decide to follow from `/u/[handle]`; **What I'm training for** hydrates from goal/plan on the live door.
 
-2. `GoFastWithMe Add My Plan`
-   - Next after CMS/Landing.
-   - This should reflect attachable/hydrated athlete-owned modules.
-   - For MVP, the core setup is the training plan/public plan path.
-   - It should hydrate the active `planId` from `Athlete.id`.
-   - It should expose plan public toggle/publish state.
-   - It should expose public plan description editing.
-   - Hosted runs are optional setup if the athlete wants to show a run they are doing.
-   - Do not add staff/team setup here.
+2. **Surface my plan** (owner studio)
+   - Publish/toggle the active GoFast plan (`training_plans.publicSlug`, `publicVisibility`, etc.).
+   - Followers see the **plan strip** in the member hub — not a duplicate config on `gofast_with_me`.
 
-3. CMS content types
-   - Tips.
-   - myRunRoutes.
-   - Blog.
-   - All three are athlete-scoped creator content.
-   - These belong under CMS, not as a confusing separate "General Content" sibling.
-   - They should not be highlighted before CMS/Landing basics are complete.
-   - Do not confuse CMS tips with container feed `tips`; one is durable public content, the other is an audience post topic.
-   - Do not call running-route content just `routes`; use `myRunRoutes`.
+3. **Messages** (owner studio + member hub)
+   - Journey announcements (`gofast_container_messages`, topic `updates`).
+   - Race updates, plan milestones, what's next — not schedule chatter as the primary product.
 
-4. `GoFastWithMe Member Manager`
-   - Owner/manager controls for the athlete-owned container.
-   - Followers, announcements, hub feed controls.
-   - This is the "view/manage as owner" side.
-   - This is how the athlete speaks and shares with their specific audience.
+4. **Followers** (owner studio + member hub)
+   - `gofast_container_memberships`, member list, preview member hub.
 
-5. `View as member`
-   - Link to `/container/[handle]`.
-   - This is the follower/member experience.
-   - It hydrates by host athlete id.
+5. **View as member**
+   - Link to `/container/[handle]` — scroll layout: training-for context, plan strip, messages, thinking, followers; My Runs collapsed as v2.
+
+### Boundaries (keep sharp)
+
+- **GoFast With Me** = personal creator + audience following a goal and surfaced plan.
+- **Run Club** = organization schedule, brand, multi-leader ops — stays in club leader / club hub.
+- Club contrast: club = "see you Saturday." GoFast With Me = "training for MCM on this plan — join my journey."
+- An athlete who leads a club can use both; GoFast With Me must not become a backdoor club admin.
+
+### Ownership (FK clarity)
+
+| Surface | Owns the data |
+|---------|---------------|
+| What I'm training for | Athlete goal / plan race link / race registry |
+| Plan strip | `training_plans` (`planId`, public fields) |
+| Messages | `gofast_container_messages` (`containerAthleteId`) |
+| Thinking | `athlete_tips` (etc.) — later |
+| My Runs (v2) | `city_runs.athleteGeneratedId` |
+| Door copy | `gofast_with_me` only |
+
+Legacy table names (`gofast_container_*`) remain in schema; product language is **GoFast With Me**.
+
+### Deferred CMS (not peer pillars today)
+
+Tips, myRunRoutes, and Blog remain athlete-scoped CMS capability (`athlete_tips`, etc.) — planned durable content, not the same as feed topics. Do not highlight before Landing basics are complete.
 
 ## What Not To Build
 
@@ -342,16 +378,24 @@ Do not build these:
 - No treating Tips, myRunRoutes, and Blog as out-of-scope forever; they are CMS capability — `athlete_tips` is the first table back.
 - No flow where the user is warned to finish Landing Page but shown another active panel.
 - No treating the public landing page as the real app container.
+- No Run Club management inside the athlete container (series ops, club roster, club announcements).
+- No full RunCrew product inside the athlete container.
+- No container-native RSVP/check-in — reuse GoRun for hosted runs.
+- No absorbing private athlete training (Garmin, private plans) into the social container except publish/share slices.
 
 ## Naming Guidance
 
 Use product language that matches the data:
 
-- "GoFastWithMe CMS" for the public landing page controls.
-- "GoFastWithMe Add My Plan" for attaching or publishing the athlete-owned active training plan.
-- "Tips", "myRunRoutes", and "Blog" for CMS content types (tables: `athlete_tips`, future `athlete_run_routes`, `athlete_blog_posts`).
-- "GoFastWithMe Member Manager" for owner controls, followers, announcements, and audience communication.
+- **GoFast With Me** — product name for the follower hub and studio (not "athlete container").
+- "My Page" / landing CMS for the public door (`/u/[handle]`).
+- **What I'm training for** — explicit name for goal/race surfacing (`GoalRaceCard`).
+- **Plan strip** — week view of surfaced GoFast plan in hub.
+- **Messages**, **Followers** — studio sections and hub surfaces (legacy: Feed, Community).
+- **My Runs (v2)** — demoted manual hosted runs; not the primary loop.
+- "Follow" / "followers" in member UX.
 - "View as member" for `/container/[handle]`.
-- "View public page" for the public landing route.
+- "View public page" / public door for `/u/[handle]`.
+- Legacy labels (`GoFastWithMe CMS`, `Add My Plan`, `Member Manager`, Feed/Runs/Community tabs) map to My Page, Surface my plan, Messages, Followers.
 
 Avoid language that implies GoFastWithMe owns everything. It does not. GoFastWithMe introduces the athlete; the athlete hydrates the experience.

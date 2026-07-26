@@ -55,6 +55,7 @@ export default function GoFastWithMeDashboardHome({
   const stoplight = myPageStoplight(metrics.landingComplete, metrics.publishReady);
   const memberCount = metrics.followerCount ?? 0;
   const hasMembers = memberCount > 0;
+  const planLive = metrics.planPublished === true;
 
   const copyInvite = async () => {
     try {
@@ -75,7 +76,7 @@ export default function GoFastWithMeDashboardHome({
       <div>
         <h2 className="text-lg font-bold text-gray-900">{STUDIO_CENTRAL_LABEL}</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Your door and your room — set up your page, then manage members when people join.
+          Goal + plan surfacing — your public door, surfaced GoFast plan, and the hub followers join.
         </p>
       </div>
 
@@ -104,21 +105,21 @@ export default function GoFastWithMeDashboardHome({
 
           <button
             type="button"
-            onClick={() => onOpenWorkspace('workouts')}
-            className="rounded-xl border border-gray-200 bg-white p-4 text-left hover:bg-gray-50 transition-colors"
+            onClick={() => onOpenWorkspace('plan')}
+            className={`rounded-xl border p-4 text-left hover:opacity-90 transition-colors ${
+              planLive ? 'border-emerald-200 bg-emerald-50/60' : 'border-gray-200 bg-white hover:bg-gray-50'
+            }`}
           >
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Training plan
+              Plan strip
             </p>
             <p className="mt-2 text-xl font-bold text-gray-900">
-              {metrics.planPublished === true
-                ? 'Published'
-                : metrics.planPublished === false
-                  ? 'Not published'
-                  : '—'}
+              {planLive ? 'Surfaced' : 'Not surfaced'}
             </p>
             <p className="mt-1 text-xs text-gray-600">
-              {metrics.planName ?? 'Share your active plan into the room'}
+              {planLive && metrics.planName
+                ? metrics.planName
+                : 'Publish your GoFast plan so followers see your week'}
             </p>
           </button>
         </div>
@@ -127,7 +128,7 @@ export default function GoFastWithMeDashboardHome({
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-wrap items-center justify-between gap-3">
             <span>
               Set up <strong>My Page</strong> first — welcome, bio, what visitors will see, and a
-              run image. When people join, manage them in <strong>My Community</strong>.
+              run image. Then surface your plan and post journey <strong>Messages</strong>.
             </span>
             <button
               type="button"
@@ -141,7 +142,7 @@ export default function GoFastWithMeDashboardHome({
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">My members</h3>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Followers</h3>
         <div className="rounded-xl border border-gray-200 bg-white p-4">
           {hasMembers ? (
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -149,19 +150,19 @@ export default function GoFastWithMeDashboardHome({
                 <Users className="h-5 w-5 text-orange-600 shrink-0 mt-0.5" aria-hidden />
                 <div>
                   <p className="text-sm font-semibold text-gray-900">
-                    {memberCount} {memberCount === 1 ? 'person' : 'people'} in your room
+                    {memberCount} {memberCount === 1 ? 'follower' : 'followers'}
                   </p>
                   <p className="text-xs text-gray-600 mt-1">
-                    You have members — engage them with updates and announcements in My Community.
+                    They see your plan strip and journey messages in GoFast With Me.
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => onOpenWorkspace('community')}
+                onClick={() => onOpenWorkspace('followers')}
                 className="shrink-0 rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
               >
-                Open My Community
+                Open Followers
               </button>
             </div>
           ) : (
@@ -169,7 +170,8 @@ export default function GoFastWithMeDashboardHome({
               <div>
                 <p className="text-sm font-semibold text-gray-900">None yet — invite your first one</p>
                 <p className="text-xs text-gray-600 mt-1">
-                  Share your GoFast-with link. When someone joins, manage them in My Community.
+                  Share your follow link. When someone joins, they follow your goal, plan strip, and
+                  messages.
                 </p>
               </div>
               <button

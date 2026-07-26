@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ExternalLink, Megaphone, Users } from 'lucide-react';
+import { ExternalLink, Users } from 'lucide-react';
 import api from '@/lib/api';
 import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
 
@@ -15,11 +15,8 @@ export default function GoFastWithMeMemberManagementPanel({ athleteId, publicSlu
   const [hub, setHub] = useState<ContainerHubPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [announcement, setAnnouncement] = useState('');
-  const [posting, setPosting] = useState(false);
-  const [postSuccess, setPostSuccess] = useState(false);
 
-  const hubPath = `/container/${encodeURIComponent(publicSlug)}`;
+  const hubPath = `/container/${encodeURIComponent(publicSlug)}#followers`;
 
   const loadHub = useCallback(async () => {
     setLoading(true);
@@ -43,36 +40,13 @@ export default function GoFastWithMeMemberManagementPanel({ athleteId, publicSlu
     void loadHub();
   }, [loadHub]);
 
-  const handleAnnouncement = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!announcement.trim() || posting) return;
-    setPosting(true);
-    setError(null);
-    setPostSuccess(false);
-    try {
-      await api.post(`/athlete/${athleteId}/container/messages`, {
-        body: announcement.trim(),
-        topic: 'updates',
-      });
-      setAnnouncement('');
-      setPostSuccess(true);
-      setTimeout(() => setPostSuccess(false), 2500);
-      await loadHub();
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } } };
-      setError(e.response?.data?.error || 'Could not send announcement.');
-    } finally {
-      setPosting(false);
-    }
-  };
-
   return (
-    <section id="community" className="space-y-6">
+    <section id="followers" className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">My Community</h2>
+        <h2 className="text-lg font-bold text-gray-900">Followers</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Owner controls for your follower container — see who follows you, send announcements, and
-          preview the member experience.
+          Runners following your GoFast With Me hub — they see your goal, plan strip, and journey
+          messages after they follow.
         </p>
       </div>
 
@@ -82,18 +56,12 @@ export default function GoFastWithMeMemberManagementPanel({ athleteId, publicSlu
         </div>
       ) : null}
 
-      {postSuccess ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Announcement posted to your followers.
-        </div>
-      ) : null}
-
       <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             <Users className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
             <div>
-              <h3 className="text-sm font-semibold text-gray-900">Followers</h3>
+              <h3 className="text-sm font-semibold text-gray-900">Follower list</h3>
               {loading ? (
                 <p className="text-xs text-gray-500 mt-1">Loading…</p>
               ) : (
@@ -130,45 +98,17 @@ export default function GoFastWithMeMemberManagementPanel({ athleteId, publicSlu
         ) : null}
       </div>
 
-      <div className="rounded-2xl border border-violet-200 bg-violet-50/40 p-5 shadow-sm space-y-3">
-        <div className="flex items-start gap-2">
-          <Megaphone className="h-5 w-5 text-violet-700 mt-0.5 shrink-0" />
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900">Send announcement</h3>
-            <p className="text-xs text-gray-600 mt-1">
-              Posts to the Updates channel in your member container — visible to all followers.
-            </p>
-          </div>
-        </div>
-        <form onSubmit={(e) => void handleAnnouncement(e)} className="space-y-2">
-          <textarea
-            value={announcement}
-            onChange={(e) => setAnnouncement(e.target.value)}
-            rows={3}
-            maxLength={2000}
-            className="w-full rounded-lg border border-gray-300 p-3 text-sm bg-white"
-            placeholder="Share an update with your followers…"
-          />
-          <button
-            type="submit"
-            disabled={posting || !announcement.trim()}
-            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
-          >
-            {posting ? 'Posting…' : 'Post announcement'}
-          </button>
-        </form>
-      </div>
-
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <h3 className="text-sm font-semibold text-gray-900">Message members</h3>
+        <h3 className="text-sm font-semibold text-gray-900">Member hub</h3>
         <p className="text-xs text-gray-600 mt-1">
-          Open your member container to post in Chatter or reply to follower conversations.
+          Preview what followers see — What I&apos;m training for, plan strip, messages, and follower
+          list in one scroll.
         </p>
         <Link
-          href={`${hubPath}#feed`}
+          href={hubPath}
           className="mt-3 inline-flex rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100"
         >
-          View as member — hub feed
+          View as member — GoFast With Me hub
         </Link>
       </div>
     </section>

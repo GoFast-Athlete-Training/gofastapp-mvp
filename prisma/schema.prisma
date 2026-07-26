@@ -191,6 +191,8 @@ model gofast_with_me {
   /// Focal point for object-cover framing (0–100). Default center when null.
   gofastWithMePhotoFocusX Int? @default(50)
   gofastWithMePhotoFocusY Int? @default(50)
+  /// Zoom for landing photo framing (1.0–3.0). Default 1 when null.
+  gofastWithMePhotoZoom Float? @default(1)
   /// Layout hint: action, group, race, portrait, other — drives surface framing.
   gofastWithMePhotoType String?
   /// Hub creator framing: "person" or "coach" (not the separate Coach entity).
@@ -295,13 +297,17 @@ model gofast_container_messages {
   /// updates | tips | nutrition | routes | chatter
   topic              String   @default("chatter")
   routeId            String?
+  /// Optional joinable run invite attached to a feed post (host-owned city_runs).
+  cityRunId          String?
   createdAt          DateTime @default(now())
   containerAthlete   Athlete  @relation("ContainerMessages", fields: [containerAthleteId], references: [id], onDelete: Cascade)
   authorAthlete      Athlete  @relation("ContainerMessageAuthor", fields: [authorAthleteId], references: [id], onDelete: Cascade)
   route              routes?  @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  cityRun            city_runs? @relation(fields: [cityRunId], references: [id], onDelete: SetNull)
 
   @@index([containerAthleteId, createdAt])
   @@index([containerAthleteId, topic, createdAt])
+  @@index([cityRunId])
 }
 
 model ambassador_credits {
@@ -1209,6 +1215,7 @@ model city_runs {
   city_run_checkins   city_run_checkins[]
   city_run_activity_links city_run_activity_links[]
   run_club_messages_linked run_club_messages[]
+  gofast_container_messages gofast_container_messages[]
   Athlete             Athlete?             @relation(fields: [athleteGeneratedId], references: [id], onDelete: Cascade)
   run_crews           run_crews?           @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
   runClub             run_clubs?           @relation(fields: [runClubId], references: [id], onDelete: SetNull)

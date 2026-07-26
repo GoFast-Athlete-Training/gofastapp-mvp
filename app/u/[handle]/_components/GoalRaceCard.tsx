@@ -126,7 +126,7 @@ export default function GoalRaceCard({ trainingSummary, primaryChasingGoal }: Pr
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-orange-700 tracking-wider uppercase">
             <Trophy className="w-3.5 h-3.5" />
-            Chasing
+            What I&apos;m training for
           </div>
           <h2 className="mt-1.5 text-2xl sm:text-3xl font-bold text-stone-900 leading-tight">
             {raceName ?? 'Goal race'}

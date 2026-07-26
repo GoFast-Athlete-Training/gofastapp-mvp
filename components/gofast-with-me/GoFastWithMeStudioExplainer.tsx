@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import {
-  BookOpen,
-  Calendar,
   Layout,
   LayoutDashboard,
+  Megaphone,
+  Route,
   Users,
   X,
   type LucideIcon,
@@ -26,9 +26,9 @@ import {
 const NAV_ICONS: Record<StudioSection | 'dashboard', LucideIcon> = {
   dashboard: LayoutDashboard,
   page: Layout,
-  community: Users,
-  workouts: Calendar,
-  content: BookOpen,
+  plan: Route,
+  messages: Megaphone,
+  followers: Users,
 };
 
 type Props = {

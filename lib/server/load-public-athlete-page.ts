@@ -67,6 +67,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
       null,
     gofastWithMePhotoFocusX: gwmRow.gofastWithMePhotoFocusX,
     gofastWithMePhotoFocusY: gwmRow.gofastWithMePhotoFocusY,
+    gofastWithMePhotoZoom: gwmRow.gofastWithMePhotoZoom,
     gofastWithMePhotoType: gwmRow.gofastWithMePhotoType,
     creatorType: gwmRow.creatorType,
     coachSpecialty: gwmRow.coachSpecialty,

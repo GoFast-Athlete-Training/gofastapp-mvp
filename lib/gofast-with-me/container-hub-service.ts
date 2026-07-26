@@ -9,27 +9,21 @@ import {
 } from '@/lib/training/public-plan-service';
 import { effectiveTrainingWeekCount } from '@/lib/training/plan-utils';
 import type { PublicPlanWeek } from '@/lib/training/public-plan-service';
+import {
+  containerMessageInclude,
+  mapContainerMessageRow,
+  type MappedContainerMessage,
+} from '@/lib/gofast-with-me/container-message-map';
 
-export type ContainerHubMessage = {
-  id: string;
-  body: string;
-  topic: string;
-  routeId: string | null;
-  createdAt: string;
-  author: {
-    id: string;
-    firstName: string | null;
-    lastName: string | null;
-    photoURL: string | null;
-    gofastHandle: string | null;
-  };
-  route: {
-    id: string;
-    name: string;
-    distanceMiles: number | null;
-    citySlug: string | null;
-  } | null;
-};
+export type ContainerHubMessage = MappedContainerMessage;
+
+import type {
+  GoFastWithMeChasingGoal,
+  GoFastWithMeTrainingFor,
+  GoFastWithMeTrainingSummary,
+} from '@/lib/gofast-with-me/training-for-types';
+
+export type { GoFastWithMeChasingGoal, GoFastWithMeTrainingFor, GoFastWithMeTrainingSummary };
 
 export type ContainerHubPayload = {
   isHost: boolean;
@@ -65,39 +59,9 @@ export type ContainerHubPayload = {
     totalWeeks: number;
     weeks: PublicPlanWeek[];
   } | null;
+  trainingFor: GoFastWithMeTrainingFor;
   messages: ContainerHubMessage[];
 };
-
-function mapMessageRow(m: {
-  id: string;
-  body: string;
-  topic: string;
-  routeId: string | null;
-  createdAt: Date;
-  authorAthlete: {
-    id: string;
-    firstName: string | null;
-    lastName: string | null;
-    photoURL: string | null;
-    gofastHandle: string | null;
-  };
-  route: {
-    id: string;
-    name: string;
-    distanceMiles: number | null;
-    citySlug: string | null;
-  } | null;
-}): ContainerHubMessage {
-  return {
-    id: m.id,
-    body: m.body,
-    topic: m.topic,
-    routeId: m.routeId,
-    createdAt: m.createdAt.toISOString(),
-    author: m.authorAthlete,
-    route: m.route,
-  };
-}
 
 async function loadPublishedPlanWeeks(hostAthleteId: string) {
   const rows = await listPublicPlansForAthlete(hostAthleteId);
@@ -177,25 +141,7 @@ export async function loadContainerHubForHost(
           },
           orderBy: { createdAt: 'desc' },
           take: options?.messageLimit ?? 40,
-          include: {
-            authorAthlete: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                photoURL: true,
-                gofastHandle: true,
-              },
-            },
-            route: {
-              select: {
-                id: true,
-                name: true,
-                distanceMiles: true,
-                citySlug: true,
-              },
-            },
-          },
+          include: containerMessageInclude,
         })
       : Promise.resolve([]),
   ]);
@@ -222,6 +168,10 @@ export async function loadContainerHubForHost(
     })),
     upcomingRuns: publicPage?.upcomingRuns ?? [],
     publishedPlan,
-    messages: messageRows.map(mapMessageRow),
+    trainingFor: {
+      trainingSummary: publicPage?.trainingSummary ?? null,
+      primaryChasingGoal: publicPage?.primaryChasingGoal ?? null,
+    },
+    messages: messageRows.map(mapContainerMessageRow),
   };
 }

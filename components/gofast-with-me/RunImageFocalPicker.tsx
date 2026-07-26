@@ -3,8 +3,12 @@
 import { useCallback, useRef, useState } from 'react';
 import {
   clampPhotoFocus,
+  clampPhotoZoom,
   DEFAULT_PHOTO_FOCUS,
-  photoFocusObjectPosition,
+  DEFAULT_PHOTO_ZOOM,
+  MAX_PHOTO_ZOOM,
+  MIN_PHOTO_ZOOM,
+  photoFrameStyle,
   type PhotoFocus,
 } from '@/lib/gofast-with-me/photo-focus';
 import {
@@ -18,16 +22,20 @@ type Props = {
   src: string;
   focusX: number;
   focusY: number;
+  zoom: number;
   photoType?: GoFastWithMePhotoType | string | null;
   onFocusChange: (focus: PhotoFocus) => void;
+  onZoomChange: (zoom: number) => void;
 };
 
 export default function RunImageFocalPicker({
   src,
   focusX,
   focusY,
+  zoom,
   photoType,
   onFocusChange,
+  onZoomChange,
 }: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -61,14 +69,25 @@ export default function RunImageFocalPicker({
     frameRef.current?.releasePointerCapture(e.pointerId);
   };
 
-  const objectPosition = photoFocusObjectPosition({ x: focusX, y: focusY });
+  const frameStyle = photoFrameStyle(focusX, focusY, zoom);
   const portrait = isPortraitPhotoType(photoType);
   const frameClass = portrait
     ? 'relative w-36 aspect-square mx-auto rounded-xl overflow-hidden bg-sky-100 border border-gray-200 cursor-crosshair touch-none select-none'
     : `relative w-full ${widePhotoFrameClass('studioPreview')} ${widePhotoFrameShellClass('studioPreview')} cursor-crosshair touch-none select-none`;
 
+  const isDefaultFrame =
+    focusX === DEFAULT_PHOTO_FOCUS &&
+    focusY === DEFAULT_PHOTO_FOCUS &&
+    clampPhotoZoom(zoom) <= MIN_PHOTO_ZOOM;
+  const showZoomHint = clampPhotoZoom(zoom) <= MIN_PHOTO_ZOOM + 0.05;
+
+  const handleReset = () => {
+    onFocusChange({ x: DEFAULT_PHOTO_FOCUS, y: DEFAULT_PHOTO_FOCUS });
+    onZoomChange(DEFAULT_PHOTO_ZOOM);
+  };
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div
         ref={frameRef}
         className={frameClass}
@@ -82,7 +101,7 @@ export default function RunImageFocalPicker({
           src={src}
           alt="Run image preview"
           className="w-full h-full object-cover pointer-events-none"
-          style={{ objectPosition }}
+          style={frameStyle}
           draggable={false}
         />
         <div
@@ -92,23 +111,47 @@ export default function RunImageFocalPicker({
         />
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 to-transparent px-3 py-2 pointer-events-none">
           <p className="text-[11px] text-white/90">
-            Click or drag to set the focal point — original image is kept.
+            Drag to reposition · zoom to tighten — original image is kept.
           </p>
         </div>
       </div>
+
+      <label className="block space-y-1.5">
+        <div className="flex items-center justify-between text-xs text-gray-600">
+          <span className="font-medium text-gray-800">Zoom</span>
+          <span>{clampPhotoZoom(zoom).toFixed(1)}×</span>
+        </div>
+        <input
+          type="range"
+          min={MIN_PHOTO_ZOOM}
+          max={MAX_PHOTO_ZOOM}
+          step={0.1}
+          value={clampPhotoZoom(zoom)}
+          onChange={(e) => onZoomChange(clampPhotoZoom(Number(e.target.value)))}
+          className="w-full accent-orange-500"
+          aria-label="Photo zoom"
+        />
+      </label>
+
+      {showZoomHint ? (
+        <p className="text-xs text-gray-500">
+          Zoom in to cut empty space above or below, then drag to reposition.
+        </p>
+      ) : null}
+
       <div className="flex items-center justify-between text-xs text-gray-500">
         <span>
-          Focus {focusX}%, {focusY}%
+          Focus {focusX}%, {focusY}% · {clampPhotoZoom(zoom).toFixed(1)}×
         </span>
-        {(focusX !== DEFAULT_PHOTO_FOCUS || focusY !== DEFAULT_PHOTO_FOCUS) && (
+        {!isDefaultFrame ? (
           <button
             type="button"
-            onClick={() => onFocusChange({ x: DEFAULT_PHOTO_FOCUS, y: DEFAULT_PHOTO_FOCUS })}
+            onClick={handleReset}
             className="font-medium text-orange-600 hover:text-orange-700"
           >
-            Reset to center
+            Reset framing
           </button>
-        )}
+        ) : null}
       </div>
     </div>
   );

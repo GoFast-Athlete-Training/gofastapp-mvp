@@ -12,8 +12,8 @@ type Props = {
 
 const HOW_IT_WORKS_STUBS = [
   {
-    title: 'How you build community',
-    body: 'Set up your public page, share your GoFast-with link, and bring runners into your member room.',
+    title: 'How GoFast With Me works',
+    body: 'Set up your public door, surface your GoFast plan, and share journey messages with followers.',
   },
   {
     title: 'How you get paid',
@@ -45,15 +45,15 @@ export default function GoFastWithMeProgramGate({ loading, error, onReady }: Pro
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-10 space-y-8">
         <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-6 sm:p-8">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-sky-700 mb-3">
-            Build Community
+            GoFast With Me
           </p>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">
-            Organize runs. Share tips. Help others hit their goals.
+            Surface your goal and plan. Invite others to train alongside you.
           </h1>
           <p className="mt-4 text-gray-700 leading-relaxed">
-            Are you someone who likes organizing runs and sharing tips? Our{' '}
-            <strong>GoFast With Me</strong> program is for you. We empower goal-focused athletes to
-            make money while encouraging others to meet their goals.
+            Share what you&apos;re training for, surface your GoFast plan, and let followers see your
+            week. Our <strong>GoFast With Me</strong> program is for goal-focused athletes who want
+            an audience on the journey — not just a static profile.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <a

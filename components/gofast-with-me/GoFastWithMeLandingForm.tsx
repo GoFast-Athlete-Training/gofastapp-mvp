@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { ImagePlus } from 'lucide-react';
 import api from '@/lib/api';
-import { DEFAULT_PHOTO_FOCUS, normalizePhotoFocus } from '@/lib/gofast-with-me/photo-focus';
+import { DEFAULT_PHOTO_FOCUS, DEFAULT_PHOTO_ZOOM, normalizePhotoFocus, clampPhotoZoom } from '@/lib/gofast-with-me/photo-focus';
 import {
   GOFAST_WITH_ME_PHOTO_TYPE_OPTIONS,
   normalizeGoFastWithMePhotoType,
@@ -23,6 +23,7 @@ export type GoFastWithMeLandingValues = {
   gofastWithMePhotoUrl: string | null;
   gofastWithMePhotoFocusX: number | null;
   gofastWithMePhotoFocusY: number | null;
+  gofastWithMePhotoZoom: number | null;
   gofastWithMePhotoType: GoFastWithMePhotoType | null;
 };
 
@@ -50,6 +51,7 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
     initial.gofastWithMePhotoUrl ?? null
   );
   const [photoFocus, setPhotoFocus] = useState(initialFocus);
+  const [photoZoom, setPhotoZoom] = useState(clampPhotoZoom(initial.gofastWithMePhotoZoom));
   const [photoType, setPhotoType] = useState<GoFastWithMePhotoType | null>(
     normalizeGoFastWithMePhotoType(initial.gofastWithMePhotoType)
   );
@@ -76,6 +78,7 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
       return URL.createObjectURL(file);
     });
     setPhotoFocus({ x: DEFAULT_PHOTO_FOCUS, y: DEFAULT_PHOTO_FOCUS });
+    setPhotoZoom(DEFAULT_PHOTO_ZOOM);
     if (!photoType) setPhotoType('action');
     setPendingPhotoFile(file);
   };
@@ -111,6 +114,7 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
         gofastWithMePhotoUrl: photoUrl,
         gofastWithMePhotoFocusX: photoFocus.x,
         gofastWithMePhotoFocusY: photoFocus.y,
+        gofastWithMePhotoZoom: photoZoom,
         gofastWithMePhotoType: photoType,
       };
       const res = await api.patch('/me/gofast-with-me', payload);
@@ -198,8 +202,10 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
               src={photoPreview}
               focusX={photoFocus.x}
               focusY={photoFocus.y}
+              zoom={photoZoom}
               photoType={photoType}
               onFocusChange={setPhotoFocus}
+              onZoomChange={setPhotoZoom}
             />
           </>
         ) : null}

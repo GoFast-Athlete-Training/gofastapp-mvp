@@ -10,65 +10,12 @@ import {
   canMemberPostToTopic,
   isValidContainerTopic,
 } from '@/lib/gofast-with-me/container-topics';
+import {
+  containerMessageInclude,
+  mapContainerMessageRow,
+} from '@/lib/gofast-with-me/container-message-map';
 
 const MAX_BODY = 2000;
-
-function mapMessage(m: {
-  id: string;
-  body: string;
-  topic: string;
-  routeId: string | null;
-  createdAt: Date;
-  authorAthlete: {
-    id: string;
-    firstName: string | null;
-    lastName: string | null;
-    photoURL: string | null;
-    gofastHandle: string | null;
-  };
-  route: {
-    id: string;
-    name: string;
-    distanceMiles: number | null;
-    citySlug: string | null;
-  } | null;
-}) {
-  return {
-    id: m.id,
-    body: m.body,
-    topic: m.topic,
-    routeId: m.routeId,
-    createdAt: m.createdAt.toISOString(),
-    author: {
-      id: m.authorAthlete.id,
-      firstName: m.authorAthlete.firstName,
-      lastName: m.authorAthlete.lastName,
-      photoURL: m.authorAthlete.photoURL,
-      gofastHandle: m.authorAthlete.gofastHandle,
-    },
-    route: m.route,
-  };
-}
-
-const messageInclude = {
-  authorAthlete: {
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      photoURL: true,
-      gofastHandle: true,
-    },
-  },
-  route: {
-    select: {
-      id: true,
-      name: true,
-      distanceMiles: true,
-      citySlug: true,
-    },
-  },
-} as const;
 
 /** GET / POST /api/athlete/[id]/container/messages — [id] = host athlete id */
 export async function GET(
@@ -123,7 +70,7 @@ export async function GET(
       orderBy: { createdAt: 'desc' },
       take: take + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      include: messageInclude,
+      include: containerMessageInclude,
     });
 
     let nextCursor: string | null = null;
@@ -136,7 +83,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      messages: list.map(mapMessage),
+      messages: list.map(mapContainerMessageRow),
       nextCursor,
     });
   } catch (e) {
@@ -182,7 +129,8 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
-    let body: { body?: string; topic?: string; routeId?: string | null } = {};
+    let body: { body?: string; topic?: string; routeId?: string | null; cityRunId?: string | null } =
+      {};
     try {
       body = await request.json();
     } catch {
@@ -223,6 +171,22 @@ export async function POST(
       routeId = route.id;
     }
 
+    let cityRunId: string | null = null;
+    if (isHost && body.cityRunId?.trim()) {
+      const run = await prisma.city_runs.findFirst({
+        where: {
+          id: body.cityRunId.trim(),
+          athleteGeneratedId: host.id,
+          published: true,
+        },
+        select: { id: true },
+      });
+      if (!run) {
+        return NextResponse.json({ success: false, error: 'Invalid run invite' }, { status: 400 });
+      }
+      cityRunId = run.id;
+    }
+
     const created = await prisma.gofast_container_messages.create({
       data: {
         containerAthleteId: host.id,
@@ -230,13 +194,14 @@ export async function POST(
         body: text,
         topic,
         routeId,
+        cityRunId,
       },
-      include: messageInclude,
+      include: containerMessageInclude,
     });
 
     return NextResponse.json({
       success: true,
-      message: mapMessage(created),
+      message: mapContainerMessageRow(created),
     });
   } catch (e) {
     console.error('container/messages POST:', e);

@@ -78,7 +78,7 @@ const primaryNavItems: NavItem[] = [
 ];
 
 const buildCommunityNav: NavItem = {
-  label: "Build Community",
+  label: "GoFast With Me",
   href: "/gofast-with-others",
   icon: Users,
   match: goFastWithOthersMatch,

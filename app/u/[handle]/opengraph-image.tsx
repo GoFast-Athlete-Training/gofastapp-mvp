@@ -46,12 +46,13 @@ export default async function OgImage({
       )
     : null;
   const avatar = data?.athlete.photoURL ?? null;
-  const ogObjectPosition = data
+  const ogFrameStyle = data
     ? photoFocusStyle(
         data.gofastWithMe?.gofastWithMePhotoFocusX,
-        data.gofastWithMe?.gofastWithMePhotoFocusY
-      ).objectPosition
-    : '50% 50%';
+        data.gofastWithMe?.gofastWithMePhotoFocusY,
+        data.gofastWithMe?.gofastWithMePhotoZoom
+      )
+    : { objectPosition: '50% 50%' as const };
 
   return new ImageResponse(
     (
@@ -75,7 +76,9 @@ export default async function OgImage({
               position: 'absolute',
               inset: 0,
               objectFit: 'cover',
-              objectPosition: ogObjectPosition,
+              objectPosition: ogFrameStyle.objectPosition,
+              transform: ogFrameStyle.transform,
+              transformOrigin: ogFrameStyle.transformOrigin,
               width: 1200,
               height: 630,
             }}

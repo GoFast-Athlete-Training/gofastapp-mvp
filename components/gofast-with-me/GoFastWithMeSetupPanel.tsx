@@ -46,7 +46,7 @@ function primaryActionLabel(
   return 'Save sharing settings';
 }
 
-export default function GoFastWithMeSetupPanel() {
+export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?: boolean }) {
   const [status, setStatus] = useState<{ plan: ShareHubPlanStatus } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -139,13 +139,15 @@ export default function GoFastWithMeSetupPanel() {
       : null;
 
   return (
-    <section id="workouts" className="space-y-6">
-      <div>
-        <h2 className="text-lg font-bold text-gray-900">My Workouts</h2>
-        <p className="text-sm text-gray-600 mt-1">
-          Your active training plan and public sharing settings — plan basics first, visibility below.
-        </p>
-      </div>
+    <section id={embedded ? undefined : 'workouts'} className={embedded ? 'space-y-6' : 'space-y-6'}>
+      {!embedded ? (
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Training plan</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Your active training plan and public sharing settings.
+          </p>
+        </div>
+      ) : null}
 
       {loading ? (
         <p className="text-sm text-gray-500">Loading active plan…</p>
@@ -290,31 +292,20 @@ export default function GoFastWithMeSetupPanel() {
         </>
       )}
 
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="flex items-start gap-2">
-          <Route className="h-4 w-4 text-sky-600 mt-0.5 shrink-0" />
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900">Hosted runs (optional)</h3>
-            <p className="text-xs text-gray-600 mt-1">
-              Show a run you are hosting on your public page. Not required for MVP1 studio setup.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Link
-                href="/host-a-run"
-                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50"
-              >
-                Host a public run
-              </Link>
-              <Link
-                href="/build-a-run"
-                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50"
-              >
-                Build a run
-              </Link>
+      {!embedded ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex items-start gap-2">
+            <Route className="h-4 w-4 text-sky-600 mt-0.5 shrink-0" />
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">My Runs (v2)</h3>
+              <p className="text-xs text-gray-600 mt-1">
+                Manual hosted runs are coming later — goal + plan surfacing is the primary GoFast With
+                Me loop.
+              </p>
             </div>
           </div>
         </div>
-      </div>
+      ) : null}
     </section>
   );
 }

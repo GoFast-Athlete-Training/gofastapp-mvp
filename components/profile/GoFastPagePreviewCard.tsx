@@ -140,6 +140,7 @@ export type GoFastPagePayload = {
     gofastWithMePhotoUrl?: string | null;
     gofastWithMePhotoFocusX?: number | null;
     gofastWithMePhotoFocusY?: number | null;
+    gofastWithMePhotoZoom?: number | null;
     gofastWithMePhotoType?: string | null;
     creatorType?: string | null;
     coachSpecialty?: string | null;
@@ -233,7 +234,8 @@ export default function GoFastPagePreviewCard({
   const actions = data.publicActions ?? [];
   const photoPosition = photoFocusStyle(
     data.gofastWithMe?.gofastWithMePhotoFocusX,
-    data.gofastWithMe?.gofastWithMePhotoFocusY
+    data.gofastWithMe?.gofastWithMePhotoFocusY,
+    data.gofastWithMe?.gofastWithMePhotoZoom
   );
   const gwmPhoto = data.gofastWithMe?.gofastWithMePhotoUrl?.trim() || null;
   const heroUsesGwmPhoto = Boolean(gwmPhoto && heroSrc === gwmPhoto);

@@ -1,46 +1,42 @@
 import type { GoFastWithMeLandingValues } from '@/components/gofast-with-me/GoFastWithMeLandingForm';
 
-export type StudioSection = 'page' | 'workouts' | 'community' | 'content';
+/** Studio workspace sections — goal + plan surfacing, not Feed/Runs/Community clone. */
+export type StudioSection = 'page' | 'plan' | 'messages' | 'followers';
 
 export type StudioView = 'dashboard' | StudioSection;
 
 export const STUDIO_NAV_ORDER: StudioView[] = [
   'dashboard',
   'page',
-  'community',
-  'workouts',
-  'content',
+  'plan',
+  'messages',
+  'followers',
 ];
 
-export const STUDIO_CENTRAL_LABEL = 'GoFast With Me Central';
+export const STUDIO_CENTRAL_LABEL = 'Studio Central';
 
 export const STUDIO_NAV_LABELS: Record<StudioView, string> = {
   dashboard: STUDIO_CENTRAL_LABEL,
   page: 'My Page',
-  workouts: 'My Workouts',
-  community: 'My Community',
-  content: 'My Content',
+  plan: 'Surface my plan',
+  messages: 'Messages',
+  followers: 'Followers',
 };
 
-export const STUDIO_BIN_ORDER: StudioSection[] = [
-  'page',
-  'community',
-  'workouts',
-  'content',
-];
+export const STUDIO_BIN_ORDER: StudioSection[] = ['page', 'plan', 'messages', 'followers'];
 
 export const STUDIO_BIN_LABELS: Record<StudioSection, string> = {
   page: 'My Page',
-  workouts: 'My Workouts',
-  community: 'My Community',
-  content: 'My Content',
+  plan: 'Surface my plan',
+  messages: 'Messages',
+  followers: 'Followers',
 };
 
 export const STUDIO_BIN_DESCRIPTIONS: Record<StudioSection, string> = {
-  page: 'Your public door — landing page and photo',
-  community: 'Your member room — followers and engagement',
-  workouts: 'Share your active plan into the room',
-  content: 'Posts, tips, routes, and supporting content',
+  page: 'Your public door — landing page, photo, and What I\'m training for context',
+  plan: 'Publish and surface your GoFast plan — followers see the plan strip in your hub',
+  messages: 'Announcements on the journey — race updates, milestones, what\'s next',
+  followers: 'Who is following your GoFast With Me hub',
 };
 
 export function isWelcomeContentComplete(values: GoFastWithMeLandingValues): boolean {

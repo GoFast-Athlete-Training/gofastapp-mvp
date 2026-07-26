@@ -64,6 +64,7 @@ const INTRO_FIELDS = [
   'gofastWithMePhotoUrl',
   'gofastWithMePhotoFocusX',
   'gofastWithMePhotoFocusY',
+  'gofastWithMePhotoZoom',
   'gofastWithMePhotoType',
   'creatorType',
   'coachSpecialty',
@@ -112,7 +113,10 @@ export async function PATCH(request: Request) {
 
     const introPatch: Record<string, string | number | null> = {};
     const stringFields = INTRO_FIELDS.filter(
-      (f) => f !== 'gofastWithMePhotoFocusX' && f !== 'gofastWithMePhotoFocusY'
+      (f) =>
+        f !== 'gofastWithMePhotoFocusX' &&
+        f !== 'gofastWithMePhotoFocusY' &&
+        f !== 'gofastWithMePhotoZoom'
     );
     for (const field of stringFields) {
       if (Object.prototype.hasOwnProperty.call(body, field)) {
@@ -130,13 +134,18 @@ export async function PATCH(request: Request) {
       introPatch.gofastWithMePhotoFocusY =
         raw == null || raw === '' ? null : Number(raw);
     }
+    if (Object.prototype.hasOwnProperty.call(body, 'gofastWithMePhotoZoom')) {
+      const raw = body.gofastWithMePhotoZoom;
+      introPatch.gofastWithMePhotoZoom =
+        raw == null || raw === '' ? null : Number(raw);
+    }
 
     if (Object.keys(introPatch).length === 0) {
       return NextResponse.json(
         {
           success: false,
           error:
-            'Provide intro fields (welcome, gofastWithMeBio, whatYoullSeeHere, sportFocus, modelFocus, myAchievements, gofastWithMePhotoUrl, gofastWithMePhotoFocusX, gofastWithMePhotoFocusY, gofastWithMePhotoType, creatorType, coachSpecialty), customSlug, or useGofastHandle',
+            'Provide intro fields (welcome, gofastWithMeBio, whatYoullSeeHere, sportFocus, modelFocus, myAchievements, gofastWithMePhotoUrl, gofastWithMePhotoFocusX, gofastWithMePhotoFocusY, gofastWithMePhotoZoom, gofastWithMePhotoType, creatorType, coachSpecialty), customSlug, or useGofastHandle',
         },
         { status: 400 }
       );

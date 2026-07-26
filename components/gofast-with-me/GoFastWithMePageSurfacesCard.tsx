@@ -38,7 +38,7 @@ export default function GoFastWithMePageSurfacesCard({
           <h2 className="text-sm font-semibold text-gray-900">Your surfaces</h2>
           <p className="text-xs text-gray-600 mt-0.5">
             {isPublishReady
-              ? 'Public landing is the door; the container is where followers engage.'
+              ? 'Public door is where strangers see your goal; the GoFast With Me hub is where followers train alongside you.'
               : 'Finish your landing page, then share your public URL.'}
           </p>
         </div>

@@ -12,10 +12,10 @@ import type { GoFastWithMeLandingValues } from "@/components/gofast-with-me/GoFa
 import { normalizeGoFastWithMePhotoType } from "@/lib/gofast-with-me/photo-type";
 import { goFastWithFrontDoorPath } from "@/lib/gofast-with-me/gofast-with-bridge";
 import GoFastWithMeHubOnboarding from "@/components/gofast-with-me/GoFastWithMeHubOnboarding";
-import GoFastWithMeSetupPanel from "@/components/gofast-with-me/GoFastWithMeSetupPanel";
 import GoFastWithMeMemberManagementPanel from "@/components/gofast-with-me/GoFastWithMeMemberManagementPanel";
 import GoFastWithMeWelcomePanel from "@/components/gofast-with-me/GoFastWithMeWelcomePanel";
-import GoFastWithMeCmsContentSection from "@/components/gofast-with-me/GoFastWithMeContentPanel";
+import GoFastWithMeFeedPanel from "@/components/gofast-with-me/GoFastWithMeFeedPanel";
+import GoFastWithMePlanPanel from "@/components/gofast-with-me/GoFastWithMePlanPanel";
 import GoFastWithMeDashboardHome, {
   type DashboardMetrics,
 } from "@/components/gofast-with-me/GoFastWithMeDashboardHome";
@@ -47,6 +47,7 @@ type OwnerGwmRow = {
   gofastWithMePhotoUrl: string | null;
   gofastWithMePhotoFocusX: number | null;
   gofastWithMePhotoFocusY: number | null;
+  gofastWithMePhotoZoom: number | null;
   gofastWithMePhotoType: string | null;
   creatorType: GoFastWithMeCreatorType | null;
   coachSpecialty: string | null;
@@ -65,6 +66,7 @@ function ownerRowToLanding(row: OwnerGwmRow | null): GoFastWithMeLandingValues {
     gofastWithMePhotoUrl: row?.gofastWithMePhotoUrl ?? null,
     gofastWithMePhotoFocusX: row?.gofastWithMePhotoFocusX ?? null,
     gofastWithMePhotoFocusY: row?.gofastWithMePhotoFocusY ?? null,
+    gofastWithMePhotoZoom: row?.gofastWithMePhotoZoom ?? null,
     gofastWithMePhotoType: normalizeGoFastWithMePhotoType(row?.gofastWithMePhotoType),
   };
 }
@@ -185,10 +187,10 @@ export default function GoFastWithOthersDashboard() {
         setIsGoFastContainer(true);
         setFollowerCount(0);
       } else {
-        setError("Could not enable Build Community. Try again.");
+        setError("Could not enable GoFast With Me. Try again.");
       }
     } catch {
-      setError("Could not enable Build Community. Try again.");
+      setError("Could not enable GoFast With Me. Try again.");
     } finally {
       setGateLoading(false);
     }
@@ -267,6 +269,7 @@ export default function GoFastWithOthersDashboard() {
                   gofastWithMePhotoUrl: null,
                   gofastWithMePhotoFocusX: null,
                   gofastWithMePhotoFocusY: null,
+                  gofastWithMePhotoZoom: null,
                   gofastWithMePhotoType: null,
                   creatorType,
                   coachSpecialty,
@@ -360,26 +363,23 @@ export default function GoFastWithOthersDashboard() {
               setPublicSlug(slug);
               setSlugUsesHandle(usesHandle);
             }}
-            onOpenCommunity={() => openWorkspace("community")}
-            onOpenContent={() => openWorkspace("content")}
+            onOpenFollowers={() => openWorkspace("followers")}
+            onOpenMessages={() => openWorkspace("messages")}
+            onOpenPlan={() => openWorkspace("plan")}
             onSaved={(values) => {
               setOwnerGwm((prev) => (prev ? { ...prev, ...values } : prev));
             }}
           />
         );
-      case "workouts":
-        return <GoFastWithMeSetupPanel />;
-      case "community":
+      case "plan":
+        return publicSlug ? (
+          <GoFastWithMePlanPanel publicSlug={publicSlug} />
+        ) : null;
+      case "messages":
+        return <GoFastWithMeFeedPanel athleteId={athleteId} publicSlug={publicSlug} />;
+      case "followers":
         return (
           <GoFastWithMeMemberManagementPanel athleteId={athleteId} publicSlug={publicSlug} />
-        );
-      case "content":
-        return (
-          <GoFastWithMeCmsContentSection
-            liveUrl={liveUrl}
-            onOpenWorkouts={() => openWorkspace("workouts")}
-            onOpenCommunity={() => openWorkspace("community")}
-          />
         );
       default:
         return null;
