@@ -13,10 +13,10 @@ export default function GoFastWithMePlanPanel({ publicSlug }: Props) {
   return (
     <section id="plan" className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">Surface my plan</h2>
+        <h2 className="text-lg font-bold text-gray-900">Share my plan</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Your GoFast plan is the core of GoFast With Me. Publish it so followers see your plan
-          strip in the hub — the week view that says &ldquo;train alongside me.&rdquo;
+          Your GoFast plan is the heart of GoFast With Me. Publish it so followers see your training
+          week in the hub — the view that says &ldquo;train alongside me.&rdquo;
         </p>
       </div>
 
@@ -25,7 +25,7 @@ export default function GoFastWithMePlanPanel({ publicSlug }: Props) {
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-2">
         <p className="text-sm font-semibold text-gray-900">Preview in member hub</p>
         <p className="text-xs text-gray-600">
-          When your plan is public, followers see the plan strip at the top of your GoFast With Me
+          When your plan is public, followers see your training week at the top of your GoFast With Me
           hub — right after What I&apos;m training for.
         </p>
         <Link
@@ -43,7 +43,7 @@ export default function GoFastWithMePlanPanel({ publicSlug }: Props) {
           My Runs (v2 — coming later)
         </summary>
         <p className="mt-2 text-xs text-gray-500">
-          Manual hosted runs are not the primary loop. Goal + plan surfacing comes first. Run hosting
+          Manual hosted runs are not the primary loop. Sharing your goal and plan comes first. Run hosting
           stays available in GoRun when you need it.
         </p>
       </details>

@@ -194,7 +194,7 @@ export default function ContainerHubPage() {
             <p className="text-sm text-gray-600 rounded-xl border border-orange-100 bg-white/60 px-4 py-3">
               {hub.isHost
                 ? 'Set a goal race or chasing goal so followers know what you are training for.'
-                : `${firstName} has not surfaced a training goal yet.`}
+                : `${firstName} hasn't shared a training goal yet.`}
             </p>
           )}
 
@@ -244,19 +244,19 @@ export default function ContainerHubPage() {
                   Plan strip
                 </h2>
                 <p className="text-sm text-gray-600 mt-2">
-                  Surface your GoFast plan so followers see your training week here.
+                  Share your GoFast plan so followers see your training week here.
                 </p>
                 <Link
                   href="/gofast-with-others"
                   className="mt-3 inline-flex text-sm font-semibold text-orange-600 hover:underline"
                 >
-                  Open GoFast With Me studio → Surface my plan
+                  Open GoFast With Me → Share my plan
                 </Link>
               </section>
             ) : (
               <section className="rounded-2xl border border-gray-100 bg-gray-50 p-5">
                 <p className="text-sm text-gray-600">
-                  {firstName} has not surfaced a public plan yet.
+                  {firstName} hasn&apos;t shared a public plan yet.
                 </p>
               </section>
             )}

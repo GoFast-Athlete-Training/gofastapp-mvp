@@ -35,7 +35,7 @@ export default function GoFastWithMePageSurfacesCard({
     <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-gray-900">Your surfaces</h2>
+          <h2 className="text-sm font-semibold text-gray-900">Share & preview</h2>
           <p className="text-xs text-gray-600 mt-0.5">
             {isPublishReady
               ? 'Public door is where strangers see your goal; the GoFast With Me hub is where followers train alongside you.'

@@ -13,11 +13,11 @@ type Props = {
 const HOW_IT_WORKS_STUBS = [
   {
     title: 'How GoFast With Me works',
-    body: 'Set up your public door, surface your GoFast plan, and share journey messages with followers.',
+    body: 'Set up your public page, share your GoFast plan, and post journey updates for followers.',
   },
   {
     title: 'How you get paid',
-    body: 'As your audience grows, advertiser placements on your public surface can earn you revenue. Details coming soon.',
+    body: 'As your audience grows, advertiser placements on your public page can earn you revenue. Details coming soon.',
   },
   {
     title: 'What an advertiser sees',
@@ -48,12 +48,12 @@ export default function GoFastWithMeProgramGate({ loading, error, onReady }: Pro
             GoFast With Me
           </p>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">
-            Surface your goal and plan. Invite others to train alongside you.
+            Share your goal and plan. Invite others to train alongside you.
           </h1>
           <p className="mt-4 text-gray-700 leading-relaxed">
-            Share what you&apos;re training for, surface your GoFast plan, and let followers see your
-            week. Our <strong>GoFast With Me</strong> program is for goal-focused athletes who want
-            an audience on the journey — not just a static profile.
+            Tell people what you&apos;re training for, share your GoFast plan, and let followers see your
+            week. <strong>GoFast With Me</strong> is for goal-focused athletes who want company on the
+            journey — not just a static profile.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <a
@@ -91,7 +91,7 @@ export default function GoFastWithMeProgramGate({ loading, error, onReady }: Pro
 
         <div className="rounded-xl border border-sky-200 bg-white p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <p className="text-sm text-gray-700">
-            Ready to open your door and member room in Studio?
+            Ready to share your running journey with others?
           </p>
           <button
             type="button"

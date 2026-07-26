@@ -70,7 +70,7 @@ export default function GoFastWithMeWelcomePanel({
         </div>
       ) : (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          Landing page is complete — share your public URL, surface your plan, and invite followers.
+          Landing page is complete — share your public URL, publish your plan, and invite followers.
         </div>
       )}
 
@@ -83,9 +83,9 @@ export default function GoFastWithMeWelcomePanel({
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 flex flex-col gap-3">
           <div>
-            <p className="text-sm font-semibold text-gray-900">Surface my plan</p>
+            <p className="text-sm font-semibold text-gray-900">Share my plan</p>
             <p className="text-xs text-gray-600 mt-0.5">
-              Publish your GoFast plan — followers see the plan strip in your hub.
+              Publish your GoFast plan — followers see your training week in your hub.
             </p>
           </div>
           <button
@@ -119,7 +119,7 @@ export default function GoFastWithMeWelcomePanel({
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Public URLs</h3>
           <p className="text-xs text-gray-500 mt-0.5">
-            Share links and preview surfaces — secondary to your landing content above.
+            Share links and preview your pages — secondary to your landing content above.
           </p>
         </div>
         <GoFastWithMePageSurfacesCard

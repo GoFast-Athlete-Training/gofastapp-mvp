@@ -299,7 +299,7 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
             <div>
               <h3 className="text-sm font-semibold text-gray-900">My Runs (v2)</h3>
               <p className="text-xs text-gray-600 mt-1">
-                Manual hosted runs are coming later — goal + plan surfacing is the primary GoFast With
+                Manual hosted runs are coming later — sharing your goal and plan is the primary GoFast With
                 Me loop.
               </p>
             </div>

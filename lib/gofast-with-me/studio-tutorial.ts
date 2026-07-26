@@ -18,7 +18,7 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
   slug: GOFAST_WITH_ME_STUDIO_TUTORIAL_SLUG,
   name: 'GoFast With Me Studio',
   summary:
-    'Surface what you are training for, publish your GoFast plan, and invite others to follow your journey — goal, plan strip, messages, followers.',
+    'Share what you are training for, publish your GoFast plan, and invite others to follow your journey — goal, training week, messages, followers.',
   steps: [
     {
       id: 'door',
@@ -29,9 +29,9 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
     },
     {
       id: 'plan',
-      title: 'Surface my plan',
+      title: 'Share my plan',
       instruction:
-        'Publish your GoFast plan so followers see the plan strip — your training week — in the hub.',
+        'Publish your GoFast plan so followers see your training week in the hub.',
       sortOrder: 1,
     },
     {

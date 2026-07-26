@@ -23,7 +23,7 @@ export default function GoFastWithMePlanStripSection({
         </h2>
         <p className="text-xs text-gray-500 mt-1">
           {isHost
-            ? 'This is the training week your followers see when you surface your GoFast plan.'
+            ? 'This is the training week your followers see when you share your GoFast plan.'
             : `Train alongside ${hostFirstName} — their current week on this plan.`}
         </p>
       </div>

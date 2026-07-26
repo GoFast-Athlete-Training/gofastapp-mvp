@@ -20,7 +20,7 @@ export default function GoFastWithMeMyRunsV2Section({ runs, isHost }: Props) {
       </summary>
       <div className="px-5 pb-5 pt-0 space-y-2 border-t border-gray-100">
         <p className="text-sm text-gray-600 pt-3">
-          Manual hosted runs are v2. The primary loop is goal + plan — surface what you&apos;re
+          Manual hosted runs are v2. The primary loop is goal + plan — share what you&apos;re
           training for and share your plan strip. Most athletes won&apos;t hand-enter every run.
         </p>
         {runs.length > 0 ? (

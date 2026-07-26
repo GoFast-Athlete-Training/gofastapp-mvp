@@ -76,7 +76,7 @@ export default function GoFastWithMeDashboardHome({
       <div>
         <h2 className="text-lg font-bold text-gray-900">{STUDIO_CENTRAL_LABEL}</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Goal + plan surfacing — your public door, surfaced GoFast plan, and the hub followers join.
+          Goal and plan first — your public page, shared training plan, and the hub followers join.
         </p>
       </div>
 
@@ -114,7 +114,7 @@ export default function GoFastWithMeDashboardHome({
               Plan strip
             </p>
             <p className="mt-2 text-xl font-bold text-gray-900">
-              {planLive ? 'Surfaced' : 'Not surfaced'}
+              {planLive ? 'Shared' : 'Not shared yet'}
             </p>
             <p className="mt-1 text-xs text-gray-600">
               {planLive && metrics.planName
@@ -128,7 +128,7 @@ export default function GoFastWithMeDashboardHome({
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-wrap items-center justify-between gap-3">
             <span>
               Set up <strong>My Page</strong> first — welcome, bio, what visitors will see, and a
-              run image. Then surface your plan and post journey <strong>Messages</strong>.
+              run image. Then share your plan and post journey <strong>Messages</strong>.
             </span>
             <button
               type="button"
