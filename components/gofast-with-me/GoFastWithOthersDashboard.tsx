@@ -10,6 +10,7 @@ import type { ShareHubStatus } from "@/lib/profile/share-creator-card-logic";
 import type { GoFastWithMeCreatorType } from "@/lib/gofast-with-me/gofast-with-me-service";
 import type { GoFastWithMeLandingValues } from "@/components/gofast-with-me/GoFastWithMeLandingForm";
 import { normalizeGoFastWithMePhotoType } from "@/lib/gofast-with-me/photo-type";
+import { goFastWithFrontDoorPath } from "@/lib/gofast-with-me/gofast-with-bridge";
 import GoFastWithMeHubOnboarding from "@/components/gofast-with-me/GoFastWithMeHubOnboarding";
 import GoFastWithMeSetupPanel from "@/components/gofast-with-me/GoFastWithMeSetupPanel";
 import GoFastWithMeMemberManagementPanel from "@/components/gofast-with-me/GoFastWithMeMemberManagementPanel";
@@ -20,9 +21,9 @@ import GoFastWithMeDashboardHome, {
 } from "@/components/gofast-with-me/GoFastWithMeDashboardHome";
 import GoFastWithMeStudioAppShell from "@/components/gofast-with-me/GoFastWithMeStudioAppShell";
 import GoFastWithMeStudioExplainer from "@/components/gofast-with-me/GoFastWithMeStudioExplainer";
+import GoFastWithMeProgramGate from "@/components/gofast-with-me/GoFastWithMeProgramGate";
 import {
   dismissStudioIntro,
-  hasGoFastWithMeStudioData,
   readStudioIntroDismissed,
   shouldShowStudioExplainer,
 } from "@/lib/gofast-with-me/studio-intro";
@@ -77,7 +78,9 @@ export default function GoFastWithOthersDashboard() {
   const [ownerGwm, setOwnerGwm] = useState<OwnerGwmRow | null>(null);
   const [publicSlug, setPublicSlug] = useState<string | null>(null);
   const [slugUsesHandle, setSlugUsesHandle] = useState(true);
+  const [isGoFastContainer, setIsGoFastContainer] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+  const [gateLoading, setGateLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copyDone, setCopyDone] = useState(false);
   const [noHandle, setNoHandle] = useState(false);
@@ -89,7 +92,6 @@ export default function GoFastWithOthersDashboard() {
 
   const landingValues = ownerRowToLanding(ownerGwm);
   const isWelcomeComplete = isWelcomeContentComplete(landingValues);
-  const hasStudioData = hasGoFastWithMeStudioData(ownerGwm);
   const showStudioExplainer = shouldShowStudioExplainer(ownerGwm, introDismissed);
 
   const isPublishReady = Boolean(
@@ -135,6 +137,7 @@ export default function GoFastWithOthersDashboard() {
         setGofastHandle(handle);
         setFirstName(athlete?.firstName ?? null);
         setProfileBio(athlete?.bio ?? null);
+        setIsGoFastContainer(Boolean(athlete?.isGoFastContainer));
 
         const gwm = gwmRes.data?.gofastWithMe as OwnerGwmRow | null;
         setOwnerGwm(gwm);
@@ -145,7 +148,10 @@ export default function GoFastWithOthersDashboard() {
 
         if (hubRes?.data?.success && hubRes.data.hub) {
           setFollowerCount(hubRes.data.hub.memberCount ?? 0);
+        } else if (athlete?.isGoFastContainer) {
+          setFollowerCount(0);
         }
+
         if (hubStatusRes?.data?.status) {
           setShareHubStatus(hubStatusRes.data.status as ShareHubStatus);
         }
@@ -169,6 +175,25 @@ export default function GoFastWithOthersDashboard() {
     setIntroDismissed(true);
   }, []);
 
+  const handleProgramReady = useCallback(async () => {
+    if (!athleteId || gateLoading) return;
+    setGateLoading(true);
+    setError(null);
+    try {
+      const res = await api.post(`/athlete/${athleteId}/container/toggle`, { value: true });
+      if (res.data?.isGoFastContainer) {
+        setIsGoFastContainer(true);
+        setFollowerCount(0);
+      } else {
+        setError("Could not enable Build Community. Try again.");
+      }
+    } catch {
+      setError("Could not enable Build Community. Try again.");
+    } finally {
+      setGateLoading(false);
+    }
+  }, [athleteId, gateLoading]);
+
   const copyAppUrl = useCallback(async (url: string) => {
     try {
       await navigator.clipboard.writeText(url);
@@ -181,15 +206,37 @@ export default function GoFastWithOthersDashboard() {
 
   if (loading) {
     return (
-      <GoFastWithMeStudioAppShell
-        activeView={activeView}
-        onViewChange={setActiveView}
-        pageNeedsAction={!isWelcomeComplete}
-      >
-        <div className="flex items-center justify-center py-24">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
+      </div>
+    );
+  }
+
+  if (noHandle) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="max-w-lg mx-auto px-4 py-10 space-y-4">
+          <p className="text-gray-700 text-sm">
+            Set your GoFast handle first — then you can join the GoFast With Me program.
+          </p>
+          <Link
+            href="/athlete-edit-profile?tab=profile-info"
+            className="inline-flex items-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+          >
+            Go to Profile Info
+          </Link>
         </div>
-      </GoFastWithMeStudioAppShell>
+      </div>
+    );
+  }
+
+  if (isGoFastContainer === false) {
+    return (
+      <GoFastWithMeProgramGate
+        loading={gateLoading}
+        error={error}
+        onReady={() => void handleProgramReady()}
+      />
     );
   }
 
@@ -202,23 +249,6 @@ export default function GoFastWithOthersDashboard() {
       <div className="px-4 sm:px-6 py-6 max-w-6xl mx-auto">{content}</div>
     </GoFastWithMeStudioAppShell>
   );
-
-  if (noHandle) {
-    return studioShell(
-      <div className="space-y-4 max-w-lg">
-        <GoFastWithMeStudioExplainer hasStudioData={false} onDismiss={handleDismissStudioIntro} />
-        <p className="text-gray-700 text-sm">
-          Set your GoFast handle first — then you can build your public landing.
-        </p>
-        <Link
-          href="/athlete-edit-profile?tab=profile-info"
-          className="inline-flex items-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
-        >
-          Go to Profile Info
-        </Link>
-      </div>
-    );
-  }
 
   if (showOnboarding) {
     return studioShell(
@@ -258,6 +288,7 @@ export default function GoFastWithOthersDashboard() {
 
   const liveUrl = `${RUNNER_BASE}/${publicSlug}`;
   const appUrl = `/u/${publicSlug}`;
+  const invitePath = goFastWithFrontDoorPath(publicSlug);
   const visitorHeadline = firstName ? `GoFast with ${firstName}` : "Your public page";
   const creatorLabel =
     ownerGwm?.creatorType === "coach"
@@ -273,6 +304,7 @@ export default function GoFastWithOthersDashboard() {
     planPublished: shareHubStatus?.plan.isPublished ?? null,
     planName: shareHubStatus?.plan.planName ?? null,
     liveUrl,
+    invitePath,
   };
 
   const renderStudioContent = () => {
@@ -356,24 +388,9 @@ export default function GoFastWithOthersDashboard() {
 
   return studioShell(
     <div className="space-y-6 pb-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 flex-1">
-          {showStudioExplainer ? (
-            <GoFastWithMeStudioExplainer
-              hasStudioData={hasStudioData}
-              onDismiss={handleDismissStudioIntro}
-            />
-          ) : null}
-        </div>
-        <a
-          href={liveUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex shrink-0 items-center justify-center rounded-lg border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-800 hover:bg-orange-100"
-        >
-          View public page →
-        </a>
-      </div>
+      {showStudioExplainer ? (
+        <GoFastWithMeStudioExplainer onDismiss={handleDismissStudioIntro} />
+      ) : null}
 
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">

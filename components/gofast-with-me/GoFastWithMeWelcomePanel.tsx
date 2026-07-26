@@ -81,7 +81,7 @@ export default function GoFastWithMeWelcomePanel({
         <div>
           <p className="text-sm font-semibold text-gray-900">Supporting content</p>
           <p className="text-xs text-gray-600 mt-0.5">
-            Tips, routes, and posts live in Build Content — they hydrate your public page over time.
+            Tips, routes, and posts live in My Content — they hydrate your public page over time.
           </p>
         </div>
         <button

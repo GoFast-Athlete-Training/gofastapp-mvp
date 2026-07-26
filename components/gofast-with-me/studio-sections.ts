@@ -7,8 +7,8 @@ export type StudioView = 'dashboard' | StudioSection;
 export const STUDIO_NAV_ORDER: StudioView[] = [
   'dashboard',
   'page',
-  'workouts',
   'community',
+  'workouts',
   'content',
 ];
 
@@ -19,13 +19,13 @@ export const STUDIO_NAV_LABELS: Record<StudioView, string> = {
   page: 'My Page',
   workouts: 'My Workouts',
   community: 'My Community',
-  content: 'Build Content',
+  content: 'My Content',
 };
 
 export const STUDIO_BIN_ORDER: StudioSection[] = [
   'page',
-  'workouts',
   'community',
+  'workouts',
   'content',
 ];
 
@@ -33,14 +33,14 @@ export const STUDIO_BIN_LABELS: Record<StudioSection, string> = {
   page: 'My Page',
   workouts: 'My Workouts',
   community: 'My Community',
-  content: 'Build Content',
+  content: 'My Content',
 };
 
 export const STUDIO_BIN_DESCRIPTIONS: Record<StudioSection, string> = {
-  page: 'Edit your public landing and photo',
-  workouts: 'Share your active plan',
-  community: 'Manage followers and member view',
-  content: 'Create posts, tips, routes, and supporting content',
+  page: 'Your public door — landing page and photo',
+  community: 'Your member room — followers and engagement',
+  workouts: 'Share your active plan into the room',
+  content: 'Posts, tips, routes, and supporting content',
 };
 
 export function isWelcomeContentComplete(values: GoFastWithMeLandingValues): boolean {

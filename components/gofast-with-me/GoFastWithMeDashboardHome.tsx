@@ -1,6 +1,7 @@
 'use client';
 
-import { CheckCircle2, Globe } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, Copy, Globe, Users } from 'lucide-react';
 import { STUDIO_CENTRAL_LABEL, type StudioSection } from '@/components/gofast-with-me/studio-sections';
 
 export type DashboardMetrics = {
@@ -10,6 +11,7 @@ export type DashboardMetrics = {
   planPublished: boolean | null;
   planName: string | null;
   liveUrl: string;
+  invitePath: string;
 };
 
 type Props = {
@@ -18,80 +20,170 @@ type Props = {
   onOpenWorkspace: (section: StudioSection) => void;
 };
 
+type Stoplight = 'red' | 'yellow' | 'green';
+
+function myPageStoplight(landingComplete: boolean, publishReady: boolean): Stoplight {
+  if (landingComplete) return 'green';
+  if (publishReady) return 'yellow';
+  return 'red';
+}
+
+const STOPLIGHT_LABELS: Record<Stoplight, string> = {
+  red: 'Not started',
+  yellow: 'In progress',
+  green: 'Complete',
+};
+
+const STOPLIGHT_HINTS: Record<Stoplight, string> = {
+  red: 'Finish welcome, bio, photo on My Page',
+  yellow: 'Almost there — finish welcome, bio, and run image',
+  green: 'Your public door is ready',
+};
+
+const STOPLIGHT_STYLES: Record<Stoplight, string> = {
+  red: 'border-red-200 bg-red-50/60',
+  yellow: 'border-amber-200 bg-amber-50/60',
+  green: 'border-emerald-200 bg-emerald-50/60',
+};
+
 export default function GoFastWithMeDashboardHome({
   metrics,
   visitorHeadline,
   onOpenWorkspace,
 }: Props) {
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const stoplight = myPageStoplight(metrics.landingComplete, metrics.publishReady);
+  const memberCount = metrics.followerCount ?? 0;
+  const hasMembers = memberCount > 0;
+
+  const copyInvite = async () => {
+    try {
+      const url =
+        typeof window !== 'undefined'
+          ? `${window.location.origin}${metrics.invitePath}`
+          : metrics.invitePath;
+      await navigator.clipboard.writeText(url);
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <h2 className="text-lg font-bold text-gray-900">{STUDIO_CENTRAL_LABEL}</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Health metrics for your public presence — use the sidebar to open a workspace.
+          Your door and your room — set up your page, then manage members when people join.
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <HealthCard
-          label="Total followers"
-          value={
-            metrics.followerCount != null
-              ? String(metrics.followerCount)
-              : '—'
-          }
-          status={
-            metrics.followerCount != null && metrics.followerCount > 0
-              ? 'ok'
-              : 'neutral'
-          }
-          hint="People GoFast with you"
-        />
-        <HealthCard
-          label="Landing page"
-          value={metrics.landingComplete ? 'Complete' : 'Incomplete'}
-          status={metrics.landingComplete ? 'ok' : 'warn'}
-          hint={
-            metrics.landingComplete
-              ? 'Public door is ready'
-              : 'Finish welcome, bio, photo'
-          }
-        />
-        <HealthCard
-          label="Public page"
-          value={metrics.publishReady ? 'Live draft' : 'Not started'}
-          status={metrics.publishReady ? 'ok' : 'neutral'}
-          hint="Runner landing surface"
-        />
-        <HealthCard
-          label="Training plan"
-          value={
-            metrics.planPublished === true
-              ? 'Published'
-              : metrics.planPublished === false
-                ? 'Not published'
-                : '—'
-          }
-          status={metrics.planPublished ? 'ok' : 'neutral'}
-          hint={metrics.planName ?? 'Active plan sharing'}
-        />
-      </div>
-
-      {!metrics.landingComplete ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-wrap items-center justify-between gap-3">
-          <span>
-            <strong>Health check:</strong> Complete My Page first — welcome, bio, what visitors
-            will see, and a run image.
-          </span>
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Setup Progress
+        </h3>
+        <div className="grid gap-4 sm:grid-cols-2">
           <button
             type="button"
             onClick={() => onOpenWorkspace('page')}
-            className="shrink-0 rounded-lg bg-amber-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-800"
+            className={`rounded-xl border p-4 text-left transition-colors hover:opacity-90 ${STOPLIGHT_STYLES[stoplight]}`}
           >
-            Open My Page
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              My Page stoplight
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <StoplightDot level={stoplight} />
+              <p className="text-xl font-bold text-gray-900">{STOPLIGHT_LABELS[stoplight]}</p>
+              {stoplight === 'green' ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" aria-hidden />
+              ) : null}
+            </div>
+            <p className="mt-1 text-xs text-gray-600">{STOPLIGHT_HINTS[stoplight]}</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onOpenWorkspace('workouts')}
+            className="rounded-xl border border-gray-200 bg-white p-4 text-left hover:bg-gray-50 transition-colors"
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Training plan
+            </p>
+            <p className="mt-2 text-xl font-bold text-gray-900">
+              {metrics.planPublished === true
+                ? 'Published'
+                : metrics.planPublished === false
+                  ? 'Not published'
+                  : '—'}
+            </p>
+            <p className="mt-1 text-xs text-gray-600">
+              {metrics.planName ?? 'Share your active plan into the room'}
+            </p>
           </button>
         </div>
-      ) : null}
+
+        {stoplight !== 'green' ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-wrap items-center justify-between gap-3">
+            <span>
+              Set up <strong>My Page</strong> first — welcome, bio, what visitors will see, and a
+              run image. When people join, manage them in <strong>My Community</strong>.
+            </span>
+            <button
+              type="button"
+              onClick={() => onOpenWorkspace('page')}
+              className="shrink-0 rounded-lg bg-amber-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-800"
+            >
+              Open My Page
+            </button>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">My members</h3>
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          {hasMembers ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <Users className="h-5 w-5 text-orange-600 shrink-0 mt-0.5" aria-hidden />
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {memberCount} {memberCount === 1 ? 'person' : 'people'} in your room
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    You have members — engage them with updates and announcements in My Community.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onOpenWorkspace('community')}
+                className="shrink-0 rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
+              >
+                Open My Community
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">None yet — invite your first one</p>
+                <p className="text-xs text-gray-600 mt-1">
+                  Share your GoFast-with link. When someone joins, manage them in My Community.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void copyInvite()}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-800 hover:bg-orange-100"
+              >
+                <Copy className="h-3.5 w-3.5" aria-hidden />
+                {inviteCopied ? 'Link copied' : 'Invite'}
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
 
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm text-gray-700">
@@ -113,33 +205,16 @@ export default function GoFastWithMeDashboardHome({
   );
 }
 
-function HealthCard({
-  label,
-  value,
-  status,
-  hint,
-}: {
-  label: string;
-  value: string;
-  status: 'ok' | 'warn' | 'neutral';
-  hint: string;
-}) {
-  const statusStyles = {
-    ok: 'border-emerald-200 bg-emerald-50/50',
-    warn: 'border-amber-200 bg-amber-50/50',
-    neutral: 'border-gray-200 bg-white',
+function StoplightDot({ level }: { level: Stoplight }) {
+  const colors: Record<Stoplight, string> = {
+    red: 'bg-red-500',
+    yellow: 'bg-amber-400',
+    green: 'bg-emerald-500',
   };
-
   return (
-    <div className={`rounded-xl border p-4 ${statusStyles[status]}`}>
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p>
-      <div className="mt-2 flex items-center gap-2">
-        {status === 'ok' ? (
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" aria-hidden />
-        ) : null}
-        <p className="text-xl font-bold text-gray-900">{value}</p>
-      </div>
-      <p className="mt-1 text-xs text-gray-600">{hint}</p>
-    </div>
+    <span
+      className={`h-3 w-3 rounded-full shrink-0 ${colors[level]}`}
+      aria-hidden
+    />
   );
 }

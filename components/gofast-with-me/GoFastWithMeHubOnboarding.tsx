@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Footprints, Sparkles, Users } from 'lucide-react';
 import api from '@/lib/api';
 import GoFastWithMeStudioCallout from '@/components/gofast-with-me/GoFastWithMeStudioCallout';
-import GoFastWithMeStudioExplainer from '@/components/gofast-with-me/GoFastWithMeStudioExplainer';
 import type { GoFastWithMeCreatorType } from '@/lib/gofast-with-me/gofast-with-me-service';
 
 type Props = {
@@ -53,13 +52,6 @@ export default function GoFastWithMeHubOnboarding({ onComplete }: Props) {
     <div className="mx-auto max-w-2xl space-y-8 py-4">
       <div className="space-y-4">
         <GoFastWithMeStudioCallout titleClassName="text-3xl font-bold text-gray-900 leading-tight" />
-        <GoFastWithMeStudioExplainer
-          hasStudioData={false}
-          onDismiss={() => {}}
-          onStartSetup={() => {
-            document.getElementById('gwm-creator-type')?.scrollIntoView({ behavior: 'smooth' });
-          }}
-        />
         <p className="text-gray-600 text-sm leading-relaxed max-w-xl">
           Choose how you show up on your public landing — express yourself, share how you train,
           and build the audience that joins your runs and plans.

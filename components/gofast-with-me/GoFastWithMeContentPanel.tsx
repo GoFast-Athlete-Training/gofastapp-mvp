@@ -37,7 +37,7 @@ export default function GoFastWithMeCmsContentSection({
   return (
     <section id="content" className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">Build Content</h2>
+        <h2 className="text-lg font-bold text-gray-900">My Content</h2>
         <p className="text-sm text-gray-600 mt-1">
           Create posts, tips, routes, and supporting content that hydrates your public landing.
         </p>
