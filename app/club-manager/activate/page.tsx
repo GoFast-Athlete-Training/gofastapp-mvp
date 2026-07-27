@@ -41,7 +41,7 @@ function ClubManagerActivateContent() {
     setView({ kind: 'loading' });
     try {
       const res = await api.get(`/club-manager/invite/resolve?token=${encodeURIComponent(token)}`);
-      const invite = (res.data?.invite ?? res.data?.claim) as ActivationContext | undefined;
+      const invite = res.data?.invite as ActivationContext | undefined;
       if (!res.data?.success || !invite) {
         throw new Error(res.data?.error ?? 'Invalid activation link');
       }

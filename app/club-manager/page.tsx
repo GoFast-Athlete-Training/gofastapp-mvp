@@ -7,15 +7,15 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
-import TopNav from '@/components/shared/TopNav';
+import { clubManagerActivatePath, clubManagerClubPath, clubManagerHubPath } from '@/lib/club-manager-paths';
+import { resolveClubManagerHomePath } from '@/lib/club-manager-home-route';
+import ClubManagerHubShell from '@/components/runclub/manager/ClubManagerHubShell';
 import type { LeaderContextClub } from '@/lib/run-club-leader-context';
-import { clubManagerClubPath, clubManagerHubPath } from '@/lib/club-manager-paths';
 
 export default function ClubManagerHubPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [clubs, setClubs] = useState<LeaderContextClub[]>([]);
-  const [isManagerPersona, setIsManagerPersona] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -32,11 +32,14 @@ export default function ClubManagerHubPage() {
 
       try {
         const profileRes = await api.get(`/athlete/${athleteId}`);
-        const athlete = profileRes.data?.athlete;
-        setIsManagerPersona(
-          athlete?.role === 'CLUB_LEADER' || athlete?.leaderContext?.isClubLeader
-        );
-        setClubs(athlete?.leaderContext?.clubs ?? []);
+        const athleteClubs = profileRes.data?.athlete?.leaderContext?.clubs ?? [];
+        setClubs(athleteClubs);
+
+        const singleClubHome = resolveClubManagerHomePath(athleteClubs);
+        if (singleClubHome && singleClubHome !== clubManagerHubPath()) {
+          router.replace(singleClubHome);
+          return;
+        }
       } catch {
         setClubs([]);
       } finally {
@@ -49,101 +52,80 @@ export default function ClubManagerHubPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4" />
-          <p className="text-white text-lg">Loading…</p>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500 mx-auto mb-4" />
+          <p className="text-gray-600">Loading Club Manager…</p>
         </div>
       </div>
     );
   }
 
+  const activationToken = LocalStorageAPI.getClubManagerActivationToken();
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600">
-      <TopNav />
-      <div className="max-w-4xl mx-auto px-6 py-12">
-        <div className="text-center mb-10">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">Club Manager</h1>
-          <p className="text-white/90 text-lg max-w-xl mx-auto">
-            Manage clubs where you&apos;re an owner or admin. You&apos;re still a full GoFast athlete
-            — switch back to training anytime.
-          </p>
-        </div>
+    <ClubManagerHubShell clubs={clubs}>
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
+        <p className="text-sm font-semibold uppercase tracking-wide text-orange-600">Club Manager</p>
+        <h1 className="mt-2 text-3xl font-bold text-gray-900">Your clubs</h1>
+        <p className="mt-2 text-gray-600">
+          Manage club profile, runs, and announcements. You&apos;re still a full GoFast athlete — use
+          Back to athlete anytime.
+        </p>
 
         {clubs.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-            <h2 className="text-xl font-bold text-gray-900 mb-2">No clubs to manage yet</h2>
-            <p className="text-gray-600 mb-6">
-              {isManagerPersona
-                ? 'Your manager access is ready, but GoFast still needs to connect your club. Ask staff to send a manager activation link or grant owner/admin membership.'
-                : 'Ask GoFast staff for a manager activation link, or open the invite you received by email.'}
+          <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-8">
+            <h2 className="text-xl font-bold text-gray-900">No manager access yet</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Open the manager invite link GoFast sent you, or ask staff to resend one.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            {activationToken ? (
               <Link
-                href="/gorun"
-                className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold"
+                href={clubManagerActivatePath(activationToken)}
+                className="mt-6 inline-flex rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white hover:bg-orange-600"
               >
-                Browse runs
+                Continue invite activation
               </Link>
-              <Link
-                href="/athlete-home"
-                className="inline-block bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-semibold"
-              >
-                Athlete home
-              </Link>
-            </div>
+            ) : (
+              <p className="mt-4 text-sm text-gray-500">
+                Manager invites always include an activation link — email match alone is not enough.
+              </p>
+            )}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="mt-8 space-y-3">
             {clubs.map((club) => (
               <Link
                 key={club.runClubId}
                 href={clubManagerClubPath(club.runClubSlug ?? club.runClubId)}
-                className="block bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow"
+                className="block rounded-xl border border-gray-200 bg-white p-5 hover:border-orange-300 hover:shadow-sm transition"
               >
                 <div className="flex items-center gap-4">
                   {club.logoUrl ? (
                     <img
                       src={club.logoUrl}
                       alt=""
-                      className="w-14 h-14 rounded-lg object-contain bg-gray-50"
+                      className="h-14 w-14 rounded-lg object-contain bg-gray-50"
                     />
                   ) : (
-                    <div className="w-14 h-14 rounded-lg bg-orange-100 flex items-center justify-center text-2xl">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-orange-100 text-2xl">
                       🏃
                     </div>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <h2 className="text-xl font-bold text-gray-900 truncate">{club.runClubName}</h2>
-                    <p className="text-sm text-gray-500">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="truncate text-lg font-bold text-gray-900">{club.runClubName}</h2>
+                    <p className="text-sm text-gray-500 capitalize">
                       {[club.city, club.state].filter(Boolean).join(', ') || 'Location TBD'} ·{' '}
-                      <span className="capitalize">{club.role}</span>
+                      {club.role}
                     </p>
                   </div>
-                  <span className="text-orange-600 font-semibold text-sm shrink-0">Manage →</span>
+                  <span className="shrink-0 text-sm font-semibold text-orange-600">Manage →</span>
                 </div>
               </Link>
             ))}
           </div>
         )}
-
-        <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Link
-            href="/runcrew/create"
-            className="bg-white/15 backdrop-blur border border-white/25 rounded-xl p-5 text-white hover:bg-white/20 transition"
-          >
-            <p className="font-bold text-lg mb-1">Start a run crew</p>
-            <p className="text-sm text-white/80">Build a smaller community inside GoFast</p>
-          </Link>
-          <Link
-            href="/athlete-home"
-            className="bg-white/15 backdrop-blur border border-white/25 rounded-xl p-5 text-white hover:bg-white/20 transition"
-          >
-            <p className="font-bold text-lg mb-1">Back to athlete mode</p>
-            <p className="text-sm text-white/80">Training, goals, and your personal runs</p>
-          </Link>
-        </div>
       </div>
-    </div>
+    </ClubManagerHubShell>
   );
 }

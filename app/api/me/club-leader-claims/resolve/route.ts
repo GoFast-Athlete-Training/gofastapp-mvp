@@ -1,24 +1,17 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
-import { resolveClubOwnerState } from '@/lib/domain-runclub-leader-claim';
 
 /**
- * GET /api/me/club-leader-claims/resolve
- * Legacy email-matched resolver for /welcome-club-owner fallback (no activation token).
+ * Deprecated — manager access resolves only via invite token (/club-manager/activate).
  */
-export async function GET(request: Request) {
-  const auth = await requireAthleteFromBearer(request);
-  if ('error' in auth) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
-  }
-
-  try {
-    const resolved = await resolveClubOwnerState(auth.athlete.id, auth.athlete.email);
-    return NextResponse.json({ success: true, ...resolved });
-  } catch (err: unknown) {
-    console.error('[GET /api/me/club-leader-claims/resolve]', err);
-    return NextResponse.json({ success: false, error: 'Failed to resolve club owner state' }, { status: 500 });
-  }
+export async function GET() {
+  return NextResponse.json(
+    {
+      success: false,
+      code: 'USE_INVITE_LINK',
+      error: 'Open your manager invite link to activate access. Email match alone is not supported.',
+    },
+    { status: 410 }
+  );
 }

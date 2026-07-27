@@ -418,6 +418,23 @@ export async function GET(
 
     // Get current user's RSVP (if authenticated)
     const userRSVP = athlete ? run.city_run_rsvps.find((r: any) => r.athleteId === athlete.id) : null;
+
+    let clubMembership: { isMember: boolean; role: string | null } | null = null;
+    if (athlete && run.runClubId) {
+      const membership = await prisma.run_club_memberships.findUnique({
+        where: {
+          runClubId_athleteId: {
+            runClubId: run.runClubId,
+            athleteId: athlete.id,
+          },
+        },
+        select: { role: true, status: true },
+      });
+      clubMembership = {
+        isMember: membership?.status === 'active',
+        role: membership?.role ?? null,
+      };
+    }
     
     // Format response (exclude sensitive fields)
     return NextResponse.json({
@@ -479,6 +496,7 @@ export async function GET(
         igPostGraphic: run.igPostGraphic ?? null,
         runClub,
         runCrew,
+        clubMembership,
         rsvps: run.city_run_rsvps.map((rsvp: any) => ({
           id: rsvp.id,
           status: rsvp.status,

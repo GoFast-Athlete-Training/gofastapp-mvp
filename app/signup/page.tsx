@@ -102,7 +102,7 @@ function routeAfterAthleteResolved(
       } else if (opts.redirect) {
         router.replace(opts.redirect);
       } else {
-        router.replace('/welcome-club-owner');
+        router.replace(clubManagerHubPath());
       }
     } else {
       router.replace('/athlete-create-profile');

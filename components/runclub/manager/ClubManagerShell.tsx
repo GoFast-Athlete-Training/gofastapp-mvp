@@ -1,35 +1,48 @@
 'use client';
 
 import Link from 'next/link';
-import TopNav from '@/components/shared/TopNav';
 import {
-  CLUB_MANAGER_BASE,
-  clubManagerClubPath,
-  clubManagerHubPath,
-} from '@/lib/club-manager-paths';
+  ArrowLeft,
+  Building2,
+  Calendar,
+  ExternalLink,
+  LayoutDashboard,
+  Megaphone,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
+import TopNav from '@/components/shared/TopNav';
+import { clubManagerClubPath, clubManagerHubPath } from '@/lib/club-manager-paths';
+
+export type ClubManagerNavSection =
+  | 'overview'
+  | 'content'
+  | 'runs'
+  | 'announcements';
 
 interface ClubManagerShellProps {
   clubName: string;
   clubSlug: string;
-  active: 'overview' | 'content' | 'runs' | 'announcements';
+  active: ClubManagerNavSection;
   children: React.ReactNode;
 }
 
-const primaryTabs: {
-  id: ClubManagerShellProps['active'];
+const NAV_ITEMS: {
+  id: ClubManagerNavSection;
   label: string;
   href: (slug: string) => string;
+  icon: LucideIcon;
 }[] = [
-  { id: 'overview', label: 'Manager home', href: (s) => clubManagerClubPath(s) },
-  { id: 'content', label: 'Club profile', href: (s) => clubManagerClubPath(s, 'content') },
-  { id: 'runs', label: 'Runs', href: (s) => clubManagerClubPath(s, 'runs') },
+  { id: 'overview', label: 'Manager home', href: (s) => clubManagerClubPath(s), icon: LayoutDashboard },
+  { id: 'content', label: 'Club profile', href: (s) => clubManagerClubPath(s, 'content'), icon: Building2 },
+  { id: 'runs', label: 'Runs', href: (s) => clubManagerClubPath(s, 'runs'), icon: Calendar },
+  {
+    id: 'announcements',
+    label: 'Announcements',
+    href: (s) => clubManagerClubPath(s, 'announcements'),
+    icon: Megaphone,
+  },
 ];
-
-const secondaryTab = {
-  id: 'announcements' as const,
-  label: 'Announcements',
-  href: (s: string) => clubManagerClubPath(s, 'announcements'),
-};
 
 export default function ClubManagerShell({
   clubName,
@@ -38,68 +51,80 @@ export default function ClubManagerShell({
   children,
 }: ClubManagerShellProps) {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <p className="text-sm text-orange-600 font-semibold uppercase tracking-wide">
-                Club Manager
-              </p>
-              <h1 className="text-2xl font-bold text-gray-900">{clubName}</h1>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href={`/runclub/${clubSlug}`}
-                className="text-sm text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg border border-gray-200"
-              >
-                Member view
-              </Link>
-              <Link
-                href={clubManagerHubPath()}
-                className="text-sm text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg border border-gray-200"
-              >
-                All clubs
-              </Link>
-              <Link
-                href="/athlete-home"
-                className="text-sm text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg border border-gray-200"
-              >
-                Athlete home
-              </Link>
-            </div>
+      <div className="flex flex-1 overflow-hidden">
+        <aside className="w-64 bg-white border-r-2 border-gray-200 flex flex-col shrink-0 overflow-y-auto">
+          <div className="p-4 border-b border-gray-200">
+            <p className="text-lg font-bold text-gray-900">Club Manager</p>
+            <p className="text-xs text-gray-500 mt-1 truncate" title={clubName}>
+              {clubName}
+            </p>
           </div>
-          <nav className="mt-6 flex flex-wrap items-end gap-1 border-b border-gray-100 -mb-px">
-            {primaryTabs.map((tab) => (
-              <Link
-                key={tab.id}
-                href={tab.href(clubSlug)}
-                className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                  active === tab.id
-                    ? 'border-orange-500 text-orange-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-800'
-                }`}
-              >
-                {tab.label}
-              </Link>
-            ))}
+
+          <nav className="flex-1 p-2 space-y-1" aria-label="Club Manager">
             <Link
-              href={secondaryTab.href(clubSlug)}
-              className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                active === secondaryTab.id
-                  ? 'border-gray-400 text-gray-700'
-                  : 'border-transparent text-gray-400 hover:text-gray-600'
-              }`}
+              href="/athlete-home"
+              className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors mb-2"
             >
-              {secondaryTab.label}
+              <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
+              Back to athlete
+            </Link>
+
+            <p className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">
+              Manage
+            </p>
+
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = active === item.id;
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href(clubSlug)}
+                  className={navButtonClass(isActive)}
+                >
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              );
+            })}
+
+            <p className="px-3 pt-4 pb-1 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">
+              Member hub
+            </p>
+
+            <Link
+              href={`/runclub/${clubSlug}`}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 border border-transparent"
+            >
+              <Users className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="truncate">View member hub</span>
+              <ExternalLink className="h-3.5 w-3.5 ml-auto shrink-0 text-gray-400" aria-hidden />
+            </Link>
+
+            <Link
+              href={clubManagerHubPath()}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 border border-transparent"
+            >
+              <Building2 className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="truncate">All clubs</span>
             </Link>
           </nav>
-        </div>
-      </header>
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">{children}</main>
+        </aside>
+
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }
 
-export { CLUB_MANAGER_BASE };
+function navButtonClass(active: boolean): string {
+  return `flex w-full items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+    active
+      ? 'bg-orange-50 text-orange-800 border border-orange-200'
+      : 'text-gray-700 hover:bg-gray-100 border border-transparent'
+  }`;
+}

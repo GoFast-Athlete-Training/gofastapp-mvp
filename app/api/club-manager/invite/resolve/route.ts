@@ -22,8 +22,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       invite,
-      /** @deprecated Use invite */
-      claim: invite,
     });
   } catch (err: unknown) {
     if (err instanceof AttachClubLeaderClaimError) {

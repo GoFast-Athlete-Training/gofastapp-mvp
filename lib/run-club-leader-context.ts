@@ -16,19 +16,14 @@ export type LeaderContext = {
 };
 
 /**
- * Compact leader context for athlete profile/bootstrap.
- * `Athlete.role` gates whether we compute this; membership rows gate write access.
+ * Manager context from active write memberships (source of truth for Manage-as-home).
  */
-export async function buildLeaderContext(
-  athleteId: string,
-  athleteRole: string | null | undefined
-): Promise<LeaderContext | null> {
-  const isClubLeader = athleteRole === 'CLUB_LEADER';
-  if (!isClubLeader) {
+export async function buildLeaderContext(athleteId: string): Promise<LeaderContext | null> {
+  const rows = await listLeaderMemberships(athleteId);
+  if (rows.length === 0) {
     return null;
   }
 
-  const rows = await listLeaderMemberships(athleteId);
   const clubs: LeaderContextClub[] = rows.map((m) => ({
     runClubId: m.run_clubs.id,
     runClubSlug: m.run_clubs.slug,

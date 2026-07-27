@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const invite = await resolveClubManagerInviteToken(token);
-    return NextResponse.json({ success: true, invite, claim: invite });
+    return NextResponse.json({ success: true, invite });
   } catch (err: unknown) {
     if (err instanceof AttachClubLeaderClaimError) {
       return NextResponse.json(
