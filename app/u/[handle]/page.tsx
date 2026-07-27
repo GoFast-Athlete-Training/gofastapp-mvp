@@ -162,10 +162,10 @@ export default async function PublicAthletePage({
           hostHandle={data.athlete.gofastHandle}
         />
 
-        {data.isGoFastContainer && data.athlete.gofastHandle ? (
+        {data.isGoFastContainer ? (
           <ProfileContainerAdSlot
-            handle={data.athlete.gofastHandle}
             isGoFastContainer={data.isGoFastContainer}
+            activeBlock={data.activeAdvertisingBlock}
           />
         ) : null}
 

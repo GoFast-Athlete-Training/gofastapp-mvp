@@ -5,20 +5,30 @@ import GoFastWithMeSetupPanel from '@/components/gofast-with-me/GoFastWithMeSetu
 
 type Props = {
   publicSlug: string;
+  embedded?: boolean;
 };
 
-export default function GoFastWithMePlanPanel({ publicSlug }: Props) {
+export default function GoFastWithMePlanPanel({ publicSlug, embedded = false }: Props) {
   const hubPlanPath = `/container/${encodeURIComponent(publicSlug)}#plan-strip`;
 
   return (
-    <section id="plan" className="space-y-6">
-      <div>
-        <h2 className="text-lg font-bold text-gray-900">Share my plan</h2>
-        <p className="text-sm text-gray-600 mt-1">
-          Your GoFast plan is the heart of GoFast With Me. Publish it so followers see your training
-          week in the hub — the view that says &ldquo;train alongside me.&rdquo;
-        </p>
-      </div>
+    <section id="plan" className={embedded ? 'space-y-4' : 'space-y-6'}>
+      {!embedded ? (
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">My plan</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Your GoFast plan is the heart of GoFast With Me. Publish it so followers see your training
+            week in the hub.
+          </p>
+        </div>
+      ) : (
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">My plan</h3>
+          <p className="text-xs text-gray-600 mt-1">
+            Publish your GoFast plan so followers see your training week in the room.
+          </p>
+        </div>
+      )}
 
       <GoFastWithMeSetupPanel embedded />
 
@@ -34,19 +44,21 @@ export default function GoFastWithMePlanPanel({ publicSlug }: Props) {
           rel="noopener noreferrer"
           className="inline-flex text-sm font-semibold text-orange-600 hover:underline"
         >
-          View hub plan strip →
+          View hub training week →
         </Link>
       </div>
 
-      <details className="rounded-xl border border-dashed border-gray-200 bg-white p-4">
-        <summary className="cursor-pointer text-sm font-semibold text-gray-600">
-          My Runs (v2 — coming later)
-        </summary>
-        <p className="mt-2 text-xs text-gray-500">
-          Manual hosted runs are not the primary loop. Sharing your goal and plan comes first. Run hosting
-          stays available in GoRun when you need it.
-        </p>
-      </details>
+      {!embedded ? (
+        <details className="rounded-xl border border-dashed border-gray-200 bg-white p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-gray-600">
+            My Runs (v2 — coming later)
+          </summary>
+          <p className="mt-2 text-xs text-gray-500">
+            Manual hosted runs are not the primary loop. Sharing your goal and plan comes first. Run
+            hosting stays available in GoRun when you need it.
+          </p>
+        </details>
+      ) : null}
     </section>
   );
 }

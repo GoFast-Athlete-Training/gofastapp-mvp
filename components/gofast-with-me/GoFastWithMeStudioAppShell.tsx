@@ -1,15 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import {
-  ArrowLeft,
-  Layout,
-  LayoutDashboard,
-  Megaphone,
-  Route,
-  Users,
-  type LucideIcon,
-} from 'lucide-react';
+import { ArrowLeft, Layout, LayoutDashboard, Users, type LucideIcon } from 'lucide-react';
 import TopNav from '@/components/shared/TopNav';
 import {
   STUDIO_BIN_ORDER,
@@ -21,9 +13,7 @@ import {
 const NAV_ICONS: Record<StudioView, LucideIcon> = {
   dashboard: LayoutDashboard,
   page: Layout,
-  plan: Route,
-  messages: Megaphone,
-  followers: Users,
+  community: Users,
 };
 
 type Props = {
@@ -46,7 +36,7 @@ export default function GoFastWithMeStudioAppShell({
         <aside className="w-64 bg-white border-r-2 border-gray-200 flex flex-col shrink-0 overflow-y-auto">
           <div className="p-4 border-b border-gray-200">
             <p className="text-lg font-bold text-gray-900">GoFast With Me</p>
-            <p className="text-xs text-gray-500 mt-1">Goal · Plan · Messages · Followers</p>
+            <p className="text-xs text-gray-500 mt-1">Door · Community</p>
           </div>
 
           <nav className="flex-1 p-2 space-y-1" aria-label="Studio">

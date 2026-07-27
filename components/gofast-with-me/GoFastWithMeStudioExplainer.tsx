@@ -1,15 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  Layout,
-  LayoutDashboard,
-  Megaphone,
-  Route,
-  Users,
-  X,
-  type LucideIcon,
-} from 'lucide-react';
+import { Layout, LayoutDashboard, Users, X, type LucideIcon } from 'lucide-react';
 import {
   STUDIO_BIN_DESCRIPTIONS,
   STUDIO_BIN_ORDER,
@@ -26,9 +18,7 @@ import {
 const NAV_ICONS: Record<StudioSection | 'dashboard', LucideIcon> = {
   dashboard: LayoutDashboard,
   page: Layout,
-  plan: Route,
-  messages: Megaphone,
-  followers: Users,
+  community: Users,
 };
 
 type Props = {
@@ -59,7 +49,7 @@ export default function GoFastWithMeStudioExplainer({ onDismiss }: Props) {
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-violet-800">Tutorial</p>
           <p className="mt-1 text-sm text-violet-950 leading-relaxed">
-            {tutorial.summary ?? STUDIO_TUTORIAL_FALLBACK.summary}
+            {STUDIO_TUTORIAL_FALLBACK.summary}
           </p>
         </div>
         <button
@@ -79,21 +69,16 @@ export default function GoFastWithMeStudioExplainer({ onDismiss }: Props) {
           <TutorialRow
             icon={NAV_ICONS.dashboard}
             label={STUDIO_CENTRAL_LABEL}
-            description="Setup progress and your members"
+            description="Setup progress and follower count"
           />
           {STUDIO_BIN_ORDER.map((section) => {
             const Icon = NAV_ICONS[section];
-            const hydratedStep = tutorial.steps.find(
-              (s) =>
-                s.title.toLowerCase().includes(STUDIO_BIN_LABELS[section].toLowerCase()) ||
-                s.id === section
-            );
             return (
               <TutorialRow
                 key={section}
                 icon={Icon}
                 label={STUDIO_BIN_LABELS[section]}
-                description={hydratedStep?.instruction ?? STUDIO_BIN_DESCRIPTIONS[section]}
+                description={STUDIO_BIN_DESCRIPTIONS[section]}
               />
             );
           })}

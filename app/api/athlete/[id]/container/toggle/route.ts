@@ -4,6 +4,10 @@ import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { getAthleteById } from '@/lib/domain-athlete';
+import {
+  ensureAdvertisingCandidateForAthlete,
+  pauseAdvertisingCandidateForAthlete,
+} from '@/lib/advertising/candidate-service';
 
 /** POST /api/athlete/[id]/container/toggle — opt in/out of GoFast Container (owner only). Body: { value?: boolean } */
 export async function POST(
@@ -50,6 +54,12 @@ export async function POST(
       where: { id: athleteId },
       data: { isGoFastContainer: next, updatedAt: new Date() },
     });
+
+    if (next) {
+      await ensureAdvertisingCandidateForAthlete(athleteId);
+    } else {
+      await pauseAdvertisingCandidateForAthlete(athleteId);
+    }
 
     return NextResponse.json({ success: true, isGoFastContainer: next });
   } catch (e) {

@@ -20,6 +20,7 @@
     "db:init-company": "tsx scripts/init-company.ts",
     "db:setup-company": "tsx scripts/setup-company.ts",
     "db:backfill-athletes": "tsx scripts/backfill-athlete-company.ts",
+    "db:backfill-advertising-candidates": "tsx scripts/backfill-advertising-candidates.ts",
     "db:check-athletes": "tsx scripts/check-athletes.ts",
     "db:verify-schema": "tsx scripts/verify-schema.ts",
     "db:populate-bidirectional-ids": "tsx scripts/populate-bidirectional-run-club-ids.ts",

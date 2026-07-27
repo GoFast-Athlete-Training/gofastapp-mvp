@@ -2,13 +2,12 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebaseAdmin";
-import { fetchSurfaceOwnerEarnings } from "@/lib/advertising/advertiser-platform-client";
 import { fetchAthleteSpendEarningsFromCompany } from "@/lib/advertising/company-platform-client";
 import { prisma } from "@/lib/prisma";
 
 /**
  * GET /api/me/advertising-earnings
- * Spend-based earnings from Company (primary); impression estimate from advertiser (fallback).
+ * Spend-based earnings from Company placement receipts.
  */
 export async function GET(request: Request) {
   try {
@@ -41,9 +40,7 @@ export async function GET(request: Request) {
     const days = daysRaw ? Number.parseInt(daysRaw, 10) : 30;
     const windowDays = Number.isFinite(days) ? days : 30;
 
-    const spendEarnings = await fetchAthleteSpendEarningsFromCompany(athlete.id, windowDays);
-    const earnings =
-      spendEarnings ?? (await fetchSurfaceOwnerEarnings(athlete.id, windowDays));
+    const earnings = await fetchAthleteSpendEarningsFromCompany(athlete.id, windowDays);
 
     return NextResponse.json({
       success: true,

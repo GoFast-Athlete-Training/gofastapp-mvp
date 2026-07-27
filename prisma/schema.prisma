@@ -170,6 +170,78 @@ model Athlete {
   athlete_appnotification_devices     athlete_appnotification_devices[]
   gofast_with_me              gofast_with_me?
   athlete_tips                athlete_tips[]
+  advertising_candidate advertising_candidates?
+}
+
+enum AdvertisingCandidateType {
+  ATHLETE
+}
+
+enum AdvertisingCandidateStatus {
+  ELIGIBLE
+  PAUSED
+  RETIRED
+}
+
+enum AdvertisingBlockStatus {
+  SCHEDULED
+  ACTIVE
+  EXPIRED
+  CANCELED
+}
+
+/// Explicit declaration that an athlete is advertising-eligible (MVP1: athlete only).
+model advertising_candidates {
+  id                 String                     @id @default(uuid())
+  code               String                     @unique
+  candidateType      AdvertisingCandidateType   @default(ATHLETE)
+  athleteId          String                     @unique
+  status             AdvertisingCandidateStatus @default(ELIGIBLE)
+  publicSlugSnapshot String?
+  displayLabel       String?
+  photoUrl           String?
+  eligibleAt         DateTime?
+  pausedAt           DateTime?
+  retiredAt          DateTime?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  athlete Athlete              @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  blocks  advertising_blocks[]
+
+  @@index([status])
+  @@index([candidateType, status])
+  @@map("advertising_candidates")
+}
+
+/// Durable purchased placement with creative snapshot (append-only history).
+model advertising_blocks {
+  id                         String                 @id @default(uuid())
+  candidateId                String
+  sourcePurchaseId           String                 @unique
+  advertiserCompanyId          String
+  advertiserCompanyName        String?
+  creativeId                 String
+  creativeName               String?
+  brandCampaignCollateralUrl String?
+  ctaUrl                     String?
+  ctaLabel                   String?
+  altText                    String?
+  amountCents                Int
+  currency                   String                 @default("usd")
+  purchasedAt                DateTime               @default(now())
+  startsAt                   DateTime
+  endsAt                     DateTime
+  status                     AdvertisingBlockStatus @default(SCHEDULED)
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime               @updatedAt
+
+  candidate advertising_candidates @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId, status])
+  @@index([candidateId, startsAt, endsAt])
+  @@index([status, endsAt])
+  @@map("advertising_blocks")
 }
 
 /// Athlete-scoped GoFast With Me — public invite identity (not the human Athlete profile).

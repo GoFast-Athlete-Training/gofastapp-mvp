@@ -1,6 +1,6 @@
 'use client';
 
-import { BookOpen, Route } from 'lucide-react';
+import { Users } from 'lucide-react';
 import GoFastWithMeLandingForm, {
   type GoFastWithMeLandingValues,
 } from '@/components/gofast-with-me/GoFastWithMeLandingForm';
@@ -19,9 +19,7 @@ type Props = {
   copyDone: boolean;
   onCopyAppUrl: () => void;
   onUrlUpdated: (slug: string, usesHandle: boolean) => void;
-  onOpenFollowers: () => void;
-  onOpenMessages: () => void;
-  onOpenPlan: () => void;
+  onOpenCommunity: () => void;
   onSaved: (values: GoFastWithMeLandingValues) => void;
 };
 
@@ -37,9 +35,7 @@ export default function GoFastWithMeWelcomePanel({
   copyDone,
   onCopyAppUrl,
   onUrlUpdated,
-  onOpenFollowers,
-  onOpenMessages,
-  onOpenPlan,
+  onOpenCommunity,
   onSaved,
 }: Props) {
   const complete = isWelcomeContentComplete(landingValues);
@@ -70,7 +66,7 @@ export default function GoFastWithMeWelcomePanel({
         </div>
       ) : (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          Landing page is complete — share your public URL, publish your plan, and invite followers.
+          Landing page is complete — share your public URL and invite followers into My Community.
         </div>
       )}
 
@@ -80,39 +76,21 @@ export default function GoFastWithMeWelcomePanel({
         onSaved={onSaved}
       />
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 flex flex-col gap-3">
-          <div>
-            <p className="text-sm font-semibold text-gray-900">Share my plan</p>
-            <p className="text-xs text-gray-600 mt-0.5">
-              Publish your GoFast plan — followers see your training week in your hub.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onOpenPlan}
-            className="inline-flex items-center gap-1.5 self-start rounded-lg border border-orange-200 bg-white px-3 py-2 text-xs font-semibold text-orange-800 hover:bg-orange-50"
-          >
-            <Route className="h-3.5 w-3.5" />
-            Open plan
-          </button>
+      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-gray-900">My Community</p>
+          <p className="text-xs text-gray-600 mt-0.5">
+            Your member room — My plan, messages, and followers live here after people follow.
+          </p>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 flex flex-col gap-3">
-          <div>
-            <p className="text-sm font-semibold text-gray-900">Messages</p>
-            <p className="text-xs text-gray-600 mt-0.5">
-              Journey announcements — race updates, milestones, what&apos;s next.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onOpenMessages}
-            className="inline-flex items-center gap-1.5 self-start rounded-lg border border-orange-200 bg-white px-3 py-2 text-xs font-semibold text-orange-800 hover:bg-orange-50"
-          >
-            <BookOpen className="h-3.5 w-3.5" />
-            Open Messages
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onOpenCommunity}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-white px-3 py-2 text-xs font-semibold text-orange-800 hover:bg-orange-50"
+        >
+          <Users className="h-3.5 w-3.5" />
+          Open My Community
+        </button>
       </div>
 
       <div className="space-y-3">
@@ -132,7 +110,7 @@ export default function GoFastWithMeWelcomePanel({
           copyDone={copyDone}
           onCopyAppUrl={onCopyAppUrl}
           onUrlUpdated={onUrlUpdated}
-          onOpenCommunity={onOpenFollowers}
+          onOpenCommunity={onOpenCommunity}
         />
       </div>
     </section>

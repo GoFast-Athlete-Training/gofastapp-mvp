@@ -21,9 +21,9 @@ function SplashLogo({ pulse = false }: { pulse?: boolean }) {
     <Image
       src="/logo.png"
       alt="GoFast Logo"
-      width={128}
-      height={128}
-      className={`w-32 h-32 rounded-full shadow-xl object-cover ${pulse ? 'animate-pulse' : ''}`}
+      width={256}
+      height={256}
+      className={`w-64 h-64 rounded-full shadow-xl object-cover ${pulse ? 'animate-pulse' : ''}`}
       priority
     />
   );

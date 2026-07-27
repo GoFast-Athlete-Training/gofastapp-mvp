@@ -1,3 +1,4 @@
+import { getActiveBlockSnapshotForAthlete } from '@/lib/advertising/block-service';
 import { prisma } from '@/lib/prisma';
 import { getJoinableCohortForHost } from '@/lib/training/cohort-service';
 import { listPublicPlansForAthlete, mapPublishedPlanCard } from '@/lib/training/public-plan-service';
@@ -366,6 +367,9 @@ export async function loadPublicAthletePage(rawHandle: string) {
 
   const joinableGroupTrainingRaw = await getJoinableCohortForHost(athlete.id);
   const publishedPlanRows = await listPublicPlansForAthlete(athlete.id);
+  const activeAdvertisingBlock = athlete.isGoFastContainer
+    ? await getActiveBlockSnapshotForAthlete(athlete.id, now)
+    : null;
   const publishedPlans = publishedPlanRows
     .map(mapPublishedPlanCard)
     .filter((p) => p.slug.length > 0);
@@ -467,5 +471,6 @@ export async function loadPublicAthletePage(rawHandle: string) {
     signedUpRaces,
     upcomingWorkouts,
     upcomingRuns,
+    activeAdvertisingBlock,
   };
 }

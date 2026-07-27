@@ -20,30 +20,30 @@ type Props = {
   onOpenWorkspace: (section: StudioSection) => void;
 };
 
-type Stoplight = 'red' | 'yellow' | 'green';
+type SetupStatus = 'not_started' | 'in_progress' | 'ready';
 
-function myPageStoplight(landingComplete: boolean, publishReady: boolean): Stoplight {
-  if (landingComplete) return 'green';
-  if (publishReady) return 'yellow';
-  return 'red';
+function myPageSetupStatus(landingComplete: boolean, publishReady: boolean): SetupStatus {
+  if (landingComplete) return 'ready';
+  if (publishReady) return 'in_progress';
+  return 'not_started';
 }
 
-const STOPLIGHT_LABELS: Record<Stoplight, string> = {
-  red: 'Not started',
-  yellow: 'In progress',
-  green: 'Complete',
+const MY_PAGE_STATUS_LABELS: Record<SetupStatus, string> = {
+  not_started: 'Not started',
+  in_progress: 'In progress',
+  ready: 'Ready',
 };
 
-const STOPLIGHT_HINTS: Record<Stoplight, string> = {
-  red: 'Finish welcome, bio, photo on My Page',
-  yellow: 'Almost there — finish welcome, bio, and run image',
-  green: 'Your public door is ready',
+const MY_PAGE_STATUS_HINTS: Record<SetupStatus, string> = {
+  not_started: 'Finish welcome, bio, photo on My Page',
+  in_progress: 'Almost there — finish welcome, bio, and run image',
+  ready: 'Your public door is ready',
 };
 
-const STOPLIGHT_STYLES: Record<Stoplight, string> = {
-  red: 'border-red-200 bg-red-50/60',
-  yellow: 'border-amber-200 bg-amber-50/60',
-  green: 'border-emerald-200 bg-emerald-50/60',
+const MY_PAGE_STATUS_STYLES: Record<SetupStatus, string> = {
+  not_started: 'border-red-200 bg-red-50/60',
+  in_progress: 'border-amber-200 bg-amber-50/60',
+  ready: 'border-emerald-200 bg-emerald-50/60',
 };
 
 export default function GoFastWithMeDashboardHome({
@@ -52,7 +52,7 @@ export default function GoFastWithMeDashboardHome({
   onOpenWorkspace,
 }: Props) {
   const [inviteCopied, setInviteCopied] = useState(false);
-  const stoplight = myPageStoplight(metrics.landingComplete, metrics.publishReady);
+  const pageStatus = myPageSetupStatus(metrics.landingComplete, metrics.publishReady);
   const memberCount = metrics.followerCount ?? 0;
   const hasMembers = memberCount > 0;
   const planLive = metrics.planPublished === true;
@@ -76,59 +76,61 @@ export default function GoFastWithMeDashboardHome({
       <div>
         <h2 className="text-lg font-bold text-gray-900">{STUDIO_CENTRAL_LABEL}</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Goal and plan first — your public page, shared training plan, and the hub followers join.
+          Your public door and member room — set up My Page, then open My Community.
         </p>
       </div>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-          Setup Progress
-        </h3>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Your setup</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <button
             type="button"
             onClick={() => onOpenWorkspace('page')}
-            className={`rounded-xl border p-4 text-left transition-colors hover:opacity-90 ${STOPLIGHT_STYLES[stoplight]}`}
+            className={`rounded-xl border p-4 text-left transition-colors hover:opacity-90 ${MY_PAGE_STATUS_STYLES[pageStatus]}`}
           >
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              My Page stoplight
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">My Page</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">door</p>
             <div className="mt-2 flex items-center gap-2">
-              <StoplightDot level={stoplight} />
-              <p className="text-xl font-bold text-gray-900">{STOPLIGHT_LABELS[stoplight]}</p>
-              {stoplight === 'green' ? (
+              <StatusDot level={pageStatus} />
+              <p className="text-xl font-bold text-gray-900">{MY_PAGE_STATUS_LABELS[pageStatus]}</p>
+              {pageStatus === 'ready' ? (
                 <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" aria-hidden />
               ) : null}
             </div>
-            <p className="mt-1 text-xs text-gray-600">{STOPLIGHT_HINTS[stoplight]}</p>
+            <p className="mt-1 text-xs text-gray-600">{MY_PAGE_STATUS_HINTS[pageStatus]}</p>
           </button>
 
           <button
             type="button"
-            onClick={() => onOpenWorkspace('plan')}
+            onClick={() => onOpenWorkspace('community')}
             className={`rounded-xl border p-4 text-left hover:opacity-90 transition-colors ${
-              planLive ? 'border-emerald-200 bg-emerald-50/60' : 'border-gray-200 bg-white hover:bg-gray-50'
+              planLive || hasMembers
+                ? 'border-emerald-200 bg-emerald-50/60'
+                : 'border-gray-200 bg-white hover:bg-gray-50'
             }`}
           >
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Plan strip
+              My Community
             </p>
+            <p className="text-[11px] text-gray-500 mt-0.5">room</p>
             <p className="mt-2 text-xl font-bold text-gray-900">
-              {planLive ? 'Shared' : 'Not shared yet'}
+              {memberCount} follower{memberCount === 1 ? '' : 's'}
             </p>
             <p className="mt-1 text-xs text-gray-600">
               {planLive && metrics.planName
-                ? metrics.planName
-                : 'Publish your GoFast plan so followers see your week'}
+                ? `${metrics.planName} · Plan shared`
+                : planLive
+                  ? 'Plan shared — open room to post messages'
+                  : 'My plan, messages, and follower list'}
             </p>
           </button>
         </div>
 
-        {stoplight !== 'green' ? (
+        {pageStatus !== 'ready' ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-wrap items-center justify-between gap-3">
             <span>
-              Set up <strong>My Page</strong> first — welcome, bio, what visitors will see, and a
-              run image. Then share your plan and post journey <strong>Messages</strong>.
+              Set up <strong>My Page</strong> first — welcome, bio, what visitors will see, and a run
+              image. Then open <strong>My Community</strong> to share your plan and invite followers.
             </span>
             <button
               type="button"
@@ -153,16 +155,16 @@ export default function GoFastWithMeDashboardHome({
                     {memberCount} {memberCount === 1 ? 'follower' : 'followers'}
                   </p>
                   <p className="text-xs text-gray-600 mt-1">
-                    They see your plan strip and journey messages in GoFast With Me.
+                    They see your training week and journey messages in My Community.
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => onOpenWorkspace('followers')}
+                onClick={() => onOpenWorkspace('community')}
                 className="shrink-0 rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
               >
-                Open Followers
+                Open My Community
               </button>
             </div>
           ) : (
@@ -170,8 +172,7 @@ export default function GoFastWithMeDashboardHome({
               <div>
                 <p className="text-sm font-semibold text-gray-900">None yet — invite your first one</p>
                 <p className="text-xs text-gray-600 mt-1">
-                  Share your follow link. When someone joins, they follow your goal, plan strip, and
-                  messages.
+                  Share your follow link. When someone joins, they enter your member room.
                 </p>
               </div>
               <button
@@ -207,11 +208,11 @@ export default function GoFastWithMeDashboardHome({
   );
 }
 
-function StoplightDot({ level }: { level: Stoplight }) {
-  const colors: Record<Stoplight, string> = {
-    red: 'bg-red-500',
-    yellow: 'bg-amber-400',
-    green: 'bg-emerald-500',
+function StatusDot({ level }: { level: SetupStatus }) {
+  const colors: Record<SetupStatus, string> = {
+    not_started: 'bg-red-500',
+    in_progress: 'bg-amber-400',
+    ready: 'bg-emerald-500',
   };
   return (
     <span

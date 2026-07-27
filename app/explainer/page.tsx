@@ -35,10 +35,10 @@ export default function ExplainerPage() {
         <Image
           src="/logo.png"
           alt=""
-          width={144}
-          height={144}
+          width={256}
+          height={256}
           aria-hidden
-          className={`w-36 h-36 rounded-full shadow-xl object-cover transition-all ease-out ${
+          className={`w-64 h-64 rounded-full shadow-xl object-cover transition-all ease-out ${
             revealed ? 'scale-90 -translate-y-10 opacity-0' : 'scale-100 translate-y-0 opacity-100'
           }`}
           style={{ transitionDuration: `${TRANSITION_MS}ms` }}

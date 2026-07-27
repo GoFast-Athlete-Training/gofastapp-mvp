@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getAthleteById } from '@/lib/domain-athlete';
+import { ensureAdvertisingCandidateForAthlete } from '@/lib/advertising/candidate-service';
 import {
   getGoFastWithMeBySlug,
   normalizeGoFastWithMeSlug,
@@ -19,6 +20,7 @@ export async function ensureFollowSurfaceForOwner(hostAthleteId: string): Promis
     where: { id: hostAthleteId },
     data: { isGoFastContainer: true, updatedAt: new Date() },
   });
+  await ensureAdvertisingCandidateForAthlete(hostAthleteId);
 }
 
 export async function resolveFollowTargetBySlug(rawHandle: string): Promise<FollowTarget | null> {

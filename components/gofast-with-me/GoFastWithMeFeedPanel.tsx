@@ -9,9 +9,14 @@ import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-ser
 type Props = {
   athleteId: string;
   publicSlug: string;
+  embedded?: boolean;
 };
 
-export default function GoFastWithMeFeedPanel({ athleteId, publicSlug }: Props) {
+export default function GoFastWithMeFeedPanel({
+  athleteId,
+  publicSlug,
+  embedded = false,
+}: Props) {
   const [hub, setHub] = useState<ContainerHubPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,14 +72,23 @@ export default function GoFastWithMeFeedPanel({ athleteId, publicSlug }: Props) 
   };
 
   return (
-    <section id="messages" className="space-y-6">
-      <div>
-        <h2 className="text-lg font-bold text-gray-900">Messages</h2>
-        <p className="text-sm text-gray-600 mt-1">
-          Journey announcements for your followers — race updates, plan milestones, what&apos;s next.
-          Posts appear in your GoFast With Me hub.
-        </p>
-      </div>
+    <section id="messages" className={embedded ? 'space-y-4' : 'space-y-6'}>
+      {!embedded ? (
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Messages</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Journey announcements for your followers — race updates, plan milestones, what&apos;s next.
+            Posts appear in your GoFast With Me hub.
+          </p>
+        </div>
+      ) : (
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Messages</h3>
+          <p className="text-xs text-gray-600 mt-1">
+            Journey announcements — race updates, milestones, what&apos;s next.
+          </p>
+        </div>
+      )}
 
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -94,7 +108,7 @@ export default function GoFastWithMeFeedPanel({ athleteId, publicSlug }: Props) 
           <div>
             <h3 className="text-sm font-semibold text-gray-900">Post an announcement</h3>
             <p className="text-xs text-gray-600 mt-1">
-              Example: &ldquo;Week 12 of MCM prep — long run Sunday, following the plan strip.&rdquo;
+              Example: &ldquo;Week 12 of MCM prep — long run Sunday, following my plan.&rdquo;
             </p>
           </div>
         </div>
@@ -125,13 +139,15 @@ export default function GoFastWithMeFeedPanel({ athleteId, publicSlug }: Props) 
               Latest messages visible to followers in the member hub.
             </p>
           </div>
-          <Link
-            href={hubPath}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800 hover:bg-orange-100"
-          >
-            View as member
-            <ExternalLink className="h-3.5 w-3.5" />
-          </Link>
+          {!embedded ? (
+            <Link
+              href={hubPath}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800 hover:bg-orange-100"
+            >
+              View as member
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          ) : null}
         </div>
         {loading ? (
           <p className="text-sm text-gray-500">Loading…</p>
@@ -149,10 +165,12 @@ export default function GoFastWithMeFeedPanel({ athleteId, publicSlug }: Props) 
         )}
       </div>
 
-      <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-600">
-        What I&apos;m thinking about (tips and voice) is planned separately via athlete-owned CMS
-        content. Today, journey messages use container announcements.
-      </div>
+      {!embedded ? (
+        <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-600">
+          What I&apos;m thinking about (tips and voice) is planned separately via athlete-owned CMS
+          content. Today, journey messages use container announcements.
+        </div>
+      ) : null}
     </section>
   );
 }

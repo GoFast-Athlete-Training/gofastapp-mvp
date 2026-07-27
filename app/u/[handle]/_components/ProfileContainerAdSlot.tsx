@@ -1,30 +1,15 @@
-import {
-  fetchServedCampaignForSurface,
-  getAdvertiserImpressionsRegisterUrl,
-} from "@/lib/advertising/advertiser-platform-client";
-import { PublicSurfaceAdPlacement } from "@/components/advertising/PublicSurfaceAdPlacement";
+import type { ActiveBlockSnapshot } from "@/lib/advertising/block-service";
+import { ProfileContainerAdBlock } from "@/components/advertising/ProfileContainerAdBlock";
 
 type ProfileContainerAdSlotProps = {
-  handle: string;
   isGoFastContainer: boolean;
+  activeBlock: ActiveBlockSnapshot | null;
 };
 
-export async function ProfileContainerAdSlot({
-  handle,
+export function ProfileContainerAdSlot({
   isGoFastContainer,
+  activeBlock,
 }: ProfileContainerAdSlotProps) {
-  if (!isGoFastContainer) return null;
-
-  const destinationKey = handle.trim().toLowerCase();
-  const [creative, registerUrl] = await Promise.all([
-    fetchServedCampaignForSurface({
-      surfaceType: "PROFILE_CONTAINER",
-      destinationKey,
-    }),
-    Promise.resolve(getAdvertiserImpressionsRegisterUrl()),
-  ]);
-
-  if (!creative || !registerUrl) return null;
-
-  return <PublicSurfaceAdPlacement creative={creative} registerUrl={registerUrl} />;
+  if (!isGoFastContainer || !activeBlock) return null;
+  return <ProfileContainerAdBlock block={activeBlock} />;
 }

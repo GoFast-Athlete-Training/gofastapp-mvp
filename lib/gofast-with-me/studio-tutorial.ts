@@ -18,33 +18,21 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
   slug: GOFAST_WITH_ME_STUDIO_TUTORIAL_SLUG,
   name: 'GoFast With Me Studio',
   summary:
-    'Share what you are training for, publish your GoFast plan, and invite others to follow your journey — goal, training week, messages, followers.',
+    'Two places: My Page is your public door. My Community is your member room — My plan, messages, and followers inside.',
   steps: [
     {
-      id: 'door',
+      id: 'page',
       title: 'My Page — the door',
       instruction:
         'Your public landing where strangers see who you are and What I\'m training for before they follow.',
       sortOrder: 0,
     },
     {
-      id: 'plan',
-      title: 'Share my plan',
+      id: 'community',
+      title: 'My Community — the room',
       instruction:
-        'Publish your GoFast plan so followers see your training week in the hub.',
+        'Your member room — publish My plan, post journey messages, and see who followed you in.',
       sortOrder: 1,
-    },
-    {
-      id: 'messages',
-      title: 'Messages',
-      instruction: 'Journey announcements — race updates, milestones, what is next on the plan.',
-      sortOrder: 2,
-    },
-    {
-      id: 'followers',
-      title: 'Followers',
-      instruction: 'Who joined your GoFast With Me hub to train alongside you.',
-      sortOrder: 3,
     },
   ],
 };

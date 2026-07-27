@@ -12,10 +12,8 @@ import type { GoFastWithMeLandingValues } from "@/components/gofast-with-me/GoFa
 import { normalizeGoFastWithMePhotoType } from "@/lib/gofast-with-me/photo-type";
 import { goFastWithFrontDoorPath } from "@/lib/gofast-with-me/gofast-with-bridge";
 import GoFastWithMeHubOnboarding from "@/components/gofast-with-me/GoFastWithMeHubOnboarding";
-import GoFastWithMeMemberManagementPanel from "@/components/gofast-with-me/GoFastWithMeMemberManagementPanel";
 import GoFastWithMeWelcomePanel from "@/components/gofast-with-me/GoFastWithMeWelcomePanel";
-import GoFastWithMeFeedPanel from "@/components/gofast-with-me/GoFastWithMeFeedPanel";
-import GoFastWithMePlanPanel from "@/components/gofast-with-me/GoFastWithMePlanPanel";
+import GoFastWithMeCommunityPanel from "@/components/gofast-with-me/GoFastWithMeCommunityPanel";
 import GoFastWithMeDashboardHome, {
   type DashboardMetrics,
 } from "@/components/gofast-with-me/GoFastWithMeDashboardHome";
@@ -121,10 +119,10 @@ export default function GoFastWithOthersDashboard() {
     let cancelled = false;
     (async () => {
       try {
-        const [profileRes, gwmRes, hubRes, hubStatusRes] = await Promise.all([
+        const [profileRes, gwmRes, membersRes, hubStatusRes] = await Promise.all([
           api.get(`/athlete/${id}`),
           api.get("/me/gofast-with-me"),
-          api.get(`/athlete/${id}/container/hub`).catch(() => null),
+          api.get(`/athlete/${id}/container/members`).catch(() => null),
           api.get("/me/share-hub-status").catch(() => null),
         ]);
         const athlete = profileRes.data?.athlete;
@@ -148,8 +146,8 @@ export default function GoFastWithOthersDashboard() {
         setSlugUsesHandle(gwm?.slugUsesHandle ?? true);
         setShowOnboarding(!gwm?.creatorType);
 
-        if (hubRes?.data?.success && hubRes.data.hub) {
-          setFollowerCount(hubRes.data.hub.memberCount ?? 0);
+        if (membersRes?.data?.success) {
+          setFollowerCount(membersRes.data.count ?? 0);
         } else if (athlete?.isGoFastContainer) {
           setFollowerCount(0);
         }
@@ -314,6 +312,10 @@ export default function GoFastWithOthersDashboard() {
     if (activeView === "dashboard") {
       return (
         <div className="space-y-6">
+          {showStudioExplainer ? (
+            <GoFastWithMeStudioExplainer onDismiss={handleDismissStudioIntro} />
+          ) : null}
+
           {creatorLabel ? (
             <div className="rounded-xl border border-gray-200 bg-white p-4 flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -363,23 +365,15 @@ export default function GoFastWithOthersDashboard() {
               setPublicSlug(slug);
               setSlugUsesHandle(usesHandle);
             }}
-            onOpenFollowers={() => openWorkspace("followers")}
-            onOpenMessages={() => openWorkspace("messages")}
-            onOpenPlan={() => openWorkspace("plan")}
+            onOpenCommunity={() => openWorkspace("community")}
             onSaved={(values) => {
               setOwnerGwm((prev) => (prev ? { ...prev, ...values } : prev));
             }}
           />
         );
-      case "plan":
-        return publicSlug ? (
-          <GoFastWithMePlanPanel publicSlug={publicSlug} />
-        ) : null;
-      case "messages":
-        return <GoFastWithMeFeedPanel athleteId={athleteId} publicSlug={publicSlug} />;
-      case "followers":
+      case "community":
         return (
-          <GoFastWithMeMemberManagementPanel athleteId={athleteId} publicSlug={publicSlug} />
+          <GoFastWithMeCommunityPanel athleteId={athleteId} publicSlug={publicSlug} />
         );
       default:
         return null;
@@ -388,10 +382,6 @@ export default function GoFastWithOthersDashboard() {
 
   return studioShell(
     <div className="space-y-6 pb-8">
-      {showStudioExplainer ? (
-        <GoFastWithMeStudioExplainer onDismiss={handleDismissStudioIntro} />
-      ) : null}
-
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}

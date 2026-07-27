@@ -250,7 +250,7 @@ export default function ContainerHubPage() {
                   href="/gofast-with-others"
                   className="mt-3 inline-flex text-sm font-semibold text-orange-600 hover:underline"
                 >
-                  Open GoFast With Me → Share my plan
+                  Open My Community → My plan
                 </Link>
               </section>
             ) : (
