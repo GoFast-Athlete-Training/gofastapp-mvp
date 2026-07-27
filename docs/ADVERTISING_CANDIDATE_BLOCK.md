@@ -11,7 +11,8 @@ Prod owns eligibility (`advertising_candidates`) and durable purchases (`adverti
 
 - Container toggle ON → `ensureAdvertisingCandidateForAthlete`
 - Container toggle OFF → pause candidate (never delete code)
-- Backfill: `npm run db:backfill-advertising-candidates`
+- Deploy migration `20260727200000_backfill_advertising_candidates` backfills existing container athletes automatically
+- Manual re-run: `npm run db:backfill-advertising-candidates`
 
 ## APIs
 
