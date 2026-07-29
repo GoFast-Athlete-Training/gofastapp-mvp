@@ -1,42 +1,29 @@
 'use client';
 
-import { Users } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import GoFastWithMeLandingForm, {
   type GoFastWithMeLandingValues,
 } from '@/components/gofast-with-me/GoFastWithMeLandingForm';
-import GoFastWithMePageSurfacesCard from '@/components/gofast-with-me/GoFastWithMePageSurfacesCard';
 import { isWelcomeContentComplete } from '@/components/gofast-with-me/studio-sections';
 
 type Props = {
   landingValues: GoFastWithMeLandingValues;
   profileBio: string | null;
+  profilePhotoURL: string | null;
+  athleteId: string;
   liveUrl: string;
-  appUrl: string;
-  publicSlug: string;
-  gofastHandle: string;
-  slugUsesHandle: boolean;
-  isPublishReady: boolean;
-  copyDone: boolean;
-  onCopyAppUrl: () => void;
-  onUrlUpdated: (slug: string, usesHandle: boolean) => void;
-  onOpenCommunity: () => void;
   onSaved: (values: GoFastWithMeLandingValues) => void;
+  onAvatarSaved?: (photoURL: string | null) => void;
 };
 
 export default function GoFastWithMeWelcomePanel({
   landingValues,
   profileBio,
+  profilePhotoURL,
+  athleteId,
   liveUrl,
-  appUrl,
-  publicSlug,
-  gofastHandle,
-  slugUsesHandle,
-  isPublishReady,
-  copyDone,
-  onCopyAppUrl,
-  onUrlUpdated,
-  onOpenCommunity,
   onSaved,
+  onAvatarSaved,
 }: Props) {
   const complete = isWelcomeContentComplete(landingValues);
 
@@ -50,69 +37,46 @@ export default function GoFastWithMeWelcomePanel({
             What I&apos;m training for hydrates from your goal and plan on the live door.
           </p>
         </div>
-        <span
-          className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
-            complete ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'
-          }`}
-        >
-          {complete ? 'Complete' : 'Incomplete'}
-        </span>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {liveUrl ? (
+            <a
+              href={liveUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-800 hover:bg-orange-100"
+            >
+              View public page
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          ) : null}
+          <span
+            className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+              complete ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'
+            }`}
+          >
+            {complete ? 'Complete' : 'Incomplete'}
+          </span>
+        </div>
       </div>
 
       {!complete ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Add your welcome message, bio, what visitors will see, and attach a run image to complete
-          your landing page health check.
+          Add a welcome, about you, what you&apos;ll post, and a run image to finish your landing page.
         </div>
       ) : (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          Landing page is complete — share your public URL and invite followers into My Community.
+          Landing page looks good — share your door from Studio Central when you&apos;re ready.
         </div>
       )}
 
       <GoFastWithMeLandingForm
         initial={landingValues}
         profileBio={profileBio}
+        profilePhotoURL={profilePhotoURL}
+        athleteId={athleteId}
         onSaved={onSaved}
+        onAvatarSaved={onAvatarSaved}
       />
-
-      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-gray-900">My Community</p>
-          <p className="text-xs text-gray-600 mt-0.5">
-            Your member room — My plan, messages, and followers live here after people follow.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onOpenCommunity}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-white px-3 py-2 text-xs font-semibold text-orange-800 hover:bg-orange-50"
-        >
-          <Users className="h-3.5 w-3.5" />
-          Open My Community
-        </button>
-      </div>
-
-      <div className="space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900">Public URLs</h3>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Share links and preview your pages — secondary to your landing content above.
-          </p>
-        </div>
-        <GoFastWithMePageSurfacesCard
-          liveUrl={liveUrl}
-          appUrl={appUrl}
-          publicSlug={publicSlug}
-          gofastHandle={gofastHandle}
-          slugUsesHandle={slugUsesHandle}
-          isPublishReady={isPublishReady}
-          copyDone={copyDone}
-          onCopyAppUrl={onCopyAppUrl}
-          onUrlUpdated={onUrlUpdated}
-          onOpenCommunity={onOpenCommunity}
-        />
-      </div>
     </section>
   );
 }

@@ -331,11 +331,13 @@ The studio (`/gofast-with-others`) is **door + room** — like race hub (`/race-
 
 1. **Studio Central** (home)
    - Setup progress + **follower count** from `GET /api/athlete/[id]/container/members` (junction count only).
+   - **Share your door** — public URL editor + View public page (not on My Page).
 
-2. **My Page** (public door)
+2. **My Page** (public door editor)
    - Required first.
-   - Landing copy/photo via `gofast_with_me` + athlete profile context.
-   - Strangers decide to follow from `/u/[handle]`; **What I'm training for** hydrates from goal/plan on the live door.
+   - Landing copy + run photo (+ optional profile avatar) via `gofast_with_me` / athlete profile.
+   - Door copy only — no Public URLs pile, no View as member, no My Community teaser.
+   - Strangers decide to follow from `/u/[handle]` and `runner…/{handle}`; **What I'm training for** hydrates from goal/plan on the live door.
 
 3. **My Community** (member room — host side)
    - One scroll/panel with sections inside (not separate studio nav items):
@@ -345,7 +347,12 @@ The studio (`/gofast-with-others`) is **door + room** — like race hub (`/race-
    - Member view of the same room: `/container/[handle]` (training-for, plan strip, messages, thinking, followers; My Runs v2 collapsed).
 
 4. **View as member**
-   - Link to `/container/[handle]` from My Community.
+   - Link to `/container/[handle]` from My Community only.
+
+5. **Public door composition** (live `/u` + runner host)
+   - Slim banner: avatar, name, handle, location, one **GoFast with {FirstName}** CTA.
+   - Body: club-style **2/3** run photo + welcome / about / what you'll see; **1/3** Training for + See my plan + On the calendar.
+   - Plan week strip and Activity/last Garmin run stay off the door (hub / My Community).
 
 Race-hub analogy: join door → member room with sections inside. GWM: follow door → `/container/[handle]` room; host edits room from **My Community** in studio.
 

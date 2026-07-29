@@ -75,6 +75,7 @@ export default function GoFastWithOthersDashboard() {
   const [gofastHandle, setGofastHandle] = useState<string | null>(null);
   const [firstName, setFirstName] = useState<string | null>(null);
   const [profileBio, setProfileBio] = useState<string | null>(null);
+  const [profilePhotoURL, setProfilePhotoURL] = useState<string | null>(null);
   const [ownerGwm, setOwnerGwm] = useState<OwnerGwmRow | null>(null);
   const [publicSlug, setPublicSlug] = useState<string | null>(null);
   const [slugUsesHandle, setSlugUsesHandle] = useState(true);
@@ -82,7 +83,6 @@ export default function GoFastWithOthersDashboard() {
   const [loading, setLoading] = useState(true);
   const [gateLoading, setGateLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copyDone, setCopyDone] = useState(false);
   const [noHandle, setNoHandle] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeView, setActiveView] = useState<StudioView>("dashboard");
@@ -137,6 +137,7 @@ export default function GoFastWithOthersDashboard() {
         setGofastHandle(handle);
         setFirstName(athlete?.firstName ?? null);
         setProfileBio(athlete?.bio ?? null);
+        setProfilePhotoURL(athlete?.photoURL ?? null);
         setIsGoFastContainer(Boolean(athlete?.isGoFastContainer));
 
         const gwm = gwmRes.data?.gofastWithMe as OwnerGwmRow | null;
@@ -193,16 +194,6 @@ export default function GoFastWithOthersDashboard() {
       setGateLoading(false);
     }
   }, [athleteId, gateLoading]);
-
-  const copyAppUrl = useCallback(async (url: string) => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopyDone(true);
-      setTimeout(() => setCopyDone(false), 2000);
-    } catch {
-      setError("Could not copy to clipboard.");
-    }
-  }, []);
 
   if (loading) {
     return (
@@ -288,7 +279,6 @@ export default function GoFastWithOthersDashboard() {
   }
 
   const liveUrl = `${RUNNER_BASE}/${publicSlug}`;
-  const appUrl = `/u/${publicSlug}`;
   const invitePath = goFastWithFrontDoorPath(publicSlug);
   const visitorHeadline = firstName ? `GoFast with ${firstName}` : "Your public page";
   const creatorLabel =
@@ -306,6 +296,9 @@ export default function GoFastWithOthersDashboard() {
     planName: shareHubStatus?.plan.planName ?? null,
     liveUrl,
     invitePath,
+    publicSlug,
+    gofastHandle,
+    slugUsesHandle,
   };
 
   const renderStudioContent = () => {
@@ -342,6 +335,10 @@ export default function GoFastWithOthersDashboard() {
             metrics={dashboardMetrics}
             visitorHeadline={visitorHeadline}
             onOpenWorkspace={openWorkspace}
+            onUrlUpdated={(slug, usesHandle) => {
+              setPublicSlug(slug);
+              setSlugUsesHandle(usesHandle);
+            }}
           />
         </div>
       );
@@ -353,22 +350,13 @@ export default function GoFastWithOthersDashboard() {
           <GoFastWithMeWelcomePanel
             landingValues={landingValues}
             profileBio={profileBio}
+            profilePhotoURL={profilePhotoURL}
+            athleteId={athleteId}
             liveUrl={liveUrl}
-            appUrl={appUrl}
-            publicSlug={publicSlug}
-            gofastHandle={gofastHandle}
-            slugUsesHandle={slugUsesHandle}
-            isPublishReady={isPublishReady}
-            copyDone={copyDone}
-            onCopyAppUrl={() => void copyAppUrl(`${window.location.origin}${appUrl}`)}
-            onUrlUpdated={(slug, usesHandle) => {
-              setPublicSlug(slug);
-              setSlugUsesHandle(usesHandle);
-            }}
-            onOpenCommunity={() => openWorkspace("community")}
             onSaved={(values) => {
               setOwnerGwm((prev) => (prev ? { ...prev, ...values } : prev));
             }}
+            onAvatarSaved={(photoURL) => setProfilePhotoURL(photoURL)}
           />
         );
       case "community":

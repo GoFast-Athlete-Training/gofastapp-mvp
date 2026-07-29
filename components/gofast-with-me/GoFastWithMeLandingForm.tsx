@@ -1,16 +1,16 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import Link from 'next/link';
-import { ImagePlus } from 'lucide-react';
+import Image from 'next/image';
+import { ImagePlus, User } from 'lucide-react';
 import api from '@/lib/api';
-import { DEFAULT_PHOTO_FOCUS, DEFAULT_PHOTO_ZOOM, normalizePhotoFocus, clampPhotoZoom } from '@/lib/gofast-with-me/photo-focus';
 import {
-  GOFAST_WITH_ME_PHOTO_TYPE_OPTIONS,
-  normalizeGoFastWithMePhotoType,
-  photoTypeGuidance,
-  type GoFastWithMePhotoType,
-} from '@/lib/gofast-with-me/photo-type';
+  DEFAULT_PHOTO_FOCUS,
+  DEFAULT_PHOTO_ZOOM,
+  normalizePhotoFocus,
+  clampPhotoZoom,
+} from '@/lib/gofast-with-me/photo-focus';
+import type { GoFastWithMePhotoType } from '@/lib/gofast-with-me/photo-type';
 import RunImageFocalPicker from '@/components/gofast-with-me/RunImageFocalPicker';
 
 export type GoFastWithMeLandingValues = {
@@ -30,11 +30,22 @@ export type GoFastWithMeLandingValues = {
 type Props = {
   initial: GoFastWithMeLandingValues;
   profileBio?: string | null;
+  profilePhotoURL?: string | null;
+  athleteId?: string | null;
   onSaved?: (values: GoFastWithMeLandingValues) => void;
+  onAvatarSaved?: (photoURL: string | null) => void;
 };
 
-export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }: Props) {
+export default function GoFastWithMeLandingForm({
+  initial,
+  profileBio,
+  profilePhotoURL,
+  athleteId,
+  onSaved,
+  onAvatarSaved,
+}: Props) {
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const initialFocus = normalizePhotoFocus(
     initial.gofastWithMePhotoFocusX,
     initial.gofastWithMePhotoFocusY
@@ -52,25 +63,28 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
   );
   const [photoFocus, setPhotoFocus] = useState(initialFocus);
   const [photoZoom, setPhotoZoom] = useState(clampPhotoZoom(initial.gofastWithMePhotoZoom));
-  const [photoType, setPhotoType] = useState<GoFastWithMePhotoType | null>(
-    normalizeGoFastWithMePhotoType(initial.gofastWithMePhotoType)
-  );
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(profilePhotoURL ?? null);
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const handlePhotoPick = () => photoInputRef.current?.click();
+  const handleAvatarPick = () => avatarInputRef.current?.click();
+
+  const validateImageFile = (file: File): string | null => {
+    if (!file.type.startsWith('image/')) return 'Please select a valid image file';
+    if (file.size > 8 * 1024 * 1024) return 'Image size must be less than 8MB';
+    return null;
+  };
 
   const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      alert('Please select a valid image file');
-      return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      alert('Image size must be less than 8MB');
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      alert(validationError);
       return;
     }
     setPhotoPreview((prev) => {
@@ -79,8 +93,37 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
     });
     setPhotoFocus({ x: DEFAULT_PHOTO_FOCUS, y: DEFAULT_PHOTO_FOCUS });
     setPhotoZoom(DEFAULT_PHOTO_ZOOM);
-    if (!photoType) setPhotoType('action');
     setPendingPhotoFile(file);
+  };
+
+  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      alert(validationError);
+      return;
+    }
+    setAvatarPreview((prev) => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+    setPendingAvatarFile(file);
+  };
+
+  const uploadFile = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+    const uploadData = (await uploadRes.json()) as {
+      success?: boolean;
+      url?: string;
+      error?: string;
+    };
+    if (!uploadRes.ok || !uploadData.url) {
+      throw new Error(uploadData.error || 'Photo upload failed');
+    }
+    return uploadData.url;
   };
 
   const handleSave = async () => {
@@ -90,20 +133,21 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
     try {
       let photoUrl = photoPreview?.startsWith('blob:') ? null : photoPreview?.trim() || null;
       if (pendingPhotoFile) {
-        const formData = new FormData();
-        formData.append('file', pendingPhotoFile);
-        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-        const uploadData = (await uploadRes.json()) as {
-          success?: boolean;
-          url?: string;
-          error?: string;
-        };
-        if (!uploadRes.ok || !uploadData.url) {
-          throw new Error(uploadData.error || 'Photo upload failed');
-        }
-        photoUrl = uploadData.url;
+        photoUrl = await uploadFile(pendingPhotoFile);
       }
 
+      let nextAvatarUrl =
+        avatarPreview?.startsWith('blob:') ? null : avatarPreview?.trim() || null;
+      if (pendingAvatarFile) {
+        nextAvatarUrl = await uploadFile(pendingAvatarFile);
+        if (!athleteId) throw new Error('Missing athlete id for profile photo');
+        await api.put(`/athlete/${athleteId}/profile`, { photoURL: nextAvatarUrl });
+        setAvatarPreview(nextAvatarUrl);
+        setPendingAvatarFile(null);
+        onAvatarSaved?.(nextAvatarUrl);
+      }
+
+      const photoType: GoFastWithMePhotoType = 'action';
       const payload: GoFastWithMeLandingValues = {
         welcome: values.welcome.trim() || null,
         gofastWithMeBio: values.gofastWithMeBio.trim() || null,
@@ -115,7 +159,7 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
         gofastWithMePhotoFocusX: photoFocus.x,
         gofastWithMePhotoFocusY: photoFocus.y,
         gofastWithMePhotoZoom: photoZoom,
-        gofastWithMePhotoType: photoType,
+        gofastWithMePhotoType: photoUrl ? photoType : null,
       };
       const res = await api.patch('/me/gofast-with-me', payload);
       if (!res.data?.success) {
@@ -147,9 +191,48 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
           Landing / identity
         </h2>
         <p className="text-xs text-gray-600">
-          Your profile avatar stays in the header. Attach a run image to show below it on your
-          public page.
+          Profile picture sits in the banner. Run image is the feature photo visitors see below it.
         </p>
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">Profile picture</h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Shown in the banner — use a runner photo if you want it more like you on the road.
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          {avatarPreview ? (
+            <Image
+              src={avatarPreview}
+              alt=""
+              width={72}
+              height={72}
+              className="h-18 w-18 h-[72px] w-[72px] rounded-full object-cover border border-gray-200"
+              unoptimized
+            />
+          ) : (
+            <div className="h-[72px] w-[72px] rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center">
+              <User className="h-8 w-8 text-gray-400" />
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={handleAvatarPick}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+          >
+            <ImagePlus className="h-4 w-4 text-orange-600" />
+            {avatarPreview ? 'Replace photo' : 'Add photo'}
+          </button>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleAvatarUpload}
+            className="hidden"
+          />
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -160,14 +243,6 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handlePhotoPick}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-        >
-          <ImagePlus className="h-4 w-4 text-orange-600" />
-          {photoPreview ? 'Replace image' : 'Attach image'}
-        </button>
         <input
           ref={photoInputRef}
           type="file"
@@ -177,44 +252,33 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
         />
 
         {photoPreview ? (
-          <>
-            <label className="block">
-              <span className="text-sm font-semibold text-gray-900">Photo type</span>
-              <span className="block text-xs text-gray-500 mt-0.5">
-                {photoTypeGuidance(photoType)}
-              </span>
-              <select
-                value={photoType ?? ''}
-                onChange={(e) =>
-                  setPhotoType(normalizeGoFastWithMePhotoType(e.target.value) ?? null)
-                }
-                className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white"
-              >
-                <option value="">Choose type…</option>
-                {GOFAST_WITH_ME_PHOTO_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <RunImageFocalPicker
-              src={photoPreview}
-              focusX={photoFocus.x}
-              focusY={photoFocus.y}
-              zoom={photoZoom}
-              photoType={photoType}
-              onFocusChange={setPhotoFocus}
-              onZoomChange={setPhotoZoom}
-            />
-          </>
+          <RunImageFocalPicker
+            src={photoPreview}
+            focusX={photoFocus.x}
+            focusY={photoFocus.y}
+            zoom={photoZoom}
+            photoType="action"
+            onFocusChange={setPhotoFocus}
+            onZoomChange={setPhotoZoom}
+          />
         ) : null}
+
+        <button
+          type="button"
+          onClick={handlePhotoPick}
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+        >
+          <ImagePlus className="h-4 w-4 text-orange-600" />
+          {photoPreview ? 'Replace image' : 'Attach image'}
+        </button>
       </div>
 
       <div className="space-y-4">
         <label className="block">
           <span className="text-sm font-semibold text-gray-900">Welcome</span>
-          <span className="block text-xs text-gray-500 mt-0.5">Invite opener for visitors.</span>
+          <span className="block text-xs text-gray-500 mt-0.5">
+            Short opener when someone lands on your page.
+          </span>
           <textarea
             value={values.welcome}
             onChange={(e) => setValues((v) => ({ ...v, welcome: e.target.value }))}
@@ -224,8 +288,10 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
         </label>
 
         <label className="block">
-          <span className="text-sm font-semibold text-gray-900">GoFastWithMe bio</span>
-          <span className="block text-xs text-gray-500 mt-0.5">Public-athlete identity copy.</span>
+          <span className="text-sm font-semibold text-gray-900">About you</span>
+          <span className="block text-xs text-gray-500 mt-0.5">
+            Describe yourself so people know what kind of runner you are and why they should follow.
+          </span>
           <textarea
             value={values.gofastWithMeBio}
             onChange={(e) => setValues((v) => ({ ...v, gofastWithMeBio: e.target.value }))}
@@ -244,7 +310,10 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
         </label>
 
         <label className="block">
-          <span className="text-sm font-semibold text-gray-900">What you&apos;ll see here</span>
+          <span className="text-sm font-semibold text-gray-900">What you&apos;ll see</span>
+          <span className="block text-xs text-gray-500 mt-0.5">
+            What kinds of content you&apos;ll post — plan updates, race notes, training tips, and so on.
+          </span>
           <textarea
             value={values.whatYoullSeeHere}
             onChange={(e) => setValues((v) => ({ ...v, whatYoullSeeHere: e.target.value }))}
@@ -285,14 +354,6 @@ export default function GoFastWithMeLandingForm({ initial, profileBio, onSaved }
           />
         </label>
       </div>
-
-      <p className="text-xs text-gray-500">
-        Name, avatar, and profile bio are edited under{' '}
-        <Link href="/athlete-edit-profile" className="font-medium text-orange-600 hover:underline">
-          Edit profile
-        </Link>
-        .
-      </p>
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       {success ? <p className="text-sm text-green-700">Saved.</p> : null}

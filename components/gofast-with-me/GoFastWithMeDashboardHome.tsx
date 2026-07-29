@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle2, Copy, Globe, Users } from 'lucide-react';
+import { CheckCircle2, Copy, ExternalLink, Globe, Users } from 'lucide-react';
 import { STUDIO_CENTRAL_LABEL, type StudioSection } from '@/components/gofast-with-me/studio-sections';
+import GoFastWithMeUrlEditor from '@/components/profile/GoFastWithMeUrlEditor';
 
 export type DashboardMetrics = {
   followerCount: number | null;
@@ -12,12 +13,16 @@ export type DashboardMetrics = {
   planName: string | null;
   liveUrl: string;
   invitePath: string;
+  publicSlug: string;
+  gofastHandle: string;
+  slugUsesHandle: boolean;
 };
 
 type Props = {
   metrics: DashboardMetrics;
   visitorHeadline: string;
   onOpenWorkspace: (section: StudioSection) => void;
+  onUrlUpdated?: (slug: string, usesHandle: boolean) => void;
 };
 
 type SetupStatus = 'not_started' | 'in_progress' | 'ready';
@@ -50,6 +55,7 @@ export default function GoFastWithMeDashboardHome({
   metrics,
   visitorHeadline,
   onOpenWorkspace,
+  onUrlUpdated,
 }: Props) {
   const [inviteCopied, setInviteCopied] = useState(false);
   const pageStatus = myPageSetupStatus(metrics.landingComplete, metrics.publishReady);
@@ -188,22 +194,37 @@ export default function GoFastWithMeDashboardHome({
         </div>
       </section>
 
-      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm text-gray-700">
-          <Globe className="h-4 w-4 text-orange-600 shrink-0" />
-          <span>
-            Public headline: <strong>{visitorHeadline}</strong>
-          </span>
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Share your door
+        </h3>
+        <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm text-gray-700">
+              <Globe className="h-4 w-4 text-orange-600 shrink-0" />
+              <span>
+                Public headline: <strong>{visitorHeadline}</strong>
+              </span>
+            </div>
+            <a
+              href={metrics.liveUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-orange-600 hover:text-orange-700"
+            >
+              View public page
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
+          <GoFastWithMeUrlEditor
+            gofastHandle={metrics.gofastHandle}
+            publicSlug={metrics.publicSlug}
+            slugUsesHandle={metrics.slugUsesHandle}
+            publicUrl={metrics.liveUrl}
+            onUpdated={(slug, usesHandle) => onUrlUpdated?.(slug, usesHandle)}
+          />
         </div>
-        <a
-          href={metrics.liveUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sm font-semibold text-orange-600 hover:text-orange-700"
-        >
-          View live page →
-        </a>
-      </div>
+      </section>
     </div>
   );
 }

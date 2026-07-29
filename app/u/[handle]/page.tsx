@@ -3,14 +3,11 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { loadPublicAthletePage } from '@/lib/server/load-public-athlete-page';
 import ProfileHero from './_components/ProfileHero';
-import GoalRaceCard from './_components/GoalRaceCard';
-import LastRunCard from './_components/LastRunCard';
+import DoorStoryColumn from './_components/DoorStoryColumn';
+import DoorSidebar from './_components/DoorSidebar';
 import RunWithMe from './_components/RunWithMe';
 import GroupTrainingCard from './_components/GroupTrainingCard';
-import PublishedPlansCard from './_components/PublishedPlansCard';
-import AboutStrip from './_components/AboutStrip';
 import { ProfileContainerAdSlot } from './_components/ProfileContainerAdSlot';
-import GoFastWithMeIntro from './_components/GoFastWithMeIntro';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,8 +49,13 @@ export async function generateMetadata({
     ? `${name}${handleStr} \u00b7 Chasing ${chasing} on GoFast`
     : `${name}${handleStr} on GoFast`;
 
+  const about =
+    data.gofastWithMe?.gofastWithMeBio?.trim() ||
+    data.gofastWithMe?.welcome?.trim() ||
+    data.athlete.bio?.trim() ||
+    null;
   const descParts: string[] = [];
-  if (data.athlete.bio?.trim()) descParts.push(data.athlete.bio.trim().slice(0, 140));
+  if (about) descParts.push(about.slice(0, 140));
   else if (chasing) descParts.push(`Chasing ${chasing}.`);
   if (data.upcomingRuns.length > 0) {
     descParts.push(
@@ -96,80 +98,61 @@ export default async function PublicAthletePage({
     data.athlete.lastName,
     data.athlete.gofastHandle,
   );
+  const hasRunPhoto = Boolean(data.gofastWithMe?.gofastWithMePhotoUrl?.trim());
 
   return (
     <div className="min-h-screen bg-stone-50">
       <ProfileHero
         athleteId={data.athlete.id}
-        firstName={data.athlete.firstName}
         displayName={displayName}
         handle={data.athlete.gofastHandle}
         photoURL={data.athlete.photoURL}
-        gofastWithMePhotoUrl={data.gofastWithMe?.gofastWithMePhotoUrl ?? null}
-        gofastWithMePhotoFocusX={data.gofastWithMe?.gofastWithMePhotoFocusX}
-        gofastWithMePhotoFocusY={data.gofastWithMe?.gofastWithMePhotoFocusY}
-        gofastWithMePhotoZoom={data.gofastWithMe?.gofastWithMePhotoZoom}
-        gofastWithMePhotoType={data.gofastWithMe?.gofastWithMePhotoType ?? null}
+        hasRunPhoto={hasRunPhoto}
         city={data.athlete.city}
         state={data.athlete.state}
         primarySport={data.athlete.primarySport}
-        fiveKPace={data.athlete.fiveKPace}
-        weeklyMileage={data.athlete.weeklyMileage}
         publicActions={data.publicActions}
       />
 
-      <main className="max-w-2xl mx-auto px-5 sm:px-6 pt-8 pb-16 space-y-8">
-        <GoFastWithMeIntro
-          gofastWithMe={data.gofastWithMe}
-          hostFirstName={data.athlete.firstName}
-        />
-
-        <GoalRaceCard
-          trainingSummary={data.trainingSummary}
-          primaryChasingGoal={data.primaryChasingGoal}
-        />
-
-        {data.joinableGroupTraining ? (
-          <GroupTrainingCard cohort={data.joinableGroupTraining} />
-        ) : null}
-
-        {data.publishedPlans && data.publishedPlans.length > 0 ? (
-          <PublishedPlansCard
-            plans={data.publishedPlans}
-            hostFirstName={data.athlete.firstName}
+      <main className="max-w-5xl mx-auto px-5 sm:px-6 pt-8 pb-16">
+        <div className="lg:grid lg:grid-cols-3 lg:gap-10 space-y-10 lg:space-y-0">
+          <div className="lg:col-span-2">
+            <DoorStoryColumn
+              gofastWithMe={data.gofastWithMe}
+              profileBio={data.athlete.bio}
+            />
+          </div>
+          <DoorSidebar
+            trainingSummary={data.trainingSummary}
+            primaryChasingGoal={data.primaryChasingGoal}
+            publishedPlans={data.publishedPlans ?? []}
+            signedUpRaces={data.signedUpRaces}
+            containerMemberCount={data.containerMemberCount}
           />
-        ) : null}
+        </div>
 
-        <LastRunCard
-          lastRun={data.lastRun}
-          weeklyMilesThisWeek={data.weeklyMilesThisWeek}
-        />
+        <div className="mt-12 space-y-8">
+          {data.joinableGroupTraining ? (
+            <GroupTrainingCard cohort={data.joinableGroupTraining} />
+          ) : null}
 
-        <RunWithMe
-          athleteId={data.athlete.id}
-          firstName={data.athlete.firstName}
-          handle={data.athlete.gofastHandle}
-          city={data.athlete.city}
-          upcomingRuns={data.upcomingRuns}
-        />
-
-        <AboutStrip
-          bio={data.athlete.bio}
-          signedUpRaces={data.signedUpRaces}
-          isGoFastContainer={data.isGoFastContainer}
-          containerMemberCount={data.containerMemberCount}
-          containerRecentMembers={data.containerRecentMembers}
-          hostHandle={data.athlete.gofastHandle}
-        />
-
-        {data.isGoFastContainer ? (
-          <ProfileContainerAdSlot
-            isGoFastContainer={data.isGoFastContainer}
-            activeBlock={data.activeAdvertisingBlock}
+          <RunWithMe
+            athleteId={data.athlete.id}
+            firstName={data.athlete.firstName}
+            handle={data.athlete.gofastHandle}
+            city={data.athlete.city}
+            upcomingRuns={data.upcomingRuns}
           />
-        ) : null}
 
-        <footer className="pt-4 text-center">
+          {data.isGoFastContainer ? (
+            <ProfileContainerAdSlot
+              isGoFastContainer={data.isGoFastContainer}
+              activeBlock={data.activeAdvertisingBlock}
+            />
+          ) : null}
+        </div>
+
+        <footer className="pt-10 text-center">
           <Link
             href="/welcome"
             className="text-xs font-semibold text-stone-500 hover:text-stone-700"
@@ -181,4 +164,3 @@ export default async function PublicAthletePage({
     </div>
   );
 }
-
