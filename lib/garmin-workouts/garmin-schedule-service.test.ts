@@ -3,7 +3,7 @@ import test from "node:test";
 import { GarminApiError } from "./garmin-training-api";
 import {
   deleteGarminScheduleIfPresent,
-  scheduleAndVerifyWorkout,
+  scheduleWorkoutOnCalendar,
   type GarminScheduleClient,
 } from "./garmin-schedule-service";
 
@@ -16,48 +16,25 @@ function mockClient(overrides: Partial<GarminScheduleClient>): GarminScheduleCli
   };
 }
 
-test("scheduleAndVerifyWorkout succeeds when schedule matches workout and date", async () => {
-  const result = await scheduleAndVerifyWorkout(
+test("scheduleWorkoutOnCalendar succeeds on POST /schedule", async () => {
+  let scheduled = false;
+  const result = await scheduleWorkoutOnCalendar(
     mockClient({
-      scheduleWorkout: async () => ({ scheduleId: 555 }),
-      getSchedule: async () => ({ workoutId: 42, date: "2026-05-29" }),
+      scheduleWorkout: async (workoutId, date) => {
+        assert.equal(workoutId, 42);
+        assert.equal(date, "2026-05-29");
+        scheduled = true;
+        return { scheduleId: 555 };
+      },
     }),
     { garminWorkoutId: 42, scheduledDate: "2026-05-29" }
   );
   assert.equal(result.ok, true);
-  if (result.ok) assert.equal(result.garminScheduleId, 555);
+  assert.equal(scheduled, true);
 });
 
-test("scheduleAndVerifyWorkout fails verify on workout id mismatch", async () => {
-  const result = await scheduleAndVerifyWorkout(
-    mockClient({
-      getSchedule: async () => ({ workoutId: 99, date: "2026-05-29" }),
-    }),
-    { garminWorkoutId: 42, scheduledDate: "2026-05-29" }
-  );
-  assert.equal(result.ok, false);
-  if (!result.ok) {
-    assert.equal(result.phase, "verify");
-    assert.match(result.message, /workout id mismatch/);
-  }
-});
-
-test("scheduleAndVerifyWorkout fails verify on date mismatch", async () => {
-  const result = await scheduleAndVerifyWorkout(
-    mockClient({
-      getSchedule: async () => ({ workoutId: 42, date: "2026-05-30" }),
-    }),
-    { garminWorkoutId: 42, scheduledDate: "2026-05-29" }
-  );
-  assert.equal(result.ok, false);
-  if (!result.ok) {
-    assert.equal(result.phase, "verify");
-    assert.match(result.message, /expected 2026-05-29/);
-  }
-});
-
-test("scheduleAndVerifyWorkout fails create when scheduleWorkout throws", async () => {
-  const result = await scheduleAndVerifyWorkout(
+test("scheduleWorkoutOnCalendar fails when scheduleWorkout throws", async () => {
+  const result = await scheduleWorkoutOnCalendar(
     mockClient({
       scheduleWorkout: async () => {
         throw new GarminApiError({
@@ -71,28 +48,8 @@ test("scheduleAndVerifyWorkout fails create when scheduleWorkout throws", async 
   );
   assert.equal(result.ok, false);
   if (!result.ok) {
-    assert.equal(result.phase, "create");
     assert.equal(result.garminStatus, 502);
-  }
-});
-
-test("scheduleAndVerifyWorkout fails verify when getSchedule throws", async () => {
-  const result = await scheduleAndVerifyWorkout(
-    mockClient({
-      getSchedule: async () => {
-        throw new GarminApiError({
-          status: 404,
-          url: "/schedule/555",
-          details: "not found",
-        });
-      },
-    }),
-    { garminWorkoutId: 42, scheduledDate: "2026-05-29" }
-  );
-  assert.equal(result.ok, false);
-  if (!result.ok) {
-    assert.equal(result.phase, "verify");
-    assert.equal(result.garminStatus, 404);
+    assert.match(result.message, /bad gateway/);
   }
 });
 

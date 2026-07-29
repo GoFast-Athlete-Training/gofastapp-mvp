@@ -16,6 +16,7 @@ import {
 import { normalizeGarminMatchText } from "./garmin-activity-match-helpers";
 import { ymdFromDate } from "./plan-utils";
 import { parseActivityToSegmentExecution } from "./activity-to-segment-execution";
+import { isWorkSegmentTitle } from "./workout-performance-analysis";
 import { sendAppNotification } from "@/lib/app-notifications/send";
 /** Max sec/mi faster than prescribed easy pace before we skip aerobic HR credit (target − actual). */
 export const EASY_LONG_RUN_MAX_FAST_DRIFT_SEC_PER_MILE = 15;
@@ -141,6 +142,159 @@ function hrTargetMidpointBpmFromTargets(targets: unknown): number | null {
     return Math.round(low);
   }
   return null;
+}
+
+function workoutHasPacedWorkSegments(
+  segments: {
+    title: string;
+    targets: unknown;
+    paceTargetEncodingVersion: number;
+  }[]
+): boolean {
+  return segments.some(
+    (seg) =>
+      isWorkSegmentTitle(seg.title) &&
+      paceTargetSecPerMileFromSegment(seg.targets, seg.paceTargetEncodingVersion) != null
+  );
+}
+
+async function applyMatchCreditsFromWorkoutRow(params: {
+  workout: WorkoutForActivityApply;
+  activity: ActivityForWorkoutApply;
+}): Promise<void> {
+  const row = await prisma.workouts.findUnique({
+    where: { id: params.workout.id },
+    select: {
+      paceDeltaSecPerMile: true,
+      actualAvgPaceSecPerMile: true,
+      actualAverageHeartRate: true,
+    },
+  });
+  if (!row) return;
+
+  const paceSecPerMile = row.actualAvgPaceSecPerMile;
+  const paceDeltaSecPerMile = row.paceDeltaSecPerMile;
+  const paceCreditEligible =
+    paceSecPerMile != null && paceDeltaSecPerMile != null && paceDeltaSecPerMile >= 0;
+
+  let creditedFiveKPaceSecPerMile: number | null = null;
+  let creditedThresholdPaceSecPerMile: number | null = null;
+
+  if (paceCreditEligible) {
+    const matched = computeMatchedWorkoutPaceCredits({
+      workoutType: params.workout.workoutType,
+      paceSecPerMile,
+      paceDeltaSecPerMile,
+      intervalsCatalogueOffsetSecPerMile:
+        params.workout.workout_catalogue?.workBasePaceOffsetSecPerMile ?? null,
+    });
+    creditedFiveKPaceSecPerMile = matched.creditedFiveKPaceSecPerMile;
+    creditedThresholdPaceSecPerMile = matched.creditedThresholdPaceSecPerMile;
+  }
+
+  const creditedAerobicCeilingBpm = computeMatchedWorkoutAerobicCeilingCredit({
+    workoutType: params.workout.workoutType,
+    averageHeartRateBpm: row.actualAverageHeartRate,
+    paceDeltaSecPerMile,
+  });
+
+  if (paceDeltaSecPerMile != null && paceSecPerMile != null) {
+    try {
+      const absD = Math.abs(Math.round(paceDeltaSecPerMile));
+      const direction =
+        paceDeltaSecPerMile > 0.5
+          ? `${absD} sec/mi faster than target`
+          : paceDeltaSecPerMile < -0.5
+            ? `${absD} sec/mi slower than target`
+            : "right on target pace";
+      const distanceMeters = params.activity.distance;
+      const miDisplay =
+        distanceMeters != null && distanceMeters > 0
+          ? `${(distanceMeters / 1609.34).toFixed(1)} mi @ `
+          : "";
+      const paceMin = Math.floor(paceSecPerMile / 60);
+      const paceSec = String(paceSecPerMile % 60).padStart(2, "0");
+      await prisma.pace_adjustment_log.create({
+        data: {
+          athleteId: params.activity.athleteId,
+          planId: params.workout.planId ?? null,
+          weekNumber: params.workout.weekNumber ?? null,
+          workoutId: params.workout.id,
+          notificationType: "WORKOUT_MATCH",
+          summaryMessage: `${miDisplay}${paceMin}:${paceSec}/mi — ${direction}.`,
+        },
+      });
+    } catch (err) {
+      console.error("pace_adjustment_log WORKOUT_MATCH insert:", err);
+    }
+  }
+
+  if (creditedFiveKPaceSecPerMile != null) {
+    try {
+      await applyWorkoutPaceCredit({
+        athleteId: params.activity.athleteId,
+        creditedFiveKPaceSecPerMile,
+        planId: params.workout.planId ?? null,
+        weekNumber: params.workout.weekNumber ?? null,
+      });
+    } catch (err) {
+      console.error("applyWorkoutPaceCredit after match:", err);
+    }
+  }
+
+  if (creditedThresholdPaceSecPerMile != null) {
+    try {
+      await applyThresholdPaceCredit({
+        athleteId: params.activity.athleteId,
+        creditedThresholdPaceSecPerMile,
+        planId: params.workout.planId ?? null,
+        weekNumber: params.workout.weekNumber ?? null,
+        workoutId: params.workout.id,
+      });
+    } catch (err) {
+      console.error("applyThresholdPaceCredit after match:", err);
+    }
+  }
+
+  if (creditedAerobicCeilingBpm != null) {
+    try {
+      await applyAerobicCeilingCredit({
+        athleteId: params.activity.athleteId,
+        creditedAerobicCeilingBpm,
+        planId: params.workout.planId ?? null,
+        weekNumber: params.workout.weekNumber ?? null,
+        workoutId: params.workout.id,
+      });
+    } catch (err) {
+      console.error("applyAerobicCeilingCredit after match:", err);
+    }
+  }
+
+  if (
+    (params.workout.workoutType === "LongRun" || params.workout.workoutType === "Race") &&
+    params.workout.planId
+  ) {
+    try {
+      await applyLightAdaptiveIfEligible({
+        athleteId: params.activity.athleteId,
+        planId: params.workout.planId,
+        weekNumber: params.workout.weekNumber ?? null,
+        workoutId: params.workout.id,
+      });
+    } catch (err) {
+      console.error("applyLightAdaptiveIfEligible after long run match:", err);
+    }
+  }
+
+  await prisma.workouts.update({
+    where: { id: params.workout.id },
+    data: {
+      creditedFiveKPaceSecPerMile,
+      creditedThresholdPaceSecPerMile,
+      creditedAerobicCeilingBpm,
+      updatedAt: new Date(),
+    },
+  });
 }
 
 function pickMainPaceTargetSecPerMile(
@@ -295,10 +449,12 @@ export async function applyActivityToWorkout(params: {
     targetSecPerMileHigh: targetPaceSecPerMileHigh,
   } = pickMainPaceTargetSecPerMile(workout.segments);
 
+  const hasPacedWorkSegments = workoutHasPacedWorkSegments(workout.segments);
+
   let paceDeltaSecPerMile: number | null = null;
   let evaluationEligible = false;
 
-  if (targetPaceSecPerMile != null && paceSecPerMile != null) {
+  if (!hasPacedWorkSegments && targetPaceSecPerMile != null && paceSecPerMile != null) {
     paceDeltaSecPerMile = targetPaceSecPerMile - paceSecPerMile;
     evaluationEligible = true;
   }
@@ -308,30 +464,6 @@ export async function applyActivityToWorkout(params: {
   if (hrTargetMid != null && activity.averageHeartRate != null) {
     hrDeltaBpm = Math.round(hrTargetMid - activity.averageHeartRate);
   }
-
-  let creditedFiveKPaceSecPerMile: number | null = null;
-  let creditedThresholdPaceSecPerMile: number | null = null;
-
-  const paceCreditEligible =
-    paceSecPerMile != null && paceDeltaSecPerMile != null && paceDeltaSecPerMile >= 0;
-
-  if (paceCreditEligible) {
-    const matched = computeMatchedWorkoutPaceCredits({
-      workoutType: workout.workoutType,
-      paceSecPerMile,
-      paceDeltaSecPerMile,
-      intervalsCatalogueOffsetSecPerMile:
-        workout.workout_catalogue?.workBasePaceOffsetSecPerMile ?? null,
-    });
-    creditedFiveKPaceSecPerMile = matched.creditedFiveKPaceSecPerMile;
-    creditedThresholdPaceSecPerMile = matched.creditedThresholdPaceSecPerMile;
-  }
-
-  const creditedAerobicCeilingBpm = computeMatchedWorkoutAerobicCeilingCredit({
-    workoutType: workout.workoutType,
-    averageHeartRateBpm: activity.averageHeartRate,
-    paceDeltaSecPerMile,
-  });
 
   const detailBlob =
     activity.detailData != null && typeof activity.detailData === "object"
@@ -361,9 +493,6 @@ export async function applyActivityToWorkout(params: {
       targetPaceSecPerMile,
       targetPaceSecPerMileHigh,
       hrDeltaBpm,
-      creditedFiveKPaceSecPerMile,
-      creditedThresholdPaceSecPerMile,
-      creditedAerobicCeilingBpm,
       evaluationEligibleFlag: evaluationEligible,
       updatedAt: new Date(),
     },
@@ -374,48 +503,22 @@ export async function applyActivityToWorkout(params: {
     data: { ingestionStatus: "MATCHED" },
   });
 
-  if (paceDeltaSecPerMile != null && paceSecPerMile != null) {
-    try {
-      const absD = Math.abs(Math.round(paceDeltaSecPerMile));
-      const direction =
-        paceDeltaSecPerMile > 0.5
-          ? `${absD} sec/mi faster than target`
-          : paceDeltaSecPerMile < -0.5
-            ? `${absD} sec/mi slower than target`
-            : "right on target pace";
-      const miDisplay =
-        distanceMeters != null
-          ? `${(distanceMeters / 1609.34).toFixed(1)} mi @ `
-          : "";
-      const paceMin = Math.floor(paceSecPerMile / 60);
-      const paceSec = String(paceSecPerMile % 60).padStart(2, "0");
-      await prisma.pace_adjustment_log.create({
-        data: {
-          athleteId: activity.athleteId,
-          planId: workout.planId ?? null,
-          weekNumber: workout.weekNumber ?? null,
-          workoutId: workout.id,
-          notificationType: "WORKOUT_MATCH",
-          summaryMessage: `${miDisplay}${paceMin}:${paceSec}/mi — ${direction}.`,
-        },
-      });
-    } catch (err) {
-      console.error("pace_adjustment_log WORKOUT_MATCH insert:", err);
-    }
-  }
-
   try {
+    const workoutDeeplink =
+      workout.planId != null ? `/workouts/${workout.id}` : `/activities/${activity.id}`;
+
     await sendAppNotification({
       athleteId: activity.athleteId,
       templateKey: "workout.complete",
       objectType: "workout",
       objectId: workout.id,
-      deeplink: `/activities/${activity.id}`,
+      deeplink: workoutDeeplink,
       payload: {
         workoutId: workout.id,
         activityId: activity.id,
+        planId: workout.planId ?? undefined,
         type: "workout_complete",
-        screen: "activity",
+        screen: workout.planId != null ? "workout" : "activity",
         objectType: "workout",
         objectId: workout.id,
       },
@@ -425,66 +528,11 @@ export async function applyActivityToWorkout(params: {
     console.error("workout_complete push:", err);
   }
 
-  if (creditedFiveKPaceSecPerMile != null) {
-    try {
-      await applyWorkoutPaceCredit({
-        athleteId: activity.athleteId,
-        creditedFiveKPaceSecPerMile,
-        planId: workout.planId ?? null,
-        weekNumber: workout.weekNumber ?? null,
-      });
-    } catch (err) {
-      console.error("applyWorkoutPaceCredit after match:", err);
-    }
-  }
-
-  if (creditedThresholdPaceSecPerMile != null) {
-    try {
-      await applyThresholdPaceCredit({
-        athleteId: activity.athleteId,
-        creditedThresholdPaceSecPerMile,
-        planId: workout.planId ?? null,
-        weekNumber: workout.weekNumber ?? null,
-        workoutId: workout.id,
-      });
-    } catch (err) {
-      console.error("applyThresholdPaceCredit after match:", err);
-    }
-  }
-
-  if (creditedAerobicCeilingBpm != null) {
-    try {
-      await applyAerobicCeilingCredit({
-        athleteId: activity.athleteId,
-        creditedAerobicCeilingBpm,
-        planId: workout.planId ?? null,
-        weekNumber: workout.weekNumber ?? null,
-        workoutId: workout.id,
-      });
-    } catch (err) {
-      console.error("applyAerobicCeilingCredit after match:", err);
-    }
-  }
-
-  if (
-    (workout.workoutType === "LongRun" || workout.workoutType === "Race") &&
-    workout.planId
-  ) {
-    try {
-      await applyLightAdaptiveIfEligible({
-        athleteId: activity.athleteId,
-        planId: workout.planId,
-        weekNumber: workout.weekNumber ?? null,
-        workoutId: workout.id,
-      });
-    } catch (err) {
-      console.error("applyLightAdaptiveIfEligible after long run match:", err);
-    }
-  }
-
   if (detailBlob) {
     await syncActivityDetailToLinkedWorkout(activity.id);
   }
+
+  await applyMatchCreditsFromWorkoutRow({ workout, activity });
 
   return { workoutId: workout.id };
 }

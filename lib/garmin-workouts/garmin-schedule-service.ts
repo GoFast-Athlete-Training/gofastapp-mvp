@@ -1,9 +1,9 @@
 /**
  * Garmin Training API calendar schedule lifecycle.
  *
- * Workout CRUD (garminWorkoutId) and schedule CRUD (garminScheduleId) are separate resources:
- * - POST /workout -> library definition
- * - POST /schedule -> calendar placement for a date
+ * Workout CRUD (garminWorkoutId) and schedule are separate:
+ * - POST /workout -> library definition (our universal key)
+ * - POST /schedule { workoutId, date } -> calendar placement
  */
 
 import { GarminApiError } from "./garmin-training-api";
@@ -19,21 +19,17 @@ export type GarminScheduleClient = {
   deleteSchedule(scheduleId: number): Promise<void>;
 };
 
-export type ScheduleAndVerifySuccess = {
+export type ScheduleWorkoutSuccess = {
   ok: true;
-  garminScheduleId: number;
 };
 
-export type ScheduleAndVerifyFailure = {
+export type ScheduleWorkoutFailure = {
   ok: false;
-  phase: "create" | "verify";
   message: string;
   garminStatus?: number;
 };
 
-export type ScheduleAndVerifyResult =
-  | ScheduleAndVerifySuccess
-  | ScheduleAndVerifyFailure;
+export type ScheduleWorkoutResult = ScheduleWorkoutSuccess | ScheduleWorkoutFailure;
 
 export type DeleteScheduleResult = {
   /** True when Garmin returned 404 — local schedule id was already stale. */
@@ -63,21 +59,15 @@ export async function deleteGarminScheduleIfPresent(
 }
 
 /**
- * POST /schedule then GET /schedule/{id} to confirm workout id and date.
+ * POST /schedule — attach garminWorkoutId to a calendar date. No GET verify.
  */
-export async function scheduleAndVerifyWorkout(
+export async function scheduleWorkoutOnCalendar(
   client: GarminScheduleClient,
   params: { garminWorkoutId: number; scheduledDate: string }
-): Promise<ScheduleAndVerifyResult> {
-  const { garminWorkoutId, scheduledDate } = params;
-
-  let garminScheduleId: number;
+): Promise<ScheduleWorkoutResult> {
   try {
-    const scheduleResult = await client.scheduleWorkout(
-      garminWorkoutId,
-      scheduledDate
-    );
-    garminScheduleId = scheduleResult.scheduleId;
+    await client.scheduleWorkout(params.garminWorkoutId, params.scheduledDate);
+    return { ok: true };
   } catch (e) {
     const message =
       e instanceof GarminApiError
@@ -87,63 +77,40 @@ export async function scheduleAndVerifyWorkout(
           : "Could not create Garmin calendar schedule";
     return {
       ok: false,
-      phase: "create",
       message,
       garminStatus: e instanceof GarminApiError ? e.status : undefined,
     };
   }
-
-  try {
-    const verified = await client.getSchedule(garminScheduleId);
-    if (verified.workoutId !== garminWorkoutId) {
-      return {
-        ok: false,
-        phase: "verify",
-        message: "Garmin schedule verification failed: workout id mismatch",
-      };
-    }
-    const verifiedDate = verified.date?.slice(0, 10);
-    if (verifiedDate && verifiedDate !== scheduledDate) {
-      return {
-        ok: false,
-        phase: "verify",
-        message: `Garmin schedule verification failed: expected ${scheduledDate}, got ${verifiedDate}`,
-      };
-    }
-  } catch (e) {
-    const message =
-      e instanceof GarminApiError
-        ? e.details || "Could not verify Garmin schedule"
-        : e instanceof Error
-          ? e.message
-          : "Could not verify Garmin schedule";
-    return {
-      ok: false,
-      phase: "verify",
-      message,
-      garminStatus: e instanceof GarminApiError ? e.status : undefined,
-    };
-  }
-
-  return { ok: true, garminScheduleId };
 }
 
-export function scheduleFailureToGarminApiResult(
-  failure: ScheduleAndVerifyFailure
-): {
+export function scheduleFailureToGarminApiResult(failure: ScheduleWorkoutFailure): {
   code: "garmin_api";
   message: string;
   garminStatus?: number;
 } {
-  const prefix =
-    failure.phase === "create"
-      ? "Garmin calendar schedule failed"
-      : "Garmin calendar verification failed";
   return {
     code: "garmin_api",
     message: failure.message.startsWith("Garmin")
       ? failure.message
-      : `${prefix}: ${failure.message}`,
+      : `Garmin calendar schedule failed: ${failure.message}`,
     garminStatus: failure.garminStatus,
   };
+}
+
+/** @deprecated Use scheduleWorkoutOnCalendar — verify GET removed (wrong scheduleId field broke pushes). */
+export type ScheduleAndVerifyFailure = ScheduleWorkoutFailure & { phase?: "create" | "verify" };
+
+/** @deprecated */
+export async function scheduleAndVerifyWorkout(
+  client: GarminScheduleClient,
+  params: { garminWorkoutId: number; scheduledDate: string }
+): Promise<
+  | { ok: true; garminScheduleId: number }
+  | { ok: false; phase: "create" | "verify"; message: string; garminStatus?: number }
+> {
+  const result = await scheduleWorkoutOnCalendar(client, params);
+  if (!result.ok) {
+    return { ok: false, phase: "create", message: result.message, garminStatus: result.garminStatus };
+  }
+  return { ok: true, garminScheduleId: 0 };
 }

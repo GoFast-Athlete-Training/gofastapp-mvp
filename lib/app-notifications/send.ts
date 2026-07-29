@@ -69,6 +69,10 @@ export async function sendAppNotification(
     data.workoutId = params.objectId;
     data.screen = 'workout';
   }
+  if (params.objectType === 'athlete_activity') {
+    data.activityId = params.objectId;
+    data.screen = 'activity';
+  }
 
   const pushesSent = await sendExpoPushBatch(tokens, {
     title: rendered.title,

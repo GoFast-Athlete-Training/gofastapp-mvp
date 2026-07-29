@@ -13,16 +13,9 @@ describe("garminCalendarSyncState", () => {
     assert.equal(garminCalendarSyncState({}), "not_pushed");
   });
 
-  it("returns library_only when workout id without schedule", () => {
+  it("returns scheduled_on_calendar when garminWorkoutId present", () => {
     assert.equal(
       garminCalendarSyncState({ garminWorkoutId: 1, garminScheduleId: null }),
-      "library_only"
-    );
-  });
-
-  it("returns scheduled_on_calendar when schedule id present", () => {
-    assert.equal(
-      garminCalendarSyncState({ garminWorkoutId: 1, garminScheduleId: 99 }),
       "scheduled_on_calendar"
     );
   });
@@ -31,7 +24,7 @@ describe("garminCalendarSyncState", () => {
 describe("defaultGarminPushModeForState", () => {
   it("maps states to push modes", () => {
     assert.equal(defaultGarminPushModeForState("not_pushed"), "schedule-today");
-    assert.equal(defaultGarminPushModeForState("library_only"), "force-reschedule");
+    assert.equal(defaultGarminPushModeForState("library_only"), "update-library");
     assert.equal(defaultGarminPushModeForState("scheduled_on_calendar"), "update-library");
   });
 });

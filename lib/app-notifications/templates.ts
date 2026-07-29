@@ -69,6 +69,18 @@ const HARDCODED_TEMPLATES: Record<NotificationTemplateKey, TemplateDefinition> =
       return `${title} complete — check your pace breakdown.`;
     },
   },
+  'activity.synced': {
+    title: 'Run logged!',
+    body: ({ activityTitle, distanceMi }) => {
+      const title =
+        typeof activityTitle === 'string' && activityTitle.trim()
+          ? activityTitle.trim()
+          : 'Your run';
+      const dist =
+        typeof distanceMi === 'string' && distanceMi.trim() ? ` (${distanceMi.trim()})` : '';
+      return `${title}${dist} synced from Garmin — nice work!`;
+    },
+  },
 };
 
 /** Stub for future content-backed templates (Company/content repo). */

@@ -12,11 +12,47 @@ import { tryMatchActivityToCityRun } from '../cta-triggers/try-match-activity-to
 import { promoteUnmatchedRunningActivityToWorkout } from '../training/promote-activity-to-workout';
 import { tryMatchActivityToBikeWorkout } from '../training/match-activity-to-bike-workout';
 import { isCyclingActivityType } from '../training/activity-type-sets';
+import { sendAppNotification } from '../app-notifications/send';
 
 function generateId(): string {
   const timestamp = Date.now().toString(36);
   const random = Math.random().toString(36).substring(2, 15);
   return `c${timestamp}${random}`;
+}
+
+async function sendActivitySyncedCongratsIfNeeded(params: {
+  activityId: string;
+  athleteId: string;
+  matchedWorkoutId?: string;
+}): Promise<void> {
+  if (params.matchedWorkoutId) {
+    const workout = await prisma.workouts.findUnique({
+      where: { id: params.matchedWorkoutId },
+      select: { planId: true },
+    });
+    if (workout?.planId != null) {
+      return;
+    }
+  }
+
+  try {
+    await sendAppNotification({
+      athleteId: params.athleteId,
+      templateKey: 'activity.synced',
+      objectType: 'athlete_activity',
+      objectId: params.activityId,
+      deeplink: `/activities/${params.activityId}`,
+      payload: {
+        activityId: params.activityId,
+        type: 'activity_synced',
+        screen: 'activity',
+        objectType: 'athlete_activity',
+        objectId: params.activityId,
+      },
+    });
+  } catch (err) {
+    console.error('activity_synced push:', err);
+  }
 }
 
 export interface ActivitySummary {
@@ -116,22 +152,36 @@ export async function handleActivitySummary(
       });
 
       try {
+        let matchResult: { matched: boolean; workoutId?: string } = { matched: false };
+
         if (isCyclingActivityType(activity.activityType)) {
           await tryMatchActivityToBikeWorkout(created.id);
         } else {
-          const matchResult = await tryMatchActivityToTrainingWorkout(created.id);
+          matchResult = await tryMatchActivityToTrainingWorkout(created.id);
 
           const ingestRow = await prisma.athlete_activities.findUnique({
             where: { id: created.id },
             select: { ingestionStatus: true },
           });
           if (!matchResult.matched && ingestRow?.ingestionStatus === 'UNMATCHED') {
-            await promoteUnmatchedRunningActivityToWorkout(created.id);
+            const promoteResult = await promoteUnmatchedRunningActivityToWorkout(created.id);
+            if (promoteResult.promoted && promoteResult.workoutId) {
+              matchResult = { matched: true, workoutId: promoteResult.workoutId };
+            }
           }
         }
         await tryMatchActivityToCityRun(created.id).catch((cityRunErr) => {
           console.warn('tryMatchActivityToCityRun:', cityRunErr);
         });
+
+        if (!isCyclingActivityType(activity.activityType)) {
+          await sendActivitySyncedCongratsIfNeeded({
+            activityId: created.id,
+            athleteId: athlete.id,
+            matchedWorkoutId: matchResult.workoutId,
+          });
+        }
+
         console.log("✅ match attempt complete", {
           id: created.id,
           sourceActivityId,

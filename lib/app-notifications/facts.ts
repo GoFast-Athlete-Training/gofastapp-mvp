@@ -127,6 +127,21 @@ export async function loadNotificationFacts(params: {
       if (!workout) return null;
       return { workoutTitle: workout.title };
     }
+    case 'activity.synced': {
+      const activity = await prisma.athlete_activities.findFirst({
+        where: { id: params.objectId, athleteId: params.athleteId },
+        select: { activityName: true, distance: true },
+      });
+      if (!activity) return null;
+      const distanceMi =
+        activity.distance != null && activity.distance > 0
+          ? `${(activity.distance / 1609.34).toFixed(2)} mi`
+          : undefined;
+      return {
+        activityTitle: activity.activityName ?? 'Run',
+        distanceMi,
+      };
+    }
     default:
       return params.payload ?? null;
   }

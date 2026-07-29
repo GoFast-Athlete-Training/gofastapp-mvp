@@ -5,9 +5,8 @@ import {
   createGarminTrainingApiForAthlete,
 } from "@/lib/garmin-workouts/garmin-training-api";
 import {
-  deleteGarminScheduleIfPresent,
-  scheduleAndVerifyWorkout,
   scheduleFailureToGarminApiResult,
+  scheduleWorkoutOnCalendar,
 } from "@/lib/garmin-workouts/garmin-schedule-service";
 import { GarminNotConnectedError, requireGarminTokenFresh } from "@/lib/domain-garmin";
 import { ymdFromDate } from "@/lib/training/plan-utils";
@@ -16,7 +15,7 @@ export type PushBikeWorkoutForAthleteResult =
   | {
       ok: true;
       garminWorkoutId: number;
-      garminScheduleId: number;
+      garminScheduleId: number | null;
       scheduledDate: string;
     }
   | {
@@ -58,6 +57,8 @@ export async function pushBikeWorkoutToGarminForAthlete(
       return { ok: false, code: "no_steps", message: "Bike workout has no steps" };
     }
 
+    const hadGarminWorkoutId = workout.garminWorkoutId != null;
+
     const scheduledDate =
       scheduleDateYmdOverride?.trim() ||
       (workout.date ? ymdFromDate(workout.date) : utcTodayYmd());
@@ -90,18 +91,21 @@ export async function pushBikeWorkoutToGarminForAthlete(
       garminWorkoutId = result.workoutId;
     }
 
-    const deleteResult = await deleteGarminScheduleIfPresent(
-      client,
-      workout.garminScheduleId
-    );
-    if (deleteResult.wasStaleOnGarmin) {
-      await prisma.bike_workout.update({
-        where: { id: workout.id },
-        data: { garminScheduleId: null },
-      });
+    await prisma.bike_workout.update({
+      where: { id: workout.id },
+      data: { garminWorkoutId },
+    });
+
+    if (hadGarminWorkoutId) {
+      return {
+        ok: true,
+        garminWorkoutId,
+        garminScheduleId: workout.garminScheduleId,
+        scheduledDate,
+      };
     }
 
-    const scheduleResult = await scheduleAndVerifyWorkout(client, {
+    const scheduleResult = await scheduleWorkoutOnCalendar(client, {
       garminWorkoutId,
       scheduledDate,
     });
@@ -114,14 +118,8 @@ export async function pushBikeWorkoutToGarminForAthlete(
         garminStatus: fail.garminStatus,
       };
     }
-    const garminScheduleId = scheduleResult.garminScheduleId;
 
-    await prisma.bike_workout.update({
-      where: { id: workout.id },
-      data: { garminWorkoutId, garminScheduleId },
-    });
-
-    return { ok: true, garminWorkoutId, garminScheduleId, scheduledDate };
+    return { ok: true, garminWorkoutId, garminScheduleId: null, scheduledDate };
   } catch (error: unknown) {
     if (error instanceof GarminNotConnectedError) {
       return { ok: false, code: "garmin_disconnected", message: error.message };

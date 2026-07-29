@@ -5,9 +5,8 @@ import {
   createGarminTrainingApiForAthlete,
 } from "@/lib/garmin-workouts/garmin-training-api";
 import {
-  deleteGarminScheduleIfPresent,
-  scheduleAndVerifyWorkout,
   scheduleFailureToGarminApiResult,
+  scheduleWorkoutOnCalendar,
 } from "@/lib/garmin-workouts/garmin-schedule-service";
 import { GarminNotConnectedError, requireGarminTokenFresh } from "@/lib/domain-garmin";
 import { dateForDayInWeek } from "@/lib/training/plan-schedule-dates";
@@ -67,95 +66,6 @@ type WorkoutGarminLookup = {
   garminWorkoutId: number | null;
 };
 
-type SiblingScheduleRow = {
-  id: string;
-  garminScheduleId: number | null;
-};
-
-/** All materialized rows for the same plan day (date or week+day). */
-async function loadSiblingPlanDayRows(
-  athleteId: string,
-  workout: WorkoutGarminLookup
-): Promise<SiblingScheduleRow[]> {
-  if (!workout.planId) {
-    return [];
-  }
-
-  if (workout.date) {
-    const byDate = await prisma.workouts.findMany({
-      where: { athleteId, planId: workout.planId, date: workout.date },
-      select: { id: true, garminScheduleId: true },
-    });
-    if (byDate.length > 0) return byDate;
-  }
-
-  if (workout.weekNumber != null && workout.dayAssigned?.trim()) {
-    return prisma.workouts.findMany({
-      where: {
-        athleteId,
-        planId: workout.planId,
-        weekNumber: workout.weekNumber,
-        dayAssigned: workout.dayAssigned.trim(),
-      },
-      select: { id: true, garminScheduleId: true },
-    });
-  }
-
-  return [];
-}
-
-/** Delete every known sibling schedule id before creating one calendar placement. */
-async function deleteSiblingGarminSchedules(
-  client: Parameters<typeof deleteGarminScheduleIfPresent>[0],
-  siblingRows: SiblingScheduleRow[]
-): Promise<void> {
-  const scheduleIds = [
-    ...new Set(
-      siblingRows
-        .map((r) => r.garminScheduleId)
-        .filter((id): id is number => id != null)
-    ),
-  ];
-
-  const staleRowIds: string[] = [];
-  for (const scheduleId of scheduleIds) {
-    const deleteResult = await deleteGarminScheduleIfPresent(client, scheduleId);
-    if (deleteResult.wasStaleOnGarmin) {
-      for (const row of siblingRows) {
-        if (row.garminScheduleId === scheduleId) {
-          staleRowIds.push(row.id);
-        }
-      }
-    }
-  }
-
-  if (staleRowIds.length > 0) {
-    await prisma.workouts.updateMany({
-      where: { id: { in: [...new Set(staleRowIds)] } },
-      data: { garminScheduleId: null },
-    });
-  }
-}
-
-async function persistGarminScheduleToSiblingRows(params: {
-  siblingRows: SiblingScheduleRow[];
-  garminWorkoutId: number;
-  garminScheduleId: number;
-  snapshot: ReturnType<typeof segmentSnapshotFromWorkout>;
-}): Promise<void> {
-  const ids = params.siblingRows.map((r) => r.id);
-  if (ids.length === 0) return;
-
-  await prisma.workouts.updateMany({
-    where: { id: { in: ids } },
-    data: {
-      garminWorkoutId: params.garminWorkoutId,
-      garminScheduleId: params.garminScheduleId,
-      segmentSnapshotJson: params.snapshot,
-    },
-  });
-}
-
 /** Reuse Garmin id from this row or a sibling plan-day row (prevents duplicate library entries). */
 async function resolveGarminWorkoutIdForPush(
   athleteId: string,
@@ -195,10 +105,17 @@ async function resolveGarminWorkoutIdForPush(
   return null;
 }
 
-async function persistGarminWorkoutId(workoutId: string, garminWorkoutId: number): Promise<void> {
+async function persistGarminWorkoutPush(params: {
+  workoutId: string;
+  garminWorkoutId: number;
+  snapshot: ReturnType<typeof segmentSnapshotFromWorkout>;
+}): Promise<void> {
   await prisma.workouts.update({
-    where: { id: workoutId },
-    data: { garminWorkoutId },
+    where: { id: params.workoutId },
+    data: {
+      garminWorkoutId: params.garminWorkoutId,
+      segmentSnapshotJson: params.snapshot,
+    },
   });
 }
 
@@ -237,10 +154,10 @@ function segmentSnapshotFromWorkout(
 
 /**
  * Push a single workout to Garmin Training API for the owning athlete (no HTTP).
- * Modes:
- * - schedule-today: update/create library workout + one Training Calendar placement
- * - update-library: update workout definition only (no new POST /schedule)
- * - force-reschedule: delete known schedule id then schedule again (manual recovery)
+ *
+ * garminWorkoutId is the universal truth:
+ * - First push: POST /workout + POST /schedule { workoutId, date }
+ * - Re-push: PUT /workout only (no second create, no second schedule unless force-reschedule)
  */
 export async function pushWorkoutToGarminForAthlete(
   athleteId: string,
@@ -266,6 +183,8 @@ export async function pushWorkoutToGarminForAthlete(
     if (!workout) {
       return { ok: false, code: "not_found", message: "Workout not found" };
     }
+
+    const hadGarminWorkoutId = workout.garminWorkoutId != null;
 
     if (!workout.segments?.length && workout.planId && workout.date) {
       await materializeWorkoutForPlanDay({
@@ -379,7 +298,6 @@ export async function pushWorkoutToGarminForAthlete(
         if (e instanceof GarminApiError && e.status === 404) {
           const result = await client.createWorkout(garminWorkoutPayload);
           garminWorkoutId = result.workoutId;
-          await persistGarminWorkoutId(workout.id, garminWorkoutId);
         } else {
           throw e;
         }
@@ -387,90 +305,52 @@ export async function pushWorkoutToGarminForAthlete(
     } else {
       const result = await client.createWorkout(garminWorkoutPayload);
       garminWorkoutId = result.workoutId;
-      await persistGarminWorkoutId(workout.id, garminWorkoutId);
     }
 
     const snapshot = segmentSnapshotFromWorkout(workout.segments);
 
-    if (mode === "update-library") {
-      await prisma.workouts.update({
-        where: { id: workout.id },
-        data: {
-          garminWorkoutId,
-          segmentSnapshotJson: snapshot,
-        },
-      });
-      const calendarState = garminCalendarSyncState({
-        garminWorkoutId,
-        garminScheduleId: workout.garminScheduleId,
-      });
+    await persistGarminWorkoutPush({
+      workoutId: workout.id,
+      garminWorkoutId,
+      snapshot,
+    });
+
+    const shouldScheduleCalendar =
+      mode === "force-reschedule" || (!hadGarminWorkoutId && mode !== "update-library");
+
+    if (mode === "update-library" || !shouldScheduleCalendar) {
       return {
         ok: true,
         garminWorkoutId,
         garminScheduleId: workout.garminScheduleId,
         scheduledDate,
-        mode,
-        calendarState:
-          calendarState === "scheduled_on_calendar"
-            ? "scheduled_on_calendar"
-            : "library_only",
-      };
-    }
-
-    const shouldReschedule =
-      mode === "force-reschedule" ||
-      mode === "schedule-today" ||
-      workout.garminScheduleId != null;
-
-    if (shouldReschedule) {
-      const siblingRows = await loadSiblingPlanDayRows(athleteId, {
-        id: workout.id,
-        planId: workout.planId,
-        date: workout.date,
-        weekNumber: workout.weekNumber,
-        dayAssigned: workout.dayAssigned,
-        garminWorkoutId: workout.garminWorkoutId,
-      });
-      const rowsForSchedule =
-        siblingRows.length > 0
-          ? siblingRows
-          : [{ id: workout.id, garminScheduleId: workout.garminScheduleId }];
-
-      await deleteSiblingGarminSchedules(client, rowsForSchedule);
-
-      const scheduleResult = await scheduleAndVerifyWorkout(client, {
-        garminWorkoutId,
-        scheduledDate,
-      });
-      if (!scheduleResult.ok) {
-        const fail = scheduleFailureToGarminApiResult(scheduleResult);
-        return {
-          ok: false,
-          code: fail.code,
-          message: fail.message,
-          garminStatus: fail.garminStatus,
-        };
-      }
-      const garminScheduleId = scheduleResult.garminScheduleId;
-
-      await persistGarminScheduleToSiblingRows({
-        siblingRows: rowsForSchedule,
-        garminWorkoutId,
-        garminScheduleId,
-        snapshot,
-      });
-
-      return {
-        ok: true,
-        garminWorkoutId,
-        garminScheduleId,
-        scheduledDate,
-        mode,
+        mode: mode === "schedule-today" && hadGarminWorkoutId ? "update-library" : mode,
         calendarState: "scheduled_on_calendar",
       };
     }
 
-    return { ok: false, code: "other", message: "Unsupported push mode" };
+    const scheduleResult = await scheduleWorkoutOnCalendar(client, {
+      garminWorkoutId,
+      scheduledDate,
+    });
+    if (!scheduleResult.ok) {
+      const fail = scheduleFailureToGarminApiResult(scheduleResult);
+      return {
+        ok: false,
+        code: fail.code,
+        message: fail.message,
+        garminStatus: fail.garminStatus,
+      };
+    }
+
+    return {
+      ok: true,
+      garminWorkoutId,
+      garminScheduleId: null,
+      scheduledDate,
+      mode,
+      calendarState: "scheduled_on_calendar",
+    };
   } catch (error: unknown) {
     if (error instanceof GarminNotConnectedError) {
       return {

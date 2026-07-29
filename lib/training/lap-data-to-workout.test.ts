@@ -5,7 +5,8 @@ import { assignLapsForTest } from "./lap-data-to-workout";
 
 function lap(
   lapIndex: number,
-  paceSecPerMile: number | null = 400
+  paceSecPerMile: number | null = 400,
+  distanceMiles = 0.37
 ): DerivedLap {
   return {
     lapIndex,
@@ -13,7 +14,7 @@ function lap(
     endTimeInSeconds: (lapIndex + 1) * 120,
     avgPaceSecPerMile: paceSecPerMile,
     avgHeartRate: null,
-    distanceMiles: 0.37,
+    distanceMiles,
     durationSeconds: 120,
   };
 }
@@ -70,10 +71,93 @@ test("Intervals: 1:1 lap per segment row when counts match", () => {
   assert.equal(result.bySegment.get("i2")![0]!.avgPaceSecPerMile, 370);
 });
 
-test("Intervals: no assignment when lap count differs from segment rows", () => {
+test("Intervals: distance fallback when lap count differs from segment rows", () => {
   const derived = [lap(0), lap(1), lap(2), lap(3), lap(4)];
   const result = assignLapsForTest(derived, intervalSegments, "Intervals");
-  assert.equal(result, null);
+  assert.ok(result);
+  assert.equal(result.mode, "distance");
+});
+
+test("Tempo: early-advance warmup assigns short lap to warmup segment", () => {
+  const segments = [
+    {
+      id: "warm",
+      stepOrder: 1,
+      title: "Warmup",
+      durationType: "DISTANCE",
+      durationValue: 1.5,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+    {
+      id: "work1",
+      stepOrder: 2,
+      title: "Tempo",
+      durationType: "DISTANCE",
+      durationValue: 2,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+    {
+      id: "work2",
+      stepOrder: 3,
+      title: "Tempo",
+      durationType: "DISTANCE",
+      durationValue: 1,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+  ];
+  const derived = [lap(0, 540, 0.7), lap(1, 420, 2.0), lap(2, 430, 1.0)];
+  const result = assignLapsForTest(derived, segments, "Tempo");
+  assert.ok(result);
+  assert.equal(result.mode, "step");
+  assert.equal(result.bySegment.get("warm")![0]!.distanceMiles, 0.7);
+  assert.equal(result.bySegment.get("work1")![0]!.distanceMiles, 2.0);
+  assert.equal(result.bySegment.get("work2")![0]!.distanceMiles, 1.0);
+});
+
+test("Tempo: distance fallback when lap count differs from segment rows", () => {
+  const segments = [
+    {
+      id: "warm",
+      stepOrder: 1,
+      title: "Warmup",
+      durationType: "DISTANCE",
+      durationValue: 1.5,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+    {
+      id: "work1",
+      stepOrder: 2,
+      title: "Tempo",
+      durationType: "DISTANCE",
+      durationValue: 2,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+    {
+      id: "work2",
+      stepOrder: 3,
+      title: "Tempo",
+      durationType: "DISTANCE",
+      durationValue: 1,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+  ];
+  const derived = [lap(0, 540, 0.7), lap(1, 420, 2.0), lap(2, 430, 1.0), lap(3, 440, 0.5)];
+  const result = assignLapsForTest(derived, segments, "Tempo");
+  assert.ok(result);
+  assert.equal(result.mode, "distance");
+  assert.equal(result.bySegment.get("warm")![0]!.distanceMiles, 0.7);
 });
 
 test("Easy: auto mile-chunk when lap totals match prescription", () => {

@@ -1,7 +1,6 @@
 /**
- * Garmin Connect has two surfaces relevant to GoFast:
- * - Workout library: structured workout exists (garminWorkoutId)
- * - Training calendar: workout scheduled for a date (garminScheduleId) → watch Training Calendar / Run prompt
+ * Garmin Connect: garminWorkoutId is the universal truth for "sent to Garmin".
+ * Calendar placement uses POST /schedule { workoutId, date } on first push only.
  */
 
 export type GarminPushMode = "schedule-today" | "update-library" | "force-reschedule";
@@ -15,15 +14,14 @@ export function garminCalendarSyncState(workout: {
   garminWorkoutId?: number | null;
   garminScheduleId?: number | null;
 }): GarminCalendarSyncState {
-  if (workout.garminScheduleId != null) return "scheduled_on_calendar";
-  if (workout.garminWorkoutId != null) return "library_only";
+  if (workout.garminWorkoutId != null) return "scheduled_on_calendar";
   return "not_pushed";
 }
 
 export function garminCalendarStateLabel(state: GarminCalendarSyncState): string {
   switch (state) {
     case "scheduled_on_calendar":
-      return "On Garmin Training Calendar";
+      return "On Garmin Connect Training Calendar";
     case "library_only":
       return "In Garmin workout library only";
     default:
@@ -39,7 +37,7 @@ export function defaultGarminPushModeForState(
     case "scheduled_on_calendar":
       return "update-library";
     case "library_only":
-      return "force-reschedule";
+      return "update-library";
     default:
       return "schedule-today";
   }

@@ -15,6 +15,7 @@ import {
   type LapAssignmentMode,
 } from "./lap-data-to-workout";
 import { normalizeActivityLapsFromDetail, type DerivedLap } from "./lap-converter";
+import { isWorkSegmentTitle } from "./workout-performance-analysis";
 import {
   normalizePaceTargetEncodingVersion,
   storedPaceSecondsKmToSecondsPerMile,
@@ -173,33 +174,17 @@ async function mutateSegmentExecution(params: {
     }
 
     const deltas: number[] = [];
-    if (mode === "step") {
-      const sorted = [...workout.segments].sort(
-        (a, b) => a.stepOrder - b.stepOrder
+    for (const seg of workout.segments) {
+      if (!isWorkSegmentTitle(seg.title)) continue;
+      const target = paceTargetSecPerMileFromTargets(
+        seg.targets,
+        seg.paceTargetEncodingVersion
       );
-      for (let i = 0; i < derived.length && i < sorted.length; i++) {
-        const seg = sorted[i]!;
-        const target = paceTargetSecPerMileFromTargets(
-          seg.targets,
-          seg.paceTargetEncodingVersion
-        );
-        const act = derived[i]!.avgPaceSecPerMile;
-        if (target != null && act != null) {
-          deltas.push(target - act);
-        }
-      }
-    } else {
-      for (const seg of workout.segments) {
-        const target = paceTargetSecPerMileFromTargets(
-          seg.targets,
-          seg.paceTargetEncodingVersion
-        );
-        const ls2 = bySegment.get(seg.id) ?? [];
-        if (ls2.length === 0) continue;
-        const agg2 = recomputeSegmentAggregates(ls2);
-        if (target != null && agg2.actualPaceSecPerMile != null) {
-          deltas.push(target - agg2.actualPaceSecPerMile);
-        }
+      const ls2 = bySegment.get(seg.id) ?? [];
+      if (ls2.length === 0) continue;
+      const agg2 = recomputeSegmentAggregates(ls2);
+      if (target != null && agg2.actualPaceSecPerMile != null) {
+        deltas.push(target - agg2.actualPaceSecPerMile);
       }
     }
 
