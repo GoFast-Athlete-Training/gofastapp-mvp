@@ -327,10 +327,11 @@ host Athlete.id
 
 ## Studio Flow Canon
 
-The studio (`/gofast-with-others`) is **door + room** — like race hub (`/race-hub/[id]`), not four peer sidebar bins.
+The studio (`/gofast-with-others`) is **Studio Central + four peer bins** — door, room, plan, and content.
 
 1. **Studio Central** (home)
    - Setup progress + **follower count** from `GET /api/athlete/[id]/container/members` (junction count only).
+   - Setup tiles for **My Page**, **My Community**, **My Plan**, and **My Content**.
    - **Share your door** — public URL editor + View public page (not on My Page).
 
 2. **My Page** (public door editor)
@@ -340,21 +341,25 @@ The studio (`/gofast-with-others`) is **door + room** — like race hub (`/race-
    - Strangers decide to follow from `/u/[handle]` and `runner…/{handle}`; **What I'm training for** hydrates from goal/plan on the live door.
 
 3. **My Community** (member room — host side)
-   - One scroll/panel with sections inside (not separate studio nav items):
-     - **My plan** — publish/toggle active GoFast plan (`training_plans` public fields)
-     - **Messages** — journey announcements (`gofast_container_messages`, topic `updates`)
-     - **Followers** — list hydrated from `/container/members` on load
+   - Messages — journey announcements (`gofast_container_messages`, topic `updates`)
+   - Followers — list hydrated from `/container/members` on load
+   - **View as member** link to `/container/[handle]`
    - Member view of the same room: `/container/[handle]` (training-for, plan strip, messages, thinking, followers; My Runs v2 collapsed).
 
-4. **View as member**
-   - Link to `/container/[handle]` from My Community only.
+4. **My Plan** (publish / share)
+   - Publish/toggle active GoFast plan (`training_plans` public fields)
+   - Owns plan publish — not buried inside My Community
 
-5. **Public door composition** (live `/u` + runner host)
+5. **My Content** (CMS stub)
+   - Tips, myRunRoutes, Blog — athlete-scoped CMS capability (`athlete_tips`, etc.)
+   - Editors deferred; stub panel lists planned models
+
+6. **Public door composition** (live `/u` + runner host)
    - Slim banner: avatar, name, handle, location, one **GoFast with {FirstName}** CTA.
    - Body: club-style **2/3** run photo + welcome / about / what you'll see; **1/3** Training for + See my plan + On the calendar.
-   - Plan week strip and Activity/last Garmin run stay off the door (hub / My Community).
+   - Plan week strip and Activity/last Garmin run stay off the door (hub / member room).
 
-Race-hub analogy: join door → member room with sections inside. GWM: follow door → `/container/[handle]` room; host edits room from **My Community** in studio.
+Race-hub analogy: join door → member room with plan + messages. GWM: follow door → `/container/[handle]` room; host edits from **My Community**, **My Plan**, and **My Content** in studio.
 
 ### Boundaries (keep sharp)
 
@@ -377,9 +382,9 @@ Race-hub analogy: join door → member room with sections inside. GWM: follow do
 
 Legacy table names (`gofast_container_*`) remain in schema; product language is **GoFast With Me**.
 
-### Deferred CMS (not peer pillars today)
+### Deferred CMS (My Content bin)
 
-Tips, myRunRoutes, and Blog remain athlete-scoped CMS capability (`athlete_tips`, etc.) — planned durable content, not the same as feed topics. Do not highlight before Landing basics are complete.
+Tips, myRunRoutes, and Blog live under **My Content** — athlete-scoped CMS capability (`athlete_tips`, etc.). Editors are deferred; the bin shows planned models. Do not highlight before Landing basics are complete.
 
 ## What Not To Build
 
@@ -406,13 +411,15 @@ Use product language that matches the data:
 
 - **GoFast With Me** — product name for the follower hub and studio (not "athlete container").
 - **My Page** — public door (`/u/[handle]`).
-- **My Community** — member room (host studio panel + `/container/[handle]` for followers).
-- **My plan**, **Messages**, **Followers** — sections **inside** My Community, not studio sidebar peers.
+- **My Community** — member room (messages + followers; host panel + `/container/[handle]` for followers).
+- **My Plan** — publish/share training plan (`training_plans` public fields); studio sidebar peer.
+- **My Content** — CMS stub for Tips, routes, Blog; studio sidebar peer.
+- **Messages**, **Followers** — sections inside My Community.
 - **What I'm training for** — goal/race on door + hub header (`GoalRaceCard`).
 - **Plan strip** — training week in the member hub.
 - **My Runs (v2)** — demoted manual hosted runs; not the primary loop.
 - "Follow" / "followers" in member UX.
 - "View as member" for `/container/[handle]`.
-- Legacy labels (Feed/Runs/Community tabs, Surface my plan, four-bin studio) map to door + room.
+- Legacy labels (Feed/Runs/Community tabs, Surface my plan) map to the four-bin studio.
 
 Avoid language that implies GoFastWithMe owns everything. It does not. GoFastWithMe introduces the athlete; the athlete hydrates the experience.

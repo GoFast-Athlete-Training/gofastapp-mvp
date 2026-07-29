@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
-import GoFastWithMePlanPanel from '@/components/gofast-with-me/GoFastWithMePlanPanel';
 import GoFastWithMeFeedPanel from '@/components/gofast-with-me/GoFastWithMeFeedPanel';
 import GoFastWithMeMemberManagementPanel from '@/components/gofast-with-me/GoFastWithMeMemberManagementPanel';
 
@@ -20,8 +19,8 @@ export default function GoFastWithMeCommunityPanel({ athleteId, publicSlug }: Pr
         <div>
           <h2 className="text-lg font-bold text-gray-900">My Community</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Your member room — publish your plan, post journey messages, and see who is following.
-            Followers see this same room at your hub link.
+            Your member room — messages and followers. Publish your plan under{' '}
+            <strong>My Plan</strong>. Followers see this same room at your hub link.
           </p>
         </div>
         <Link
@@ -35,7 +34,6 @@ export default function GoFastWithMeCommunityPanel({ athleteId, publicSlug }: Pr
         </Link>
       </div>
 
-      <GoFastWithMePlanPanel publicSlug={publicSlug} embedded />
       <GoFastWithMeFeedPanel athleteId={athleteId} publicSlug={publicSlug} embedded />
       <GoFastWithMeMemberManagementPanel
         athleteId={athleteId}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle2, Copy, ExternalLink, Globe, Users } from 'lucide-react';
+import { CheckCircle2, Copy, ExternalLink, Globe, Target, Users } from 'lucide-react';
 import { STUDIO_CENTRAL_LABEL, type StudioSection } from '@/components/gofast-with-me/studio-sections';
 import GoFastWithMeUrlEditor from '@/components/profile/GoFastWithMeUrlEditor';
 
@@ -82,7 +82,7 @@ export default function GoFastWithMeDashboardHome({
       <div>
         <h2 className="text-lg font-bold text-gray-900">{STUDIO_CENTRAL_LABEL}</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Your public door and member room — set up My Page, then open My Community.
+          Your public door, member room, plan, and content — four places to set up GoFast With Me.
         </p>
       </div>
 
@@ -110,7 +110,7 @@ export default function GoFastWithMeDashboardHome({
             type="button"
             onClick={() => onOpenWorkspace('community')}
             className={`rounded-xl border p-4 text-left hover:opacity-90 transition-colors ${
-              planLive || hasMembers
+              hasMembers
                 ? 'border-emerald-200 bg-emerald-50/60'
                 : 'border-gray-200 bg-white hover:bg-gray-50'
             }`}
@@ -123,12 +123,48 @@ export default function GoFastWithMeDashboardHome({
               {memberCount} follower{memberCount === 1 ? '' : 's'}
             </p>
             <p className="mt-1 text-xs text-gray-600">
-              {planLive && metrics.planName
-                ? `${metrics.planName} · Plan shared`
-                : planLive
-                  ? 'Plan shared — open room to post messages'
-                  : 'My plan, messages, and follower list'}
+              {hasMembers
+                ? 'Messages and follower list in your member room'
+                : 'Post journey messages and see who follows you in'}
             </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onOpenWorkspace('plan')}
+            className={`rounded-xl border p-4 text-left hover:opacity-90 transition-colors ${
+              planLive ? 'border-emerald-200 bg-emerald-50/60' : 'border-gray-200 bg-white hover:bg-gray-50'
+            }`}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">My Plan</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">publish</p>
+            <div className="mt-2 flex items-center gap-2">
+              <Target className="h-4 w-4 text-orange-600 shrink-0" aria-hidden />
+              <p className="text-xl font-bold text-gray-900">
+                {planLive ? 'Published' : 'Not published'}
+              </p>
+              {planLive ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" aria-hidden />
+              ) : null}
+            </div>
+            <p className="mt-1 text-xs text-gray-600">
+              {planLive && metrics.planName
+                ? `${metrics.planName} · followers see your training week`
+                : planLive
+                  ? 'Followers see your training week in the hub'
+                  : 'Publish your GoFast plan for followers'}
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onOpenWorkspace('content')}
+            className="rounded-xl border border-gray-200 bg-white p-4 text-left hover:bg-gray-50 hover:opacity-90 transition-colors"
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">My Content</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">cms</p>
+            <p className="mt-2 text-xl font-bold text-gray-900">Coming soon</p>
+            <p className="mt-1 text-xs text-gray-600">Tips, routes, and blog posts for your hub</p>
           </button>
         </div>
 
@@ -136,7 +172,8 @@ export default function GoFastWithMeDashboardHome({
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-wrap items-center justify-between gap-3">
             <span>
               Set up <strong>My Page</strong> first — welcome, bio, what visitors will see, and a run
-              image. Then open <strong>My Community</strong> to share your plan and invite followers.
+              image. Then publish your plan under <strong>My Plan</strong> and invite followers from{' '}
+              <strong>My Community</strong>.
             </span>
             <button
               type="button"
