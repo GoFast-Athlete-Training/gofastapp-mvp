@@ -28,7 +28,7 @@ export type ShareHubPlanStatus = {
   hasSchedule: boolean;
   isPublished: boolean;
   publicSlug: string | null;
-  publicVisibility: "DRAFT" | "PUBLIC" | "UNLISTED" | "ARCHIVED" | null;
+  publicVisibility: "DRAFT" | "PUBLIC" | "ARCHIVED" | null;
   publicDescription: string | null;
   publicPublishedAt: string | null;
   startDate: string | null;

@@ -129,7 +129,7 @@ export async function listAuthorPublicPlans(athleteId: string) {
 
 export async function getPublicPlanBySlug(
   rawSlug: string,
-  options?: { allowUnlisted?: boolean; authorAthleteId?: string }
+  options?: { authorAthleteId?: string }
 ) {
   const slug = slugifyPlanSlug(rawSlug);
   if (!slug) return null;
@@ -137,9 +137,6 @@ export async function getPublicPlanBySlug(
   const visibilityFilter: PublicTrainingPlanVisibility[] = [
     PublicTrainingPlanVisibility.PUBLIC,
   ];
-  if (options?.allowUnlisted) {
-    visibilityFilter.push(PublicTrainingPlanVisibility.UNLISTED);
-  }
   if (options?.authorAthleteId) {
     visibilityFilter.push(PublicTrainingPlanVisibility.DRAFT);
   }
@@ -235,10 +232,7 @@ export async function publishPublicTrainingPlan(input: PublishPublicPlanInput) {
   const slug = await uniquePublicPlanSlug(title);
   const now = new Date();
   const publishedAt =
-    visibility === PublicTrainingPlanVisibility.PUBLIC ||
-    visibility === PublicTrainingPlanVisibility.UNLISTED
-      ? now
-      : null;
+    visibility === PublicTrainingPlanVisibility.PUBLIC ? now : null;
 
   return prisma.public_training_plans.create({
     data: {
@@ -311,8 +305,7 @@ export async function updatePublicTrainingPlan(
 
   const visibility = patch.visibility ?? existing.visibility;
   const publishedAt =
-    visibility === PublicTrainingPlanVisibility.PUBLIC ||
-    visibility === PublicTrainingPlanVisibility.UNLISTED
+    visibility === PublicTrainingPlanVisibility.PUBLIC
       ? existing.publishedAt ?? new Date()
       : null;
 
@@ -429,12 +422,7 @@ export async function adoptPublicTrainingPlan(
   const publicPlan = await prisma.public_training_plans.findFirst({
     where: {
       slug: slugifyPlanSlug(input.slug),
-      visibility: {
-        in: [
-          PublicTrainingPlanVisibility.PUBLIC,
-          PublicTrainingPlanVisibility.UNLISTED,
-        ],
-      },
+      visibility: PublicTrainingPlanVisibility.PUBLIC,
     },
   });
 
@@ -627,12 +615,7 @@ export async function listPublishedPlansForAthlete(athleteId: string) {
   return prisma.public_training_plans.findMany({
     where: {
       authorAthleteId: athleteId,
-      visibility: {
-        in: [
-          PublicTrainingPlanVisibility.PUBLIC,
-          PublicTrainingPlanVisibility.UNLISTED,
-        ],
-      },
+      visibility: PublicTrainingPlanVisibility.PUBLIC,
     },
     orderBy: { publishedAt: "desc" },
     select: {

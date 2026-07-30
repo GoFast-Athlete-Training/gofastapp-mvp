@@ -62,11 +62,10 @@ export async function loadShareHubStatus(athleteId: string): Promise<ShareHubSta
     (activePlan.planSchedule as unknown[]).length > 0;
 
   const isPublished =
-    !!activePlan?.publicSlug &&
-    (activePlan.publicVisibility === "PUBLIC" || activePlan.publicVisibility === "UNLISTED");
+    !!activePlan?.publicSlug && activePlan.publicVisibility === "PUBLIC";
 
   const publishedPlans = publishedPlanRows.filter(
-    (p) => p.publicVisibility === "PUBLIC" || p.publicVisibility === "UNLISTED"
+    (p) => p.publicVisibility === "PUBLIC"
   );
 
   const adminCount = memberships.filter((m) => m.role === "admin" || m.role === "manager").length;

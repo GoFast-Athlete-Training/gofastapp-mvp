@@ -1,13 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle2, ChevronRight, Copy, ExternalLink, Users } from 'lucide-react';
-import {
-  STUDIO_BIN_LABELS,
-  STUDIO_BIN_ORDER,
-  STUDIO_CENTRAL_LABEL,
-  type StudioSection,
-} from '@/components/gofast-with-me/studio-sections';
+import { Copy, ExternalLink, Users } from 'lucide-react';
+import { STUDIO_CENTRAL_LABEL, type StudioSection } from '@/components/gofast-with-me/studio-sections';
 import GoFastWithMeUrlEditor from '@/components/profile/GoFastWithMeUrlEditor';
 
 export type DashboardMetrics = {
@@ -40,18 +35,33 @@ function myPageSetupStatus(landingComplete: boolean, publishReady: boolean): Set
 
 function pageHealthLabel(status: SetupStatus): string {
   if (status === 'ready') return 'Ready';
+  if (status === 'in_progress') return 'Almost';
   return 'Needs work';
 }
 
-function pageHealthClass(status: SetupStatus): string {
-  if (status === 'ready') return 'text-emerald-700 bg-emerald-50 border-emerald-100';
-  return 'text-amber-800 bg-amber-50 border-amber-100';
+type Stoplight = 'green' | 'yellow' | 'red' | 'gray';
+
+function pageStoplight(status: SetupStatus): Stoplight {
+  if (status === 'ready') return 'green';
+  if (status === 'in_progress') return 'yellow';
+  return 'red';
 }
 
-function planHealthClass(live: boolean): string {
-  return live
-    ? 'text-emerald-700 bg-emerald-50 border-emerald-100'
-    : 'text-stone-600 bg-stone-50 border-stone-200';
+function planStoplight(live: boolean): Stoplight {
+  return live ? 'green' : 'yellow';
+}
+
+function stoplightDotClass(light: Stoplight): string {
+  switch (light) {
+    case 'green':
+      return 'bg-emerald-500 ring-emerald-500/30';
+    case 'yellow':
+      return 'bg-amber-400 ring-amber-400/30';
+    case 'red':
+      return 'bg-red-500 ring-red-500/30';
+    default:
+      return 'bg-gray-300 ring-gray-300/30';
+  }
 }
 
 export default function GoFastWithMeDashboardHome({
@@ -61,7 +71,6 @@ export default function GoFastWithMeDashboardHome({
   onUrlUpdated,
 }: Props) {
   const [inviteCopied, setInviteCopied] = useState(false);
-  const [urlEditorOpen, setUrlEditorOpen] = useState(false);
   const pageStatus = myPageSetupStatus(metrics.landingComplete, metrics.publishReady);
   const memberCount = metrics.followerCount ?? 0;
   const planLive = metrics.planPublished === true;
@@ -82,79 +91,77 @@ export default function GoFastWithMeDashboardHome({
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-bold text-gray-900">{STUDIO_CENTRAL_LABEL}</h2>
-        <p className="text-sm text-gray-600 mt-1">
-          Check setup, invite people, and see who joined your community.
-        </p>
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">{STUDIO_CENTRAL_LABEL}</h2>
+          <p className="text-sm text-gray-600 mt-0.5">
+            Your numbers — setup status, invite link, and followers. Use the sidebar to open each workspace.
+          </p>
+        </div>
+
+        <div
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2"
+          role="group"
+          aria-label="Setup status"
+        >
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 shrink-0">
+            Setup
+          </span>
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            <StoplightChip
+              label="Page"
+              light={pageStoplight(pageStatus)}
+              hint={pageHealthLabel(pageStatus)}
+              onClick={() => onOpenWorkspace('page')}
+            />
+            <StoplightChip
+              label="Plan"
+              light={planStoplight(planLive)}
+              hint={planLive ? 'Public' : 'Private'}
+              onClick={() => onOpenWorkspace('plan')}
+            />
+            <StoplightChip
+              label="Content"
+              light="gray"
+              hint="Soon"
+              onClick={() => onOpenWorkspace('content')}
+              muted
+            />
+          </div>
+        </div>
+
+        {pageStatus !== 'ready' ? (
+          <p className="text-xs text-amber-800 px-1">
+            Page still needs work — use <strong>My Page</strong> in the sidebar.
+          </p>
+        ) : null}
       </div>
 
-      {/* 1. Compact setup health strip */}
-      <section className="rounded-xl border border-gray-200 bg-white px-3 py-2.5">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 px-1 mb-2">
-          Setup
-        </p>
-        <ul className="divide-y divide-gray-100">
-          <HealthRow
-            label="My Page"
-            status={
-              <span
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${pageHealthClass(pageStatus)}`}
-              >
-                {pageStatus === 'ready' ? (
-                  <CheckCircle2 className="h-3 w-3 shrink-0" aria-hidden />
-                ) : null}
-                {pageHealthLabel(pageStatus)}
-              </span>
-            }
-            onClick={() => onOpenWorkspace('page')}
-          />
-          <HealthRow
-            label="My Plan"
-            status={
-              <span
-                className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${planHealthClass(planLive)}`}
-              >
-                {planLive ? 'Public' : 'Not public'}
-              </span>
-            }
-            onClick={() => onOpenWorkspace('plan')}
-          />
-          <HealthRow
-            label="My Content"
-            status={
-              <span className="inline-flex rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-[11px] font-semibold text-stone-500">
-                Coming soon
-              </span>
-            }
-            onClick={() => onOpenWorkspace('content')}
-            muted
-          />
-        </ul>
+      <section className="rounded-xl border border-gray-200 bg-white p-5">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Followers</p>
+        <div className="mt-2 flex flex-wrap items-end gap-x-8 gap-y-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-orange-100 p-2 text-orange-700">
+              <Users className="h-5 w-5" aria-hidden />
+            </div>
+            <p className="text-4xl font-bold text-gray-900 tabular-nums leading-none">{memberCount}</p>
+          </div>
+          <div className="text-sm text-gray-600 pb-0.5">
+            {memberCount === 0
+              ? 'No followers yet.'
+              : memberCount === 1
+                ? '1 follower'
+                : `${memberCount} followers`}
+          </div>
+        </div>
       </section>
 
-      {pageStatus !== 'ready' ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-wrap items-center justify-between gap-3">
-          <span>
-            Finish <strong>My Page</strong> first — welcome, bio, run image — then invite people below.
-          </span>
-          <button
-            type="button"
-            onClick={() => onOpenWorkspace('page')}
-            className="shrink-0 rounded-lg bg-amber-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-800"
-          >
-            Open My Page
-          </button>
-        </div>
-      ) : null}
-
-      {/* 2. Invite hero */}
-      <section className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-5 space-y-4">
+      <section className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-5 space-y-3">
         <div>
-          <h3 className="text-base font-bold text-gray-900">Invite people to your community</h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Share your invite link so others can follow you and join your personal community.
+          <h3 className="text-sm font-bold text-gray-900">Invite link</h3>
+          <p className="text-xs text-gray-600 mt-0.5">
+            Copy and share so people can follow you.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -177,13 +184,9 @@ export default function GoFastWithMeDashboardHome({
           </a>
         </div>
         <p className="text-xs text-gray-500">
-          Public headline: <strong className="text-gray-700">{visitorHeadline}</strong>
+          Headline: <strong className="text-gray-700">{visitorHeadline}</strong>
         </p>
-        <details
-          open={urlEditorOpen}
-          onToggle={(e) => setUrlEditorOpen((e.target as HTMLDetailsElement).open)}
-          className="rounded-lg border border-gray-200 bg-white/80"
-        >
+        <details className="rounded-lg border border-gray-200 bg-white/80">
           <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-gray-600 hover:text-gray-900">
             Edit public URL
           </summary>
@@ -198,94 +201,38 @@ export default function GoFastWithMeDashboardHome({
           </div>
         </details>
       </section>
-
-      {/* 3. Followers metric */}
-      <section className="rounded-xl border border-gray-200 bg-white p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="rounded-lg bg-orange-100 p-2 text-orange-700">
-              <Users className="h-5 w-5" aria-hidden />
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                Followers
-              </p>
-              <p className="text-3xl font-bold text-gray-900 tabular-nums leading-tight mt-0.5">
-                {memberCount}
-              </p>
-              <p className="text-sm text-gray-600 mt-1">
-                {memberCount === 0
-                  ? 'Nobody yet — copy your invite link above to get your first follower.'
-                  : memberCount === 1
-                    ? 'One person in your community.'
-                    : `${memberCount} people in your community.`}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => onOpenWorkspace('community')}
-            className="shrink-0 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
-          >
-            Open My Community
-          </button>
-        </div>
-      </section>
-
-      {/* 4. Quiet workspace shortcuts */}
-      <section className="pt-1">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-2">
-          Open workspace
-        </p>
-        <div className="flex flex-wrap gap-x-1 gap-y-1 text-sm">
-          {STUDIO_BIN_ORDER.map((section, index) => (
-            <span key={section} className="inline-flex items-center">
-              {index > 0 ? (
-                <span className="text-gray-300 mx-1 select-none" aria-hidden>
-                  ·
-                </span>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => onOpenWorkspace(section)}
-                className="font-medium text-gray-600 hover:text-orange-700 hover:underline"
-              >
-                {STUDIO_BIN_LABELS[section]}
-              </button>
-            </span>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }
 
-function HealthRow({
+function StoplightChip({
   label,
-  status,
+  light,
+  hint,
   onClick,
   muted,
 }: {
   label: string;
-  status: React.ReactNode;
+  light: Stoplight;
+  hint: string;
   onClick: () => void;
   muted?: boolean;
 }) {
   return (
-    <li>
-      <button
-        type="button"
-        onClick={onClick}
-        className={`flex w-full items-center justify-between gap-3 px-1 py-2 text-left rounded-md hover:bg-gray-50 transition-colors ${
-          muted ? 'opacity-80' : ''
-        }`}
-      >
-        <span className="text-sm font-medium text-gray-800">{label}</span>
-        <span className="flex items-center gap-1 shrink-0">
-          {status}
-          <ChevronRight className="h-3.5 w-3.5 text-gray-400" aria-hidden />
-        </span>
-      </button>
-    </li>
+    <button
+      type="button"
+      onClick={onClick}
+      title={`${label}: ${hint}`}
+      className={`inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 text-left hover:bg-white/80 transition-colors ${
+        muted ? 'opacity-70' : ''
+      }`}
+    >
+      <span
+        className={`h-2.5 w-2.5 rounded-full shrink-0 ring-2 ${stoplightDotClass(light)}`}
+        aria-hidden
+      />
+      <span className="text-xs font-medium text-gray-800">{label}</span>
+      <span className="text-[10px] text-gray-500 hidden sm:inline">{hint}</span>
+    </button>
   );
 }

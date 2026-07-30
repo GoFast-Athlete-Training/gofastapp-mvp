@@ -11,17 +11,14 @@ import { PublicTrainingPlanVisibility } from "@prisma/client";
 
 type Ctx = { params: Promise<{ slug: string }> };
 
-/** GET /api/public-training-plans/[slug] — public detail (unlisted allowed with slug) */
+/** GET /api/public-training-plans/[slug] — public detail (author may load DRAFT preview) */
 export async function GET(request: NextRequest, context: Ctx) {
   try {
     const { slug } = await context.params;
     const auth = await requireAthleteFromBearer(request);
     const athleteId = !("error" in auth) ? auth.athlete.id : undefined;
 
-    const plan = await getPublicPlanBySlug(slug, {
-      allowUnlisted: true,
-      authorAthleteId: athleteId,
-    });
+    const plan = await getPublicPlanBySlug(slug, { authorAthleteId: athleteId });
 
     if (!plan) {
       return NextResponse.json({ error: "Plan not found" }, { status: 404 });

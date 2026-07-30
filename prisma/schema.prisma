@@ -32,7 +32,6 @@ enum CoachReviewStatus {
 enum PublicTrainingPlanVisibility {
   DRAFT
   PUBLIC
-  UNLISTED
   ARCHIVED
 }
 

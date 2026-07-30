@@ -65,12 +65,7 @@ export async function listPublicPlansForAthlete(athleteId: string) {
   return prisma.training_plans.findMany({
     where: {
       athleteId,
-      publicVisibility: {
-        in: [
-          PublicTrainingPlanVisibility.PUBLIC,
-          PublicTrainingPlanVisibility.UNLISTED,
-        ],
-      },
+      publicVisibility: PublicTrainingPlanVisibility.PUBLIC,
     },
     orderBy: { publicPublishedAt: "desc" },
     select: {
@@ -88,7 +83,7 @@ export async function listPublicPlansForAthlete(athleteId: string) {
 
 export async function getPublicPlanBySlug(
   rawSlug: string,
-  options?: { allowUnlisted?: boolean; authorAthleteId?: string }
+  options?: { authorAthleteId?: string }
 ) {
   const slug = slugifyPlanSlug(rawSlug);
   if (!slug) return null;
@@ -96,9 +91,6 @@ export async function getPublicPlanBySlug(
   const visibilityFilter: PublicTrainingPlanVisibility[] = [
     PublicTrainingPlanVisibility.PUBLIC,
   ];
-  if (options?.allowUnlisted) {
-    visibilityFilter.push(PublicTrainingPlanVisibility.UNLISTED);
-  }
   if (options?.authorAthleteId) {
     visibilityFilter.push(PublicTrainingPlanVisibility.DRAFT);
   }
@@ -168,8 +160,7 @@ export async function promoteTrainingPlanPublic(input: PromotePublicPlanInput) {
 
   const now = new Date();
   const publicPublishedAt =
-    visibility === PublicTrainingPlanVisibility.PUBLIC ||
-    visibility === PublicTrainingPlanVisibility.UNLISTED
+    visibility === PublicTrainingPlanVisibility.PUBLIC
       ? plan.publicPublishedAt ?? now
       : null;
 
@@ -361,10 +352,7 @@ export async function updatePublicTrainingPlanBySlug(
   athleteId: string,
   input: UpdatePublicPlanInput
 ) {
-  const existing = await getPublicPlanBySlug(slug, {
-    allowUnlisted: true,
-    authorAthleteId: athleteId,
-  });
+  const existing = await getPublicPlanBySlug(slug, { authorAthleteId: athleteId });
   if (!existing || existing.athleteId !== athleteId) {
     throw new Error("Plan not found");
   }
@@ -385,10 +373,7 @@ export async function updatePublicTrainingPlanBySlug(
 
   if (input.visibility) {
     data.publicVisibility = input.visibility;
-    if (
-      input.visibility === PublicTrainingPlanVisibility.PUBLIC ||
-      input.visibility === PublicTrainingPlanVisibility.UNLISTED
-    ) {
+    if (input.visibility === PublicTrainingPlanVisibility.PUBLIC) {
       data.publicPublishedAt = existing.publicPublishedAt ?? new Date();
     } else {
       data.publicPublishedAt = null;

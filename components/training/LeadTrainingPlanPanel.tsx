@@ -78,9 +78,7 @@ export default function LeadTrainingPlanPanel({ planId, hasSchedule }: Props) {
 
   if (loading) return null;
 
-  const published = plans.filter(
-    (p) => p.visibility === "PUBLIC" || p.visibility === "UNLISTED"
-  );
+  const published = plans.filter((p) => p.visibility === "PUBLIC");
 
   return (
     <section className="rounded-2xl border border-violet-200 bg-violet-50/60 p-5">

@@ -68,7 +68,7 @@ async function loadPublishedPlanWeeks(hostAthleteId: string) {
   const first = rows.find((p) => p.publicSlug?.trim());
   if (!first?.publicSlug) return null;
 
-  const plan = await getPublicPlanBySlug(first.publicSlug, { allowUnlisted: true });
+  const plan = await getPublicPlanBySlug(first.publicSlug);
   if (
     !plan ||
     plan.publicVisibility === 'DRAFT' ||

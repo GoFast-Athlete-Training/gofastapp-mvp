@@ -29,7 +29,7 @@ export async function generateMetadata({
   params: Promise<RouteParams>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const plan = await getPublicPlanBySlug(slug, { allowUnlisted: true });
+  const plan = await getPublicPlanBySlug(slug);
   if (!plan) return { title: "Plan not found · GoFast" };
   return {
     title: `${plan.name} · GoFast Training Plan`,
@@ -45,7 +45,7 @@ export default async function PublicTrainingPlanPage({
   params: Promise<RouteParams>;
 }) {
   const { slug } = await params;
-  const plan = await getPublicPlanBySlug(slug, { allowUnlisted: true });
+  const plan = await getPublicPlanBySlug(slug);
   if (
     !plan ||
     plan.publicVisibility === "DRAFT" ||

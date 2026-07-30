@@ -27,7 +27,7 @@ export default function LeadTrainingPlanPage() {
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
 
   const [description, setDescription] = useState("");
-  const [visibility, setVisibility] = useState<"DRAFT" | "PUBLIC" | "UNLISTED">("PUBLIC");
+  const [visibility, setVisibility] = useState<"DRAFT" | "PUBLIC">("PUBLIC");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -200,14 +200,11 @@ export default function LeadTrainingPlanPage() {
             <span className="text-sm font-medium text-gray-700">Visibility</span>
             <select
               value={visibility}
-              onChange={(e) =>
-                setVisibility(e.target.value as "DRAFT" | "PUBLIC" | "UNLISTED")
-              }
+              onChange={(e) => setVisibility(e.target.value as "DRAFT" | "PUBLIC")}
               className="mt-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
             >
-              <option value="PUBLIC">Public — discoverable</option>
-              <option value="UNLISTED">Unlisted — link only</option>
-              <option value="DRAFT">Draft — only you</option>
+              <option value="PUBLIC">Public — followers can see your plan</option>
+              <option value="DRAFT">Private — only you</option>
             </select>
           </label>
 

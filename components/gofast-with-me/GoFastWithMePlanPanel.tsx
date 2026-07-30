@@ -17,15 +17,15 @@ export default function GoFastWithMePlanPanel({ publicSlug, embedded = false }: 
         <div>
           <h2 className="text-lg font-bold text-gray-900">My plan</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Share your training plan with followers — use <strong>Make this public</strong> when you are
-            ready for them to see your training week.
+            Choose <strong>Public</strong> when you want followers to see your training week on your
+            page and in your community.
           </p>
         </div>
       ) : (
         <div>
           <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">My plan</h3>
           <p className="text-xs text-gray-600 mt-1">
-            Make your plan public so followers see your training week in your community.
+            Set your plan to Public so followers see your training week in your community.
           </p>
         </div>
       )}
