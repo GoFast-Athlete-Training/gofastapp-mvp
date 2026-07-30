@@ -20,7 +20,7 @@ export default function GoFastWithMeCommunityPanel({ athleteId, publicSlug }: Pr
           <h2 className="text-lg font-bold text-gray-900">My Community</h2>
           <p className="text-sm text-gray-600 mt-1">
             Your personal community — messages and followers. Publish your plan under{' '}
-            <strong>My Plan</strong>. Followers see this same space at your hub link.
+            <strong>My Workouts</strong>. Followers see this same space at your hub link.
           </p>
         </div>
         <Link

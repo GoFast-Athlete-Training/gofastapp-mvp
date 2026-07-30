@@ -116,10 +116,10 @@ export default function GoFastWithMeDashboardHome({
               onClick={() => onOpenWorkspace('page')}
             />
             <StoplightChip
-              label="Plan"
+              label="Workouts"
               light={planStoplight(planLive)}
               hint={planLive ? 'Public' : 'Private'}
-              onClick={() => onOpenWorkspace('plan')}
+              onClick={() => onOpenWorkspace('workouts')}
             />
             <StoplightChip
               label="Content"

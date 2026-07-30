@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BookOpen, Layout, LayoutDashboard, Target, Users, X, type LucideIcon } from 'lucide-react';
+import { BookOpen, CalendarDays, Layout, LayoutDashboard, Users, X, type LucideIcon } from 'lucide-react';
 import {
   STUDIO_BIN_DESCRIPTIONS,
   STUDIO_BIN_ORDER,
@@ -19,7 +19,7 @@ const NAV_ICONS: Record<StudioSection | 'dashboard', LucideIcon> = {
   dashboard: LayoutDashboard,
   page: Layout,
   community: Users,
-  plan: Target,
+  workouts: CalendarDays,
   content: BookOpen,
 };
 

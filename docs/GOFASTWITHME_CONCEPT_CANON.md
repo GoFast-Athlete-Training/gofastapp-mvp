@@ -80,7 +80,7 @@ Do not overplay the public landing page and forsake the container. The landing p
 The studio is not one section. It is the operating center that connects:
 
 - CMS / public landing and content.
-- Add My Plan / athlete-owned plan publishing.
+- Add **My Workouts** / athlete-owned plan week + publishing.
 - Member Manager / container audience engagement.
 - View as member / the follower-facing container.
 
@@ -127,10 +127,9 @@ Use names that match the fork:
    - Current schema has `gofast_container_messages.topic = tips`, but that is a container feed post topic, not a CMS content model.
    - Important naming correction: old `gofast_page_routes` meant athlete/run routes attached to the GoFastWithMe page, not Next.js page routes. Future naming should be `myRunRoutes`.
 
-2. `GoFastWithMe Add My Plan`
-   - Replaces vague `Configure` language for MVP1.
-   - Lets the athlete connect/publish/toggle the active training plan.
-   - Lets the athlete edit public plan description.
+2. `GoFastWithMe My Workouts`
+   - Creator-facing mirror of the active training week (same week strip as My Training).
+   - Lets the athlete connect/publish/toggle the active training plan and edit public plan title + follower intro.
    - Hydrates from signed-in `Athlete.id` and active `planId`.
 
 3. `GoFastWithMe Member Manager`
@@ -154,12 +153,11 @@ There are three related surfaces, but they are not the same thing:
    - It owns public-facing intro/copy/photo only.
    - It is not the hydrated member container.
 
-3. `Add My Plan`
-   - This is the pass-2 setup area.
-   - Its core job is training plan/public plan setup.
-   - It should hydrate the full meta of the owner athlete's active `planId`.
-   - It should let the owner toggle/publish the training plan and edit public descriptions.
-   - Hosted public runs are the other optional setup path: "show a run I am doing."
+3. `My Workouts`
+   - This is the pass-2 setup area (replaces legacy **My Plan** naming in studio).
+   - Primary UI: active plan week strip (`GET /api/training/plan/week`, same cards as My Training).
+   - Secondary UI: plan sharing — Private/Public toggle, canonical `training_plans.name`, follower intro, first-public review step.
+   - Workout-to-hosted-run activation is deferred; see `docs/MY_WORKOUTS_RUNWITHME_FUTURE.md`.
 
 Pause the model here before adding pass-3 ideas.
 
@@ -327,11 +325,11 @@ host Athlete.id
 
 ## Studio Flow Canon
 
-The studio (`/gofast-with-others`) is **Studio Central + four peer bins** — door, room, plan, and content.
+The studio (`/gofast-with-others`) is **Studio Central + four peer bins** — page, community, workouts, and content.
 
 1. **Studio Central** (home)
    - Setup progress + **follower count** from `GET /api/athlete/[id]/container/members` (junction count only).
-   - Setup tiles for **My Page**, **My Community**, **My Plan**, and **My Content**.
+   - Setup tiles for **My Page**, **My Community**, **My Workouts**, and **My Content**.
    - **Share your page** — public URL editor + View public page (not on My Page). Copy: share your page so others can join your personal community.
 
 2. **My Page** (public page editor)
@@ -346,9 +344,12 @@ The studio (`/gofast-with-others`) is **Studio Central + four peer bins** — do
    - **View as member** link to `/container/[handle]`
    - Member view of the same community: `/container/[handle]` (training-for, plan strip, messages, thinking, followers; My Runs v2 collapsed).
 
-4. **My Plan** (publish / share)
-   - Publish/toggle active GoFast plan (`training_plans` public fields)
-   - Owns plan publish — not buried inside My Community
+4. **My Workouts** (creator week + plan sharing)
+   - Primary: active plan week strip — same hydration as My Training (`PlanWeekViewer`, `/training/day/{dateKey}` for execution).
+   - Secondary: publish/toggle active GoFast plan (`training_plans` public fields), editable canonical plan title, follower intro.
+   - First-time Public shows **Review what followers will see** with optional title edit; republish after Private skips review.
+   - Owns plan publish — not buried inside My Community.
+   - No MVP1 workout-to-hosted-run CTA; future handoff documented in `docs/MY_WORKOUTS_RUNWITHME_FUTURE.md`.
 
 5. **My Content** (CMS stub)
    - Tips, myRunRoutes, Blog — athlete-scoped CMS capability (`athlete_tips`, etc.)
@@ -359,7 +360,7 @@ The studio (`/gofast-with-others`) is **Studio Central + four peer bins** — do
    - Body: club-style **2/3** run photo + welcome / about / what you'll see; **1/3** Training for + See my plan + On the calendar.
    - Plan week strip and Activity/last Garmin run stay off the door (hub / member room).
 
-Race-hub analogy: join door → member room with plan + messages. GWM: follow door → `/container/[handle]` room; host edits from **My Community**, **My Plan**, and **My Content** in studio.
+Race-hub analogy: join door → member room with plan + messages. GWM: follow door → `/container/[handle]` room; host edits from **My Community**, **My Workouts**, and **My Content** in studio.
 
 ### Boundaries (keep sharp)
 
@@ -373,7 +374,7 @@ Race-hub analogy: join door → member room with plan + messages. GWM: follow do
 | Surface | Owns the data |
 |---------|---------------|
 | What I'm training for | Athlete goal / plan race link / race registry |
-| Plan strip / My plan | `training_plans` (`planId`, public fields) |
+| Plan strip / My plan | `training_plans` (`planId`, public fields) — edited from **My Workouts** |
 | Messages | `gofast_container_messages` (`containerAthleteId`) |
 | Followers | `gofast_container_memberships` via `/container/members` |
 | Thinking | `athlete_tips` (etc.) — later |
@@ -412,7 +413,7 @@ Use product language that matches the data:
 - **GoFast With Me** — product name for the follower hub and studio (not "athlete container").
 - **My Page** — public page (`/u/[handle]`). User-facing: "page", not "door".
 - **My Community** — personal community (messages + followers; host panel + `/container/[handle]` for followers). User-facing: "community", not "room".
-- **My Plan** — publish/share training plan (`training_plans` public fields); studio sidebar peer.
+- **My Workouts** — creator week strip + publish/share training plan (`training_plans` public fields, canonical `name`); studio sidebar peer. Replaces legacy **My Plan** label.
 - **My Content** — CMS stub for Tips, routes, Blog; studio sidebar peer.
 - **Messages**, **Followers** — sections inside My Community.
 - **What I'm training for** — goal/race on page + hub header (`GoalRaceCard`).

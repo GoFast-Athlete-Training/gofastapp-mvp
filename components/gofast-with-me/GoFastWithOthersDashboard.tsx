@@ -14,7 +14,7 @@ import { goFastWithFrontDoorPath } from "@/lib/gofast-with-me/gofast-with-bridge
 import GoFastWithMeHubOnboarding from "@/components/gofast-with-me/GoFastWithMeHubOnboarding";
 import GoFastWithMeWelcomePanel from "@/components/gofast-with-me/GoFastWithMeWelcomePanel";
 import GoFastWithMeCommunityPanel from "@/components/gofast-with-me/GoFastWithMeCommunityPanel";
-import GoFastWithMePlanPanel from "@/components/gofast-with-me/GoFastWithMePlanPanel";
+import GoFastWithMeWorkoutsPanel from "@/components/gofast-with-me/GoFastWithMeWorkoutsPanel";
 import GoFastWithMeCmsContentSection from "@/components/gofast-with-me/GoFastWithMeContentPanel";
 import GoFastWithMeDashboardHome, {
   type DashboardMetrics,
@@ -365,13 +365,15 @@ export default function GoFastWithOthersDashboard() {
         return (
           <GoFastWithMeCommunityPanel athleteId={athleteId} publicSlug={publicSlug} />
         );
-      case "plan":
-        return <GoFastWithMePlanPanel publicSlug={publicSlug} />;
+      case "workouts":
+        return (
+          <GoFastWithMeWorkoutsPanel publicSlug={publicSlug} firstName={firstName} />
+        );
       case "content":
         return (
           <GoFastWithMeCmsContentSection
             liveUrl={liveUrl}
-            onOpenWorkouts={() => openWorkspace("plan")}
+            onOpenWorkouts={() => openWorkspace("workouts")}
             onOpenCommunity={() => openWorkspace("community")}
           />
         );

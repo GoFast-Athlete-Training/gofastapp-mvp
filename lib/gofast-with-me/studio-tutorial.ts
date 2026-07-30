@@ -18,7 +18,7 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
   slug: GOFAST_WITH_ME_STUDIO_TUTORIAL_SLUG,
   name: 'GoFast With Me Studio',
   summary:
-    'Four places: My Page is your public page. My Community is your personal community. My Plan publishes your training week. My Content is for tips, routes, and blog posts.',
+    'Four places: My Page is your public page. My Community is your personal community. My Workouts is your training week and plan sharing. My Content is for tips, routes, and blog posts.',
   steps: [
     {
       id: 'page',
@@ -35,10 +35,10 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
       sortOrder: 1,
     },
     {
-      id: 'plan',
-      title: 'My Plan — publish',
+      id: 'workouts',
+      title: 'My Workouts — plan week',
       instruction:
-        'Publish your GoFast plan so followers see your training week in the hub.',
+        'Your creator view of the active plan week — publish when followers should see it on your hub.',
       sortOrder: 2,
     },
     {

@@ -2,9 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Calendar, CheckCircle2, ExternalLink, Loader2, Sparkles } from 'lucide-react';
+import { Calendar, CheckCircle2, ExternalLink, Loader2, Pencil, Sparkles } from 'lucide-react';
 import api from '@/lib/api';
 import type { ShareHubPlanStatus } from '@/lib/profile/share-creator-card-logic';
+import {
+  normalizePlanTitleInput,
+  planTitleFallback,
+} from '@/lib/gofast-with-me/plan-title-utils';
 
 type PlanVisibility = 'DRAFT' | 'PUBLIC' | 'ARCHIVED';
 
@@ -19,26 +23,34 @@ function isPlanPublic(plan: ShareHubPlanStatus): boolean {
   return plan.isPublished && plan.publicVisibility === 'PUBLIC';
 }
 
-function planDisplayTitle(plan: ShareHubPlanStatus): string {
-  if (plan.raceName?.trim()) {
-    return `Training plan for ${plan.raceName.trim()}`;
-  }
-  return plan.planName?.trim() || 'Active plan';
-}
-
-export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?: boolean }) {
+export default function GoFastWithMeSetupPanel({
+  embedded = false,
+  sharingOnly = false,
+  firstName = null,
+}: {
+  embedded?: boolean;
+  sharingOnly?: boolean;
+  firstName?: string | null;
+}) {
   const [status, setStatus] = useState<{ plan: ShareHubPlanStatus } | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [description, setDescription] = useState('');
+  const [planTitle, setPlanTitle] = useState('');
   const [saving, setSaving] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [publishReviewOpen, setPublishReviewOpen] = useState(false);
+  const [reviewTitle, setReviewTitle] = useState('');
+  const [editingReviewTitle, setEditingReviewTitle] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const titleDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const descriptionRef = useRef(description);
+  const planTitleRef = useRef(planTitle);
 
   descriptionRef.current = description;
+  planTitleRef.current = planTitle;
 
   const loadStatus = useCallback(async (soft = false) => {
     if (soft) setRefreshing(true);
@@ -52,6 +64,7 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
         const next = res.data.status as { plan: ShareHubPlanStatus };
         setStatus(next);
         setDescription(next.plan.publicDescription ?? '');
+        setPlanTitle(next.plan.planName?.trim() || planTitleFallback(firstName));
       }
     } catch {
       if (!soft) setError('Could not load your active plan.');
@@ -59,7 +72,7 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
       if (soft) setRefreshing(false);
       else setInitialLoading(false);
     }
-  }, []);
+  }, [firstName]);
 
   useEffect(() => {
     void loadStatus(false);
@@ -74,6 +87,7 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
   const canPublish = !!plan?.hasActivePlan && !!plan?.hasSchedule;
   const isPublic = plan ? isPlanPublic(plan) : false;
   const busy = saving || drafting;
+  const hasBeenPublishedBefore = Boolean(plan?.publicSlug);
 
   const draftDescription = useCallback(async (): Promise<string | null> => {
     if (!plan?.planId) return null;
@@ -99,6 +113,36 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
     return null;
   }, [plan?.planId]);
 
+  const savePlanTitleNow = useCallback(
+    async (value: string): Promise<boolean> => {
+      if (!plan?.planId) return false;
+      const normalized = normalizePlanTitleInput(value, firstName);
+      setSaving(true);
+      setError(null);
+      try {
+        if (isPlanPublic(plan) && plan.publicSlug) {
+          await api.patch(`/public-training-plans/${encodeURIComponent(plan.publicSlug)}`, {
+            name: normalized,
+            visibility: 'PUBLIC' satisfies PlanVisibility,
+          });
+        } else {
+          await api.patch(`/training-plan/${encodeURIComponent(plan.planId)}`, {
+            name: normalized,
+          });
+        }
+        setPlanTitle(normalized);
+        return true;
+      } catch (err: unknown) {
+        const e = err as { response?: { data?: { error?: string } } };
+        setError(e.response?.data?.error || 'Could not save plan title.');
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [plan, firstName]
+  );
+
   const saveDescriptionNow = useCallback(
     async (value: string) => {
       if (!plan?.publicSlug || !isPlanPublic(plan)) return false;
@@ -121,12 +165,51 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
     [plan]
   );
 
-  const persistVisibility = async (nextPublic: boolean) => {
-    if (!plan?.planId || busy) return;
+  const publishPlan = async (title: string, intro: string) => {
+    if (!plan?.planId || busy) return false;
     setSaving(true);
     setError(null);
     try {
-      if (nextPublic) {
+      const normalizedTitle = normalizePlanTitleInput(title, firstName);
+      if (normalizedTitle !== (plan.planName ?? '').trim()) {
+        await api.patch(`/training-plan/${encodeURIComponent(plan.planId)}`, {
+          name: normalizedTitle,
+        });
+        setPlanTitle(normalizedTitle);
+      }
+      await api.post('/public-training-plans', {
+        sourceTrainingPlanId: plan.planId,
+        description: intro.trim() || null,
+        visibility: 'PUBLIC' satisfies PlanVisibility,
+      });
+      setPublishReviewOpen(false);
+      flashSuccess('Your plan is public for followers.');
+      await loadStatus(true);
+      return true;
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setError(e.response?.data?.error || 'Could not make plan public.');
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const persistVisibility = async (nextPublic: boolean) => {
+    if (!plan?.planId || busy) return;
+    if (nextPublic) {
+      if (!hasBeenPublishedBefore) {
+        setReviewTitle(planTitle);
+        setEditingReviewTitle(false);
+        setPublishReviewOpen(true);
+        if (!description.trim()) {
+          void draftDescription();
+        }
+        return;
+      }
+      setSaving(true);
+      setError(null);
+      try {
         let desc = description.trim();
         if (!desc) {
           const drafted = await draftDescription();
@@ -138,20 +221,30 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
           visibility: 'PUBLIC' satisfies PlanVisibility,
         });
         flashSuccess('Your plan is public for followers.');
-      } else if (plan.publicSlug) {
-        await api.patch(`/public-training-plans/${encodeURIComponent(plan.publicSlug)}`, {
-          description: description.trim() || null,
-          visibility: 'DRAFT' satisfies PlanVisibility,
-        });
-        flashSuccess('Your plan is private.');
+        await loadStatus(true);
+      } catch (err: unknown) {
+        const e = err as { response?: { data?: { error?: string } } };
+        setError(e.response?.data?.error || 'Could not make plan public.');
+      } finally {
+        setSaving(false);
       }
+      return;
+    }
+
+    if (!plan.publicSlug) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await api.patch(`/public-training-plans/${encodeURIComponent(plan.publicSlug)}`, {
+        description: description.trim() || null,
+        visibility: 'DRAFT' satisfies PlanVisibility,
+      });
+      setPublishReviewOpen(false);
+      flashSuccess('Your plan is private.');
       await loadStatus(true);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      setError(
-        e.response?.data?.error ||
-          (nextPublic ? 'Could not make plan public.' : 'Could not make plan private.')
-      );
+      setError(e.response?.data?.error || 'Could not make plan private.');
     } finally {
       setSaving(false);
     }
@@ -181,6 +274,29 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
     };
   }, [description, isPublic, plan?.publicDescription, plan?.publicSlug, persistDescription]);
 
+  useEffect(() => {
+    if (!isPublic || !plan?.planId || publishReviewOpen) return;
+    const saved = (plan.planName ?? '').trim();
+    if (planTitle.trim() === saved) return;
+
+    if (titleDebounceRef.current) clearTimeout(titleDebounceRef.current);
+    titleDebounceRef.current = setTimeout(() => {
+      titleDebounceRef.current = null;
+      void savePlanTitleNow(planTitleRef.current);
+    }, 800);
+
+    return () => {
+      if (titleDebounceRef.current) clearTimeout(titleDebounceRef.current);
+    };
+  }, [
+    planTitle,
+    isPublic,
+    plan?.planId,
+    plan?.planName,
+    publishReviewOpen,
+    savePlanTitleNow,
+  ]);
+
   const handleRegenerate = async () => {
     if (busy || !plan?.planId) return;
     const drafted = await draftDescription();
@@ -190,6 +306,15 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
       flashSuccess('Draft refreshed — edit anything you want changed.');
       await loadStatus(true);
     }
+  };
+
+  const handleConfirmPublish = async () => {
+    let intro = description.trim();
+    if (!intro) {
+      const drafted = await draftDescription();
+      intro = drafted?.trim() ?? '';
+    }
+    await publishPlan(reviewTitle, intro);
   };
 
   const raceLine = [plan?.raceName, plan?.raceDistanceLabel].filter(Boolean).join(' · ');
@@ -203,11 +328,14 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
     plan?.startDate ? `starts ${formatPlanDate(plan.startDate)}` : null,
     raceLine || null,
     plan?.goalRaceTime ? `goal ${plan.goalRaceTime}` : null,
-  ].filter(Boolean);
+  ].filter((part): part is string => Boolean(part));
+
+  const showStandaloneHeader = !embedded && !sharingOnly;
+  const showPlanSummary = !sharingOnly;
 
   return (
-    <section id={embedded ? undefined : 'workouts'} className={embedded ? 'space-y-6' : 'space-y-6'}>
-      {!embedded ? (
+    <section id={embedded ? undefined : 'workouts-sharing'} className="space-y-6">
+      {showStandaloneHeader ? (
         <div>
           <h2 className="text-lg font-bold text-gray-900">Training plan</h2>
           <p className="text-sm text-gray-600 mt-1">
@@ -245,37 +373,39 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
             </div>
           ) : null}
 
-          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-3">
-            <div className="flex items-start gap-3">
-              <div className="rounded-lg bg-stone-100 p-2 text-stone-700">
-                <Calendar className="h-5 w-5" />
+          {showPlanSummary ? (
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg bg-stone-100 p-2 text-stone-700">
+                  <Calendar className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-semibold text-gray-900">{planTitle}</h3>
+                  {summaryParts.length > 0 ? (
+                    <p className="mt-1.5 text-sm text-gray-600">{summaryParts.join(' · ')}</p>
+                  ) : null}
+                  {!plan.hasSchedule ? (
+                    <p className="mt-1 text-xs text-amber-700">Schedule not generated yet</p>
+                  ) : null}
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-semibold text-gray-900">{planDisplayTitle(plan)}</h3>
-                {summaryParts.length > 0 ? (
-                  <p className="mt-1.5 text-sm text-gray-600">{summaryParts.join(' · ')}</p>
-                ) : null}
-                {!plan.hasSchedule ? (
-                  <p className="mt-1 text-xs text-amber-700">Schedule not generated yet</p>
-                ) : null}
-              </div>
-            </div>
 
-            {!plan.hasSchedule ? (
-              <Link
-                href={plan.planId ? `/training-setup/${plan.planId}` : '/training-setup'}
-                className="inline-flex rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-900 hover:bg-sky-100"
-              >
-                Finish generating schedule
-              </Link>
-            ) : null}
-          </div>
+              {!plan.hasSchedule ? (
+                <Link
+                  href={plan.planId ? `/training-setup/${plan.planId}` : '/training-setup'}
+                  className="inline-flex rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-900 hover:bg-sky-100"
+                >
+                  Finish generating schedule
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
 
           {canPublish ? (
             <div className="rounded-2xl border border-stone-200 bg-stone-50/70 p-5 shadow-sm space-y-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Sharing</h3>
+                  <h3 className="text-sm font-semibold text-gray-900">Plan sharing</h3>
                   <p className="text-xs text-gray-600 mt-1">
                     {isPublic
                       ? 'Followers see your training week on your hub and in your community.'
@@ -295,6 +425,22 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
                 onChange={(nextPublic) => void persistVisibility(nextPublic)}
               />
 
+              {publishReviewOpen && !isPublic ? (
+                <PublishReviewPanel
+                  reviewTitle={reviewTitle}
+                  editingTitle={editingReviewTitle}
+                  description={description}
+                  summaryParts={summaryParts}
+                  busy={busy}
+                  drafting={drafting}
+                  onReviewTitleChange={setReviewTitle}
+                  onToggleEditTitle={() => setEditingReviewTitle((v) => !v)}
+                  onDescriptionChange={setDescription}
+                  onCancel={() => setPublishReviewOpen(false)}
+                  onConfirm={() => void handleConfirmPublish()}
+                />
+              ) : null}
+
               {isPublic ? (
                 <>
                   <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2.5 text-sm text-emerald-900 flex items-center gap-2">
@@ -305,6 +451,24 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
                         · since {formatPlanDate(plan.publicPublishedAt)}
                       </span>
                     ) : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="plan-title" className="text-xs font-semibold text-gray-700">
+                      Plan title
+                    </label>
+                    <p className="text-xs text-gray-600">
+                      Shown on your public plan page and hub. This is the same name as in My Training.
+                    </p>
+                    <input
+                      id="plan-title"
+                      type="text"
+                      value={planTitle}
+                      onChange={(e) => setPlanTitle(e.target.value)}
+                      maxLength={120}
+                      disabled={busy}
+                      className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm bg-white disabled:opacity-60"
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -348,6 +512,8 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
                     </div>
                   </div>
 
+                  <PublicDisclosure summaryParts={summaryParts} />
+
                   {plan.publicSlug ? (
                     <Link
                       href={`/plans/${encodeURIComponent(plan.publicSlug)}`}
@@ -365,19 +531,118 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
           ) : null}
         </>
       )}
-
-      {!embedded ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900">My Runs (v2)</h3>
-            <p className="text-xs text-gray-600 mt-1">
-              Manual hosted runs are coming later — sharing your goal and plan is the primary GoFast With
-              Me loop.
-            </p>
-          </div>
-        </div>
-      ) : null}
     </section>
+  );
+}
+
+function PublicDisclosure({ summaryParts }: { summaryParts: string[] }) {
+  return (
+    <div className="rounded-lg border border-stone-200 bg-white/80 px-3 py-2.5 text-xs text-gray-600 space-y-1">
+      <p className="font-semibold text-gray-800">Followers also see from your plan</p>
+      <ul className="list-disc pl-4 space-y-0.5">
+        {summaryParts.length > 0 ? <li>{summaryParts.join(' · ')}</li> : null}
+        <li>Your full training week — workout types, dates, and planned distances</li>
+        <li>Your name and public profile on the plan page</li>
+      </ul>
+    </div>
+  );
+}
+
+function PublishReviewPanel({
+  reviewTitle,
+  editingTitle,
+  description,
+  summaryParts,
+  busy,
+  drafting,
+  onReviewTitleChange,
+  onToggleEditTitle,
+  onDescriptionChange,
+  onCancel,
+  onConfirm,
+}: {
+  reviewTitle: string;
+  editingTitle: boolean;
+  description: string;
+  summaryParts: string[];
+  busy: boolean;
+  drafting: boolean;
+  onReviewTitleChange: (value: string) => void;
+  onToggleEditTitle: () => void;
+  onDescriptionChange: (value: string) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-4 space-y-4">
+      <div>
+        <h4 className="text-sm font-semibold text-gray-900">Review what followers will see</h4>
+        <p className="text-xs text-gray-600 mt-1">
+          Your training week becomes visible on your hub when you publish.
+        </p>
+      </div>
+
+      <div className="rounded-lg border border-stone-200 bg-white p-3 space-y-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Plan title</p>
+        {editingTitle ? (
+          <input
+            type="text"
+            value={reviewTitle}
+            onChange={(e) => onReviewTitleChange(e.target.value)}
+            maxLength={120}
+            className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm"
+            autoFocus
+          />
+        ) : (
+          <p className="text-sm font-semibold text-gray-900">{reviewTitle}</p>
+        )}
+        <button
+          type="button"
+          onClick={onToggleEditTitle}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 hover:underline"
+        >
+          <Pencil className="h-3 w-3" aria-hidden />
+          {editingTitle ? 'Use this title' : 'Want to change the title?'}
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-xs font-semibold text-gray-700">Intro for followers</label>
+        <textarea
+          value={description}
+          onChange={(e) => onDescriptionChange(e.target.value)}
+          rows={4}
+          maxLength={4000}
+          disabled={drafting}
+          className="w-full rounded-lg border border-stone-300 p-3 text-sm bg-white disabled:opacity-60"
+          placeholder="We draft this from your plan — edit anything you want changed."
+        />
+        {drafting ? (
+          <p className="text-[11px] text-gray-500">Drafting from your plan…</p>
+        ) : null}
+      </div>
+
+      <PublicDisclosure summaryParts={summaryParts} />
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onConfirm}
+          className="inline-flex rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+        >
+          Publish plan
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onCancel}
+          className="inline-flex rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-stone-50 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
 

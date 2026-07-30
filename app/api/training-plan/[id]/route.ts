@@ -266,6 +266,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         (k) =>
           k !== "lifecycleStatus" &&
           k !== "currentFiveKPace" &&
+          k !== "name" &&
           !REGENERATE_PATCH_KEYS.has(k)
       );
       if (invalid.length > 0) {
@@ -280,6 +281,12 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     }
 
     const data: Record<string, unknown> = { updatedAt: new Date() };
+
+    if (typeof body.name === "string") {
+      const trimmed = body.name.trim();
+      const fallbackFirst = auth.athlete.firstName?.trim();
+      data.name = trimmed || (fallbackFirst ? `${fallbackFirst}'s plan` : "My training plan");
+    }
 
     const canUpdatePreferences =
       !scheduleLocked || patchKeys.some((k) => REGENERATE_PATCH_KEYS.has(k));
@@ -296,7 +303,6 @@ export async function PATCH(request: NextRequest, context: Ctx) {
       let finalInterval = existing.preferredIntervalDow ?? null;
 
       if (!scheduleLocked) {
-        if (typeof body.name === "string") data.name = body.name.trim();
         if (body.startDate != null) {
           const d = new Date(body.startDate);
           if (Number.isNaN(d.getTime())) {
