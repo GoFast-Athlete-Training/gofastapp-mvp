@@ -90,7 +90,7 @@ export async function draftPublicPlanDescriptionForPlan(params: {
       planSchedule: true,
       totalWeeks: true,
       goalRaceTime: true,
-      athlete: {
+      Athlete: {
         select: { firstName: true },
       },
       race_registry: {
@@ -127,7 +127,7 @@ export async function draftPublicPlanDescriptionForPlan(params: {
     raceDistanceLabel,
     goalRaceTime: plan.goalRaceTime ?? null,
     totalWeeks: plan.totalWeeks ?? null,
-    athleteFirstName: plan.athlete.firstName ?? null,
+    athleteFirstName: plan.Athlete.firstName ?? null,
     planSchedule: plan.planSchedule,
   });
 
