@@ -15,9 +15,15 @@ ALTER TABLE "training_plans"
   USING ("publicVisibility"::text::"PublicTrainingPlanVisibility_new");
 
 ALTER TABLE "public_training_plans"
+  ALTER COLUMN "visibility" DROP DEFAULT;
+
+ALTER TABLE "public_training_plans"
   ALTER COLUMN "visibility" TYPE "PublicTrainingPlanVisibility_new"
   USING ("visibility"::text::"PublicTrainingPlanVisibility_new");
 
 DROP TYPE "PublicTrainingPlanVisibility";
 
 ALTER TYPE "PublicTrainingPlanVisibility_new" RENAME TO "PublicTrainingPlanVisibility";
+
+ALTER TABLE "public_training_plans"
+  ALTER COLUMN "visibility" SET DEFAULT 'DRAFT'::"PublicTrainingPlanVisibility";
