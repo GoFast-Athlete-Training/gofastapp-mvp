@@ -55,7 +55,7 @@ export default function GoFastWithMeFollowersSection({ hub, handle }: Props) {
           href={`/u/${encodeURIComponent(handle)}`}
           className="inline-flex text-xs font-semibold text-orange-600 hover:underline"
         >
-          View public door →
+          View public page →
         </Link>
       )}
     </section>

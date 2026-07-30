@@ -18,20 +18,20 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
   slug: GOFAST_WITH_ME_STUDIO_TUTORIAL_SLUG,
   name: 'GoFast With Me Studio',
   summary:
-    'Four places: My Page is your public door. My Community is your member room. My Plan publishes your training week. My Content is for tips, routes, and blog posts.',
+    'Four places: My Page is your public page. My Community is your personal community. My Plan publishes your training week. My Content is for tips, routes, and blog posts.',
   steps: [
     {
       id: 'page',
-      title: 'My Page — the door',
+      title: 'My Page — your page',
       instruction:
         'Your public landing where strangers see who you are and What I\'m training for before they follow.',
       sortOrder: 0,
     },
     {
       id: 'community',
-      title: 'My Community — the room',
+      title: 'My Community — personal community',
       instruction:
-        'Your member room — post journey messages and see who followed you in.',
+        'Your personal community — post journey messages and see who followed you.',
       sortOrder: 1,
     },
     {

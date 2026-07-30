@@ -1,6 +1,6 @@
 import type { GoFastWithMeLandingValues } from '@/components/gofast-with-me/GoFastWithMeLandingForm';
 
-/** Studio workspace — door, room, plan, and content bins. */
+/** Studio workspace — page, community, plan, and content bins. */
 export type StudioSection = 'page' | 'community' | 'plan' | 'content';
 
 export type StudioView = 'dashboard' | StudioSection;
@@ -27,8 +27,8 @@ export const STUDIO_BIN_LABELS: Record<StudioSection, string> = {
 };
 
 export const STUDIO_BIN_DESCRIPTIONS: Record<StudioSection, string> = {
-  page: "Your public door — landing page, photo, and What I'm training for",
-  community: 'Your member room — messages and followers',
+  page: "Your public page — landing copy, photo, and What I'm training for",
+  community: 'Your personal community — messages and followers',
   plan: 'Publish and share your training plan with followers',
   content: 'Tips, routes, and blog posts for your hub',
 };

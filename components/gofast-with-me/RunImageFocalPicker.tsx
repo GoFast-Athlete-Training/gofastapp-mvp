@@ -28,6 +28,17 @@ type Props = {
   onZoomChange: (zoom: number) => void;
 };
 
+type DragOrigin = {
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  startFocusX: number;
+  startFocusY: number;
+};
+
+/**
+ * Drag pans the crop (object-position). Dragging the photo right reveals more of the left edge.
+ */
 export default function RunImageFocalPicker({
   src,
   focusX,
@@ -38,42 +49,73 @@ export default function RunImageFocalPicker({
   onZoomChange,
 }: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<DragOrigin | null>(null);
   const [dragging, setDragging] = useState(false);
 
-  const setFocusFromPointer = useCallback(
+  const applyPan = useCallback(
     (clientX: number, clientY: number) => {
+      const drag = dragRef.current;
       const frame = frameRef.current;
-      if (!frame) return;
+      if (!drag || !frame) return;
       const rect = frame.getBoundingClientRect();
-      const x = clampPhotoFocus(((clientX - rect.left) / rect.width) * 100);
-      const y = clampPhotoFocus(((clientY - rect.top) / rect.height) * 100);
-      onFocusChange({ x, y });
+      if (rect.width <= 0 || rect.height <= 0) return;
+
+      const z = clampPhotoZoom(zoom);
+      // Higher zoom → same pixel drag covers more of the focus range.
+      const sensitivity = 100 / z;
+      const nextX = clampPhotoFocus(
+        drag.startFocusX - ((clientX - drag.startClientX) / rect.width) * sensitivity
+      );
+      const nextY = clampPhotoFocus(
+        drag.startFocusY - ((clientY - drag.startClientY) / rect.height) * sensitivity
+      );
+      onFocusChange({ x: nextX, y: nextY });
     },
-    [onFocusChange]
+    [onFocusChange, zoom]
   );
 
+  const endDrag = useCallback((pointerId?: number) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    if (pointerId != null && drag.pointerId !== pointerId) return;
+    dragRef.current = null;
+    setDragging(false);
+    try {
+      frameRef.current?.releasePointerCapture(drag.pointerId);
+    } catch {
+      /* already released */
+    }
+  }, []);
+
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
     e.preventDefault();
+    dragRef.current = {
+      pointerId: e.pointerId,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startFocusX: focusX,
+      startFocusY: focusY,
+    };
     setDragging(true);
     frameRef.current?.setPointerCapture(e.pointerId);
-    setFocusFromPointer(e.clientX, e.clientY);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragging) return;
-    setFocusFromPointer(e.clientX, e.clientY);
+    if (!dragRef.current || dragRef.current.pointerId !== e.pointerId) return;
+    e.preventDefault();
+    applyPan(e.clientX, e.clientY);
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    setDragging(false);
-    frameRef.current?.releasePointerCapture(e.pointerId);
+    endDrag(e.pointerId);
   };
 
   const frameStyle = photoFrameStyle(focusX, focusY, zoom);
   const portrait = isPortraitPhotoType(photoType);
   const frameClass = portrait
-    ? 'relative w-36 aspect-square mx-auto rounded-xl overflow-hidden bg-sky-100 border border-gray-200 cursor-crosshair touch-none select-none'
-    : `relative w-full ${widePhotoFrameClass('studioPreview')} ${widePhotoFrameShellClass('studioPreview')} cursor-crosshair touch-none select-none`;
+    ? 'relative w-36 aspect-square rounded-xl overflow-hidden bg-sky-100 border border-gray-200 touch-none select-none'
+    : `relative w-full ${widePhotoFrameClass('studioPreview')} ${widePhotoFrameShellClass('studioPreview')} touch-none select-none`;
 
   const isDefaultFrame =
     focusX === DEFAULT_PHOTO_FOCUS &&
@@ -87,15 +129,16 @@ export default function RunImageFocalPicker({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 max-w-md">
       <div
         ref={frameRef}
-        className={frameClass}
+        className={`${frameClass} ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-        role="presentation"
+        onPointerCancel={handlePointerUp}
+        role="img"
+        aria-label="Drag to reposition run image crop"
       >
         <img
           src={src}
@@ -105,13 +148,13 @@ export default function RunImageFocalPicker({
           draggable={false}
         />
         <div
-          className="absolute w-4 h-4 -ml-2 -mt-2 rounded-full border-2 border-white bg-orange-500 shadow-md pointer-events-none"
+          className="absolute w-3.5 h-3.5 -ml-[7px] -mt-[7px] rounded-full border-2 border-white bg-orange-500 shadow-md pointer-events-none"
           style={{ left: `${focusX}%`, top: `${focusY}%` }}
           aria-hidden
         />
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 to-transparent px-3 py-2 pointer-events-none">
-          <p className="text-[11px] text-white/90">
-            Drag to reposition · zoom to tighten — original image is kept.
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-3 py-2 pointer-events-none">
+          <p className="text-[11px] text-white/95">
+            Drag to move · use zoom to tighten — same crop as your public page.
           </p>
         </div>
       </div>
@@ -135,7 +178,7 @@ export default function RunImageFocalPicker({
 
       {showZoomHint ? (
         <p className="text-xs text-gray-500">
-          Zoom in to cut empty space above or below, then drag to reposition.
+          Zoom in to cut empty space, then drag the photo to frame what you want.
         </p>
       ) : null}
 

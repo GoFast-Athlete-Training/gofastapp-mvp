@@ -89,8 +89,8 @@ export default function GoFastWithMeHubOnboarding({ onComplete }: Props) {
             <Users className="w-5 h-5 text-violet-600 mb-2" />
             <p className="font-semibold text-gray-900">I&apos;m a coach</p>
             <p className="text-xs text-gray-600 mt-1">
-              Build an audience on your public page and earn advertiser revenue — your front door
-              before paid athlete management.
+              Build an audience on your public page and earn advertiser revenue before paid
+              athlete management.
             </p>
           </button>
         </div>

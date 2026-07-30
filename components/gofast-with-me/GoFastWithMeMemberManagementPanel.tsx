@@ -61,7 +61,7 @@ export default function GoFastWithMeMemberManagementPanel({
         <div>
           <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Followers</h3>
           <p className="text-xs text-gray-600 mt-1">
-            Who joined your room — from your follower list.
+            Who joined your personal community — from your follower list.
           </p>
         </div>
       )}

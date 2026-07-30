@@ -73,11 +73,12 @@ export function usesWideFeaturePhotoLayout(
 export function widePhotoFrameClass(surface: GoFastWithMePhotoSurface): string {
   switch (surface) {
     case 'studioPreview':
-      return 'aspect-[16/9]';
+      // Match public door story column: short wide crop, not a giant 16:9 wall.
+      return 'aspect-[2/1] max-h-72';
     case 'inAppProfile':
       return 'aspect-[16/9]';
     case 'publicLanding':
-      return 'aspect-[16/9]';
+      return 'aspect-[2/1] max-h-72';
     case 'previewHero':
       return 'aspect-[16/9]';
     case 'openGraph':

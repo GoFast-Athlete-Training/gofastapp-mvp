@@ -42,7 +42,7 @@ const MY_PAGE_STATUS_LABELS: Record<SetupStatus, string> = {
 const MY_PAGE_STATUS_HINTS: Record<SetupStatus, string> = {
   not_started: 'Finish welcome, bio, photo on My Page',
   in_progress: 'Almost there — finish welcome, bio, and run image',
-  ready: 'Your public door is ready',
+  ready: 'Your page is ready to share',
 };
 
 const MY_PAGE_STATUS_STYLES: Record<SetupStatus, string> = {
@@ -82,7 +82,7 @@ export default function GoFastWithMeDashboardHome({
       <div>
         <h2 className="text-lg font-bold text-gray-900">{STUDIO_CENTRAL_LABEL}</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Your public door, member room, plan, and content — four places to set up GoFast With Me.
+          Set up your page, personal community, plan, and content — then share so others can join.
         </p>
       </div>
 
@@ -95,7 +95,7 @@ export default function GoFastWithMeDashboardHome({
             className={`rounded-xl border p-4 text-left transition-colors hover:opacity-90 ${MY_PAGE_STATUS_STYLES[pageStatus]}`}
           >
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">My Page</p>
-            <p className="text-[11px] text-gray-500 mt-0.5">door</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">public page</p>
             <div className="mt-2 flex items-center gap-2">
               <StatusDot level={pageStatus} />
               <p className="text-xl font-bold text-gray-900">{MY_PAGE_STATUS_LABELS[pageStatus]}</p>
@@ -118,14 +118,14 @@ export default function GoFastWithMeDashboardHome({
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
               My Community
             </p>
-            <p className="text-[11px] text-gray-500 mt-0.5">room</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">personal community</p>
             <p className="mt-2 text-xl font-bold text-gray-900">
               {memberCount} follower{memberCount === 1 ? '' : 's'}
             </p>
             <p className="mt-1 text-xs text-gray-600">
               {hasMembers
-                ? 'Messages and follower list in your member room'
-                : 'Post journey messages and see who follows you in'}
+                ? 'Messages and follower list in your community'
+                : 'Post journey messages and see who follows you'}
             </p>
           </button>
 
@@ -215,7 +215,7 @@ export default function GoFastWithMeDashboardHome({
               <div>
                 <p className="text-sm font-semibold text-gray-900">None yet — invite your first one</p>
                 <p className="text-xs text-gray-600 mt-1">
-                  Share your follow link. When someone joins, they enter your member room.
+                  Share your page so others can join your personal community.
                 </p>
               </div>
               <button
@@ -233,8 +233,11 @@ export default function GoFastWithMeDashboardHome({
 
       <section className="space-y-3">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-          Share your door
+          Share your page
         </h3>
+        <p className="text-xs text-gray-600 -mt-1">
+          Share your page with others so they can join your personal community.
+        </p>
         <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm text-gray-700">

@@ -286,7 +286,7 @@ export default function ContainerHubPage() {
               href={`/u/${encodeURIComponent(handle)}`}
               className="inline-flex text-sm font-semibold text-orange-600 hover:underline"
             >
-              View public door →
+              View public page →
             </Link>
             <Link
               href={`/gofast-with/${encodeURIComponent(handle)}`}

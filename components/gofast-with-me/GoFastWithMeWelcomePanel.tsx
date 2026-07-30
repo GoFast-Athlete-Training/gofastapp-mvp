@@ -33,8 +33,8 @@ export default function GoFastWithMeWelcomePanel({
         <div>
           <h2 className="text-lg font-bold text-gray-900">My Page</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Your public door — welcome copy, run photo, and the story visitors see before they follow.
-            What I&apos;m training for hydrates from your goal and plan on the live door.
+            Your public page — welcome copy, run photo, and the story visitors see before they follow.
+            What I&apos;m training for comes from your goal and plan on the live page.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -65,7 +65,7 @@ export default function GoFastWithMeWelcomePanel({
         </div>
       ) : (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          Landing page looks good — share your door from Studio Central when you&apos;re ready.
+          Landing page looks good — share your page from Studio Central when you&apos;re ready.
         </div>
       )}
 

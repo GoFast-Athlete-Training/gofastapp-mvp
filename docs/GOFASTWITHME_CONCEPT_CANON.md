@@ -332,19 +332,19 @@ The studio (`/gofast-with-others`) is **Studio Central + four peer bins** — do
 1. **Studio Central** (home)
    - Setup progress + **follower count** from `GET /api/athlete/[id]/container/members` (junction count only).
    - Setup tiles for **My Page**, **My Community**, **My Plan**, and **My Content**.
-   - **Share your door** — public URL editor + View public page (not on My Page).
+   - **Share your page** — public URL editor + View public page (not on My Page). Copy: share your page so others can join your personal community.
 
-2. **My Page** (public door editor)
+2. **My Page** (public page editor)
    - Required first.
    - Landing copy + run photo (+ optional profile avatar) via `gofast_with_me` / athlete profile.
-   - Door copy only — no Public URLs pile, no View as member, no My Community teaser.
-   - Strangers decide to follow from `/u/[handle]` and `runner…/{handle}`; **What I'm training for** hydrates from goal/plan on the live door.
+   - Page copy only — no Public URLs pile, no View as member, no My Community teaser.
+   - Strangers decide to follow from `/u/[handle]` and `runner…/{handle}`; **What I'm training for** hydrates from goal/plan on the live page.
 
-3. **My Community** (member room — host side)
+3. **My Community** (personal community — host side)
    - Messages — journey announcements (`gofast_container_messages`, topic `updates`)
    - Followers — list hydrated from `/container/members` on load
    - **View as member** link to `/container/[handle]`
-   - Member view of the same room: `/container/[handle]` (training-for, plan strip, messages, thinking, followers; My Runs v2 collapsed).
+   - Member view of the same community: `/container/[handle]` (training-for, plan strip, messages, thinking, followers; My Runs v2 collapsed).
 
 4. **My Plan** (publish / share)
    - Publish/toggle active GoFast plan (`training_plans` public fields)
@@ -410,16 +410,17 @@ Do not build these:
 Use product language that matches the data:
 
 - **GoFast With Me** — product name for the follower hub and studio (not "athlete container").
-- **My Page** — public door (`/u/[handle]`).
-- **My Community** — member room (messages + followers; host panel + `/container/[handle]` for followers).
+- **My Page** — public page (`/u/[handle]`). User-facing: "page", not "door".
+- **My Community** — personal community (messages + followers; host panel + `/container/[handle]` for followers). User-facing: "community", not "room".
 - **My Plan** — publish/share training plan (`training_plans` public fields); studio sidebar peer.
 - **My Content** — CMS stub for Tips, routes, Blog; studio sidebar peer.
 - **Messages**, **Followers** — sections inside My Community.
-- **What I'm training for** — goal/race on door + hub header (`GoalRaceCard`).
+- **What I'm training for** — goal/race on page + hub header (`GoalRaceCard`).
 - **Plan strip** — training week in the member hub.
 - **My Runs (v2)** — demoted manual hosted runs; not the primary loop.
 - "Follow" / "followers" in member UX.
 - "View as member" for `/container/[handle]`.
-- Legacy labels (Feed/Runs/Community tabs, Surface my plan) map to the four-bin studio.
+- "Share your page" — share so others can join your personal community.
+- Internal code may still say door/room (`DoorSidebar`, front-door bridge helpers); product UI should not.
 
 Avoid language that implies GoFastWithMe owns everything. It does not. GoFastWithMe introduces the athlete; the athlete hydrates the experience.
