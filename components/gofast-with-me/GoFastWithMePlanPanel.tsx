@@ -17,26 +17,27 @@ export default function GoFastWithMePlanPanel({ publicSlug, embedded = false }: 
         <div>
           <h2 className="text-lg font-bold text-gray-900">My plan</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Choose <strong>Public</strong> when you want followers to see your training week on your
-            page and in your community.
+            Go public when you want followers to see your training week on your hub — the plan page is
+            secondary.
           </p>
         </div>
       ) : (
         <div>
           <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">My plan</h3>
           <p className="text-xs text-gray-600 mt-1">
-            Set your plan to Public so followers see your training week in your community.
+            Public plans show your training week on your hub first; preview the full plan page if you
+            want.
           </p>
         </div>
       )}
 
       <GoFastWithMeSetupPanel embedded />
 
-      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-2">
-        <p className="text-sm font-semibold text-gray-900">Preview in member hub</p>
-        <p className="text-xs text-gray-600">
-          When your plan is public, followers see your training week at the top of your GoFast With Me
-          hub — right after What I&apos;m training for.
+      <div className="rounded-xl border border-stone-200 bg-stone-50/80 p-4 space-y-2">
+        <p className="text-sm font-semibold text-gray-900">Where followers see it</p>
+        <p className="text-xs text-gray-600 leading-relaxed">
+          When your plan is public, your training week lives on your GoFast With Me hub — right after
+          What I&apos;m training for. The full plan page is a deeper preview, not the main share surface.
         </p>
         <Link
           href={hubPlanPath}
@@ -44,7 +45,7 @@ export default function GoFastWithMePlanPanel({ publicSlug, embedded = false }: 
           rel="noopener noreferrer"
           className="inline-flex text-sm font-semibold text-orange-600 hover:underline"
         >
-          View hub training week →
+          Open hub training week →
         </Link>
       </div>
 

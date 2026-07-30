@@ -2,17 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Calendar, CheckCircle2, ExternalLink } from 'lucide-react';
+import { Calendar, CheckCircle2, ExternalLink, Loader2, Sparkles } from 'lucide-react';
 import api from '@/lib/api';
 import type { ShareHubPlanStatus } from '@/lib/profile/share-creator-card-logic';
 
 type PlanVisibility = 'DRAFT' | 'PUBLIC' | 'ARCHIVED';
-
-const DESCRIPTION_PROMPTS = [
-  'What race are you training for?',
-  "What's your goal for this block?",
-  'What should followers know about your approach?',
-];
 
 function formatPlanDate(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -25,6 +19,13 @@ function isPlanPublic(plan: ShareHubPlanStatus): boolean {
   return plan.isPublished && plan.publicVisibility === 'PUBLIC';
 }
 
+function planDisplayTitle(plan: ShareHubPlanStatus): string {
+  if (plan.raceName?.trim()) {
+    return `Training plan for ${plan.raceName.trim()}`;
+  }
+  return plan.planName?.trim() || 'Active plan';
+}
+
 export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?: boolean }) {
   const [status, setStatus] = useState<{ plan: ShareHubPlanStatus } | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -32,6 +33,7 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
   const [error, setError] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
+  const [drafting, setDrafting] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const descriptionRef = useRef(description);
@@ -71,16 +73,68 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
   const plan = status?.plan;
   const canPublish = !!plan?.hasActivePlan && !!plan?.hasSchedule;
   const isPublic = plan ? isPlanPublic(plan) : false;
+  const busy = saving || drafting;
+
+  const draftDescription = useCallback(async (): Promise<string | null> => {
+    if (!plan?.planId) return null;
+    setDrafting(true);
+    setError(null);
+    try {
+      const res = await api.post('/public-training-plans/draft-description', {
+        trainingPlanId: plan.planId,
+      });
+      if (res.data?.description && typeof res.data.description === 'string') {
+        const text = res.data.description.trim();
+        if (text) {
+          setDescription(text);
+          return text;
+        }
+      }
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setError(e.response?.data?.error || 'Could not draft description.');
+    } finally {
+      setDrafting(false);
+    }
+    return null;
+  }, [plan?.planId]);
+
+  const saveDescriptionNow = useCallback(
+    async (value: string) => {
+      if (!plan?.publicSlug || !isPlanPublic(plan)) return false;
+      setSaving(true);
+      setError(null);
+      try {
+        await api.patch(`/public-training-plans/${encodeURIComponent(plan.publicSlug)}`, {
+          description: value.trim() || null,
+          visibility: 'PUBLIC' satisfies PlanVisibility,
+        });
+        return true;
+      } catch (err: unknown) {
+        const e = err as { response?: { data?: { error?: string } } };
+        setError(e.response?.data?.error || 'Could not save description.');
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [plan]
+  );
 
   const persistVisibility = async (nextPublic: boolean) => {
-    if (!plan?.planId || saving) return;
+    if (!plan?.planId || busy) return;
     setSaving(true);
     setError(null);
     try {
       if (nextPublic) {
+        let desc = description.trim();
+        if (!desc) {
+          const drafted = await draftDescription();
+          desc = drafted?.trim() ?? '';
+        }
         await api.post('/public-training-plans', {
           sourceTrainingPlanId: plan.planId,
-          description: description.trim() || null,
+          description: desc || null,
           visibility: 'PUBLIC' satisfies PlanVisibility,
         });
         flashSuccess('Your plan is public for followers.');
@@ -106,21 +160,9 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
   const persistDescription = useCallback(
     async (value: string) => {
       if (!plan?.publicSlug || !isPlanPublic(plan) || saving) return;
-      setSaving(true);
-      setError(null);
-      try {
-        await api.patch(`/public-training-plans/${encodeURIComponent(plan.publicSlug)}`, {
-          description: value.trim() || null,
-          visibility: 'PUBLIC' satisfies PlanVisibility,
-        });
-      } catch (err: unknown) {
-        const e = err as { response?: { data?: { error?: string } } };
-        setError(e.response?.data?.error || 'Could not save description.');
-      } finally {
-        setSaving(false);
-      }
+      await saveDescriptionNow(value);
     },
-    [plan, saving]
+    [plan, saveDescriptionNow, saving]
   );
 
   useEffect(() => {
@@ -138,6 +180,17 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [description, isPublic, plan?.publicDescription, plan?.publicSlug, persistDescription]);
+
+  const handleRegenerate = async () => {
+    if (busy || !plan?.planId) return;
+    const drafted = await draftDescription();
+    if (!drafted?.trim()) return;
+    const ok = await saveDescriptionNow(drafted);
+    if (ok) {
+      flashSuccess('Draft refreshed — edit anything you want changed.');
+      await loadStatus(true);
+    }
+  };
 
   const raceLine = [plan?.raceName, plan?.raceDistanceLabel].filter(Boolean).join(' · ');
   const durationLine =
@@ -168,11 +221,11 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
       ) : error && !plan?.hasActivePlan ? (
         <p className="text-sm text-red-600">{error}</p>
       ) : !plan?.hasActivePlan ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-3">
+        <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm space-y-3">
           <p className="text-sm text-gray-700">No active training plan yet.</p>
           <Link
             href="/training-setup"
-            className="inline-flex rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
+            className="inline-flex rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
           >
             Build a plan
           </Link>
@@ -192,13 +245,13 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
             </div>
           ) : null}
 
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-3">
+          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-3">
             <div className="flex items-start gap-3">
-              <div className="rounded-lg bg-violet-100 p-2 text-violet-700">
+              <div className="rounded-lg bg-stone-100 p-2 text-stone-700">
                 <Calendar className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-semibold text-gray-900">{plan.planName ?? 'Active plan'}</h3>
+                <h3 className="text-sm font-semibold text-gray-900">{planDisplayTitle(plan)}</h3>
                 {summaryParts.length > 0 ? (
                   <p className="mt-1.5 text-sm text-gray-600">{summaryParts.join(' · ')}</p>
                 ) : null}
@@ -211,7 +264,7 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
             {!plan.hasSchedule ? (
               <Link
                 href={plan.planId ? `/training-setup/${plan.planId}` : '/training-setup'}
-                className="inline-flex rounded-lg border border-violet-300 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-900 hover:bg-violet-100"
+                className="inline-flex rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-900 hover:bg-sky-100"
               >
                 Finish generating schedule
               </Link>
@@ -219,13 +272,13 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
           </div>
 
           {canPublish ? (
-            <div className="rounded-2xl border border-violet-200 bg-violet-50/40 p-5 shadow-sm space-y-4">
+            <div className="rounded-2xl border border-stone-200 bg-stone-50/70 p-5 shadow-sm space-y-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Sharing</h3>
                   <p className="text-xs text-gray-600 mt-1">
                     {isPublic
-                      ? 'Followers see your training week on your page and in your community.'
+                      ? 'Followers see your training week on your hub and in your community.'
                       : 'Your plan is private — only you can see it.'}
                   </p>
                 </div>
@@ -238,7 +291,7 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
 
               <VisibilityToggle
                 isPublic={isPublic}
-                disabled={saving}
+                disabled={busy}
                 onChange={(nextPublic) => void persistVisibility(nextPublic)}
               />
 
@@ -254,54 +307,55 @@ export default function GoFastWithMeSetupPanel({ embedded = false }: { embedded?
                     ) : null}
                   </div>
 
-                  {plan.publicSlug ? (
-                    <div className="rounded-lg border border-violet-100 bg-white px-3 py-2 text-xs">
-                      <p className="text-gray-500">Plan link</p>
-                      <p className="mt-0.5 font-mono text-[11px] text-gray-900 break-all">
-                        {plan.publicSlug}
-                      </p>
-                    </div>
-                  ) : null}
-
                   <div className="space-y-2">
                     <label htmlFor="public-description" className="text-xs font-semibold text-gray-700">
-                      Description for followers
+                      Intro for followers
                     </label>
-                    <p className="text-xs text-gray-500">
-                      A short blurb on your public plan page — race, goal, or what you&apos;re chasing.
+                    <p className="text-xs text-gray-600 leading-relaxed">
+                      This short blurb appears under your plan title on your public plan page. Race,
+                      distance, weeks, and goal already show from your plan — use this to add voice or
+                      context in your own words.
                     </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {DESCRIPTION_PROMPTS.map((prompt) => (
-                        <button
-                          key={prompt}
-                          type="button"
-                          onClick={() => setDescription(prompt)}
-                          className="rounded-full border border-violet-200 bg-white px-2.5 py-1 text-[11px] font-medium text-violet-800 hover:bg-violet-50"
-                        >
-                          {prompt}
-                        </button>
-                      ))}
-                    </div>
                     <textarea
                       id="public-description"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      rows={3}
+                      rows={4}
                       maxLength={4000}
-                      className="w-full rounded-lg border border-gray-300 p-3 text-sm bg-white"
-                      placeholder="Tell followers what this plan is about…"
+                      disabled={drafting}
+                      className="w-full rounded-lg border border-stone-300 p-3 text-sm bg-white disabled:opacity-60"
+                      placeholder="We draft this from your plan when you go public — edit anything you want changed."
                     />
-                    {saving ? (
-                      <p className="text-[11px] text-gray-500">Saving…</p>
-                    ) : null}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => void handleRegenerate()}
+                        disabled={busy}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-stone-50 disabled:opacity-50"
+                      >
+                        {drafting ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                        ) : (
+                          <Sparkles className="h-3.5 w-3.5 text-sky-600" aria-hidden />
+                        )}
+                        Regenerate draft
+                      </button>
+                      {saving ? (
+                        <p className="text-[11px] text-gray-500">Saving…</p>
+                      ) : drafting ? (
+                        <p className="text-[11px] text-gray-500">Drafting from your plan…</p>
+                      ) : null}
+                    </div>
                   </div>
 
                   {plan.publicSlug ? (
                     <Link
                       href={`/plans/${encodeURIComponent(plan.publicSlug)}`}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300 bg-white px-4 py-2 text-sm font-semibold text-violet-900 hover:bg-violet-50"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-sm font-semibold text-sky-700 hover:underline"
                     >
-                      Preview plan
+                      Preview plan page
                       <ExternalLink className="h-3.5 w-3.5" />
                     </Link>
                   ) : null}
@@ -338,7 +392,7 @@ function VisibilityToggle({
 }) {
   return (
     <div
-      className="inline-flex rounded-lg border border-gray-300 bg-white p-0.5"
+      className="inline-flex rounded-lg border border-stone-300 bg-white p-0.5"
       role="group"
       aria-label="Plan visibility"
     >
@@ -348,7 +402,7 @@ function VisibilityToggle({
         onClick={() => onChange(false)}
         className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50 ${
           !isPublic
-            ? 'bg-gray-900 text-white shadow-sm'
+            ? 'bg-stone-800 text-white shadow-sm'
             : 'text-gray-600 hover:text-gray-900'
         }`}
         aria-pressed={!isPublic}
@@ -361,7 +415,7 @@ function VisibilityToggle({
         onClick={() => onChange(true)}
         className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50 ${
           isPublic
-            ? 'bg-violet-600 text-white shadow-sm'
+            ? 'bg-sky-600 text-white shadow-sm'
             : 'text-gray-600 hover:text-gray-900'
         }`}
         aria-pressed={isPublic}
