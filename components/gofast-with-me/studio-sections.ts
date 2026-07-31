@@ -29,7 +29,7 @@ export const STUDIO_BIN_LABELS: Record<StudioSection, string> = {
 export const STUDIO_BIN_DESCRIPTIONS: Record<StudioSection, string> = {
   page: "Your public page — landing copy, photo, and What I'm training for",
   community: 'Your personal community — messages and followers',
-  workouts: 'Your training week and plan sharing for followers',
+  workouts: 'Plan sharing studio — title, intro, preview, and GoRun With Me builder',
   content: 'Tips, routes, and blog posts for your hub',
 };
 

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Calendar, ExternalLink, Plus, Route } from 'lucide-react';
 import api from '@/lib/api';
-import GoFastWithMeSetupPanel from '@/components/gofast-with-me/GoFastWithMeSetupPanel';
 import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
 
 type Props = {
@@ -140,7 +139,12 @@ export default function GoFastWithMeRunsPanel({ athleteId, publicSlug }: Props) 
             </p>
           </div>
         </div>
-        <GoFastWithMeSetupPanel embedded />
+        <Link
+          href="/gofast-with-others"
+          className="inline-flex rounded-lg border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-900 hover:bg-violet-100"
+        >
+          Open My Workouts in studio
+        </Link>
       </div>
     </section>
   );

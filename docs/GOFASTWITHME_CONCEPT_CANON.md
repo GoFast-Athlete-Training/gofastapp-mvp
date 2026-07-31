@@ -128,9 +128,8 @@ Use names that match the fork:
    - Important naming correction: old `gofast_page_routes` meant athlete/run routes attached to the GoFastWithMe page, not Next.js page routes. Future naming should be `myRunRoutes`.
 
 2. `GoFastWithMe My Workouts`
-   - Creator-facing mirror of the active training week (same week strip as My Training).
-   - Lets the athlete connect/publish/toggle the active training plan and edit public plan title + follower intro.
-   - Hydrates from signed-in `Athlete.id` and active `planId`.
+   - Editor-first plan sharing studio — title, follower intro, visibility, public preview.
+   - Optional workout-backed GoRun With Me builder via existing let-others-join flow.
 
 3. `GoFastWithMe Member Manager`
    - Controls how the athlete speaks to and shares with their specific audience.
@@ -155,9 +154,8 @@ There are three related surfaces, but they are not the same thing:
 
 3. `My Workouts`
    - This is the pass-2 setup area (replaces legacy **My Plan** naming in studio).
-   - Primary UI: active plan week strip (`GET /api/training/plan/week`, same cards as My Training).
-   - Secondary UI: plan sharing — Private/Public toggle, canonical `training_plans.name`, follower intro, first-public review step.
-   - Workout-to-hosted-run activation is deferred; see `docs/MY_WORKOUTS_RUNWITHME_FUTURE.md`.
+   - Primary UI: plan sharing editor — canonical `training_plans.name`, follower intro, Private/Public.
+   - On demand: hub preview and workout-backed GoRun With Me builder (`docs/MY_WORKOUTS_RUNWITHME_FUTURE.md`).
 
 Pause the model here before adding pass-3 ideas.
 
@@ -344,12 +342,12 @@ The studio (`/gofast-with-others`) is **Studio Central + four peer bins** — pa
    - **View as member** link to `/container/[handle]`
    - Member view of the same community: `/container/[handle]` (training-for, plan strip, messages, thinking, followers; My Runs v2 collapsed).
 
-4. **My Workouts** (creator week + plan sharing)
-   - Primary: active plan week strip — same hydration as My Training (`PlanWeekViewer`, `/training/day/{dateKey}` for execution).
-   - Secondary: publish/toggle active GoFast plan (`training_plans` public fields), editable canonical plan title, follower intro.
+4. **My Workouts** (plan sharing studio)
+   - Primary: plan title, follower intro, Private/Public, explicit save — polish before publishing.
+   - On demand: **See how your plan looks to others** opens the follower hub plan strip (`/container/{handle}#plan-strip`); full plan page is secondary.
+   - On demand: **Build a GoRun With Me** opens a compact workout picker, then the existing `/workouts/{id}/let-others-join` flow.
    - First-time Public shows **Review what followers will see** with optional title edit; republish after Private skips review.
-   - Owns plan publish — not buried inside My Community.
-   - No MVP1 workout-to-hosted-run CTA; future handoff documented in `docs/MY_WORKOUTS_RUNWITHME_FUTURE.md`.
+   - Full training execution stays in **My Training** — not duplicated in studio.
 
 5. **My Content** (CMS stub)
    - Tips, myRunRoutes, Blog — athlete-scoped CMS capability (`athlete_tips`, etc.)
@@ -413,7 +411,7 @@ Use product language that matches the data:
 - **GoFast With Me** — product name for the follower hub and studio (not "athlete container").
 - **My Page** — public page (`/u/[handle]`). User-facing: "page", not "door".
 - **My Community** — personal community (messages + followers; host panel + `/container/[handle]` for followers). User-facing: "community", not "room".
-- **My Workouts** — creator week strip + publish/share training plan (`training_plans` public fields, canonical `name`); studio sidebar peer. Replaces legacy **My Plan** label.
+- **My Workouts** — plan sharing studio (title, intro, preview, GoRun With Me builder); studio sidebar peer. Replaces legacy **My Plan** label.
 - **My Content** — CMS stub for Tips, routes, Blog; studio sidebar peer.
 - **Messages**, **Followers** — sections inside My Community.
 - **What I'm training for** — goal/race on page + hub header (`GoalRaceCard`).

@@ -106,6 +106,17 @@ export default function GoFastWithOthersDashboard() {
     setActiveView(section);
   }, []);
 
+  const refreshShareHubStatus = useCallback(async () => {
+    try {
+      const res = await api.get('/me/share-hub-status');
+      if (res.data?.status) {
+        setShareHubStatus(res.data.status as ShareHubStatus);
+      }
+    } catch {
+      /* keep last known status */
+    }
+  }, []);
+
   useEffect(() => {
     setIntroDismissed(readStudioIntroDismissed());
   }, []);
@@ -367,7 +378,13 @@ export default function GoFastWithOthersDashboard() {
         );
       case "workouts":
         return (
-          <GoFastWithMeWorkoutsPanel publicSlug={publicSlug} firstName={firstName} />
+          <GoFastWithMeWorkoutsPanel
+            publicSlug={publicSlug}
+            firstName={firstName}
+            plan={shareHubStatus?.plan ?? null}
+            planLoading={shareHubStatus == null}
+            onRefreshPlanStatus={refreshShareHubStatus}
+          />
         );
       case "content":
         return (

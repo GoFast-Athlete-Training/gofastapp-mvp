@@ -9,6 +9,7 @@ import {
 } from "@/lib/slug-utils";
 import { assignUniqueWorkoutShareSlug } from "@/lib/workout-public-slug";
 import { parseCalendarDateForWrite } from "@/lib/calendar-date";
+import { WORKOUT_BACKED_CITY_RUN_VISIBILITY } from '@/lib/cityrun/workout-backed-run-visibility';
 import { autoRsvpHostGoing, buildJoinRunSignupUrl } from "@/lib/host-run-rsvp";
 
 export const dynamic = "force-dynamic";
@@ -305,7 +306,7 @@ export async function POST(request: NextRequest) {
       athleteGeneratedId: athlete.id,
       cityRunType: 'INDIVIDUAL',
       title: finalTitle,
-      workflowStatus: "APPROVED",
+      ...WORKOUT_BACKED_CITY_RUN_VISIBILITY,
       dayOfWeek: null,
       date: runDateObj,
       startTimeHour: parseHour(startTimeHour ?? null),
