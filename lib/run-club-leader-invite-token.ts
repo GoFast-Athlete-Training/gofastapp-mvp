@@ -23,6 +23,16 @@ export function buildClubManagerActivateUrl(token: string, baseUrl?: string): st
   return `${base.replace(/\/$/, '')}/club-manager/activate?token=${encodeURIComponent(token)}`;
 }
 
+export function buildClubManagerWelcomeUrl(baseUrl?: string): string {
+  const base = baseUrl ?? getClubManagerAppUrl();
+  return `${base.replace(/\/$/, '')}/welcome-clubmanager`;
+}
+
+export function buildClubManagerHubUrl(baseUrl?: string): string {
+  const base = baseUrl ?? getClubManagerAppUrl();
+  return `${base.replace(/\/$/, '')}/club-manager`;
+}
+
 /** @deprecated Use buildClubManagerActivateUrl — kept for internal callers during rollout */
 export function buildClubOwnerInviteUrl(token: string, baseUrl?: string): string {
   return buildClubManagerActivateUrl(token, baseUrl);

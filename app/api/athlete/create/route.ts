@@ -266,13 +266,11 @@ export async function POST(request: Request) {
       console.log('✅ ATHLETE CREATE: New athlete record created successfully:', athlete.id);
     }
 
-    // If club leader intent, set role so front door routes to /leader (welcome run club leader UX)
+    // Club leader intent: product distinction only (authorization is membership-scoped).
     if (onboardingIntent === 'CLUB_LEADER') {
-      athlete = await prisma.athlete.update({
-        where: { id: athlete.id },
-        data: { role: 'CLUB_LEADER' },
-      });
-      console.log('✅ ATHLETE CREATE: Role set to CLUB_LEADER for athlete:', athlete.id);
+      const { upsertAthleteProductRole } = await import('@/lib/athlete-product-roles');
+      await upsertAthleteProductRole(athlete.id, 'CLUB_LEADER');
+      console.log('✅ ATHLETE CREATE: Product role CLUB_LEADER upserted for athlete:', athlete.id);
     }
 
     // New athlete only — fire transactional email trigger on Company stack

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { listLeaderMemberships } from '@/lib/run-club-leader-auth';
+import { syncClubLeaderProductRole } from '@/lib/athlete-product-roles';
 import type { RunClubLeaderRole } from '@/lib/run-club-leader-scope';
 import {
   canonicalClubManagerRoleForStorage,
@@ -413,14 +414,6 @@ export async function attachClubLeaderClaim(athleteId: string, athleteEmail: str
       },
     });
 
-    await tx.athlete.update({
-      where: { id: athleteId },
-      data: {
-        role: 'CLUB_LEADER',
-        runClubId: claim.runClubId,
-      },
-    });
-
     await tx.run_club_leader_claims.update({
       where: { id: claim.id },
       data: {
@@ -430,6 +423,8 @@ export async function attachClubLeaderClaim(athleteId: string, athleteEmail: str
       },
     });
   });
+
+  await syncClubLeaderProductRole(athleteId);
 
   return getAttachResult(athleteId, claim.runClubId);
 }

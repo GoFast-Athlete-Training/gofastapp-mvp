@@ -130,6 +130,7 @@ model Athlete {
   run_crew_messages       run_crew_messages[]
   run_club_memberships    run_club_memberships[]
   run_club_leader_claims    run_club_leader_claims[]
+  athlete_product_roles   athlete_product_roles[]
   run_club_announcements  run_club_announcements[]
   run_club_events         run_club_events[]
   run_club_event_rsvps    run_club_event_rsvps[]
@@ -943,6 +944,19 @@ model run_club_memberships {
   @@index([runClubId])
   @@index([athleteId])
   @@map("run_club_memberships")
+}
+
+/// Product-scoped athlete distinctions (non-authorizing). e.g. CLUB_LEADER, AMBASSADOR.
+model athlete_product_roles {
+  id        String      @id @default(cuid())
+  athleteId String
+  role      AthleteRole
+  createdAt DateTime    @default(now())
+  Athlete   Athlete     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([athleteId, role])
+  @@index([role])
+  @@map("athlete_product_roles")
 }
 
 /// Pre-seeded club-owner slots from Company — athlete claims by verified email match.
