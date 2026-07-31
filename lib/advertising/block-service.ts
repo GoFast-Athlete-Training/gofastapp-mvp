@@ -4,7 +4,7 @@ import {
   AdvertisingCandidateStatus,
   type advertising_blocks,
 } from "@prisma/client";
-import { getCandidateForPurchase } from "@/lib/advertising/candidate-service";
+import { getCandidateByIdForPurchase } from "@/lib/advertising/candidate-service";
 
 export type BlockCreativeSnapshot = {
   creativeId: string;
@@ -18,7 +18,6 @@ export type BlockCreativeSnapshot = {
 export type CreateBlockInput = {
   sourcePurchaseId: string;
   candidateId: string;
-  candidateCode: string;
   advertiserCompanyId: string;
   advertiserCompanyName?: string | null;
   amountCents: number;
@@ -72,9 +71,9 @@ export async function createAdvertisingBlockFromPurchase(
   });
   if (existing) return existing;
 
-  const candidate = await getCandidateForPurchase(input.candidateId, input.candidateCode);
+  const candidate = await getCandidateByIdForPurchase(input.candidateId);
   if (!candidate) {
-    throw new Error("Candidate not found, not eligible, or ID/code mismatch");
+    throw new Error("Candidate not found or not eligible");
   }
 
   const overlap = await findOverlappingActiveBlock(

@@ -54,7 +54,6 @@ export async function POST(request: NextRequest) {
     const block = await createAdvertisingBlockFromPurchase({
       sourcePurchaseId,
       candidateId: snapshot.advertisingCandidateId,
-      candidateCode: snapshot.advertisingCandidateCode,
       advertiserCompanyId: snapshot.advertiserCompanyId,
       advertiserCompanyName: snapshot.advertiserCompanyName,
       amountCents: snapshot.amountCents,
@@ -86,12 +85,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Block creation failed";
-    const status =
-      message.includes("not eligible") ||
-      message.includes("overlapping") ||
-      message.includes("mismatch")
-        ? 409
-        : 500;
+    const status = message.includes("not eligible") || message.includes("overlapping") ? 409 : 500;
     console.error("POST /api/advertising/blocks/create:", error);
     return NextResponse.json({ success: false, error: message }, { status });
   }

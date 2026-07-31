@@ -27,10 +27,6 @@
     {
       "path": "/api/cron/advance-club-run-instances",
       "schedule": "0 3 * * 1"
-    },
-    {
-      "path": "/api/cron/advertising-blocks/expire",
-      "schedule": "0 * * * *"
     }
   ]
 }
