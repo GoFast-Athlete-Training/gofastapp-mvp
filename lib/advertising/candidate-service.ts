@@ -209,6 +209,35 @@ export async function getEligibleCandidateByCode(
   return candidate ? toCandidatePublicFields(candidate) : null;
 }
 
+export function validateCandidatePurchaseIdentity(
+  candidate: Pick<advertising_candidates, "id" | "code" | "status" | "candidateType">,
+  candidateId: string,
+  candidateCode: string,
+): boolean {
+  return (
+    candidate.id === candidateId &&
+    candidate.code === candidateCode &&
+    candidate.status === AdvertisingCandidateStatus.ELIGIBLE &&
+    candidate.candidateType === AdvertisingCandidateType.ATHLETE
+  );
+}
+
+export async function getCandidateForPurchase(
+  candidateId: string,
+  candidateCode: string,
+): Promise<advertising_candidates | null> {
+  const candidate = await prisma.advertising_candidates.findFirst({
+    where: {
+      id: candidateId,
+      code: candidateCode,
+      status: AdvertisingCandidateStatus.ELIGIBLE,
+      candidateType: AdvertisingCandidateType.ATHLETE,
+    },
+  });
+  return candidate;
+}
+
+/** @deprecated Use getCandidateForPurchase with candidate code validation */
 export async function getCandidateByIdForPurchase(
   candidateId: string,
 ): Promise<advertising_candidates | null> {

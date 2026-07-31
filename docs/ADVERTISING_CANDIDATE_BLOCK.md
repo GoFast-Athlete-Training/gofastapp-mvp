@@ -18,8 +18,8 @@ Prod owns eligibility (`advertising_candidates`) and durable purchases (`adverti
 
 - `GET /api/advertising/candidates` — eligible candidates for Brand
 - `GET /api/advertising/candidates/[code]` — lookup by purchase code
-- `POST /api/advertising/blocks/create` — Firebase-verified Block creation
-- `POST /api/cron/advertising-blocks/expire` — status maintenance
+- `POST /api/advertising/blocks/create` — Firebase-verified Block creation (validates candidate ID **and** code)
+- `POST /api/cron/advertising-blocks/expire` — hourly status maintenance (scheduled in `vercel.json`)
 
 ## Page hydration
 
