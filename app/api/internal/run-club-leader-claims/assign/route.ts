@@ -39,7 +39,11 @@ export async function POST(request: NextRequest) {
 
     let athleteId = body.athleteId?.trim();
     if (!athleteId && body.email?.trim()) {
-      const matches = await lookupAthletesByEmail(body.email);
+      const normalizedEmail = normalizeLeaderEmail(body.email);
+      if (!normalizedEmail) {
+        return NextResponse.json({ success: false, error: 'email is invalid' }, { status: 400 });
+      }
+      const matches = await lookupAthletesByEmail(normalizedEmail);
       if (matches.length === 0) {
         return NextResponse.json({ success: false, error: 'No athlete found for email' }, { status: 404 });
       }
@@ -65,6 +69,9 @@ export async function POST(request: NextRequest) {
 
     if (body.email?.trim()) {
       const normalized = normalizeLeaderEmail(body.email);
+      if (!normalized) {
+        return NextResponse.json({ success: false, error: 'email is invalid' }, { status: 400 });
+      }
       const matches = await lookupAthletesByEmail(normalized);
       const match = matches.find((a) => a.athleteId === athleteId);
       if (!match) {
