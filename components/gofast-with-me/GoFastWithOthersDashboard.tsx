@@ -389,6 +389,7 @@ export default function GoFastWithOthersDashboard() {
       case "content":
         return (
           <GoFastWithMeCmsContentSection
+            athleteId={athleteId}
             liveUrl={liveUrl}
             onOpenWorkouts={() => openWorkspace("workouts")}
             onOpenCommunity={() => openWorkspace("community")}

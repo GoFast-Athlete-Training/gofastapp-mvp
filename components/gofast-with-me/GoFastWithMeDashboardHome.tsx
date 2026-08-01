@@ -96,7 +96,8 @@ export default function GoFastWithMeDashboardHome({
         <div>
           <h2 className="text-lg font-bold text-gray-900">{STUDIO_CENTRAL_LABEL}</h2>
           <p className="text-sm text-gray-600 mt-0.5">
-            Your numbers — setup status, invite link, and followers. Use the sidebar to open each workspace.
+            Your community at a glance — setup status, invite link, followers, and the tools that
+            hydrate your public hub.
           </p>
         </div>
 
@@ -116,24 +117,23 @@ export default function GoFastWithMeDashboardHome({
               onClick={() => onOpenWorkspace('page')}
             />
             <StoplightChip
-              label="Workouts"
+              label="Runs/Training"
               light={planStoplight(planLive)}
               hint={planLive ? 'Public' : 'Private'}
               onClick={() => onOpenWorkspace('workouts')}
             />
             <StoplightChip
-              label="Content"
+              label="Tips"
               light="gray"
-              hint="Soon"
+              hint="Library"
               onClick={() => onOpenWorkspace('content')}
-              muted
             />
           </div>
         </div>
 
         {pageStatus !== 'ready' ? (
           <p className="text-xs text-amber-800 px-1">
-            Page still needs work — use <strong>My Page</strong> in the sidebar.
+            Page still needs work — use <strong>Page Settings</strong> in the sidebar.
           </p>
         ) : null}
       </div>

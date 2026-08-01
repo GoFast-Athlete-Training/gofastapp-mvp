@@ -8,6 +8,8 @@ import {
   normalizeGoFastWithMeSlug,
 } from '@/lib/gofast-with-me/gofast-with-me-service';
 import { resolvePublicActions } from '@/lib/gofast-with-me/resolve-public-actions';
+import { listPublishedAthleteTips } from '@/lib/gofast-with-me/athlete-tips';
+import { listPublicInstagramMedia } from '@/lib/gofast-with-me/instagram-hydration';
 
 const METERS_PER_MILE = 1609.344;
 
@@ -87,6 +89,8 @@ export async function loadPublicAthletePage(rawHandle: string) {
     lastActivity,
     workoutRows,
     weeklyAggregate,
+    athleteTips,
+    instagramMedia,
   ] = await Promise.all([
     prisma.athlete_race_signups.findMany({
       where: { athleteId: athlete.id },
@@ -194,6 +198,8 @@ export async function loadPublicAthletePage(rawHandle: string) {
       },
       _sum: { distance: true },
     }),
+    listPublishedAthleteTips(athlete.id, 6),
+    listPublicInstagramMedia(athlete.id, 5),
   ]);
 
   const signedUpRaces = raceSignupRows
@@ -463,6 +469,9 @@ export async function loadPublicAthletePage(rawHandle: string) {
       primarySport: athlete.primarySport,
       fiveKPace: athlete.fiveKPace,
       weeklyMileage: athlete.weeklyMileage,
+      instagram: athlete.instagram,
+      instagramUsername: athlete.instagramUsername,
+      instagramConnected: Boolean(athlete.instagramUserId),
     },
     trainingSummary,
     primaryChasingGoal,
@@ -471,6 +480,8 @@ export async function loadPublicAthletePage(rawHandle: string) {
     signedUpRaces,
     upcomingWorkouts,
     upcomingRuns,
+    athleteTips,
+    instagramMedia,
     activeSponsorship,
   };
 }

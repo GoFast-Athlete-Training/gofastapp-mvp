@@ -18,34 +18,34 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
   slug: GOFAST_WITH_ME_STUDIO_TUTORIAL_SLUG,
   name: 'GoFast With Me Studio',
   summary:
-    'Four places: My Page is your public page. My Community is your personal community. My Workouts is your plan sharing studio. My Content is for tips, routes, and blog posts.',
+    'My Community is the studio: Dashboard shows the hub, Updates & Members manages the daily feed, Runs & Training shares plans and GoRuns, Page Settings controls the public front door, and Tips & Thinking holds durable advice.',
   steps: [
     {
       id: 'page',
-      title: 'My Page — your page',
+      title: 'Page Settings — public front door',
       instruction:
         'Your public landing where strangers see who you are and What I\'m training for before they follow.',
       sortOrder: 0,
     },
     {
       id: 'community',
-      title: 'My Community — personal community',
+      title: 'Updates & Members — daily community',
       instruction:
-        'Your personal community — post journey messages and see who followed you.',
+        'Post journey updates, review Chatter, preview follower view, and see who followed you.',
       sortOrder: 1,
     },
     {
       id: 'workouts',
-      title: 'My Workouts — plan sharing',
+      title: 'Runs & Training — plan sharing',
       instruction:
         'Polish your plan title and follower intro, preview the public hub, and build a GoRun With Me when ready.',
       sortOrder: 2,
     },
     {
       id: 'content',
-      title: 'My Content — cms',
+      title: 'Tips & Thinking — durable content',
       instruction:
-        'Tips, routes, and blog posts that hydrate your public landing (editors coming soon).',
+        'Publish athlete-owned tips that hydrate your public page and community outside the daily update feed.',
       sortOrder: 3,
     },
   ],

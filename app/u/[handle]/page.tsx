@@ -8,6 +8,8 @@ import DoorSidebar from './_components/DoorSidebar';
 import RunWithMe from './_components/RunWithMe';
 import GroupTrainingCard from './_components/GroupTrainingCard';
 import { ProfileContainerSponsorshipSlot } from './_components/ProfileContainerSponsorshipSlot';
+import AthleteTipsSection from '@/components/gofast-with-me/AthleteTipsSection';
+import AthleteInstagramSection from '@/components/gofast-with-me/AthleteInstagramSection';
 
 export const dynamic = 'force-dynamic';
 
@@ -132,6 +134,18 @@ export default async function PublicAthletePage({
         </div>
 
         <div className="mt-12 space-y-8">
+          {data.athleteTips.length > 0 ? (
+            <AthleteTipsSection
+              tips={data.athleteTips}
+              hostFirstName={data.athlete.firstName}
+            />
+          ) : null}
+
+          <AthleteInstagramSection
+            media={data.instagramMedia}
+            username={data.athlete.instagramUsername || data.athlete.instagram}
+          />
+
           {data.joinableGroupTraining ? (
             <GroupTrainingCard cohort={data.joinableGroupTraining} />
           ) : null}

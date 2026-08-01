@@ -60,6 +60,14 @@ model Athlete {
   primarySport            String?
   bio                     String?
   instagram               String?
+  /// Instagram Graph API connection metadata. Token stays server-side only.
+  instagramUserId         String?                  @unique
+  instagramUsername       String?
+  instagramAccountType    String?
+  instagramAccessTokenEncrypted String?
+  instagramTokenExpiresAt DateTime?
+  instagramConnectedAt    DateTime?
+  instagramLastSyncedAt   DateTime?
   /// Opt-in: GoFast Page acts as a lightweight community (membership + chatter).
   isGoFastContainer       Boolean                  @default(false)
   garmin_user_id          String?                  @unique
@@ -170,6 +178,7 @@ model Athlete {
   athlete_appnotification_devices     athlete_appnotification_devices[]
   gofast_with_me              gofast_with_me?
   athlete_tips                athlete_tips[]
+  athlete_instagram_media     athlete_instagram_media[]
   sponsorship_candidate sponsorship_candidates?
 }
 
@@ -312,6 +321,27 @@ model athlete_tips {
   @@index([athleteId, sortOrder])
   @@index([athleteId, isPublished])
   @@map("athlete_tips")
+}
+
+/// Public-safe Instagram media snapshot for hydrating athlete public/community surfaces.
+model athlete_instagram_media {
+  id               String   @id @default(cuid())
+  athleteId        String
+  instagramMediaId String
+  mediaType        String
+  mediaUrl         String?
+  thumbnailUrl     String?
+  permalink        String?
+  caption          String?  @db.Text
+  timestamp        DateTime?
+  raw              Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  athlete          Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([athleteId, instagramMediaId])
+  @@index([athleteId, timestamp])
+  @@map("athlete_instagram_media")
 }
 
 /// Human coach — first-class entity (Firebase auth), parallel to Athlete.

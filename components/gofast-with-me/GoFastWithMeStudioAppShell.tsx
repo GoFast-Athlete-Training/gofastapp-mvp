@@ -45,8 +45,8 @@ export default function GoFastWithMeStudioAppShell({
       <div className="flex flex-1 min-h-0 flex-col overflow-hidden md:flex-row">
         <aside className="w-full bg-white border-b-2 border-gray-200 flex flex-col shrink-0 md:w-64 md:border-b-0 md:border-r-2 md:overflow-y-auto">
           <div className="p-4 border-b border-gray-200">
-            <p className="text-lg font-bold text-gray-900">GoFast With Me</p>
-            <p className="text-xs text-gray-500 mt-1">Page · Community · Workouts · Content</p>
+            <p className="text-lg font-bold text-gray-900">My Community</p>
+            <p className="text-xs text-gray-500 mt-1">Dashboard · Updates · Runs · Tips</p>
           </div>
 
           <nav className="p-2 md:flex-1 md:space-y-1" aria-label="Studio">

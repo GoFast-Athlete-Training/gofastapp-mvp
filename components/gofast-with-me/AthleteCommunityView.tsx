@@ -21,6 +21,8 @@ import GoFastWithMePlanStripSection from '@/components/gofast-with-me/GoFastWith
 import ContainerHubRunsSection from '@/components/gofast-with-me/ContainerHubRunsSection';
 import GoFastWithMeHubFeed from '@/components/gofast-with-me/GoFastWithMeHubFeed';
 import GoFastWithMeFollowersSection from '@/components/gofast-with-me/GoFastWithMeFollowersSection';
+import AthleteTipsSection from '@/components/gofast-with-me/AthleteTipsSection';
+import AthleteInstagramSection from '@/components/gofast-with-me/AthleteInstagramSection';
 
 type Props = {
   handle: string;
@@ -273,7 +275,7 @@ export default function AthleteCommunityView({ handle }: Props) {
               <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Plan</h2>
               <p className="text-sm text-gray-600 mt-2">
                 {displayAsOwner
-                  ? 'Publish your plan in My Workouts so followers can see your training week here.'
+                  ? 'Publish your plan in Runs & Training so followers can see your training week here.'
                   : `${firstName} hasn't shared a public plan yet.`}
               </p>
               {displayAsOwner ? (
@@ -281,7 +283,7 @@ export default function AthleteCommunityView({ handle }: Props) {
                   href="/gofast-with-others"
                   className="mt-3 inline-flex text-sm font-semibold text-orange-600 hover:underline"
                 >
-                  Open My Workouts →
+                  Open Runs &amp; Training →
                 </Link>
               ) : null}
             </div>
@@ -320,6 +322,14 @@ export default function AthleteCommunityView({ handle }: Props) {
             </Link>
           ) : null}
         </section>
+
+        <AthleteTipsSection
+          tips={community.tips}
+          hostFirstName={firstName}
+          isOwner={displayAsOwner}
+        />
+
+        <AthleteInstagramSection media={community.instagramMedia} />
 
         <ContainerHubRunsSection
             runs={community.upcomingRuns}

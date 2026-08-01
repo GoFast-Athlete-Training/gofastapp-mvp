@@ -6,11 +6,12 @@ import {
 } from '@/lib/gofast-with-me/gofast-with-bridge';
 
 /** Canonical sections on `/u/{handle}/community`. */
-export type AthleteCommunitySection = 'plan' | 'updates' | 'goruns' | 'chatter' | 'followers';
+export type AthleteCommunitySection = 'plan' | 'updates' | 'tips' | 'goruns' | 'chatter' | 'followers';
 
 export const ATHLETE_COMMUNITY_SECTIONS: { id: AthleteCommunitySection; label: string }[] = [
   { id: 'plan', label: 'Plan' },
   { id: 'updates', label: 'Updates' },
+  { id: 'tips', label: 'Tips' },
   { id: 'goruns', label: 'GoRuns' },
   { id: 'chatter', label: 'Chatter' },
   { id: 'followers', label: 'Followers' },
@@ -38,6 +39,8 @@ const LEGACY_CONTAINER_HASH_MAP: Record<string, AthleteCommunitySection> = {
   plan: 'plan',
   messages: 'updates',
   updates: 'updates',
+  tips: 'tips',
+  thinking: 'tips',
   feed: 'chatter',
   chatter: 'chatter',
   runs: 'goruns',

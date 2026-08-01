@@ -35,7 +35,7 @@ export default function GoFastWithMeWorkoutsPanel({
     <section id="workouts" className={embedded ? 'space-y-4' : 'space-y-6'}>
       {!embedded ? (
         <div>
-          <h2 className="text-lg font-bold text-gray-900">My Workouts</h2>
+          <h2 className="text-lg font-bold text-gray-900">Runs &amp; Training</h2>
           <p className="text-sm text-gray-600 mt-1">
             Studio controls for how followers see your plan — polish the title and intro, preview
             the public view, and build a GoRun With Me when you&apos;re ready.
@@ -49,7 +49,7 @@ export default function GoFastWithMeWorkoutsPanel({
         </div>
       ) : (
         <div>
-          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">My Workouts</h3>
+          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Runs &amp; Training</h3>
           <p className="text-xs text-gray-600 mt-1">
             Plan sharing studio — not a second training dashboard.
           </p>

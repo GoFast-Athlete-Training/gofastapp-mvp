@@ -65,7 +65,7 @@ export default function GoFastWithMeWelcomePanel({
         </div>
       ) : (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          Landing page looks good — share your page from Studio Central when you&apos;re ready.
+          Landing page looks good — share your page from Community Dashboard when you&apos;re ready.
         </div>
       )}
 

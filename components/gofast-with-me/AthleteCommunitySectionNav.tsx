@@ -46,6 +46,7 @@ export function parseAthleteCommunitySection(hash: string): AthleteCommunitySect
   if (
     value === 'plan' ||
     value === 'updates' ||
+    value === 'tips' ||
     value === 'goruns' ||
     value === 'chatter' ||
     value === 'followers'

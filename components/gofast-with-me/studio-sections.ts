@@ -5,7 +5,7 @@ export type StudioSection = 'page' | 'community' | 'workouts' | 'content';
 
 export type StudioView = 'dashboard' | StudioSection;
 
-export const STUDIO_CENTRAL_LABEL = 'Studio Central';
+export const STUDIO_CENTRAL_LABEL = 'Community Dashboard';
 
 export const STUDIO_BIN_ORDER: StudioSection[] = ['page', 'community', 'workouts', 'content'];
 
@@ -13,24 +13,24 @@ export const STUDIO_NAV_ORDER: StudioView[] = ['dashboard', ...STUDIO_BIN_ORDER]
 
 export const STUDIO_NAV_LABELS: Record<StudioView, string> = {
   dashboard: STUDIO_CENTRAL_LABEL,
-  page: 'My Page',
-  community: 'My Community',
-  workouts: 'My Workouts',
-  content: 'My Content',
+  page: 'Page Settings',
+  community: 'Updates & Members',
+  workouts: 'Runs & Training',
+  content: 'Tips & Thinking',
 };
 
 export const STUDIO_BIN_LABELS: Record<StudioSection, string> = {
-  page: 'My Page',
-  community: 'My Community',
-  workouts: 'My Workouts',
-  content: 'My Content',
+  page: 'Page Settings',
+  community: 'Updates & Members',
+  workouts: 'Runs & Training',
+  content: 'Tips & Thinking',
 };
 
 export const STUDIO_BIN_DESCRIPTIONS: Record<StudioSection, string> = {
-  page: "Your public page — landing copy, photo, and What I'm training for",
-  community: 'Your personal community — messages and followers',
-  workouts: 'Plan sharing studio — title, intro, preview, and GoRun With Me builder',
-  content: 'Tips, routes, and blog posts for your hub',
+  page: "Public front door settings — landing copy, photo, and What I'm training for",
+  community: 'Community feed controls — updates, chatter review, follower view, and members',
+  workouts: 'Runs and training — public plan, GoRun With Me, and workout sharing',
+  content: 'Durable tips and thinking — nutrition, routes, training thoughts, and future blog',
 };
 
 export function isWelcomeContentComplete(values: GoFastWithMeLandingValues): boolean {

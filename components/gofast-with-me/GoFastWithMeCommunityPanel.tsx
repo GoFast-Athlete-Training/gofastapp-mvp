@@ -52,10 +52,10 @@ export default function GoFastWithMeCommunityPanel({ athleteId, publicSlug }: Pr
     <section id="community" className="space-y-10 pb-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">My Community</h2>
+          <h2 className="text-lg font-bold text-gray-900">Updates &amp; Members</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Owner controls for your athlete community — post Updates, review Chatter, and manage
-            followers. Followers read everything for free at your public community link.
+            Owner controls for the daily side of your community — post Updates, review Chatter, and
+            manage followers. Durable tips live in Tips &amp; Thinking.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">

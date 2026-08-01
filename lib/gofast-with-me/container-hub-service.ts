@@ -13,6 +13,14 @@ import {
   mapContainerMessageRow,
   type MappedContainerMessage,
 } from '@/lib/gofast-with-me/container-message-map';
+import {
+  listPublishedAthleteTips,
+  type AthleteTipPayload,
+} from '@/lib/gofast-with-me/athlete-tips';
+import {
+  listPublicInstagramMedia,
+  type AthleteInstagramMediaPayload,
+} from '@/lib/gofast-with-me/instagram-hydration';
 import type {
   GoFastWithMeChasingGoal,
   GoFastWithMeTrainingFor,
@@ -68,6 +76,8 @@ export type ContainerHubPayload = {
   } | null;
   trainingFor: GoFastWithMeTrainingFor;
   messages: ContainerHubMessage[];
+  tips: AthleteTipPayload[];
+  instagramMedia: AthleteInstagramMediaPayload[];
 };
 
 export type AthleteCommunityPayload = ContainerHubPayload & {
@@ -149,7 +159,7 @@ export async function loadAthleteCommunityForHost(
   const handle = host.gofastHandle?.trim();
   const publicPage = handle ? await loadPublicAthletePage(handle) : null;
 
-  const [memberRows, memberCount, publishedPlan, messageRows] = await Promise.all([
+  const [memberRows, memberCount, publishedPlan, messageRows, tips, instagramMedia] = await Promise.all([
     prisma.gofast_container_memberships.findMany({
       where: { containerAthleteId: host.id },
       orderBy: { joinedAt: 'desc' },
@@ -177,6 +187,8 @@ export async function loadAthleteCommunityForHost(
       take: options?.messageLimit ?? 40,
       include: containerMessageInclude,
     }),
+    listPublishedAthleteTips(host.id, 6),
+    listPublicInstagramMedia(host.id, 5),
   ]);
 
   return {
@@ -209,6 +221,8 @@ export async function loadAthleteCommunityForHost(
       primaryChasingGoal: publicPage?.primaryChasingGoal ?? null,
     },
     messages: messageRows.map(mapContainerMessageRow),
+    tips,
+    instagramMedia,
   };
 }
 
