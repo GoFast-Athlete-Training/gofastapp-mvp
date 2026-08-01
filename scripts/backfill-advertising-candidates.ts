@@ -1,4 +1,4 @@
-import { backfillEligibleContainerCandidates } from "@/lib/advertising/candidate-service";
+import { backfillEligibleContainerCandidates } from "@/lib/sponsorship/candidate-service";
 
 async function main() {
   const result = await backfillEligibleContainerCandidates();
