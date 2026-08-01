@@ -96,8 +96,8 @@ export default function GoFastWithMeDashboardHome({
         <div>
           <h2 className="text-lg font-bold text-gray-900">{STUDIO_CENTRAL_LABEL}</h2>
           <p className="text-sm text-gray-600 mt-0.5">
-            Your community at a glance — setup status, invite link, followers, and the tools that
-            hydrate your public hub.
+            The hydrated control center — setup status, invite link, followers, public view, and the
+            tools that feed your community.
           </p>
         </div>
 
@@ -115,6 +115,12 @@ export default function GoFastWithMeDashboardHome({
               light={pageStoplight(pageStatus)}
               hint={pageHealthLabel(pageStatus)}
               onClick={() => onOpenWorkspace('page')}
+            />
+            <StoplightChip
+              label="Messages"
+              light="green"
+              hint="Live"
+              onClick={() => onOpenWorkspace('community')}
             />
             <StoplightChip
               label="Runs/Training"

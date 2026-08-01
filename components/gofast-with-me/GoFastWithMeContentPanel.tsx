@@ -135,7 +135,7 @@ export default function GoFastWithMeCmsContentSection({
       </div>
 
       <div className="rounded-lg border border-violet-200 bg-violet-50/50 px-4 py-3 text-xs text-violet-900">
-        <strong>Tips are not announcements.</strong> Updates stay in My Community. Tips are
+        <strong>Tips are not announcements.</strong> Updates stay in Messages. Tips are
         athlete-owned content that hydrates the public page and community.
       </div>
 
@@ -280,7 +280,7 @@ export default function GoFastWithMeCmsContentSection({
               className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-100"
             >
               <BookOpen className="h-3.5 w-3.5" />
-              Updates &amp; Members
+              Messages
             </button>
           ) : null}
           <a

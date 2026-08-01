@@ -10,7 +10,6 @@ import {
   athleteCommunityPreviewPath,
 } from '@/lib/gofast-with-me/athlete-community-routes';
 import GoFastWithMeFeedPanel from '@/components/gofast-with-me/GoFastWithMeFeedPanel';
-import GoFastWithMeMemberManagementPanel from '@/components/gofast-with-me/GoFastWithMeMemberManagementPanel';
 
 type Props = {
   athleteId: string;
@@ -52,10 +51,10 @@ export default function GoFastWithMeCommunityPanel({ athleteId, publicSlug }: Pr
     <section id="community" className="space-y-10 pb-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Updates &amp; Members</h2>
+          <h2 className="text-lg font-bold text-gray-900">Messages</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Owner controls for the daily side of your community — post Updates, review Chatter, and
-            manage followers. Durable tips live in Tips &amp; Thinking.
+            The daily side of your community — post Updates and review Chatter. Follower management
+            lives in Community Management.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
@@ -127,16 +126,6 @@ export default function GoFastWithMeCommunityPanel({ athleteId, publicSlug }: Pr
           </Link>
         </div>
       </section>
-
-      <GoFastWithMeMemberManagementPanel
-        athleteId={athleteId}
-        publicSlug={publicSlug}
-        embedded
-        memberCount={hub?.memberCount}
-        members={hub?.members}
-        membersLoading={loading}
-        onMembersRefresh={loadHub}
-      />
     </section>
   );
 }

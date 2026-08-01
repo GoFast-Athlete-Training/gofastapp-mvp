@@ -18,7 +18,7 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
   slug: GOFAST_WITH_ME_STUDIO_TUTORIAL_SLUG,
   name: 'GoFast With Me Studio',
   summary:
-    'My Community is the studio: Dashboard shows the hub, Updates & Members manages the daily feed, Runs & Training shares plans and GoRuns, Page Settings controls the public front door, and Tips & Thinking holds durable advice.',
+    'My Community is the studio: Community Management hydrates the whole hub, Messages is the daily feed, Runs & Training shares plans and GoRuns, Tips & Thinking holds durable advice, and Page Settings controls the public front door.',
   steps: [
     {
       id: 'page',
@@ -29,9 +29,9 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
     },
     {
       id: 'community',
-      title: 'Updates & Members — daily community',
+      title: 'Messages — daily community',
       instruction:
-        'Post journey updates, review Chatter, preview follower view, and see who followed you.',
+        'Post journey updates and review Chatter. Manage followers from Community Management.',
       sortOrder: 1,
     },
     {

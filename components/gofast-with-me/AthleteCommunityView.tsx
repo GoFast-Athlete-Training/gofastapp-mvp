@@ -318,7 +318,7 @@ export default function AthleteCommunityView({ handle }: Props) {
               href="/gofast-with-others"
               className="inline-flex text-xs font-semibold text-orange-600 hover:underline"
             >
-              Post updates from My Community in studio →
+              Post updates from Messages in studio →
             </Link>
           ) : null}
         </section>
