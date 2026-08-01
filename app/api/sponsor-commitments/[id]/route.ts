@@ -1,15 +1,25 @@
 export const dynamic = "force-dynamic";
 
-import { verifyInternalApiKey } from "@/lib/internal-api-auth";
+import {
+  assertBrandBearerAuth,
+  getForwardedBrandId,
+  getForwardedBrandUserId,
+} from "@/lib/sponsorship/brand-partnership-auth";
 import { getCommitmentById } from "@/lib/sponsorship/commitment-service";
 import { NextRequest, NextResponse } from "next/server";
 
-/** GET /api/sponsor-commitments/[id] — read commitment payment/runtime state */
+/** GET /api/sponsor-commitments/[id] — brand-scoped commitment status hydration */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const authError = await assertBrandBearerAuth(request);
+  if (authError) return authError;
+
+  const brandId = getForwardedBrandId(request);
+  const brandUserId = getForwardedBrandUserId(request);
   const { id } = await params;
+
   if (!id?.trim()) {
     return NextResponse.json({ success: false, error: "Missing commitment id" }, { status: 400 });
   }
@@ -19,10 +29,16 @@ export async function GET(
     return NextResponse.json({ success: false, error: "Commitment not found" }, { status: 404 });
   }
 
+  if (commitment.brandId !== brandId || commitment.brandUserId !== brandUserId) {
+    return NextResponse.json({ success: false, error: "Commitment not found" }, { status: 404 });
+  }
+
   return NextResponse.json({
     success: true,
     commitment: {
       id: commitment.id,
+      brandId: commitment.brandId,
+      brandUserId: commitment.brandUserId,
       paymentStatus: commitment.paymentStatus,
       status: commitment.status,
       amountPaidCents: commitment.amountPaidCents,

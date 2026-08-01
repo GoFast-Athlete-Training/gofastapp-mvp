@@ -153,9 +153,14 @@ export async function attachCheckoutSessionToCommitment(
   });
 }
 
+export type FinalizePaidResult = {
+  commitment: sponsor_commitments;
+  newlyActivated: boolean;
+};
+
 export async function finalizePaidCommitment(
   input: FinalizePaidInput,
-): Promise<sponsor_commitments> {
+): Promise<FinalizePaidResult> {
   const existing = await prisma.sponsor_commitments.findUnique({
     where: { id: input.commitmentId },
     include: { candidate: true },
@@ -166,7 +171,7 @@ export async function finalizePaidCommitment(
   }
 
   if (existing.paymentStatus === SponsorCommitmentPaymentStatus.PAID) {
-    return existing;
+    return { commitment: existing, newlyActivated: false };
   }
 
   if (
@@ -199,7 +204,7 @@ export async function finalizePaidCommitment(
 
   await notifyAthleteOfNewSponsorship(updated);
 
-  return updated;
+  return { commitment: updated, newlyActivated: true };
 }
 
 async function notifyAthleteOfNewSponsorship(

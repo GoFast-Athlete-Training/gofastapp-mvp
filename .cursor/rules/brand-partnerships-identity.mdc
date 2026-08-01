@@ -1,0 +1,15 @@
+---
+description: Brand Partnerships identity-scoped auth and hydration
+alwaysApply: true
+---
+
+# Brand Partnerships identity canon (gofastapp-mvp)
+
+- Do **not** use `GOFAST_INTERNAL_API_KEY` or `x-gofast-internal-key` in the Brand Partnerships flow.
+- **Firebase Bearer** authenticates humans. Domain scope uses forwarded headers:
+  - `x-gofast-brand-user-id` + `x-gofast-brand-id` for Brand buyer checkout/commitment writes and reads
+  - `x-gofast-staff-id` for Company staff training proxies (existing pattern)
+  - `x-athlete-id` + Firebase Bearer for athlete APIs
+- `brandUserId`, `staffId`, and `athleteId` are **authorship/ownership**, not secret credentials.
+- **Stripe webhook** (`/api/stripe/webhook`) is write-only: Stripe signature verifies payment authority; response must not hydrate private user/finance data.
+- **Reads/hydration** must scope by the verified domain identity. Public profile rendering exposes only active creative fields.

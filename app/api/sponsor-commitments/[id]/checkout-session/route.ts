@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
-import { verifyInternalApiKey } from "@/lib/internal-api-auth";
-import { attachCheckoutSessionToCommitment } from "@/lib/sponsorship/commitment-service";
+import { assertBrandBearerAuth } from "@/lib/sponsorship/brand-partnership-auth";
+import { attachCheckoutSessionToCommitment, getCommitmentById } from "@/lib/sponsorship/commitment-service";
 import { NextRequest, NextResponse } from "next/server";
 
 /** POST /api/sponsor-commitments/[id]/checkout-session — attach Stripe Checkout session id */
@@ -9,7 +9,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const authError = verifyInternalApiKey(request);
+  const authError = await assertBrandBearerAuth(request);
   if (authError) return authError;
 
   const { id } = await params;
@@ -25,6 +25,11 @@ export async function POST(
       { success: false, error: "stripeCheckoutSessionId is required" },
       { status: 400 },
     );
+  }
+
+  const existing = await getCommitmentById(id.trim());
+  if (!existing) {
+    return NextResponse.json({ success: false, error: "Commitment not found" }, { status: 404 });
   }
 
   const commitment = await attachCheckoutSessionToCommitment(

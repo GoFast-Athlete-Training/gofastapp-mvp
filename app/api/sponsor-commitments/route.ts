@@ -1,6 +1,10 @@
 export const dynamic = "force-dynamic";
 
-import { verifyInternalApiKey } from "@/lib/internal-api-auth";
+import {
+  assertBrandBearerAuth,
+  getForwardedBrandId,
+  getForwardedBrandUserId,
+} from "@/lib/sponsorship/brand-partnership-auth";
 import {
   attachCheckoutSessionToCommitment,
   createCheckoutPendingCommitment,
@@ -28,10 +32,13 @@ type CreateCommitmentBody = {
   stripeCheckoutSessionId?: string;
 };
 
-/** POST /api/sponsor-commitments — Company checkout orchestration creates CHECKOUT_PENDING row */
+/** POST /api/sponsor-commitments — Brand proxy creates CHECKOUT_PENDING row */
 export async function POST(request: NextRequest) {
-  const authError = verifyInternalApiKey(request);
+  const authError = await assertBrandBearerAuth(request);
   if (authError) return authError;
+
+  const headerBrandUserId = getForwardedBrandUserId(request);
+  const headerBrandId = getForwardedBrandId(request);
 
   let body: CreateCommitmentBody;
   try {
@@ -40,11 +47,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Invalid JSON body" }, { status: 400 });
   }
 
+  if (body.brandUserId?.trim() && body.brandUserId.trim() !== headerBrandUserId) {
+    return NextResponse.json({ success: false, error: "brandUserId mismatch" }, { status: 403 });
+  }
+  if (body.brandId?.trim() && body.brandId.trim() !== headerBrandId) {
+    return NextResponse.json({ success: false, error: "brandId mismatch" }, { status: 403 });
+  }
+
   const {
     candidateId,
     candidateCode,
-    brandId,
-    brandUserId,
     startsAt,
     endsAt,
     pricingRuleKey,
@@ -54,8 +66,8 @@ export async function POST(request: NextRequest) {
   if (
     !candidateId?.trim() ||
     !candidateCode?.trim() ||
-    !brandId?.trim() ||
-    !brandUserId?.trim() ||
+    !headerBrandId ||
+    !headerBrandUserId ||
     !startsAt ||
     !endsAt ||
     !pricingRuleKey?.trim() ||
@@ -71,8 +83,8 @@ export async function POST(request: NextRequest) {
     const commitment = await createCheckoutPendingCommitment({
       candidateId: candidateId.trim(),
       candidateCode: candidateCode.trim(),
-      brandId: brandId.trim(),
-      brandUserId: brandUserId.trim(),
+      brandId: headerBrandId,
+      brandUserId: headerBrandUserId,
       brandNameSnapshot: body.brandNameSnapshot ?? null,
       brandLogoUrlSnapshot: body.brandLogoUrlSnapshot ?? null,
       creativeUrl: body.creativeUrl ?? null,

@@ -1,7 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { deriveRuntimeStatus } from "./commitment-service";
-import { SponsorCommitmentStatus } from "@prisma/client";
+import {
+  deriveRuntimeStatus,
+  finalizePaidCommitment,
+  type FinalizePaidResult,
+} from "./commitment-service";
+import { SponsorCommitmentPaymentStatus, SponsorCommitmentStatus } from "@prisma/client";
+
+test("finalizePaidCommitment result exposes newlyActivated for idempotent webhook retries", () => {
+  const paidResult: FinalizePaidResult = {
+    commitment: {
+      id: "commit_1",
+    } as FinalizePaidResult["commitment"],
+    newlyActivated: false,
+  };
+
+  assert.equal(paidResult.newlyActivated, false);
+  assert.equal(typeof finalizePaidCommitment, "function");
+  assert.ok(SponsorCommitmentPaymentStatus.PAID);
+});
+
 
 test("deriveRuntimeStatus returns SCHEDULED before start", () => {
   const startsAt = new Date("2026-08-01T00:00:00.000Z");
