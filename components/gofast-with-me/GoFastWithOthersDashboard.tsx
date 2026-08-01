@@ -14,7 +14,6 @@ import { goFastWithFrontDoorPath } from "@/lib/gofast-with-me/gofast-with-bridge
 import GoFastWithMeHubOnboarding from "@/components/gofast-with-me/GoFastWithMeHubOnboarding";
 import GoFastWithMeWelcomePanel from "@/components/gofast-with-me/GoFastWithMeWelcomePanel";
 import GoFastWithMeCommunityPanel from "@/components/gofast-with-me/GoFastWithMeCommunityPanel";
-import GoFastWithMeMemberManagementPanel from "@/components/gofast-with-me/GoFastWithMeMemberManagementPanel";
 import GoFastWithMeWorkoutsPanel from "@/components/gofast-with-me/GoFastWithMeWorkoutsPanel";
 import GoFastWithMeCmsContentSection from "@/components/gofast-with-me/GoFastWithMeContentPanel";
 import GoFastWithMeDashboardHome, {
@@ -355,10 +354,6 @@ export default function GoFastWithOthersDashboard() {
             }}
           />
 
-          <GoFastWithMeMemberManagementPanel
-            athleteId={athleteId}
-            publicSlug={publicSlug}
-          />
         </div>
       );
     }

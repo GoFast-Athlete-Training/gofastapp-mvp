@@ -4,6 +4,10 @@ import { useState } from 'react';
 import { Copy, ExternalLink, Users } from 'lucide-react';
 import { STUDIO_CENTRAL_LABEL, type StudioSection } from '@/components/gofast-with-me/studio-sections';
 import GoFastWithMeUrlEditor from '@/components/profile/GoFastWithMeUrlEditor';
+import {
+  athleteCommunityPath,
+  athleteCommunityPreviewPath,
+} from '@/lib/gofast-with-me/athlete-community-routes';
 
 export type DashboardMetrics = {
   followerCount: number | null;
@@ -74,6 +78,8 @@ export default function GoFastWithMeDashboardHome({
   const pageStatus = myPageSetupStatus(metrics.landingComplete, metrics.publishReady);
   const memberCount = metrics.followerCount ?? 0;
   const planLive = metrics.planPublished === true;
+  const publicCommunityPath = athleteCommunityPath(metrics.publicSlug);
+  const followerPreviewPath = athleteCommunityPreviewPath(metrics.publicSlug);
 
   const inviteUrl =
     typeof window !== 'undefined'
@@ -160,6 +166,43 @@ export default function GoFastWithMeDashboardHome({
                 ? '1 follower'
                 : `${memberCount} followers`}
           </div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
+        <div>
+          <h3 className="text-sm font-bold text-gray-900">Member view &amp; admin</h3>
+          <p className="text-xs text-gray-600 mt-0.5">
+            Check the hydrated community experience and jump into admin workspaces when something
+            needs attention.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <a
+            href={followerPreviewPath}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-semibold text-orange-800 hover:bg-orange-100"
+          >
+            View as member
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+          <a
+            href={publicCommunityPath}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-100"
+          >
+            Open public community
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+          <button
+            type="button"
+            onClick={() => onOpenWorkspace('community')}
+            className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+          >
+            Admin: messages
+          </button>
         </div>
       </section>
 
