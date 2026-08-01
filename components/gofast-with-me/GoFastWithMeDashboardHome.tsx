@@ -173,8 +173,7 @@ export default function GoFastWithMeDashboardHome({
         <div>
           <h3 className="text-sm font-bold text-gray-900">Member view &amp; admin</h3>
           <p className="text-xs text-gray-600 mt-0.5">
-            Check the hydrated community experience and jump into admin workspaces when something
-            needs attention.
+            Check the hydrated community experience and control which studio parts surface there.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -196,13 +195,32 @@ export default function GoFastWithMeDashboardHome({
             Open public community
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
-          <button
-            type="button"
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <SurfaceControlCard
+            title="Announcement / update"
+            description="Edit the next hydrated message followers see."
+            action="Open Messages"
             onClick={() => onOpenWorkspace('community')}
-            className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-          >
-            Admin: messages
-          </button>
+          />
+          <SurfaceControlCard
+            title="Topics"
+            description="Publish durable tips and thinking by topic."
+            action="Open Tips"
+            onClick={() => onOpenWorkspace('content')}
+          />
+          <SurfaceControlCard
+            title="Next blog"
+            description="Longer-form content will surface from Tips & Thinking."
+            action="Open Tips"
+            onClick={() => onOpenWorkspace('content')}
+          />
+          <SurfaceControlCard
+            title="Next run"
+            description="Choose the run/training item that hydrates the community."
+            action="Open Runs"
+            onClick={() => onOpenWorkspace('workouts')}
+          />
         </div>
       </section>
 
@@ -251,6 +269,30 @@ export default function GoFastWithMeDashboardHome({
         </details>
       </section>
     </div>
+  );
+}
+
+function SurfaceControlCard({
+  title,
+  description,
+  action,
+  onClick,
+}: {
+  title: string;
+  description: string;
+  action: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-left transition hover:border-orange-200 hover:bg-orange-50"
+    >
+      <p className="text-sm font-semibold text-gray-900">{title}</p>
+      <p className="mt-1 text-xs leading-relaxed text-gray-600">{description}</p>
+      <p className="mt-2 text-xs font-semibold text-orange-700">{action} →</p>
+    </button>
   );
 }
 
