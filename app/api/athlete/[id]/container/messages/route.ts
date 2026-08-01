@@ -28,31 +28,9 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'Missing host id' }, { status: 400 });
     }
 
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-
-    let decodedToken;
-    try {
-      decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    } catch {
-      return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 });
-    }
-
-    const caller = await getAthleteByFirebaseId(decodedToken.uid);
-    if (!caller) {
-      return NextResponse.json({ success: false, error: 'Athlete not found' }, { status: 404 });
-    }
-
     const host = await getAthleteById(hostAthleteId);
     if (!host?.isGoFastContainer) {
       return NextResponse.json({ success: false, error: 'Not a container' }, { status: 404 });
-    }
-
-    const ok = await canAccessGoFastContainer(host.id, caller.id);
-    if (!ok) {
-      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

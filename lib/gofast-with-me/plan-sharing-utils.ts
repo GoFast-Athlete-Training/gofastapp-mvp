@@ -1,4 +1,5 @@
 import type { ShareHubPlanStatus } from '@/lib/profile/share-creator-card-logic';
+import { athleteCommunityPath } from '@/lib/gofast-with-me/athlete-community-routes';
 
 export function formatPlanDate(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -33,7 +34,7 @@ export function buildPlanSummaryParts(plan: ShareHubPlanStatus | null | undefine
 }
 
 export function hubPlanStripPath(landingSlug: string): string {
-  return `/container/${encodeURIComponent(landingSlug)}#plan-strip`;
+  return athleteCommunityPath(landingSlug, 'plan');
 }
 
 export function publicPlanPagePath(planSlug: string): string {

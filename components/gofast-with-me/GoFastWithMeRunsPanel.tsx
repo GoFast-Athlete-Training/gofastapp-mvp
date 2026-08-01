@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Calendar, ExternalLink, Plus, Route } from 'lucide-react';
 import api from '@/lib/api';
 import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
+import { athleteCommunityPath } from '@/lib/gofast-with-me/athlete-community-routes';
 
 type Props = {
   athleteId: string;
@@ -16,7 +17,7 @@ export default function GoFastWithMeRunsPanel({ athleteId, publicSlug }: Props) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const hubRunsPath = `/container/${encodeURIComponent(publicSlug)}#runs`;
+  const hubRunsPath = athleteCommunityPath(publicSlug, 'goruns');
 
   const loadHub = useCallback(async () => {
     setLoading(true);

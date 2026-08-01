@@ -37,19 +37,19 @@ What I'm training for (e.g. MCM)
 ```
 
 Door (`/u/[handle]`) answers: **who am I training with / what are they chasing?**  
-Hub (`/container/[handle]`) answers: **what's their week look like — can I follow along?**
+Community (`/u/[handle]/community`) answers: **what's their week look like — can I follow along?**
 
 | Priority | Surface | Where | Role |
 |----------|---------|-------|------|
 | **P0** | What I'm training for | Door + hub header | Goal/race identity via `GoalRaceCard` / plan goal hydrate |
-| **P0** | Plan strip | Hub (members); teaser on door if public | Week view of surfaced GoFast plan |
-| P1 | Messages | Hub | Journey announcements (`gofast_container_messages`) |
+| **P0** | Plan strip | Community (public read); teaser on door if public | Week view of surfaced GoFast plan |
+| P1 | Updates | Community | Journey announcements (`gofast_container_messages`, topic `updates`) |
 | P1 | What I'm thinking about | Hub / door later | Tips / voice (`athlete_tips` etc.) |
 | **P2 v2** | My Runs | Hub (collapsed) | Manual `city_runs.athleteGeneratedId` — not primary loop |
 
 Boundary sentence:
 
-> Door surfaces What I'm training for. Hub surfaces Plan strip for that same plan. Others join the journey. My Runs is v2.
+> Door surfaces What I'm training for. Community surfaces Plan strip for that same plan. Others follow the athlete for free — following is not training-plan enrollment. My Runs is v2.
 
 ## The Crucial Product Fork
 
@@ -61,17 +61,14 @@ The product must keep two surfaces clear:
    - It helps strangers understand the athlete and decide to follow/join.
    - It is not the monetizable relationship layer by itself.
 
-2. Container (GoFast With Me member hub)
+2. Athlete community (GoFast With {Name} Community)
    - This is how the athlete engages fans/followers after they follow.
-   - This is where the audience relationship lives at `/container/[handle]`.
-   - **P0 surfaces (scroll layout, not tabs):**
-     - **What I'm training for** — goal/race identity in hub header (same signal as door `GoalRaceCard`).
-     - **Plan strip** — week view of the host's surfaced GoFast plan (`training_plans` public fields).
-   - **P1 surfaces:** Messages (journey announcements), What I'm thinking about (tips/voice — later).
-   - **P2 v2:** My Runs — manual hosted `city_runs`; not the primary loop.
-   - `gofast_with_me` holds door copy/photo only — no plan or goal config duplicated there.
+   - Canonical public destination: `/u/[handle]/community` (legacy `/container/[handle]` redirects here).
+   - **Public read** — plan, Updates, GoRuns, Chatter, follower count — no follow required.
+   - **Follow** unlocks Chatter posting and follower interactions; it does not enroll someone in a training plan.
+   - **P0 surfaces (scroll layout, not tabs):** Plan, Updates, GoRuns, Chatter, Followers.
 
-Do not overplay the public landing page and forsake the container. The landing page is the door. The container is the room.
+Do not overplay the public landing page and forsake the community. The landing page is the door. `/u/{handle}/community` is the ongoing athlete community.
 
 ## Studio Is The Top Level
 
@@ -339,12 +336,12 @@ The studio (`/gofast-with-others`) is **Studio Central + four peer bins** — pa
 3. **My Community** (personal community — host side)
    - Messages — journey announcements (`gofast_container_messages`, topic `updates`)
    - Followers — list hydrated from `/container/members` on load
-   - **View as member** link to `/container/[handle]`
-   - Member view of the same community: `/container/[handle]` (training-for, plan strip, messages, thinking, followers; My Runs v2 collapsed).
+   - **View public community** / **Preview follower view** links to `/u/{handle}/community`
+   - Public community: `/u/{handle}/community` (training-for, plan, Updates, GoRuns, Chatter, Followers)
 
 4. **My Workouts** (plan sharing studio)
    - Primary: plan title, follower intro, Private/Public, explicit save — polish before publishing.
-   - On demand: **See how your plan looks to others** opens the follower hub plan strip (`/container/{handle}#plan-strip`); full plan page is secondary.
+   - On demand: **See how your plan looks to others** opens the public community plan section (`/u/{handle}/community#plan`)
    - On demand: **Build a GoRun With Me** opens a compact workout picker, then the existing `/workouts/{id}/let-others-join` flow.
    - First-time Public shows **Review what followers will see** with optional title edit; republish after Private skips review.
    - Full training execution stays in **My Training** — not duplicated in studio.
@@ -358,11 +355,12 @@ The studio (`/gofast-with-others`) is **Studio Central + four peer bins** — pa
    - Body: club-style **2/3** run photo + welcome / about / what you'll see; **1/3** Training for + See my plan + On the calendar.
    - Plan week strip and Activity/last Garmin run stay off the door (hub / member room).
 
-Race-hub analogy: join door → member room with plan + messages. GWM: follow door → `/container/[handle]` room; host edits from **My Community**, **My Workouts**, and **My Content** in studio.
+Race-hub analogy: follow door → `/u/{handle}/community`; host edits from **My Community**, **My Workouts**, and **My Content** in studio.
 
 ### Boundaries (keep sharp)
 
-- **GoFast With Me** = personal creator + audience following a goal and shared plan.
+- **GoFast With Me** = personal creator + audience following a goal and shared plan (follow is free; not training-plan enrollment).
+- **Training Groups / Cohorts** (coach/manager product, later) = group-plan enrollment — separate from athlete follow/community.
 - **Run Club** = organization schedule, brand, multi-leader ops — stays in club leader / club hub.
 - Club contrast: club = "see you Saturday." GoFast With Me = "training for MCM on this plan — join my journey."
 - An athlete who leads a club can use both; GoFast With Me must not become a backdoor club admin.
@@ -410,7 +408,7 @@ Use product language that matches the data:
 
 - **GoFast With Me** — product name for the follower hub and studio (not "athlete container").
 - **My Page** — public page (`/u/[handle]`). User-facing: "page", not "door".
-- **My Community** — personal community (messages + followers; host panel + `/container/[handle]` for followers). User-facing: "community", not "room".
+- **My Community** — owner studio controls (Updates, Chatter review, followers, preview links). Public read lives at `/u/{handle}/community`.
 - **My Workouts** — plan sharing studio (title, intro, preview, GoRun With Me builder); studio sidebar peer. Replaces legacy **My Plan** label.
 - **My Content** — CMS stub for Tips, routes, Blog; studio sidebar peer.
 - **Messages**, **Followers** — sections inside My Community.
@@ -418,7 +416,7 @@ Use product language that matches the data:
 - **Plan strip** — training week in the member hub.
 - **My Runs (v2)** — demoted manual hosted runs; not the primary loop.
 - "Follow" / "followers" in member UX.
-- "View as member" for `/container/[handle]`.
+- View public community / Preview follower view for `/u/{handle}/community`.
 - "Share your page" — share so others can join your personal community.
 - Internal code may still say door/room (`DoorSidebar`, front-door bridge helpers); product UI should not.
 

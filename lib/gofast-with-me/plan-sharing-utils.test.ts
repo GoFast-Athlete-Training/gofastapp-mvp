@@ -53,7 +53,7 @@ describe('buildPlanSummaryParts', () => {
 
 describe('preview paths', () => {
   it('builds hub and plan page URLs', () => {
-    expect(hubPlanStripPath('adam')).toBe('/container/adam#plan-strip');
+    expect(hubPlanStripPath('adam')).toBe('/u/adam/community#plan');
     expect(publicPlanPagePath('adams-plan')).toBe('/plans/adams-plan');
   });
 });

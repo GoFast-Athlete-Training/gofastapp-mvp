@@ -13,6 +13,7 @@ import {
   headlineForTarget,
   type GoFastWithTarget,
 } from '@/lib/gofast-with-me/gofast-with-bridge';
+import { athleteCommunityPath } from '@/lib/gofast-with-me/athlete-community-routes';
 import {
   GoFastWithAppAllusion,
   GoFastWithBridgeShell,
@@ -108,7 +109,7 @@ export default function GoFastWithFrontDoorPage() {
   const handlePrimary = () => {
     if (isSelf) return;
     if (isMember) {
-      router.push(`/container/${encodeURIComponent(slug)}`);
+      router.push(athleteCommunityPath(slug));
       return;
     }
     if (isAuthenticated) {
@@ -147,7 +148,7 @@ export default function GoFastWithFrontDoorPage() {
                 onClick={handlePrimary}
                 className="w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-600"
               >
-                Open hub
+                Open community
               </button>
             </>
           ) : (

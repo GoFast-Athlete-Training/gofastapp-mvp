@@ -13,6 +13,7 @@ import {
   headlineForTarget,
   type GoFastWithTarget,
 } from '@/lib/gofast-with-me/gofast-with-bridge';
+import { athleteCommunityPath } from '@/lib/gofast-with-me/athlete-community-routes';
 import {
   GoFastWithAppAllusion,
   GoFastWithBridgeShell,
@@ -106,7 +107,7 @@ export default function GoFastWithConfirmPage() {
       }
       LocalStorageAPI.removeGwmFollowIntent();
       const slug = res.data.slug || handle;
-      router.replace(`/container/${encodeURIComponent(slug)}`);
+      router.replace(athleteCommunityPath(slug));
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } }; message?: string };
       setError(e.response?.data?.error || e.message || 'Could not connect');
@@ -148,10 +149,10 @@ export default function GoFastWithConfirmPage() {
             You&apos;re already GoFasting with {target.firstName?.trim() || target.displayName}.
           </p>
           <Link
-            href={`/container/${encodeURIComponent(slug)}`}
+            href={athleteCommunityPath(slug)}
             className="inline-flex w-full justify-center rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-600"
           >
-            Open hub
+            Open community
           </Link>
         </div>
       </GoFastWithBridgeShell>

@@ -12,7 +12,7 @@ type Props = {
 
 export default function ContainerHubRunsSection({ runs, hostFirstName, isHost }: Props) {
   return (
-    <section id="runs" className="space-y-4">
+    <section id="goruns" className="space-y-4">
       <div className="px-1">
         <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Runs</h2>
         <p className="text-xs text-gray-500 mt-1">

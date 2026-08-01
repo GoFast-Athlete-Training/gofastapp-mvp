@@ -4,27 +4,43 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ExternalLink, Users } from 'lucide-react';
 import api from '@/lib/api';
+import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
 import type { ContainerMemberRow } from '@/lib/gofast-with-me/container-members-types';
+import { athleteCommunityPath } from '@/lib/gofast-with-me/athlete-community-routes';
 
 type Props = {
   athleteId: string;
   publicSlug: string;
   embedded?: boolean;
+  memberCount?: number;
+  members?: ContainerHubPayload['members'];
+  membersLoading?: boolean;
+  onMembersRefresh?: () => Promise<void>;
 };
 
 export default function GoFastWithMeMemberManagementPanel({
   athleteId,
   publicSlug,
   embedded = false,
+  memberCount: memberCountProp,
+  members: membersProp,
+  membersLoading = false,
+  onMembersRefresh,
 }: Props) {
-  const [memberCount, setMemberCount] = useState(0);
-  const [members, setMembers] = useState<ContainerMemberRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [memberCount, setMemberCount] = useState(memberCountProp ?? 0);
+  const [members, setMembers] = useState<ContainerMemberRow[]>(
+    (membersProp ?? []) as ContainerMemberRow[]
+  );
+  const [loading, setLoading] = useState(memberCountProp == null);
   const [error, setError] = useState<string | null>(null);
 
-  const hubPath = `/container/${encodeURIComponent(publicSlug)}#followers`;
+  const followersPath = athleteCommunityPath(publicSlug, 'followers');
 
   const loadMembers = useCallback(async () => {
+    if (onMembersRefresh) {
+      await onMembersRefresh();
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -41,11 +57,20 @@ export default function GoFastWithMeMemberManagementPanel({
     } finally {
       setLoading(false);
     }
-  }, [athleteId]);
+  }, [athleteId, onMembersRefresh]);
 
   useEffect(() => {
+    if (memberCountProp != null) setMemberCount(memberCountProp);
+    if (membersProp) setMembers(membersProp as ContainerMemberRow[]);
+    if (memberCountProp != null) setLoading(false);
+  }, [memberCountProp, membersProp]);
+
+  useEffect(() => {
+    if (memberCountProp != null || onMembersRefresh) return;
     void loadMembers();
-  }, [loadMembers]);
+  }, [memberCountProp, onMembersRefresh, loadMembers]);
+
+  const isLoading = loading || membersLoading;
 
   return (
     <section id="followers" className={embedded ? 'space-y-4' : 'space-y-6'}>
@@ -53,16 +78,14 @@ export default function GoFastWithMeMemberManagementPanel({
         <div>
           <h2 className="text-lg font-bold text-gray-900">Followers</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Runners following your GoFast With Me hub — they see your goal, plan, and journey messages
-            after they follow.
+            Runners following your athlete community — they see your goal, plan, updates, and
+            GoRuns for free after they follow.
           </p>
         </div>
       ) : (
         <div>
           <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Followers</h3>
-          <p className="text-xs text-gray-600 mt-1">
-            Who joined your personal community — from your follower list.
-          </p>
+          <p className="text-xs text-gray-600 mt-1">Who follows your athlete community.</p>
         </div>
       )}
 
@@ -78,7 +101,7 @@ export default function GoFastWithMeMemberManagementPanel({
             <Users className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
             <div>
               <h3 className="text-sm font-semibold text-gray-900">Follower list</h3>
-              {loading ? (
+              {isLoading ? (
                 <p className="text-xs text-gray-500 mt-1">Loading…</p>
               ) : (
                 <p className="text-xs text-gray-600 mt-1">
@@ -89,16 +112,18 @@ export default function GoFastWithMeMemberManagementPanel({
           </div>
           {!embedded ? (
             <Link
-              href={hubPath}
+              href={followersPath}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800 hover:bg-orange-100"
             >
-              View as member
+              View public community
               <ExternalLink className="h-3.5 w-3.5" />
             </Link>
           ) : null}
         </div>
 
-        {!loading && members.length > 0 ? (
+        {!isLoading && members.length > 0 ? (
           <ul className="flex flex-wrap gap-2">
             {members.map((m) => (
               <li
@@ -111,23 +136,25 @@ export default function GoFastWithMeMemberManagementPanel({
               </li>
             ))}
           </ul>
-        ) : !loading ? (
+        ) : !isLoading ? (
           <p className="text-sm text-gray-500">No followers yet — share your public page to grow.</p>
         ) : null}
       </div>
 
       {!embedded ? (
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-gray-900">Member hub</h3>
+          <h3 className="text-sm font-semibold text-gray-900">Public community</h3>
           <p className="text-xs text-gray-600 mt-1">
-            Preview what followers see — What I&apos;m training for, training week, messages, and
-            follower list in one scroll.
+            Preview what followers see — training goal, plan, updates, GoRuns, Chatter, and
+            followers in one scroll.
           </p>
           <Link
-            href={hubPath}
+            href={athleteCommunityPath(publicSlug)}
+            target="_blank"
+            rel="noopener noreferrer"
             className="mt-3 inline-flex rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100"
           >
-            View as member — GoFast With Me hub
+            View public community
           </Link>
         </div>
       ) : null}

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
+import { athleteCommunityPath } from '@/lib/gofast-with-me/athlete-community-routes';
 
 type Props = {
   hub: ContainerHubPayload;
@@ -86,7 +87,7 @@ export default function ContainerHubCommunitySection({
           Member conversations live in the Feed under Chatter. Switch to Feed to read and reply.
         </p>
         <Link
-          href={`/container/${encodeURIComponent(handle)}#feed`}
+          href={athleteCommunityPath(handle, 'chatter')}
           className="inline-flex rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100"
         >
           Open Feed — Chatter

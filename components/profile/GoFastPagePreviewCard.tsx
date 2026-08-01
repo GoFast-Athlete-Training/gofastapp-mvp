@@ -25,6 +25,7 @@ import {
   portraitPhotoImageClass,
   usesWideFeaturePhotoLayout,
 } from "@/lib/gofast-with-me/photo-type";
+import { athleteCommunityPath } from "@/lib/gofast-with-me/athlete-community-routes";
 
 export type GoFastPageAthlete = {
   gofastHandle: string | null;
@@ -468,7 +469,7 @@ export default function GoFastPagePreviewCard({
                   ))}
                 </ul>
                 <a
-                  href={`${appBase.replace(/\/$/, "")}/container/${encodeURIComponent(athlete.gofastHandle)}`}
+                  href={`${appBase.replace(/\/$/, "")}${athleteCommunityPath(athlete.gofastHandle, "chatter")}`}
                   className="mt-3 inline-block text-xs font-semibold text-amber-400 hover:text-amber-300"
                 >
                   Open full feed in the app →
@@ -476,7 +477,7 @@ export default function GoFastPagePreviewCard({
               </div>
             ) : (
               <a
-                href={`${appBase.replace(/\/$/, "")}/container/${encodeURIComponent(athlete.gofastHandle)}`}
+                href={`${appBase.replace(/\/$/, "")}${athleteCommunityPath(athlete.gofastHandle, "chatter")}`}
                 className="inline-block text-xs font-semibold text-amber-400 hover:text-amber-300"
               >
                 Say hi in the app →

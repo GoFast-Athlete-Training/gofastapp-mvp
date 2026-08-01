@@ -23,6 +23,8 @@ type Props = {
   initialMessages?: ContainerHubMessage[];
   /** Journey announcements — updates topic only, no topic tabs or plan banner. */
   announcementsMode?: boolean;
+  /** Chatter-only community section. */
+  chatterMode?: boolean;
 };
 
 type FeedFilter = 'all' | ContainerTopic;
@@ -70,8 +72,11 @@ export default function GoFastWithMeHubFeed({
   publishedPlan = null,
   initialMessages = [],
   announcementsMode = false,
+  chatterMode = false,
 }: Props) {
-  const [filter, setFilter] = useState<FeedFilter>(announcementsMode ? 'updates' : 'all');
+  const [filter, setFilter] = useState<FeedFilter>(
+    announcementsMode ? 'updates' : chatterMode ? 'chatter' : 'all'
+  );
   const [messages, setMessages] = useState<ContainerHubMessage[]>(initialMessages);
   const [composer, setComposer] = useState('');
   const [attachRunId, setAttachRunId] = useState('');
@@ -79,13 +84,20 @@ export default function GoFastWithMeHubFeed({
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const postTopic: ContainerTopic =
-    announcementsMode || filter === 'all' ? 'updates' : (filter as ContainerTopic);
+  const postTopic: ContainerTopic = announcementsMode
+    ? 'updates'
+    : chatterMode
+      ? 'chatter'
+      : filter === 'all'
+        ? 'updates'
+        : (filter as ContainerTopic);
   const canPostInTopic =
-    isHost || (!announcementsMode && filter === 'chatter' && canMemberPostToTopic('chatter'));
+    canAccessFeed &&
+    (isHost ||
+      ((!announcementsMode && (chatterMode || filter === 'chatter')) &&
+        canMemberPostToTopic('chatter')));
 
   const loadMessages = useCallback(async (activeFilter: FeedFilter) => {
-    if (!canAccessFeed) return;
     setLoading(true);
     setError(null);
     try {
@@ -103,11 +115,15 @@ export default function GoFastWithMeHubFeed({
     } finally {
       setLoading(false);
     }
-  }, [canAccessFeed, hostId]);
+  }, [hostId]);
 
   useEffect(() => {
+    if (chatterMode) {
+      void loadMessages('chatter');
+      return;
+    }
     void loadMessages(filter);
-  }, [filter, loadMessages]);
+  }, [filter, loadMessages, chatterMode]);
 
   const handlePost = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,7 +138,7 @@ export default function GoFastWithMeHubFeed({
       });
       setComposer('');
       setAttachRunId('');
-      await loadMessages(filter);
+      await loadMessages(chatterMode ? 'chatter' : filter);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       setError(e.response?.data?.error || 'Could not post.');
@@ -141,9 +157,9 @@ export default function GoFastWithMeHubFeed({
     }
   };
 
-  const sectionTitle = announcementsMode ? 'Messages' : 'Feed';
+  const sectionTitle = announcementsMode ? 'Updates' : chatterMode ? 'Chatter' : 'Feed';
 
-  if (!canAccessFeed) {
+  if (!canAccessFeed && !chatterMode && !announcementsMode) {
     return (
       <section className="rounded-2xl border border-gray-200 bg-white p-5">
         <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">{sectionTitle}</h2>
@@ -155,7 +171,7 @@ export default function GoFastWithMeHubFeed({
   }
 
   return (
-    <section id={announcementsMode ? 'messages' : 'feed'} className="space-y-4">
+    <section id={announcementsMode ? 'updates' : chatterMode ? 'chatter' : 'feed'} className="space-y-4">
       {!announcementsMode && publishedPlan ? (
         <div className="rounded-xl border border-violet-100 bg-violet-50/40 px-4 py-3 text-xs text-violet-900">
           Training plan shared in this hub —{' '}
@@ -169,7 +185,7 @@ export default function GoFastWithMeHubFeed({
       ) : null}
 
       <div className="rounded-2xl border border-gray-200 bg-white p-5 space-y-4">
-        {!announcementsMode ? (
+        {!announcementsMode && !chatterMode ? (
           <div>
             <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">{sectionTitle}</h2>
             <p className="text-xs text-gray-500 mt-1">
@@ -178,9 +194,20 @@ export default function GoFastWithMeHubFeed({
                 : 'Updates from the host and community chatter.'}
             </p>
           </div>
+        ) : chatterMode ? (
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">{sectionTitle}</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              {isHost
+                ? 'Follower conversation — review and moderate from studio.'
+                : canAccessFeed
+                  ? 'Join the conversation with other followers.'
+                  : 'Follow to post in Chatter.'}
+            </p>
+          </div>
         ) : null}
 
-        {!announcementsMode ? (
+        {!announcementsMode && !chatterMode ? (
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
             {FEED_FILTERS.map((f) => (
               <button
@@ -305,6 +332,8 @@ export default function GoFastWithMeHubFeed({
           </form>
         ) : announcementsMode ? (
           <p className="text-xs text-gray-500">Only the host posts journey announcements.</p>
+        ) : chatterMode && !canAccessFeed ? (
+          <p className="text-xs text-gray-500">Follow to post in Chatter.</p>
         ) : (
           <p className="text-xs text-gray-500">
             Only the host can post updates. Switch to Chatter to join the conversation.

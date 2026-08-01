@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getAthleteById } from '@/lib/domain-athlete';
-import { canAccessGoFastContainer } from '@/lib/gofast-container-access';
-import { loadPublicAthletePage } from '@/lib/server/load-public-athlete-page';
+import { loadPublicAthletePage, normalizeHandle } from '@/lib/server/load-public-athlete-page';
 import {
   computeAllPublicPlanWeeks,
   getPublicPlanBySlug,
@@ -14,20 +13,28 @@ import {
   mapContainerMessageRow,
   type MappedContainerMessage,
 } from '@/lib/gofast-with-me/container-message-map';
-
-export type ContainerHubMessage = MappedContainerMessage;
-
 import type {
   GoFastWithMeChasingGoal,
   GoFastWithMeTrainingFor,
   GoFastWithMeTrainingSummary,
 } from '@/lib/gofast-with-me/training-for-types';
+import { athleteCommunityRelationship } from '@/lib/gofast-with-me/athlete-community-access';
 
+export type ContainerHubMessage = MappedContainerMessage;
 export type { GoFastWithMeChasingGoal, GoFastWithMeTrainingFor, GoFastWithMeTrainingSummary };
 
 export type ContainerHubPayload = {
+  /** Owner of this athlete community. */
+  isOwner: boolean;
+  /** Caller follows this athlete (not enrollment in a training plan). */
+  isFollowing: boolean;
+  /** Can post Chatter and use follower interactions. */
+  canParticipate: boolean;
+  /** @deprecated use isOwner */
   isHost: boolean;
+  /** @deprecated use isFollowing */
   isMember: boolean;
+  /** @deprecated use canParticipate */
   canAccessFeed: boolean;
   host: {
     id: string;
@@ -61,6 +68,10 @@ export type ContainerHubPayload = {
   } | null;
   trainingFor: GoFastWithMeTrainingFor;
   messages: ContainerHubMessage[];
+};
+
+export type AthleteCommunityPayload = ContainerHubPayload & {
+  handle: string;
 };
 
 async function loadPublishedPlanWeeks(hostAthleteId: string) {
@@ -99,17 +110,41 @@ async function loadPublishedPlanWeeks(hostAthleteId: string) {
   };
 }
 
-export async function loadContainerHubForHost(
+async function resolveFollowRelationship(
   hostAthleteId: string,
-  callerAthleteId: string,
+  callerAthleteId: string | null
+): Promise<{ isOwner: boolean; isFollowing: boolean; canParticipate: boolean }> {
+  if (!callerAthleteId || callerAthleteId === hostAthleteId) {
+    return athleteCommunityRelationship({
+      hostAthleteId,
+      callerAthleteId,
+      hasMembership: false,
+    });
+  }
+  const membership = await prisma.gofast_container_memberships.findUnique({
+    where: {
+      containerAthleteId_memberAthleteId: {
+        containerAthleteId: hostAthleteId,
+        memberAthleteId: callerAthleteId,
+      },
+    },
+  });
+  return athleteCommunityRelationship({
+    hostAthleteId,
+    callerAthleteId,
+    hasMembership: Boolean(membership),
+  });
+}
+
+export async function loadAthleteCommunityForHost(
+  hostAthleteId: string,
+  callerAthleteId: string | null,
   options?: { messageTopic?: string; messageLimit?: number }
 ): Promise<ContainerHubPayload | null> {
   const host = await getAthleteById(hostAthleteId);
   if (!host?.isGoFastContainer) return null;
 
-  const isHost = callerAthleteId === host.id;
-  const canAccessFeed = await canAccessGoFastContainer(host.id, callerAthleteId);
-  const isMember = canAccessFeed && !isHost;
+  const relationship = await resolveFollowRelationship(host.id, callerAthleteId);
 
   const handle = host.gofastHandle?.trim();
   const publicPage = handle ? await loadPublicAthletePage(handle) : null;
@@ -133,23 +168,24 @@ export async function loadContainerHubForHost(
     }),
     prisma.gofast_container_memberships.count({ where: { containerAthleteId: host.id } }),
     loadPublishedPlanWeeks(host.id),
-    canAccessFeed
-      ? prisma.gofast_container_messages.findMany({
-          where: {
-            containerAthleteId: host.id,
-            ...(options?.messageTopic ? { topic: options.messageTopic } : {}),
-          },
-          orderBy: { createdAt: 'desc' },
-          take: options?.messageLimit ?? 40,
-          include: containerMessageInclude,
-        })
-      : Promise.resolve([]),
+    prisma.gofast_container_messages.findMany({
+      where: {
+        containerAthleteId: host.id,
+        ...(options?.messageTopic ? { topic: options.messageTopic } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: options?.messageLimit ?? 40,
+      include: containerMessageInclude,
+    }),
   ]);
 
   return {
-    isHost,
-    isMember,
-    canAccessFeed,
+    isOwner: relationship.isOwner,
+    isFollowing: relationship.isFollowing,
+    canParticipate: relationship.canParticipate,
+    isHost: relationship.isOwner,
+    isMember: relationship.isFollowing,
+    canAccessFeed: relationship.canParticipate,
     host: {
       id: host.id,
       firstName: host.firstName,
@@ -174,4 +210,35 @@ export async function loadContainerHubForHost(
     },
     messages: messageRows.map(mapContainerMessageRow),
   };
+}
+
+export async function loadAthleteCommunityByHandle(
+  rawHandle: string,
+  callerAthleteId: string | null,
+  options?: { messageTopic?: string; messageLimit?: number }
+): Promise<AthleteCommunityPayload | null> {
+  const publicPage = await loadPublicAthletePage(rawHandle);
+  if (!publicPage?.isGoFastContainer || !publicPage.athlete.id) return null;
+
+  const payload = await loadAthleteCommunityForHost(
+    publicPage.athlete.id,
+    callerAthleteId,
+    options
+  );
+  if (!payload) return null;
+
+  const handle =
+    publicPage.athlete.gofastHandle?.trim() ||
+    normalizeHandle(rawHandle);
+
+  return { ...payload, handle };
+}
+
+/** Authenticated hub boot — requires caller id. */
+export async function loadContainerHubForHost(
+  hostAthleteId: string,
+  callerAthleteId: string,
+  options?: { messageTopic?: string; messageLimit?: number }
+): Promise<ContainerHubPayload | null> {
+  return loadAthleteCommunityForHost(hostAthleteId, callerAthleteId, options);
 }

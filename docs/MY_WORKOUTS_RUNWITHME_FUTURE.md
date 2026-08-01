@@ -14,7 +14,7 @@ Alternate lighter path (`/training/schedule-run`) does **not** create `city_runs
 ## Studio UX
 
 - Default surface: plan title, follower intro, Private/Public, explicit **Save changes**
-- Public preview: primary **See how your plan looks to others** → `/container/{landingSlug}#plan-strip`
+- Public preview: primary **See how your plan looks to others** → `/u/{landingSlug}/community#plan`
 - GoRun builder: collapsed until **Choose a workout**; compact week picker only (not full `PlanWeekViewer`)
 
 ## Visibility

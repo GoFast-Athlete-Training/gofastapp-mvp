@@ -16,7 +16,7 @@ export default function GoFastWithMePlanStripSection({
   isHost,
 }: Props) {
   return (
-    <section id="plan-strip" className="space-y-3">
+    <div className="space-y-3">
       <div className="px-1">
         <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
           Plan strip
@@ -43,6 +43,6 @@ export default function GoFastWithMePlanStripSection({
         {' · '}
         Join the journey on this plan.
       </p>
-    </section>
+    </div>
   );
 }

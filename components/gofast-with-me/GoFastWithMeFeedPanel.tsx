@@ -5,28 +5,39 @@ import Link from 'next/link';
 import { ExternalLink, Megaphone } from 'lucide-react';
 import api from '@/lib/api';
 import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
+import { athleteCommunityPath } from '@/lib/gofast-with-me/athlete-community-routes';
 
 type Props = {
   athleteId: string;
   publicSlug: string;
   embedded?: boolean;
+  hub?: ContainerHubPayload | null;
+  hubLoading?: boolean;
+  onHubRefresh?: () => Promise<void>;
 };
 
 export default function GoFastWithMeFeedPanel({
   athleteId,
   publicSlug,
   embedded = false,
+  hub: hubProp = null,
+  hubLoading = false,
+  onHubRefresh,
 }: Props) {
-  const [hub, setHub] = useState<ContainerHubPayload | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [hub, setHub] = useState<ContainerHubPayload | null>(hubProp);
+  const [loading, setLoading] = useState(!hubProp);
   const [error, setError] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const [posting, setPosting] = useState(false);
   const [postSuccess, setPostSuccess] = useState(false);
 
-  const hubPath = `/container/${encodeURIComponent(publicSlug)}#messages`;
+  const updatesPath = athleteCommunityPath(publicSlug, 'updates');
 
   const loadHub = useCallback(async () => {
+    if (onHubRefresh) {
+      await onHubRefresh();
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -34,19 +45,30 @@ export default function GoFastWithMeFeedPanel({
       if (res.data?.success && res.data.hub) {
         setHub(res.data.hub as ContainerHubPayload);
       } else {
-        throw new Error(res.data?.error || 'Could not load hub');
+        throw new Error(res.data?.error || 'Could not load community');
       }
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } }; message?: string };
-      setError(e.response?.data?.error || e.message || 'Could not load hub');
+      setError(e.response?.data?.error || e.message || 'Could not load community');
     } finally {
       setLoading(false);
     }
-  }, [athleteId]);
+  }, [athleteId, onHubRefresh]);
 
   useEffect(() => {
+    setHub(hubProp);
+    if (hubProp) {
+      setLoading(false);
+    }
+  }, [hubProp]);
+
+  useEffect(() => {
+    if (hubProp || onHubRefresh) return;
     void loadHub();
-  }, [loadHub]);
+  }, [hubProp, onHubRefresh, loadHub]);
+
+  const updateMessages = hub?.messages.filter((m) => m.topic === 'updates') ?? [];
+  const isLoading = loading || hubLoading;
 
   const handleAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,25 +87,25 @@ export default function GoFastWithMeFeedPanel({
       await loadHub();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      setError(e.response?.data?.error || 'Could not post announcement.');
+      setError(e.response?.data?.error || 'Could not post update.');
     } finally {
       setPosting(false);
     }
   };
 
   return (
-    <section id="messages" className={embedded ? 'space-y-4' : 'space-y-6'}>
+    <section id="updates" className={embedded ? 'space-y-4' : 'space-y-6'}>
       {!embedded ? (
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Messages</h2>
+          <h2 className="text-lg font-bold text-gray-900">Updates</h2>
           <p className="text-sm text-gray-600 mt-1">
             Journey announcements for your followers — race updates, plan milestones, what&apos;s next.
-            Posts appear in your GoFast With Me hub.
+            Posts appear on your public community.
           </p>
         </div>
       ) : (
         <div>
-          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Messages</h3>
+          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Updates</h3>
           <p className="text-xs text-gray-600 mt-1">
             Journey announcements — race updates, milestones, what&apos;s next.
           </p>
@@ -98,7 +120,7 @@ export default function GoFastWithMeFeedPanel({
 
       {postSuccess ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Announcement posted to your hub.
+          Update posted to your public community.
         </div>
       ) : null}
 
@@ -106,7 +128,7 @@ export default function GoFastWithMeFeedPanel({
         <div className="flex items-start gap-2">
           <Megaphone className="h-5 w-5 text-violet-700 mt-0.5 shrink-0" />
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Post an announcement</h3>
+            <h3 className="text-sm font-semibold text-gray-900">Post an update</h3>
             <p className="text-xs text-gray-600 mt-1">
               Example: &ldquo;Week 12 of MCM prep — long run Sunday, following my plan.&rdquo;
             </p>
@@ -126,7 +148,7 @@ export default function GoFastWithMeFeedPanel({
             disabled={posting || !announcement.trim()}
             className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
           >
-            {posting ? 'Posting…' : 'Post announcement'}
+            {posting ? 'Posting…' : 'Post update'}
           </button>
         </form>
       </div>
@@ -134,26 +156,28 @@ export default function GoFastWithMeFeedPanel({
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Recent announcements</h3>
+            <h3 className="text-sm font-semibold text-gray-900">Recent updates</h3>
             <p className="text-xs text-gray-600 mt-1">
-              Latest messages visible to followers in the member hub.
+              Latest announcements visible on your public community.
             </p>
           </div>
           {!embedded ? (
             <Link
-              href={hubPath}
+              href={updatesPath}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800 hover:bg-orange-100"
             >
-              View as member
+              View public community
               <ExternalLink className="h-3.5 w-3.5" />
             </Link>
           ) : null}
         </div>
-        {loading ? (
+        {isLoading ? (
           <p className="text-sm text-gray-500">Loading…</p>
-        ) : hub && hub.messages.length > 0 ? (
+        ) : updateMessages.length > 0 ? (
           <ul className="space-y-2">
-            {hub.messages.slice(0, 5).map((m) => (
+            {updateMessages.slice(0, 5).map((m) => (
               <li key={m.id} className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm">
                 <p className="text-gray-800 whitespace-pre-wrap line-clamp-3">{m.body}</p>
                 <p className="text-xs text-gray-400 mt-1">{new Date(m.createdAt).toLocaleString()}</p>
@@ -161,16 +185,9 @@ export default function GoFastWithMeFeedPanel({
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-gray-500">No announcements yet.</p>
+          <p className="text-sm text-gray-500">No updates yet.</p>
         )}
       </div>
-
-      {!embedded ? (
-        <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-600">
-          What I&apos;m thinking about (tips and voice) is planned separately via athlete-owned CMS
-          content. Today, journey messages use container announcements.
-        </div>
-      ) : null}
     </section>
   );
 }

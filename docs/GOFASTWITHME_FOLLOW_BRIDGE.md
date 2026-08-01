@@ -43,12 +43,14 @@ Public GoFastWithMe → Follow {Name} CTA → /follow/{slug}
 |---|---|
 | `/follow/[handle]` | Public explainer + follow confirm |
 | `POST /api/follow/[handle]` | Auth: upsert follower membership |
-| `/container/[handle]` | Authenticated member hub (UI: **Following {Name}**) |
-| `GET /api/athlete/[id]/container/hub` | Boot payload for member hub |
+| `/u/[handle]/community` | Canonical athlete community (public read; follow unlocks Chatter) |
+| `/container/[handle]` | Legacy redirect → `/u/[handle]/community` |
+| `GET /api/athlete/public/[handle]/community` | Public community read (+ optional auth relationship fields) |
+| `GET /api/athlete/[id]/container/hub` | Authenticated owner/follower boot payload (studio + legacy APIs) |
 
-## Member hub (`/container/[handle]`)
+## Athlete community (`/u/[handle]/community`)
 
-After follow, members land on the **Following {Name}** hub:
+After follow, members return to the athlete community:
 
 | Section | Source |
 |---|---|
