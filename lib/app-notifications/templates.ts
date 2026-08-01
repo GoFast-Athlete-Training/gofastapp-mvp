@@ -81,6 +81,17 @@ const HARDCODED_TEMPLATES: Record<NotificationTemplateKey, TemplateDefinition> =
       return `${title}${dist} synced from Garmin — nice work!`;
     },
   },
+  'sponsorship.received': {
+    title: ({ brandName }) =>
+      typeof brandName === 'string' && brandName.trim()
+        ? `${brandName.trim()} is sponsoring you`
+        : 'You have a new sponsor',
+    body: ({ brandName }) => {
+      const brand =
+        typeof brandName === 'string' && brandName.trim() ? brandName.trim() : 'A brand';
+      return `${brand} just activated a Brand Partnership on your GoFast profile.`;
+    },
+  },
 };
 
 /** Stub for future content-backed templates (Company/content repo). */

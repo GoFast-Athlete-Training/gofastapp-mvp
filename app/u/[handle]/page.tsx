@@ -7,7 +7,7 @@ import DoorStoryColumn from './_components/DoorStoryColumn';
 import DoorSidebar from './_components/DoorSidebar';
 import RunWithMe from './_components/RunWithMe';
 import GroupTrainingCard from './_components/GroupTrainingCard';
-import { ProfileContainerAdSlot } from './_components/ProfileContainerAdSlot';
+import { ProfileContainerSponsorshipSlot } from './_components/ProfileContainerSponsorshipSlot';
 
 export const dynamic = 'force-dynamic';
 
@@ -145,9 +145,9 @@ export default async function PublicAthletePage({
           />
 
           {data.isGoFastContainer ? (
-            <ProfileContainerAdSlot
+            <ProfileContainerSponsorshipSlot
               isGoFastContainer={data.isGoFastContainer}
-              activeBlock={data.activeAdvertisingBlock}
+              activeSponsorship={data.activeSponsorship}
             />
           ) : null}
         </div>

@@ -170,33 +170,42 @@ model Athlete {
   athlete_appnotification_devices     athlete_appnotification_devices[]
   gofast_with_me              gofast_with_me?
   athlete_tips                athlete_tips[]
-  advertising_candidate advertising_candidates?
+  sponsorship_candidate sponsorship_candidates?
 }
 
-enum AdvertisingCandidateType {
+enum SponsorshipCandidateType {
   ATHLETE
 }
 
-enum AdvertisingCandidateStatus {
+enum SponsorshipCandidateStatus {
   ELIGIBLE
   PAUSED
   RETIRED
 }
 
-enum AdvertisingBlockStatus {
+enum SponsorCommitmentPaymentStatus {
+  UNPAID
+  CHECKOUT_PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum SponsorCommitmentStatus {
+  DRAFT
   SCHEDULED
   ACTIVE
   EXPIRED
   CANCELED
 }
 
-/// Explicit declaration that an athlete is advertising-eligible (MVP1: athlete only).
-model advertising_candidates {
+/// Athlete (or future surface) eligible for Brand Partnerships inventory.
+model sponsorship_candidates {
   id                 String                     @id @default(uuid())
   code               String                     @unique
-  candidateType      AdvertisingCandidateType   @default(ATHLETE)
+  candidateType      SponsorshipCandidateType   @default(ATHLETE)
   athleteId          String                     @unique
-  status             AdvertisingCandidateStatus @default(ELIGIBLE)
+  status             SponsorshipCandidateStatus @default(ELIGIBLE)
   publicSlugSnapshot String?
   displayLabel       String?
   photoUrl           String?
@@ -206,42 +215,51 @@ model advertising_candidates {
   createdAt          DateTime                   @default(now())
   updatedAt          DateTime                   @updatedAt
 
-  athlete Athlete              @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  blocks  advertising_blocks[]
+  athlete     Athlete               @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  commitments sponsor_commitments[]
 
   @@index([status])
   @@index([candidateType, status])
-  @@map("advertising_candidates")
+  @@map("sponsorship_candidates")
 }
 
-/// Durable purchased placement with creative snapshot (append-only history).
-model advertising_blocks {
-  id                         String                 @id @default(uuid())
-  candidateId                String
-  sourcePurchaseId           String                 @unique
-  advertiserCompanyId          String
-  advertiserCompanyName        String?
-  creativeId                 String
-  creativeName               String?
-  brandCampaignCollateralUrl String?
-  ctaUrl                     String?
-  ctaLabel                   String?
-  altText                    String?
-  amountCents                Int
-  currency                   String                 @default("usd")
-  purchasedAt                DateTime               @default(now())
-  startsAt                   DateTime
-  endsAt                     DateTime
-  status                     AdvertisingBlockStatus @default(SCHEDULED)
-  createdAt                  DateTime               @default(now())
-  updatedAt                  DateTime               @updatedAt
+/// Flat Brand Partnerships runtime + payment record (Prod-owned).
+model sponsor_commitments {
+  id                      String                         @id @default(uuid())
+  candidateId             String
+  candidateCodeSnapshot   String
+  brandId                 String
+  brandUserId             String?
+  brandNameSnapshot       String?
+  brandLogoUrlSnapshot    String?
+  creativeUrl             String?
+  ctaUrl                  String?
+  startsAt                DateTime
+  endsAt                  DateTime
+  pricingRuleKey          String
+  pricingRuleVersion      Int                            @default(1)
+  pricingBreakdownJson    Json?
+  quotedAmountCents       Int
+  amountPaidCents         Int?
+  currency                String                         @default("usd")
+  athleteShareCents       Int?
+  platformShareCents      Int?
+  paymentStatus           SponsorCommitmentPaymentStatus @default(UNPAID)
+  status                  SponsorCommitmentStatus          @default(DRAFT)
+  stripeCheckoutSessionId String?                        @unique
+  stripePaymentIntentId   String?                        @unique
+  paidAt                  DateTime?
+  createdAt               DateTime                       @default(now())
+  updatedAt               DateTime                       @updatedAt
 
-  candidate advertising_candidates @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  candidate sponsorship_candidates @relation(fields: [candidateId], references: [id], onDelete: Cascade)
 
   @@index([candidateId, status])
   @@index([candidateId, startsAt, endsAt])
   @@index([status, endsAt])
-  @@map("advertising_blocks")
+  @@index([paymentStatus])
+  @@index([brandId])
+  @@map("sponsor_commitments")
 }
 
 /// Athlete-scoped GoFast With Me — public invite identity (not the human Athlete profile).

@@ -7,7 +7,7 @@ import {
 import { verifyCronSecret } from "@/lib/cron/verify-cron-secret";
 import { NextRequest, NextResponse } from "next/server";
 
-/** @deprecated Use POST /api/cron/sponsor-commitments/maintain */
+/** POST /api/cron/sponsor-commitments/maintain — transition ended commitments to EXPIRED. */
 export async function POST(request: NextRequest) {
   const authFailure = verifyCronSecret(request);
   if (authFailure) return authFailure;
@@ -23,6 +23,5 @@ export async function POST(request: NextRequest) {
     expiredCount,
     activatedCount,
     processedAt: now.toISOString(),
-    deprecated: true,
   });
 }

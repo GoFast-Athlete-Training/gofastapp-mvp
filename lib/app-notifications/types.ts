@@ -7,7 +7,8 @@ export type NotificationTemplateKey =
   | 'club.chatter'
   | 'crew.announcement'
   | 'workout.complete'
-  | 'activity.synced';
+  | 'activity.synced'
+  | 'sponsorship.received';
 
 export type AppNotificationObjectType =
   | 'workout'
@@ -15,7 +16,8 @@ export type AppNotificationObjectType =
   | 'city_run'
   | 'run_club'
   | 'run_crew_announcement'
-  | 'athlete_activity';
+  | 'athlete_activity'
+  | 'sponsor_commitment';
 
 export type TemplateFacts = Record<string, unknown>;
 
@@ -63,6 +65,8 @@ export function templateKeyToMobileType(templateKey: NotificationTemplateKey): s
       return 'workout_complete';
     case 'activity.synced':
       return 'activity_synced';
+    case 'sponsorship.received':
+      return 'sponsorship_received';
     default:
       return templateKey;
   }

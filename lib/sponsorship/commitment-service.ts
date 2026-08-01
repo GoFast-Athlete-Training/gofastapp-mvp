@@ -1,0 +1,340 @@
+import { prisma } from "@/lib/prisma";
+import { sendAppNotification } from "@/lib/app-notifications/send";
+import {
+  getCandidateForPurchase,
+  validateCandidatePurchaseIdentity,
+} from "@/lib/sponsorship/candidate-service";
+import {
+  SponsorCommitmentPaymentStatus,
+  SponsorCommitmentStatus,
+  type sponsor_commitments,
+} from "@prisma/client";
+
+export type CreateCheckoutPendingInput = {
+  candidateId: string;
+  candidateCode: string;
+  brandId: string;
+  brandUserId: string;
+  brandNameSnapshot?: string | null;
+  brandLogoUrlSnapshot?: string | null;
+  creativeUrl?: string | null;
+  ctaUrl?: string | null;
+  startsAt: Date;
+  endsAt: Date;
+  pricingRuleKey: string;
+  pricingRuleVersion: number;
+  pricingBreakdownJson?: unknown;
+  quotedAmountCents: number;
+  currency?: string;
+  athleteShareCents?: number | null;
+  platformShareCents?: number | null;
+  stripeCheckoutSessionId?: string | null;
+};
+
+export type FinalizePaidInput = {
+  commitmentId: string;
+  amountPaidCents: number;
+  stripeCheckoutSessionId?: string | null;
+  stripePaymentIntentId?: string | null;
+  paidAt?: Date;
+};
+
+export type ActiveCommitmentSnapshot = {
+  commitmentId: string;
+  brandNameSnapshot: string | null;
+  brandLogoUrlSnapshot: string | null;
+  creativeUrl: string | null;
+  ctaUrl: string | null;
+  startsAt: string;
+  endsAt: string;
+};
+
+export type AthleteSponsorshipHistoryRow = {
+  commitmentId: string;
+  brandNameSnapshot: string | null;
+  brandLogoUrlSnapshot: string | null;
+  creativeUrl: string | null;
+  ctaUrl: string | null;
+  startsAt: string;
+  endsAt: string;
+  status: SponsorCommitmentStatus;
+  paymentStatus: SponsorCommitmentPaymentStatus;
+  amountPaidCents: number | null;
+  paidAt: string | null;
+};
+
+function deriveRuntimeStatus(
+  startsAt: Date,
+  endsAt: Date,
+  now = new Date(),
+): SponsorCommitmentStatus {
+  if (now < startsAt) return SponsorCommitmentStatus.SCHEDULED;
+  if (now >= endsAt) return SponsorCommitmentStatus.EXPIRED;
+  return SponsorCommitmentStatus.ACTIVE;
+}
+
+async function findOverlappingPaidCommitment(
+  candidateId: string,
+  startsAt: Date,
+  endsAt: Date,
+  excludeCommitmentId?: string,
+): Promise<sponsor_commitments | null> {
+  return prisma.sponsor_commitments.findFirst({
+    where: {
+      id: excludeCommitmentId ? { not: excludeCommitmentId } : undefined,
+      candidateId,
+      paymentStatus: SponsorCommitmentPaymentStatus.PAID,
+      status: {
+        in: [
+          SponsorCommitmentStatus.SCHEDULED,
+          SponsorCommitmentStatus.ACTIVE,
+        ],
+      },
+      startsAt: { lt: endsAt },
+      endsAt: { gt: startsAt },
+    },
+  });
+}
+
+export async function createCheckoutPendingCommitment(
+  input: CreateCheckoutPendingInput,
+): Promise<sponsor_commitments> {
+  const candidate = await getCandidateForPurchase(input.candidateId, input.candidateCode);
+  if (!candidate) {
+    throw new Error("Candidate not found, not eligible, or ID/code mismatch");
+  }
+
+  const overlap = await findOverlappingPaidCommitment(
+    candidate.id,
+    input.startsAt,
+    input.endsAt,
+  );
+  if (overlap) {
+    throw new Error("Candidate already has an overlapping paid commitment");
+  }
+
+  return prisma.sponsor_commitments.create({
+    data: {
+      candidateId: candidate.id,
+      candidateCodeSnapshot: candidate.code,
+      brandId: input.brandId,
+      brandUserId: input.brandUserId,
+      brandNameSnapshot: input.brandNameSnapshot ?? null,
+      brandLogoUrlSnapshot: input.brandLogoUrlSnapshot ?? null,
+      creativeUrl: input.creativeUrl ?? null,
+      ctaUrl: input.ctaUrl ?? null,
+      startsAt: input.startsAt,
+      endsAt: input.endsAt,
+      pricingRuleKey: input.pricingRuleKey,
+      pricingRuleVersion: input.pricingRuleVersion,
+      pricingBreakdownJson: input.pricingBreakdownJson ?? undefined,
+      quotedAmountCents: input.quotedAmountCents,
+      currency: input.currency ?? "usd",
+      athleteShareCents: input.athleteShareCents ?? null,
+      platformShareCents: input.platformShareCents ?? null,
+      paymentStatus: SponsorCommitmentPaymentStatus.CHECKOUT_PENDING,
+      status: SponsorCommitmentStatus.DRAFT,
+      stripeCheckoutSessionId: input.stripeCheckoutSessionId ?? null,
+    },
+  });
+}
+
+export async function attachCheckoutSessionToCommitment(
+  commitmentId: string,
+  stripeCheckoutSessionId: string,
+): Promise<sponsor_commitments> {
+  return prisma.sponsor_commitments.update({
+    where: { id: commitmentId },
+    data: {
+      stripeCheckoutSessionId,
+      paymentStatus: SponsorCommitmentPaymentStatus.CHECKOUT_PENDING,
+      updatedAt: new Date(),
+    },
+  });
+}
+
+export async function finalizePaidCommitment(
+  input: FinalizePaidInput,
+): Promise<sponsor_commitments> {
+  const existing = await prisma.sponsor_commitments.findUnique({
+    where: { id: input.commitmentId },
+    include: { candidate: true },
+  });
+
+  if (!existing) {
+    throw new Error("Commitment not found");
+  }
+
+  if (existing.paymentStatus === SponsorCommitmentPaymentStatus.PAID) {
+    return existing;
+  }
+
+  if (
+    !validateCandidatePurchaseIdentity(
+      existing.candidate,
+      existing.candidateId,
+      existing.candidateCodeSnapshot,
+    )
+  ) {
+    throw new Error("Candidate no longer eligible for this commitment");
+  }
+
+  const paidAt = input.paidAt ?? new Date();
+  const runtimeStatus = deriveRuntimeStatus(existing.startsAt, existing.endsAt, paidAt);
+
+  const updated = await prisma.sponsor_commitments.update({
+    where: { id: existing.id },
+    data: {
+      paymentStatus: SponsorCommitmentPaymentStatus.PAID,
+      status: runtimeStatus,
+      amountPaidCents: input.amountPaidCents,
+      paidAt,
+      stripeCheckoutSessionId:
+        input.stripeCheckoutSessionId ?? existing.stripeCheckoutSessionId,
+      stripePaymentIntentId: input.stripePaymentIntentId ?? existing.stripePaymentIntentId,
+      updatedAt: new Date(),
+    },
+    include: { candidate: true },
+  });
+
+  await notifyAthleteOfNewSponsorship(updated);
+
+  return updated;
+}
+
+async function notifyAthleteOfNewSponsorship(
+  commitment: sponsor_commitments & { candidate: { athleteId: string } },
+): Promise<void> {
+  const brandName = commitment.brandNameSnapshot?.trim() || "A brand";
+  try {
+    await sendAppNotification({
+      athleteId: commitment.candidate.athleteId,
+      templateKey: "sponsorship.received",
+      objectType: "sponsor_commitment",
+      objectId: commitment.id,
+      payload: {
+        brandName,
+        brandLogoUrl: commitment.brandLogoUrlSnapshot,
+        commitmentId: commitment.id,
+      },
+      facts: {
+        brandName,
+        startsAt: commitment.startsAt.toISOString(),
+        endsAt: commitment.endsAt.toISOString(),
+      },
+    });
+  } catch (error) {
+    console.warn("[commitment-service] athlete notification failed", error);
+  }
+}
+
+export async function getCommitmentById(
+  commitmentId: string,
+): Promise<sponsor_commitments | null> {
+  return prisma.sponsor_commitments.findUnique({ where: { id: commitmentId } });
+}
+
+export async function getActiveCommitmentSnapshotForAthlete(
+  athleteId: string,
+  now = new Date(),
+): Promise<ActiveCommitmentSnapshot | null> {
+  const candidate = await prisma.sponsorship_candidates.findFirst({
+    where: { athleteId },
+    select: { id: true },
+  });
+  if (!candidate) return null;
+
+  const commitment = await prisma.sponsor_commitments.findFirst({
+    where: {
+      candidateId: candidate.id,
+      paymentStatus: SponsorCommitmentPaymentStatus.PAID,
+      startsAt: { lte: now },
+      endsAt: { gt: now },
+      status: {
+        in: [SponsorCommitmentStatus.SCHEDULED, SponsorCommitmentStatus.ACTIVE],
+      },
+    },
+    orderBy: [{ startsAt: "desc" }],
+  });
+
+  if (!commitment || (!commitment.creativeUrl?.trim() && !commitment.ctaUrl?.trim())) {
+    return null;
+  }
+
+  return {
+    commitmentId: commitment.id,
+    brandNameSnapshot: commitment.brandNameSnapshot,
+    brandLogoUrlSnapshot: commitment.brandLogoUrlSnapshot,
+    creativeUrl: commitment.creativeUrl,
+    ctaUrl: commitment.ctaUrl,
+    startsAt: commitment.startsAt.toISOString(),
+    endsAt: commitment.endsAt.toISOString(),
+  };
+}
+
+export async function listAthleteSponsorshipHistory(
+  athleteId: string,
+): Promise<AthleteSponsorshipHistoryRow[]> {
+  const candidate = await prisma.sponsorship_candidates.findFirst({
+    where: { athleteId },
+    select: { id: true },
+  });
+  if (!candidate) return [];
+
+  const rows = await prisma.sponsor_commitments.findMany({
+    where: {
+      candidateId: candidate.id,
+      paymentStatus: SponsorCommitmentPaymentStatus.PAID,
+    },
+    orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }],
+  });
+
+  return rows.map((row) => ({
+    commitmentId: row.id,
+    brandNameSnapshot: row.brandNameSnapshot,
+    brandLogoUrlSnapshot: row.brandLogoUrlSnapshot,
+    creativeUrl: row.creativeUrl,
+    ctaUrl: row.ctaUrl,
+    startsAt: row.startsAt.toISOString(),
+    endsAt: row.endsAt.toISOString(),
+    status: row.status,
+    paymentStatus: row.paymentStatus,
+    amountPaidCents: row.amountPaidCents,
+    paidAt: row.paidAt?.toISOString() ?? null,
+  }));
+}
+
+export async function expireEndedSponsorCommitments(now = new Date()): Promise<number> {
+  const result = await prisma.sponsor_commitments.updateMany({
+    where: {
+      endsAt: { lte: now },
+      paymentStatus: SponsorCommitmentPaymentStatus.PAID,
+      status: {
+        in: [SponsorCommitmentStatus.SCHEDULED, SponsorCommitmentStatus.ACTIVE],
+      },
+    },
+    data: {
+      status: SponsorCommitmentStatus.EXPIRED,
+      updatedAt: now,
+    },
+  });
+  return result.count;
+}
+
+export async function activateStartedSponsorCommitments(now = new Date()): Promise<number> {
+  const result = await prisma.sponsor_commitments.updateMany({
+    where: {
+      startsAt: { lte: now },
+      endsAt: { gt: now },
+      paymentStatus: SponsorCommitmentPaymentStatus.PAID,
+      status: SponsorCommitmentStatus.SCHEDULED,
+    },
+    data: {
+      status: SponsorCommitmentStatus.ACTIVE,
+      updatedAt: now,
+    },
+  });
+  return result.count;
+}
+
+export { deriveRuntimeStatus };
