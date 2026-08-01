@@ -171,9 +171,9 @@ export default function GoFastWithMeDashboardHome({
 
       <section className="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
         <div>
-          <h3 className="text-sm font-bold text-gray-900">Member view &amp; admin</h3>
+          <h3 className="text-sm font-bold text-gray-900">Community surface controls</h3>
           <p className="text-xs text-gray-600 mt-0.5">
-            Check the hydrated community experience and control which studio parts surface there.
+            Preview the follower experience and control which studio parts surface there.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -183,7 +183,7 @@ export default function GoFastWithMeDashboardHome({
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-semibold text-orange-800 hover:bg-orange-100"
           >
-            View as member
+            View as follower
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
           <a
