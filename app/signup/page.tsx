@@ -9,7 +9,10 @@ import { auth } from '@/lib/firebase';
 import { signInWithGoogle } from '@/lib/auth';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
-import { clubManagerActivatePath, clubManagerHubPath } from '@/lib/club-manager-paths';
+import {
+  clubManagerActivatePath,
+  clubManagerWelcomePath,
+} from '@/lib/club-manager-paths';
 
 type SignupMode = 'default' | 'join-crew' | 'club-owner' | 'club-manager';
 
@@ -97,12 +100,14 @@ function routeAfterAthleteResolved(
     LocalStorageAPI.setClubManagerMode(true);
     const activationToken = LocalStorageAPI.getClubManagerActivationToken();
     if (hasHandle) {
+      // Invite token path stays on activate; return/sign path always hits Club Manager welcome.
       if (activationToken) {
         router.replace(clubManagerActivatePath(activationToken));
-      } else if (opts.redirect) {
-        router.replace(opts.redirect);
       } else {
-        router.replace(clubManagerHubPath());
+        const redirect = opts.redirect?.trim();
+        router.replace(
+          redirect && redirect.startsWith('/') ? redirect : clubManagerWelcomePath()
+        );
       }
     } else {
       router.replace('/athlete-create-profile');

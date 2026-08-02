@@ -7,14 +7,16 @@ import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
-import { resolveClubManagerHomePath } from '@/lib/club-manager-home-route';
+import { clubManagerWelcomePath } from '@/lib/club-manager-paths';
+import { athleteHasManagerMemberships } from '@/lib/club-manager-home-route';
+import type { LeaderContextClub } from '@/lib/run-club-leader-context';
 
 const SESSION_GATE_KEY = 'gofast_uid_resolved';
 
 type WelcomeStep = 'loading-local' | 'resolving-profile' | 'dashboard' | 'finish-profile';
 type SecondaryCta = {
   label: string;
-  action: 'dashboard' | 'profile';
+  action: 'dashboard' | 'profile' | 'club-manager';
 };
 
 type StoredSessionGate = {
@@ -84,8 +86,12 @@ function stepCopy(step: WelcomeStep): string {
   }
 }
 
-function readySubtitle(step: WelcomeStep): string | null {
-  if (step === 'dashboard') return 'Ready to start crushing your goals.';
+function readySubtitle(step: WelcomeStep, isManager: boolean): string | null {
+  if (step === 'dashboard') {
+    return isManager
+      ? "You're a GoFast athlete and a club manager."
+      : 'Ready to start crushing your goals.';
+  }
   if (step === 'finish-profile') return 'Finish your profile, then you\u2019re in.';
   return null;
 }
@@ -102,6 +108,7 @@ export default function WelcomePage() {
   const [runnerName, setRunnerName] = useState('runner');
   const [step, setStep] = useState<WelcomeStep>('loading-local');
   const [hasProfileHandle, setHasProfileHandle] = useState<boolean | null>(null);
+  const [isClubManager, setIsClubManager] = useState(false);
   const [secondaryCta, setSecondaryCta] = useState<SecondaryCta | null>(null);
 
   useEffect(() => {
@@ -110,12 +117,18 @@ export default function WelcomePage() {
       return;
     }
 
-    setSecondaryCta(
-      hasProfileHandle
-        ? null
-        : { label: 'Go to dashboard anyway', action: 'dashboard' }
-    );
-  }, [hasProfileHandle]);
+    if (!hasProfileHandle) {
+      setSecondaryCta({ label: 'Go to dashboard anyway', action: 'dashboard' });
+      return;
+    }
+
+    if (isClubManager) {
+      setSecondaryCta({ label: 'Continue as athlete', action: 'dashboard' });
+      return;
+    }
+
+    setSecondaryCta(null);
+  }, [hasProfileHandle, isClubManager]);
 
   useEffect(() => {
     if (hasProcessedRef.current) {
@@ -150,6 +163,13 @@ export default function WelcomePage() {
         setStep('loading-local');
 
         const storedAthleteId = LocalStorageAPI.getAthleteId();
+
+        // Club Manager sign/return flow uses its own welcome.
+        if (LocalStorageAPI.getClubManagerMode()) {
+          router.replace(clubManagerWelcomePath());
+          return;
+        }
+
         const gate = getSessionGate();
         if (
           gate &&
@@ -160,6 +180,13 @@ export default function WelcomePage() {
           const nextStep = gate.profileComplete ? 'dashboard' : 'finish-profile';
           setHasProfileHandle(gate.profileComplete);
           setStep(nextStep);
+          try {
+            const profRes = await api.get(`/athlete/${storedAthleteId}`);
+            const clubs = (profRes.data?.athlete?.leaderContext?.clubs ?? []) as LeaderContextClub[];
+            setIsClubManager(athleteHasManagerMemberships(clubs));
+          } catch {
+            setIsClubManager(false);
+          }
           setResolving(false);
           return;
         }
@@ -168,7 +195,11 @@ export default function WelcomePage() {
         const token = await firebaseUser.getIdToken();
         let athleteId = storedAthleteId;
         let athlete:
-          | { firstName?: string | null; gofastHandle?: string | null }
+          | {
+              firstName?: string | null;
+              gofastHandle?: string | null;
+              leaderContext?: { clubs?: LeaderContextClub[] } | null;
+            }
           | undefined;
 
         try {
@@ -216,8 +247,11 @@ export default function WelcomePage() {
         }
 
         const hasHandle = !!athlete?.gofastHandle?.trim();
+        const managerClubs = athlete?.leaderContext?.clubs ?? [];
+        const hasManager = athleteHasManagerMemberships(managerClubs);
         setRunnerName(runnerNameFromSession(athlete, firebaseUser));
         setHasProfileHandle(hasHandle);
+        setIsClubManager(hasManager);
         setStep(hasHandle ? 'dashboard' : 'finish-profile');
         setSessionGate({
           uid: firebaseUser.uid,
@@ -248,17 +282,12 @@ export default function WelcomePage() {
   }
 
   function goToDashboard() {
-    const athleteId = LocalStorageAPI.getAthleteId();
-    if (athleteId) {
-      void api.get(`/athlete/${athleteId}`).then((res) => {
-        const managerHome = resolveClubManagerHomePath(res.data?.athlete?.leaderContext?.clubs);
-        router.replace(managerHome ?? '/athlete-home');
-      }).catch(() => {
-        router.replace('/athlete-home');
-      });
-      return;
-    }
     router.replace('/athlete-home');
+  }
+
+  function goToClubManagerWelcome() {
+    LocalStorageAPI.setClubManagerMode(true);
+    router.replace(clubManagerWelcomePath());
   }
 
   function goToProfile() {
@@ -266,6 +295,7 @@ export default function WelcomePage() {
   }
 
   const recommendProfile = hasProfileHandle === false;
+  const primaryIsManager = !recommendProfile && isClubManager;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center p-6">
@@ -279,10 +309,12 @@ export default function WelcomePage() {
           priority
         />
 
-        <h1 className="mt-8 text-3xl font-bold text-white">Welcome, {runnerName}</h1>
+        <h1 className="mt-8 text-3xl font-bold text-white">
+          {isClubManager && !resolving && !error ? `Welcome back, ${runnerName}` : `Welcome, ${runnerName}`}
+        </h1>
         <p className="mt-2 text-base text-white/90">{stepCopy(step)}</p>
-        {!error && !resolving && readySubtitle(step) ? (
-          <p className="mt-2 text-sm text-white/80">{readySubtitle(step)}</p>
+        {!error && !resolving && readySubtitle(step, isClubManager) ? (
+          <p className="mt-2 text-sm text-white/80">{readySubtitle(step, isClubManager)}</p>
         ) : null}
 
         {error ? (
@@ -304,18 +336,36 @@ export default function WelcomePage() {
           <div className="mt-8 flex w-full flex-col gap-3">
             <button
               type="button"
-              onClick={recommendProfile ? goToProfile : goToDashboard}
+              onClick={
+                recommendProfile
+                  ? goToProfile
+                  : primaryIsManager
+                    ? goToClubManagerWelcome
+                    : goToDashboard
+              }
               className={`w-full rounded-xl px-5 py-4 text-base font-bold ${
-                recommendProfile ? 'bg-white text-sky-600' : 'bg-white/15 text-white'
+                recommendProfile || primaryIsManager
+                  ? 'bg-white text-sky-600'
+                  : 'bg-white/15 text-white'
               }`}
             >
-              {recommendProfile ? 'Finish profile' : "Let's go"}
+              {recommendProfile
+                ? 'Finish profile'
+                : primaryIsManager
+                  ? 'Continue as Club Manager'
+                  : "Let's go"}
             </button>
 
             {secondaryCta ? (
               <button
                 type="button"
-                onClick={secondaryCta.action === 'dashboard' ? goToDashboard : goToProfile}
+                onClick={
+                  secondaryCta.action === 'dashboard'
+                    ? goToDashboard
+                    : secondaryCta.action === 'club-manager'
+                      ? goToClubManagerWelcome
+                      : goToProfile
+                }
                 className="w-full rounded-xl border border-white/40 px-5 py-4 text-base font-semibold text-white"
               >
                 {secondaryCta.label}

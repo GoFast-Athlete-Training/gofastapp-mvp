@@ -2,6 +2,11 @@
 
 export const CLUB_MANAGER_BASE = '/club-manager';
 
+/** Post sign-in welcome for the clubmanage host / mode=club-manager return path. */
+export function clubManagerWelcomePath(): string {
+  return '/welcome-clubmanager';
+}
+
 export function clubManagerHubPath(): string {
   return CLUB_MANAGER_BASE;
 }

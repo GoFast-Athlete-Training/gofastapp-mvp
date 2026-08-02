@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -10,6 +11,7 @@ import { LocalStorageAPI } from '@/lib/localstorage';
 import {
   clubManagerClubPath,
   clubManagerHubPath,
+  clubManagerWelcomePath,
 } from '@/lib/club-manager-paths';
 import { resolveClubManagerHomePath } from '@/lib/club-manager-home-route';
 import { formatClubManagerRoleLabel } from '@/lib/club-manager-membership-roles';
@@ -18,7 +20,13 @@ import type { LeaderContextClub } from '@/lib/run-club-leader-context';
 type WelcomeState =
   | { kind: 'loading' }
   | { kind: 'signed_out' }
-  | { kind: 'ready'; clubs: LeaderContextClub[]; displayName: string | null; email: string | null };
+  | {
+      kind: 'ready';
+      clubs: LeaderContextClub[];
+      displayName: string | null;
+      email: string | null;
+      gofastHandle: string | null;
+    };
 
 export default function WelcomeClubManagerPage() {
   const router = useRouter();
@@ -67,9 +75,16 @@ export default function WelcomeClubManagerPage() {
             athlete?.gofastHandle ||
             null,
           email: user.email ?? athlete?.email ?? null,
+          gofastHandle: athlete?.gofastHandle?.trim() || null,
         });
       } catch {
-        setView({ kind: 'ready', clubs: [], displayName: user.email, email: user.email });
+        setView({
+          kind: 'ready',
+          clubs: [],
+          displayName: user.email,
+          email: user.email,
+          gofastHandle: null,
+        });
       }
     });
 
@@ -78,31 +93,38 @@ export default function WelcomeClubManagerPage() {
 
   if (view.kind === 'loading') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-sky-50 to-white flex items-center justify-center px-4">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-sky-600" />
+      <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center px-4">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white" />
       </div>
     );
   }
 
   if (view.kind === 'signed_out') {
     // Return door for managers who already have an athlete account (not invite activation).
-    const returnUrl = encodeURIComponent('/welcome-clubmanager');
+    const returnUrl = encodeURIComponent(clubManagerWelcomePath());
     return (
       <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center px-4">
-        <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl p-8 text-center">
-          <p className="text-xs font-bold uppercase tracking-wide text-sky-700">Club Manager</p>
-          <h1 className="mt-2 text-2xl font-bold text-gray-900">Sign back in</h1>
-          <p className="mt-3 text-sm text-gray-600">
-            This is the Club Manager door — sign in with the GoFast account that has manager
-            membership for your club.
+        <div className="max-w-lg w-full text-center">
+          <Image
+            src="/logo.png"
+            alt="GoFast Logo"
+            width={112}
+            height={112}
+            className="mx-auto h-28 w-28 rounded-full object-cover shadow-xl"
+            priority
+          />
+          <p className="mt-6 text-xs font-bold uppercase tracking-wide text-white/80">Club Manager</p>
+          <h1 className="mt-2 text-3xl font-bold text-white">Welcome back</h1>
+          <p className="mt-3 text-base text-white/90">
+            Sign in with your GoFast athlete account that also manages a run club.
           </p>
           <Link
             href={`/signup?mode=club-manager&auth=signin&redirect=${returnUrl}`}
-            className="mt-8 inline-flex w-full justify-center rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white hover:bg-sky-700"
+            className="mt-8 inline-flex w-full max-w-sm justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-sky-700 hover:bg-sky-50"
           >
             Club Manager sign in
           </Link>
-          <p className="mt-4 text-xs text-gray-500">
+          <p className="mt-4 text-xs text-white/70">
             First-time invite? Open the activation link from your email instead.
           </p>
         </div>
@@ -115,46 +137,73 @@ export default function WelcomeClubManagerPage() {
     view.clubs.length > 0
       ? resolveClubManagerHomePath(view.clubs) ?? clubManagerHubPath()
       : clubManagerHubPath();
+  const isManager = view.clubs.length > 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center px-4">
-      <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl p-8">
-        <p className="text-xs font-bold uppercase tracking-wide text-sky-700">Club Manager welcome</p>
-        <h1 className="mt-2 text-2xl font-bold text-gray-900">
-          {view.displayName ? `Welcome, ${view.displayName}` : 'Welcome'}
-        </h1>
-        {view.email ? <p className="mt-1 text-sm text-gray-500">{view.email}</p> : null}
+      <div className="max-w-lg w-full text-center">
+        <Image
+          src="/logo.png"
+          alt="GoFast Logo"
+          width={112}
+          height={112}
+          className="mx-auto h-28 w-28 rounded-full object-cover shadow-xl"
+          priority
+        />
 
-        {view.clubs.length === 0 ? (
-          <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            No active club manager memberships were found yet. If you were just added, try again in a
-            moment or contact GoFast staff.
-          </div>
-        ) : (
-          <div className="mt-6 space-y-3">
+        <p className="mt-6 text-xs font-bold uppercase tracking-wide text-white/80">Club Manager</p>
+        <h1 className="mt-2 text-3xl font-bold text-white">
+          {view.displayName ? `Welcome back, ${view.displayName}` : 'Welcome back'}
+        </h1>
+        <p className="mt-3 text-base text-white/90">
+          {isManager
+            ? "You're a GoFast athlete and a club manager."
+            : "You're signed in as a GoFast athlete. We don't see active manager membership yet."}
+        </p>
+        {view.gofastHandle ? (
+          <p className="mt-1 text-sm text-white/70">@{view.gofastHandle}</p>
+        ) : view.email ? (
+          <p className="mt-1 text-sm text-white/70">{view.email}</p>
+        ) : null}
+
+        {isManager ? (
+          <div className="mt-6 space-y-3 text-left">
             {view.clubs.map((club) => (
               <div
                 key={club.runClubId}
-                className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3"
+                className="rounded-xl border border-white/25 bg-white/10 px-4 py-3 backdrop-blur-sm"
               >
-                <p className="font-semibold text-gray-900">{club.runClubName}</p>
-                <p className="text-sm text-gray-600">
-                  Role: {formatClubManagerRoleLabel(club.role)} · Status: active
+                <p className="font-semibold text-white">{club.runClubName}</p>
+                <p className="text-sm text-white/80">
+                  {formatClubManagerRoleLabel(club.role)} · active
                 </p>
               </div>
             ))}
           </div>
+        ) : (
+          <div className="mt-6 rounded-xl border border-amber-200/40 bg-amber-500/20 p-4 text-sm text-amber-50">
+            If you were just added in Company, refresh in a moment — or open the invite activation
+            link from email.
+          </div>
         )}
 
-        <Link
-          href={dashboardPath}
-          className="mt-8 inline-flex w-full justify-center rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white hover:bg-sky-700"
-        >
-          {primaryClub ? `Go to ${primaryClub.runClubName} dashboard` : 'Go to Club Manager'}
-        </Link>
+        <div className="mt-8 flex w-full flex-col gap-3">
+          <Link
+            href={dashboardPath}
+            className="inline-flex w-full justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-sky-700 hover:bg-sky-50"
+          >
+            {primaryClub ? `Manage ${primaryClub.runClubName}` : 'Open Club Manager'}
+          </Link>
+          <Link
+            href="/athlete-home"
+            className="inline-flex w-full justify-center rounded-xl border border-white/40 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10"
+          >
+            Continue as athlete
+          </Link>
+        </div>
 
         {primaryClub?.runClubSlug ? (
-          <p className="mt-3 text-center text-xs text-gray-500">
+          <p className="mt-3 text-center text-xs text-white/60">
             {clubManagerClubPath(primaryClub.runClubSlug)}
           </p>
         ) : null}

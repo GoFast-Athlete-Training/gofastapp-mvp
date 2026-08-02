@@ -38,7 +38,7 @@ export function resolveRootEntryPath(opts: {
 }): string {
   const intent = resolveRootHostIntent(opts.hostname);
 
-  // Dedicated Club Manager host: always the club-manager front door.
+  // Dedicated Club Manager host: always the club-manager welcome/sign-back-in door.
   if (intent === 'club-manager') {
     return CLUB_MANAGER_FRONT_DOOR;
   }
