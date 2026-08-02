@@ -5,16 +5,12 @@ import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import Image from 'next/image';
-
-function isCoachSubdomain(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.location.hostname.startsWith('coach.');
-}
-
-function isLeaderSubdomain(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.location.hostname.startsWith('leader.');
-}
+import { LocalStorageAPI } from '@/lib/localstorage';
+import {
+  resolveRootEntryPath,
+  resolveRootHostIntent,
+  type RootHostIntent,
+} from '@/lib/product-host';
 
 function SplashLogo({ pulse = false }: { pulse?: boolean }) {
   return (
@@ -33,14 +29,14 @@ export default function RootPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLeaderIntent, setIsLeaderIntent] = useState(false);
-  const [isCoachIntent, setIsCoachIntent] = useState(false);
+  const [hostIntent, setHostIntent] = useState<RootHostIntent>('default');
 
   useEffect(() => {
-    const coach = isCoachSubdomain();
-    setIsCoachIntent(coach);
-    if (!coach) {
-      setIsLeaderIntent(isLeaderSubdomain());
+    const hostname = window.location.hostname;
+    const intent = resolveRootHostIntent(hostname);
+    setHostIntent(intent);
+    if (intent === 'club-manager') {
+      LocalStorageAPI.setClubManagerMode(true);
     }
   }, []);
 
@@ -55,44 +51,51 @@ export default function RootPage() {
 
   useEffect(() => {
     if (isLoading) return;
+    if (typeof window === 'undefined') return;
 
-    if (isCoachIntent) {
-      router.replace(isAuthenticated ? '/coach-hub' : '/coach-signup');
-      return;
-    }
-    if (isAuthenticated) {
-      router.replace('/welcome');
-      return;
-    }
-    if (isLeaderIntent) {
-      router.replace('/signup?intent=club-leader');
-      return;
-    }
-    router.replace('/explainer');
-  }, [isLoading, isAuthenticated, isLeaderIntent, isCoachIntent, router]);
+    router.replace(
+      resolveRootEntryPath({
+        hostname: window.location.hostname,
+        isAuthenticated,
+      })
+    );
+  }, [isLoading, isAuthenticated, router]);
+
+  const isCoachIntent = hostIntent === 'coach';
+  const isLeaderIntent = hostIntent === 'leader';
+  const isClubManagerIntent = hostIntent === 'club-manager';
 
   const coachHeadline = 'Train your athletes. Build champions.';
   const coachSub = 'Manage race training groups and assign workouts.';
   const leaderHeadline = 'Claim and manage your run club';
+  const clubManagerHeadline = 'Manage your run club.';
+  const clubManagerSub = 'Edit profile, runs, and announcements for your club.';
   const defaultHeadline = 'Find your pace group. Train hard. PR.';
 
   const headline = isCoachIntent
     ? coachHeadline
-    : isLeaderIntent
-      ? leaderHeadline
-      : defaultHeadline;
+    : isClubManagerIntent
+      ? clubManagerHeadline
+      : isLeaderIntent
+        ? leaderHeadline
+        : defaultHeadline;
 
   const ctaText = isCoachIntent
     ? 'Get started as a coach'
-    : isLeaderIntent
-      ? 'Get Started'
-      : 'Join Now';
+    : isClubManagerIntent
+      ? 'Continue to Club Manager'
+      : isLeaderIntent
+        ? 'Get Started'
+        : 'Join Now';
 
   const gradientClass = isCoachIntent
     ? 'bg-gradient-to-br from-amber-500 to-orange-700'
     : 'bg-gradient-to-br from-sky-400 to-sky-600';
 
-  const showIntentSplash = !isLoading && (isCoachIntent || isLeaderIntent) && !isAuthenticated;
+  const showIntentSplash =
+    !isLoading &&
+    (isCoachIntent || isLeaderIntent || isClubManagerIntent) &&
+    !isAuthenticated;
 
   return (
     <div className={`min-h-screen ${gradientClass} flex items-center justify-center`}>
@@ -103,7 +106,10 @@ export default function RootPage() {
           {isCoachIntent && (
             <p className="text-xl md:text-2xl text-white/90 mb-8">{coachSub}</p>
           )}
-          {!isCoachIntent && !isLeaderIntent && (
+          {isClubManagerIntent && (
+            <p className="text-xl md:text-2xl text-white/90 mb-8">{clubManagerSub}</p>
+          )}
+          {!isCoachIntent && !isLeaderIntent && !isClubManagerIntent && (
             <p className="text-xl md:text-2xl text-white/90 mb-8">
               Find runs. Join crews. Race.
             </p>
@@ -111,6 +117,7 @@ export default function RootPage() {
           <button
             onClick={() => {
               if (isCoachIntent) router.replace('/coach-signup');
+              else if (isClubManagerIntent) router.replace('/welcome-clubmanager');
               else router.replace('/signup?intent=club-leader');
             }}
             className={
