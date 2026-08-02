@@ -85,21 +85,26 @@ export default function WelcomeClubManagerPage() {
   }
 
   if (view.kind === 'signed_out') {
+    // Return door for managers who already have an athlete account (not invite activation).
     const returnUrl = encodeURIComponent('/welcome-clubmanager');
     return (
       <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center px-4">
         <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl p-8 text-center">
           <p className="text-xs font-bold uppercase tracking-wide text-sky-700">Club Manager</p>
-          <h1 className="mt-2 text-2xl font-bold text-gray-900">Sign in to continue</h1>
+          <h1 className="mt-2 text-2xl font-bold text-gray-900">Sign back in</h1>
           <p className="mt-3 text-sm text-gray-600">
-            Sign in with your GoFast account to view your club manager access.
+            This is the Club Manager door — sign in with the GoFast account that has manager
+            membership for your club.
           </p>
           <Link
-            href={`/signup?mode=club-manager&redirect=${returnUrl}`}
+            href={`/signup?mode=club-manager&auth=signin&redirect=${returnUrl}`}
             className="mt-8 inline-flex w-full justify-center rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white hover:bg-sky-700"
           >
-            Sign in
+            Club Manager sign in
           </Link>
+          <p className="mt-4 text-xs text-gray-500">
+            First-time invite? Open the activation link from your email instead.
+          </p>
         </div>
       </div>
     );
