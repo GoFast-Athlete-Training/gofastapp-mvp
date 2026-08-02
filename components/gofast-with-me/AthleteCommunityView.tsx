@@ -228,7 +228,7 @@ export default function AthleteCommunityView({ handle }: Props) {
                     href={athleteCommunityPreviewPath(handle)}
                     className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800 hover:bg-orange-100"
                   >
-                    Preview follower
+                    See what followers see
                   </Link>
                   <Link
                     href="/gofast-with-others"
@@ -268,13 +268,13 @@ export default function AthleteCommunityView({ handle }: Props) {
 
           {previewFollower && community.isOwner ? (
             <p className="mt-3 text-xs font-medium text-orange-800 rounded-lg bg-orange-50 px-3 py-2">
-              Previewing what followers see — owner controls hidden.
+              You&apos;re seeing what followers see — your owner controls are hidden.
             </p>
           ) : null}
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-10">
         {error ? (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             {error}
@@ -293,7 +293,7 @@ export default function AthleteCommunityView({ handle }: Props) {
           hasTrainingFor={hasTrainingFor}
         />
 
-        <div className="hidden lg:grid grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
+        <div className="hidden lg:grid grid-cols-12 gap-4 sm:gap-6">
           <div className="lg:col-span-6 space-y-6 min-w-0">
             {latestUpdate ? (
               <AthleteCommunityLatestUpdateBanner
@@ -319,7 +319,7 @@ export default function AthleteCommunityView({ handle }: Props) {
             />
           </div>
 
-          <aside className="lg:col-span-6 space-y-6 min-w-0">
+          <aside className="lg:col-span-6 space-y-6 min-w-0 lg:sticky lg:top-6 lg:self-start">
             {hasTrainingFor ? (
               <GoFastWithMeTrainingForCard
                 trainingSummary={community.trainingFor.trainingSummary}

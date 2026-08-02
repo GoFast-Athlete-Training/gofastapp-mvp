@@ -73,7 +73,7 @@ export default function GoFastWithMeCommunityPanel({ athleteId, publicSlug }: Pr
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50"
           >
-            Preview follower view
+            See what followers see
             <ExternalLink className="h-3.5 w-3.5" />
           </Link>
         </div>
