@@ -83,10 +83,10 @@ export default function RootPage() {
   const ctaText = isCoachIntent
     ? 'Get started as a coach'
     : isClubManagerIntent
-      ? 'Continue to Club Manager'
+      ? 'Continue'
       : isLeaderIntent
         ? 'Get Started'
-        : 'Join Now';
+        : 'Join Now'
 
   const gradientClass = isCoachIntent
     ? 'bg-gradient-to-br from-amber-500 to-orange-700'

@@ -2,6 +2,9 @@
 
 export type RootHostIntent = 'coach' | 'club-manager' | 'leader' | 'default';
 
+/** Dedicated Club Manager host: clubmanage.gofastcrushgoals.com */
+export const CLUB_MANAGER_FRONT_DOOR = '/welcome-clubmanager';
+
 export function isCoachHostname(hostname: string): boolean {
   return hostname.toLowerCase().startsWith('coach.');
 }
@@ -10,7 +13,6 @@ export function isLeaderHostname(hostname: string): boolean {
   return hostname.toLowerCase().startsWith('leader.');
 }
 
-/** Dedicated Club Manager host: clubmanage.gofastcrushgoals.com */
 export function isClubManageHostname(hostname: string): boolean {
   return hostname.toLowerCase().startsWith('clubmanage.');
 }
@@ -23,8 +25,10 @@ export function resolveRootHostIntent(hostname: string): RootHostIntent {
 }
 
 /**
- * Root `/` destination by host + auth.
- * clubmanage.* must never fall through to the athlete explainer.
+ * Root `/` destination by host.
+ *
+ * clubmanage.* is a hardcoded dedicated front door — host only, never the
+ * athlete explainer, and not gated on auth/membership/role.
  */
 export function resolveRootEntryPath(opts: {
   hostname: string;
@@ -32,12 +36,13 @@ export function resolveRootEntryPath(opts: {
 }): string {
   const intent = resolveRootHostIntent(opts.hostname);
 
-  if (intent === 'coach') {
-    return opts.isAuthenticated ? '/coach-hub' : '/coach-signup';
+  // Dedicated Club Manager host: always the club-manager front door.
+  if (intent === 'club-manager') {
+    return CLUB_MANAGER_FRONT_DOOR;
   }
 
-  if (intent === 'club-manager') {
-    return opts.isAuthenticated ? '/club-manager' : '/welcome-clubmanager';
+  if (intent === 'coach') {
+    return opts.isAuthenticated ? '/coach-hub' : '/coach-signup';
   }
 
   if (opts.isAuthenticated) {

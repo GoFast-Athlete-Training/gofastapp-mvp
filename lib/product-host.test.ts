@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  CLUB_MANAGER_FRONT_DOOR,
   isClubManageHostname,
   isCoachHostname,
   isLeaderHostname,
@@ -22,7 +23,8 @@ describe('product-host', () => {
     assert.equal(resolveRootHostIntent('app.gofastcrushgoals.com'), 'default');
   });
 
-  it('routes clubmanage root away from /explainer', () => {
+  it('always sends clubmanage root to the club-manager front door', () => {
+    assert.equal(CLUB_MANAGER_FRONT_DOOR, '/welcome-clubmanager');
     assert.equal(
       resolveRootEntryPath({
         hostname: 'clubmanage.gofastcrushgoals.com',
@@ -35,7 +37,7 @@ describe('product-host', () => {
         hostname: 'clubmanage.gofastcrushgoals.com',
         isAuthenticated: true,
       }),
-      '/club-manager'
+      '/welcome-clubmanager'
     );
   });
 
