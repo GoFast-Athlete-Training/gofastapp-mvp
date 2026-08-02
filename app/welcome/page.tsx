@@ -7,7 +7,7 @@ import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
-import { clubManagerWelcomePath } from '@/lib/club-manager-paths';
+import { clubManagerHubPath } from '@/lib/club-manager-paths';
 import { athleteHasManagerMemberships } from '@/lib/club-manager-home-route';
 import type { LeaderContextClub } from '@/lib/run-club-leader-context';
 
@@ -89,7 +89,7 @@ function stepCopy(step: WelcomeStep): string {
 function readySubtitle(step: WelcomeStep, isManager: boolean): string | null {
   if (step === 'dashboard') {
     return isManager
-      ? "You're a GoFast athlete and a club manager."
+      ? "You're also a club manager — open Club Manager anytime from home."
       : 'Ready to start crushing your goals.';
   }
   if (step === 'finish-profile') return 'Finish your profile, then you\u2019re in.';
@@ -122,8 +122,9 @@ export default function WelcomePage() {
       return;
     }
 
+    // Athlete door stays athlete — manager membership only surfaces a secondary entry.
     if (isClubManager) {
-      setSecondaryCta({ label: 'Continue as athlete', action: 'dashboard' });
+      setSecondaryCta({ label: 'Open Club Manager', action: 'club-manager' });
       return;
     }
 
@@ -163,13 +164,6 @@ export default function WelcomePage() {
         setStep('loading-local');
 
         const storedAthleteId = LocalStorageAPI.getAthleteId();
-
-        // Club Manager sign/return flow uses its own welcome.
-        if (LocalStorageAPI.getClubManagerMode()) {
-          router.replace(clubManagerWelcomePath());
-          return;
-        }
-
         const gate = getSessionGate();
         if (
           gate &&
@@ -282,12 +276,12 @@ export default function WelcomePage() {
   }
 
   function goToDashboard() {
+    // Athlete door → athlete home. Manager membership surfaces ClubManagerHomeCard there.
     router.replace('/athlete-home');
   }
 
-  function goToClubManagerWelcome() {
-    LocalStorageAPI.setClubManagerMode(true);
-    router.replace(clubManagerWelcomePath());
+  function goToClubManagerSurface() {
+    router.replace(clubManagerHubPath());
   }
 
   function goToProfile() {
@@ -295,7 +289,6 @@ export default function WelcomePage() {
   }
 
   const recommendProfile = hasProfileHandle === false;
-  const primaryIsManager = !recommendProfile && isClubManager;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center p-6">
@@ -309,9 +302,7 @@ export default function WelcomePage() {
           priority
         />
 
-        <h1 className="mt-8 text-3xl font-bold text-white">
-          {isClubManager && !resolving && !error ? `Welcome back, ${runnerName}` : `Welcome, ${runnerName}`}
-        </h1>
+        <h1 className="mt-8 text-3xl font-bold text-white">Welcome, {runnerName}</h1>
         <p className="mt-2 text-base text-white/90">{stepCopy(step)}</p>
         {!error && !resolving && readySubtitle(step, isClubManager) ? (
           <p className="mt-2 text-sm text-white/80">{readySubtitle(step, isClubManager)}</p>
@@ -336,24 +327,12 @@ export default function WelcomePage() {
           <div className="mt-8 flex w-full flex-col gap-3">
             <button
               type="button"
-              onClick={
-                recommendProfile
-                  ? goToProfile
-                  : primaryIsManager
-                    ? goToClubManagerWelcome
-                    : goToDashboard
-              }
+              onClick={recommendProfile ? goToProfile : goToDashboard}
               className={`w-full rounded-xl px-5 py-4 text-base font-bold ${
-                recommendProfile || primaryIsManager
-                  ? 'bg-white text-sky-600'
-                  : 'bg-white/15 text-white'
+                recommendProfile ? 'bg-white text-sky-600' : 'bg-white/15 text-white'
               }`}
             >
-              {recommendProfile
-                ? 'Finish profile'
-                : primaryIsManager
-                  ? 'Continue as Club Manager'
-                  : "Let's go"}
+              {recommendProfile ? 'Finish profile' : "Let's go"}
             </button>
 
             {secondaryCta ? (
@@ -363,7 +342,7 @@ export default function WelcomePage() {
                   secondaryCta.action === 'dashboard'
                     ? goToDashboard
                     : secondaryCta.action === 'club-manager'
-                      ? goToClubManagerWelcome
+                      ? goToClubManagerSurface
                       : goToProfile
                 }
                 className="w-full rounded-xl border border-white/40 px-5 py-4 text-base font-semibold text-white"

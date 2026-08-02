@@ -8,6 +8,8 @@ export const GWM_FOLLOW_INTENT_HANDLE_KEY = 'gwmFollowIntentHandle';
 /** Canonical Club Manager activation context keys */
 export const CLUB_MANAGER_MODE_KEY = 'clubManagerMode';
 export const CLUB_MANAGER_ACTIVATION_TOKEN_KEY = 'clubManagerActivationToken';
+/** Per-club first-time confirm gate (slug or id) */
+export const CLUB_MANAGER_CONFIRMED_CLUBS_KEY = 'clubManagerConfirmedClubs';
 
 /** @deprecated Legacy keys — read for compatibility, prefer CLUB_MANAGER_* setters */
 export const CLUB_OWNER_MODE_KEY = 'clubOwnerMode';
@@ -165,6 +167,34 @@ export const LocalStorageAPI = {
       localStorage.removeItem(CLUB_MANAGER_ACTIVATION_TOKEN_KEY);
       localStorage.removeItem(CLUB_OWNER_INVITE_TOKEN_KEY);
     }
+  },
+
+  getClubManagerConfirmedClubs(): string[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(CLUB_MANAGER_CONFIRMED_CLUBS_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+    } catch {
+      return [];
+    }
+  },
+
+  isClubManagerClubConfirmed(clubKey: string): boolean {
+    const key = clubKey.trim();
+    if (!key) return false;
+    return LocalStorageAPI.getClubManagerConfirmedClubs().includes(key);
+  },
+
+  markClubManagerClubConfirmed(clubKey: string) {
+    if (typeof window === 'undefined') return;
+    const key = clubKey.trim();
+    if (!key) return;
+    const existing = LocalStorageAPI.getClubManagerConfirmedClubs();
+    if (existing.includes(key)) return;
+    localStorage.setItem(CLUB_MANAGER_CONFIRMED_CLUBS_KEY, JSON.stringify([...existing, key]));
   },
 
   /** @deprecated Use setClubManagerMode */

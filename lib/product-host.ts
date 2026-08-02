@@ -27,10 +27,12 @@ export function resolveRootHostIntent(hostname: string): RootHostIntent {
 /**
  * Root `/` destination by host.
  *
- * Club Manager forks (do not collapse into athlete /explainer):
- * 1) Invite activation: /club-manager/activate?token=… (email link)
- * 2) Return host clubmanage.* → /welcome-clubmanager (already an athlete / sign back in)
- * 3) Membership resolve happens after auth — not at this host front door
+ * Two front doors (do not collapse):
+ * - clubmanage.* → Club Manager sign-in /welcome-clubmanager (dedicated fork)
+ * - athlete host → /explainer or /welcome; manager membership only surfaces
+ *   Club Manager entry inside the athlete shell (not this host fork)
+ *
+ * Invite activation stays on /club-manager/activate?token=…
  */
 export function resolveRootEntryPath(opts: {
   hostname: string;
