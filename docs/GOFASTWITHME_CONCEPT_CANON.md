@@ -66,7 +66,7 @@ The product must keep two surfaces clear:
    - Canonical public destination: `/u/[handle]/community` (legacy `/container/[handle]` redirects here).
    - **Public read** — plan, Updates, GoRuns, Chatter, follower count — no follow required.
    - **Follow** unlocks Chatter posting and follower interactions; it does not enroll someone in a training plan.
-   - **P0 surfaces (scroll layout, not tabs):** Plan, Updates, GoRuns, Chatter, Followers.
+   - **P0 surfaces (RunCrew / Race Hub pattern):** identity header + hub tabs — Chatter (lead), Journey (plan / updates / tips), Runs, People. Deep links (`#plan`, `#updates`, etc.) still map into those tabs.
 
 Do not overplay the public landing page and forsake the community. The landing page is the door. `/u/{handle}/community` is the ongoing athlete community.
 

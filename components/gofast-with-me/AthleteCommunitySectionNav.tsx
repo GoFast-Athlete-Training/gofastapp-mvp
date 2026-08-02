@@ -1,5 +1,16 @@
 'use client';
 
+/**
+ * @deprecated Scroll-section pill nav. The community hub now uses the RunCrew /
+ * Race Hub tab pattern via AthleteCommunityMobileTabs + desktop grid.
+ * Re-exports kept for older imports.
+ */
+export {
+  parseAthleteCommunitySection,
+  ATHLETE_COMMUNITY_SECTIONS,
+  type AthleteCommunitySection,
+} from '@/lib/gofast-with-me/athlete-community-routes';
+
 import {
   ATHLETE_COMMUNITY_SECTIONS,
   type AthleteCommunitySection,
@@ -10,6 +21,7 @@ type Props = {
   onSectionChange: (section: AthleteCommunitySection) => void;
 };
 
+/** @deprecated Prefer AthleteCommunityMobileTabs / hub grid. */
 export default function AthleteCommunitySectionNav({
   activeSection,
   onSectionChange,
@@ -39,19 +51,4 @@ export default function AthleteCommunitySectionNav({
       })}
     </nav>
   );
-}
-
-export function parseAthleteCommunitySection(hash: string): AthleteCommunitySection | null {
-  const value = hash.replace(/^#/, '').trim();
-  if (
-    value === 'plan' ||
-    value === 'updates' ||
-    value === 'tips' ||
-    value === 'goruns' ||
-    value === 'chatter' ||
-    value === 'followers'
-  ) {
-    return value;
-  }
-  return null;
 }

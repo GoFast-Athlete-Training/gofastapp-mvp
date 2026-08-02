@@ -3,9 +3,11 @@ import test from 'node:test';
 import {
   athleteCommunityPath,
   athleteCommunityPreviewPath,
+  athleteCommunitySectionToHubTab,
   athletePublicPagePath,
   legacyContainerRedirectTarget,
   mapLegacyContainerHash,
+  parseAthleteCommunitySection,
 } from './athlete-community-routes';
 
 test('builds canonical community URLs', () => {
@@ -26,4 +28,21 @@ test('redirects legacy container paths', () => {
   assert.equal(legacyContainerRedirectTarget('adam', '#plan-strip'), '/u/adam/community#plan');
   assert.equal(legacyContainerRedirectTarget('adam', '#feed'), '/u/adam/community#chatter');
   assert.equal(legacyContainerRedirectTarget('adam'), '/u/adam/community');
+});
+
+test('maps deep-link sections onto RunCrew-style hub tabs', () => {
+  assert.equal(athleteCommunitySectionToHubTab('chatter'), 'chatter');
+  assert.equal(athleteCommunitySectionToHubTab('plan'), 'journey');
+  assert.equal(athleteCommunitySectionToHubTab('updates'), 'journey');
+  assert.equal(athleteCommunitySectionToHubTab('tips'), 'journey');
+  assert.equal(athleteCommunitySectionToHubTab('goruns'), 'runs');
+  assert.equal(athleteCommunitySectionToHubTab('followers'), 'people');
+  assert.equal(athleteCommunitySectionToHubTab(null), 'chatter');
+});
+
+test('parses section and hub-tab hashes', () => {
+  assert.equal(parseAthleteCommunitySection('#plan'), 'plan');
+  assert.equal(parseAthleteCommunitySection('#journey'), 'plan');
+  assert.equal(parseAthleteCommunitySection('#runs'), 'goruns');
+  assert.equal(parseAthleteCommunitySection('#people'), 'followers');
 });

@@ -14,8 +14,8 @@ export default function ContainerHubRunsSection({ runs, hostFirstName, isHost }:
   return (
     <section id="goruns" className="space-y-4">
       <div className="px-1">
-        <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Runs</h2>
-        <p className="text-xs text-gray-500 mt-1">
+        <h2 className="text-lg font-bold text-gray-900">Runs</h2>
+        <p className="text-sm text-gray-500 mt-1">
           {isHost
             ? 'Runs you are hosting for your audience — followers RSVP through GoRun.'
             : `Join ${hostFirstName} in real life — RSVP to upcoming hosted runs.`}

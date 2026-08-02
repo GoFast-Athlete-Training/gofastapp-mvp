@@ -25,6 +25,9 @@ type Props = {
   announcementsMode?: boolean;
   /** Chatter-only community section. */
   chatterMode?: boolean;
+  /** RunCrew / Race Hub mobile tab layout — taller chat pane, tighter chrome. */
+  variant?: 'default' | 'mobile-hub';
+  showHeading?: boolean;
 };
 
 type FeedFilter = 'all' | ContainerTopic;
@@ -73,7 +76,10 @@ export default function GoFastWithMeHubFeed({
   initialMessages = [],
   announcementsMode = false,
   chatterMode = false,
+  variant = 'default',
+  showHeading = true,
 }: Props) {
+  const isMobileHub = variant === 'mobile-hub';
   const [filter, setFilter] = useState<FeedFilter>(
     announcementsMode ? 'updates' : chatterMode ? 'chatter' : 'all'
   );
@@ -170,9 +176,20 @@ export default function GoFastWithMeHubFeed({
     );
   }
 
+  const listClassName = isMobileHub
+    ? 'min-h-[min(18rem,42dvh)] max-h-[min(32rem,calc(100dvh-18rem))] flex-1'
+    : 'max-h-96';
+
   return (
-    <section id={announcementsMode ? 'updates' : chatterMode ? 'chatter' : 'feed'} className="space-y-4">
-      {!announcementsMode && publishedPlan ? (
+    <section
+      id={announcementsMode ? 'updates' : chatterMode ? 'chatter' : 'feed'}
+      className={
+        isMobileHub
+          ? 'flex min-h-0 flex-1 flex-col space-y-3 min-w-0'
+          : 'space-y-4'
+      }
+    >
+      {!announcementsMode && !isMobileHub && publishedPlan ? (
         <div className="rounded-xl border border-violet-100 bg-violet-50/40 px-4 py-3 text-xs text-violet-900">
           Training plan shared in this hub —{' '}
           <Link
@@ -184,8 +201,14 @@ export default function GoFastWithMeHubFeed({
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 space-y-4">
-        {!announcementsMode && !chatterMode ? (
+      <div
+        className={
+          isMobileHub
+            ? 'flex min-h-0 flex-1 flex-col space-y-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm'
+            : 'rounded-2xl border border-gray-200 bg-white p-5 space-y-4'
+        }
+      >
+        {showHeading && !announcementsMode && !chatterMode ? (
           <div>
             <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">{sectionTitle}</h2>
             <p className="text-xs text-gray-500 mt-1">
@@ -194,10 +217,13 @@ export default function GoFastWithMeHubFeed({
                 : 'Updates from the host and community chatter.'}
             </p>
           </div>
-        ) : chatterMode ? (
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">{sectionTitle}</h2>
-            <p className="text-xs text-gray-500 mt-1">
+        ) : null}
+        {showHeading && chatterMode ? (
+          <div className={isMobileHub ? 'px-0.5' : undefined}>
+            <h2 className={isMobileHub ? 'text-xl font-bold text-gray-900 mb-1' : 'text-sm font-semibold text-gray-900 uppercase tracking-wide'}>
+              {sectionTitle}
+            </h2>
+            <p className={isMobileHub ? 'text-sm text-gray-500' : 'text-xs text-gray-500 mt-1'}>
               {isHost
                 ? 'Follower conversation — review and moderate from studio.'
                 : canAccessFeed
@@ -228,7 +254,9 @@ export default function GoFastWithMeHubFeed({
 
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-        <div className="max-h-96 overflow-y-auto space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
+        <div
+          className={`overflow-y-auto space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-3 ${listClassName}`}
+        >
           {loading ? (
             <p className="text-sm text-gray-500 text-center py-6">Loading…</p>
           ) : messages.length === 0 ? (
@@ -277,11 +305,11 @@ export default function GoFastWithMeHubFeed({
         </div>
 
         {canPostInTopic ? (
-          <form onSubmit={(e) => void handlePost(e)} className="space-y-2">
+          <form onSubmit={(e) => void handlePost(e)} className="space-y-2 shrink-0">
             <textarea
               value={composer}
               onChange={(e) => setComposer(e.target.value)}
-              rows={3}
+              rows={isMobileHub ? 2 : 3}
               maxLength={2000}
               className="w-full rounded-lg border border-gray-300 p-3 text-sm"
               placeholder={
