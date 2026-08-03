@@ -22,14 +22,6 @@ function resolveCompanyAppUrl(): string | null {
   );
 }
 
-function internalHeaders(): HeadersInit {
-  const key = process.env.GOFAST_INTERNAL_API_KEY?.trim();
-  return {
-    Accept: "application/json",
-    ...(key ? { "x-gofast-internal-key": key } : {}),
-  };
-}
-
 type CompanySpendEarnings = {
   ownerAthleteId: string;
   revenueSharePercent: number;
@@ -45,6 +37,7 @@ type CompanySpendEarnings = {
 
 export async function fetchAthleteSpendEarningsFromCompany(
   ownerAthleteId: string,
+  authorization: string,
   days = 30
 ): Promise<AthleteAdvertisingEarnings | null> {
   const base = resolveCompanyAppUrl();
@@ -53,7 +46,16 @@ export async function fetchAthleteSpendEarningsFromCompany(
   try {
     const response = await fetch(
       `${base}/api/advertiser/athlete-earnings/${encodeURIComponent(ownerAthleteId)}?days=${days}`,
-      { headers: internalHeaders(), cache: "no-store" }
+      {
+        headers: {
+          Accept: "application/json",
+          Authorization: authorization.startsWith("Bearer ")
+            ? authorization
+            : `Bearer ${authorization}`,
+          "x-athlete-id": ownerAthleteId,
+        },
+        cache: "no-store",
+      }
     );
     if (!response.ok) return null;
 

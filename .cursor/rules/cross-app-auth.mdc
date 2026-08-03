@@ -1,0 +1,13 @@
+---
+description: Dual-lane auth — human Firebase vs machine internal key
+alwaysApply: true
+---
+
+# Cross-app auth (gofastapp-mvp)
+
+- **Human:** staff Bearer + `x-gofast-staff-id`, athlete Bearer + `x-athlete-id`, brand flows via advertising platform.
+- **Machine:** `internalApiHeaders()` from [`lib/internal-api-auth.ts`](lib/internal-api-auth.ts) for Prod → Company notification triggers.
+
+Set `GOFAST_INTERNAL_API_KEY` in Vercel (same value as go-fast-company).
+
+Sponsorship finance → Company uses Stripe `stripeEventId` only (no internal key).

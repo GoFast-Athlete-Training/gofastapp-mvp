@@ -1,6 +1,4 @@
-/**
- * Fire-and-forget product events to GoFastCompany notification trigger endpoint.
- */
+import { internalApiHeaders } from "@/lib/internal-api-auth";
 
 function getCompanyAppUrl(): string {
   return (
@@ -27,14 +25,10 @@ export function fireCompanyNotificationTrigger(
   payload: NotificationTriggerPayload
 ): void {
   const url = `${getCompanyAppUrl()}/api/notifications/trigger`;
-  const key = process.env.GOFAST_INTERNAL_API_KEY?.trim() ?? "";
 
   fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(key ? { "x-gofast-internal-key": key } : {}),
-    },
+    headers: internalApiHeaders(),
     body: JSON.stringify({ event, payload }),
   }).catch((err) => {
     console.warn("[company-notification-trigger] failed:", event, err);

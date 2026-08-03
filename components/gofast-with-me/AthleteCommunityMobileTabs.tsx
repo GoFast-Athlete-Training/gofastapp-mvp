@@ -10,7 +10,6 @@ import GoFastWithMePlanStripSection from '@/components/gofast-with-me/GoFastWith
 import ContainerHubRunsSection from '@/components/gofast-with-me/ContainerHubRunsSection';
 import GoFastWithMeFollowersSection from '@/components/gofast-with-me/GoFastWithMeFollowersSection';
 import AthleteTipsSection from '@/components/gofast-with-me/AthleteTipsSection';
-import AthleteInstagramSection from '@/components/gofast-with-me/AthleteInstagramSection';
 import AthleteCommunityUpdatesSection from '@/components/gofast-with-me/AthleteCommunityUpdatesSection';
 import AthleteCommunityLatestUpdateBanner from '@/components/gofast-with-me/AthleteCommunityLatestUpdateBanner';
 
@@ -112,9 +111,8 @@ export default function AthleteCommunityMobileTabs({
             tips={community.tips}
             hostFirstName={firstName}
             isOwner={displayAsOwner}
+            instagramUsername={community.host.instagramUsername}
           />
-
-          <AthleteInstagramSection media={community.instagramMedia} />
         </div>
       ) : null}
 

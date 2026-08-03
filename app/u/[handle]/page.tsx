@@ -9,7 +9,6 @@ import RunWithMe from './_components/RunWithMe';
 import GroupTrainingCard from './_components/GroupTrainingCard';
 import { ProfileContainerSponsorshipSlot } from './_components/ProfileContainerSponsorshipSlot';
 import AthleteTipsSection from '@/components/gofast-with-me/AthleteTipsSection';
-import AthleteInstagramSection from '@/components/gofast-with-me/AthleteInstagramSection';
 
 export const dynamic = 'force-dynamic';
 
@@ -102,6 +101,11 @@ export default async function PublicAthletePage({
   );
   const hasRunPhoto = Boolean(data.gofastWithMe?.gofastWithMePhotoUrl?.trim());
 
+  const instagramUsername =
+    data.athlete.instagramUsername || data.athlete.instagram || null;
+  const showTipsSection =
+    data.athleteTips.length > 0 || Boolean(instagramUsername?.trim());
+
   return (
     <div className="min-h-screen bg-stone-50">
       <ProfileHero
@@ -134,17 +138,13 @@ export default async function PublicAthletePage({
         </div>
 
         <div className="mt-12 space-y-8">
-          {data.athleteTips.length > 0 ? (
+          {showTipsSection ? (
             <AthleteTipsSection
               tips={data.athleteTips}
               hostFirstName={data.athlete.firstName}
+              instagramUsername={instagramUsername}
             />
           ) : null}
-
-          <AthleteInstagramSection
-            media={data.instagramMedia}
-            username={data.athlete.instagramUsername || data.athlete.instagram}
-          />
 
           {data.joinableGroupTraining ? (
             <GroupTrainingCard cohort={data.joinableGroupTraining} />

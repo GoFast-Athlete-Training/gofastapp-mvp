@@ -22,7 +22,7 @@ const toneClasses: Record<NonNullable<ManagerWizardCardProps['statusTone']>, str
 };
 
 const priorityClasses: Record<NonNullable<ManagerWizardCardProps['priority']>, string> = {
-  primary: 'border-orange-200 bg-white shadow-sm hover:shadow-md',
+  primary: 'border-sky-200 bg-white shadow-sm hover:shadow-md',
   secondary: 'border-gray-200 bg-gray-50/80',
   future: 'border-dashed border-gray-300 bg-gray-50 opacity-80',
 };
@@ -69,7 +69,7 @@ export default function ManagerWizardCard({
           {detail ? <p className="mt-2 text-xs text-gray-500">{detail}</p> : null}
         </div>
         {href && !disabled ? (
-          <ChevronRight className="h-5 w-5 shrink-0 text-orange-500 mt-1" aria-hidden />
+          <ChevronRight className="h-5 w-5 shrink-0 text-sky-600 mt-1" aria-hidden />
         ) : null}
       </div>
     </div>

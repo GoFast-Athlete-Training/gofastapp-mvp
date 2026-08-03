@@ -221,7 +221,7 @@ export default function ClubManagerShell({
 function navButtonClass(active: boolean): string {
   return `flex min-w-max items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors md:w-full ${
     active
-      ? 'bg-orange-50 text-orange-800 border border-orange-200'
+      ? 'bg-sky-50 text-sky-800 border border-sky-200'
       : 'text-gray-700 hover:bg-gray-100 border border-transparent'
   }`;
 }

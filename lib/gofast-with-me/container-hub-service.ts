@@ -50,6 +50,7 @@ export type ContainerHubPayload = {
     lastName: string | null;
     gofastHandle: string | null;
     photoURL: string | null;
+    instagramUsername: string | null;
   };
   memberCount: number;
   members: {
@@ -204,6 +205,7 @@ export async function loadAthleteCommunityForHost(
       lastName: host.lastName,
       gofastHandle: host.gofastHandle,
       photoURL: host.photoURL,
+      instagramUsername: host.instagramUsername?.trim() || host.instagram?.trim() || null,
     },
     memberCount,
     members: memberRows.map((r) => ({

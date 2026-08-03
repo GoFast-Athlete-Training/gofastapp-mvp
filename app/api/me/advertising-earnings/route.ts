@@ -40,7 +40,11 @@ export async function GET(request: Request) {
     const days = daysRaw ? Number.parseInt(daysRaw, 10) : 30;
     const windowDays = Number.isFinite(days) ? days : 30;
 
-    const earnings = await fetchAthleteSpendEarningsFromCompany(athlete.id, windowDays);
+    const earnings = await fetchAthleteSpendEarningsFromCompany(
+      athlete.id,
+      authHeader,
+      windowDays
+    );
 
     return NextResponse.json({
       success: true,

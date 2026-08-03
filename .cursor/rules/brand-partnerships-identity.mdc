@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Brand Partnerships identity canon (gofastapp-mvp)
 
-- Do **not** use `GOFAST_INTERNAL_API_KEY` or `x-gofast-internal-key` in the Brand Partnerships flow.
+- Do **not** use internal API key for brand human flows — use Firebase + brand headers. Machine lane (Prod → Company notifications) uses `internalApiHeaders()` — see [cross-app-auth.mdc](cross-app-auth.mdc).
 - **Firebase Bearer** authenticates humans. Domain scope uses forwarded headers:
   - `x-gofast-brand-user-id` + `x-gofast-brand-id` for Brand buyer checkout/commitment writes and reads
   - `x-gofast-staff-id` for Company staff training proxies (existing pattern)

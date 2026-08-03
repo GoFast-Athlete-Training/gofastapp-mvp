@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BookOpen, ExternalLink, Lightbulb, MapPin, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
-import type { AthleteTipPayload } from '@/lib/gofast-with-me/athlete-tips';
+import type { AthleteTipMediaType, AthleteTipPayload } from '@/lib/gofast-with-me/athlete-tips';
+import TipMediaPicker from '@/components/gofast-with-me/TipMediaPicker';
 
 type Props = {
   athleteId: string;
@@ -17,6 +18,8 @@ type TipDraft = {
   body: string;
   sortOrder: string;
   isPublished: boolean;
+  mediaUrl: string | null;
+  mediaType: AthleteTipMediaType | null;
 };
 
 const EMPTY_DRAFT: TipDraft = {
@@ -24,7 +27,31 @@ const EMPTY_DRAFT: TipDraft = {
   body: '',
   sortOrder: '0',
   isPublished: false,
+  mediaUrl: null,
+  mediaType: null,
 };
+
+function tipPayloadToDraft(tip: AthleteTipPayload): TipDraft {
+  return {
+    title: tip.title,
+    body: tip.body,
+    sortOrder: String(tip.sortOrder),
+    isPublished: tip.visibility === 'published',
+    mediaUrl: tip.mediaUrl,
+    mediaType: tip.mediaType,
+  };
+}
+
+function draftToApiBody(draft: TipDraft) {
+  return {
+    title: draft.title,
+    body: draft.body,
+    sortOrder: Number(draft.sortOrder) || 0,
+    isPublished: draft.isPublished,
+    mediaUrl: draft.mediaUrl,
+    mediaType: draft.mediaType,
+  };
+}
 
 export default function GoFastWithMeCmsContentSection({
   athleteId,
@@ -64,12 +91,7 @@ export default function GoFastWithMeCmsContentSection({
     setError(null);
     setSuccess(null);
     try {
-      const res = await api.post(`/athlete/${athleteId}/tips`, {
-        title: draft.title,
-        body: draft.body,
-        sortOrder: Number(draft.sortOrder) || 0,
-        isPublished: draft.isPublished,
-      });
+      const res = await api.post(`/athlete/${athleteId}/tips`, draftToApiBody(draft));
       if (res.data?.tip) {
         setTips((prev) => [res.data.tip as AthleteTipPayload, ...prev]);
       } else {
@@ -89,12 +111,7 @@ export default function GoFastWithMeCmsContentSection({
     setError(null);
     setSuccess(null);
     try {
-      const res = await api.put(`/athlete/${athleteId}/tips/${tipId}`, {
-        title: next.title,
-        body: next.body,
-        sortOrder: Number(next.sortOrder) || 0,
-        isPublished: next.isPublished,
-      });
+      const res = await api.put(`/athlete/${athleteId}/tips/${tipId}`, draftToApiBody(next));
       if (res.data?.tip) {
         const updated = res.data.tip as AthleteTipPayload;
         setTips((prev) => prev.map((tip) => (tip.id === updated.id ? updated : tip)));
@@ -129,8 +146,7 @@ export default function GoFastWithMeCmsContentSection({
       <div>
         <h2 className="text-lg font-bold text-gray-900">Tips &amp; Thinking</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Durable advice for your community — nutrition notes, training thoughts, route ideas, and
-          the stuff followers should find after today&apos;s update scrolls by.
+          Short tips you talk about — training, nutrition, routes. Add a photo or video when it helps.
         </p>
       </div>
 
@@ -157,7 +173,7 @@ export default function GoFastWithMeCmsContentSection({
           <div>
             <h4 className="text-sm font-semibold text-gray-900">Add a tip</h4>
             <p className="text-xs text-gray-600 mt-1">
-              Write something evergreen: how you fuel, stay healthy, pick routes, or think about training.
+              Write something evergreen — how you fuel, stay healthy, pick routes, or think about training.
             </p>
           </div>
         </div>
@@ -195,6 +211,19 @@ export default function GoFastWithMeCmsContentSection({
             placeholder="Share a practical tip your followers can come back to..."
           />
         </label>
+
+        <TipMediaPicker
+          mediaUrl={draft.mediaUrl}
+          mediaType={draft.mediaType}
+          disabled={saving}
+          onChange={(next) =>
+            setDraft((prev) => ({
+              ...prev,
+              mediaUrl: next.mediaUrl,
+              mediaType: next.mediaType,
+            }))
+          }
+        />
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <label className="inline-flex items-center gap-2 text-sm text-gray-700">
@@ -307,14 +336,13 @@ function TipEditorCard({
   onSave: (tipId: string, next: TipDraft) => Promise<void>;
   onDelete: (tipId: string) => Promise<void>;
 }) {
-  const [draft, setDraft] = useState<TipDraft>({
-    title: tip.title,
-    body: tip.body,
-    sortOrder: String(tip.sortOrder),
-    isPublished: tip.visibility === 'published',
-  });
+  const [draft, setDraft] = useState<TipDraft>(() => tipPayloadToDraft(tip));
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    setDraft(tipPayloadToDraft(tip));
+  }, [tip.id, tip.updatedAt]);
 
   const save = async () => {
     if (!draft.title.trim() || !draft.body.trim() || saving) return;
@@ -384,6 +412,19 @@ function TipEditorCard({
         rows={5}
         maxLength={8000}
         className="w-full rounded-lg border border-gray-300 p-3 text-sm"
+      />
+
+      <TipMediaPicker
+        mediaUrl={draft.mediaUrl}
+        mediaType={draft.mediaType}
+        disabled={saving || deleting}
+        onChange={(next) =>
+          setDraft((prev) => ({
+            ...prev,
+            mediaUrl: next.mediaUrl,
+            mediaType: next.mediaType,
+          }))
+        }
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">

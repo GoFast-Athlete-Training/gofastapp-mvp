@@ -90,6 +90,8 @@ export async function POST(
         athleteId,
         title: input.title,
         body: input.body,
+        mediaUrl: input.mediaUrl,
+        mediaType: input.mediaType,
         sortOrder: input.sortOrder,
         isPublished: input.isPublished,
         publishedAt: input.isPublished ? new Date() : null,

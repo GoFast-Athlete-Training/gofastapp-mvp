@@ -1,0 +1,30 @@
+---
+description: Staff Bearer auth on Prod endpoints called from GoFastCompany companypush
+alwaysApply: true
+---
+
+# Companypush auth (gofastapp-mvp / Prod)
+
+Editorial sync from GoFastCompany uses **staff-attributed** Firebase sessions.
+
+## Canonical pattern
+
+Company verifies `company_staff`, then forwards:
+
+- `Authorization: Bearer <staff Firebase ID token>`
+- `x-gofast-staff-id: <company_staff.id>`
+
+Reference: [`lib/training/training-engine-auth.ts`](lib/training/training-engine-auth.ts) (`assertStaffBearerAuth`).
+
+## Athlete → Company reads
+
+Forward Firebase Bearer + `x-athlete-id` (see Company `assertAthleteProxyAuth`).
+
+## Do NOT
+
+- Use internal key on staff/brand/athlete routes — machine lane only; see [cross-app-auth.mdc](cross-app-auth.mdc)
+- Treat program owner or club leader Firebase as the Company companypush write actor
+
+## Cron exception
+
+Company cron jobs hit Prod without a staff session — secured by `CRON_SECRET` on the **Company** cron route, not by internal API key.

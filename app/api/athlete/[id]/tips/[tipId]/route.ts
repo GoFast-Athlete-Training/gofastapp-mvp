@@ -73,6 +73,8 @@ export async function PUT(
       data: {
         title: input.title,
         body: input.body,
+        mediaUrl: input.mediaUrl,
+        mediaType: input.mediaType,
         sortOrder: input.sortOrder,
         isPublished: input.isPublished,
         publishedAt:

@@ -1,11 +1,14 @@
 import { prisma } from '@/lib/prisma';
 
 export type AthleteTipVisibility = 'draft' | 'published';
+export type AthleteTipMediaType = 'image' | 'video';
 
 export type AthleteTipPayload = {
   id: string;
   title: string;
   body: string;
+  mediaUrl: string | null;
+  mediaType: AthleteTipMediaType | null;
   sortOrder: number;
   visibility: AthleteTipVisibility;
   publishedAt: string | null;
@@ -17,6 +20,8 @@ type AthleteTipRow = {
   id: string;
   title: string;
   body: string;
+  mediaUrl: string | null;
+  mediaType: string | null;
   sortOrder: number;
   isPublished: boolean;
   publishedAt: Date | null;
@@ -24,11 +29,20 @@ type AthleteTipRow = {
   updatedAt: Date;
 };
 
+function normalizeMediaType(value: unknown): AthleteTipMediaType | null {
+  if (value === 'image' || value === 'video') return value;
+  return null;
+}
+
 export function mapAthleteTip(row: AthleteTipRow): AthleteTipPayload {
+  const mediaUrl = row.mediaUrl?.trim() || null;
+  const mediaType = normalizeMediaType(row.mediaType);
   return {
     id: row.id,
     title: row.title,
     body: row.body,
+    mediaUrl,
+    mediaType: mediaUrl ? mediaType : null,
     sortOrder: row.sortOrder,
     visibility: row.isPublished ? 'published' : 'draft',
     publishedAt: row.publishedAt?.toISOString() ?? null,
@@ -60,6 +74,8 @@ export async function listPublishedAthleteTips(
 export function normalizeTipInput(input: unknown): {
   title: string;
   body: string;
+  mediaUrl: string | null;
+  mediaType: AthleteTipMediaType | null;
   sortOrder: number;
   isPublished: boolean;
 } {
@@ -70,5 +86,21 @@ export function normalizeTipInput(input: unknown): {
   const sortOrder = Number.isFinite(sortOrderRaw) ? Math.trunc(sortOrderRaw) : 0;
   const isPublished = Boolean(value.isPublished ?? value.visibility === 'published');
 
-  return { title, body, sortOrder, isPublished };
+  const mediaUrlRaw =
+    value.mediaUrl === null || value.mediaUrl === undefined
+      ? null
+      : String(value.mediaUrl).trim() || null;
+  const mediaTypeRaw = normalizeMediaType(value.mediaType);
+
+  let mediaUrl: string | null = mediaUrlRaw;
+  let mediaType: AthleteTipMediaType | null = mediaTypeRaw;
+
+  if (!mediaUrl) {
+    mediaUrl = null;
+    mediaType = null;
+  } else if (!mediaType) {
+    mediaType = 'image';
+  }
+
+  return { title, body, mediaUrl, mediaType, sortOrder, isPublished };
 }

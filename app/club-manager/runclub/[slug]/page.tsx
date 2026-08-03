@@ -7,6 +7,7 @@ import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import ClubManagerShell from '@/components/runclub/manager/ClubManagerShell';
 import ClubProfileSetupCard from '@/components/runclub/manager/ClubProfileSetupCard';
+import ClubRunsSetupCard from '@/components/runclub/manager/ClubRunsSetupCard';
 import ManagerWizardCard from '@/components/runclub/leader/ManagerWizardCard';
 import type { SetupCompleteness } from '@/lib/run-club-leader-setup';
 import { clubManagerClubPath, clubManagerHubPath } from '@/lib/club-manager-paths';
@@ -121,19 +122,6 @@ export default function ClubManagerOverviewPage() {
 
   const { club, setup, memberCount, series, upcomingRuns, announcementsSummary, invites } = data;
 
-  const runsStatus =
-    setup?.hasSeries && setup?.hasUpcomingRuns
-      ? setup.runsNeedReview > 0
-        ? `${setup.runsNeedReview} need review`
-        : 'Scheduled'
-      : !setup?.hasSeries
-        ? 'Add series'
-        : 'Add runs';
-  const runsTone =
-    setup?.hasSeries && setup?.hasUpcomingRuns && setup.runsNeedReview === 0
-      ? 'complete'
-      : 'attention';
-
   return (
     <ClubManagerShell
       clubName={club.name}
@@ -142,7 +130,7 @@ export default function ClubManagerOverviewPage() {
       active="overview"
     >
       <div className="mb-8">
-        <p className="text-sm font-semibold uppercase tracking-wide text-orange-600">Club Manager</p>
+        <p className="text-sm font-semibold uppercase tracking-wide text-sky-600">Club Manager</p>
         <h2 className="text-2xl font-bold text-gray-900 mt-1">Get your club ready for members</h2>
         <p className="text-sm text-gray-600 mt-2 max-w-2xl">
           Start with club profile and weekly runs. Announcements come after the basics are in place.
@@ -171,18 +159,11 @@ export default function ClubManagerOverviewPage() {
           socialsComplete={setup?.socialsComplete ?? false}
           href={clubManagerClubPath(slug, 'content')}
         />
-        <ManagerWizardCard
-          priority="primary"
-          title="Runs"
-          description="Weekly series and upcoming run instances — submit changes for GoFast review when ready."
+        <ClubRunsSetupCard
+          hasSeries={setup?.hasSeries ?? false}
+          hasUpcomingRuns={setup?.hasUpcomingRuns ?? false}
+          runsNeedReview={setup?.runsNeedReview ?? 0}
           href={clubManagerClubPath(slug, 'runs')}
-          statusLabel={runsStatus}
-          statusTone={runsTone}
-          detail={
-            series.length > 0
-              ? `${series.length} series · ${upcomingRuns.length} upcoming run${upcomingRuns.length === 1 ? '' : 's'}`
-              : 'No series linked yet.'
-          }
         />
       </div>
 

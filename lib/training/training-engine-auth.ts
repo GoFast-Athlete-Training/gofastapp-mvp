@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebaseAdmin";
 
 /**
- * Server-to-server auth for training engine CRUD from GoFastCompany.
+ * Staff-forwarded auth for training engine and companypush receivers from GoFastCompany.
  * Company verifies `company_staff` and forwards `x-gofast-staff-id` + the user's Firebase Bearer token.
+ * See `.cursor/rules/companypush-auth.mdc`.
  */
 export const STAFF_ID_HEADER = "x-gofast-staff-id";
 
