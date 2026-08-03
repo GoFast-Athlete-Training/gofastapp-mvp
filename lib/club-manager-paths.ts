@@ -6,6 +6,11 @@ export function clubManagerHubPath(): string {
   return CLUB_MANAGER_BASE;
 }
 
+/** One-time welcome/confirm after staff assigns manager membership. */
+export function clubManagerWelcomePath(): string {
+  return '/welcome-clubmanager';
+}
+
 export function clubManagerActivatePath(token?: string | null): string {
   if (token?.trim()) {
     return `${CLUB_MANAGER_BASE}/activate?token=${encodeURIComponent(token.trim())}`;

@@ -8,6 +8,8 @@ import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import { clubManagerActivatePath, clubManagerClubPath, clubManagerHubPath } from '@/lib/club-manager-paths';
+import { resolveClubManagerEntryPath, managerAlreadyActiveForClub } from '@/lib/club-manager-entry-route';
+import type { LeaderContextClub } from '@/lib/run-club-leader-context';
 import { formatClubManagerRoleLabel } from '@/lib/club-manager-membership-roles';
 
 type ActivationContext = {
@@ -37,6 +39,34 @@ function ClubManagerActivateContent() {
   const activationRef = useRef<ActivationContext | null>(null);
   const activateStartedRef = useRef(false);
 
+  const redirectIfAlreadyManager = useCallback(
+    async (runClubId: string) => {
+      const athleteId = LocalStorageAPI.getAthleteId();
+      if (!athleteId) return false;
+
+      try {
+        const prof = await api.get(`/athlete/${athleteId}`);
+        const athlete = prof.data?.athlete;
+        const clubs = (athlete?.leaderContext?.clubs ?? []) as LeaderContextClub[];
+        if (!managerAlreadyActiveForClub(clubs, runClubId)) {
+          return false;
+        }
+        LocalStorageAPI.clearClubManagerActivationToken();
+        LocalStorageAPI.clearClubManagerMode();
+        router.replace(
+          resolveClubManagerEntryPath({
+            clubs,
+            clubManagerState: athlete?.clubManagerState,
+          })
+        );
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [router]
+  );
+
   const resolveActivation = useCallback(async (token: string) => {
     setView({ kind: 'loading' });
     try {
@@ -46,15 +76,43 @@ function ClubManagerActivateContent() {
         throw new Error(res.data?.error ?? 'Invalid activation link');
       }
       const activation = invite;
-      setView({ kind: 'ready', activation });
       activationRef.current = activation;
+
+      if (auth.currentUser && (await redirectIfAlreadyManager(activation.runClubId))) {
+        return;
+      }
+
+      setView({ kind: 'ready', activation });
     } catch (err: unknown) {
+      const athleteId = LocalStorageAPI.getAthleteId();
+      const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
+      if (code === 'INVITE_ALREADY_USED' && athleteId) {
+        try {
+          const prof = await api.get(`/athlete/${athleteId}`);
+          const athlete = prof.data?.athlete;
+          const clubs = (athlete?.leaderContext?.clubs ?? []) as LeaderContextClub[];
+          if (clubs.length > 0) {
+            LocalStorageAPI.clearClubManagerActivationToken();
+            LocalStorageAPI.clearClubManagerMode();
+            router.replace(
+              resolveClubManagerEntryPath({
+                clubs,
+                clubManagerState: athlete?.clubManagerState,
+              })
+            );
+            return;
+          }
+        } catch {
+          // fall through to invalid state
+        }
+      }
+
       const message =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
         (err instanceof Error ? err.message : 'Invalid activation link');
       setView({ kind: 'invalid', message });
     }
-  }, []);
+  }, [redirectIfAlreadyManager, router]);
 
   const activateManagerAccess = useCallback(
     async (token: string) => {
@@ -65,6 +123,25 @@ function ClubManagerActivateContent() {
           throw new Error(res.data?.error ?? 'Could not activate manager access');
         }
         LocalStorageAPI.clearClubManagerMode();
+        LocalStorageAPI.clearClubManagerActivationToken();
+
+        const athleteId = LocalStorageAPI.getAthleteId();
+        if (athleteId) {
+          try {
+            const prof = await api.get(`/athlete/${athleteId}`);
+            const athlete = prof.data?.athlete;
+            router.replace(
+              resolveClubManagerEntryPath({
+                clubs: athlete?.leaderContext?.clubs,
+                clubManagerState: athlete?.clubManagerState,
+              })
+            );
+            return;
+          } catch {
+            // fall through
+          }
+        }
+
         const slug = res.data.runClubSlug as string | null;
         router.replace(slug ? clubManagerClubPath(slug) : clubManagerHubPath());
       } catch (err: unknown) {
@@ -123,6 +200,10 @@ function ClubManagerActivateContent() {
         const athlete = prof.data?.athlete;
         if (!athlete?.gofastHandle) return;
 
+        if (await redirectIfAlreadyManager(activation.runClubId)) {
+          return;
+        }
+
         const expected = activation.email.toLowerCase();
         const actual = (user.email ?? '').toLowerCase();
         if (actual && expected !== actual) {
@@ -138,7 +219,7 @@ function ClubManagerActivateContent() {
     });
 
     return () => unsub();
-  }, [activationToken, activateManagerAccess]);
+  }, [activationToken, activateManagerAccess, redirectIfAlreadyManager]);
 
   if (view.kind === 'loading' || view.kind === 'activating') {
     return (

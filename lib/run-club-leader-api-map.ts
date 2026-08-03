@@ -1,15 +1,13 @@
 /**
- * Club Manager API surface map.
+ * Club Manager API surface map. See docs/CLUB_MANAGER_FORKS.md for fork boundaries.
  *
- * Invite accept (intentional grant — email + club + role seeded before token):
- * - GET  /api/club-manager/invite/resolve?token=   (pre-auth grant preview)
- * - POST /api/me/athlete-link                        (step 1: Firebase → Athlete)
- * - POST /api/me/club-manager-resolve                (step 2: attach membership + role)
+ * Staff-assign entry (authority = run_club_memberships):
+ * - GET  /api/athlete/[id]  (leaderContext + clubManagerState)
+ * - POST /api/me/club-manager-welcome  (first-ack only — not membership write)
  *
- * Legacy aliases (deprecated):
- * - GET  /api/clubowner/invite/resolve
- * - POST /api/me/club-leader-claim/attach
- *
+ * Invite-new voucher path (stashed — only when no membership yet):
+ * - GET  /api/club-manager/invite/resolve?token=
+ * - POST /api/me/club-manager-resolve  (writes membership from run_club_leader_claims)
  * Athlete-facing manager writes (requireRunClubLeader — run_club_memberships manager|admin):
  * - GET  /api/me/run-club-leaderships
  * - GET  /api/runclub/[slug]/leader

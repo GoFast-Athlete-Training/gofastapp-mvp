@@ -6,7 +6,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
-import { resolveClubManagerHomePath } from '@/lib/club-manager-home-route';
+import { resolveClubManagerEntryPath } from '@/lib/club-manager-entry-route';
 
 /**
  * Home — managers land in Club Manager; everyone else goes to athlete-home.
@@ -29,8 +29,18 @@ export default function HomePage() {
 
       try {
         const res = await api.get(`/athlete/${athleteId}`);
-        const managerHome = resolveClubManagerHomePath(res.data?.athlete?.leaderContext?.clubs);
-        router.replace(managerHome ?? '/athlete-home');
+        const athlete = res.data?.athlete;
+        const clubs = athlete?.leaderContext?.clubs;
+        if (clubs?.length) {
+          router.replace(
+            resolveClubManagerEntryPath({
+              clubs,
+              clubManagerState: athlete?.clubManagerState,
+            })
+          );
+          return;
+        }
+        router.replace('/athlete-home');
       } catch {
         router.replace('/athlete-home');
       }

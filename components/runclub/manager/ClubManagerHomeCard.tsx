@@ -31,8 +31,8 @@ export default function ClubManagerHomeCard({ leaderContext }: ClubManagerHomeCa
     description = `${clubCount} clubs ready to manage.`;
   } else if (activationToken) {
     title = 'Finish manager invite';
-    description = 'Open your invite link to activate manager access for your club.';
-    cta = 'Activate invite';
+    description = 'Complete your invite to link your GoFast account to club manager access.';
+    cta = 'Complete invite';
     href = clubManagerActivatePath(activationToken);
   } else {
     description = 'Ask GoFast staff to send a manager invite link if you need access.';

@@ -58,6 +58,7 @@ const PROFILE_ATHLETE_KEYS = [
   'lastSeenAt',
   'avgWeeklyMilesSnapshot',
   'mileageSnapshotUpdatedAt',
+  'clubManagerState',
 ] as const;
 
 function pickProfileFields(row: AthleteRow): Record<string, unknown> {

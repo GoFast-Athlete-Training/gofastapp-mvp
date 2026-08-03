@@ -9,7 +9,8 @@ import { auth } from '@/lib/firebase';
 import { signInWithGoogle } from '@/lib/auth';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
-import { clubManagerActivatePath, clubManagerHubPath } from '@/lib/club-manager-paths';
+import { resolveClubManagerEntryPath } from '@/lib/club-manager-entry-route';
+import type { LeaderContextClub } from '@/lib/run-club-leader-context';
 
 type SignupMode = 'default' | 'join-crew' | 'club-owner' | 'club-manager';
 
@@ -81,7 +82,13 @@ function redirectToGofastWithConfirmIfIntent(
 
 function routeAfterAthleteResolved(
   router: ReturnType<typeof useRouter>,
-  athlete: { data?: { gofastHandle?: string | null } },
+  athlete: {
+    data?: {
+      gofastHandle?: string | null;
+      leaderContext?: { clubs?: LeaderContextClub[] } | null;
+      clubManagerState?: unknown;
+    };
+  },
   opts: { mode: SignupMode; runCrewHandle: string | null; redirect?: string | null }
 ) {
   if (redirectToFrontDoorIfIntent(router)) return;
@@ -95,15 +102,14 @@ function routeAfterAthleteResolved(
 
   if (isClubManagerSignupMode(opts.mode)) {
     LocalStorageAPI.setClubManagerMode(true);
-    const activationToken = LocalStorageAPI.getClubManagerActivationToken();
     if (hasHandle) {
-      if (activationToken) {
-        router.replace(clubManagerActivatePath(activationToken));
-      } else if (opts.redirect) {
-        router.replace(opts.redirect);
-      } else {
-        router.replace(clubManagerHubPath());
-      }
+      router.replace(
+        resolveClubManagerEntryPath({
+          clubs: athlete.data?.leaderContext?.clubs,
+          clubManagerState: athlete.data?.clubManagerState,
+          redirect: opts.redirect,
+        })
+      );
     } else {
       router.replace('/athlete-create-profile');
     }
@@ -219,7 +225,7 @@ function SignupPageContent() {
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, [router, mode, runCrewHandle, redirectParam, isClubLeaderIntent]);
 
   const handleGoogle = async () => {
     try {

@@ -125,6 +125,8 @@ model Athlete {
   avgWeeklyMilesSnapshot  Float?
   /// When avgWeeklyMilesSnapshot was last written by the mileage cron.
   mileageSnapshotUpdatedAt DateTime?
+  /// Club Manager UX state — welcomed clubs (first-ack), not membership authority.
+  clubManagerState        Json?
   go_fast_companies       go_fast_companies        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   runClub                 run_clubs?               @relation(fields: [runClubId], references: [id], onDelete: SetNull)
   ambassador_credits      ambassador_credits[]
