@@ -10,11 +10,32 @@ describe('computeSetupCompleteness', () => {
       runsNeedReview: 0,
     });
 
+    expect(result.coreComplete).toBe(false);
+    expect(result.socialsComplete).toBe(false);
     expect(result.metaComplete).toBe(false);
     expect(result.metaMissing).toContain('Club description');
     expect(result.metaMissing).toContain('All runs description');
     expect(result.metaMissing).toContain('Logo');
     expect(result.hasSeries).toBe(true);
+    expect(result.readyForMembers).toBe(false);
+  });
+
+  it('marks socials complete with website or Instagram only', () => {
+    const result = computeSetupCompleteness({
+      club: {
+        description: 'A great club',
+        allRunsDescription: 'We run Tuesdays',
+        logoUrl: 'https://example.com/logo.png',
+        instagramUrl: '@runclub',
+      },
+      seriesCount: 0,
+      upcomingRunCount: 0,
+      runsNeedReview: 0,
+    });
+
+    expect(result.coreComplete).toBe(true);
+    expect(result.socialsComplete).toBe(true);
+    expect(result.metaComplete).toBe(true);
     expect(result.readyForMembers).toBe(false);
   });
 
@@ -31,6 +52,8 @@ describe('computeSetupCompleteness', () => {
       runsNeedReview: 1,
     });
 
+    expect(result.coreComplete).toBe(true);
+    expect(result.socialsComplete).toBe(true);
     expect(result.metaComplete).toBe(true);
     expect(result.metaMissing).toHaveLength(0);
     expect(result.readyForMembers).toBe(true);

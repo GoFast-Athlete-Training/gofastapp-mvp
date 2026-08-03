@@ -8,6 +8,8 @@ type ClubMetaInput = {
 };
 
 export type SetupCompleteness = {
+  coreComplete: boolean;
+  socialsComplete: boolean;
   metaComplete: boolean;
   metaMissing: string[];
   hasSeries: boolean;
@@ -26,19 +28,24 @@ export function computeSetupCompleteness(input: {
   upcomingRunCount: number;
   runsNeedReview: number;
 }): SetupCompleteness {
-  const metaMissing: string[] = [];
-  if (!hasText(input.club.description)) metaMissing.push('Club description');
-  if (!hasText(input.club.allRunsDescription)) metaMissing.push('All runs description');
-  if (!hasText(input.club.logoUrl)) metaMissing.push('Logo');
-  if (!hasText(input.club.websiteUrl) && !hasText(input.club.instagramUrl)) {
-    metaMissing.push('Website or Instagram');
-  }
+  const coreMissing: string[] = [];
+  if (!hasText(input.club.description)) coreMissing.push('Club description');
+  if (!hasText(input.club.allRunsDescription)) coreMissing.push('All runs description');
+  if (!hasText(input.club.logoUrl)) coreMissing.push('Logo');
 
-  const metaComplete = metaMissing.length === 0;
+  const socialsComplete =
+    hasText(input.club.websiteUrl) || hasText(input.club.instagramUrl);
+  const socialsMissing = socialsComplete ? [] : ['Website or Instagram'];
+
+  const coreComplete = coreMissing.length === 0;
+  const metaMissing = [...coreMissing, ...socialsMissing];
+  const metaComplete = coreComplete && socialsComplete;
   const hasSeries = input.seriesCount > 0;
   const hasUpcomingRuns = input.upcomingRunCount > 0;
 
   return {
+    coreComplete,
+    socialsComplete,
     metaComplete,
     metaMissing,
     hasSeries,

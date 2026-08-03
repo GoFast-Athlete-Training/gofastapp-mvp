@@ -6,6 +6,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import ClubManagerShell from '@/components/runclub/manager/ClubManagerShell';
+import ClubProfileSetupCard from '@/components/runclub/manager/ClubProfileSetupCard';
 import ManagerWizardCard from '@/components/runclub/leader/ManagerWizardCard';
 import type { SetupCompleteness } from '@/lib/run-club-leader-setup';
 import { clubManagerClubPath, clubManagerHubPath } from '@/lib/club-manager-paths';
@@ -119,14 +120,6 @@ export default function ClubManagerOverviewPage() {
   }
 
   const { club, setup, memberCount, series, upcomingRuns, announcementsSummary, invites } = data;
-  const base = clubManagerClubPath(slug);
-
-  const metaStatus = setup?.metaComplete
-    ? 'Complete'
-    : setup?.metaMissing.length
-      ? `${setup.metaMissing.length} to fix`
-      : 'Needs review';
-  const metaTone = setup?.metaComplete ? 'complete' : 'attention';
 
   const runsStatus =
     setup?.hasSeries && setup?.hasUpcomingRuns
@@ -156,20 +149,6 @@ export default function ClubManagerOverviewPage() {
         </p>
       </div>
 
-      {setup && !setup.readyForMembers ? (
-        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <span className="font-semibold">Setup in progress.</span>{' '}
-          {setup.metaMissing.length > 0 ? `Still missing: ${setup.metaMissing.join(', ')}.` : null}
-          {!setup.hasSeries ? ' Add at least one weekly series.' : null}
-          {setup.hasSeries && !setup.hasUpcomingRuns ? ' Schedule upcoming runs.' : null}
-        </div>
-      ) : setup?.readyForMembers ? (
-        <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          <span className="font-semibold">Looking good.</span> Core club setup is complete — keep
-          runs and announcements fresh.
-        </div>
-      ) : null}
-
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <p className="text-xs text-gray-500 uppercase tracking-wide">Members</p>
@@ -187,20 +166,10 @@ export default function ClubManagerOverviewPage() {
 
       <div className="space-y-4 mb-10">
         <p className="text-xs font-bold uppercase tracking-[0.15em] text-gray-500">MVP1 — do first</p>
-        <ManagerWizardCard
-          priority="primary"
-          title="Club profile"
-          description="Description, all-runs blurb, logo, and social links — how members discover your club."
+        <ClubProfileSetupCard
+          coreComplete={setup?.coreComplete ?? false}
+          socialsComplete={setup?.socialsComplete ?? false}
           href={clubManagerClubPath(slug, 'content')}
-          statusLabel={metaStatus}
-          statusTone={metaTone}
-          detail={
-            setup?.metaMissing.length
-              ? `Missing: ${setup.metaMissing.slice(0, 3).join(', ')}${setup.metaMissing.length > 3 ? '…' : ''}`
-              : club.description
-                ? 'Profile copy is in place.'
-                : undefined
-          }
         />
         <ManagerWizardCard
           priority="primary"
