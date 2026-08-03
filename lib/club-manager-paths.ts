@@ -18,10 +18,13 @@ export function clubManagerActivatePath(token?: string | null): string {
   return `${CLUB_MANAGER_BASE}/activate`;
 }
 
-export function clubManagerClubPath(slug: string, section?: 'content' | 'runs' | 'announcements'): string {
+export type ClubManagerClubSection = 'content' | 'runs' | 'events' | 'announcements';
+
+export function clubManagerClubPath(slug: string, section?: ClubManagerClubSection): string {
   const base = `${CLUB_MANAGER_BASE}/runclub/${slug}`;
   if (section === 'content') return `${base}/content`;
   if (section === 'runs') return `${base}/runs`;
+  if (section === 'events') return `${base}/events`;
   if (section === 'announcements') return `${base}/announcements`;
   return base;
 }
@@ -29,11 +32,16 @@ export function clubManagerClubPath(slug: string, section?: 'content' | 'runs' |
 /** Map legacy /leader paths to club-manager equivalents. */
 export function legacyLeaderPathToClubManager(pathname: string): string | null {
   if (pathname === '/leader') return clubManagerHubPath();
-  const match = pathname.match(/^\/leader\/runclub\/([^/]+)(?:\/(content|runs|announcements))?$/);
+  const match = pathname.match(/^\/leader\/runclub\/([^/]+)(?:\/(content|runs|events|announcements))?$/);
   if (!match) return null;
   const [, slug, section] = match;
   if (!slug) return null;
-  if (section === 'content' || section === 'runs' || section === 'announcements') {
+  if (
+    section === 'content' ||
+    section === 'runs' ||
+    section === 'events' ||
+    section === 'announcements'
+  ) {
     return clubManagerClubPath(slug, section);
   }
   return clubManagerClubPath(slug);

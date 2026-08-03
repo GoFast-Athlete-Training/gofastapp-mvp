@@ -9,7 +9,7 @@ import {
   ExternalLink,
   LayoutDashboard,
   Megaphone,
-  Users,
+  PartyPopper,
   type LucideIcon,
 } from 'lucide-react';
 import TopNav from '@/components/shared/TopNav';
@@ -23,6 +23,7 @@ export type ClubManagerNavSection =
   | 'overview'
   | 'content'
   | 'runs'
+  | 'events'
   | 'announcements';
 
 interface ClubManagerShellProps {
@@ -42,6 +43,7 @@ const NAV_ITEMS: {
   { id: 'overview', label: 'Manager home', href: (s) => clubManagerClubPath(s), icon: LayoutDashboard },
   { id: 'content', label: 'Club profile', href: (s) => clubManagerClubPath(s, 'content'), icon: Building2 },
   { id: 'runs', label: 'Runs', href: (s) => clubManagerClubPath(s, 'runs'), icon: Calendar },
+  { id: 'events', label: 'Events', href: (s) => clubManagerClubPath(s, 'events'), icon: PartyPopper },
   {
     id: 'announcements',
     label: 'Announcements',
@@ -62,6 +64,7 @@ export default function ClubManagerShell({
   const [welcomeGate, setWelcomeGate] = useState<WelcomeGateState>('loading');
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [managedClubCount, setManagedClubCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,6 +84,10 @@ export default function ClubManagerShell({
           (c: { runClubSlug?: string | null; runClubId: string }) =>
             (c.runClubSlug ?? c.runClubId) === clubSlug
         );
+
+        if (!cancelled) {
+          setManagedClubCount(clubs.length);
+        }
 
         if (!club) {
           if (!cancelled) setWelcomeGate('ready');
@@ -128,7 +135,7 @@ export default function ClubManagerShell({
   if (welcomeGate === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500" />
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-sky-500" />
       </div>
     );
   }
@@ -156,6 +163,15 @@ export default function ClubManagerShell({
             <p className="text-xs text-gray-500 mt-1 truncate" title={clubName}>
               {clubName}
             </p>
+            <a
+              href={`/runclub/${clubSlug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
+            >
+              View as member
+              <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+            </a>
           </div>
 
           <nav className="p-2 md:flex-1 md:space-y-1" aria-label="Club Manager">
@@ -188,25 +204,14 @@ export default function ClubManagerShell({
               })}
             </div>
 
-            <p className="hidden px-3 pt-4 pb-1 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400 md:block">
-              Member hub
-            </p>
-
-            <div className="mt-2 flex gap-2 overflow-x-auto pb-1 md:mt-0 md:block md:space-y-1 md:overflow-visible md:pb-0">
-              <Link
-                href={`/runclub/${clubSlug}`}
-                className={secondaryNavClass()}
-              >
-                <Users className="h-4 w-4 shrink-0" aria-hidden />
-                <span className="truncate">View member hub</span>
-                <ExternalLink className="h-3.5 w-3.5 ml-auto shrink-0 text-gray-400 hidden md:block" aria-hidden />
-              </Link>
-
-              <Link href={clubManagerHubPath()} className={secondaryNavClass()}>
-                <Building2 className="h-4 w-4 shrink-0" aria-hidden />
-                <span className="truncate">All clubs</span>
-              </Link>
-            </div>
+            {managedClubCount > 1 ? (
+              <div className="mt-3 border-t border-gray-100 pt-3 md:mt-4">
+                <Link href={clubManagerHubPath()} className={secondaryNavClass()}>
+                  <Building2 className="h-4 w-4 shrink-0" aria-hidden />
+                  <span className="truncate">Switch clubs</span>
+                </Link>
+              </div>
+            ) : null}
           </nav>
         </aside>
 
