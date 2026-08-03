@@ -153,7 +153,7 @@ export async function getAthleteById(id: string) {
 **Pages**:
 - `app/page.tsx` - Entry point (auth check)
 - `app/welcome/page.tsx` - Universal hydration
-- `app/home/page.tsx` - Main dashboard
+- `app/athlete-home/page.tsx` - Main athlete dashboard
 - All `/runcrew/*` pages (7 pages)
 - All `/activities/*` pages (2 pages)
 - All `/settings/*` pages (3 pages)

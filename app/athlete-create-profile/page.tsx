@@ -7,7 +7,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
-import { resolveClubManagerEntryPath } from '@/lib/club-manager-entry-route';
+import { clubManagerActivatePath, clubManagerHubPath } from '@/lib/club-manager-paths';
 
 type ProfileStep = 'intro' | 'form' | 'success';
 
@@ -207,15 +207,8 @@ export default function AthleteCreateProfilePage() {
 
       let nextPath = '/welcome';
       if (LocalStorageAPI.getClubManagerMode()) {
-        try {
-          const prof = await api.get(`/athlete/${athleteId}`);
-          nextPath = resolveClubManagerEntryPath({
-            clubs: prof.data?.athlete?.leaderContext?.clubs,
-            clubManagerState: prof.data?.athlete?.clubManagerState,
-          });
-        } catch {
-          nextPath = resolveClubManagerEntryPath({});
-        }
+        const activationToken = LocalStorageAPI.getClubManagerActivationToken();
+        nextPath = activationToken ? clubManagerActivatePath(activationToken) : clubManagerHubPath();
       } else {
         const createCrewIntent = LocalStorageAPI.getRunCrewCreateIntent();
         if (createCrewIntent) {

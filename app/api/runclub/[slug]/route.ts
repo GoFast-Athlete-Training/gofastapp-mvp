@@ -17,8 +17,9 @@ import {
  *  - club identity (name, logo, city, social links)
  *  - membership count + current viewer membership status
  *  - announcements and club events (non-run programming)
- *  - upcoming city_runs with per-run RSVP status for the current athlete
- *  - recent city_runs with check-in count, photos, and shouts
+ *  - upcoming city_runs with per-run RSVP status and goingAthletes for the hub hero
+ *  - runFeed: photo-first check-in entries from recent runs
+ *  - recent city_runs with check-in count, photos, and shouts (legacy shape)
  */
 export async function GET(
   request: Request,
@@ -165,7 +166,19 @@ export async function GET(
           totalMiles: true,
           pace: true,
           city_run_rsvps: {
-            select: { id: true, athleteId: true, status: true },
+            select: {
+              id: true,
+              athleteId: true,
+              status: true,
+              Athlete: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  photoURL: true,
+                },
+              },
+            },
           },
         },
       }),
@@ -253,6 +266,12 @@ export async function GET(
         pace: run.pace,
         rsvpCount: goingRsvps.length,
         myRsvpStatus: myRsvp?.status ?? null,
+        goingAthletes: goingRsvps.slice(0, 8).map((r) => ({
+          id: r.Athlete?.id ?? r.athleteId,
+          firstName: r.Athlete?.firstName ?? null,
+          lastName: r.Athlete?.lastName ?? null,
+          photoURL: r.Athlete?.photoURL ?? null,
+        })),
       };
     });
 
@@ -279,8 +298,42 @@ export async function GET(
           lastName: c.Athlete?.lastName ?? null,
           photoURL: c.Athlete?.photoURL ?? null,
         })),
+        photoEntries: run.city_run_checkins
+          .filter((c) => !!c.runPhotoUrl)
+          .map((c) => ({
+            checkinId: c.id,
+            photoUrl: c.runPhotoUrl as string,
+            shout: c.runShouts?.trim() || null,
+            checkedInAt: c.checkedInAt.toISOString(),
+            athlete: {
+              id: c.athleteId,
+              firstName: c.Athlete?.firstName ?? null,
+              lastName: c.Athlete?.lastName ?? null,
+              photoURL: c.Athlete?.photoURL ?? null,
+            },
+          })),
       };
     });
+
+    const runFeed = recentFormatted
+      .flatMap((run) =>
+        run.photoEntries.map((entry) => ({
+          checkinId: entry.checkinId,
+          runId: run.id,
+          runSlug: run.slug,
+          runTitle: run.title,
+          runDate: run.date,
+          photoUrl: entry.photoUrl,
+          shout: entry.shout,
+          checkedInAt: entry.checkedInAt,
+          athlete: entry.athlete,
+        }))
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.checkedInAt).getTime() - new Date(a.checkedInAt).getTime()
+      )
+      .slice(0, 20);
 
     return NextResponse.json({
       success: true,
@@ -291,6 +344,7 @@ export async function GET(
       upcomingEvents: upcomingEventsFormatted,
       upcomingRuns: upcomingFormatted,
       recentRuns: recentFormatted,
+      runFeed,
     });
   } catch (error: any) {
     console.error('[GET /api/runclub/[slug]] Error:', error);

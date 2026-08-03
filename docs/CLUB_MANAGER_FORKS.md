@@ -1,6 +1,38 @@
 # Club Manager forks
 
-Three product forks share similar UI but different authority models. Do not mix them in routing or copy.
+Two doors, three product forks. Do not collapse the doors with a global "has membership → club manager" redirect.
+
+## Doors (which surface you land on)
+
+| Door | Host / entry | Default after sign-in |
+|---|---|---|
+| **Club door** | `clubmanage.*` → `/welcome-clubmanager` | **Manage** → club dashboard (no athlete shell on this path) |
+| **Athlete door** | app host → `/welcome` / `/athlete-home` | Athlete home; Club Manager is opt-in (`ClubManagerHomeCard`) |
+
+Managers are dual identity: same Firebase + `athleteId`, but which surface you see depends on which door you walked through.
+
+## `/home` is dead
+
+- **`/home`** was a legacy RunCrew-era route, later repurposed as a hidden manager router — **removed**.
+- Bookmarks to `/home` redirect permanently to **`/athlete-home`** via `next.config.mjs`.
+- **Never reintroduce `/home`** as a navigation target or smart router.
+
+## Athlete escape hatch (club door only)
+
+- Club welcome (`/welcome-clubmanager`) does **not** link to athlete-home — manager path only.
+- After entering Club Manager, **"Back to athlete" → `/athlete-home`** lives in:
+  - [`ClubManagerShell`](../components/runclub/manager/ClubManagerShell.tsx)
+  - [`ClubManagerHubShell`](../components/runclub/manager/ClubManagerHubShell.tsx)
+  - [`ClubManagerConfirmWelcome`](../components/runclub/manager/ClubManagerConfirmWelcome.tsx) (first-time confirm, already in shell flow)
+
+## First-time confirm vs welcome fork
+
+- **`/welcome-clubmanager`** — "Welcome back" + **Manage {club}** only. No DB ack on this page.
+- **`ClubManagerShell`** — first visit to a club dashboard shows `ClubManagerConfirmWelcome` once; `POST /api/me/club-manager-welcome` writes `clubManagerState`. Later visits skip confirm.
+
+Do **not** use `localStorage` for confirm. Do **not** redirect unwelcomed managers back to welcome from athlete surfaces.
+
+---
 
 ## 1. Staff assign (current)
 
@@ -13,13 +45,14 @@ Three product forks share similar UI but different authority models. Do not mix 
 1. Firebase sign-in
 2. Athlete bootstrap (`GET /api/athlete/me`, profile if needed)
 3. Read DB membership — no client "claim" ceremony for staff-assigned managers
-4. **First visit:** `/welcome-clubmanager` — mental confirm ("You're managing {club}")
-5. **Later visits:** straight to Club Manager — `Athlete.clubManagerState.welcomed[clubId]` persisted on ack
+4. **Club door:** `/welcome-clubmanager` → Manage
+5. **First dashboard visit:** shell confirm → DB ack
+6. **Later visits:** straight to club dashboard
 
 **Staff paths:**
 
 - **Assign existing:** Company → `assignClubManagerMembership` on prod. Welcome link only.
-- **Invite new (stashed machinery):** Creates `run_club_leader_claims` + token; voucher redeem via `/me/club-manager-resolve` only when no membership yet. After membership exists, same welcome flow as staff assign.
+- **Invite new (stashed machinery):** Creates `run_club_leader_claims` + token; voucher redeem via `/me/club-manager-resolve` only when no membership yet. After membership exists, activate page redirects to club path (no re-redeem).
 
 **Not authority:** `localStorage` invite token, `clubManagerMode` flag, claim row status.
 
@@ -34,7 +67,7 @@ Three product forks share similar UI but different authority models. Do not mix 
 1. Athlete submits claim request
 2. Staff reviews in Company
 3. Staff writes membership (same as fork 1)
-4. Same first-welcome / later-skip via `clubManagerState`
+4. Same shell confirm / `clubManagerState` skip on return
 
 **Raw material:** `run_club_leader_claims` and invite-token APIs — do not delete; repurpose for pre-approval grants if needed. Do not use for staff-assign happy path.
 
@@ -56,8 +89,8 @@ Three product forks share similar UI but different authority models. Do not mix 
 {
   "welcomed": {
     "<runClubId>": {
-      "runClubSlug": "dc-road-runners",
-      "runClubName": "DC Road Runners",
+      "runClubSlug": "the-ballston-runaways",
+      "runClubName": "The Ballston Runaways",
       "ackedAt": "2026-08-03T18:00:00.000Z"
     }
   }
@@ -65,9 +98,11 @@ Three product forks share similar UI but different authority models. Do not mix 
 ```
 
 - Helpers: [`lib/club-manager-state.ts`](../lib/club-manager-state.ts)
-- Entry routing: [`lib/club-manager-entry-route.ts`](../lib/club-manager-entry-route.ts)
+- Entry routing (no welcome hijack): [`lib/club-manager-entry-route.ts`](../lib/club-manager-entry-route.ts)
+- Host routing: [`lib/product-host.ts`](../lib/product-host.ts)
 - Ack API: `POST /api/me/club-manager-welcome`
-- Welcome UI: [`app/welcome-clubmanager/page.tsx`](../app/welcome-clubmanager/page.tsx)
+- Confirm UI: [`ClubManagerConfirmWelcome.tsx`](../components/runclub/manager/ClubManagerConfirmWelcome.tsx) in [`ClubManagerShell`](../components/runclub/manager/ClubManagerShell.tsx)
+- Club welcome: [`app/welcome-clubmanager/page.tsx`](../app/welcome-clubmanager/page.tsx)
 
 ## Related files
 
@@ -76,3 +111,5 @@ Three product forks share similar UI but different authority models. Do not mix 
 | Membership write (staff) | `lib/domain-club-manager-staff-assign.ts` |
 | Voucher redeem (invite_new only) | `lib/domain-runclub-leader-claim.ts`, `POST /api/me/club-manager-resolve` |
 | Leader context | `lib/run-club-leader-context.ts` |
+| Single-club home path | `lib/club-manager-home-route.ts` |
+| Opt-in from athlete home | `components/runclub/manager/ClubManagerHomeCard.tsx` |

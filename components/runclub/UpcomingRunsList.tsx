@@ -23,6 +23,12 @@ export interface UpcomingRun {
   pace: string | null;
   rsvpCount: number;
   myRsvpStatus: string | null;
+  goingAthletes?: Array<{
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    photoURL: string | null;
+  }>;
 }
 
 interface UpcomingRunsListProps {

@@ -82,9 +82,9 @@ npm run dev
 1. **Welcome Hydration** (`/welcome`)
    - One API call: `POST /api/athlete/hydrate`
    - Stores: athlete, crews, weekly activities, weekly totals
-   - Redirects to `/home`
+   - Redirects to `/athlete-home`
 
-2. **Home Hydration** (`/home`)
+2. **Athlete home** (`/athlete-home`)
    - Second API call: `POST /api/runcrew/hydrate`
    - Stores: full crew object with members, messages, announcements, runs
 
@@ -109,7 +109,7 @@ npm run dev
 
 - `/` - Entry point (sign in)
 - `/welcome` - Universal hydration
-- `/home` - Main dashboard
+- `/athlete-home` - Main athlete dashboard
 - `/profile` - Athlete profile
 - `/activities` - Activity feed
 - `/settings` - Settings

@@ -9,8 +9,10 @@ import { auth } from '@/lib/firebase';
 import { signInWithGoogle } from '@/lib/auth';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
-import { resolveClubManagerEntryPath } from '@/lib/club-manager-entry-route';
-import type { LeaderContextClub } from '@/lib/run-club-leader-context';
+import {
+  clubManagerActivatePath,
+  clubManagerWelcomePath,
+} from '@/lib/club-manager-paths';
 
 type SignupMode = 'default' | 'join-crew' | 'club-owner' | 'club-manager';
 
@@ -82,13 +84,7 @@ function redirectToGofastWithConfirmIfIntent(
 
 function routeAfterAthleteResolved(
   router: ReturnType<typeof useRouter>,
-  athlete: {
-    data?: {
-      gofastHandle?: string | null;
-      leaderContext?: { clubs?: LeaderContextClub[] } | null;
-      clubManagerState?: unknown;
-    };
-  },
+  athlete: { data?: { gofastHandle?: string | null } },
   opts: { mode: SignupMode; runCrewHandle: string | null; redirect?: string | null }
 ) {
   if (redirectToFrontDoorIfIntent(router)) return;
@@ -102,14 +98,16 @@ function routeAfterAthleteResolved(
 
   if (isClubManagerSignupMode(opts.mode)) {
     LocalStorageAPI.setClubManagerMode(true);
+    const activationToken = LocalStorageAPI.getClubManagerActivationToken();
     if (hasHandle) {
-      router.replace(
-        resolveClubManagerEntryPath({
-          clubs: athlete.data?.leaderContext?.clubs,
-          clubManagerState: athlete.data?.clubManagerState,
-          redirect: opts.redirect,
-        })
-      );
+      if (activationToken) {
+        router.replace(clubManagerActivatePath(activationToken));
+      } else {
+        const redirect = opts.redirect?.trim();
+        router.replace(
+          redirect && redirect.startsWith('/') ? redirect : clubManagerWelcomePath()
+        );
+      }
     } else {
       router.replace('/athlete-create-profile');
     }
@@ -141,23 +139,24 @@ function SignupPageContent() {
           : 'default';
   const runCrewHandle = searchParams?.get('handle') || null;
   const redirectParam = searchParams?.get('redirect');
+  const authParam = searchParams?.get('auth');
   
   // Detect club leader intent from URL param (passed from splash page)
   const isClubLeaderIntent = searchParams?.get('intent') === 'club-leader';
+  const isClubManagerMode = isClubManagerSignupMode(mode);
 
-  useEffect(() => {
-    if (isClubManagerSignupMode(mode)) {
-      LocalStorageAPI.setClubManagerMode(true);
-    }
-    if (searchParams?.get('mode') === 'signin') {
-      setAuthMode('signin');
-    }
-  }, [mode, searchParams]);
-  
+  // Club Manager return/host path is sign-back-in by default; invite "get started" passes auth=signup.
+  const initialAuthMode: 'signup' | 'signin' =
+    searchParams?.get('mode') === 'signin' ||
+    authParam === 'signin' ||
+    (isClubManagerMode && authParam !== 'signup')
+      ? 'signin'
+      : 'signup';
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [authMode, setAuthMode] = useState<'signup' | 'signin'>('signup');
+  const [authMode, setAuthMode] = useState<'signup' | 'signin'>(initialAuthMode);
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [emailData, setEmailData] = useState({
@@ -167,9 +166,24 @@ function SignupPageContent() {
     password: '',
     confirmPassword: '',
   });
-  
+
   // Fetch crew name for join-crew mode
   const [crewName, setCrewName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isClubManagerMode) {
+      LocalStorageAPI.setClubManagerMode(true);
+    }
+    if (
+      searchParams?.get('mode') === 'signin' ||
+      authParam === 'signin' ||
+      (isClubManagerMode && authParam !== 'signup')
+    ) {
+      setAuthMode('signin');
+    } else if (authParam === 'signup') {
+      setAuthMode('signup');
+    }
+  }, [mode, searchParams, authParam, isClubManagerMode]);
   
   useEffect(() => {
     if (mode === 'join-crew' && runCrewHandle) {
@@ -464,16 +478,24 @@ function SignupPageContent() {
               <h1 className="text-4xl font-bold text-white mb-2">
                 {mode === 'join-crew' && crewName
                   ? `Join ${crewName}`
-                  : authMode === 'signup'
-                  ? 'Welcome to GoFast!'
-                  : 'Welcome Back!'}
+                  : isClubManagerMode
+                    ? authMode === 'signin'
+                      ? 'Club Manager sign in'
+                      : 'Create your Club Manager account'
+                    : authMode === 'signup'
+                      ? 'Welcome to GoFast!'
+                      : 'Welcome Back!'}
               </h1>
               <p className="text-xl text-white/90 mb-8">
                 {mode === 'join-crew'
                   ? 'Create your account to join this crew'
-                  : authMode === 'signup'
-                  ? 'Join the community!'
-                  : 'Sign in to continue'}
+                  : isClubManagerMode
+                    ? authMode === 'signin'
+                      ? 'Sign back in to manage your run club — not the athlete front door.'
+                      : 'Use the email on your manager invite to get started.'
+                    : authMode === 'signup'
+                      ? 'Join the community!'
+                      : 'Sign in to continue'}
               </p>
             </div>
 

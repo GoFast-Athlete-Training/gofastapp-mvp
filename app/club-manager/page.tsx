@@ -8,7 +8,7 @@ import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import { clubManagerActivatePath, clubManagerClubPath, clubManagerHubPath } from '@/lib/club-manager-paths';
-import { resolveClubManagerEntryPath } from '@/lib/club-manager-entry-route';
+import { resolveClubManagerHomePath } from '@/lib/club-manager-home-route';
 import ClubManagerHubShell from '@/components/runclub/manager/ClubManagerHubShell';
 import type { LeaderContextClub } from '@/lib/run-club-leader-context';
 
@@ -32,16 +32,12 @@ export default function ClubManagerHubPage() {
 
       try {
         const profileRes = await api.get(`/athlete/${athleteId}`);
-        const athlete = profileRes.data?.athlete;
-        const athleteClubs = athlete?.leaderContext?.clubs ?? [];
+        const athleteClubs = profileRes.data?.athlete?.leaderContext?.clubs ?? [];
         setClubs(athleteClubs);
 
-        const entryPath = resolveClubManagerEntryPath({
-          clubs: athleteClubs,
-          clubManagerState: athlete?.clubManagerState,
-        });
-        if (entryPath !== clubManagerHubPath()) {
-          router.replace(entryPath);
+        const singleClubHome = resolveClubManagerHomePath(athleteClubs);
+        if (singleClubHome && singleClubHome !== clubManagerHubPath()) {
+          router.replace(singleClubHome);
           return;
         }
       } catch {

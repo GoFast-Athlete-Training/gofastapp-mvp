@@ -2,13 +2,13 @@
 
 export const CLUB_MANAGER_BASE = '/club-manager';
 
-export function clubManagerHubPath(): string {
-  return CLUB_MANAGER_BASE;
-}
-
-/** One-time welcome/confirm after staff assigns manager membership. */
+/** Post sign-in welcome for the clubmanage host / mode=club-manager return path. */
 export function clubManagerWelcomePath(): string {
   return '/welcome-clubmanager';
+}
+
+export function clubManagerHubPath(): string {
+  return CLUB_MANAGER_BASE;
 }
 
 export function clubManagerActivatePath(token?: string | null): string {

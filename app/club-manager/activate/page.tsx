@@ -56,7 +56,6 @@ function ClubManagerActivateContent() {
         router.replace(
           resolveClubManagerEntryPath({
             clubs,
-            clubManagerState: athlete?.clubManagerState,
           })
         );
         return true;
@@ -97,7 +96,6 @@ function ClubManagerActivateContent() {
             router.replace(
               resolveClubManagerEntryPath({
                 clubs,
-                clubManagerState: athlete?.clubManagerState,
               })
             );
             return;
@@ -133,7 +131,6 @@ function ClubManagerActivateContent() {
             router.replace(
               resolveClubManagerEntryPath({
                 clubs: athlete?.leaderContext?.clubs,
-                clubManagerState: athlete?.clubManagerState,
               })
             );
             return;
@@ -289,13 +286,13 @@ function ClubManagerActivateContent() {
         </p>
         <div className="mt-8 flex flex-col gap-3">
           <Link
-            href="/signup?mode=club-manager"
+            href="/signup?mode=club-manager&auth=signup"
             className="rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white text-center hover:bg-sky-700"
           >
             Get started
           </Link>
           <Link
-            href="/signup?mode=club-manager"
+            href="/signup?mode=club-manager&auth=signin"
             className="rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 text-center hover:bg-gray-50"
           >
             I already have an account — sign in

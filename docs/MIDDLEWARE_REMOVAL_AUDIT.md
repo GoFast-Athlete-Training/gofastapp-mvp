@@ -10,7 +10,7 @@
 The middleware/onboarding-intent system was designed to:
 - **Detect club leaders** visiting `leader.*` subdomain
 - **Grant access to content pages** for editing their run club's public content
-- **Provide different front door** (`/leader` hub) vs regular athletes (`/home`)
+- **Provide different front door** (`/leader` hub) vs regular athletes (`/athlete-home`)
 
 ---
 
@@ -23,7 +23,7 @@ The middleware/onboarding-intent system was designed to:
 
 ## Files Updated
 
-1. **`app/page.tsx`** - Removed `getOnboardingIntentClient()` usage, defaults to `/home`
+1. **`app/page.tsx`** - Removed `getOnboardingIntentClient()` usage; root uses host-aware routing via `product-host.ts` (athlete → `/welcome`, clubmanage → `/welcome-clubmanager`)
 2. **`app/signup/page.tsx`** - Removed `getOnboardingIntentClient()` usage, removed all `onboardingIntent` state
 3. **`app/api/athlete/create/route.ts`** - Removed `onboardingIntent` handling (was only logging, never assigned roles)
 

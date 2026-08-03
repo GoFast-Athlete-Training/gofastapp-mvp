@@ -10,7 +10,7 @@ interface ClubManagerHomeCardProps {
   leaderContext?: LeaderContext | null;
 }
 
-/** Secondary entry from athlete-home — managers normally land in Manage by default. */
+/** Opt-in Club Manager entry from athlete-home (never auto-yank from athlete door). */
 export default function ClubManagerHomeCard({ leaderContext }: ClubManagerHomeCardProps) {
   const clubs = leaderContext?.clubs ?? [];
   const clubCount = clubs.length;

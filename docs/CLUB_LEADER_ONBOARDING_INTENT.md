@@ -18,7 +18,7 @@ The onboarding intent system was designed to give **club leaders** a different f
 2. **Middleware detects hostname** → Sets `onboarding_intent` cookie = `CLUB_LEADER`
 3. **Signup/Login** → Reads cookie, passes `onboardingIntent: 'CLUB_LEADER'` to API
 4. **API assigns CLUB_LEADER role** → Grants access to content management
-5. **Routes to `/leader` hub** → Different front door than regular athletes (`/home`)
+5. **Routes to `/leader` hub** → Different front door than regular athletes (`/athlete-home`)
 
 ### Content Page Access:
 - Club leaders can **edit their run club's content pages** (in `gofast-contentpublic`)

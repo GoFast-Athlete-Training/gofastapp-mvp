@@ -351,7 +351,7 @@
 
 **Public Access:** Yes
 
-**Behavior:** Generic success page, redirects to `/home` (line 22)
+**Behavior:** Generic success page, redirects to `/athlete-home` (line 22)
 
 ---
 

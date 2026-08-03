@@ -7,12 +7,13 @@ import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import TopNav from '@/components/shared/TopNav';
 import UpcomingRunsList, { UpcomingRun } from '@/components/runclub/UpcomingRunsList';
-import RecentRunsStrip, { RecentRun } from '@/components/runclub/RecentRunsStrip';
+import ClubNextRunHero, { type NextRunHeroRun } from '@/components/runclub/ClubNextRunHero';
+import ClubRunPhotoFeed, { type RunFeedItem } from '@/components/runclub/ClubRunPhotoFeed';
 import ClubAnnouncementsList, {
   ClubAnnouncement,
 } from '@/components/runclub/ClubAnnouncementsList';
 import ClubEventsList, { ClubEvent } from '@/components/runclub/ClubEventsList';
-import { Globe, Instagram, Route, MapPin, ArrowLeft, Users, UserPlus, UserCheck } from 'lucide-react';
+import { Route, MapPin, ArrowLeft, UserPlus, UserCheck } from 'lucide-react';
 
 interface RunClub {
   id: string;
@@ -24,9 +25,6 @@ interface RunClub {
   neighborhood: string | null;
   description: string | null;
   allRunsDescription: string | null;
-  websiteUrl: string | null;
-  instagramUrl: string | null;
-  stravaUrl: string | null;
 }
 
 interface MembershipState {
@@ -43,12 +41,11 @@ interface ContainerData {
   announcements: ClubAnnouncement[];
   upcomingEvents: ClubEvent[];
   upcomingRuns: UpcomingRun[];
-  recentRuns: RecentRun[];
+  runFeed: RunFeedItem[];
 }
 
 /**
- * Authenticated app club hub — membership, announcements, events, upcoming runs.
- * Not the public SEO discovery page (see gofast-contentpublic ClubPublicDiscoveryView).
+ * Authenticated app club hub — next run, photo feed, secondary club programming.
  */
 export default function AuthenticatedRunClubHubPage() {
   const params = useParams();
@@ -67,7 +64,7 @@ export default function AuthenticatedRunClubHubPage() {
         router.replace(`/signup?redirect=/runclub/${slug}`);
         return;
       }
-      fetchClub();
+      void fetchClub();
     });
   }, [slug]);
 
@@ -82,14 +79,15 @@ export default function AuthenticatedRunClubHubPage() {
           membership: res.data.membership ?? null,
           announcements: res.data.announcements ?? [],
           upcomingEvents: res.data.upcomingEvents ?? [],
-          upcomingRuns: res.data.upcomingRuns,
-          recentRuns: res.data.recentRuns,
+          upcomingRuns: res.data.upcomingRuns ?? [],
+          runFeed: res.data.runFeed ?? [],
         });
       } else {
         setError('Run club not found');
       }
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 404) {
         setError('Run club not found');
       } else {
         setError('Failed to load run club');
@@ -143,195 +141,116 @@ export default function AuthenticatedRunClubHubPage() {
     );
   }
 
-  const { club, memberCount, membership, announcements, upcomingEvents, upcomingRuns, recentRuns } =
-    data;
+  const { club, membership, announcements, upcomingEvents, upcomingRuns, runFeed } = data;
   const isMember = membership?.isMember ?? false;
   const locationParts = [club.neighborhood, club.city, club.state].filter(Boolean);
   const locationText = locationParts.join(', ');
 
-  const instagramHandle = club.instagramUrl
-    ? club.instagramUrl.replace(/^https?:\/\/(www\.)?instagram\.com\/?/, '').replace(/\/$/, '')
+  const nextRun: NextRunHeroRun | null = upcomingRuns[0]
+    ? { ...upcomingRuns[0], goingAthletes: upcomingRuns[0].goingAthletes ?? [] }
     : null;
+
+  const moreUpcoming = upcomingRuns.slice(1);
+  const hasSecondary =
+    moreUpcoming.length > 0 || announcements.length > 0 || upcomingEvents.length > 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNav />
 
-      {/* Club Banner */}
-      <div className="bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4 min-w-0">
+      {/* Compact club chrome */}
+      <div className="border-b border-gray-200 bg-white">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               {club.logoUrl ? (
-                <div className="bg-white rounded-xl p-2 shadow-lg flex-shrink-0">
-                  <img
-                    src={club.logoUrl}
-                    alt={`${club.name} logo`}
-                    className="w-16 h-16 md:w-20 md:h-20 object-contain"
-                  />
-                </div>
+                <img
+                  src={club.logoUrl}
+                  alt=""
+                  className="h-11 w-11 rounded-xl object-contain bg-gray-50 ring-1 ring-gray-100"
+                />
               ) : (
-                <div className="bg-white rounded-xl p-2 shadow-lg w-16 h-16 md:w-20 md:h-20 flex items-center justify-center flex-shrink-0">
-                  <Route className="w-10 h-10 text-orange-500" />
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-100">
+                  <Route className="h-5 w-5 text-orange-600" />
                 </div>
               )}
-
               <div className="min-w-0">
-                <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight">
-                  {club.name}
-                </h1>
-                {locationText && (
-                  <div className="flex items-center gap-1.5 mt-1.5 text-orange-100 text-sm">
-                    <MapPin className="w-3.5 h-3.5" />
-                    <span>{locationText}</span>
-                  </div>
-                )}
-                <div className="mt-2 flex items-center gap-2 text-orange-100 text-sm">
-                  <Users className="w-4 h-4" />
-                  <span>
-                    {memberCount} member{memberCount === 1 ? '' : 's'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-4 mt-2 flex-wrap">
-                  {club.websiteUrl && (
-                    <a
-                      href={
-                        club.websiteUrl.startsWith('http')
-                          ? club.websiteUrl
-                          : `https://${club.websiteUrl}`
-                      }
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex items-center gap-1 text-orange-100 hover:text-white text-xs transition-colors"
-                    >
-                      <Globe className="w-3.5 h-3.5" />
-                      Website
-                    </a>
-                  )}
-                  {instagramHandle && (
-                    <a
-                      href={`https://instagram.com/${instagramHandle}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex items-center gap-1 text-orange-100 hover:text-white text-xs transition-colors"
-                    >
-                      <Instagram className="w-3.5 h-3.5" />
-                      @{instagramHandle}
-                    </a>
-                  )}
-                  {club.stravaUrl && (
-                    <a
-                      href={club.stravaUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex items-center gap-1 text-orange-100 hover:text-white text-xs transition-colors"
-                    >
-                      <Route className="w-3.5 h-3.5" />
-                      Strava
-                    </a>
-                  )}
-                </div>
+                <h1 className="truncate text-lg font-bold text-gray-900">{club.name}</h1>
+                {locationText ? (
+                  <p className="flex items-center gap-1 text-xs text-gray-500 truncate">
+                    <MapPin className="h-3 w-3 shrink-0" />
+                    {locationText}
+                  </p>
+                ) : null}
               </div>
             </div>
-
-            <div className="flex flex-col items-end gap-3">
-              <button
-                onClick={handleJoinToggle}
-                disabled={joinLoading}
-                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${
-                  isMember
-                    ? 'bg-white/15 text-white border border-white/30 hover:bg-white/25'
-                    : 'bg-white text-orange-600 hover:bg-orange-50'
-                }`}
-              >
-                {isMember ? (
-                  <>
-                    <UserCheck className="h-4 w-4" />
-                    Joined
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="h-4 w-4" />
-                    Join Club
-                  </>
-                )}
-              </button>
-              <div className="hidden sm:flex items-center gap-2">
-                <img
-                  src="/logo.jpg"
-                  alt="GoFast"
-                  className="h-10 w-10 rounded-full object-cover border-2 border-white"
-                />
-                <span className="text-white font-semibold text-sm">GoFast</span>
-              </div>
-            </div>
+            <button
+              onClick={() => void handleJoinToggle()}
+              disabled={joinLoading}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                isMember
+                  ? 'bg-orange-50 text-orange-700 ring-1 ring-orange-200'
+                  : 'bg-gray-900 text-white hover:bg-gray-800'
+              }`}
+            >
+              {isMember ? (
+                <>
+                  <UserCheck className="h-3.5 w-3.5" />
+                  Joined
+                </>
+              ) : (
+                <>
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Join
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
-        {(club.description || club.allRunsDescription) && (
-          <div>
-            {club.description && (
-              <p className="text-gray-600 leading-relaxed whitespace-pre-line">{club.description}</p>
-            )}
-            {club.allRunsDescription && club.allRunsDescription !== club.description && (
-              <p className="text-gray-500 text-sm mt-2 leading-relaxed whitespace-pre-line">
-                {club.allRunsDescription}
-              </p>
-            )}
-          </div>
-        )}
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+        <ClubNextRunHero run={nextRun} onRsvpChange={() => void fetchClub()} />
 
         <section>
-          <div className="mb-4">
-            <h2 className="text-lg font-bold text-gray-900">Announcements</h2>
-            <p className="text-sm text-gray-500">
-              Club updates for members. Join the club to see member-only posts.
-            </p>
-          </div>
-          <ClubAnnouncementsList announcements={announcements} />
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">
+            From recent runs
+          </h2>
+          <ClubRunPhotoFeed items={runFeed} />
         </section>
 
-        <section>
-          <div className="mb-4">
-            <h2 className="text-lg font-bold text-gray-900">Club Events</h2>
-            <p className="text-sm text-gray-500">
-              Socials, clinics, and sponsor activations beyond weekly runs.
-            </p>
+        {hasSecondary ? (
+          <div className="space-y-8 border-t border-gray-200 pt-8">
+            {moreUpcoming.length > 0 ? (
+              <section>
+                <h2 className="mb-3 text-base font-bold text-gray-900">More upcoming</h2>
+                <UpcomingRunsList runs={moreUpcoming} onRsvpChange={() => void fetchClub()} />
+              </section>
+            ) : null}
+
+            {announcements.length > 0 ? (
+              <section>
+                <h2 className="mb-3 text-base font-bold text-gray-900">Announcements</h2>
+                <ClubAnnouncementsList announcements={announcements} />
+              </section>
+            ) : null}
+
+            {upcomingEvents.length > 0 ? (
+              <section>
+                <h2 className="mb-3 text-base font-bold text-gray-900">Club events</h2>
+                <ClubEventsList events={upcomingEvents} />
+              </section>
+            ) : null}
           </div>
-          <ClubEventsList events={upcomingEvents} />
-        </section>
+        ) : null}
 
-        <section>
-          <div className="mb-4">
-            <h2 className="text-lg font-bold text-gray-900">Upcoming Runs</h2>
-            <p className="text-sm text-gray-500">
-              RSVP to individual runs separately — joining the club does not auto-RSVP you.
-            </p>
-          </div>
-          <UpcomingRunsList runs={upcomingRuns} />
-        </section>
-
-        {recentRuns.length > 0 && (
-          <section>
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Recent Runs</h2>
-            <RecentRunsStrip runs={recentRuns} />
-          </section>
-        )}
-
-        <div className="pt-4 border-t border-gray-200">
-          <button
-            onClick={() => router.push('/gorun')}
-            className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Browse all runs
-          </button>
-        </div>
+        <button
+          onClick={() => router.push('/gorun')}
+          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Browse all runs
+        </button>
       </div>
     </div>
   );

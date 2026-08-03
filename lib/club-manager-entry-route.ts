@@ -3,35 +3,23 @@ import {
   clubManagerActivatePath,
   clubManagerClubPath,
   clubManagerHubPath,
-  clubManagerWelcomePath,
 } from '@/lib/club-manager-paths';
-import {
-  allManagerClubsWelcomed,
-  parseClubManagerState,
-} from '@/lib/club-manager-state';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import type { LeaderContextClub } from '@/lib/run-club-leader-context';
 
 /**
- * Where to send someone entering Club Manager.
- * Authority: run_club_memberships (leaderContext). Welcome is first-ack only (clubManagerState).
+ * Where to send someone entering Club Manager with no active session context.
+ * Authority: run_club_memberships (leaderContext). First-time confirm happens in ClubManagerShell.
  */
 export function resolveClubManagerEntryPath(input: {
   clubs?: LeaderContextClub[] | null;
-  clubManagerState?: unknown;
   redirect?: string | null;
 }): string {
   const clubs = input.clubs ?? [];
 
   if (clubs.length > 0) {
     LocalStorageAPI.clearClubManagerActivationToken();
-
-    const state = parseClubManagerState(input.clubManagerState);
-    if (allManagerClubsWelcomed(state, clubs)) {
-      return resolveClubManagerHomePath(clubs) ?? clubManagerHubPath();
-    }
-
-    return clubManagerWelcomePath();
+    return resolveClubManagerHomePath(clubs) ?? clubManagerHubPath();
   }
 
   const token = LocalStorageAPI.getClubManagerActivationToken();

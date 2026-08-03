@@ -133,7 +133,7 @@ gofastapp-mvp/
 3. /athlete-welcome
    ├── Calls POST /api/athlete/hydrate
    ├── If 404 (athlete not found) → shows button anyway
-   └── Button routes to /profile or /home
+   └── Button routes to /profile or /athlete-home
    ❌ PROBLEM: Athlete never gets created!
 ```
 
@@ -271,7 +271,7 @@ export async function POST(request: Request) {
   - `weeklyTotals`
   - `hydrationTimestamp`
 
-#### Stage 2: Crew Hydration (`/home`)
+#### Stage 2: Crew Hydration (`/athlete-home`)
 - **Endpoint**: `POST /api/runcrew/hydrate`
 - **Stores in localStorage**:
   - `primaryCrew` (full crew object with members, messages, etc.)
@@ -421,10 +421,10 @@ NEXT_PUBLIC_API_URL="/api" # Defaults to /api
 - **Purpose**: Universal hydration + welcome screen
 - **Hydration**: `POST /api/athlete/hydrate`
 - **Never redirects automatically** (always shows button)
-- **Routes**: `/profile` (if no gofastHandle) or `/home` (if profile complete)
+- **Routes**: `/profile` (if no gofastHandle) or `/athlete-home` (if profile complete)
 
-### `/home`
-- **Purpose**: Main dashboard
+### `/athlete-home`
+- **Purpose**: Main athlete dashboard
 - **Reads**: localStorage (athlete, crews)
 - **Hydration**: `POST /api/runcrew/hydrate` (secondary, for primary crew)
 - **Shows**: Dashboard with RunCrews, activities, settings

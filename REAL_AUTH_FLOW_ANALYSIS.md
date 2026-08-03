@@ -441,7 +441,7 @@ export const GOFAST_COMPANY_ID = 'cmhpqe7kl0000nw1uvcfhf2hs';
 - Call `POST /api/athlete/hydrate` (no body, token auto-injected)
 - Store response via `LocalStorageAPI.setFullHydrationModel()`
 - Show "Let's Train!" button
-- **NO automatic redirect** - user clicks button → `/home`
+- **NO automatic redirect** - user clicks button → `/athlete-home`
 
 ### **4. Profile Setup (`/athlete-create-profile`)**
 - Call `POST /api/athlete/create` (ensure athlete exists)

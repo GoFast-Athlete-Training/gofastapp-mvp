@@ -142,7 +142,12 @@ export default function ClubManagerOverviewPage() {
       : 'attention';
 
   return (
-    <ClubManagerShell clubName={club.name} clubSlug={slug} active="overview">
+    <ClubManagerShell
+      clubName={club.name}
+      clubSlug={slug}
+      logoUrl={club.logoUrl}
+      active="overview"
+    >
       <div className="mb-8">
         <p className="text-sm font-semibold uppercase tracking-wide text-orange-600">Club Manager</p>
         <h2 className="text-2xl font-bold text-gray-900 mt-1">Get your club ready for members</h2>
