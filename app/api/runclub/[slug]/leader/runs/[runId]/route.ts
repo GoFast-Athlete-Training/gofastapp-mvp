@@ -11,10 +11,14 @@ import {
 import { parseRunTotalMiles } from '@/lib/parse-run-total-miles';
 import { toCanonicalDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 import { parseCalendarDateForWrite } from '@/lib/calendar-date';
+import {
+  fieldsWhenSettingWorkflowStatus,
+  type RunWorkflowStatus,
+} from '@/lib/runInstanceApprovalPublish';
 
 /**
  * PATCH /api/runclub/[slug]/leader/runs/[runId]
- * Update a city run the leader owns (club-scoped). Leaders may submit for review but not approve.
+ * Update a city run the leader owns (club-scoped). Managers self-publish (APPROVED + published).
  */
 export async function PATCH(
   request: Request,
@@ -137,11 +141,14 @@ export async function PATCH(
       const next = String(body.workflowStatus).toUpperCase();
       if (!LEADER_ALLOWED_WORKFLOW_STATUSES.includes(next as (typeof LEADER_ALLOWED_WORKFLOW_STATUSES)[number])) {
         return NextResponse.json(
-          { success: false, error: 'Leaders may only set workflowStatus to DEVELOP, PENDING, or SUBMITTED' },
+          { success: false, error: 'Leaders may only set workflowStatus to DEVELOP, PENDING, SUBMITTED, or APPROVED' },
           { status: 403 }
         );
       }
-      updateData.workflowStatus = next;
+      Object.assign(
+        updateData,
+        fieldsWhenSettingWorkflowStatus(next as RunWorkflowStatus)
+      );
     }
 
     if (Object.keys(updateData).length <= 1) {
@@ -153,16 +160,15 @@ export async function PATCH(
       data: updateData as Parameters<typeof prisma.city_runs.update>[0]['data'],
     });
 
+    const publishedRun = updateData.workflowStatus === 'APPROVED';
+
     return NextResponse.json({
       success: true,
       run: {
         ...updated,
         date: updated.date.toISOString(),
       },
-      message:
-        updateData.workflowStatus === 'SUBMITTED'
-          ? 'Run submitted for staff review'
-          : 'Run updated',
+      message: publishedRun ? 'Run published' : 'Run updated',
     });
   } catch (error: unknown) {
     console.error('[PATCH leader run] Error:', error);

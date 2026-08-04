@@ -8,6 +8,7 @@ import {
 import {
   attachCheckoutSessionToCommitment,
   createCheckoutPendingCommitment,
+  listCommitmentsForBrand,
 } from "@/lib/sponsorship/commitment-service";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -31,6 +32,21 @@ type CreateCommitmentBody = {
   platformShareCents?: number;
   stripeCheckoutSessionId?: string;
 };
+
+/** GET /api/sponsor-commitments — brand-scoped list with athlete hydration */
+export async function GET(request: NextRequest) {
+  const authError = await assertBrandBearerAuth(request);
+  if (authError) return authError;
+
+  const brandId = getForwardedBrandId(request);
+  const brandUserId = getForwardedBrandUserId(request);
+  if (!brandId || !brandUserId) {
+    return NextResponse.json({ success: false, error: "Missing brand scope" }, { status: 400 });
+  }
+
+  const commitments = await listCommitmentsForBrand({ brandId, brandUserId });
+  return NextResponse.json({ success: true, commitments });
+}
 
 /** POST /api/sponsor-commitments — Brand proxy creates CHECKOUT_PENDING row */
 export async function POST(request: NextRequest) {

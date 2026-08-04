@@ -32,6 +32,16 @@ Managers are dual identity: same Firebase + `athleteId`, but which surface you s
 
 Do **not** use `localStorage` for confirm. Do **not** redirect unwelcomed managers back to welcome from athlete surfaces.
 
+## Run go-live (manager self-publish)
+
+Club managers **do not** submit runs for GoFast staff review in MVP. They self-publish:
+
+- `PATCH /api/runclub/[slug]/leader/runs/[runId]` with `workflowStatus: APPROVED` sets `published: true` via [`fieldsWhenSettingWorkflowStatus`](../lib/runInstanceApprovalPublish.ts).
+- Leader **Reuse/advance** (`POST /api/runclub/[slug]/leader/instances`) and product cron advance create instances as **APPROVED + published**.
+- Staff/Company VA workflow (`POST /api/runs/advance-instances`, companypush seeds) may still create `DEVELOP` rows — that is separate from Club Manager.
+
+Org hierarchy / multi-approver review within a club org is **MVP5** — not part of Club Manager MVP.
+
 ---
 
 ## 1. Staff assign (current)

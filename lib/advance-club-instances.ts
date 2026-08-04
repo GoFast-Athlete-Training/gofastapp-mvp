@@ -261,7 +261,8 @@ function targetDateFromPrior(priorDate: Date): string {
 async function duplicateRunForward(
   prior: Awaited<ReturnType<typeof fetchClubSeriesRuns>>[number],
   targetYmd: string,
-  staffGeneratedId?: string | null
+  staffGeneratedId?: string | null,
+  publishLive = false
 ) {
   const targetDate = parseYmd(targetYmd);
   const title = titleForAdvancedDate(prior.title, targetYmd);
@@ -295,8 +296,8 @@ async function duplicateRunForward(
     athleteGeneratedId: null,
     runCrewId: null,
     title,
-    workflowStatus: "DEVELOP",
-    published: false,
+    workflowStatus: publishLive ? "APPROVED" : "DEVELOP",
+    published: publishLive,
     dayOfWeek: prior.dayOfWeek,
     date: targetDate,
     startTimeHour: prior.startTimeHour,
@@ -363,8 +364,10 @@ export async function advanceClubInstances(opts: {
   runClubId: string;
   staffGeneratedId?: string | null;
   runSeriesIds?: string[];
+  /** When true, new instances are APPROVED + published (club manager / product cron). */
+  publishLive?: boolean;
 }): Promise<AdvanceResult[]> {
-  const { runClubId, staffGeneratedId } = opts;
+  const { runClubId, staffGeneratedId, publishLive = false } = opts;
   const filterIds =
     Array.isArray(opts.runSeriesIds) && opts.runSeriesIds.length > 0
       ? new Set(opts.runSeriesIds.map(String))
@@ -406,7 +409,7 @@ export async function advanceClubInstances(opts: {
         continue;
       }
 
-      const created = await duplicateRunForward(prior, targetYmd, staffGeneratedId);
+      const created = await duplicateRunForward(prior, targetYmd, staffGeneratedId, publishLive);
       results.push({
         runSeriesId,
         priorRunId: prior.id,

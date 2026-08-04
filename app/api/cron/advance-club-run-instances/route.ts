@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     for (const runClubId of clubIds) {
       try {
-        const results = await advanceClubInstances({ runClubId });
+        const results = await advanceClubInstances({ runClubId, publishLive: true });
         let created = 0;
         let found = 0;
         let skipped = 0;

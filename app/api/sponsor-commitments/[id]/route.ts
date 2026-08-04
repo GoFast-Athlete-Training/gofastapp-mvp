@@ -5,7 +5,10 @@ import {
   getForwardedBrandId,
   getForwardedBrandUserId,
 } from "@/lib/sponsorship/brand-partnership-auth";
-import { getCommitmentById } from "@/lib/sponsorship/commitment-service";
+import {
+  getCommitmentByIdWithCandidate,
+  listCommitmentsForBrand,
+} from "@/lib/sponsorship/commitment-service";
 import { NextRequest, NextResponse } from "next/server";
 
 /** GET /api/sponsor-commitments/[id] — brand-scoped commitment status hydration */
@@ -24,7 +27,7 @@ export async function GET(
     return NextResponse.json({ success: false, error: "Missing commitment id" }, { status: 400 });
   }
 
-  const commitment = await getCommitmentById(id.trim());
+  const commitment = await getCommitmentByIdWithCandidate(id.trim());
   if (!commitment) {
     return NextResponse.json({ success: false, error: "Commitment not found" }, { status: 404 });
   }
@@ -35,16 +38,6 @@ export async function GET(
 
   return NextResponse.json({
     success: true,
-    commitment: {
-      id: commitment.id,
-      brandId: commitment.brandId,
-      brandUserId: commitment.brandUserId,
-      paymentStatus: commitment.paymentStatus,
-      status: commitment.status,
-      amountPaidCents: commitment.amountPaidCents,
-      paidAt: commitment.paidAt?.toISOString() ?? null,
-      startsAt: commitment.startsAt.toISOString(),
-      endsAt: commitment.endsAt.toISOString(),
-    },
+    commitment,
   });
 }

@@ -104,6 +104,7 @@ export async function POST(
       runClubId: auth.club.id,
       staffGeneratedId: auth.athlete.id,
       runSeriesIds,
+      publishLive: true,
     });
 
     const created = results.filter((r) => r.outcome === 'created').length;

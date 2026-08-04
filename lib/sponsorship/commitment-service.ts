@@ -8,6 +8,7 @@ import {
   SponsorCommitmentPaymentStatus,
   SponsorCommitmentStatus,
   type sponsor_commitments,
+  type sponsorship_candidates,
 } from "@prisma/client";
 
 export type CreateCheckoutPendingInput = {
@@ -233,10 +234,106 @@ async function notifyAthleteOfNewSponsorship(
   }
 }
 
+export type CommitmentWithCandidatePublic = {
+  id: string;
+  brandId: string;
+  brandUserId: string | null;
+  paymentStatus: SponsorCommitmentPaymentStatus;
+  status: SponsorCommitmentStatus;
+  amountPaidCents: number | null;
+  quotedAmountCents: number;
+  paidAt: string | null;
+  startsAt: string;
+  endsAt: string;
+  candidateId: string;
+  candidateCode: string;
+  athleteId: string;
+  displayLabel: string | null;
+  photoUrl: string | null;
+  publicSlug: string | null;
+};
+
+function serializeCommitmentWithCandidate(
+  commitment: sponsor_commitments & {
+    candidate: Pick<
+      sponsorship_candidates,
+      "id" | "code" | "athleteId" | "displayLabel" | "photoUrl" | "publicSlugSnapshot"
+    >;
+  },
+): CommitmentWithCandidatePublic {
+  return {
+    id: commitment.id,
+    brandId: commitment.brandId,
+    brandUserId: commitment.brandUserId,
+    paymentStatus: commitment.paymentStatus,
+    status: commitment.status,
+    amountPaidCents: commitment.amountPaidCents,
+    quotedAmountCents: commitment.quotedAmountCents,
+    paidAt: commitment.paidAt?.toISOString() ?? null,
+    startsAt: commitment.startsAt.toISOString(),
+    endsAt: commitment.endsAt.toISOString(),
+    candidateId: commitment.candidate.id,
+    candidateCode: commitment.candidate.code,
+    athleteId: commitment.candidate.athleteId,
+    displayLabel: commitment.candidate.displayLabel,
+    photoUrl: commitment.candidate.photoUrl,
+    publicSlug: commitment.candidate.publicSlugSnapshot,
+  };
+}
+
 export async function getCommitmentById(
   commitmentId: string,
 ): Promise<sponsor_commitments | null> {
   return prisma.sponsor_commitments.findUnique({ where: { id: commitmentId } });
+}
+
+export async function getCommitmentByIdWithCandidate(
+  commitmentId: string,
+): Promise<CommitmentWithCandidatePublic | null> {
+  const commitment = await prisma.sponsor_commitments.findUnique({
+    where: { id: commitmentId },
+    include: {
+      candidate: {
+        select: {
+          id: true,
+          code: true,
+          athleteId: true,
+          displayLabel: true,
+          photoUrl: true,
+          publicSlugSnapshot: true,
+        },
+      },
+    },
+  });
+  if (!commitment) return null;
+  return serializeCommitmentWithCandidate(commitment);
+}
+
+export async function listCommitmentsForBrand(input: {
+  brandId: string;
+  brandUserId: string;
+}): Promise<CommitmentWithCandidatePublic[]> {
+  const rows = await prisma.sponsor_commitments.findMany({
+    where: {
+      brandId: input.brandId,
+      brandUserId: input.brandUserId,
+    },
+    include: {
+      candidate: {
+        select: {
+          id: true,
+          code: true,
+          athleteId: true,
+          displayLabel: true,
+          photoUrl: true,
+          publicSlugSnapshot: true,
+        },
+      },
+    },
+    orderBy: [{ createdAt: "desc" }],
+    take: 50,
+  });
+  return rows.map(serializeCommitmentWithCandidate);
 }
 
 export async function getActiveCommitmentSnapshotForAthlete(

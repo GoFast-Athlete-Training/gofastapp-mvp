@@ -5,27 +5,14 @@ import ManagerStoplightCard from '@/components/runclub/manager/ManagerStoplightC
 type ClubRunsSetupCardProps = {
   hasSeries: boolean;
   hasUpcomingRuns: boolean;
-  runsNeedReview: number;
   href: string;
 };
 
 export default function ClubRunsSetupCard({
   hasSeries,
   hasUpcomingRuns,
-  runsNeedReview,
   href,
 }: ClubRunsSetupCardProps) {
-  const upcomingTone = !hasUpcomingRuns
-    ? 'incomplete'
-    : runsNeedReview > 0
-      ? 'attention'
-      : 'complete';
-  const upcomingStatus = !hasUpcomingRuns
-    ? 'Needs fix'
-    : runsNeedReview > 0
-      ? `${runsNeedReview} need review`
-      : 'Done';
-
   return (
     <ManagerStoplightCard
       title="Runs"
@@ -39,10 +26,10 @@ export default function ClubRunsSetupCard({
         },
         {
           label: 'Upcoming',
-          tone: upcomingTone,
-          status: upcomingStatus,
+          tone: hasUpcomingRuns ? 'complete' : 'incomplete',
+          status: hasUpcomingRuns ? 'Done' : 'Needs fix',
           href,
-          actionLabel: upcomingTone === 'complete' ? 'Edit' : 'Fix',
+          actionLabel: hasUpcomingRuns ? 'Edit' : 'Fix',
         },
       ]}
     />

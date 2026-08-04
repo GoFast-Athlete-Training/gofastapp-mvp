@@ -162,7 +162,6 @@ export default function ClubManagerOverviewPage() {
         <ClubRunsSetupCard
           hasSeries={setup?.hasSeries ?? false}
           hasUpcomingRuns={setup?.hasUpcomingRuns ?? false}
-          runsNeedReview={setup?.runsNeedReview ?? 0}
           href={clubManagerClubPath(slug, 'runs')}
         />
       </div>

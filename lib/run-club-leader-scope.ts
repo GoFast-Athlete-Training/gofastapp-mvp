@@ -123,8 +123,8 @@ export const STAFF_ONLY_CITY_RUN_FIELDS = [
   'igPostGraphic',
 ] as const;
 
-/** Workflow statuses managers may set (submit for staff review; never APPROVED). */
-export const LEADER_ALLOWED_WORKFLOW_STATUSES = ['DEVELOP', 'PENDING', 'SUBMITTED'] as const;
+/** Workflow statuses managers may set (self-publish live; org hierarchy review is MVP5). */
+export const LEADER_ALLOWED_WORKFLOW_STATUSES = ['DEVELOP', 'PENDING', 'SUBMITTED', 'APPROVED'] as const;
 
 export function pickLeaderFields<T extends Record<string, unknown>>(
   body: T,

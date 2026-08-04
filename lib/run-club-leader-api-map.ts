@@ -17,7 +17,7 @@
  * - GET|POST /api/runclub/[slug]/leader/events
  * - PATCH|DELETE /api/runclub/[slug]/leader/events/[eventId]
  * - GET /api/runclub/[slug]/leader/runs
- * - PATCH /api/runclub/[slug]/leader/runs/[runId]
+ * - PATCH /api/runclub/[slug]/leader/runs/[runId]  (manager self-publish APPROVED + published)
  *
  * Staff / Company only:
  * - POST /api/internal/run-club-leader-claims/invite
