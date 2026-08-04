@@ -8,7 +8,8 @@ import api from '@/lib/api';
 import TopNav from '@/components/shared/TopNav';
 import UpcomingRunsList, { UpcomingRun } from '@/components/runclub/UpcomingRunsList';
 import ClubNextRunHero, { type NextRunHeroRun } from '@/components/runclub/ClubNextRunHero';
-import ClubRunPhotoFeed, { type RunFeedItem } from '@/components/runclub/ClubRunPhotoFeed';
+import ClubCompletedRunFeed from '@/components/runclub/ClubCompletedRunFeed';
+import type { CompletedRunFeedItem } from '@/lib/runclub/completed-run-feed';
 import ClubAnnouncementsList, {
   ClubAnnouncement,
 } from '@/components/runclub/ClubAnnouncementsList';
@@ -41,7 +42,7 @@ interface ContainerData {
   announcements: ClubAnnouncement[];
   upcomingEvents: ClubEvent[];
   upcomingRuns: UpcomingRun[];
-  runFeed: RunFeedItem[];
+  completedRunFeed: CompletedRunFeedItem[];
 }
 
 /**
@@ -80,7 +81,7 @@ export default function AuthenticatedRunClubHubPage() {
           announcements: res.data.announcements ?? [],
           upcomingEvents: res.data.upcomingEvents ?? [],
           upcomingRuns: res.data.upcomingRuns ?? [],
-          runFeed: res.data.runFeed ?? [],
+          completedRunFeed: res.data.completedRunFeed ?? [],
         });
       } else {
         setError('Run club not found');
@@ -141,7 +142,7 @@ export default function AuthenticatedRunClubHubPage() {
     );
   }
 
-  const { club, membership, announcements, upcomingEvents, upcomingRuns, runFeed } = data;
+  const { club, membership, announcements, upcomingEvents, upcomingRuns, completedRunFeed } = data;
   const isMember = membership?.isMember ?? false;
   const locationParts = [club.neighborhood, club.city, club.state].filter(Boolean);
   const locationText = locationParts.join(', ');
@@ -214,9 +215,9 @@ export default function AuthenticatedRunClubHubPage() {
 
         <section>
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">
-            From recent runs
+            Recent runs
           </h2>
-          <ClubRunPhotoFeed items={runFeed} />
+          <ClubCompletedRunFeed items={completedRunFeed} />
         </section>
 
         {hasSecondary ? (

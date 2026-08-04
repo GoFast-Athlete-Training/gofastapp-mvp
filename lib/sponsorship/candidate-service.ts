@@ -51,9 +51,40 @@ export type CandidatePublicFields = {
   displayLabel: string | null;
   photoUrl: string | null;
   publicSlug: string | null;
+  gofastHandle: string | null;
+  followerCount: number;
+  runsOnPlatform: number;
 };
 
-export function toCandidatePublicFields(candidate: sponsorship_candidates): CandidatePublicFields {
+async function resolveCandidateStats(athleteId: string): Promise<{
+  gofastHandle: string | null;
+  followerCount: number;
+  runsOnPlatform: number;
+}> {
+  const [athlete, followerCount, runsOnPlatform] = await Promise.all([
+    prisma.athlete.findUnique({
+      where: { id: athleteId },
+      select: { gofastHandle: true },
+    }),
+    prisma.gofast_container_memberships.count({
+      where: { containerAthleteId: athleteId },
+    }),
+    prisma.city_run_checkins.count({
+      where: { athleteId },
+    }),
+  ]);
+
+  return {
+    gofastHandle: athlete?.gofastHandle ?? null,
+    followerCount,
+    runsOnPlatform,
+  };
+}
+
+export async function toCandidatePublicFields(
+  candidate: sponsorship_candidates,
+): Promise<CandidatePublicFields> {
+  const stats = await resolveCandidateStats(candidate.athleteId);
   return {
     id: candidate.id,
     code: candidate.code,
@@ -63,6 +94,9 @@ export function toCandidatePublicFields(candidate: sponsorship_candidates): Cand
     displayLabel: candidate.displayLabel,
     photoUrl: candidate.photoUrl,
     publicSlug: candidate.publicSlugSnapshot,
+    gofastHandle: stats.gofastHandle,
+    followerCount: stats.followerCount,
+    runsOnPlatform: stats.runsOnPlatform,
   };
 }
 
@@ -203,7 +237,7 @@ export async function listEligibleSponsorshipCandidates(): Promise<CandidatePubl
     orderBy: [{ displayLabel: "asc" }, { code: "asc" }],
   });
 
-  return rows.map(toCandidatePublicFields);
+  return Promise.all(rows.map((row) => toCandidatePublicFields(row)));
 }
 
 export async function getEligibleCandidateByCode(
@@ -217,7 +251,7 @@ export async function getEligibleCandidateByCode(
     },
   });
 
-  return candidate ? toCandidatePublicFields(candidate) : null;
+  return candidate ? await toCandidatePublicFields(candidate) : null;
 }
 
 export async function getCandidateForPurchase(

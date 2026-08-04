@@ -9,6 +9,10 @@ import {
   getActiveMemberCount,
   getViewerMembership,
 } from '@/lib/domain-runclub';
+import {
+  completedRunFeedWindowStart,
+  formatCompletedRunFeedItem,
+} from '@/lib/runclub/completed-run-feed';
 
 /**
  * GET /api/runclub/[slug]
@@ -18,8 +22,7 @@ import {
  *  - membership count + current viewer membership status
  *  - announcements and club events (non-run programming)
  *  - upcoming city_runs with per-run RSVP status and goingAthletes for the hub hero
- *  - runFeed: photo-first check-in entries from recent runs
- *  - recent city_runs with check-in count, photos, and shouts (legacy shape)
+ *  - completedRunFeed: manager-published post-run recaps (last ~2 weeks)
  */
 export async function GET(
   request: Request,
@@ -84,12 +87,14 @@ export async function GET(
       ? ['public', 'members']
       : ['public'];
 
+    const windowStart = completedRunFeedWindowStart(now);
+
     const [
       memberCount,
       announcements,
       upcomingEvents,
       upcomingRuns,
-      recentRuns,
+      completedRunFeedRaw,
     ] = await Promise.all([
       getActiveMemberCount(club.id),
       prisma.run_club_announcements.findMany({
@@ -182,36 +187,24 @@ export async function GET(
           },
         },
       }),
-      // Recent: past runs, most recent first
+      // Completed club runs in rolling window — published post-run recaps for hub feed
       prisma.city_runs.findMany({
-        where: { runClubId: club.id, date: { lt: now } },
+        where: {
+          runClubId: club.id,
+          date: { lt: now, gte: windowStart },
+          postRunPublished: true,
+        },
         orderBy: { date: 'desc' },
-        take: 5,
+        take: 20,
         select: {
           id: true,
           slug: true,
           title: true,
           date: true,
-          dayOfWeek: true,
           meetUpPoint: true,
-          city_run_checkins: {
-            select: {
-              id: true,
-              athleteId: true,
-              runPhotoUrl: true,
-              runShouts: true,
-              checkedInAt: true,
-              Athlete: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                  photoURL: true,
-                },
-              },
-            },
-            orderBy: { checkedInAt: 'asc' },
-          },
+          postRunNote: true,
+          postRunPhotoUrl: true,
+          postRunPublishedAt: true,
         },
       }),
     ]);
@@ -275,65 +268,7 @@ export async function GET(
       };
     });
 
-    const recentFormatted = recentRuns.map((run) => {
-      const photos = run.city_run_checkins
-        .map((c) => c.runPhotoUrl)
-        .filter((p): p is string => !!p);
-      const shouts = run.city_run_checkins
-        .map((c) => c.runShouts)
-        .filter((s): s is string => !!s && s.trim().length > 0);
-      return {
-        id: run.id,
-        slug: run.slug,
-        title: run.title,
-        date: run.date.toISOString(),
-        dayOfWeek: run.dayOfWeek,
-        meetUpPoint: run.meetUpPoint,
-        checkinCount: run.city_run_checkins.length,
-        photos,
-        topShouts: shouts.slice(0, 3),
-        attendees: run.city_run_checkins.map((c) => ({
-          id: c.athleteId,
-          firstName: c.Athlete?.firstName ?? null,
-          lastName: c.Athlete?.lastName ?? null,
-          photoURL: c.Athlete?.photoURL ?? null,
-        })),
-        photoEntries: run.city_run_checkins
-          .filter((c) => !!c.runPhotoUrl)
-          .map((c) => ({
-            checkinId: c.id,
-            photoUrl: c.runPhotoUrl as string,
-            shout: c.runShouts?.trim() || null,
-            checkedInAt: c.checkedInAt.toISOString(),
-            athlete: {
-              id: c.athleteId,
-              firstName: c.Athlete?.firstName ?? null,
-              lastName: c.Athlete?.lastName ?? null,
-              photoURL: c.Athlete?.photoURL ?? null,
-            },
-          })),
-      };
-    });
-
-    const runFeed = recentFormatted
-      .flatMap((run) =>
-        run.photoEntries.map((entry) => ({
-          checkinId: entry.checkinId,
-          runId: run.id,
-          runSlug: run.slug,
-          runTitle: run.title,
-          runDate: run.date,
-          photoUrl: entry.photoUrl,
-          shout: entry.shout,
-          checkedInAt: entry.checkedInAt,
-          athlete: entry.athlete,
-        }))
-      )
-      .sort(
-        (a, b) =>
-          new Date(b.checkedInAt).getTime() - new Date(a.checkedInAt).getTime()
-      )
-      .slice(0, 20);
+    const completedRunFeed = completedRunFeedRaw.map(formatCompletedRunFeedItem);
 
     return NextResponse.json({
       success: true,
@@ -343,8 +278,7 @@ export async function GET(
       announcements: announcementsFormatted,
       upcomingEvents: upcomingEventsFormatted,
       upcomingRuns: upcomingFormatted,
-      recentRuns: recentFormatted,
-      runFeed,
+      completedRunFeed,
     });
   } catch (error: any) {
     console.error('[GET /api/runclub/[slug]] Error:', error);

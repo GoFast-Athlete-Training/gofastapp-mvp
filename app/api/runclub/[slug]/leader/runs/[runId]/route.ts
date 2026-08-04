@@ -76,6 +76,23 @@ export async function PATCH(
           ? null
           : String(patch.postRunActivity).trim();
     }
+    if (patch.postRunNote !== undefined) {
+      updateData.postRunNote =
+        patch.postRunNote == null || patch.postRunNote === ''
+          ? null
+          : String(patch.postRunNote).trim();
+    }
+    if (patch.postRunPhotoUrl !== undefined) {
+      updateData.postRunPhotoUrl =
+        patch.postRunPhotoUrl == null || patch.postRunPhotoUrl === ''
+          ? null
+          : String(patch.postRunPhotoUrl).trim();
+    }
+    if (patch.postRunPublished !== undefined) {
+      const published = patch.postRunPublished === true || patch.postRunPublished === 'true';
+      updateData.postRunPublished = published;
+      updateData.postRunPublishedAt = published ? new Date() : null;
+    }
     if (patch.meetUpPoint !== undefined && String(patch.meetUpPoint).trim()) {
       updateData.meetUpPoint = String(patch.meetUpPoint).trim();
     }
@@ -161,14 +178,20 @@ export async function PATCH(
     });
 
     const publishedRun = updateData.workflowStatus === 'APPROVED';
+    const publishedPostRun = updateData.postRunPublished === true;
 
     return NextResponse.json({
       success: true,
       run: {
         ...updated,
         date: updated.date.toISOString(),
+        postRunPublishedAt: updated.postRunPublishedAt?.toISOString() ?? null,
       },
-      message: publishedRun ? 'Run published' : 'Run updated',
+      message: publishedPostRun
+        ? 'Post-run recap published'
+        : publishedRun
+          ? 'Run published'
+          : 'Run updated',
     });
   } catch (error: unknown) {
     console.error('[PATCH leader run] Error:', error);
