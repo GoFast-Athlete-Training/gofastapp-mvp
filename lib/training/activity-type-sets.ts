@@ -48,3 +48,17 @@ export function isSwimmingActivityType(activityType: string | null | undefined):
   if (!activityType) return false;
   return SWIMMING_ACTIVITY_TYPES.has(activityType.toUpperCase());
 }
+
+export function isRunningActivityType(activityType: string | null | undefined): boolean {
+  if (!activityType) return false;
+  return RUNNING_ACTIVITY_TYPES.has(activityType.toUpperCase());
+}
+
+export type ActivitySport = "run" | "cycle" | "swim" | "other";
+
+export function resolveActivitySport(activityType: string | null | undefined): ActivitySport {
+  if (isRunningActivityType(activityType)) return "run";
+  if (isCyclingActivityType(activityType)) return "cycle";
+  if (isSwimmingActivityType(activityType)) return "swim";
+  return "other";
+}

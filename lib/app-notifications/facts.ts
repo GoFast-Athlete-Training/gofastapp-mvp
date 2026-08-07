@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { buildClubRunReminderCopy } from '@/lib/city-run-copy';
+import { resolveActivitySport } from '@/lib/training/activity-type-sets';
 import type {
   AppNotificationObjectType,
   NotificationTemplateKey,
@@ -130,7 +131,7 @@ export async function loadNotificationFacts(params: {
     case 'activity.synced': {
       const activity = await prisma.athlete_activities.findFirst({
         where: { id: params.objectId, athleteId: params.athleteId },
-        select: { activityName: true, distance: true },
+        select: { activityName: true, activityType: true, distance: true },
       });
       if (!activity) return null;
       const distanceMi =
@@ -138,7 +139,8 @@ export async function loadNotificationFacts(params: {
           ? `${(activity.distance / 1609.34).toFixed(2)} mi`
           : undefined;
       return {
-        activityTitle: activity.activityName ?? 'Run',
+        activityTitle: activity.activityName?.trim() || undefined,
+        activitySport: resolveActivitySport(activity.activityType),
         distanceMi,
       };
     }

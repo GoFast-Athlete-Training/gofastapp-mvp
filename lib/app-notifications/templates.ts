@@ -1,6 +1,41 @@
 import type { NotificationTemplateKey, RenderedNotification, TemplateFacts } from '@/lib/app-notifications/types';
+import type { ActivitySport } from '@/lib/training/activity-type-sets';
 
 export type { TemplateFacts };
+
+function activitySportFromFacts(facts: TemplateFacts): ActivitySport {
+  const sport = facts.activitySport;
+  if (sport === 'run' || sport === 'cycle' || sport === 'swim' || sport === 'other') {
+    return sport;
+  }
+  return 'other';
+}
+
+function syncedActivityTitle(sport: ActivitySport): string {
+  switch (sport) {
+    case 'run':
+      return 'Run logged!';
+    case 'cycle':
+      return 'Ride logged!';
+    case 'swim':
+      return 'Swim logged!';
+    default:
+      return 'Another activity in the books!';
+  }
+}
+
+function syncedActivityNoun(sport: ActivitySport): string {
+  switch (sport) {
+    case 'run':
+      return 'Your run';
+    case 'cycle':
+      return 'Your ride';
+    case 'swim':
+      return 'Your swim';
+    default:
+      return 'Your activity';
+  }
+}
 
 type TemplateDefinition = {
   title: string | ((facts: TemplateFacts) => string);
@@ -70,14 +105,17 @@ const HARDCODED_TEMPLATES: Record<NotificationTemplateKey, TemplateDefinition> =
     },
   },
   'activity.synced': {
-    title: 'Run logged!',
-    body: ({ activityTitle, distanceMi }) => {
+    title: (facts) => syncedActivityTitle(activitySportFromFacts(facts)),
+    body: (facts) => {
+      const sport = activitySportFromFacts(facts);
       const title =
-        typeof activityTitle === 'string' && activityTitle.trim()
-          ? activityTitle.trim()
-          : 'Your run';
+        typeof facts.activityTitle === 'string' && facts.activityTitle.trim()
+          ? facts.activityTitle.trim()
+          : syncedActivityNoun(sport);
       const dist =
-        typeof distanceMi === 'string' && distanceMi.trim() ? ` (${distanceMi.trim()})` : '';
+        typeof facts.distanceMi === 'string' && facts.distanceMi.trim()
+          ? ` (${facts.distanceMi.trim()})`
+          : '';
       return `${title}${dist} synced from Garmin — nice work!`;
     },
   },
