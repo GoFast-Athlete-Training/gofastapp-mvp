@@ -22,6 +22,7 @@ const CITY_RUN_DISCOVER_SELECT = {
   date: true,
   runClubId: true,
   cityRunType: true,
+  athleteGeneratedId: true,
   meetUpPoint: true,
   meetUpStreetAddress: true,
   meetUpCity: true,
@@ -49,6 +50,15 @@ const CITY_RUN_DISCOVER_SELECT = {
       name: true,
       logoUrl: true,
       city: true,
+    },
+  },
+  Athlete: {
+    select: {
+      id: true,
+      gofastHandle: true,
+      firstName: true,
+      lastName: true,
+      photoURL: true,
     },
   },
   runSeries: {
@@ -117,6 +127,16 @@ function mapCityRunForResponse(run: Awaited<ReturnType<typeof queryCityRunsForDi
     date: run.date,
     runClubId: run.runClubId,
     cityRunType: run.cityRunType,
+    athleteGeneratedId: run.athleteGeneratedId ?? null,
+    hostAthlete: run.Athlete
+      ? {
+          id: run.Athlete.id,
+          gofastHandle: run.Athlete.gofastHandle,
+          firstName: run.Athlete.firstName,
+          lastName: run.Athlete.lastName,
+          photoURL: run.Athlete.photoURL,
+        }
+      : null,
     runClub: run.runClub || null,
     runClubSlug: run.runClub?.slug || null,
     meetUpPoint: run.meetUpPoint,
@@ -139,22 +159,22 @@ function mapCityRunForResponse(run: Awaited<ReturnType<typeof queryCityRunsForDi
   };
 }
 
-async function buildCityRunDiscoverWhere(filters: GetRunsFilters) {
-  const where: Record<string, unknown> = {};
+async function buildCityRunDiscoverWhere(filters: GetRunsFilters, mode: GetRunsMode) {
+  const andParts: Record<string, unknown>[] = [];
 
   if (filters.citySlug) {
-    where.citySlug = filters.citySlug;
+    andParts.push({ citySlug: filters.citySlug });
   }
 
   if (filters.runClubId) {
-    where.runClubId = filters.runClubId;
+    andParts.push({ runClubId: filters.runClubId });
   } else if (filters.runClubSlug) {
     const runClub = await prisma.run_clubs.findUnique({
       where: { slug: filters.runClubSlug },
       select: { id: true },
     });
     if (runClub) {
-      where.runClubId = runClub.id;
+      andParts.push({ runClubId: runClub.id });
     } else {
       return null;
     }
@@ -162,10 +182,20 @@ async function buildCityRunDiscoverWhere(filters: GetRunsFilters) {
 
   const startOfToday = new Date();
   startOfToday.setUTCHours(0, 0, 0, 0);
-  where.date = { gte: startOfToday };
-  where.cityRunType = 'CLUB';
+  andParts.push({ date: { gte: startOfToday } });
 
-  return where;
+  if (mode === 'discovery') {
+    andParts.push({
+      OR: [
+        { cityRunType: 'CLUB' },
+        { cityRunType: 'INDIVIDUAL', published: true },
+      ],
+    });
+  } else {
+    andParts.push({ cityRunType: 'CLUB' });
+  }
+
+  return { AND: andParts };
 }
 
 async function queryCityRunsForDiscover(filters: GetRunsFilters, mode: GetRunsMode) {
@@ -176,13 +206,13 @@ async function queryCityRunsForDiscover(filters: GetRunsFilters, mode: GetRunsMo
     dbHost: getDbHost(),
   });
 
-  const where = await buildCityRunDiscoverWhere(filters);
+  const where = await buildCityRunDiscoverWhere(filters, mode);
   if (!where) {
     return [];
   }
 
   if (mode === 'public') {
-    where.published = true;
+    where.AND.push({ published: true });
   }
 
   let allRuns;
@@ -244,7 +274,7 @@ export async function getRuns(filters: GetRunsFilters = {}) {
 }
 
 /**
- * Authenticated app discovery — Product club runs without SEO publish gating.
+ * Authenticated app discovery — club + published people runs without SEO publish gating on clubs.
  */
 export async function getDiscoveryRuns(filters: GetRunsFilters = {}) {
   const filteredRuns = await queryCityRunsForDiscover(filters, 'discovery');

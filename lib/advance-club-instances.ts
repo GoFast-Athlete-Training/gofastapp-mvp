@@ -36,6 +36,9 @@ export type AdvanceResult = {
   error?: string;
 };
 
+/** How many weekly occurrence slots advance should keep filled ahead of today. */
+export const DEFAULT_ADVANCE_HORIZON_WEEKS = 2;
+
 function generateId(): string {
   const timestamp = Date.now().toString(36);
   const random = Math.random().toString(36).substring(2, 15);
@@ -98,6 +101,50 @@ export function titleForAdvancedDate(priorTitle: string, targetYmd: string): str
   const suffix = runInstanceDateSuffix(targetYmd);
   const withoutOldSuffix = priorTitle.replace(/\s*\(\d{1,2}\/\d{1,2}\)\s*$/, "").trim();
   return `${withoutOldSuffix}${suffix}`;
+}
+
+/** Next N weekly dates on or after today, stepping from the latest prior occurrence. */
+export function getHorizonTargetDatesFromPrior(
+  priorDate: Date,
+  horizonWeeks: number = DEFAULT_ADVANCE_HORIZON_WEEKS,
+  startOfToday: Date = getStartOfTodayUTC()
+): string[] {
+  let target = addDaysUtc(priorDate, 7);
+  while (target < startOfToday) {
+    target = addDaysUtc(target, 7);
+  }
+  const dates: string[] = [];
+  for (let i = 0; i < horizonWeeks; i++) {
+    dates.push(dateToYmd(addDaysUtc(target, i * 7)));
+  }
+  return dates;
+}
+
+export function computeLaneAdvanceState(
+  latestPriorDate: Date | null,
+  futureOrTodayDates: Date[],
+  horizonWeeks: number = DEFAULT_ADVANCE_HORIZON_WEEKS,
+  startOfToday: Date = getStartOfTodayUTC()
+): {
+  needsAdvance: boolean;
+  expectedNextDateYmd: string | null;
+  horizonDates: string[];
+} {
+  if (!latestPriorDate) {
+    return { needsAdvance: false, expectedNextDateYmd: null, horizonDates: [] };
+  }
+  const horizonDates = getHorizonTargetDatesFromPrior(
+    latestPriorDate,
+    horizonWeeks,
+    startOfToday
+  );
+  const futureYmds = new Set(futureOrTodayDates.map((d) => dateToYmd(d)));
+  const missing = horizonDates.filter((d) => !futureYmds.has(d));
+  return {
+    needsAdvance: missing.length > 0,
+    expectedNextDateYmd: missing[0] ?? null,
+    horizonDates,
+  };
 }
 
 const CLUB_RUN_SELECT = {
@@ -218,17 +265,12 @@ export async function resolveClubInstanceLanes(
     const latestPriorRun = historical[0] ?? null;
     const nextRun = futureOrToday[0] ?? null;
 
-    let expectedNextDateYmd: string | null = null;
-    if (latestPriorRun) {
-      let target = addDaysUtc(new Date(latestPriorRun.date), 7);
-      while (target < startOfToday) {
-        target = addDaysUtc(target, 7);
-      }
-      expectedNextDateYmd = dateToYmd(target);
-    }
-
-    const needsAdvance =
-      !nextRun && latestPriorRun != null && expectedNextDateYmd != null;
+    const { needsAdvance, expectedNextDateYmd } = computeLaneAdvanceState(
+      latestPriorRun ? new Date(latestPriorRun.date) : null,
+      futureOrToday.map((r) => new Date(r.date)),
+      DEFAULT_ADVANCE_HORIZON_WEEKS,
+      startOfToday
+    );
 
     lanes.push({
       runSeriesId,
@@ -247,15 +289,6 @@ export async function resolveClubInstanceLanes(
   });
 
   return lanes;
-}
-
-function targetDateFromPrior(priorDate: Date): string {
-  const startOfToday = getStartOfTodayUTC();
-  let target = addDaysUtc(priorDate, 7);
-  while (target < startOfToday) {
-    target = addDaysUtc(target, 7);
-  }
-  return dateToYmd(target);
 }
 
 async function duplicateRunForward(
@@ -357,17 +390,23 @@ async function duplicateRunForward(
 }
 
 /**
- * Product-first find-or-create: duplicate latest prior instance per runSeriesId +7 days.
+ * Product-first find-or-create: fill the next N weekly occurrence slots per runSeriesId lane.
  * Does not touch Company acq tables.
  */
 export async function advanceClubInstances(opts: {
   runClubId: string;
   staffGeneratedId?: string | null;
   runSeriesIds?: string[];
-  /** When true, new instances are APPROVED + published (club manager / product cron). */
+  /** When true, new instances are APPROVED + published (MVP1 default). */
   publishLive?: boolean;
+  horizonWeeks?: number;
 }): Promise<AdvanceResult[]> {
-  const { runClubId, staffGeneratedId, publishLive = false } = opts;
+  const {
+    runClubId,
+    staffGeneratedId,
+    publishLive = true,
+    horizonWeeks = DEFAULT_ADVANCE_HORIZON_WEEKS,
+  } = opts;
   const filterIds =
     Array.isArray(opts.runSeriesIds) && opts.runSeriesIds.length > 0
       ? new Set(opts.runSeriesIds.map(String))
@@ -376,62 +415,91 @@ export async function advanceClubInstances(opts: {
   const runs = await fetchClubSeriesRuns(runClubId);
   const startOfToday = getStartOfTodayUTC();
 
-  const latestPriorBySeries = new Map<
-    string,
-    (typeof runs)[number]
-  >();
-
+  const bySeries = new Map<string, (typeof runs)[number][]>();
   for (const run of runs) {
     if (!run.runSeriesId) continue;
     if (filterIds && !filterIds.has(run.runSeriesId)) continue;
-    if (run.date >= startOfToday) continue;
-    const existing = latestPriorBySeries.get(run.runSeriesId);
-    if (!existing || run.date > existing.date) {
-      latestPriorBySeries.set(run.runSeriesId, run);
-    }
+    const list = bySeries.get(run.runSeriesId) ?? [];
+    list.push(run);
+    bySeries.set(run.runSeriesId, list);
   }
 
   const results: AdvanceResult[] = [];
 
-  for (const [runSeriesId, prior] of latestPriorBySeries) {
-    const targetYmd = targetDateFromPrior(prior.date);
+  for (const [runSeriesId, seriesRuns] of bySeries) {
+    const historical = seriesRuns.filter((run) => run.date < startOfToday);
+    if (historical.length === 0) {
+      continue;
+    }
 
-    try {
-      const existing = await findRunOnDate(runClubId, runSeriesId, targetYmd);
-      if (existing) {
+    historical.sort((a, b) => b.date.getTime() - a.date.getTime());
+    const latestPrior = historical[0];
+    const futureOrToday = seriesRuns.filter((run) => run.date >= startOfToday);
+    futureOrToday.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+    let template: (typeof runs)[number] = futureOrToday[0] ?? latestPrior;
+    const horizonDates = getHorizonTargetDatesFromPrior(
+      latestPrior.date,
+      horizonWeeks,
+      startOfToday
+    );
+    const existingYmds = new Set(seriesRuns.map((run) => dateToYmd(run.date)));
+
+    for (const targetYmd of horizonDates) {
+      try {
+        if (existingYmds.has(targetYmd)) {
+          const existing = await findRunOnDate(runClubId, runSeriesId, targetYmd);
+          results.push({
+            runSeriesId,
+            priorRunId: template.id,
+            targetDateYmd: targetYmd,
+            outcome: "found_existing",
+            runId: existing?.id,
+          });
+          continue;
+        }
+
+        const created = await duplicateRunForward(
+          template,
+          targetYmd,
+          staffGeneratedId,
+          publishLive
+        );
+        existingYmds.add(targetYmd);
+
+        const fullCreated = await prisma.city_runs.findUnique({
+          where: { id: created.id },
+          select: CLUB_RUN_SELECT,
+        });
+        if (fullCreated) {
+          template = fullCreated;
+        }
+
         results.push({
           runSeriesId,
-          priorRunId: prior.id,
+          priorRunId: latestPrior.id,
           targetDateYmd: targetYmd,
-          outcome: "found_existing",
-          runId: existing.id,
+          outcome: "created",
+          runId: created.id,
         });
-        continue;
+      } catch (error: unknown) {
+        const err = error as { message?: string };
+        results.push({
+          runSeriesId,
+          priorRunId: latestPrior.id,
+          targetDateYmd: targetYmd,
+          outcome: "error",
+          error: err?.message || "Failed to advance instance",
+        });
       }
-
-      const created = await duplicateRunForward(prior, targetYmd, staffGeneratedId, publishLive);
-      results.push({
-        runSeriesId,
-        priorRunId: prior.id,
-        targetDateYmd: targetYmd,
-        outcome: "created",
-        runId: created.id,
-      });
-    } catch (error: unknown) {
-      const err = error as { message?: string };
-      results.push({
-        runSeriesId,
-        priorRunId: prior.id,
-        targetDateYmd: targetYmd,
-        outcome: "error",
-        error: err?.message || "Failed to advance instance",
-      });
     }
   }
 
   if (filterIds) {
     for (const seriesId of filterIds) {
-      if (!latestPriorBySeries.has(seriesId)) {
+      const seriesRuns = bySeries.get(seriesId) ?? [];
+      const hasPrior = seriesRuns.some((run) => run.date < startOfToday);
+      if (!hasPrior) {
         results.push({
           runSeriesId: seriesId,
           priorRunId: "",

@@ -23,7 +23,7 @@ type Body = {
 
 /**
  * POST /api/runs/advance-instances
- * Product-only find-or-create: duplicate latest prior city_run forward 7 days per runSeriesId lane.
+ * Product-only find-or-create: fill the next 2 weekly occurrence slots per runSeriesId lane (live by default).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
       runClubId,
       staffGeneratedId: body.staffGeneratedId,
       runSeriesIds: body.runSeriesIds,
+      publishLive: true,
     });
 
     const created = results.filter((r) => r.outcome === "created").length;

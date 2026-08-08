@@ -8,7 +8,7 @@ export const maxDuration = 300;
 
 /**
  * GET /api/cron/advance-club-run-instances
- * Monday 3:00 AM UTC — advance latest prior city_runs +7 days per linked series lane.
+ * Monday 3:00 AM UTC — fill the next 2 weekly city_runs slots per linked series lane (live).
  * Product-owned; no Firebase or Company proxy.
  */
 export async function GET(request: NextRequest) {
