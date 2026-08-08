@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 
 /**
  * GET /api/athlete/discover/locations
- * Distinct city/state from athletes with a public handle (for find-runners filters).
+ * Distinct city/state from GoFast With Me athletes (for find-runners filters).
  */
 export async function GET() {
   try {
@@ -13,6 +13,7 @@ export async function GET() {
       where: {
         gofastHandle: { not: null },
         NOT: { gofastHandle: '' },
+        isGoFastContainer: true,
         state: { not: null },
       },
       select: {

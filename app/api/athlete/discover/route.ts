@@ -64,8 +64,9 @@ function pickDisplayRace(
 
 /**
  * GET /api/athlete/discover
- * Public. Athletes with a GoFast handle; optional filters by race, state, city.
- * Query: page, limit, raceId, state, city
+ * Public. Athletes opted into GoFast With Me (isGoFastContainer) with a handle;
+ * optional filters by race, state, city.
+ * Query: page, limit, q, raceId, state, city
  */
 export async function GET(request: Request) {
   try {
@@ -78,13 +79,24 @@ export async function GET(request: Request) {
     const raceId = searchParams.get('raceId')?.trim() || '';
     const state = searchParams.get('state')?.trim() || '';
     const city = searchParams.get('city')?.trim() || '';
+    const q = searchParams.get('q')?.trim().replace(/^@/, '') || '';
 
     const baseWhere = {
       gofastHandle: { not: null },
       NOT: { gofastHandle: '' },
+      isGoFastContainer: true,
     };
 
     const andParts: object[] = [];
+    if (q) {
+      andParts.push({
+        OR: [
+          { gofastHandle: { contains: q, mode: 'insensitive' as const } },
+          { firstName: { contains: q, mode: 'insensitive' as const } },
+          { lastName: { contains: q, mode: 'insensitive' as const } },
+        ],
+      });
+    }
     if (state) {
       andParts.push({ state });
     }

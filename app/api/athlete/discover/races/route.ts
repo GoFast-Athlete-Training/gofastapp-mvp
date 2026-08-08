@@ -5,13 +5,14 @@ import { prisma } from '@/lib/prisma';
 
 /**
  * GET /api/athlete/discover/races
- * Races referenced by discoverable athletes (active plan or active goal with race).
+ * Races referenced by GoFast With Me athletes (active plan or active goal with race).
  */
 export async function GET() {
   try {
     const baseAthlete = {
       gofastHandle: { not: null },
       NOT: { gofastHandle: '' },
+      isGoFastContainer: true,
     };
 
     const [fromPlans, fromGoals] = await Promise.all([
