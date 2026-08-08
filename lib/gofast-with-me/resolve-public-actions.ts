@@ -74,5 +74,5 @@ export function publicHeroPhotoUrl(
 
 export function goFastWithPersonHeadline(firstName: string | null, fallbackName: string): string {
   const name = firstName?.trim() || fallbackName.trim();
-  return name ? `GoFast with ${name}` : 'GoFast';
+  return name ? `Join ${name} in Going Fast` : 'Join in Going Fast';
 }
