@@ -18,6 +18,10 @@ import {
   type AthleteTipPayload,
 } from '@/lib/gofast-with-me/athlete-tips';
 import {
+  listAthleteAnnouncements,
+  type AthleteAnnouncementPayload,
+} from '@/lib/gofast-with-me/athlete-announcements';
+import {
   listPublicInstagramMedia,
   type AthleteInstagramMediaPayload,
 } from '@/lib/gofast-with-me/instagram-hydration';
@@ -29,6 +33,7 @@ import type {
 import { athleteCommunityRelationship } from '@/lib/gofast-with-me/athlete-community-access';
 
 export type ContainerHubMessage = MappedContainerMessage;
+export type AthleteAnnouncement = AthleteAnnouncementPayload;
 export type { GoFastWithMeChasingGoal, GoFastWithMeTrainingFor, GoFastWithMeTrainingSummary };
 
 export type ContainerHubPayload = {
@@ -76,6 +81,8 @@ export type ContainerHubPayload = {
     weeks: PublicPlanWeek[];
   } | null;
   trainingFor: GoFastWithMeTrainingFor;
+  /** First-class weekly / journey broadcasts (not chatter topics). */
+  announcements: AthleteAnnouncementPayload[];
   messages: ContainerHubMessage[];
   tips: AthleteTipPayload[];
   instagramMedia: AthleteInstagramMediaPayload[];
@@ -160,37 +167,42 @@ export async function loadAthleteCommunityForHost(
   const handle = host.gofastHandle?.trim();
   const publicPage = handle ? await loadPublicAthletePage(handle) : null;
 
-  const [memberRows, memberCount, publishedPlan, messageRows, tips, instagramMedia] = await Promise.all([
-    prisma.gofast_container_memberships.findMany({
-      where: { containerAthleteId: host.id },
-      orderBy: { joinedAt: 'desc' },
-      take: 24,
-      include: {
-        memberAthlete: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            photoURL: true,
-            gofastHandle: true,
+  const [memberRows, memberCount, publishedPlan, announcements, messageRows, tips, instagramMedia] =
+    await Promise.all([
+      prisma.gofast_container_memberships.findMany({
+        where: { containerAthleteId: host.id },
+        orderBy: { joinedAt: 'desc' },
+        take: 24,
+        include: {
+          memberAthlete: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              photoURL: true,
+              gofastHandle: true,
+            },
           },
         },
-      },
-    }),
-    prisma.gofast_container_memberships.count({ where: { containerAthleteId: host.id } }),
-    loadPublishedPlanWeeks(host.id),
-    prisma.gofast_container_messages.findMany({
-      where: {
-        containerAthleteId: host.id,
-        ...(options?.messageTopic ? { topic: options.messageTopic } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: options?.messageLimit ?? 40,
-      include: containerMessageInclude,
-    }),
-    listPublishedAthleteTips(host.id, 6),
-    listPublicInstagramMedia(host.id, 5),
-  ]);
+      }),
+      prisma.gofast_container_memberships.count({ where: { containerAthleteId: host.id } }),
+      loadPublishedPlanWeeks(host.id),
+      listAthleteAnnouncements(host.id, 20),
+      prisma.gofast_container_messages.findMany({
+        where: {
+          containerAthleteId: host.id,
+          // Announcements are first-class; never hydrate legacy topic=updates into chatter.
+          ...(options?.messageTopic && options.messageTopic !== 'updates'
+            ? { topic: options.messageTopic }
+            : { topic: { not: 'updates' } }),
+        },
+        orderBy: { createdAt: 'desc' },
+        take: options?.messageLimit ?? 40,
+        include: containerMessageInclude,
+      }),
+      listPublishedAthleteTips(host.id, 6),
+      listPublicInstagramMedia(host.id, 5),
+    ]);
 
   return {
     isOwner: relationship.isOwner,
@@ -222,6 +234,7 @@ export async function loadAthleteCommunityForHost(
       trainingSummary: publicPage?.trainingSummary ?? null,
       primaryChasingGoal: publicPage?.primaryChasingGoal ?? null,
     },
+    announcements,
     messages: messageRows.map(mapContainerMessageRow),
     tips,
     instagramMedia,

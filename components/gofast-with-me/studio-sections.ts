@@ -14,7 +14,7 @@ export const STUDIO_NAV_ORDER: StudioView[] = ['dashboard', ...STUDIO_BIN_ORDER]
 export const STUDIO_NAV_LABELS: Record<StudioView, string> = {
   dashboard: STUDIO_CENTRAL_LABEL,
   page: 'Page Settings',
-  community: 'Messages',
+  community: 'Weekly message',
   workouts: 'Runs & Training',
   content: 'Tips & Thinking',
 };
@@ -22,7 +22,7 @@ export const STUDIO_NAV_LABELS: Record<StudioView, string> = {
 /** Short labels for the mobile studio tab strip — full names stay on desktop. */
 export const STUDIO_MOBILE_NAV_LABELS: Record<StudioView, string> = {
   dashboard: 'Home',
-  community: 'Feed',
+  community: 'Week',
   workouts: 'Runs',
   content: 'Tips',
   page: 'Page',
@@ -30,14 +30,14 @@ export const STUDIO_MOBILE_NAV_LABELS: Record<StudioView, string> = {
 
 export const STUDIO_BIN_LABELS: Record<StudioSection, string> = {
   page: 'Page Settings',
-  community: 'Messages',
+  community: 'Weekly message',
   workouts: 'Runs & Training',
   content: 'Tips & Thinking',
 };
 
 export const STUDIO_BIN_DESCRIPTIONS: Record<StudioSection, string> = {
   page: "Public front door settings — landing copy, photo, and What I'm training for",
-  community: 'Updates and Chatter — the daily message feed for the community',
+  community: 'First-class weekly announcements for Journey — not Chatter',
   workouts: 'Runs and training — public plan, GoRun With Me, and workout sharing',
   content: 'Durable tips and thinking — nutrition, routes, training thoughts, and future blog',
 };

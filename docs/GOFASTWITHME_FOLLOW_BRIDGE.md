@@ -56,7 +56,8 @@ After follow, members return to the athlete community:
 |---|---|
 | Training week | Host's first published public plan → `PublicPlanWeekViewer` |
 | This week's runs | Custom week strip from upcoming hosted runs when no published plan |
-| Feed (topical) | `gofast_container_messages` with `topic` |
+| Weekly message | `gofast_athlete_announcements` (first-class; not a chatter topic) |
+| Feed / Chatter | `gofast_container_messages` with `topic` (`chatter`, tips, …) |
 | Upcoming runs | Public hydrate when plan week is shown |
 | Followers | `gofast_container_memberships` |
 
@@ -66,11 +67,12 @@ Defined in [`lib/gofast-with-me/container-topics.ts`](../lib/gofast-with-me/cont
 
 | Topic | Who posts (MVP) |
 |---|---|
-| `updates` | Host only |
 | `tips` | Host only |
 | `nutrition` | Host only |
 | `routes` | Host only (optional `routeId` FK to `routes`) |
 | `chatter` | Host + followers |
+
+Weekly / journey broadcasts are **not** a topic — they use `gofast_athlete_announcements` via `/api/athlete/[id]/announcements`.
 
 Messages API: `GET/POST /api/athlete/[id]/container/messages?topic=...`
 

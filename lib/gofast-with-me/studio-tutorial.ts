@@ -18,7 +18,7 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
   slug: GOFAST_WITH_ME_STUDIO_TUTORIAL_SLUG,
   name: 'GoFast With Me Studio',
   summary:
-    'Manage and engage your community: Home shows setup, followers, and invite; Messages is the daily feed; Runs & Training shares plans and GoRuns; Tips holds durable advice; Page Settings is the public front door and creator type.',
+    'Manage and engage your community: Home shows setup, followers, and invite; Weekly message posts first-class announcements for Journey; Runs & Training shares plans and GoRuns; Tips holds durable advice; Page Settings is the public front door and creator type.',
   steps: [
     {
       id: 'page',
@@ -29,9 +29,9 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
     },
     {
       id: 'community',
-      title: 'Messages — daily community',
+      title: 'Weekly message — announcements',
       instruction:
-        'Post journey updates and review Chatter. Manage followers from Community Management.',
+        'Post the Journey banner (“Hey guys — new week…”) as first-class announcements, separate from Chatter.',
       sortOrder: 1,
     },
     {

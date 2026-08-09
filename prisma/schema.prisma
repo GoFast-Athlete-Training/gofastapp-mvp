@@ -174,6 +174,8 @@ model Athlete {
   member_container_memberships   gofast_container_memberships[] @relation("ContainerMember")
   container_messages_as_host     gofast_container_messages[]    @relation("ContainerMessages")
   container_messages_as_author   gofast_container_messages[]    @relation("ContainerMessageAuthor")
+  athlete_announcements_as_host  gofast_athlete_announcements[] @relation("AthleteAnnouncementHost")
+  athlete_announcements_as_author gofast_athlete_announcements[] @relation("AthleteAnnouncementAuthor")
   hosted_training_cohorts      training_cohorts[]               @relation("TrainingCohortHost")
   authored_public_training_plans public_training_plans[]        @relation("PublicPlanAuthor")
   plan_custom_workouts         plan_custom_workouts[]
@@ -420,7 +422,7 @@ model gofast_container_messages {
   containerAthleteId String
   authorAthleteId    String
   body               String
-  /// updates | tips | nutrition | routes | chatter
+  /// tips | nutrition | routes | chatter — journey broadcasts live in gofast_athlete_announcements
   topic              String   @default("chatter")
   routeId            String?
   /// Optional joinable run invite attached to a feed post (host-owned city_runs).
@@ -434,6 +436,23 @@ model gofast_container_messages {
   @@index([containerAthleteId, createdAt])
   @@index([containerAthleteId, topic, createdAt])
   @@index([cityRunId])
+}
+
+/// Host weekly / journey broadcasts — first-class like run_club_announcements (not a chatter topic).
+model gofast_athlete_announcements {
+  id            String   @id @default(cuid())
+  hostAthleteId String
+  authorId      String
+  title         String?
+  body          String
+  publishedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  hostAthlete   Athlete  @relation("AthleteAnnouncementHost", fields: [hostAthleteId], references: [id], onDelete: Cascade)
+  author        Athlete  @relation("AthleteAnnouncementAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([hostAthleteId, publishedAt])
+  @@map("gofast_athlete_announcements")
 }
 
 model ambassador_credits {

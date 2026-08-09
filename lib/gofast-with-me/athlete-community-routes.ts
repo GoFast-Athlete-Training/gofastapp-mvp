@@ -15,7 +15,7 @@ export type AthleteCommunitySection = 'plan' | 'updates' | 'tips' | 'goruns' | '
 export type AthleteCommunityHubTab = 'journey' | 'runs' | 'people' | 'chatter';
 
 export const ATHLETE_COMMUNITY_SECTIONS: { id: AthleteCommunitySection; label: string }[] = [
-  { id: 'updates', label: 'Updates' },
+  { id: 'updates', label: 'Weekly message' },
   { id: 'plan', label: 'Plan' },
   { id: 'tips', label: 'Tips' },
   { id: 'goruns', label: 'GoRuns' },

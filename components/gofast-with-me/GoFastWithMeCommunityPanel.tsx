@@ -51,10 +51,10 @@ export default function GoFastWithMeCommunityPanel({ athleteId, publicSlug }: Pr
     <section id="community" className="space-y-10 pb-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Messages</h2>
+          <h2 className="text-lg font-bold text-gray-900">Weekly message</h2>
           <p className="text-sm text-gray-600 mt-1">
-            The daily side of your community — post Updates and review Chatter. Follower management
-            lives in Community Management.
+            Post first-class announcements for Journey — separate from Chatter. Follower management
+            lives on Home.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
@@ -89,7 +89,7 @@ export default function GoFastWithMeCommunityPanel({ athleteId, publicSlug }: Pr
         athleteId={athleteId}
         publicSlug={publicSlug}
         embedded
-        hub={hub}
+        announcements={hub?.announcements}
         hubLoading={loading}
         onHubRefresh={loadHub}
       />

@@ -21,8 +21,6 @@ type Props = {
   upcomingRuns?: ContainerHubPayload['upcomingRuns'];
   publishedPlan?: ContainerHubPayload['publishedPlan'];
   initialMessages?: ContainerHubMessage[];
-  /** Journey announcements — updates topic only, no topic tabs or plan banner. */
-  announcementsMode?: boolean;
   /** Chatter-only community section. */
   chatterMode?: boolean;
   /** RunCrew / Race Hub mobile tab layout — taller chat pane, tighter chrome. */
@@ -74,15 +72,12 @@ export default function GoFastWithMeHubFeed({
   upcomingRuns = [],
   publishedPlan = null,
   initialMessages = [],
-  announcementsMode = false,
   chatterMode = false,
   variant = 'default',
   showHeading = true,
 }: Props) {
   const isMobileHub = variant === 'mobile-hub';
-  const [filter, setFilter] = useState<FeedFilter>(
-    announcementsMode ? 'updates' : chatterMode ? 'chatter' : 'all'
-  );
+  const [filter, setFilter] = useState<FeedFilter>(chatterMode ? 'chatter' : 'all');
   const [messages, setMessages] = useState<ContainerHubMessage[]>(initialMessages);
   const [composer, setComposer] = useState('');
   const [attachRunId, setAttachRunId] = useState('');
@@ -90,18 +85,14 @@ export default function GoFastWithMeHubFeed({
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const postTopic: ContainerTopic = announcementsMode
-    ? 'updates'
-    : chatterMode
+  const postTopic: ContainerTopic = chatterMode
+    ? 'chatter'
+    : filter === 'all'
       ? 'chatter'
-      : filter === 'all'
-        ? 'updates'
-        : (filter as ContainerTopic);
+      : (filter as ContainerTopic);
   const canPostInTopic =
     canAccessFeed &&
-    (isHost ||
-      ((!announcementsMode && (chatterMode || filter === 'chatter')) &&
-        canMemberPostToTopic('chatter')));
+    (isHost || ((chatterMode || filter === 'chatter') && canMemberPostToTopic('chatter')));
 
   const loadMessages = useCallback(async (activeFilter: FeedFilter) => {
     setLoading(true);
@@ -163,14 +154,14 @@ export default function GoFastWithMeHubFeed({
     }
   };
 
-  const sectionTitle = announcementsMode ? 'Updates' : chatterMode ? 'Chatter' : 'Feed';
+  const sectionTitle = chatterMode ? 'Chatter' : 'Feed';
 
-  if (!canAccessFeed && !chatterMode && !announcementsMode) {
+  if (!canAccessFeed && !chatterMode) {
     return (
       <section className="rounded-2xl border border-gray-200 bg-white p-5">
         <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">{sectionTitle}</h2>
         <p className="mt-2 text-sm text-gray-600">
-          Follow to read journey announcements from this GoFast athlete.
+          Follow to join Chatter with this GoFast athlete.
         </p>
       </section>
     );
@@ -182,14 +173,14 @@ export default function GoFastWithMeHubFeed({
 
   return (
     <section
-      id={announcementsMode ? 'updates' : chatterMode ? 'chatter' : 'feed'}
+      id={chatterMode ? 'chatter' : 'feed'}
       className={
         isMobileHub
           ? 'flex min-h-0 flex-1 flex-col space-y-3 min-w-0'
           : 'space-y-4'
       }
     >
-      {!announcementsMode && !isMobileHub && publishedPlan ? (
+      {!isMobileHub && publishedPlan ? (
         <div className="rounded-xl border border-violet-100 bg-violet-50/40 px-4 py-3 text-xs text-violet-900">
           Training plan shared in this hub —{' '}
           <Link
@@ -208,13 +199,13 @@ export default function GoFastWithMeHubFeed({
             : 'rounded-2xl border border-gray-200 bg-white p-5 space-y-4'
         }
       >
-        {showHeading && !announcementsMode && !chatterMode ? (
+        {showHeading && !chatterMode ? (
           <div>
             <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">{sectionTitle}</h2>
             <p className="text-xs text-gray-500 mt-1">
               {isHost
                 ? 'Share what you are doing, thinking, and invite followers to join your runs.'
-                : 'Updates from the host and community chatter.'}
+                : 'Community chatter and host posts.'}
             </p>
           </div>
         ) : null}
@@ -233,7 +224,7 @@ export default function GoFastWithMeHubFeed({
           </div>
         ) : null}
 
-        {!announcementsMode && !chatterMode ? (
+        {!chatterMode ? (
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
             {FEED_FILTERS.map((f) => (
               <button
@@ -261,11 +252,9 @@ export default function GoFastWithMeHubFeed({
             <p className="text-sm text-gray-500 text-center py-6">Loading…</p>
           ) : messages.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-6">
-              {announcementsMode
-                ? 'No announcements yet.'
-                : filter === 'all'
-                  ? 'No posts yet.'
-                  : `No ${FEED_FILTERS.find((f) => f.id === filter)?.label.toLowerCase()} yet.`}
+              {filter === 'all'
+                ? 'No posts yet.'
+                : `No ${FEED_FILTERS.find((f) => f.id === filter)?.label.toLowerCase()} yet.`}
             </p>
           ) : (
             messages.map((m) => (
@@ -314,13 +303,11 @@ export default function GoFastWithMeHubFeed({
               className="w-full rounded-lg border border-gray-300 p-3 text-sm"
               placeholder={
                 isHost
-                  ? announcementsMode
-                    ? 'Share a journey update — race prep, plan milestone, what\'s next…'
-                    : 'Share an update — e.g. running 10 miles Saturday morning, join me…'
+                  ? 'Share something with followers — or invite them to a run…'
                   : 'Say something to the group…'
               }
             />
-            {isHost && !announcementsMode && upcomingRuns.length > 0 ? (
+            {isHost && upcomingRuns.length > 0 ? (
               <div className="space-y-1">
                 <label htmlFor="attach-run" className="text-xs font-semibold text-gray-700">
                   Attach a joinable run (optional)
@@ -339,7 +326,7 @@ export default function GoFastWithMeHubFeed({
                   ))}
                 </select>
               </div>
-            ) : isHost && !announcementsMode ? (
+            ) : isHost ? (
               <p className="text-xs text-gray-500">
                 Host a run from GoRun to attach run invites to legacy feed posts.
               </p>
@@ -352,20 +339,14 @@ export default function GoFastWithMeHubFeed({
               {posting
                 ? 'Posting…'
                 : isHost
-                  ? announcementsMode
-                    ? 'Post announcement'
-                    : `Post to ${filter === 'all' ? 'Updates' : containerTopicLabel(postTopic)}`
+                  ? `Post to ${filter === 'all' ? 'Chatter' : containerTopicLabel(postTopic)}`
                   : 'Post to Chatter'}
             </button>
           </form>
-        ) : announcementsMode ? (
-          <p className="text-xs text-gray-500">Only the host posts journey announcements.</p>
         ) : chatterMode && !canAccessFeed ? (
           <p className="text-xs text-gray-500">Follow to post in Chatter.</p>
         ) : (
-          <p className="text-xs text-gray-500">
-            Only the host can post updates. Switch to Chatter to join the conversation.
-          </p>
+          <p className="text-xs text-gray-500">Follow to post in Chatter.</p>
         )}
       </div>
     </section>

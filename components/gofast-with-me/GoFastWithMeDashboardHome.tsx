@@ -123,7 +123,7 @@ export default function GoFastWithMeDashboardHome({
                 onClick={() => onOpenWorkspace('page')}
               />
               <StoplightChip
-                label="Feed"
+                label="Week"
                 light="green"
                 hint="Live"
                 onClick={() => onOpenWorkspace('community')}
@@ -249,8 +249,8 @@ export default function GoFastWithMeDashboardHome({
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
           <ArrangeShortcutCard
             title="Weekly message"
-            description="Write the next update."
-            action="Messages"
+            description="Hey guys — new week…"
+            action="Week"
             onClick={() => onOpenWorkspace('community')}
           />
           <ArrangeShortcutCard
