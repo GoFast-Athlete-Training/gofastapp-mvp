@@ -43,7 +43,7 @@ Community (`/u/[handle]/community`) answers: **what's their week look like — c
 |----------|---------|-------|------|
 | **P0** | What I'm training for | Door + hub header | Goal/race identity via `GoalRaceCard` / plan goal hydrate |
 | **P0** | Plan strip | Community (public read); teaser on door if public | Week view of surfaced GoFast plan |
-| P1 | Updates | Community | Journey announcements (`gofast_container_messages`, topic `updates`) |
+| P1 | Weekly message | Community | First-class announcements (`gofast_athlete_announcements`) — Run Club pattern, not a chatter topic |
 | P1 | What I'm thinking about | Hub / door later | Tips / voice (`athlete_tips` etc.) |
 | **P2 v2** | My Runs | Hub (collapsed) | Manual `city_runs.athleteGeneratedId` — not primary loop |
 
@@ -334,7 +334,7 @@ The studio (`/gofast-with-others`) is **Studio Central + four peer bins** — pa
    - Strangers decide to follow from `/u/[handle]` and `runner…/{handle}`; **What I'm training for** hydrates from goal/plan on the live page.
 
 3. **My Community** (personal community — host side)
-   - Messages — journey announcements (`gofast_container_messages`, topic `updates`)
+   - Weekly message — first-class announcements (`gofast_athlete_announcements`); Chatter stays on `gofast_container_messages`
    - Followers — list hydrated from `/container/members` on load
    - **View public community** / **Preview follower view** links to `/u/{handle}/community`
    - Public community: `/u/{handle}/community` (training-for, plan, Updates, GoRuns, Chatter, Followers)

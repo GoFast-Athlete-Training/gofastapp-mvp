@@ -107,10 +107,7 @@ export default function AthleteCommunityView({ handle }: Props) {
   }, [community, handle]);
 
   const firstName = community?.host.firstName?.trim() || displayName;
-  const updateMessages = useMemo(
-    () => community?.messages.filter((m) => m.topic === 'updates') ?? [],
-    [community?.messages]
-  );
+  const announcements = community?.announcements ?? [];
 
   const handleFollow = async () => {
     setActionLoading(true);
@@ -287,14 +284,14 @@ export default function AthleteCommunityView({ handle }: Props) {
           displayAsOwner={displayAsOwner}
           canParticipate={canParticipate}
           handle={handle}
-          updateMessages={updateMessages}
+          announcements={announcements}
           hasTrainingFor={hasTrainingFor}
         />
 
         <div className="hidden lg:grid grid-cols-12 gap-4 sm:gap-6">
           <div className="lg:col-span-6 space-y-6 min-w-0">
             <AthleteCommunityUpdatesSection
-              messages={updateMessages}
+              announcements={announcements}
               hostFirstName={firstName}
               isOwner={displayAsOwner}
             />

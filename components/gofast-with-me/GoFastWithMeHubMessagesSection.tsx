@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import GoFastWithMeHubFeed from '@/components/gofast-with-me/GoFastWithMeHubFeed';
 import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
+import AthleteCommunityUpdatesSection from '@/components/gofast-with-me/AthleteCommunityUpdatesSection';
 
 type Props = {
   hostId: string;
@@ -11,27 +11,16 @@ type Props = {
   hub: ContainerHubPayload;
 };
 
-export default function GoFastWithMeHubMessagesSection({
-  hostId,
-  isHost,
-  canAccessFeed,
-  hub,
-}: Props) {
+/** Follower-facing weekly announcements — first-class rows, not chatter topics. */
+export default function GoFastWithMeHubMessagesSection({ isHost, hub }: Props) {
+  const firstName = hub.host.firstName?.trim() || 'Host';
+
   return (
     <section id="messages" className="space-y-2">
-      <div className="px-1">
-        <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Messages</h2>
-        <p className="text-xs text-gray-500 mt-1">
-          Announcements on the journey — race updates, plan milestones, what&apos;s next.
-        </p>
-      </div>
-      <GoFastWithMeHubFeed
-        hostId={hostId}
-        isHost={isHost}
-        canAccessFeed={canAccessFeed}
-        upcomingRuns={hub.upcomingRuns}
-        publishedPlan={hub.publishedPlan}
-        announcementsMode
+      <AthleteCommunityUpdatesSection
+        announcements={hub.announcements ?? []}
+        hostFirstName={firstName}
+        isOwner={isHost}
       />
       {isHost ? (
         <p className="text-xs text-gray-500 px-1">

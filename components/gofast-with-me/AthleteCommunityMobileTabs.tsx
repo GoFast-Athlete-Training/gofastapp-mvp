@@ -13,6 +13,7 @@ import GoFastWithMeFollowersSection from '@/components/gofast-with-me/GoFastWith
 import AthleteTipsSection from '@/components/gofast-with-me/AthleteTipsSection';
 import AthleteCommunityUpdatesSection from '@/components/gofast-with-me/AthleteCommunityUpdatesSection';
 import HubWeeklyRunStrip from '@/components/gofast-with-me/HubWeeklyRunStrip';
+import type { AthleteAnnouncement } from '@/lib/gofast-with-me/container-hub-service';
 
 /** Journey leads; Chatter is last — weekly message → training → runs → join-me → tips. */
 const TABS = [
@@ -30,7 +31,7 @@ type Props = {
   displayAsOwner: boolean;
   canParticipate: boolean;
   handle: string;
-  updateMessages: AthleteCommunityPayload['messages'];
+  announcements: AthleteAnnouncement[];
   hasTrainingFor: boolean;
 };
 
@@ -42,7 +43,7 @@ export default function AthleteCommunityMobileTabs({
   displayAsOwner,
   canParticipate,
   handle,
-  updateMessages,
+  announcements,
   hasTrainingFor,
 }: Props) {
   const nextRun = community.upcomingRuns[0] ?? null;
@@ -56,7 +57,7 @@ export default function AthleteCommunityMobileTabs({
       {activeTab === 'journey' ? (
         <div className="space-y-6">
           <AthleteCommunityUpdatesSection
-            messages={updateMessages}
+            announcements={announcements}
             hostFirstName={firstName}
             isOwner={displayAsOwner}
           />

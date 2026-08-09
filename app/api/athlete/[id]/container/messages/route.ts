@@ -127,6 +127,16 @@ export async function POST(
     }
 
     const rawTopic = String(body.topic ?? DEFAULT_CONTAINER_TOPIC).trim();
+    if (rawTopic === 'updates') {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Announcements are first-class — POST /api/athlete/[id]/announcements instead of topic=updates',
+        },
+        { status: 400 }
+      );
+    }
     const topic = isValidContainerTopic(rawTopic) ? rawTopic : DEFAULT_CONTAINER_TOPIC;
     const isHost = caller.id === host.id;
 

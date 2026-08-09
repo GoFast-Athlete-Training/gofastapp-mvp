@@ -2,16 +2,16 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ExternalLink, Megaphone } from 'lucide-react';
+import { ExternalLink, Megaphone, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
-import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
+import type { AthleteAnnouncement } from '@/lib/gofast-with-me/container-hub-service';
 import { athleteCommunityPath } from '@/lib/gofast-with-me/athlete-community-routes';
 
 type Props = {
   athleteId: string;
   publicSlug: string;
   embedded?: boolean;
-  hub?: ContainerHubPayload | null;
+  announcements?: AthleteAnnouncement[];
   hubLoading?: boolean;
   onHubRefresh?: () => Promise<void>;
 };
@@ -20,20 +20,24 @@ export default function GoFastWithMeFeedPanel({
   athleteId,
   publicSlug,
   embedded = false,
-  hub: hubProp = null,
+  announcements: announcementsProp,
   hubLoading = false,
   onHubRefresh,
 }: Props) {
-  const [hub, setHub] = useState<ContainerHubPayload | null>(hubProp);
-  const [loading, setLoading] = useState(!hubProp);
+  const [announcements, setAnnouncements] = useState<AthleteAnnouncement[]>(
+    announcementsProp ?? []
+  );
+  const [loading, setLoading] = useState(!announcementsProp);
   const [error, setError] = useState<string | null>(null);
-  const [announcement, setAnnouncement] = useState('');
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
   const [posting, setPosting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [postSuccess, setPostSuccess] = useState(false);
 
   const updatesPath = athleteCommunityPath(publicSlug, 'updates');
 
-  const loadHub = useCallback(async () => {
+  const loadAnnouncements = useCallback(async () => {
     if (onHubRefresh) {
       await onHubRefresh();
       return;
@@ -41,55 +45,70 @@ export default function GoFastWithMeFeedPanel({
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get(`/athlete/${athleteId}/container/hub`);
-      if (res.data?.success && res.data.hub) {
-        setHub(res.data.hub as ContainerHubPayload);
+      const res = await api.get(`/athlete/${athleteId}/announcements`);
+      if (res.data?.success && Array.isArray(res.data.announcements)) {
+        setAnnouncements(res.data.announcements as AthleteAnnouncement[]);
       } else {
-        throw new Error(res.data?.error || 'Could not load community');
+        throw new Error(res.data?.error || 'Could not load announcements');
       }
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } }; message?: string };
-      setError(e.response?.data?.error || e.message || 'Could not load community');
+      setError(e.response?.data?.error || e.message || 'Could not load announcements');
     } finally {
       setLoading(false);
     }
   }, [athleteId, onHubRefresh]);
 
   useEffect(() => {
-    setHub(hubProp);
-    if (hubProp) {
+    if (announcementsProp) {
+      setAnnouncements(announcementsProp);
       setLoading(false);
     }
-  }, [hubProp]);
+  }, [announcementsProp]);
 
   useEffect(() => {
-    if (hubProp || onHubRefresh) return;
-    void loadHub();
-  }, [hubProp, onHubRefresh, loadHub]);
+    if (announcementsProp || onHubRefresh) return;
+    void loadAnnouncements();
+  }, [announcementsProp, onHubRefresh, loadAnnouncements]);
 
-  const updateMessages = hub?.messages.filter((m) => m.topic === 'updates') ?? [];
   const isLoading = loading || hubLoading;
 
   const handleAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!announcement.trim() || posting) return;
+    if (!body.trim() || posting) return;
     setPosting(true);
     setError(null);
     setPostSuccess(false);
     try {
-      await api.post(`/athlete/${athleteId}/container/messages`, {
-        body: announcement.trim(),
-        topic: 'updates',
+      await api.post(`/athlete/${athleteId}/announcements`, {
+        title: title.trim() || undefined,
+        body: body.trim(),
       });
-      setAnnouncement('');
+      setTitle('');
+      setBody('');
       setPostSuccess(true);
       setTimeout(() => setPostSuccess(false), 2500);
-      await loadHub();
+      await loadAnnouncements();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      setError(e.response?.data?.error || 'Could not post update.');
+      setError(e.response?.data?.error || 'Could not post announcement.');
     } finally {
       setPosting(false);
+    }
+  };
+
+  const handleDelete = async (announcementId: string) => {
+    if (deletingId) return;
+    setDeletingId(announcementId);
+    setError(null);
+    try {
+      await api.delete(`/athlete/${athleteId}/announcements/${announcementId}`);
+      await loadAnnouncements();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setError(e.response?.data?.error || 'Could not delete announcement.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -97,17 +116,18 @@ export default function GoFastWithMeFeedPanel({
     <section id="updates" className={embedded ? 'space-y-4' : 'space-y-6'}>
       {!embedded ? (
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Updates</h2>
+          <h2 className="text-lg font-bold text-gray-900">Weekly message</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Journey announcements for your followers — race updates, plan milestones, what&apos;s next.
-            Posts appear on your public community.
+            First-class announcements for followers — like Run Club broadcasts, not Chatter.
           </p>
         </div>
       ) : (
         <div>
-          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Updates</h3>
+          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+            Weekly message
+          </h3>
           <p className="text-xs text-gray-600 mt-1">
-            Journey announcements — race updates, milestones, what&apos;s next.
+            Host announcements — the Journey banner followers see first.
           </p>
         </div>
       )}
@@ -120,35 +140,43 @@ export default function GoFastWithMeFeedPanel({
 
       {postSuccess ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Update posted to your public community.
+          Weekly message posted to your community.
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-violet-200 bg-violet-50/40 p-5 shadow-sm space-y-3">
+      <div className="rounded-2xl border border-orange-200 bg-orange-50/40 p-5 shadow-sm space-y-3">
         <div className="flex items-start gap-2">
-          <Megaphone className="h-5 w-5 text-violet-700 mt-0.5 shrink-0" />
+          <Megaphone className="h-5 w-5 text-orange-700 mt-0.5 shrink-0" />
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Post an update</h3>
+            <h3 className="text-sm font-semibold text-gray-900">Post this week&apos;s message</h3>
             <p className="text-xs text-gray-600 mt-1">
-              Example: &ldquo;Week 12 of MCM prep — long run Sunday, following my plan.&rdquo;
+              Example: &ldquo;Hey guys — new week, let&apos;s crush it. Long run Sunday.&rdquo;
             </p>
           </div>
         </div>
         <form onSubmit={(e) => void handleAnnouncement(e)} className="space-y-2">
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={120}
+            className="w-full rounded-lg border border-gray-300 p-3 text-sm bg-white"
+            placeholder="Optional title (e.g. Week 12)"
+          />
           <textarea
-            value={announcement}
-            onChange={(e) => setAnnouncement(e.target.value)}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
             rows={3}
             maxLength={2000}
             className="w-full rounded-lg border border-gray-300 p-3 text-sm bg-white"
-            placeholder="Share a journey update with your followers…"
+            placeholder="Hey guys — new week, let's crush it…"
           />
           <button
             type="submit"
-            disabled={posting || !announcement.trim()}
-            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+            disabled={posting || !body.trim()}
+            className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
           >
-            {posting ? 'Posting…' : 'Post update'}
+            {posting ? 'Posting…' : 'Post weekly message'}
           </button>
         </form>
       </div>
@@ -156,9 +184,9 @@ export default function GoFastWithMeFeedPanel({
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Recent updates</h3>
+            <h3 className="text-sm font-semibold text-gray-900">Recent announcements</h3>
             <p className="text-xs text-gray-600 mt-1">
-              Latest announcements visible on your public community.
+              Latest weekly messages on your public community Journey.
             </p>
           </div>
           {!embedded ? (
@@ -175,17 +203,36 @@ export default function GoFastWithMeFeedPanel({
         </div>
         {isLoading ? (
           <p className="text-sm text-gray-500">Loading…</p>
-        ) : updateMessages.length > 0 ? (
+        ) : announcements.length > 0 ? (
           <ul className="space-y-2">
-            {updateMessages.slice(0, 5).map((m) => (
-              <li key={m.id} className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm">
-                <p className="text-gray-800 whitespace-pre-wrap line-clamp-3">{m.body}</p>
-                <p className="text-xs text-gray-400 mt-1">{new Date(m.createdAt).toLocaleString()}</p>
+            {announcements.slice(0, 8).map((a) => (
+              <li
+                key={a.id}
+                className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm flex gap-3"
+              >
+                <div className="min-w-0 flex-1">
+                  {a.title ? (
+                    <p className="font-semibold text-gray-900 mb-1">{a.title}</p>
+                  ) : null}
+                  <p className="text-gray-800 whitespace-pre-wrap line-clamp-3">{a.body}</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {new Date(a.publishedAt).toLocaleString()}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleDelete(a.id)}
+                  disabled={deletingId === a.id}
+                  className="shrink-0 rounded-md p-1.5 text-gray-400 hover:bg-white hover:text-red-600 disabled:opacity-50"
+                  aria-label="Delete announcement"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-gray-500">No updates yet.</p>
+          <p className="text-sm text-gray-500">No weekly messages yet.</p>
         )}
       </div>
     </section>
