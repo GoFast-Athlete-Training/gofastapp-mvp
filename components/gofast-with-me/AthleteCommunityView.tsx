@@ -27,7 +27,7 @@ import GoFastWithMeHubFeed from '@/components/gofast-with-me/GoFastWithMeHubFeed
 import GoFastWithMeFollowersSection from '@/components/gofast-with-me/GoFastWithMeFollowersSection';
 import AthleteTipsSection from '@/components/gofast-with-me/AthleteTipsSection';
 import AthleteCommunityUpdatesSection from '@/components/gofast-with-me/AthleteCommunityUpdatesSection';
-import AthleteCommunityLatestUpdateBanner from '@/components/gofast-with-me/AthleteCommunityLatestUpdateBanner';
+import HubWeeklyRunStrip from '@/components/gofast-with-me/HubWeeklyRunStrip';
 
 type Props = {
   handle: string;
@@ -111,7 +111,6 @@ export default function AthleteCommunityView({ handle }: Props) {
     () => community?.messages.filter((m) => m.topic === 'updates') ?? [],
     [community?.messages]
   );
-  const latestUpdate = updateMessages[0] ?? null;
 
   const handleFollow = async () => {
     setActionLoading(true);
@@ -294,37 +293,30 @@ export default function AthleteCommunityView({ handle }: Props) {
 
         <div className="hidden lg:grid grid-cols-12 gap-4 sm:gap-6">
           <div className="lg:col-span-6 space-y-6 min-w-0">
-            {latestUpdate ? (
-              <AthleteCommunityLatestUpdateBanner
-                update={latestUpdate}
-                hostFirstName={firstName}
-                hasMultiple={updateMessages.length > 1}
-              />
-            ) : null}
-            <GoFastWithMeHubFeed
-              hostId={community.host.id}
-              isHost={displayAsOwner}
-              canAccessFeed={canParticipate}
-              upcomingRuns={community.upcomingRuns}
-              publishedPlan={community.publishedPlan}
-              initialMessages={community.messages.filter((m) => m.topic === 'chatter')}
-              chatterMode
-              showHeading
-            />
             <AthleteCommunityUpdatesSection
               messages={updateMessages}
               hostFirstName={firstName}
               isOwner={displayAsOwner}
             />
-          </div>
 
-          <aside className="lg:col-span-6 space-y-6 min-w-0 lg:sticky lg:top-6 lg:self-start">
             {hasTrainingFor ? (
               <GoFastWithMeTrainingForCard
                 trainingSummary={community.trainingFor.trainingSummary}
                 primaryChasingGoal={community.trainingFor.primaryChasingGoal}
               />
             ) : null}
+
+            <section className="space-y-3">
+              <div className="px-1">
+                <h2 className="text-lg font-bold text-gray-900">My next run</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {displayAsOwner
+                    ? 'Hosted runs followers can join.'
+                    : `Join ${firstName} on an upcoming run.`}
+                </p>
+              </div>
+              <HubWeeklyRunStrip runs={community.upcomingRuns} />
+            </section>
 
             {community.publishedPlan ? (
               <GoFastWithMePlanStripSection
@@ -334,10 +326,10 @@ export default function AthleteCommunityView({ handle }: Props) {
               />
             ) : (
               <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                <h2 className="text-lg font-bold text-gray-900">Plan</h2>
+                <h2 className="text-lg font-bold text-gray-900">Join me</h2>
                 <p className="text-sm text-gray-600 mt-2">
                   {displayAsOwner
-                    ? 'Publish your plan in Runs & Training so followers can see your training week here.'
+                    ? 'Publish your plan in Runs & Training so followers can train with you here.'
                     : `${firstName} hasn't shared a public plan yet.`}
                 </p>
                 {displayAsOwner ? (
@@ -351,17 +343,30 @@ export default function AthleteCommunityView({ handle }: Props) {
               </div>
             )}
 
-            <ContainerHubRunsSection
-              runs={community.upcomingRuns}
-              hostFirstName={firstName}
-              isHost={displayAsOwner}
-            />
-
             <AthleteTipsSection
               tips={community.tips}
               hostFirstName={firstName}
               isOwner={displayAsOwner}
               instagramUsername={community.host.instagramUsername}
+            />
+          </div>
+
+          <aside className="lg:col-span-6 space-y-6 min-w-0 lg:sticky lg:top-6 lg:self-start">
+            <GoFastWithMeHubFeed
+              hostId={community.host.id}
+              isHost={displayAsOwner}
+              canAccessFeed={canParticipate}
+              upcomingRuns={community.upcomingRuns}
+              publishedPlan={community.publishedPlan}
+              initialMessages={community.messages.filter((m) => m.topic === 'chatter')}
+              chatterMode
+              showHeading
+            />
+
+            <ContainerHubRunsSection
+              runs={community.upcomingRuns}
+              hostFirstName={firstName}
+              isHost={displayAsOwner}
             />
 
             <GoFastWithMeFollowersSection

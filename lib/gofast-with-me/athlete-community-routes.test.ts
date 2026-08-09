@@ -37,7 +37,7 @@ test('maps deep-link sections onto RunCrew-style hub tabs', () => {
   assert.equal(athleteCommunitySectionToHubTab('tips'), 'journey');
   assert.equal(athleteCommunitySectionToHubTab('goruns'), 'runs');
   assert.equal(athleteCommunitySectionToHubTab('followers'), 'people');
-  assert.equal(athleteCommunitySectionToHubTab(null), 'chatter');
+  assert.equal(athleteCommunitySectionToHubTab(null), 'journey');
 });
 
 test('parses section and hub-tab hashes', () => {

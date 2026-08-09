@@ -15,9 +15,9 @@ export default function AthleteCommunityUpdatesSection({
   return (
     <section id="updates" className="space-y-3">
       <div className="px-1">
-        <h2 className="text-lg font-bold text-gray-900">Updates</h2>
+        <h2 className="text-lg font-bold text-gray-900">Weekly message</h2>
         <p className="text-sm text-gray-500 mt-1">
-          Journey announcements from {hostFirstName} — race prep, milestones, what&apos;s next.
+          From {hostFirstName} — race prep, milestones, what&apos;s next this week.
         </p>
       </div>
       {messages.length > 0 ? (

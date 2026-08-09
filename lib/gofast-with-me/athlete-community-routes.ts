@@ -10,24 +10,24 @@ export type AthleteCommunitySection = 'plan' | 'updates' | 'tips' | 'goruns' | '
 
 /**
  * Hub tabs (RunCrew / Race Hub pattern). Deep-link sections map into these.
- * Chatter leads — destination hub, not a long scroll brochure.
+ * Journey leads — weekly update, training-for, next run / join-me, tips — then Chatter.
  */
-export type AthleteCommunityHubTab = 'chatter' | 'journey' | 'runs' | 'people';
+export type AthleteCommunityHubTab = 'journey' | 'runs' | 'people' | 'chatter';
 
 export const ATHLETE_COMMUNITY_SECTIONS: { id: AthleteCommunitySection; label: string }[] = [
-  { id: 'plan', label: 'Plan' },
   { id: 'updates', label: 'Updates' },
+  { id: 'plan', label: 'Plan' },
   { id: 'tips', label: 'Tips' },
   { id: 'goruns', label: 'GoRuns' },
-  { id: 'chatter', label: 'Chatter' },
   { id: 'followers', label: 'Followers' },
+  { id: 'chatter', label: 'Chatter' },
 ];
 
 export const ATHLETE_COMMUNITY_HUB_TABS: { id: AthleteCommunityHubTab; label: string }[] = [
-  { id: 'chatter', label: 'Chatter' },
   { id: 'journey', label: 'Journey' },
   { id: 'runs', label: 'Runs' },
   { id: 'people', label: 'People' },
+  { id: 'chatter', label: 'Chatter' },
 ];
 
 /** Primary hash written when a hub tab is selected. */
@@ -35,10 +35,10 @@ export const ATHLETE_COMMUNITY_TAB_PRIMARY_SECTION: Record<
   AthleteCommunityHubTab,
   AthleteCommunitySection
 > = {
-  chatter: 'chatter',
-  journey: 'plan',
+  journey: 'updates',
   runs: 'goruns',
   people: 'followers',
+  chatter: 'chatter',
 };
 
 export function athleteCommunitySectionToHubTab(
@@ -49,13 +49,13 @@ export function athleteCommunitySectionToHubTab(
       return 'runs';
     case 'followers':
       return 'people';
+    case 'chatter':
+      return 'chatter';
     case 'plan':
     case 'updates':
     case 'tips':
-      return 'journey';
-    case 'chatter':
     default:
-      return 'chatter';
+      return 'journey';
   }
 }
 
