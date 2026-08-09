@@ -98,24 +98,24 @@ export default function GoFastWithMeDashboardHome({
 
   return (
     <div className="lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start">
-      <div className="space-y-5 lg:col-span-7">
+      <div className="space-y-3 sm:space-y-5 lg:col-span-7">
         <div className="space-y-2">
-          <div>
+          <div className="hidden md:block">
             <h2 className="text-lg font-bold text-gray-900">{STUDIO_CENTRAL_LABEL}</h2>
             <p className="text-sm text-gray-600 mt-0.5">
-              Your community at a glance — setup status, followers, and invite link.
+              Setup status, followers, and invite link.
             </p>
           </div>
 
           <div
-            className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2"
+            className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2"
             role="group"
             aria-label="Setup status"
           >
             <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 shrink-0">
               Setup
             </span>
-            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            <div className="flex flex-wrap items-center gap-2.5 sm:gap-4">
               <StoplightChip
                 label="Page"
                 light={pageStoplight(pageStatus)}
@@ -123,13 +123,13 @@ export default function GoFastWithMeDashboardHome({
                 onClick={() => onOpenWorkspace('page')}
               />
               <StoplightChip
-                label="Messages"
+                label="Feed"
                 light="green"
                 hint="Live"
                 onClick={() => onOpenWorkspace('community')}
               />
               <StoplightChip
-                label="Runs/Training"
+                label="Runs"
                 light={planStoplight(planLive)}
                 hint={planLive ? 'Public' : 'Private'}
                 onClick={() => onOpenWorkspace('workouts')}
@@ -145,31 +145,35 @@ export default function GoFastWithMeDashboardHome({
 
           {pageStatus !== 'ready' ? (
             <p className="text-xs text-amber-800 px-1">
-              Page still needs work — use <strong>Page Settings</strong> in the sidebar.
+              Page still needs work — open <strong>Page</strong> to finish landing copy.
             </p>
           ) : null}
         </div>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Followers</p>
-          <div className="mt-2 flex flex-wrap items-end gap-x-8 gap-y-3">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-orange-100 p-2 text-orange-700">
-                <Users className="h-5 w-5" aria-hidden />
-              </div>
-              <p className="text-4xl font-bold text-gray-900 tabular-nums leading-none">{memberCount}</p>
+        <section className="rounded-xl border border-gray-200 bg-white px-4 py-3 sm:p-5">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-orange-100 p-2 text-orange-700">
+              <Users className="h-5 w-5" aria-hidden />
             </div>
-            <div className="text-sm text-gray-600 pb-0.5">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                Followers
+              </p>
+              <p className="text-2xl sm:text-4xl font-bold text-gray-900 tabular-nums leading-none mt-0.5">
+                {memberCount}
+              </p>
+            </div>
+            <p className="ml-auto text-sm text-gray-600">
               {memberCount === 0
-                ? 'No followers yet.'
+                ? 'None yet'
                 : memberCount === 1
                   ? '1 follower'
                   : `${memberCount} followers`}
-            </div>
+            </p>
           </div>
         </section>
 
-        <section className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-5 space-y-3">
+        <section className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white px-4 py-3 sm:p-5 space-y-3">
           <div>
             <h3 className="text-sm font-bold text-gray-900">Invite link</h3>
             <p className="text-xs text-gray-600 mt-0.5">
@@ -180,7 +184,7 @@ export default function GoFastWithMeDashboardHome({
             <button
               type="button"
               onClick={() => void copyInvite()}
-              className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+              className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
             >
               <Copy className="h-4 w-4 shrink-0" aria-hidden />
               {inviteCopied ? 'Link copied' : 'Copy invite link'}
@@ -189,7 +193,7 @@ export default function GoFastWithMeDashboardHome({
               href={metrics.liveUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-white px-4 py-2.5 text-sm font-semibold text-orange-800 hover:bg-orange-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-white px-3 py-2.5 text-sm font-semibold text-orange-800 hover:bg-orange-50"
             >
               View public page
               <ExternalLink className="h-3.5 w-3.5" />
@@ -215,11 +219,11 @@ export default function GoFastWithMeDashboardHome({
         </section>
       </div>
 
-      <aside className="mt-5 space-y-3 rounded-xl border border-gray-200 bg-white p-5 lg:col-span-5 lg:mt-0 lg:sticky lg:top-6">
+      <aside className="mt-3 sm:mt-5 space-y-3 rounded-xl border border-gray-200 bg-white px-4 py-3 sm:p-5 lg:col-span-5 lg:mt-0 lg:sticky lg:top-6">
         <div>
-          <h3 className="text-sm font-bold text-gray-900">Arrange and see what your community sees</h3>
+          <h3 className="text-sm font-bold text-gray-900">Engage your community</h3>
           <p className="text-xs text-gray-600 mt-0.5">
-            Choose what shows up, then check how it looks to followers.
+            Post updates, share runs, and preview what followers see.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -227,45 +231,45 @@ export default function GoFastWithMeDashboardHome({
             href={followerPreviewPath}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-semibold text-orange-800 hover:bg-orange-100"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-800 hover:bg-orange-100"
           >
-            See what followers see
+            Follower preview
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
           <a
             href={publicCommunityPath}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-100"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100"
           >
-            Open public community
+            Open community
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
         </div>
-        <div className="grid gap-2">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
           <ArrangeShortcutCard
-            title="Announcement / update"
-            description="Write the next update followers will see."
-            action="Open Messages"
+            title="Weekly message"
+            description="Write the next update."
+            action="Messages"
             onClick={() => onOpenWorkspace('community')}
           />
           <ArrangeShortcutCard
-            title="Topics"
-            description="Publish tips and thinking by topic."
-            action="Open Tips"
-            onClick={() => onOpenWorkspace('content')}
-          />
-          <ArrangeShortcutCard
-            title="Next blog"
-            description="Longer posts live in Tips & Thinking."
-            action="Open Tips"
-            onClick={() => onOpenWorkspace('content')}
-          />
-          <ArrangeShortcutCard
             title="Next run"
-            description="Pick the run or workout followers see on your community."
-            action="Open Runs"
+            description="Share a joinable run."
+            action="Runs"
             onClick={() => onOpenWorkspace('workouts')}
+          />
+          <ArrangeShortcutCard
+            title="Tips"
+            description="Publish durable advice."
+            action="Tips"
+            onClick={() => onOpenWorkspace('content')}
+          />
+          <ArrangeShortcutCard
+            title="Page"
+            description="Landing copy & photo."
+            action="Page"
+            onClick={() => onOpenWorkspace('page')}
           />
         </div>
       </aside>
@@ -288,11 +292,11 @@ function ArrangeShortcutCard({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-left transition hover:border-orange-200 hover:bg-orange-50"
+      className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-left transition hover:border-orange-200 hover:bg-orange-50"
     >
       <p className="text-sm font-semibold text-gray-900">{title}</p>
-      <p className="mt-1 text-xs leading-relaxed text-gray-600">{description}</p>
-      <p className="mt-2 text-xs font-semibold text-orange-700">{action} →</p>
+      <p className="mt-0.5 text-xs leading-snug text-gray-600">{description}</p>
+      <p className="mt-1.5 text-xs font-semibold text-orange-700">{action} →</p>
     </button>
   );
 }

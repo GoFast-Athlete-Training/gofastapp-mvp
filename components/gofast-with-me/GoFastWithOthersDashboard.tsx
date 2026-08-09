@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Pencil } from "lucide-react";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import type { ShareHubStatus } from "@/lib/profile/share-creator-card-logic";
@@ -250,7 +249,7 @@ export default function GoFastWithOthersDashboard() {
       onViewChange={setActiveView}
       pageNeedsAction={!isWelcomeComplete}
     >
-      <div className="px-4 sm:px-6 py-6 max-w-6xl mx-auto">{content}</div>
+      <div className="px-3 sm:px-6 py-3 sm:py-6 max-w-6xl mx-auto">{content}</div>
     </GoFastWithMeStudioAppShell>
   );
 
@@ -317,31 +316,9 @@ export default function GoFastWithOthersDashboard() {
   const renderStudioContent = () => {
     if (activeView === "dashboard") {
       return (
-        <div className="space-y-6">
+        <div className="space-y-3 sm:space-y-6">
           {showStudioExplainer ? (
             <GoFastWithMeStudioExplainer onDismiss={handleDismissStudioIntro} />
-          ) : null}
-
-          {creatorLabel ? (
-            <div className="rounded-xl border border-gray-200 bg-white p-4 flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Creator type
-                </p>
-                <p className="text-sm font-semibold text-gray-900 mt-0.5">{creatorLabel}</p>
-                {ownerGwm?.creatorType === "coach" && ownerGwm.coachSpecialty?.trim() ? (
-                  <p className="text-sm text-gray-600 mt-1">{ownerGwm.coachSpecialty.trim()}</p>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowOnboarding(true)}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-orange-600 hover:text-orange-700"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                Edit creator type
-              </button>
-            </div>
           ) : null}
 
           <GoFastWithMeDashboardHome
@@ -353,7 +330,6 @@ export default function GoFastWithOthersDashboard() {
               setSlugUsesHandle(usesHandle);
             }}
           />
-
         </div>
       );
     }
@@ -367,6 +343,9 @@ export default function GoFastWithOthersDashboard() {
             profilePhotoURL={profilePhotoURL}
             athleteId={athleteId}
             liveUrl={liveUrl}
+            creatorLabel={creatorLabel}
+            coachSpecialty={ownerGwm?.coachSpecialty ?? null}
+            onEditCreatorType={() => setShowOnboarding(true)}
             onSaved={(values) => {
               setOwnerGwm((prev) => (prev ? { ...prev, ...values } : prev));
             }}
@@ -402,7 +381,7 @@ export default function GoFastWithOthersDashboard() {
   };
 
   return studioShell(
-    <div className="space-y-6 pb-8">
+    <div className="space-y-3 sm:space-y-6 pb-6 sm:pb-8">
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}

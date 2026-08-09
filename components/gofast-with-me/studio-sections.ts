@@ -19,6 +19,15 @@ export const STUDIO_NAV_LABELS: Record<StudioView, string> = {
   content: 'Tips & Thinking',
 };
 
+/** Short labels for the mobile studio tab strip — full names stay on desktop. */
+export const STUDIO_MOBILE_NAV_LABELS: Record<StudioView, string> = {
+  dashboard: 'Home',
+  community: 'Feed',
+  workouts: 'Runs',
+  content: 'Tips',
+  page: 'Page',
+};
+
 export const STUDIO_BIN_LABELS: Record<StudioSection, string> = {
   page: 'Page Settings',
   community: 'Messages',

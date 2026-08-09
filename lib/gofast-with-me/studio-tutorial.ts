@@ -18,7 +18,7 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
   slug: GOFAST_WITH_ME_STUDIO_TUTORIAL_SLUG,
   name: 'GoFast With Me Studio',
   summary:
-    'My Community is the studio: Community Management hydrates the whole hub, Messages is the daily feed, Runs & Training shares plans and GoRuns, Tips & Thinking holds durable advice, and Page Settings controls the public front door.',
+    'Manage and engage your community: Home shows setup, followers, and invite; Messages is the daily feed; Runs & Training shares plans and GoRuns; Tips holds durable advice; Page Settings is the public front door and creator type.',
   steps: [
     {
       id: 'page',
