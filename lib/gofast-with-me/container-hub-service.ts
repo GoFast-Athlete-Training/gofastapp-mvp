@@ -1,3 +1,4 @@
+import { PublicTrainingPlanVisibility } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getAthleteById } from '@/lib/domain-athlete';
 import { loadPublicAthletePage, normalizeHandle } from '@/lib/server/load-public-athlete-page';
@@ -74,6 +75,8 @@ export type ContainerHubPayload = {
     name: string;
     totalWeeks: number;
     weeks: PublicPlanWeek[];
+    /** False when owner-only preview of an unpublished active plan. */
+    isPublic: boolean;
   } | null;
   trainingFor: GoFastWithMeTrainingFor;
   messages: ContainerHubMessage[];
@@ -85,20 +88,23 @@ export type AthleteCommunityPayload = ContainerHubPayload & {
   handle: string;
 };
 
-async function loadPublishedPlanWeeks(hostAthleteId: string) {
-  const rows = await listPublicPlansForAthlete(hostAthleteId);
-  const first = rows.find((p) => p.publicSlug?.trim());
-  if (!first?.publicSlug) return null;
+type HubPlanStrip = NonNullable<ContainerHubPayload['publishedPlan']>;
 
-  const plan = await getPublicPlanBySlug(first.publicSlug);
-  if (
-    !plan ||
-    plan.publicVisibility === 'DRAFT' ||
-    plan.publicVisibility === 'ARCHIVED' ||
-    !plan.planSchedule
-  ) {
-    return null;
-  }
+async function buildPlanStripFromTrainingPlan(plan: {
+  id: string;
+  name: string;
+  publicSlug: string | null;
+  publicVisibility: PublicTrainingPlanVisibility;
+  startDate: Date;
+  totalWeeks: number;
+  planSchedule: unknown;
+  race_registry: {
+    name: string;
+    raceDate: Date;
+    distanceMeters: number | null;
+  } | null;
+}): Promise<HubPlanStrip | null> {
+  if (!plan.planSchedule) return null;
 
   const raceDate = plan.race_registry?.raceDate ?? null;
   const effectiveWeeks = effectiveTrainingWeekCount(
@@ -112,13 +118,60 @@ async function loadPublishedPlanWeeks(hostAthleteId: string) {
     totalWeeks: plan.totalWeeks,
     race_registry: plan.race_registry,
   });
+  if (weeks.length === 0) return null;
 
   return {
-    slug: first.publicSlug,
+    slug: plan.publicSlug?.trim() || plan.id,
     name: plan.name,
     totalWeeks: effectiveWeeks,
     weeks,
+    isPublic: plan.publicVisibility === PublicTrainingPlanVisibility.PUBLIC,
   };
+}
+
+/** Public published plan for followers; owner also sees active plan weeks when not published yet. */
+async function loadHubPlanStrip(
+  hostAthleteId: string,
+  isOwner: boolean
+): Promise<HubPlanStrip | null> {
+  const publicRows = await listPublicPlansForAthlete(hostAthleteId);
+  const firstPublic = publicRows.find((p) => p.publicSlug?.trim());
+  if (firstPublic?.publicSlug) {
+    const plan = await getPublicPlanBySlug(firstPublic.publicSlug);
+    if (
+      plan &&
+      plan.publicVisibility !== PublicTrainingPlanVisibility.ARCHIVED &&
+      plan.planSchedule
+    ) {
+      const strip = await buildPlanStripFromTrainingPlan(plan);
+      if (strip) return strip;
+    }
+  }
+
+  if (!isOwner) return null;
+
+  const active = await prisma.training_plans.findFirst({
+    where: {
+      athleteId: hostAthleteId,
+      planSchedule: { not: null },
+    },
+    orderBy: { updatedAt: 'desc' },
+    select: {
+      id: true,
+      name: true,
+      publicSlug: true,
+      publicVisibility: true,
+      startDate: true,
+      totalWeeks: true,
+      planSchedule: true,
+      race_registry: {
+        select: { name: true, raceDate: true, distanceMeters: true },
+      },
+    },
+  });
+
+  if (!active?.planSchedule) return null;
+  return buildPlanStripFromTrainingPlan(active);
 }
 
 async function resolveFollowRelationship(
@@ -178,7 +231,7 @@ export async function loadAthleteCommunityForHost(
       },
     }),
     prisma.gofast_container_memberships.count({ where: { containerAthleteId: host.id } }),
-    loadPublishedPlanWeeks(host.id),
+    loadHubPlanStrip(host.id, relationship.isOwner),
     prisma.gofast_container_messages.findMany({
       where: {
         containerAthleteId: host.id,
