@@ -8,6 +8,7 @@ import {
   raceSelectorDescription,
   raceSelectorTagline,
 } from "@/lib/race-selector-card";
+import { AdjustPlanPrompt } from "@/components/training/PlanSecondaryRacesReview";
 
 type CatalogRace = {
   id: string;
@@ -40,6 +41,12 @@ export default function DiscoverRacesSection({
   const [catalog, setCatalog] = useState<CatalogRace[]>([]);
   const [loading, setLoading] = useState(true);
   const [submittingRaceId, setSubmittingRaceId] = useState<string | null>(null);
+  const [adjustPrompt, setAdjustPrompt] = useState<{
+    planId: string;
+    weekNumber: number | null;
+    raceName: string;
+    impactSummary: string[];
+  } | null>(null);
 
   const loadCatalog = useCallback(async () => {
     setLoading(true);
@@ -64,12 +71,28 @@ export default function DiscoverRacesSection({
     return catalog.filter((r) => !signedRaceIds.has(r.id)).slice(0, 3);
   }, [catalog, signedRaceIds]);
 
-  async function onAddToCalendar(raceRegistryId: string) {
+  async function onAddToCalendar(raceRegistryId: string, raceName: string) {
     setSubmittingRaceId(raceRegistryId);
+    setAdjustPrompt(null);
     try {
-      await api.post("/race-signups", { raceRegistryId });
+      const { data } = await api.post<{
+        planImpact?: {
+          affectsPlan: boolean;
+          planId: string | null;
+          weekNumber: number | null;
+        };
+        impactPreview?: { nearbyChanges?: string[] } | null;
+      }>("/race-signups", { raceRegistryId });
       onRaceAdded?.();
       void loadCatalog();
+      if (data.planImpact?.affectsPlan && data.planImpact.planId) {
+        setAdjustPrompt({
+          planId: data.planImpact.planId,
+          weekNumber: data.planImpact.weekNumber,
+          raceName,
+          impactSummary: data.impactPreview?.nearbyChanges ?? [],
+        });
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -91,6 +114,17 @@ export default function DiscoverRacesSection({
 
   return (
     <section className="pt-6 border-t border-gray-100">
+      {adjustPrompt ? (
+        <div className="mb-4">
+          <AdjustPlanPrompt
+            planId={adjustPrompt.planId}
+            weekNumber={adjustPrompt.weekNumber}
+            raceName={adjustPrompt.raceName}
+            impactSummary={adjustPrompt.impactSummary}
+            onDismiss={() => setAdjustPrompt(null)}
+          />
+        </div>
+      ) : null}
       <div className="flex items-center justify-between gap-2 mb-3">
         <div>
           <h2 className="text-sm font-semibold text-gray-700">Discover races</h2>
@@ -142,7 +176,7 @@ export default function DiscoverRacesSection({
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => void onAddToCalendar(race.id)}
+                onClick={() => void onAddToCalendar(race.id, race.name)}
                 className="mt-3 inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white text-xs font-semibold px-2.5 py-1.5 w-full"
               >
                 {busy ? "Adding…" : "Add →"}

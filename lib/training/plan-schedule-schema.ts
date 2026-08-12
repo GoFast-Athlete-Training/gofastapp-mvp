@@ -16,6 +16,13 @@ export type PlanDaySchedule = {
   planCycleIndex: number | null;
   /** Stamped after first materialization (structured schedules only, JSON on training_plans) */
   workoutId?: string | null;
+  /** When set, this day is a race workout for this registry row (primary or secondary). */
+  raceRegistryId?: string | null;
+  planRaceEventRole?: "PRIMARY" | "SECONDARY" | null;
+  /** Display name for secondary race days when expanding schedule to UI. */
+  raceName?: string | null;
+  /** Post-secondary-race recovery constraint — easy volume capped in distribute-easy. */
+  recoveryAfterRace?: boolean;
 };
 
 export type PlanWeekSchedule = {

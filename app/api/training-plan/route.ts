@@ -13,6 +13,10 @@ import {
   presetMatchesDistance,
   snapDistanceLabelFromMeters,
 } from "@/lib/training/preset-distance-match";
+import {
+  listSecondaryCandidatesForPlan,
+  syncPlanRaceEventsFromCalendar,
+} from "@/lib/training/plan-race-events";
 
 /**
  * POST /api/training-plan
@@ -261,9 +265,23 @@ export async function POST(request: NextRequest) {
         ? fiveKPaceResolved
         : athlete.fiveKPace ?? null;
 
+    const [calendarRaceEvents, secondaryCandidates] = await Promise.all([
+      syncPlanRaceEventsFromCalendar({
+        trainingPlanId: plan.id,
+        athleteId: athlete.id,
+      }).catch(() => []),
+      listSecondaryCandidatesForPlan({
+        athleteId: athlete.id,
+        planStart: startDate,
+        primaryRaceDate: raceDate,
+      }),
+    ]);
+
     return NextResponse.json({
       plan,
       athleteFiveKPace: athleteFiveKPaceAfter,
+      planRaceEvents: calendarRaceEvents,
+      secondaryCandidates,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Failed to create plan";

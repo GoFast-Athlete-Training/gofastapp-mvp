@@ -32,6 +32,8 @@ type Signup = {
   id: string;
   raceRegistryId: string;
   race_registry: RaceRegistryRow;
+  calendarRole?: "PRIMARY" | "OTHER";
+  positionRelativeToPrimary?: "BEFORE" | "ON" | "AFTER" | "UNKNOWN";
 };
 
 type GoalRow = {
@@ -236,7 +238,7 @@ export default function MyRacesPage() {
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [suRes, gRes, upRes] = await Promise.all([
+      const [suRes, gRes, upRes, calRes] = await Promise.all([
         api.get<{ signups: Signup[] }>("/race-signups"),
         api.get<{ goals: GoalRow[] }>("/goals?status=ACTIVE").catch(() => ({ data: { goals: [] } })),
         api
@@ -244,8 +246,36 @@ export default function MyRacesPage() {
           .catch(() => ({
             data: { activePlanSummary: undefined as ActivePlanSummary | null | undefined },
           })),
+        api
+          .get<{
+            calendar?: {
+              signups: Signup[];
+              primaryGoalRaceRegistryId: string | null;
+            };
+          }>("/race-calendar")
+          .catch(() => ({ data: { calendar: undefined } })),
       ]);
-      setSignups(suRes.data.signups ?? []);
+      const calendarSignups = calRes.data?.calendar?.signups;
+      const baseSignups = suRes.data.signups ?? [];
+      if (calendarSignups?.length) {
+        const roleByRegistry = new Map(
+          calendarSignups.map((s) => [s.raceRegistryId, s] as const)
+        );
+        setSignups(
+          baseSignups.map((s) => {
+            const hydrated = roleByRegistry.get(s.raceRegistryId);
+            return hydrated
+              ? {
+                  ...s,
+                  calendarRole: hydrated.calendarRole,
+                  positionRelativeToPrimary: hydrated.positionRelativeToPrimary,
+                }
+              : s;
+          })
+        );
+      } else {
+        setSignups(baseSignups);
+      }
       setGoals(gRes.data.goals ?? []);
       const s = upRes.data?.activePlanSummary;
       setActivePlanSummary(
@@ -527,9 +557,14 @@ export default function MyRacesPage() {
 
           {otherSignups.length > 0 ? (
             <section>
-              <h2 className="text-sm font-semibold text-gray-700 mb-3">
-                {heroSignup ? "Other races" : "Your races"}
+              <h2 className="text-sm font-semibold text-gray-700 mb-1">
+                {heroSignup ? "Races along the way" : "Your races"}
               </h2>
+              <p className="text-xs text-gray-500 mb-3">
+                {heroSignup
+                  ? "Other upcoming races on your calendar before your goal race."
+                  : "Upcoming races on your calendar."}
+              </p>
               <ul className="grid gap-3 sm:grid-cols-2">
                 {otherSignups.map((s) => (
                   <SignupRaceCard

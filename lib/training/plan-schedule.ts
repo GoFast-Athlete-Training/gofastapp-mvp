@@ -290,6 +290,8 @@ function expandStructuredDays(params: {
     planCycleIndex: number | null;
     catalogueWorkoutId?: string | null;
     workoutId?: string | null;
+    planRaceEventRole?: "PRIMARY" | "SECONDARY" | null;
+    raceNameOnDay?: string | null;
   }) {
     const date = dateForDayInWeek(
       planStartDate,
@@ -302,11 +304,21 @@ function expandStructuredDays(params: {
     let workoutType: WorkoutType = opts.wt;
     let distMeters = estMeters;
 
-    if (
+    const onPrimaryRaceDate =
+      raceUtc != null && utcDateOnly(date).getTime() === raceUtc.getTime();
+    const isSecondaryRaceDay =
+      workoutType === "Race" && opts.planRaceEventRole === "SECONDARY";
+
+    if (isSecondaryRaceDay) {
+      workoutType = "Race";
+      distMeters = estMeters;
+      title = formatPlannedWorkoutTitle("LongRun", distMeters, {
+        isRace: true,
+        raceName: opts.raceNameOnDay?.trim() || "Race",
+      });
+    } else if (
       workoutType === "Race" ||
-      (raceUtc != null &&
-        utcDateOnly(date).getTime() === raceUtc.getTime() &&
-        workoutType === "LongRun")
+      (onPrimaryRaceDate && workoutType === "LongRun")
     ) {
       workoutType = "Race";
       distMeters =
@@ -363,6 +375,8 @@ function expandStructuredDays(params: {
       planCycleIndex: d.planCycleIndex,
       catalogueWorkoutId: d.catalogueWorkoutId,
       workoutId: d.workoutId ?? null,
+      planRaceEventRole: d.planRaceEventRole ?? null,
+      raceNameOnDay: d.raceName ?? null,
     });
   }
 
@@ -383,6 +397,8 @@ function expandStructuredDays(params: {
           planCycleIndex: d.planCycleIndex,
           catalogueWorkoutId: d.catalogueWorkoutId,
           workoutId: d.workoutId ?? null,
+          planRaceEventRole: d.planRaceEventRole ?? null,
+          raceNameOnDay: d.raceName ?? null,
         });
       }
     }

@@ -30,6 +30,8 @@ export type DistributeEasyInput = {
   typicalWeekPreferredCount: number;
   /** Weeks at or after this number skip fill-toward-target (taper/race). */
   taperStartWeekNumber?: number | null;
+  /** Secondary race distances keyed by raceRegistryId for multi-race plans. */
+  secondaryRaceDistanceMilesByRegistryId?: Map<string, number>;
 };
 
 type EasySlot = { miles: number };
@@ -93,7 +95,16 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
       weekNum < Number(taperStartWeekNumber);
 
     for (const d of week.days.filter((x) => x.workoutType === "Race")) {
-      d.miles = round2(Math.max(input.raceDistanceMiles, 0));
+      let raceMi = input.raceDistanceMiles;
+      if (d.raceRegistryId) {
+        const secondary = input.secondaryRaceDistanceMilesByRegistryId?.get(d.raceRegistryId);
+        if (secondary != null && Number.isFinite(secondary)) {
+          raceMi = secondary;
+        } else if (d.planRaceEventRole === "SECONDARY" && secondary != null) {
+          raceMi = secondary;
+        }
+      }
+      d.miles = round2(Math.max(raceMi, 0));
     }
 
     if (week.days.length > 0 && week.days.every((d) => d.workoutType === "Race")) {
@@ -116,6 +127,9 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
         cfg
       );
       ep.miles = milesPerEasy > 0 ? milesPerEasy : 0;
+      if (ep.recoveryAfterRace) {
+        ep.miles = capEasyMiles(Math.max(cfg.minMiles, ep.miles * 0.65), cfg);
+      }
     }
 
     const weekSum = (): number => week.days.reduce((s, d) => s + d.miles, 0);

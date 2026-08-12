@@ -80,6 +80,11 @@ export async function planGeneratePostHandler(
       Math.min(100, weeklyMileageTarget)
     );
 
+    const rawIncluded = body.includedSecondarySignupIds;
+    const includedSecondarySignupIds = Array.isArray(rawIncluded)
+      ? rawIncluded.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+      : undefined;
+
     const presetLink = await ensureTrainingPlanPresetLinked({
       planId: trainingPlanId,
       athleteId: athlete.id,
@@ -112,6 +117,7 @@ export async function planGeneratePostHandler(
       },
       weeklyMileageTarget,
       minWeeklyMiles,
+      includedSecondarySignupIds,
     });
 
     const cleanup = await cleanupFuturePlanWorkoutsAfterRegenerate({

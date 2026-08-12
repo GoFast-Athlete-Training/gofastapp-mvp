@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, use } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -32,6 +32,9 @@ import {
   workoutCardPrimaryName,
   workoutCardSubtypeLine,
 } from "@/lib/training/plan-day-card-display";
+import PlanSecondaryRacesReview, {
+  type SecondaryRaceCandidate,
+} from "@/components/training/PlanSecondaryRacesReview";
 
 type PlanWeekRow =
   | { weekNumber: number; phase: string; schedule: string }
@@ -138,6 +141,8 @@ export default function TrainingSetupPlanPage({
 }) {
   const { planId } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const adjustRaceFromSignup = searchParams.get("adjustRace") === "1";
   const [plan, setPlan] = useState<PlanDetail | null>(null);
   const [weekDays, setWeekDays] = useState<PlanDayCard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -161,6 +166,10 @@ export default function TrainingSetupPlanPage({
   const [athleteWeeklyTargetPreference, setAthleteWeeklyTargetPreference] = useState<
     number | null
   >(null);
+  const [secondaryCandidates, setSecondaryCandidates] = useState<SecondaryRaceCandidate[]>([]);
+  const [includedSecondarySignupIds, setIncludedSecondarySignupIds] = useState<Set<string>>(
+    new Set()
+  );
   async function getToken() {
     const u = auth.currentUser;
     if (!u) throw new Error("Sign in required");
@@ -191,6 +200,38 @@ export default function TrainingSetupPlanPage({
       }
     }
   }, [planId]);
+
+  const loadPlanRaceEvents = useCallback(async () => {
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/training-plan/${planId}/race-events`, {
+        headers: athleteBearerFetchHeaders(token),
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        candidates?: SecondaryRaceCandidate[];
+      };
+      const candidates = (data.candidates ?? []).map((c) => ({
+        signupId: c.signupId,
+        raceRegistryId: c.raceRegistryId,
+        race: {
+          name: c.race.name,
+          raceDate: c.race.raceDate,
+          distanceLabel: c.race.distanceLabel ?? null,
+        },
+      }));
+      setSecondaryCandidates(candidates);
+      setIncludedSecondarySignupIds(new Set(candidates.map((c) => c.signupId)));
+    } catch {
+      setSecondaryCandidates([]);
+      setIncludedSecondarySignupIds(new Set());
+    }
+  }, [planId]);
+
+  useEffect(() => {
+    if (!authReady) return;
+    void loadPlanRaceEvents();
+  }, [authReady, loadPlanRaceEvents]);
 
   useEffect(() => {
     if (!plan) return;
@@ -569,6 +610,7 @@ export default function TrainingSetupPlanPage({
         trainingPlanId: planId,
         weeklyMileageTarget: targetMiles,
         minWeeklyMiles: presetMinWeeklyMiles,
+        includedSecondarySignupIds: [...includedSecondarySignupIds],
       }),
     });
     const genData = await genRes.json();
@@ -689,6 +731,26 @@ export default function TrainingSetupPlanPage({
             {effectiveTotalWeeks} weeks · Start{" "}
             {formatPlanDateDisplay(plan.startDate)}
           </p>
+
+          {adjustRaceFromSignup && hasSchedule ? (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <p className="font-medium">Adjust your plan for the new race</p>
+              <p className="mt-1 text-amber-900/90">
+                Review secondary races below, then regenerate to rebuild your schedule with the
+                race overlay applied.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setRegenerationSuccess(false);
+                  setShowPreferencesEditor(true);
+                }}
+                className="mt-3 inline-flex rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
+              >
+                Edit preferences & regenerate
+              </button>
+            </div>
+          ) : null}
 
           {regenerationSuccess && showSchedulePreview && (
             <div
@@ -889,6 +951,22 @@ export default function TrainingSetupPlanPage({
                 </ul>
               </div>
             )}
+
+            {(showPreferencesEditor || !hasSchedule) && secondaryCandidates.length > 0 ? (
+              <PlanSecondaryRacesReview
+                candidates={secondaryCandidates}
+                includedSignupIds={includedSecondarySignupIds}
+                goalRaceName={plan.race_registry?.name ?? null}
+                onToggle={(signupId, included) => {
+                  setIncludedSecondarySignupIds((prev) => {
+                    const next = new Set(prev);
+                    if (included) next.add(signupId);
+                    else next.delete(signupId);
+                    return next;
+                  });
+                }}
+              />
+            ) : null}
 
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-800">

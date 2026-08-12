@@ -33,6 +33,11 @@ import {
   rotationMissingCatalogueWorkout,
 } from "@/lib/training/run-type-config-validation";
 import { parseCoachPlanOverview } from "@/lib/training/preset-strategy";
+import { applyRaceEventOverlay } from "@/lib/training/apply-race-event-overlay";
+import {
+  loadIncludedPlanRaceEventsForGeneration,
+  syncPlanRaceEventsFromCalendar,
+} from "@/lib/training/plan-race-events";
 
 export async function executePlanGenerate(params: {
   athleteId: string;
@@ -51,6 +56,8 @@ export async function executePlanGenerate(params: {
   };
   weeklyMileageTarget: number;
   minWeeklyMiles: number;
+  /** When set, only these secondary signup IDs are included in the plan overlay. */
+  includedSecondarySignupIds?: string[] | null;
 }): Promise<{ planId: string; weekCount: number }> {
   const { athleteId, plan } = params;
 
@@ -212,6 +219,32 @@ export async function executePlanGenerate(params: {
 
   const schedule = placement.schedule;
 
+  await syncPlanRaceEventsFromCalendar({
+    trainingPlanId: plan.id,
+    athleteId,
+    includedSecondarySignupIds: params.includedSecondarySignupIds,
+  });
+  const { secondary: secondaryEvents } = await loadIncludedPlanRaceEventsForGeneration(plan.id);
+
+  applyRaceEventOverlay({
+    planStart: plan.startDate,
+    totalWeeks: weekCount,
+    schedule,
+    primaryRaceId: race.id,
+    primaryRaceDate: race.raceDate,
+    secondaryEvents,
+  });
+
+  const secondaryRaceDistanceMilesByRegistryId = new Map<string, number>();
+  for (const ev of secondaryEvents) {
+    if (ev.distanceMeters != null && Number.isFinite(ev.distanceMeters)) {
+      secondaryRaceDistanceMilesByRegistryId.set(
+        ev.raceRegistryId,
+        metersToMiles(ev.distanceMeters)
+      );
+    }
+  }
+
   const vb = Number(vol.baseMiles);
   const vp = Number(vol.peakMiles);
   const vt = Number(vol.taperMiles);
@@ -292,6 +325,7 @@ export async function executePlanGenerate(params: {
     catalogueRowsById,
     typicalWeekPreferredCount: preferredDays.length,
     taperStartWeekNumber: placement.taperStartWeekNumber,
+    secondaryRaceDistanceMilesByRegistryId,
   });
 
   const syncedFiveKPace =

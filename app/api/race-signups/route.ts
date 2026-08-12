@@ -5,6 +5,11 @@ import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { prisma } from "@/lib/prisma";
 import { syncAthleteProfileSnapshot } from "@/lib/athlete-profile-snapshot";
 import { upsertRaceMembershipFromSignup } from "@/lib/race-container-membership";
+import {
+  findActivePlanForAthlete,
+  signupAffectsActivePlan,
+} from "@/lib/training/plan-race-events";
+import { previewRaceImpactOnPlan } from "@/lib/training/plan-race-impact";
 
 async function athleteFromRequest(request: NextRequest) {
   const auth = await requireAthleteFromBearer(request);
@@ -109,7 +114,36 @@ export async function POST(request: NextRequest) {
     await upsertRaceMembershipFromSignup(athlete!.id, raceRegistryId);
     await syncAthleteProfileSnapshot(athlete!.id);
 
-    return NextResponse.json({ signup });
+    const planImpact = await signupAffectsActivePlan({
+      athleteId: athlete!.id,
+      raceRegistryId,
+      raceDate: race.raceDate,
+    });
+
+    let impactPreview = null;
+    if (planImpact.affectsPlan && planImpact.planId) {
+      const activePlan = await findActivePlanForAthlete(athlete!.id);
+      if (activePlan?.planSchedule) {
+        impactPreview = previewRaceImpactOnPlan({
+          planId: planImpact.planId,
+          planStart: activePlan.startDate,
+          totalWeeks: activePlan.totalWeeks,
+          planSchedule: activePlan.planSchedule,
+          event: {
+            raceRegistryId: race.id,
+            raceName: race.name,
+            raceDate: race.raceDate,
+            distanceMeters: race.distanceMeters,
+          },
+        });
+      }
+    }
+
+    return NextResponse.json({
+      signup,
+      planImpact,
+      impactPreview,
+    });
   } catch (err: unknown) {
     console.error("POST /api/race-signups:", err);
     return NextResponse.json(
