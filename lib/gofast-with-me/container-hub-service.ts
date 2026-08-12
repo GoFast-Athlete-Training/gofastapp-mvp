@@ -1,4 +1,4 @@
-import { PublicTrainingPlanVisibility } from '@prisma/client';
+import { Prisma, PublicTrainingPlanVisibility } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getAthleteById } from '@/lib/domain-athlete';
 import { loadPublicAthletePage, normalizeHandle } from '@/lib/server/load-public-athlete-page';
@@ -94,7 +94,7 @@ async function buildPlanStripFromTrainingPlan(plan: {
   id: string;
   name: string;
   publicSlug: string | null;
-  publicVisibility: PublicTrainingPlanVisibility;
+  publicVisibility: PublicTrainingPlanVisibility | null;
   startDate: Date;
   totalWeeks: number;
   planSchedule: unknown;
@@ -153,7 +153,7 @@ async function loadHubPlanStrip(
   const active = await prisma.training_plans.findFirst({
     where: {
       athleteId: hostAthleteId,
-      planSchedule: { not: null },
+      planSchedule: { not: Prisma.JsonNull },
     },
     orderBy: { updatedAt: 'desc' },
     select: {
