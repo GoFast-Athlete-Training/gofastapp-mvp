@@ -1,29 +1,17 @@
 /**
- * Hydrate athlete race calendar with primary goal designation and relative ordering.
+ * Hydrate athlete race calendar from athlete_races snapshots (working set).
  */
 
 import { prisma } from "@/lib/prisma";
 import { utcDateOnly } from "@/lib/training/plan-utils";
 
-const raceSelect = {
-  id: true,
-  slug: true,
-  name: true,
-  distanceLabel: true,
-  distanceMeters: true,
-  raceDate: true,
-  city: true,
-  state: true,
-  logoUrl: true,
-} as const;
-
 export type HydratedRaceCalendarSignup = {
+  athleteRaceId: string;
+  /** @deprecated alias for athleteRaceId */
   signupId: string;
   raceRegistryId: string;
   goalId: string | null;
-  /** PRIMARY when this signup matches the active goal race; otherwise OTHER */
   calendarRole: "PRIMARY" | "OTHER";
-  /** Position vs primary goal race date */
   positionRelativeToPrimary: "BEFORE" | "ON" | "AFTER" | "UNKNOWN";
   race: {
     id: string;
@@ -39,12 +27,12 @@ export type HydratedRaceCalendarSignup = {
 };
 
 export type HydratedRaceCalendar = {
+  primaryPlanAthleteRaceId: string | null;
   primaryGoalRaceRegistryId: string | null;
   primaryGoalId: string | null;
   primaryGoalName: string | null;
   primaryGoalTime: string | null;
   signups: HydratedRaceCalendarSignup[];
-  /** Upcoming signups before primary goal race (candidate secondary plan events) */
   secondaryCandidates: HydratedRaceCalendarSignup[];
 };
 
@@ -61,50 +49,68 @@ function positionRelativeToPrimary(
 }
 
 export async function loadHydratedRaceCalendar(
-  athleteId: string
+  athleteId: string,
+  opts?: { primaryAthleteRaceId?: string | null }
 ): Promise<HydratedRaceCalendar> {
-  const [activeGoal, signups] = await Promise.all([
-    prisma.athleteGoal.findFirst({
-      where: { athleteId, status: "ACTIVE" },
-      orderBy: { targetByDate: "asc" },
-      select: {
-        id: true,
-        name: true,
-        goalTime: true,
-        raceRegistryId: true,
-        race_registry: { select: raceSelect },
-      },
+  const [activePlan, athleteRaces] = await Promise.all([
+    prisma.training_plans.findFirst({
+      where: { athleteId, lifecycleStatus: "ACTIVE" },
+      orderBy: { updatedAt: "desc" },
+      select: { primaryAthleteRaceId: true },
     }),
-    prisma.athlete_race_signups.findMany({
+    prisma.athlete_races.findMany({
       where: { athleteId },
-      include: { race_registry: { select: raceSelect } },
-      orderBy: { race_registry: { raceDate: "asc" } },
+      include: {
+        race_registry: {
+          select: {
+            id: true,
+            slug: true,
+            logoUrl: true,
+          },
+        },
+        athlete_goals: {
+          where: { status: "ACTIVE" },
+          select: { id: true, goalTime: true, name: true },
+          take: 1,
+        },
+      },
+      orderBy: { raceDate: "asc" },
     }),
   ]);
 
-  const primaryRaceId = activeGoal?.raceRegistryId ?? null;
-  const primaryDate = activeGoal?.race_registry?.raceDate ?? activeGoal?.targetByDate ?? null;
+  const primaryAthleteRaceId =
+    opts?.primaryAthleteRaceId ?? activePlan?.primaryAthleteRaceId ?? null;
+  const primaryRow = primaryAthleteRaceId
+    ? athleteRaces.find((r) => r.id === primaryAthleteRaceId)
+    : null;
+  const primaryDate = primaryRow?.raceDate ?? null;
+  const primaryRegistryId = primaryRow?.raceRegistryId ?? null;
 
-  const hydrated: HydratedRaceCalendarSignup[] = signups.map((s) => {
-    const rr = s.race_registry;
+  const hydrated: HydratedRaceCalendarSignup[] = athleteRaces.map((ar) => {
+    const goal = ar.athlete_goals[0] ?? null;
     const calendarRole: HydratedRaceCalendarSignup["calendarRole"] =
-      primaryRaceId && s.raceRegistryId === primaryRaceId ? "PRIMARY" : "OTHER";
+      primaryAthleteRaceId && ar.id === primaryAthleteRaceId
+        ? "PRIMARY"
+        : primaryRegistryId && ar.raceRegistryId === primaryRegistryId
+          ? "PRIMARY"
+          : "OTHER";
     return {
-      signupId: s.id,
-      raceRegistryId: s.raceRegistryId,
-      goalId: s.goalId,
+      athleteRaceId: ar.id,
+      signupId: ar.id,
+      raceRegistryId: ar.raceRegistryId,
+      goalId: goal?.id ?? null,
       calendarRole,
-      positionRelativeToPrimary: positionRelativeToPrimary(rr.raceDate, primaryDate),
+      positionRelativeToPrimary: positionRelativeToPrimary(ar.raceDate, primaryDate),
       race: {
-        id: rr.id,
-        slug: rr.slug,
-        name: rr.name,
-        distanceLabel: rr.distanceLabel,
-        distanceMeters: rr.distanceMeters,
-        raceDate: rr.raceDate.toISOString(),
-        city: rr.city,
-        state: rr.state,
-        logoUrl: rr.logoUrl,
+        id: ar.raceRegistryId,
+        slug: ar.race_registry.slug,
+        name: ar.name,
+        distanceLabel: ar.distanceLabel,
+        distanceMeters: ar.distanceMeters,
+        raceDate: ar.raceDate.toISOString(),
+        city: ar.city,
+        state: ar.state,
+        logoUrl: ar.race_registry.logoUrl,
       },
     };
   });
@@ -117,17 +123,19 @@ export async function loadHydratedRaceCalendar(
       utcDateOnly(new Date(h.race.raceDate)).getTime() >= todayMs
   );
 
+  const primaryGoal = primaryRow?.athlete_goals[0] ?? null;
+
   return {
-    primaryGoalRaceRegistryId: primaryRaceId,
-    primaryGoalId: activeGoal?.id ?? null,
-    primaryGoalName: activeGoal?.name ?? activeGoal?.race_registry?.name ?? null,
-    primaryGoalTime: activeGoal?.goalTime ?? null,
+    primaryPlanAthleteRaceId: primaryAthleteRaceId,
+    primaryGoalRaceRegistryId: primaryRegistryId,
+    primaryGoalId: primaryGoal?.id ?? null,
+    primaryGoalName: primaryGoal?.name ?? primaryRow?.name ?? null,
+    primaryGoalTime: primaryGoal?.goalTime ?? null,
     signups: hydrated,
     secondaryCandidates,
   };
 }
 
-/** Signups that fall strictly between plan start and primary race (inclusive of race day). */
 export function filterSignupsInPlanWindow(
   signups: HydratedRaceCalendarSignup[],
   planStart: Date,

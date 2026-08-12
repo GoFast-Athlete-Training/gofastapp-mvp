@@ -175,7 +175,7 @@ model Athlete {
   swim_workouts           swim_workout[]
   tri_workouts            tri_workout[]
   athlete_goals           AthleteGoal[]
-  athlete_race_signups    athlete_race_signups[]
+  athlete_races           athlete_races[]
   athlete_race_results    athlete_race_results[]
   race_memberships        race_memberships[]
   training_cohort_memberships training_cohort_memberships[]
@@ -664,7 +664,7 @@ model race_registry {
   training_cohorts         training_cohorts[]
   training_cohort_memberships training_cohort_memberships[]
   athlete_goals            AthleteGoal[]
-  athlete_race_signups     athlete_race_signups[]
+  athlete_races            athlete_races[]
   athlete_race_results     athlete_race_results[]
   race_memberships         race_memberships[]
   race_messages            race_messages[]
@@ -714,6 +714,7 @@ model AthleteGoal {
   goalPace5K       Int?
   targetByDate     DateTime
   raceRegistryId   String?
+  athleteRaceId    String?
   status           String         @default("ACTIVE")
   whyGoal          String?        @db.Text
   successLooksLike String?        @db.Text
@@ -723,37 +724,46 @@ model AthleteGoal {
   updatedAt        DateTime       @updatedAt
   Athlete          Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   race_registry    race_registry? @relation(fields: [raceRegistryId], references: [id], onDelete: SetNull)
+  athlete_race     athlete_races? @relation(fields: [athleteRaceId], references: [id], onDelete: SetNull)
   training_plans   training_plans[]
-  athlete_race_signups athlete_race_signups[]
   athlete_race_results athlete_race_results[]
 
   @@index([athleteId])
   @@index([athleteId, status])
   @@index([raceRegistryId])
+  @@index([athleteRaceId])
   @@map("athlete_goals")
 }
 
-/// Self-declared "I'm doing this race" — independent of goals/plans.
-model athlete_race_signups {
-  id              String   @id @default(cuid())
-  athleteId       String
-  raceRegistryId  String
-  selfDeclaredAt  DateTime @default(now())
-  goalId          String?
-  notifyEnabled   Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+/// Athlete's claimed race snapshot — working set for training (origin: race_registry).
+model athlete_races {
+  id               String   @id @default(cuid())
+  athleteId        String
+  raceRegistryId   String
+  /// Snapshot at claim — not live registry reads for training rules.
+  name             String
+  raceDate         DateTime
+  distanceMeters   Int?
+  distanceLabel    String?
+  city             String?
+  state            String?
+  selfDeclaredAt   DateTime @default(now())
+  notifyEnabled    Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  Athlete        Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  race_registry  race_registry  @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
-  athlete_goal   AthleteGoal?   @relation(fields: [goalId], references: [id], onDelete: SetNull)
-  athlete_race_result athlete_race_results?
+  Athlete                   Athlete                     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  race_registry             race_registry               @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
+  athlete_race_result       athlete_race_results?
   training_plan_race_events training_plan_race_events[]
+  training_plans_primary    training_plans[]            @relation("PlanPrimaryAthleteRace")
+  athlete_goals             AthleteGoal[]
 
   @@unique([athleteId, raceRegistryId])
   @@index([athleteId])
   @@index([raceRegistryId])
-  @@map("athlete_race_signups")
+  @@index([raceDate])
+  @@map("athlete_races")
 }
 
 /// Persisted finish data for a race (manual or linked Garmin activity).
@@ -761,7 +771,7 @@ model athlete_race_results {
   id                     String   @id @default(cuid())
   athleteId              String
   raceRegistryId         String
-  signupId               String?  @unique
+  athleteRaceId          String?  @unique
   goalId                 String?  @unique
   /// Primary display time — chip or net when that is the official "finish" (string "H:MM:SS" or "MM:SS").
   officialFinishTime     String?
@@ -799,7 +809,7 @@ model athlete_race_results {
 
   Athlete              Athlete            @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   race_registry        race_registry      @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
-  athlete_race_signup  athlete_race_signups? @relation(fields: [signupId], references: [id], onDelete: SetNull)
+  athlete_race         athlete_races?        @relation(fields: [athleteRaceId], references: [id], onDelete: SetNull)
   athlete_goal         AthleteGoal?        @relation(fields: [goalId], references: [id], onDelete: SetNull)
   athlete_activity     athlete_activities?  @relation(fields: [garminActivityId], references: [id], onDelete: SetNull)
 
@@ -1938,6 +1948,7 @@ model training_plans {
   id                   String                 @id
   athleteId            String
   raceId               String?
+  primaryAthleteRaceId String?
   athleteGoalId        String?
   /// Optional link to the training cohort this plan was created through
   cohortId             String?
@@ -1995,6 +2006,7 @@ model training_plans {
   planned_workouts     workouts[]
   Athlete              Athlete                @relation(fields: [athleteId], references: [id])
   race_registry        race_registry?         @relation(fields: [raceId], references: [id])
+  primary_athlete_race athlete_races?         @relation("PlanPrimaryAthleteRace", fields: [primaryAthleteRaceId], references: [id], onDelete: SetNull)
   athlete_goal         AthleteGoal?           @relation(fields: [athleteGoalId], references: [id], onDelete: SetNull)
   pace_adjustment_logs pace_adjustment_log[]
   training_plan_preset training_plan_preset? @relation(fields: [presetId], references: [id])
@@ -2005,6 +2017,7 @@ model training_plans {
   plan_race_events     training_plan_race_events[]
 
   @@index([athleteGoalId])
+  @@index([primaryAthleteRaceId])
   @@index([athleteId, lifecycleStatus])
   @@index([presetId])
   @@index([cohortId])
@@ -2016,16 +2029,16 @@ model training_plan_race_events {
   id                  String                         @id @default(cuid())
   trainingPlanId      String
   raceRegistryId      String
-  athleteRaceSignupId String?
+  athleteRaceId       String?
   role                TrainingPlanRaceEventRole
   source              TrainingPlanRaceEventSource    @default(CALENDAR)
   inclusion           TrainingPlanRaceEventInclusion @default(INCLUDED)
   createdAt           DateTime                       @default(now())
   updatedAt           DateTime                       @updatedAt
 
-  training_plans       training_plans        @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
-  race_registry        race_registry         @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
-  athlete_race_signups athlete_race_signups? @relation(fields: [athleteRaceSignupId], references: [id], onDelete: SetNull)
+  training_plans training_plans @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
+  race_registry  race_registry  @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
+  athlete_race   athlete_races? @relation(fields: [athleteRaceId], references: [id], onDelete: SetNull)
 
   @@unique([trainingPlanId, raceRegistryId])
   @@index([trainingPlanId])

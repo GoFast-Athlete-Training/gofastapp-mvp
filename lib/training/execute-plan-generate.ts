@@ -33,11 +33,10 @@ import {
   rotationMissingCatalogueWorkout,
 } from "@/lib/training/run-type-config-validation";
 import { parseCoachPlanOverview } from "@/lib/training/preset-strategy";
-import { applyRaceEventOverlay } from "@/lib/training/apply-race-event-overlay";
 import {
-  loadIncludedPlanRaceEventsForGeneration,
-  syncPlanRaceEventsFromCalendar,
-} from "@/lib/training/plan-race-events";
+  imprintPlanRaceCalendarOnSchedule,
+  resolvePlanRaceCalendar,
+} from "@/lib/training/race-plan-calendar-service";
 
 export async function executePlanGenerate(params: {
   athleteId: string;
@@ -56,7 +55,9 @@ export async function executePlanGenerate(params: {
   };
   weeklyMileageTarget: number;
   minWeeklyMiles: number;
-  /** When set, only these secondary signup IDs are included in the plan overlay. */
+  /** When set, only these secondary athlete race IDs are included in the plan imprint. */
+  includedSecondaryAthleteRaceIds?: string[] | null;
+  /** @deprecated use includedSecondaryAthleteRaceIds */
   includedSecondarySignupIds?: string[] | null;
 }): Promise<{ planId: string; weekCount: number }> {
   const { athleteId, plan } = params;
@@ -65,10 +66,15 @@ export async function executePlanGenerate(params: {
     where: { id: plan.id, athleteId },
     include: {
       race_registry: true,
+      primary_athlete_race: true,
       athlete_goal: { select: { goalTime: true, goalRacePace: true, distance: true } },
     },
   });
-  if (!planRow?.race_registry) {
+  if (!planRow) {
+    throw new Error("Plan not found");
+  }
+  const race = planRow.primary_athlete_race ?? planRow.race_registry;
+  if (!race) {
     throw new Error("Plan not found or has no linked race");
   }
   if (!planRow.presetId) {
@@ -76,8 +82,6 @@ export async function executePlanGenerate(params: {
       "This plan has no training preset linked — re-create your plan or contact support."
     );
   }
-
-  const race = planRow.race_registry;
 
   const [prefs, rawPreset] = await Promise.all([
     prisma.trainingPreferences.findUnique({ where: { athleteId } }),
@@ -219,24 +223,26 @@ export async function executePlanGenerate(params: {
 
   const schedule = placement.schedule;
 
-  await syncPlanRaceEventsFromCalendar({
-    trainingPlanId: plan.id,
-    athleteId,
-    includedSecondarySignupIds: params.includedSecondarySignupIds,
-  });
-  const { secondary: secondaryEvents } = await loadIncludedPlanRaceEventsForGeneration(plan.id);
+  const includedIds =
+    params.includedSecondaryAthleteRaceIds ??
+    params.includedSecondarySignupIds ??
+    null;
 
-  applyRaceEventOverlay({
+  const calendar = await resolvePlanRaceCalendar({
+    athleteId,
+    trainingPlanId: plan.id,
+    includedSecondaryAthleteRaceIds: includedIds,
+  });
+
+  imprintPlanRaceCalendarOnSchedule({
     planStart: plan.startDate,
     totalWeeks: weekCount,
     schedule,
-    primaryRaceId: race.id,
-    primaryRaceDate: race.raceDate,
-    secondaryEvents,
+    calendar,
   });
 
   const secondaryRaceDistanceMilesByRegistryId = new Map<string, number>();
-  for (const ev of secondaryEvents) {
+  for (const ev of calendar.secondaries.filter((e) => e.inclusion === "INCLUDED")) {
     if (ev.distanceMeters != null && Number.isFinite(ev.distanceMeters)) {
       secondaryRaceDistanceMilesByRegistryId.set(
         ev.raceRegistryId,

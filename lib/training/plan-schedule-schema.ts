@@ -18,9 +18,13 @@ export type PlanDaySchedule = {
   workoutId?: string | null;
   /** When set, this day is a race workout for this registry row (primary or secondary). */
   raceRegistryId?: string | null;
+  /** Working-set identity — athlete_races.id */
+  athleteRaceId?: string | null;
   planRaceEventRole?: "PRIMARY" | "SECONDARY" | null;
   /** Display name for secondary race days when expanding schedule to UI. */
   raceName?: string | null;
+  /** Workout type replaced when a bolt-on race imprinted this day. */
+  replacedWorkoutType?: string | null;
   /** Post-secondary-race recovery constraint — easy volume capped in distribute-easy. */
   recoveryAfterRace?: boolean;
 };

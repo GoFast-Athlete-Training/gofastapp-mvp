@@ -4,6 +4,8 @@ import Link from "next/link";
 import { formatRaceListDate } from "@/lib/races-display";
 
 export type SecondaryRaceCandidate = {
+  athleteRaceId: string;
+  /** @deprecated alias */
   signupId: string;
   raceRegistryId: string;
   race: {
@@ -16,7 +18,7 @@ export type SecondaryRaceCandidate = {
 type PlanSecondaryRacesReviewProps = {
   candidates: SecondaryRaceCandidate[];
   includedSignupIds: Set<string>;
-  onToggle: (signupId: string, included: boolean) => void;
+  onToggle: (athleteRaceId: string, included: boolean) => void;
   goalRaceName?: string | null;
 };
 
@@ -38,20 +40,20 @@ export default function PlanSecondaryRacesReview({
       </p>
       <ul className="mt-4 space-y-2">
         {candidates.map((c) => {
-          const included = includedSignupIds.has(c.signupId);
+          const included = includedSignupIds.has(c.athleteRaceId);
           return (
             <li
-              key={c.signupId}
+              key={c.athleteRaceId}
               className="flex items-start gap-3 rounded-lg border border-sky-100 bg-white px-3 py-2.5"
             >
               <input
                 type="checkbox"
-                id={`secondary-race-${c.signupId}`}
+                id={`secondary-race-${c.athleteRaceId}`}
                 className="mt-1 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
                 checked={included}
-                onChange={(e) => onToggle(c.signupId, e.target.checked)}
+                onChange={(e) => onToggle(c.athleteRaceId, e.target.checked)}
               />
-              <label htmlFor={`secondary-race-${c.signupId}`} className="min-w-0 flex-1 cursor-pointer">
+              <label htmlFor={`secondary-race-${c.athleteRaceId}`} className="min-w-0 flex-1 cursor-pointer">
                 <span className="font-semibold text-gray-900">{c.race.name}</span>
                 <span className="block text-xs text-gray-600 mt-0.5">
                   {formatRaceListDate(c.race.raceDate)}

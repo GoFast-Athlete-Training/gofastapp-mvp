@@ -12,7 +12,7 @@ async function athleteFromRequest(request: NextRequest) {
   return { athlete: auth.athlete };
 }
 
-/** PATCH /api/race-signups/[id] — link goalId to this signup */
+/** PATCH /api/race-signups/[id] — attach goal to athlete race via AthleteGoal.athleteRaceId */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -37,10 +37,10 @@ export async function PATCH(
           ? body.goalId.trim()
           : null;
 
-    const existing = await prisma.athlete_race_signups.findFirst({
+    const athleteRace = await prisma.athlete_races.findFirst({
       where: { id, athleteId: athlete!.id },
     });
-    if (!existing) {
+    if (!athleteRace) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
@@ -51,17 +51,23 @@ export async function PATCH(
       if (!goal) {
         return NextResponse.json({ error: "Goal not found" }, { status: 404 });
       }
-      if (goal.raceRegistryId !== existing.raceRegistryId) {
-        return NextResponse.json(
-          { error: "Goal must be for this race" },
-          { status: 400 }
-        );
-      }
+      await prisma.athleteGoal.update({
+        where: { id: goalId },
+        data: {
+          athleteRaceId: athleteRace.id,
+          raceRegistryId: athleteRace.raceRegistryId,
+          updatedAt: new Date(),
+        },
+      });
+    } else {
+      await prisma.athleteGoal.updateMany({
+        where: { athleteId: athlete!.id, athleteRaceId: athleteRace.id },
+        data: { athleteRaceId: null, updatedAt: new Date() },
+      });
     }
 
-    const signup = await prisma.athlete_race_signups.update({
+    const signup = await prisma.athlete_races.findUnique({
       where: { id },
-      data: { goalId },
       include: {
         race_registry: {
           select: {
@@ -76,10 +82,15 @@ export async function PATCH(
             registrationUrl: true,
           },
         },
+        athlete_goals: {
+          where: goalId ? { id: goalId } : { athleteRaceId: athleteRace.id },
+          select: { id: true, goalTime: true, name: true },
+          take: 1,
+        },
       },
     });
 
-    return NextResponse.json({ signup });
+    return NextResponse.json({ signup, athleteRace: signup });
   } catch (err: unknown) {
     console.error("PATCH /api/race-signups/[id]:", err);
     return NextResponse.json(
@@ -89,7 +100,7 @@ export async function PATCH(
   }
 }
 
-/** DELETE /api/race-signups/[id] — remove "I'm in" */
+/** DELETE /api/race-signups/[id] — remove claimed athlete race */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -103,16 +114,15 @@ export async function DELETE(
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
-    const existing = await prisma.athlete_race_signups.findFirst({
+    const existing = await prisma.athlete_races.findFirst({
       where: { id, athleteId: athlete!.id },
     });
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    await prisma.athlete_race_signups.delete({ where: { id } });
+    await prisma.athlete_races.delete({ where: { id } });
 
-    // Revoke hub membership that was granted by this signup (MEMBER only; ADMIN unchanged)
     await prisma.race_memberships.deleteMany({
       where: {
         athleteId: athlete!.id,

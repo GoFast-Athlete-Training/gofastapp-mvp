@@ -121,7 +121,7 @@ export async function getAthleteEngagement(athleteId: string): Promise<AthleteEn
     prisma.run_club_event_rsvps.count({
       where: { athleteId, status: 'going' },
     }),
-    prisma.athlete_race_signups.count({ where: { athleteId } }),
+    prisma.athlete_races.count({ where: { athleteId } }),
     prisma.athlete_race_results.count({ where: { athleteId } }),
     prisma.athlete_activities.count({
       where: {

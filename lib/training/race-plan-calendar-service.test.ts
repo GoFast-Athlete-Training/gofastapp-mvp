@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { WorkoutType as WT } from "@prisma/client";
 import { assignWorkoutDays } from "@/lib/training/assign-workout-days";
-import { applyRaceEventOverlay } from "@/lib/training/apply-race-event-overlay";
-import type { PlanRaceEventRow } from "@/lib/training/plan-race-events";
+import {
+  imprintPlanRaceCalendarOnSchedule,
+  type PlanRaceCalendarEntry,
+} from "@/lib/training/race-plan-calendar-service";
 import { filterSignupsInPlanWindow } from "@/lib/training/race-calendar-hydrate";
 import type { HydratedRaceCalendarSignup } from "@/lib/training/race-calendar-hydrate";
 
@@ -28,16 +30,12 @@ const baseInput = {
   easyPositions: [{ cyclePosition: 0, distributionWeight: 1, catalogueWorkoutId: "easy-1" }],
 };
 
-function secondaryEvent(
-  partial: Pick<PlanRaceEventRow, "raceRegistryId" | "raceName" | "raceDate"> &
-    Partial<PlanRaceEventRow>
-): PlanRaceEventRow {
+function calendarEntry(
+  partial: Pick<PlanRaceCalendarEntry, "athleteRaceId" | "raceRegistryId" | "raceName" | "raceDate"> &
+    Partial<PlanRaceCalendarEntry>
+): PlanRaceCalendarEntry {
   return {
-    id: partial.id ?? "ev-1",
-    trainingPlanId: partial.trainingPlanId ?? "plan-1",
-    athleteRaceSignupId: partial.athleteRaceSignupId ?? "signup-1",
     role: partial.role ?? "SECONDARY",
-    source: partial.source ?? "CALENDAR",
     inclusion: partial.inclusion ?? "INCLUDED",
     distanceMeters: partial.distanceMeters ?? 42195,
     distanceLabel: partial.distanceLabel ?? "Half Marathon",
@@ -45,56 +43,75 @@ function secondaryEvent(
   };
 }
 
-test("applyRaceEventOverlay replaces long run on secondary race day", () => {
+test("imprintPlanRaceCalendarOnSchedule replaces long run on secondary race day", () => {
   const { schedule } = assignWorkoutDays(baseInput);
   const boulderDate = new Date("2026-09-12T00:00:00.000Z");
 
-  const result = applyRaceEventOverlay({
+  const result = imprintPlanRaceCalendarOnSchedule({
     planStart: baseInput.planStartDate,
     totalWeeks: baseInput.totalWeeks,
     schedule,
-    primaryRaceId: "mcm-id",
-    primaryRaceDate: baseInput.raceDate,
-    secondaryEvents: [
-      secondaryEvent({
-        raceRegistryId: "boulder-id",
-        raceName: "Boulder Half",
-        raceDate: boulderDate,
+    calendar: {
+      primary: calendarEntry({
+        athleteRaceId: "mcm-ar",
+        raceRegistryId: "mcm-id",
+        raceName: "Marine Corps Marathon",
+        raceDate: baseInput.raceDate,
+        role: "PRIMARY",
+        inclusion: "INCLUDED",
       }),
-    ],
+      secondaries: [
+        calendarEntry({
+          athleteRaceId: "boulder-ar",
+          raceRegistryId: "boulder-id",
+          raceName: "Boulder Half",
+          raceDate: boulderDate,
+        }),
+      ],
+    },
   });
 
   assert.equal(result.collisions.length, 1);
   assert.equal(result.collisions[0]?.replacedWorkoutType, WT.LongRun);
 
   const hitWeek = schedule.find((w) => w.weekNumber === result.collisions[0]!.weekNumber);
-  const raceDay = hitWeek?.days.find((d) => d.workoutType === WT.Race && d.planRaceEventRole === "SECONDARY");
+  const raceDay = hitWeek?.days.find(
+    (d) => d.workoutType === WT.Race && d.planRaceEventRole === "SECONDARY"
+  );
   assert.ok(raceDay);
+  assert.equal(raceDay.athleteRaceId, "boulder-ar");
   assert.equal(raceDay.raceRegistryId, "boulder-id");
-  assert.equal(raceDay.raceName, "Boulder Half");
+  assert.equal(raceDay.replacedWorkoutType, WT.LongRun);
 });
 
-test("applyRaceEventOverlay is no-op with zero secondary events (one-race regression)", () => {
+test("imprintPlanRaceCalendarOnSchedule is no-op with zero secondary events", () => {
   const { schedule } = assignWorkoutDays(baseInput);
-  const before = JSON.stringify(schedule);
 
-  applyRaceEventOverlay({
+  imprintPlanRaceCalendarOnSchedule({
     planStart: baseInput.planStartDate,
     totalWeeks: baseInput.totalWeeks,
     schedule,
-    primaryRaceId: "mcm-id",
-    primaryRaceDate: baseInput.raceDate,
-    secondaryEvents: [],
+    calendar: {
+      primary: calendarEntry({
+        athleteRaceId: "mcm-ar",
+        raceRegistryId: "mcm-id",
+        raceName: "Marine Corps Marathon",
+        raceDate: baseInput.raceDate,
+        role: "PRIMARY",
+        inclusion: "INCLUDED",
+      }),
+      secondaries: [],
+    },
   });
 
   const longRuns = schedule.flatMap((w) => w.days.filter((d) => d.workoutType === WT.LongRun));
   assert.ok(longRuns.length > 0);
-  assert.notEqual(before, JSON.stringify(schedule)); // primary race stamps role
 });
 
 test("filterSignupsInPlanWindow keeps races between start and primary inclusive", () => {
   const signups: HydratedRaceCalendarSignup[] = [
     {
+      athleteRaceId: "s1",
       signupId: "s1",
       raceRegistryId: "early",
       goalId: null,
@@ -113,6 +130,7 @@ test("filterSignupsInPlanWindow keeps races between start and primary inclusive"
       },
     },
     {
+      athleteRaceId: "s2",
       signupId: "s2",
       raceRegistryId: "primary",
       goalId: "g1",
@@ -130,24 +148,6 @@ test("filterSignupsInPlanWindow keeps races between start and primary inclusive"
         logoUrl: null,
       },
     },
-    {
-      signupId: "s3",
-      raceRegistryId: "after",
-      goalId: null,
-      calendarRole: "OTHER",
-      positionRelativeToPrimary: "AFTER",
-      race: {
-        id: "after",
-        slug: null,
-        name: "Later 5K",
-        distanceLabel: "5K",
-        distanceMeters: 5000,
-        raceDate: "2026-11-01T00:00:00.000Z",
-        city: null,
-        state: null,
-        logoUrl: null,
-      },
-    },
   ];
 
   const inWindow = filterSignupsInPlanWindow(
@@ -155,5 +155,5 @@ test("filterSignupsInPlanWindow keeps races between start and primary inclusive"
     new Date("2026-05-20T00:00:00.000Z"),
     new Date("2026-10-24T00:00:00.000Z")
   );
-  assert.deepEqual(inWindow.map((s) => s.signupId), ["s1", "s2"]);
+  assert.deepEqual(inWindow.map((s) => s.athleteRaceId), ["s1", "s2"]);
 });

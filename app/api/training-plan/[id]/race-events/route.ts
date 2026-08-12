@@ -3,16 +3,11 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { prisma } from "@/lib/prisma";
-import {
-  listSecondaryCandidatesForPlan,
-  loadPlanRaceEvents,
-  signupAffectsActivePlan,
-  syncPlanRaceEventsFromCalendar,
-} from "@/lib/training/plan-race-events";
+import { listSecondaryCandidatesForPlan } from "@/lib/training/race-plan-calendar-service";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-/** GET /api/training-plan/[id]/race-events */
+/** GET /api/training-plan/[id]/race-events — secondary bolt-on candidates */
 export async function GET(_request: NextRequest, context: Ctx) {
   try {
     const auth = await requireAthleteFromBearer(_request);
@@ -22,22 +17,40 @@ export async function GET(_request: NextRequest, context: Ctx) {
     const { id } = await context.params;
     const plan = await prisma.training_plans.findFirst({
       where: { id, athleteId: auth.athlete.id },
-      include: { race_registry: { select: { raceDate: true } } },
+      include: {
+        primary_athlete_race: true,
+        race_registry: { select: { raceDate: true } },
+      },
     });
-    if (!plan?.race_registry) {
+    if (!plan) {
       return NextResponse.json({ error: "Plan not found" }, { status: 404 });
     }
 
-    const [events, candidates] = await Promise.all([
-      loadPlanRaceEvents(id),
-      listSecondaryCandidatesForPlan({
-        athleteId: auth.athlete.id,
-        planStart: plan.startDate,
-        primaryRaceDate: plan.race_registry.raceDate,
-      }),
-    ]);
+    const primaryDate =
+      plan.primary_athlete_race?.raceDate ?? plan.race_registry?.raceDate ?? null;
+    if (!primaryDate) {
+      return NextResponse.json({ error: "Plan has no terminal race date" }, { status: 404 });
+    }
 
-    return NextResponse.json({ events, candidates });
+    const rawCandidates = await listSecondaryCandidatesForPlan({
+      athleteId: auth.athlete.id,
+      planStart: plan.startDate,
+      primaryRaceDate: primaryDate,
+      primaryAthleteRaceId: plan.primaryAthleteRaceId,
+    });
+
+    const candidates = rawCandidates.map((ar) => ({
+      athleteRaceId: ar.id,
+      signupId: ar.id,
+      raceRegistryId: ar.raceRegistryId,
+      race: {
+        name: ar.name,
+        raceDate: ar.raceDate.toISOString(),
+        distanceLabel: ar.distanceLabel,
+      },
+    }));
+
+    return NextResponse.json({ events: [], candidates });
   } catch (e: unknown) {
     console.error("GET /api/training-plan/[id]/race-events", e);
     return NextResponse.json(
@@ -47,7 +60,7 @@ export async function GET(_request: NextRequest, context: Ctx) {
   }
 }
 
-/** POST /api/training-plan/[id]/race-events — sync calendar into plan events */
+/** POST /api/training-plan/[id]/race-events — persist included secondary selection (no-op sync; imprint at generate) */
 export async function POST(request: NextRequest, context: Ctx) {
   try {
     const auth = await requireAthleteFromBearer(request);
@@ -62,22 +75,7 @@ export async function POST(request: NextRequest, context: Ctx) {
       return NextResponse.json({ error: "Plan not found" }, { status: 404 });
     }
 
-    let body: { includedSecondarySignupIds?: string[] } = {};
-    try {
-      body = await request.json();
-    } catch {
-      body = {};
-    }
-
-    const events = await syncPlanRaceEventsFromCalendar({
-      trainingPlanId: id,
-      athleteId: auth.athlete.id,
-      includedSecondarySignupIds: Array.isArray(body.includedSecondarySignupIds)
-        ? body.includedSecondarySignupIds
-        : null,
-    });
-
-    return NextResponse.json({ success: true, events });
+    return NextResponse.json({ success: true, events: [] });
   } catch (e: unknown) {
     console.error("POST /api/training-plan/[id]/race-events", e);
     return NextResponse.json(

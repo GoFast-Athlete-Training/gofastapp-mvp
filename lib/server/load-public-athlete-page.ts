@@ -92,7 +92,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
     athleteTips,
     instagramMedia,
   ] = await Promise.all([
-    prisma.athlete_race_signups.findMany({
+    prisma.athlete_races.findMany({
       where: { athleteId: athlete.id },
       include: {
         race_registry: {

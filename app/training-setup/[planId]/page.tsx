@@ -167,9 +167,13 @@ export default function TrainingSetupPlanPage({
     number | null
   >(null);
   const [secondaryCandidates, setSecondaryCandidates] = useState<SecondaryRaceCandidate[]>([]);
-  const [includedSecondarySignupIds, setIncludedSecondarySignupIds] = useState<Set<string>>(
+  const [includedSecondaryAthleteRaceIds, setIncludedSecondaryAthleteRaceIds] = useState<Set<string>>(
     new Set()
   );
+  const [claimedRaces, setClaimedRaces] = useState<
+    Array<{ id: string; name: string; raceDate: string; distanceLabel: string | null }>
+  >([]);
+  const [primaryAthleteRaceId, setPrimaryAthleteRaceId] = useState<string>("");
   async function getToken() {
     const u = auth.currentUser;
     if (!u) throw new Error("Sign in required");
@@ -212,7 +216,8 @@ export default function TrainingSetupPlanPage({
         candidates?: SecondaryRaceCandidate[];
       };
       const candidates = (data.candidates ?? []).map((c) => ({
-        signupId: c.signupId,
+        athleteRaceId: c.athleteRaceId ?? c.signupId,
+        signupId: c.signupId ?? c.athleteRaceId,
         raceRegistryId: c.raceRegistryId,
         race: {
           name: c.race.name,
@@ -221,10 +226,10 @@ export default function TrainingSetupPlanPage({
         },
       }));
       setSecondaryCandidates(candidates);
-      setIncludedSecondarySignupIds(new Set(candidates.map((c) => c.signupId)));
+      setIncludedSecondaryAthleteRaceIds(new Set(candidates.map((c) => c.athleteRaceId)));
     } catch {
       setSecondaryCandidates([]);
-      setIncludedSecondarySignupIds(new Set());
+      setIncludedSecondaryAthleteRaceIds(new Set());
     }
   }, [planId]);
 
@@ -232,6 +237,30 @@ export default function TrainingSetupPlanPage({
     if (!authReady) return;
     void loadPlanRaceEvents();
   }, [authReady, loadPlanRaceEvents]);
+
+  useEffect(() => {
+    if (!authReady) return;
+    void (async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch("/api/race-signups", {
+          headers: athleteBearerFetchHeaders(token),
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          athleteRaces?: Array<{
+            id: string;
+            name: string;
+            raceDate: string;
+            distanceLabel: string | null;
+          }>;
+        };
+        setClaimedRaces(data.athleteRaces ?? []);
+      } catch {
+        setClaimedRaces([]);
+      }
+    })();
+  }, [authReady, planId]);
 
   useEffect(() => {
     if (!plan) return;
@@ -589,6 +618,7 @@ export default function TrainingSetupPlanPage({
         preferredLongRunDow: preferredLongRunDowLocal,
         preferredTempoDow: preferredTempoDowLocal,
         preferredIntervalDow: preferredIntervalDowLocal,
+        ...(primaryAthleteRaceId ? { primaryAthleteRaceId } : {}),
       }),
     });
     const patchData = await patchRes.json();
@@ -610,7 +640,8 @@ export default function TrainingSetupPlanPage({
         trainingPlanId: planId,
         weeklyMileageTarget: targetMiles,
         minWeeklyMiles: presetMinWeeklyMiles,
-        includedSecondarySignupIds: [...includedSecondarySignupIds],
+        includedSecondaryAthleteRaceIds: [...includedSecondaryAthleteRaceIds],
+        includedSecondarySignupIds: [...includedSecondaryAthleteRaceIds],
       }),
     });
     const genData = await genRes.json();
@@ -952,16 +983,40 @@ export default function TrainingSetupPlanPage({
               </div>
             )}
 
+            {(showPreferencesEditor || !hasSchedule) && claimedRaces.length > 1 ? (
+              <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm">
+                <p className="font-medium text-gray-900">Plan terminal race</p>
+                <p className="mt-1 text-gray-600">
+                  Which claimed race is this training block built toward?
+                </p>
+                <select
+                  className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+                  value={primaryAthleteRaceId}
+                  onChange={(e) => setPrimaryAthleteRaceId(e.target.value)}
+                >
+                  <option value="">
+                    Use plan default ({plan.race_registry?.name ?? "race"})
+                  </option>
+                  {claimedRaces.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                      {r.distanceLabel ? ` · ${r.distanceLabel}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+
             {(showPreferencesEditor || !hasSchedule) && secondaryCandidates.length > 0 ? (
               <PlanSecondaryRacesReview
                 candidates={secondaryCandidates}
-                includedSignupIds={includedSecondarySignupIds}
+                includedSignupIds={includedSecondaryAthleteRaceIds}
                 goalRaceName={plan.race_registry?.name ?? null}
-                onToggle={(signupId, included) => {
-                  setIncludedSecondarySignupIds((prev) => {
+                onToggle={(athleteRaceId, included) => {
+                  setIncludedSecondaryAthleteRaceIds((prev) => {
                     const next = new Set(prev);
-                    if (included) next.add(signupId);
-                    else next.delete(signupId);
+                    if (included) next.add(athleteRaceId);
+                    else next.delete(athleteRaceId);
                     return next;
                   });
                 }}

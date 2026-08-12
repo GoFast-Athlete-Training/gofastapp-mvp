@@ -113,7 +113,9 @@ export type CreateRaceResultInput = {
 export type SaveRaceResultExtendedInput = {
   raceRegistryId: string;
   goalId?: string | null;
+  /** @deprecated alias — athlete_races.id */
   signupId?: string | null;
+  athleteRaceId?: string | null;
   officialFinishTime?: string | null;
   chipTime?: string | null;
   gunTime?: string | null;
@@ -149,7 +151,8 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
   const {
     raceRegistryId,
     goalId: inputGoalId,
-    signupId: inputSignupId,
+    signupId: inputSignupIdLegacy,
+    athleteRaceId: inputAthleteRaceId,
     officialFinishTime,
     chipTime,
     gunTime,
@@ -161,6 +164,8 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
     reflection,
     racePhotoUrls: inputRacePhotoUrls,
   } = input;
+
+  const inputSignupId = inputAthleteRaceId ?? inputSignupIdLegacy ?? null;
 
   const racePhotoUrls = normalizeRacePhotoUrls(inputRacePhotoUrls);
 
@@ -290,9 +295,9 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
   }
 
   const raceDate = goal?.race_registry?.raceDate ?? reg.raceDate ?? goal?.targetByDate;
-  const resolvedSignupId =
+  const resolvedAthleteRaceId =
     inputSignupId ||
-    (await prisma.athlete_race_signups.findUnique({
+    (await prisma.athlete_races.findUnique({
       where: { athleteId_raceRegistryId: { athleteId, raceRegistryId } },
     }))?.id;
 
@@ -361,13 +366,13 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
       athleteId,
       raceRegistryId,
       goalId: resolvedGoalId,
-      signupId: resolvedSignupId,
+      athleteRaceId: resolvedAthleteRaceId,
       ...data,
     },
     update: {
       ...data,
       goalId: resolvedGoalId,
-      signupId: resolvedSignupId ?? undefined,
+      athleteRaceId: resolvedAthleteRaceId ?? undefined,
     },
   });
 
@@ -479,7 +484,12 @@ export async function updateRaceResultById(athleteId: string, resultId: string, 
   return saveRaceResultExtended(athleteId, {
     raceRegistryId: patch.raceRegistryId ?? row.raceRegistryId,
     goalId: patch.goalId !== undefined ? patch.goalId : row.goalId,
-    signupId: patch.signupId !== undefined ? patch.signupId : row.signupId,
+    athleteRaceId:
+      patch.athleteRaceId !== undefined
+        ? patch.athleteRaceId
+        : patch.signupId !== undefined
+          ? patch.signupId
+          : row.athleteRaceId,
     officialFinishTime: patch.officialFinishTime !== undefined ? patch.officialFinishTime : row.officialFinishTime,
     chipTime: patch.chipTime !== undefined ? patch.chipTime : row.chipTime,
     gunTime: patch.gunTime !== undefined ? patch.gunTime : row.gunTime,

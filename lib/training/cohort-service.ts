@@ -398,12 +398,22 @@ export async function joinTrainingCohort(
   const planName = `${race.name} — group training`;
 
   const result = await prisma.$transaction(async (tx) => {
-    await tx.athlete_race_signups.upsert({
+    await tx.athlete_races.upsert({
       where: {
         athleteId_raceRegistryId: { athleteId, raceRegistryId: race.id },
       },
-      create: { athleteId, raceRegistryId: race.id },
-      update: {},
+      create: {
+        athleteId,
+        raceRegistryId: race.id,
+        name: race.name,
+        raceDate: race.raceDate,
+        distanceMeters: race.distanceMeters,
+        distanceLabel: race.distanceLabel,
+        city: race.city,
+        state: race.state,
+        updatedAt: new Date(),
+      },
+      update: { updatedAt: new Date() },
     });
 
     const goal = await createGoal(athleteId, {

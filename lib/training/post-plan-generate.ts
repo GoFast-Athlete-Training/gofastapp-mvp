@@ -80,8 +80,9 @@ export async function planGeneratePostHandler(
       Math.min(100, weeklyMileageTarget)
     );
 
-    const rawIncluded = body.includedSecondarySignupIds;
-    const includedSecondarySignupIds = Array.isArray(rawIncluded)
+    const rawIncluded =
+      body.includedSecondaryAthleteRaceIds ?? body.includedSecondarySignupIds;
+    const includedSecondaryAthleteRaceIds = Array.isArray(rawIncluded)
       ? rawIncluded.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
       : undefined;
 
@@ -117,7 +118,8 @@ export async function planGeneratePostHandler(
       },
       weeklyMileageTarget,
       minWeeklyMiles,
-      includedSecondarySignupIds,
+      includedSecondaryAthleteRaceIds,
+      includedSecondarySignupIds: includedSecondaryAthleteRaceIds,
     });
 
     const cleanup = await cleanupFuturePlanWorkoutsAfterRegenerate({

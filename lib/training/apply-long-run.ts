@@ -97,8 +97,8 @@ export function applyLongRunSchedule(input: ApplyLongRunInput): void {
     const lrMi = round1(macroPool * weightNorm);
 
     for (const d of week.days) {
+      if (d.workoutType === "Race") continue;
       if (d.workoutType !== "LongRun") continue;
-      if (d.planRaceEventRole === "SECONDARY") continue;
       d.miles = lrMi;
       if (catalogueWorkoutId) d.catalogueWorkoutId = catalogueWorkoutId;
       const rowCount = sortedPos(longRunPositions).length;

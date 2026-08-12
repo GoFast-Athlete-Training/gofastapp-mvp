@@ -13,10 +13,10 @@ import {
   presetMatchesDistance,
   snapDistanceLabelFromMeters,
 } from "@/lib/training/preset-distance-match";
+import { claimAthleteRace, findAthleteRaceByRegistry } from "@/lib/athlete-races-service";
 import {
   listSecondaryCandidatesForPlan,
-  syncPlanRaceEventsFromCalendar,
-} from "@/lib/training/plan-race-events";
+} from "@/lib/training/race-plan-calendar-service";
 
 /**
  * POST /api/training-plan
@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       raceRegistryId,
+      primaryAthleteRaceId: bodyPrimaryAthleteRaceId,
       athleteGoalId: bodyGoalId,
       startDate: startRaw,
       name,
@@ -53,9 +54,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!raceRegistryId || !startRaw) {
+    if (!startRaw) {
+      return NextResponse.json({ error: "startDate is required" }, { status: 400 });
+    }
+    if (
+      !bodyPrimaryAthleteRaceId &&
+      (!raceRegistryId || typeof raceRegistryId !== "string")
+    ) {
       return NextResponse.json(
-        { error: "raceRegistryId and startDate are required" },
+        { error: "primaryAthleteRaceId or raceRegistryId is required" },
         { status: 400 }
       );
     }
@@ -75,7 +82,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (!goal.raceRegistryId) {
+    if (!goal.raceRegistryId && !goal.athleteRaceId) {
       return NextResponse.json(
         { error: "Goal must have a race before creating a training plan" },
         { status: 400 }
@@ -88,18 +95,52 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (goal.raceRegistryId !== raceRegistryId) {
+    let primaryAthleteRace =
+      typeof bodyPrimaryAthleteRaceId === "string" && bodyPrimaryAthleteRaceId.trim()
+        ? await prisma.athlete_races.findFirst({
+            where: { id: bodyPrimaryAthleteRaceId.trim(), athleteId: athlete.id },
+          })
+        : goal.athleteRaceId
+          ? await prisma.athlete_races.findFirst({
+              where: { id: goal.athleteRaceId, athleteId: athlete.id },
+            })
+          : raceRegistryId
+            ? await findAthleteRaceByRegistry({
+                athleteId: athlete.id,
+                raceRegistryId,
+              })
+            : null;
+
+    if (!primaryAthleteRace && raceRegistryId) {
+      primaryAthleteRace = await claimAthleteRace({
+        athleteId: athlete.id,
+        raceRegistryId,
+      });
+    }
+
+    if (!primaryAthleteRace) {
       return NextResponse.json(
-        { error: "raceRegistryId must match the selected goal's race" },
+        { error: "Pick a terminal race for this plan (primaryAthleteRaceId or raceRegistryId)" },
         { status: 400 }
       );
     }
 
     const race = await prisma.race_registry.findUnique({
-      where: { id: raceRegistryId },
+      where: { id: primaryAthleteRace.raceRegistryId },
     });
     if (!race) {
       return NextResponse.json({ error: "Race not found" }, { status: 404 });
+    }
+
+    if (
+      raceRegistryId &&
+      raceRegistryId !== primaryAthleteRace.raceRegistryId &&
+      !bodyPrimaryAthleteRaceId
+    ) {
+      return NextResponse.json(
+        { error: "raceRegistryId must match the selected terminal athlete race" },
+        { status: 400 }
+      );
     }
 
     const startDate = new Date(startRaw);
@@ -232,6 +273,7 @@ export async function POST(request: NextRequest) {
           id: randomUUID(),
           athleteId: athlete.id,
           raceId: race.id,
+          primaryAthleteRaceId: primaryAthleteRace.id,
           athleteGoalId,
           name: planName,
           startDate,
@@ -265,23 +307,26 @@ export async function POST(request: NextRequest) {
         ? fiveKPaceResolved
         : athlete.fiveKPace ?? null;
 
-    const [calendarRaceEvents, secondaryCandidates] = await Promise.all([
-      syncPlanRaceEventsFromCalendar({
-        trainingPlanId: plan.id,
-        athleteId: athlete.id,
-      }).catch(() => []),
-      listSecondaryCandidatesForPlan({
-        athleteId: athlete.id,
-        planStart: startDate,
-        primaryRaceDate: raceDate,
-      }),
-    ]);
+    const secondaryCandidates = await listSecondaryCandidatesForPlan({
+      athleteId: athlete.id,
+      planStart: startDate,
+      primaryRaceDate: raceDate,
+      primaryAthleteRaceId: primaryAthleteRace.id,
+    });
 
     return NextResponse.json({
       plan,
       athleteFiveKPace: athleteFiveKPaceAfter,
-      planRaceEvents: calendarRaceEvents,
-      secondaryCandidates,
+      secondaryCandidates: secondaryCandidates.map((ar) => ({
+        athleteRaceId: ar.id,
+        signupId: ar.id,
+        raceRegistryId: ar.raceRegistryId,
+        race: {
+          name: ar.name,
+          raceDate: ar.raceDate.toISOString(),
+          distanceLabel: ar.distanceLabel,
+        },
+      })),
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Failed to create plan";

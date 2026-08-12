@@ -489,15 +489,25 @@ export async function adoptPublicTrainingPlan(
   const snapshot = publicPlan.customWorkoutSnapshot as PublicPlanCustomWorkoutSnapshot | null;
 
   const result = await prisma.$transaction(async (tx) => {
-    await tx.athlete_race_signups.upsert({
+    await tx.athlete_races.upsert({
       where: {
         athleteId_raceRegistryId: {
           athleteId: input.athleteId,
           raceRegistryId: race.id,
         },
       },
-      create: { athleteId: input.athleteId, raceRegistryId: race.id },
-      update: {},
+      create: {
+        athleteId: input.athleteId,
+        raceRegistryId: race.id,
+        name: race.name,
+        raceDate: race.raceDate,
+        distanceMeters: race.distanceMeters,
+        distanceLabel: race.distanceLabel,
+        city: race.city,
+        state: race.state,
+        updatedAt: new Date(),
+      },
+      update: { updatedAt: new Date() },
     });
 
     const existingActive = await tx.training_plans.findFirst({

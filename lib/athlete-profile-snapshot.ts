@@ -21,6 +21,17 @@ export async function derivePrimaryRaceForAthlete(
       where: { athleteId, status: 'ACTIVE' },
       orderBy: { targetByDate: 'asc' },
       include: {
+        athlete_race: {
+          select: {
+            id: true,
+            raceRegistryId: true,
+            name: true,
+            raceDate: true,
+            distanceLabel: true,
+            city: true,
+            state: true,
+          },
+        },
         race_registry: {
           select: {
             id: true,
@@ -38,6 +49,7 @@ export async function derivePrimaryRaceForAthlete(
       where: { athleteId, lifecycleStatus: 'ACTIVE' },
       orderBy: { updatedAt: 'desc' },
       include: {
+        primary_athlete_race: true,
         race_registry: {
           select: {
             id: true,
@@ -51,36 +63,63 @@ export async function derivePrimaryRaceForAthlete(
         },
       },
     }),
-    prisma.athlete_race_signups.findFirst({
+    prisma.athlete_races.findFirst({
       where: {
         athleteId,
-        race_registry: {
-          isActive: true,
-          isCancelled: false,
-          raceDate: { gte: new Date() },
-        },
+        raceDate: { gte: new Date() },
       },
-      orderBy: { race_registry: { raceDate: 'asc' } },
+      orderBy: { raceDate: 'asc' },
       include: {
         race_registry: {
           select: {
             id: true,
             slug: true,
-            name: true,
-            raceDate: true,
-            distanceLabel: true,
-            city: true,
-            state: true,
+            logoUrl: true,
           },
         },
       },
     }),
   ]);
 
+  const planPrimary = activePlan?.primary_athlete_race;
+  const raceFromPlan = planPrimary
+    ? {
+        id: planPrimary.raceRegistryId,
+        slug: activePlan?.race_registry?.slug ?? null,
+        name: planPrimary.name,
+        raceDate: planPrimary.raceDate,
+        distanceLabel: planPrimary.distanceLabel,
+        city: planPrimary.city,
+        state: planPrimary.state,
+      }
+    : activePlan?.race_registry ?? null;
+
+  const raceFromGoal = activeGoal?.athlete_race
+    ? {
+        id: activeGoal.athlete_race.raceRegistryId,
+        slug: activeGoal.race_registry?.slug ?? null,
+        name: activeGoal.athlete_race.name,
+        raceDate: activeGoal.athlete_race.raceDate,
+        distanceLabel: activeGoal.athlete_race.distanceLabel,
+        city: activeGoal.athlete_race.city,
+        state: activeGoal.athlete_race.state,
+      }
+    : activeGoal?.race_registry ?? null;
+
   const race =
-    activeGoal?.race_registry ??
-    activePlan?.race_registry ??
-    futureSignup?.race_registry ??
+    raceFromPlan ??
+    raceFromGoal ??
+    (futureSignup
+      ? {
+          id: futureSignup.raceRegistryId,
+          slug: futureSignup.race_registry.slug,
+          name: futureSignup.name,
+          raceDate: futureSignup.raceDate,
+          distanceLabel: futureSignup.distanceLabel,
+          city: futureSignup.city,
+          state: futureSignup.state,
+        }
+      : null) ??
     null;
 
   if (!race) return null;

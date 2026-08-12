@@ -326,6 +326,20 @@ export async function PATCH(request: NextRequest, context: Ctx) {
           }
           data.athleteGoalId = gid;
         }
+        if (body.primaryAthleteRaceId != null) {
+          const arId = String(body.primaryAthleteRaceId).trim();
+          const ar = await prisma.athlete_races.findFirst({
+            where: { id: arId, athleteId: auth.athlete.id },
+          });
+          if (!ar) {
+            return NextResponse.json({ error: "Athlete race not found" }, { status: 404 });
+          }
+          data.primaryAthleteRaceId = ar.id;
+          data.raceId = ar.raceRegistryId;
+          const startForWeeks =
+            (data.startDate as Date | undefined) ?? existing.startDate;
+          data.totalWeeks = totalWeeksFromDates(startForWeeks, ar.raceDate);
+        }
         if ("presetId" in body) {
           const raw = body.presetId;
           if (raw === null || raw === "") {

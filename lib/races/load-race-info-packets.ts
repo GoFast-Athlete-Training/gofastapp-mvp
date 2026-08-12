@@ -33,7 +33,7 @@ export async function loadRaceInfoPacketsForAthlete(
   if (!race) return null;
 
   const [signup, plan, goal] = await Promise.all([
-    prisma.athlete_race_signups.findUnique({
+    prisma.athlete_races.findUnique({
       where: {
         athleteId_raceRegistryId: {
           athleteId,
