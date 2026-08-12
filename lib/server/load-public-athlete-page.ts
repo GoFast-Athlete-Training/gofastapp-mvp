@@ -13,6 +13,51 @@ import { listPublicInstagramMedia } from '@/lib/gofast-with-me/instagram-hydrati
 
 const METERS_PER_MILE = 1609.344;
 
+const athleteRaceSnapshotSelect = {
+  name: true,
+  raceDate: true,
+  city: true,
+  state: true,
+  distanceLabel: true,
+  distanceMeters: true,
+} as const;
+
+type AthleteRaceSnapshotFields = {
+  name: string;
+  raceDate: Date;
+  city: string | null;
+  state: string | null;
+  distanceLabel: string | null;
+  distanceMeters: number | null;
+};
+
+type RegistryRaceFields = {
+  name?: string;
+  slug?: string | null;
+  raceDate?: Date;
+  city?: string | null;
+  state?: string | null;
+  distanceLabel?: string | null;
+  distanceMeters?: number | null;
+};
+
+function raceDisplayFromAthleteRace(params: {
+  snapshot?: AthleteRaceSnapshotFields | null;
+  registry?: RegistryRaceFields | null;
+}) {
+  const snap = params.snapshot;
+  const reg = params.registry;
+  return {
+    name: snap?.name ?? reg?.name ?? null,
+    raceDate: snap?.raceDate ?? reg?.raceDate ?? null,
+    city: snap?.city ?? reg?.city ?? null,
+    state: snap?.state ?? reg?.state ?? null,
+    distanceLabel: snap?.distanceLabel ?? reg?.distanceLabel ?? null,
+    distanceMeters: snap?.distanceMeters ?? reg?.distanceMeters ?? null,
+    slug: reg?.slug ?? null,
+  };
+}
+
 export type PublicAthletePayload = Awaited<ReturnType<typeof loadPublicAthletePage>>;
 
 export function normalizeHandle(raw: string): string {
@@ -110,7 +155,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
           },
         },
       },
-      orderBy: { race_registry: { raceDate: 'asc' } },
+      orderBy: { raceDate: 'asc' },
       take: 24,
     }),
     prisma.city_runs.findMany({
@@ -141,6 +186,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
         name: true,
         startDate: true,
         totalWeeks: true,
+        primary_athlete_race: { select: athleteRaceSnapshotSelect },
         race_registry: {
           select: {
             name: true,
@@ -158,6 +204,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
       where: { athleteId: athlete.id, status: 'ACTIVE' },
       orderBy: { targetByDate: 'asc' },
       include: {
+        athlete_race: { select: athleteRaceSnapshotSelect },
         race_registry: {
           select: {
             name: true,
@@ -205,16 +252,20 @@ export async function loadPublicAthletePage(rawHandle: string) {
   const signedUpRaces = raceSignupRows
     .filter((row) => row.race_registry?.isActive && !row.race_registry.isCancelled)
     .map((row) => {
-      const r = row.race_registry;
+      const display = raceDisplayFromAthleteRace({
+        snapshot: row,
+        registry: row.race_registry,
+      });
+      const raceDate = display.raceDate ?? row.raceDate;
       return {
-        id: r.id,
-        name: r.name,
-        slug: r.slug,
-        raceDate: r.raceDate.toISOString(),
-        city: r.city,
-        state: r.state,
-        distanceMeters: r.distanceMeters,
-        distanceLabel: r.distanceLabel,
+        id: row.raceRegistryId,
+        name: display.name ?? row.name,
+        slug: display.slug,
+        raceDate: raceDate.toISOString(),
+        city: display.city,
+        state: display.state,
+        distanceMeters: display.distanceMeters,
+        distanceLabel: display.distanceLabel,
       };
     });
 
@@ -273,17 +324,31 @@ export async function loadPublicAthletePage(rawHandle: string) {
     };
   });
 
+  const planRace = plan
+    ? raceDisplayFromAthleteRace({
+        snapshot: plan.primary_athlete_race,
+        registry: plan.race_registry,
+      })
+    : null;
+
   const trainingSummary = plan
     ? {
         planName: plan.name,
         startDate: plan.startDate.toISOString(),
         totalWeeks: plan.totalWeeks,
-        raceName: plan.race_registry?.name ?? null,
-        raceDate: plan.race_registry?.raceDate?.toISOString() ?? null,
-        raceCity: plan.race_registry?.city ?? null,
-        raceState: plan.race_registry?.state ?? null,
-        raceDistanceLabel: plan.race_registry?.distanceLabel ?? null,
+        raceName: planRace?.name ?? null,
+        raceDate: planRace?.raceDate?.toISOString() ?? null,
+        raceCity: planRace?.city ?? null,
+        raceState: planRace?.state ?? null,
+        raceDistanceLabel: planRace?.distanceLabel ?? null,
       }
+    : null;
+
+  const chasingRace = chasing
+    ? raceDisplayFromAthleteRace({
+        snapshot: chasing.athlete_race,
+        registry: chasing.race_registry,
+      })
     : null;
 
   const primaryChasingGoal =
@@ -294,12 +359,12 @@ export async function loadPublicAthletePage(rawHandle: string) {
           distance: chasing.distance,
           goalTime: chasing.goalTime,
           targetByDate: chasing.targetByDate.toISOString(),
-          raceName: chasing.race_registry?.name ?? null,
-          raceSlug: chasing.race_registry?.slug ?? null,
-          raceDate: chasing.race_registry?.raceDate?.toISOString() ?? null,
-          raceCity: chasing.race_registry?.city ?? null,
-          raceState: chasing.race_registry?.state ?? null,
-          raceDistanceLabel: chasing.race_registry?.distanceLabel ?? null,
+          raceName: chasingRace?.name ?? null,
+          raceSlug: chasingRace?.slug ?? null,
+          raceDate: chasingRace?.raceDate?.toISOString() ?? null,
+          raceCity: chasingRace?.city ?? null,
+          raceState: chasingRace?.state ?? null,
+          raceDistanceLabel: chasingRace?.distanceLabel ?? null,
         }
       : null;
 

@@ -111,6 +111,13 @@ export async function getPublicPlanBySlug(
           distanceMeters: true,
         },
       },
+      primary_athlete_race: {
+        select: {
+          name: true,
+          raceDate: true,
+          distanceMeters: true,
+        },
+      },
       training_plan_preset: {
         select: {
           id: true,

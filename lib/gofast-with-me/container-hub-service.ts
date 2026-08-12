@@ -90,6 +90,27 @@ export type AthleteCommunityPayload = ContainerHubPayload & {
 
 type HubPlanStrip = NonNullable<ContainerHubPayload['publishedPlan']>;
 
+type PlanWeekRace = {
+  name: string;
+  raceDate: Date;
+  distanceMeters: number | null;
+};
+
+function raceForPlanWeeks(plan: {
+  primary_athlete_race?: PlanWeekRace | null;
+  race_registry: PlanWeekRace | null;
+}): PlanWeekRace | null {
+  const snap = plan.primary_athlete_race;
+  if (snap) {
+    return {
+      name: snap.name,
+      raceDate: snap.raceDate,
+      distanceMeters: snap.distanceMeters,
+    };
+  }
+  return plan.race_registry;
+}
+
 async function buildPlanStripFromTrainingPlan(plan: {
   id: string;
   name: string;
@@ -98,15 +119,13 @@ async function buildPlanStripFromTrainingPlan(plan: {
   startDate: Date;
   totalWeeks: number;
   planSchedule: unknown;
-  race_registry: {
-    name: string;
-    raceDate: Date;
-    distanceMeters: number | null;
-  } | null;
+  race_registry: PlanWeekRace | null;
+  primary_athlete_race?: PlanWeekRace | null;
 }): Promise<HubPlanStrip | null> {
   if (!plan.planSchedule) return null;
 
-  const raceDate = plan.race_registry?.raceDate ?? null;
+  const race = raceForPlanWeeks(plan);
+  const raceDate = race?.raceDate ?? null;
   const effectiveWeeks = effectiveTrainingWeekCount(
     plan.startDate,
     plan.totalWeeks,
@@ -116,7 +135,7 @@ async function buildPlanStripFromTrainingPlan(plan: {
     planSchedule: plan.planSchedule,
     startDate: plan.startDate,
     totalWeeks: plan.totalWeeks,
-    race_registry: plan.race_registry,
+    race_registry: race,
   });
   if (weeks.length === 0) return null;
 
@@ -165,6 +184,9 @@ async function loadHubPlanStrip(
       totalWeeks: true,
       planSchedule: true,
       race_registry: {
+        select: { name: true, raceDate: true, distanceMeters: true },
+      },
+      primary_athlete_race: {
         select: { name: true, raceDate: true, distanceMeters: true },
       },
     },
