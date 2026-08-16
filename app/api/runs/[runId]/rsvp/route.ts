@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
-import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
+import { requireAthleteFromBearerForRsvp } from '@/lib/training/require-athlete';
 import { prisma } from '@/lib/prisma';
 import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
 
@@ -106,7 +106,7 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid status. Must be going or not-going' }, { status: 400 });
     }
 
-    const auth = await requireAthleteFromBearer(request);
+    const auth = await requireAthleteFromBearerForRsvp(request);
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }

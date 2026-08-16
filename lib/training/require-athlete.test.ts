@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveAthleteForVerifiedUid } from "./require-athlete";
+import {
+  resolveAthleteForVerifiedUid,
+  resolveAthleteForVerifiedUidAllowingFirebaseFallback,
+} from "./require-athlete";
 
 const athlete = {
   id: "ath-1",
@@ -18,8 +21,20 @@ test("matching x-athlete-id resolves by primary key", async () => {
   assert.deepEqual(result, { athlete });
 });
 
-test("missing x-athlete-id falls back to firebaseId", async () => {
+test("missing x-athlete-id is rejected on the shared helper", async () => {
   const result = await resolveAthleteForVerifiedUid("uid-1", null, lookups);
+  assert.deepEqual(result, {
+    error: "Missing athlete session header",
+    status: 400,
+  });
+});
+
+test("RSVP helper falls back to firebaseId when header is missing", async () => {
+  const result = await resolveAthleteForVerifiedUidAllowingFirebaseFallback(
+    "uid-1",
+    null,
+    lookups
+  );
   assert.deepEqual(result, { athlete });
 });
 
@@ -33,10 +48,5 @@ test("mismatched x-athlete-id is rejected", async () => {
 
 test("unknown header athlete is not found", async () => {
   const result = await resolveAthleteForVerifiedUid("uid-1", "missing", lookups);
-  assert.deepEqual(result, { error: "Athlete not found", status: 404 });
-});
-
-test("unknown firebase user is not found", async () => {
-  const result = await resolveAthleteForVerifiedUid("uid-missing", null, lookups);
   assert.deepEqual(result, { error: "Athlete not found", status: 404 });
 });
