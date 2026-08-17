@@ -2,9 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { listPublicPlansForAthlete } from "@/lib/training/public-plan-service";
 import type { ShareHubStatus } from "@/lib/profile/share-creator-card-logic";
 
-const RUNNER_BASE =
-  process.env.NEXT_PUBLIC_RUNNER_PHOTO_URL?.replace(/\/$/, "") ||
-  "https://runner.gofastcrushgoals.com";
+import { runnerPublicLandingUrl } from "@/lib/gofast-with-me/runner-public-url";
 
 export async function loadShareHubStatus(athleteId: string): Promise<ShareHubStatus> {
   const now = new Date();
@@ -75,7 +73,7 @@ export async function loadShareHubStatus(athleteId: string): Promise<ShareHubSta
       hasHandle: !!handle,
       gofastHandle: handle,
       isGoFastContainer: !!athlete?.isGoFastContainer,
-      publicPageUrl: handle ? `${RUNNER_BASE}/${handle}` : null,
+      publicPageUrl: handle ? runnerPublicLandingUrl(handle) : null,
       upcomingPublicRuns: upcomingHostedRuns,
       publishedPlans: publishedPlans.length,
     },

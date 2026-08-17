@@ -117,7 +117,7 @@ export default function GoFastWithMeDashboardHome({
             </span>
             <div className="flex flex-wrap items-center gap-3 sm:gap-4">
               <StoplightChip
-                label="Page"
+                label="Landing"
                 light={pageStoplight(pageStatus)}
                 hint={pageHealthLabel(pageStatus)}
                 onClick={() => onOpenWorkspace('page')}
@@ -145,7 +145,7 @@ export default function GoFastWithMeDashboardHome({
 
           {pageStatus !== 'ready' ? (
             <p className="text-xs text-amber-800 px-1">
-              Page still needs work — use <strong>Page Settings</strong> in the sidebar.
+              Landing still needs work — use <strong>Landing page</strong> in the sidebar.
             </p>
           ) : null}
         </div>
@@ -244,9 +244,9 @@ export default function GoFastWithMeDashboardHome({
         </div>
         <div className="grid gap-2">
           <ArrangeShortcutCard
-            title="Announcement / update"
-            description="Write the next update followers will see."
-            action="Open Messages"
+            title="Daily log"
+            description="How you're feeling today — spills into the member feed."
+            action="Open Daily log"
             onClick={() => onOpenWorkspace('community')}
           />
           <ArrangeShortcutCard

@@ -9,6 +9,7 @@ import { DollarSign, Hash, Sparkles, Globe, Copy, Check } from 'lucide-react';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import AthleteAppShell from '@/components/athlete/AthleteAppShell';
 import api from '@/lib/api';
+import { athletePublicLandingUrl } from '@/lib/gofast-with-me/athlete-community-routes';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -86,7 +87,7 @@ export default function SettingsPage() {
   const copyPublicProfileUrl = async () => {
     const h = athlete?.gofastHandle;
     if (!h || typeof window === 'undefined') return;
-    const url = `${window.location.origin}/u/${encodeURIComponent(h)}`;
+    const url = athletePublicLandingUrl(h);
     try {
       await navigator.clipboard.writeText(url);
       setCopiedProfileUrl(true);
@@ -250,14 +251,14 @@ export default function SettingsPage() {
                   )}
                   {copiedProfileUrl ? 'Copied' : 'Copy link'}
                 </button>
-                <Link
-                  href={`/u/${athlete.gofastHandle}`}
+                <a
+                  href={athletePublicLandingUrl(athlete.gofastHandle)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-sky-600 hover:text-sky-800 font-medium"
                 >
                   Open public page →
-                </Link>
+                </a>
               </div>
             )}
           </div>

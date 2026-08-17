@@ -163,14 +163,14 @@ export default function GoFastWithMeHubFeed({
     }
   };
 
-  const sectionTitle = announcementsMode ? 'Updates' : chatterMode ? 'Chatter' : 'Feed';
+  const sectionTitle = announcementsMode ? 'Daily log' : chatterMode ? 'Chatter' : 'Feed';
 
   if (!canAccessFeed && !chatterMode && !announcementsMode) {
     return (
       <section className="rounded-2xl border border-gray-200 bg-white p-5">
         <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">{sectionTitle}</h2>
         <p className="mt-2 text-sm text-gray-600">
-          Follow to read journey announcements from this GoFast athlete.
+          Follow to read daily logs from this GoFast athlete.
         </p>
       </section>
     );
@@ -262,7 +262,7 @@ export default function GoFastWithMeHubFeed({
           ) : messages.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-6">
               {announcementsMode
-                ? 'No announcements yet.'
+                ? 'No daily logs yet.'
                 : filter === 'all'
                   ? 'No posts yet.'
                   : `No ${FEED_FILTERS.find((f) => f.id === filter)?.label.toLowerCase()} yet.`}
@@ -315,7 +315,7 @@ export default function GoFastWithMeHubFeed({
               placeholder={
                 isHost
                   ? announcementsMode
-                    ? 'Share a journey update — race prep, plan milestone, what\'s next…'
+                    ? 'How are you feeling today?'
                     : 'Share an update — e.g. running 10 miles Saturday morning, join me…'
                   : 'Say something to the group…'
               }
@@ -353,13 +353,13 @@ export default function GoFastWithMeHubFeed({
                 ? 'Posting…'
                 : isHost
                   ? announcementsMode
-                    ? 'Post announcement'
+                    ? 'Post daily log'
                     : `Post to ${filter === 'all' ? 'Updates' : containerTopicLabel(postTopic)}`
                   : 'Post to Chatter'}
             </button>
           </form>
         ) : announcementsMode ? (
-          <p className="text-xs text-gray-500">Only the host posts journey announcements.</p>
+          <p className="text-xs text-gray-500">Only the host posts daily logs.</p>
         ) : chatterMode && !canAccessFeed ? (
           <p className="text-xs text-gray-500">Follow to post in Chatter.</p>
         ) : (

@@ -3,31 +3,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { User } from 'lucide-react';
+import { MessageCircle, User, X } from 'lucide-react';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import type { AthleteCommunityPayload } from '@/lib/gofast-with-me/container-hub-service';
 import {
-  ATHLETE_COMMUNITY_TAB_PRIMARY_SECTION,
   athleteCommunityPreviewPath,
-  athleteCommunitySectionToHubTab,
-  athletePublicPagePath,
+  athletePublicLandingUrl,
   goFastWithConfirmPath,
   goFastWithSignupPath,
   parseAthleteCommunitySection,
-  type AthleteCommunityHubTab,
 } from '@/lib/gofast-with-me/athlete-community-routes';
 import { applyFollowerPreviewMode } from '@/lib/gofast-with-me/athlete-community-access';
+import { composeCommunityFeed } from '@/lib/gofast-with-me/community-feed';
 import TopNav from '@/components/shared/TopNav';
-import AthleteCommunityMobileTabs from '@/components/gofast-with-me/AthleteCommunityMobileTabs';
-import GoFastWithMeTrainingForCard from '@/components/gofast-with-me/GoFastWithMeTrainingForCard';
-import GoFastWithMePlanStripSection from '@/components/gofast-with-me/GoFastWithMePlanStripSection';
-import ContainerHubRunsSection from '@/components/gofast-with-me/ContainerHubRunsSection';
+import AthleteCommunityFeed from '@/components/gofast-with-me/AthleteCommunityFeed';
+import AthleteCommunityHubStubs from '@/components/gofast-with-me/AthleteCommunityHubStubs';
+import AthleteCommunityProfilePanel from '@/components/gofast-with-me/AthleteCommunityProfilePanel';
 import GoFastWithMeHubFeed from '@/components/gofast-with-me/GoFastWithMeHubFeed';
-import GoFastWithMeFollowersSection from '@/components/gofast-with-me/GoFastWithMeFollowersSection';
-import AthleteTipsSection from '@/components/gofast-with-me/AthleteTipsSection';
-import AthleteCommunityUpdatesSection from '@/components/gofast-with-me/AthleteCommunityUpdatesSection';
-import HubWeeklyRunStrip from '@/components/gofast-with-me/HubWeeklyRunStrip';
 
 type Props = {
   handle: string;
@@ -41,12 +34,14 @@ export default function AthleteCommunityView({ handle }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [community, setCommunity] = useState<AthleteCommunityPayload | null>(null);
-  const [activeTab, setActiveTab] = useState<AthleteCommunityHubTab>(() =>
-    athleteCommunitySectionToHubTab(
-      parseAthleteCommunitySection(typeof window !== 'undefined' ? window.location.hash : '')
-    )
-  );
+  const [chatterOpen, setChatterOpen] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return parseAthleteCommunitySection(window.location.hash) === 'chatter';
+  });
+  const [profileOpen, setProfileOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const publicLandingUrl = athletePublicLandingUrl(handle);
 
   const loadCommunity = useCallback(async () => {
     setError(null);
@@ -69,22 +64,25 @@ export default function AthleteCommunityView({ handle }: Props) {
     void loadCommunity();
   }, [loadCommunity]);
 
+  const openChatter = useCallback(() => {
+    setChatterOpen(true);
+    window.history.replaceState(null, '', '#chatter');
+  }, []);
+
+  const closeChatter = useCallback(() => {
+    setChatterOpen(false);
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }, []);
+
   useEffect(() => {
     const syncHash = () => {
-      setActiveTab(
-        athleteCommunitySectionToHubTab(parseAthleteCommunitySection(window.location.hash))
-      );
+      const section = parseAthleteCommunitySection(window.location.hash);
+      setChatterOpen(section === 'chatter');
     };
     syncHash();
     window.addEventListener('hashchange', syncHash);
     return () => window.removeEventListener('hashchange', syncHash);
   }, []);
-
-  const selectTab = (tab: AthleteCommunityHubTab) => {
-    setActiveTab(tab);
-    const section = ATHLETE_COMMUNITY_TAB_PRIMARY_SECTION[tab];
-    window.history.replaceState(null, '', `#${section}`);
-  };
 
   const preview = applyFollowerPreviewMode(
     {
@@ -111,6 +109,16 @@ export default function AthleteCommunityView({ handle }: Props) {
     () => community?.messages.filter((m) => m.topic === 'updates') ?? [],
     [community?.messages]
   );
+
+  const feedItems = useMemo(() => {
+    if (!community) return [];
+    return composeCommunityFeed({
+      updateMessages,
+      tips: community.tips,
+      upcomingRuns: community.upcomingRuns,
+      lastActivity: community.lastActivity,
+    });
+  }, [community, updateMessages]);
 
   const handleFollow = async () => {
     setActionLoading(true);
@@ -156,7 +164,7 @@ export default function AthleteCommunityView({ handle }: Props) {
   if (error && !community) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <TopNav showBack backUrl={athletePublicPagePath(handle)} backLabel="Public page" />
+        <TopNav showBack backUrl={publicLandingUrl} backLabel="Public page" />
         <div className="max-w-lg mx-auto py-10 px-4 space-y-4">
           <p className="text-gray-700">{error}</p>
         </div>
@@ -175,46 +183,55 @@ export default function AthleteCommunityView({ handle }: Props) {
   const hasTrainingFor =
     community.trainingFor.trainingSummary != null ||
     community.trainingFor.primaryChasingGoal != null;
-  const publicPagePath = athletePublicPagePath(handle);
   const initials = (community.host.firstName?.[0] || community.host.gofastHandle?.[0] || 'A').toUpperCase();
 
-  return (
-    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
-      <TopNav showBack backUrl={publicPagePath} backLabel="Public page" />
+  const profileTrigger = (
+    <button
+      type="button"
+      onClick={() => setProfileOpen(true)}
+      className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 text-left rounded-xl hover:bg-gray-50/80 transition -m-1 p-1"
+      aria-label={`View ${firstName}'s profile`}
+    >
+      {community.host.photoURL ? (
+        <img
+          src={community.host.photoURL}
+          alt=""
+          className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl object-cover border-2 border-gray-200 flex-shrink-0"
+        />
+      ) : (
+        <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white border-2 border-gray-200 flex-shrink-0">
+          <span className="text-lg sm:text-2xl font-bold">{initials}</span>
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-orange-700">
+          GoFast With {firstName}
+        </p>
+        <h1 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">
+          {displayName}
+        </h1>
+        <p className="text-xs sm:text-sm text-gray-600 mt-0.5">
+          {community.host.gofastHandle ? `@${community.host.gofastHandle} · ` : ''}
+          {community.memberCount} follower{community.memberCount === 1 ? '' : 's'}
+          <span className="text-orange-600 font-medium"> · Profile</span>
+        </p>
+      </div>
+    </button>
+  );
 
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
+  return (
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden flex flex-col">
+      <TopNav showBack backUrl={publicLandingUrl} backLabel="Public page" />
+
+      <header className="bg-white shadow-sm border-b shrink-0">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-              {community.host.photoURL ? (
-                <img
-                  src={community.host.photoURL}
-                  alt=""
-                  className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl object-cover border-2 border-gray-200 flex-shrink-0"
-                />
-              ) : (
-                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white border-2 border-gray-200 flex-shrink-0">
-                  <span className="text-lg sm:text-2xl font-bold">{initials}</span>
-                </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-orange-700">
-                  GoFast With {firstName}
-                </p>
-                <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold text-gray-900 truncate">
-                  {displayName}
-                </h1>
-                <p className="text-xs sm:text-sm text-gray-600 mt-0.5">
-                  {community.host.gofastHandle ? `@${community.host.gofastHandle} · ` : ''}
-                  {community.memberCount} follower{community.memberCount === 1 ? '' : 's'}
-                </p>
-              </div>
-            </div>
+            {profileTrigger}
 
             <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
               {previewFollower && community.isOwner ? (
                 <Link
-                  href={`${publicPagePath}/community`}
+                  href={`/u/${encodeURIComponent(handle)}/community`}
                   className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50"
                 >
                   Exit preview
@@ -272,86 +289,31 @@ export default function AthleteCommunityView({ handle }: Props) {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-10">
+      <main className="flex-1 max-w-2xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 pb-24">
         {error ? (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             {error}
           </div>
         ) : null}
 
-        <AthleteCommunityMobileTabs
-          activeTab={activeTab}
-          onTabChange={selectTab}
-          community={community}
-          firstName={firstName}
-          displayAsOwner={displayAsOwner}
-          canParticipate={canParticipate}
-          handle={handle}
-          updateMessages={updateMessages}
-          hasTrainingFor={hasTrainingFor}
-        />
-
-        <div className="hidden lg:grid grid-cols-12 gap-4 sm:gap-6">
-          <div className="lg:col-span-6 space-y-6 min-w-0">
-            <AthleteCommunityUpdatesSection
-              messages={updateMessages}
-              hostFirstName={firstName}
-              isOwner={displayAsOwner}
-            />
-
-            {hasTrainingFor ? (
-              <GoFastWithMeTrainingForCard
-                trainingSummary={community.trainingFor.trainingSummary}
-                primaryChasingGoal={community.trainingFor.primaryChasingGoal}
-              />
-            ) : null}
-
-            <section className="space-y-3">
-              <div className="px-1">
-                <h2 className="text-lg font-bold text-gray-900">My next run</h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  {displayAsOwner
-                    ? 'Hosted runs followers can join.'
-                    : `Join ${firstName} on an upcoming run.`}
+        {chatterOpen ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Chatter</h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Talk with {firstName} and other followers.
                 </p>
               </div>
-              <HubWeeklyRunStrip runs={community.upcomingRuns} />
-            </section>
-
-            {community.publishedPlan ? (
-              <GoFastWithMePlanStripSection
-                publishedPlan={community.publishedPlan}
-                hostFirstName={firstName}
-                isHost={displayAsOwner}
-              />
-            ) : (
-              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                <h2 className="text-lg font-bold text-gray-900">Join me</h2>
-                <p className="text-sm text-gray-600 mt-2">
-                  {displayAsOwner
-                    ? 'Publish your plan in Runs & Training so followers can train with you here.'
-                    : `${firstName} hasn't shared a public plan yet.`}
-                </p>
-                {displayAsOwner ? (
-                  <Link
-                    href="/gofast-with-others"
-                    className="mt-3 inline-flex text-sm font-semibold text-orange-600 hover:underline"
-                  >
-                    Open Runs &amp; Training →
-                  </Link>
-                ) : null}
-              </div>
-            )}
-
-            <AthleteTipsSection
-              tips={community.tips}
-              hostFirstName={firstName}
-              isOwner={displayAsOwner}
-              instagramUsername={community.host.instagramUsername}
-            />
-          </div>
-
-          <aside className="lg:col-span-6 space-y-6 min-w-0 lg:sticky lg:top-6 lg:self-start">
+              <button
+                type="button"
+                onClick={closeChatter}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50"
+              >
+                <X className="h-4 w-4" aria-hidden />
+                Back to feed
+              </button>
+            </div>
             <GoFastWithMeHubFeed
               hostId={community.host.id}
               isHost={displayAsOwner}
@@ -360,63 +322,105 @@ export default function AthleteCommunityView({ handle }: Props) {
               publishedPlan={community.publishedPlan}
               initialMessages={community.messages.filter((m) => m.topic === 'chatter')}
               chatterMode
-              showHeading
+              showHeading={false}
             />
-
-            <ContainerHubRunsSection
-              runs={community.upcomingRuns}
-              hostFirstName={firstName}
-              isHost={displayAsOwner}
-            />
-
-            <GoFastWithMeFollowersSection
-              hub={{
-                ...community,
-                isHost: displayAsOwner,
-              }}
-              handle={handle}
-              variant="hub"
-            />
-          </aside>
-        </div>
-
-        {!displayAsOwner && !displayAsFollower && !previewFollower ? (
-          <section className="mt-6 hidden lg:block rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
-            <div className="flex items-start gap-3">
-              <div className="rounded-full bg-orange-100 p-2 text-orange-700">
-                <User className="h-4 w-4" />
-              </div>
-              <p className="text-sm text-gray-700">
-                Follow {firstName} to join Chatter and get updates when they post. Following is free —
-                it is not training-plan enrollment.
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Feed</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Daily logs, tips, training, and runs from {firstName}.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={actionLoading}
-                onClick={() => {
-                  const athleteId = LocalStorageAPI.getAthleteId();
-                  if (!athleteId) {
-                    router.push(goFastWithSignupPath(handle));
-                    return;
-                  }
-                  router.push(goFastWithConfirmPath(handle));
-                }}
-                className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
-              >
-                Follow {firstName}
-              </button>
-              <Link
-                href={publicPagePath}
-                className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100"
-              >
-                Back to public page
-              </Link>
-            </div>
-          </section>
-        ) : null}
+
+            <AthleteCommunityFeed items={feedItems} hostFirstName={firstName} />
+
+            <AthleteCommunityHubStubs
+              community={community}
+              firstName={firstName}
+              displayAsOwner={displayAsOwner}
+              hasTrainingFor={hasTrainingFor}
+            />
+
+            {!displayAsOwner && !displayAsFollower && !previewFollower ? (
+              <section className="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-orange-100 p-2 text-orange-700">
+                    <User className="h-4 w-4" />
+                  </div>
+                  <p className="text-sm text-gray-700">
+                    Follow {firstName} to join Chatter and get updates when they post. Following is
+                    free — it is not training-plan enrollment.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={actionLoading}
+                    onClick={() => {
+                      const athleteId = LocalStorageAPI.getAthleteId();
+                      if (!athleteId) {
+                        router.push(goFastWithSignupPath(handle));
+                        return;
+                      }
+                      router.push(goFastWithConfirmPath(handle));
+                    }}
+                    className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
+                  >
+                    Follow {firstName}
+                  </button>
+                  <a
+                    href={publicLandingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100"
+                  >
+                    View public page
+                  </a>
+                </div>
+              </section>
+            ) : null}
+          </div>
+        )}
       </main>
+
+      {!chatterOpen ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+          <div className="max-w-2xl mx-auto px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <button
+              type="button"
+              onClick={openChatter}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-600 transition"
+            >
+              <MessageCircle className="h-5 w-5" aria-hidden />
+              Chatter
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {profileOpen ? (
+        <div className="fixed inset-0 z-50">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40"
+            aria-label="Close profile"
+            onClick={() => setProfileOpen(false)}
+          />
+          <div className="absolute inset-x-0 bottom-0 sm:inset-y-0 sm:left-auto sm:w-full sm:max-w-md overflow-y-auto bg-white shadow-xl rounded-t-2xl sm:rounded-none">
+            <AthleteCommunityProfilePanel
+              community={community}
+              handle={handle}
+              firstName={firstName}
+              displayAsOwner={displayAsOwner}
+              hasTrainingFor={hasTrainingFor}
+              variant="sheet"
+              onClose={() => setProfileOpen(false)}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

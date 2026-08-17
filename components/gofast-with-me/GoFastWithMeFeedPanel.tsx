@@ -97,17 +97,16 @@ export default function GoFastWithMeFeedPanel({
     <section id="updates" className={embedded ? 'space-y-4' : 'space-y-6'}>
       {!embedded ? (
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Updates</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Journey announcements for your followers — race updates, plan milestones, what&apos;s next.
-            Posts appear on your public community.
-          </p>
+        <h2 className="text-lg font-bold text-gray-900">Daily log</h2>
+        <p className="text-sm text-gray-600 mt-1">
+          How you&apos;re feeling today — posts appear on your member feed.
+        </p>
         </div>
       ) : (
         <div>
-          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Updates</h3>
+          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Daily log</h3>
           <p className="text-xs text-gray-600 mt-1">
-            Journey announcements — race updates, milestones, what&apos;s next.
+            How you&apos;re feeling today — spills into the member feed.
           </p>
         </div>
       )}
@@ -120,7 +119,7 @@ export default function GoFastWithMeFeedPanel({
 
       {postSuccess ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Update posted to your public community.
+          Update posted to your member feed.
         </div>
       ) : null}
 
@@ -128,9 +127,9 @@ export default function GoFastWithMeFeedPanel({
         <div className="flex items-start gap-2">
           <Megaphone className="h-5 w-5 text-violet-700 mt-0.5 shrink-0" />
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Post an update</h3>
+            <h3 className="text-sm font-semibold text-gray-900">Post a daily log</h3>
             <p className="text-xs text-gray-600 mt-1">
-              Example: &ldquo;Week 12 of MCM prep — long run Sunday, following my plan.&rdquo;
+              Example: &ldquo;Legs are tired but grateful for easy miles today.&rdquo;
             </p>
           </div>
         </div>
@@ -141,14 +140,14 @@ export default function GoFastWithMeFeedPanel({
             rows={3}
             maxLength={2000}
             className="w-full rounded-lg border border-gray-300 p-3 text-sm bg-white"
-            placeholder="Share a journey update with your followers…"
+            placeholder="How are you feeling today?"
           />
           <button
             type="submit"
             disabled={posting || !announcement.trim()}
             className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
           >
-            {posting ? 'Posting…' : 'Post update'}
+            {posting ? 'Posting…' : 'Post daily log'}
           </button>
         </form>
       </div>
@@ -156,9 +155,9 @@ export default function GoFastWithMeFeedPanel({
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Recent updates</h3>
+            <h3 className="text-sm font-semibold text-gray-900">Recent daily logs</h3>
             <p className="text-xs text-gray-600 mt-1">
-              Latest announcements visible on your public community.
+              Latest entries visible on your member feed.
             </p>
           </div>
           {!embedded ? (
@@ -185,7 +184,7 @@ export default function GoFastWithMeFeedPanel({
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-gray-500">No updates yet.</p>
+          <p className="text-sm text-gray-500">No daily logs yet.</p>
         )}
       </div>
     </section>

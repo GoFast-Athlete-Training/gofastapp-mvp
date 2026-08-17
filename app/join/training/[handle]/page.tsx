@@ -8,6 +8,7 @@ import { auth } from "@/lib/firebase";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import api from "@/lib/api";
 import { formatCohortStartLabel } from "@/lib/training/cohort-display";
+import { athletePublicLandingUrl } from "@/lib/gofast-with-me/athlete-community-routes";
 
 const TRAINING_JOIN_INTENT_KEY = "trainingCohortJoinIntent";
 const TRAINING_JOIN_HANDLE_KEY = "trainingCohortJoinHandle";
@@ -202,12 +203,14 @@ export default function TrainingCohortFrontDoorPage() {
         </button>
 
         {cohort.host?.gofastHandle ? (
-          <Link
-            href={`/u/${encodeURIComponent(cohort.host.gofastHandle)}`}
+          <a
+            href={athletePublicLandingUrl(cohort.host.gofastHandle)}
+            target="_blank"
+            rel="noopener noreferrer"
             className="mt-4 block text-center text-sm font-semibold text-orange-700 hover:text-orange-800"
           >
             View {hostName}&apos;s page →
-          </Link>
+          </a>
         ) : null}
       </div>
     </div>

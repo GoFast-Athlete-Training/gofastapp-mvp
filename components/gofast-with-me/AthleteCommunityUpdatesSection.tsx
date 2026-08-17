@@ -15,9 +15,9 @@ export default function AthleteCommunityUpdatesSection({
   return (
     <section id="updates" className="space-y-3">
       <div className="px-1">
-        <h2 className="text-lg font-bold text-gray-900">Weekly message</h2>
+        <h2 className="text-lg font-bold text-gray-900">Daily log</h2>
         <p className="text-sm text-gray-500 mt-1">
-          From {hostFirstName} — race prep, milestones, what&apos;s next this week.
+          From {hostFirstName} — how they&apos;re feeling today.
         </p>
       </div>
       {messages.length > 0 ? (
@@ -33,7 +33,7 @@ export default function AthleteCommunityUpdatesSection({
         </ul>
       ) : (
         <p className="text-sm text-gray-500 rounded-xl border border-dashed border-gray-200 bg-white p-5 text-center">
-          No updates yet.
+          No daily logs yet.
         </p>
       )}
       {isOwner ? (
@@ -41,7 +41,7 @@ export default function AthleteCommunityUpdatesSection({
           href="/gofast-with-others"
           className="inline-flex text-xs font-semibold text-orange-600 hover:underline"
         >
-          Post updates from Messages in studio →
+          Post daily logs from Daily log in studio →
         </Link>
       ) : null}
     </section>

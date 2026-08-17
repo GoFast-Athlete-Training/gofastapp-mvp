@@ -51,10 +51,10 @@ export default function GoFastWithMeCommunityPanel({ athleteId, publicSlug }: Pr
     <section id="community" className="space-y-10 pb-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Messages</h2>
+          <h2 className="text-lg font-bold text-gray-900">Daily log</h2>
           <p className="text-sm text-gray-600 mt-1">
-            The daily side of your community — post Updates and review Chatter. Follower management
-            lives in Community Management.
+            How you&apos;re feeling today — optional photo later. Posts spill into the member feed.
+            Chatter stays in the hub.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">

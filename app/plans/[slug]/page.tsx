@@ -8,6 +8,7 @@ import {
 } from "@/lib/training/public-plan-service";
 import { effectiveTrainingWeekCount } from "@/lib/training/plan-utils";
 import PublicPlanWeekViewer from "@/components/training/PublicPlanWeekViewer";
+import { athletePublicLandingUrl } from "@/lib/gofast-with-me/athlete-community-routes";
 
 export const dynamic = "force-dynamic";
 
@@ -97,12 +98,14 @@ export default async function PublicTrainingPlanPage({
               )}
               Led by {name}
               {author.gofastHandle ? (
-                <Link
-                  href={`/u/${encodeURIComponent(author.gofastHandle)}`}
+                <a
+                  href={athletePublicLandingUrl(author.gofastHandle)}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-amber-300 hover:text-amber-200 font-medium"
                 >
                   @{author.gofastHandle}
-                </Link>
+                </a>
               ) : null}
             </span>
             <span>{effectiveWeeks} weeks</span>

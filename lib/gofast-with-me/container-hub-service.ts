@@ -82,6 +82,14 @@ export type ContainerHubPayload = {
   messages: ContainerHubMessage[];
   tips: AthleteTipPayload[];
   instagramMedia: AthleteInstagramMediaPayload[];
+  lastActivity: {
+    activityName: string | null;
+    startTime: string;
+    distanceMiles: number | null;
+    durationSeconds: number | null;
+    activityType: string | null;
+    source: string | null;
+  } | null;
 };
 
 export type AthleteCommunityPayload = ContainerHubPayload & {
@@ -300,6 +308,16 @@ export async function loadAthleteCommunityForHost(
     messages: messageRows.map(mapContainerMessageRow),
     tips,
     instagramMedia,
+    lastActivity: publicPage?.lastRun
+      ? {
+          activityName: publicPage.lastRun.activityName,
+          startTime: publicPage.lastRun.startTime!,
+          distanceMiles: publicPage.lastRun.distanceMiles,
+          durationSeconds: publicPage.lastRun.durationSeconds,
+          activityType: publicPage.lastRun.activityType,
+          source: publicPage.lastRun.source ?? null,
+        }
+      : null,
   };
 }
 

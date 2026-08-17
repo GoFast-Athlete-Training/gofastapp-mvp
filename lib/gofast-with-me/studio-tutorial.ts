@@ -18,11 +18,11 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
   slug: GOFAST_WITH_ME_STUDIO_TUTORIAL_SLUG,
   name: 'GoFast With Me Studio',
   summary:
-    'My Community is the studio: Community Management hydrates the whole hub, Messages is the daily feed, Runs & Training shares plans and GoRuns, Tips & Thinking holds durable advice, and Page Settings controls the public front door.',
+    'My Community is the studio: Community Management hydrates the whole hub, Landing page is your public front door, Messages is the daily feed, Runs & Training shares plans and GoRuns, and Tips & Thinking holds durable advice.',
   steps: [
     {
       id: 'page',
-      title: 'Page Settings — public front door',
+      title: 'Landing page — public front door',
       instruction:
         'Your public landing where strangers see who you are and What I\'m training for before they follow.',
       sortOrder: 0,

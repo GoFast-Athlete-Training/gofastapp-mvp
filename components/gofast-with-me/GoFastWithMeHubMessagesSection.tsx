@@ -20,9 +20,9 @@ export default function GoFastWithMeHubMessagesSection({
   return (
     <section id="messages" className="space-y-2">
       <div className="px-1">
-        <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Messages</h2>
+        <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Daily log</h2>
         <p className="text-xs text-gray-500 mt-1">
-          Announcements on the journey — race updates, plan milestones, what&apos;s next.
+          How you&apos;re feeling today — posts appear in the member feed.
         </p>
       </div>
       <GoFastWithMeHubFeed

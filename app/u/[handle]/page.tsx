@@ -1,14 +1,7 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { loadPublicAthletePage } from '@/lib/server/load-public-athlete-page';
-import ProfileHero from './_components/ProfileHero';
-import DoorStoryColumn from './_components/DoorStoryColumn';
-import DoorSidebar from './_components/DoorSidebar';
-import RunWithMe from './_components/RunWithMe';
-import GroupTrainingCard from './_components/GroupTrainingCard';
-import { ProfileContainerSponsorshipSlot } from './_components/ProfileContainerSponsorshipSlot';
-import AthleteTipsSection from '@/components/gofast-with-me/AthleteTipsSection';
+import { athletePublicLandingUrl } from '@/lib/gofast-with-me/athlete-community-routes';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +25,7 @@ export async function generateMetadata({
   const { handle } = await params;
   const data = await loadPublicAthletePage(handle);
   if (!data) {
-    return { title: 'Profile not found \u00b7 GoFast' };
+    return { title: 'Profile not found · GoFast' };
   }
 
   const name = displayNameFor(
@@ -47,7 +40,7 @@ export async function generateMetadata({
     null;
   const handleStr = data.athlete.gofastHandle ? ` (@${data.athlete.gofastHandle})` : '';
   const title = chasing
-    ? `${name}${handleStr} \u00b7 Chasing ${chasing} on GoFast`
+    ? `${name}${handleStr} · Chasing ${chasing} on GoFast`
     : `${name}${handleStr} on GoFast`;
 
   const about =
@@ -82,7 +75,8 @@ export async function generateMetadata({
   };
 }
 
-export default async function PublicAthletePage({
+/** Legacy in-app door — canonical public landing lives on the runner content host. */
+export default async function PublicAthleteRedirectPage({
   params,
 }: {
   params: Promise<RouteParams>;
@@ -94,87 +88,5 @@ export default async function PublicAthletePage({
     return notFound();
   }
 
-  const displayName = displayNameFor(
-    data.athlete.firstName,
-    data.athlete.lastName,
-    data.athlete.gofastHandle,
-  );
-  const hasRunPhoto = Boolean(data.gofastWithMe?.gofastWithMePhotoUrl?.trim());
-
-  const instagramUsername =
-    data.athlete.instagramUsername || data.athlete.instagram || null;
-  const showTipsSection =
-    data.athleteTips.length > 0 || Boolean(instagramUsername?.trim());
-
-  return (
-    <div className="min-h-screen bg-stone-50">
-      <ProfileHero
-        athleteId={data.athlete.id}
-        displayName={displayName}
-        handle={data.athlete.gofastHandle}
-        photoURL={data.athlete.photoURL}
-        hasRunPhoto={hasRunPhoto}
-        city={data.athlete.city}
-        state={data.athlete.state}
-        primarySport={data.athlete.primarySport}
-        publicActions={data.publicActions}
-      />
-
-      <main className="max-w-5xl mx-auto px-5 sm:px-6 pt-8 pb-16">
-        <div className="lg:grid lg:grid-cols-3 lg:gap-10 space-y-10 lg:space-y-0">
-          <div className="lg:col-span-2">
-            <DoorStoryColumn
-              gofastWithMe={data.gofastWithMe}
-              profileBio={data.athlete.bio}
-            />
-          </div>
-          <DoorSidebar
-            trainingSummary={data.trainingSummary}
-            primaryChasingGoal={data.primaryChasingGoal}
-            publishedPlans={data.publishedPlans ?? []}
-            signedUpRaces={data.signedUpRaces}
-            containerMemberCount={data.containerMemberCount}
-          />
-        </div>
-
-        <div className="mt-12 space-y-8">
-          {showTipsSection ? (
-            <AthleteTipsSection
-              tips={data.athleteTips}
-              hostFirstName={data.athlete.firstName}
-              instagramUsername={instagramUsername}
-            />
-          ) : null}
-
-          {data.joinableGroupTraining ? (
-            <GroupTrainingCard cohort={data.joinableGroupTraining} />
-          ) : null}
-
-          <RunWithMe
-            athleteId={data.athlete.id}
-            firstName={data.athlete.firstName}
-            handle={data.athlete.gofastHandle}
-            city={data.athlete.city}
-            upcomingRuns={data.upcomingRuns}
-          />
-
-          {data.isGoFastContainer ? (
-            <ProfileContainerSponsorshipSlot
-              isGoFastContainer={data.isGoFastContainer}
-              activeSponsorship={data.activeSponsorship}
-            />
-          ) : null}
-        </div>
-
-        <footer className="pt-10 text-center">
-          <Link
-            href="/welcome"
-            className="text-xs font-semibold text-stone-500 hover:text-stone-700"
-          >
-            Powered by GoFast
-          </Link>
-        </footer>
-      </main>
-    </div>
-  );
+  redirect(athletePublicLandingUrl(handle));
 }

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import MemberDetailCard from '@/components/RunCrew/MemberDetailCard';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import { athletePublicLandingUrl } from '@/lib/gofast-with-me/athlete-community-routes';
 import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
 
 type Props = {
@@ -78,12 +79,14 @@ export default function GoFastWithMeFollowersSection({
             Manage in GoFast With Me studio →
           </Link>
         ) : (
-          <Link
-            href={`/u/${encodeURIComponent(handle)}`}
+          <a
+            href={athletePublicLandingUrl(handle)}
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex text-xs font-semibold text-orange-600 hover:underline"
           >
             View public page →
-          </Link>
+          </a>
         )}
       </section>
     );
@@ -124,12 +127,14 @@ export default function GoFastWithMeFollowersSection({
           Manage in GoFast With Me studio →
         </Link>
       ) : (
-        <Link
-          href={`/u/${encodeURIComponent(handle)}`}
+        <a
+          href={athletePublicLandingUrl(handle)}
+          target="_blank"
+          rel="noopener noreferrer"
           className="inline-flex text-xs font-semibold text-orange-600 hover:underline"
         >
           View public page →
-        </Link>
+        </a>
       )}
     </section>
   );

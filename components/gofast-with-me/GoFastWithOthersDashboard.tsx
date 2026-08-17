@@ -32,10 +32,7 @@ import {
   type StudioSection,
   type StudioView,
 } from "@/components/gofast-with-me/studio-sections";
-
-const RUNNER_BASE =
-  process.env.NEXT_PUBLIC_RUNNER_PHOTO_URL?.replace(/\/$/, "") ||
-  "https://runner.gofastcrushgoals.com";
+import { runnerPublicLandingUrl } from "@/lib/gofast-with-me/runner-public-url";
 
 type OwnerGwmRow = {
   welcome: string | null;
@@ -291,7 +288,7 @@ export default function GoFastWithOthersDashboard() {
     );
   }
 
-  const liveUrl = `${RUNNER_BASE}/${publicSlug}`;
+  const liveUrl = runnerPublicLandingUrl(publicSlug);
   const invitePath = goFastWithFrontDoorPath(publicSlug);
   const visitorHeadline = firstName ? `GoFast with ${firstName}` : "Your public page";
   const creatorLabel =

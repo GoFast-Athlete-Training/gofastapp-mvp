@@ -31,7 +31,7 @@ export default function GoFastWithMeWelcomePanel({
     <section id="page" className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">My Page</h2>
+          <h2 className="text-lg font-bold text-gray-900">Landing page</h2>
           <p className="text-sm text-gray-600 mt-1">
             Your public page — welcome copy, run photo, and the story visitors see before they follow.
             What I&apos;m training for comes from your goal and plan on the live page.

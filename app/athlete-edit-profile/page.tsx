@@ -7,9 +7,7 @@ import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import AthleteAppShell from '@/components/athlete/AthleteAppShell';
-
-const RUNNER_BASE =
-  process.env.NEXT_PUBLIC_RUNNER_PHOTO_URL?.replace(/\/$/, '') || 'https://runner.gofastcrushgoals.com';
+import { athletePublicLandingUrl } from '@/lib/gofast-with-me/athlete-community-routes';
 
 const TAB_IDS = ['profile-info', 'about-you', 'goal-perf'] as const;
 type ProfileTab = (typeof TAB_IDS)[number];
@@ -314,7 +312,7 @@ function AthleteEditProfileInner() {
     );
   }
 
-  const liveGoFastUrl = formData.gofastHandle ? `${RUNNER_BASE}/${formData.gofastHandle}` : null;
+  const liveGoFastUrl = formData.gofastHandle ? athletePublicLandingUrl(formData.gofastHandle) : null;
 
   const sectionMeta: Record<ProfileTab, { title: string; subtitle: string }> = {
     'profile-info': {

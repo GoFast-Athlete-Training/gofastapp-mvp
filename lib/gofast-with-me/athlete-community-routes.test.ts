@@ -4,6 +4,7 @@ import {
   athleteCommunityPath,
   athleteCommunityPreviewPath,
   athleteCommunitySectionToHubTab,
+  athletePublicLandingUrl,
   athletePublicPagePath,
   legacyContainerRedirectTarget,
   mapLegacyContainerHash,
@@ -12,6 +13,7 @@ import {
 
 test('builds canonical community URLs', () => {
   assert.equal(athletePublicPagePath('Adam'), '/u/adam');
+  assert.equal(athletePublicLandingUrl('adam'), 'https://runner.gofastcrushgoals.com/adam');
   assert.equal(athleteCommunityPath('adam'), '/u/adam/community');
   assert.equal(athleteCommunityPath('adam', 'plan'), '/u/adam/community#plan');
   assert.equal(athleteCommunityPreviewPath('adam'), '/u/adam/community?preview=follower');
@@ -32,17 +34,18 @@ test('redirects legacy container paths', () => {
 
 test('maps deep-link sections onto RunCrew-style hub tabs', () => {
   assert.equal(athleteCommunitySectionToHubTab('chatter'), 'chatter');
-  assert.equal(athleteCommunitySectionToHubTab('plan'), 'journey');
-  assert.equal(athleteCommunitySectionToHubTab('updates'), 'journey');
-  assert.equal(athleteCommunitySectionToHubTab('tips'), 'journey');
+  assert.equal(athleteCommunitySectionToHubTab('plan'), 'feed');
+  assert.equal(athleteCommunitySectionToHubTab('updates'), 'feed');
+  assert.equal(athleteCommunitySectionToHubTab('tips'), 'feed');
   assert.equal(athleteCommunitySectionToHubTab('goruns'), 'runs');
   assert.equal(athleteCommunitySectionToHubTab('followers'), 'people');
-  assert.equal(athleteCommunitySectionToHubTab(null), 'journey');
+  assert.equal(athleteCommunitySectionToHubTab(null), 'feed');
 });
 
 test('parses section and hub-tab hashes', () => {
   assert.equal(parseAthleteCommunitySection('#plan'), 'plan');
-  assert.equal(parseAthleteCommunitySection('#journey'), 'plan');
+  assert.equal(parseAthleteCommunitySection('#feed'), 'updates');
+  assert.equal(parseAthleteCommunitySection('#journey'), 'updates');
   assert.equal(parseAthleteCommunitySection('#runs'), 'goruns');
   assert.equal(parseAthleteCommunitySection('#people'), 'followers');
 });

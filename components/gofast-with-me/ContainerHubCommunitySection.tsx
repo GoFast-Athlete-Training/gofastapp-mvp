@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
+import { athletePublicLandingUrl } from '@/lib/gofast-with-me/athlete-community-routes';
 import { athleteCommunityPath } from '@/lib/gofast-with-me/athlete-community-routes';
 
 type Props = {
@@ -62,12 +63,14 @@ export default function ContainerHubCommunitySection({
               >
                 <span className="text-sm font-medium text-gray-900">{memberDisplayName(m)}</span>
                 {m.gofastHandle ? (
-                  <Link
-                    href={`/u/${encodeURIComponent(m.gofastHandle)}`}
+                  <a
+                    href={athletePublicLandingUrl(m.gofastHandle)}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="text-xs text-orange-600 hover:underline shrink-0"
                   >
                     View profile
-                  </Link>
+                  </a>
                 ) : null}
               </li>
             ))}

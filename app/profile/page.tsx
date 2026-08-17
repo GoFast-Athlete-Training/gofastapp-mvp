@@ -10,9 +10,7 @@ import Link from 'next/link';
 import MissingPaceBanner from '@/components/profile/MissingPaceBanner';
 import PersonalCommunityCard from '@/components/profile/PersonalCommunityCard';
 
-const RUNNER_BASE =
-  process.env.NEXT_PUBLIC_RUNNER_PHOTO_URL?.replace(/\/$/, '') ||
-  'https://runner.gofastcrushgoals.com';
+import { athletePublicLandingUrl } from '@/lib/gofast-with-me/athlete-community-routes';
 
 type PublicGoalPayload = {
   trainingSummary: {
@@ -164,7 +162,7 @@ export default function ProfilePage() {
   };
 
   const age = calculateAge(birthday);
-  const liveGoFastUrl = handle ? `${RUNNER_BASE}/${handle}` : null;
+  const liveGoFastUrl = handle ? athletePublicLandingUrl(handle) : null;
 
   const pill = (label: string, done: boolean) => (
     <span

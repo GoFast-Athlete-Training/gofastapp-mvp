@@ -4,15 +4,16 @@ import {
   goFastWithFrontDoorPath,
   goFastWithSignupPath,
 } from '@/lib/gofast-with-me/gofast-with-bridge';
+import { runnerPublicLandingUrl } from '@/lib/gofast-with-me/runner-public-url';
 
 /** Canonical deep-link sections on `/u/{handle}/community`. */
 export type AthleteCommunitySection = 'plan' | 'updates' | 'tips' | 'goruns' | 'chatter' | 'followers';
 
 /**
  * Hub tabs (RunCrew / Race Hub pattern). Deep-link sections map into these.
- * Journey leads — weekly update, training-for, next run / join-me, tips — then Chatter.
+ * Feed is the default home — chronological updates, tips, and runs. Profile is header click-in.
  */
-export type AthleteCommunityHubTab = 'journey' | 'runs' | 'people' | 'chatter';
+export type AthleteCommunityHubTab = 'feed' | 'runs' | 'people' | 'chatter';
 
 export const ATHLETE_COMMUNITY_SECTIONS: { id: AthleteCommunitySection; label: string }[] = [
   { id: 'updates', label: 'Updates' },
@@ -24,7 +25,7 @@ export const ATHLETE_COMMUNITY_SECTIONS: { id: AthleteCommunitySection; label: s
 ];
 
 export const ATHLETE_COMMUNITY_HUB_TABS: { id: AthleteCommunityHubTab; label: string }[] = [
-  { id: 'journey', label: 'Journey' },
+  { id: 'feed', label: 'Feed' },
   { id: 'runs', label: 'Runs' },
   { id: 'people', label: 'People' },
   { id: 'chatter', label: 'Chatter' },
@@ -35,7 +36,7 @@ export const ATHLETE_COMMUNITY_TAB_PRIMARY_SECTION: Record<
   AthleteCommunityHubTab,
   AthleteCommunitySection
 > = {
-  journey: 'updates',
+  feed: 'updates',
   runs: 'goruns',
   people: 'followers',
   chatter: 'chatter',
@@ -55,7 +56,7 @@ export function athleteCommunitySectionToHubTab(
     case 'updates':
     case 'tips':
     default:
-      return 'journey';
+      return 'feed';
   }
 }
 
@@ -71,13 +72,24 @@ export function parseAthleteCommunitySection(hash: string): AthleteCommunitySect
   ) {
     return value;
   }
-  // Hub tab ids also accepted as hashes.
-  if (value === 'journey') return 'plan';
+  // Hub tab ids also accepted as hashes (journey is legacy alias for feed).
+  if (value === 'feed' || value === 'journey') return 'updates';
   if (value === 'runs') return 'goruns';
   if (value === 'people') return 'followers';
   return null;
 }
 
+/** In-app community path segment (member hub lives on the app host). */
+export function athleteCommunityAppPath(handle: string): string {
+  return `/u/${encodeURIComponent(normalizeGoFastWithMeSlug(handle))}/community`;
+}
+
+/** Canonical public landing on the runner content host. */
+export function athletePublicLandingUrl(handle: string): string {
+  return runnerPublicLandingUrl(handle);
+}
+
+/** @deprecated Use athletePublicLandingUrl for stranger-facing links. Kept for redirects. */
 export function athletePublicPagePath(handle: string): string {
   return `/u/${encodeURIComponent(normalizeGoFastWithMeSlug(handle))}`;
 }

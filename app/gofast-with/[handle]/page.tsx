@@ -14,6 +14,7 @@ import {
   type GoFastWithTarget,
 } from '@/lib/gofast-with-me/gofast-with-bridge';
 import { athleteCommunityPath } from '@/lib/gofast-with-me/athlete-community-routes';
+import { runnerPublicLandingUrl } from '@/lib/gofast-with-me/runner-public-url';
 import {
   GoFastWithAppAllusion,
   GoFastWithBridgeShell,
@@ -161,12 +162,14 @@ export default function GoFastWithFrontDoorPage() {
             </button>
           )}
 
-          <Link
-            href={`/u/${encodeURIComponent(slug)}`}
+          <a
+            href={runnerPublicLandingUrl(slug)}
+            target="_blank"
+            rel="noopener noreferrer"
             className="block text-center text-sm font-medium text-gray-500 hover:text-gray-700"
           >
             View public page
-          </Link>
+          </a>
         </div>
       </div>
     </GoFastWithBridgeShell>

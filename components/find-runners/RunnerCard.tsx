@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Calendar, MapPin, Target, Timer, User, Flag } from 'lucide-react';
 import type { DiscoverRunnerCard } from '@/lib/find-runners-types';
+import { athletePublicLandingUrl } from '@/lib/gofast-with-me/athlete-community-routes';
 
 function formatRunWhen(iso: string): string {
   const d = new Date(iso);
@@ -135,12 +136,14 @@ export default function RunnerCard({ runner }: Props) {
         )}
 
         <div className="pt-2">
-          <Link
-            href={`/u/${encodeURIComponent(runner.gofastHandle)}`}
+          <a
+            href={athletePublicLandingUrl(runner.gofastHandle)}
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-sm text-orange-600 hover:text-orange-700 font-medium"
           >
             View profile
-          </Link>
+          </a>
         </div>
       </div>
     </div>
