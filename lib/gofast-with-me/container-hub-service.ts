@@ -19,6 +19,10 @@ import {
   type AthleteTipPayload,
 } from '@/lib/gofast-with-me/athlete-tips';
 import {
+  listPublishedActivityPosts,
+  type ActivityPostPayload,
+} from '@/lib/gofast-with-me/activity-posts';
+import {
   listPublicInstagramMedia,
   type AthleteInstagramMediaPayload,
 } from '@/lib/gofast-with-me/instagram-hydration';
@@ -82,14 +86,7 @@ export type ContainerHubPayload = {
   messages: ContainerHubMessage[];
   tips: AthleteTipPayload[];
   instagramMedia: AthleteInstagramMediaPayload[];
-  lastActivity: {
-    activityName: string | null;
-    startTime: string;
-    distanceMiles: number | null;
-    durationSeconds: number | null;
-    activityType: string | null;
-    source: string | null;
-  } | null;
+  activityPosts: ActivityPostPayload[];
 };
 
 export type AthleteCommunityPayload = ContainerHubPayload & {
@@ -243,7 +240,8 @@ export async function loadAthleteCommunityForHost(
   const handle = host.gofastHandle?.trim();
   const publicPage = handle ? await loadPublicAthletePage(handle) : null;
 
-  const [memberRows, memberCount, publishedPlan, messageRows, tips, instagramMedia] = await Promise.all([
+  const [memberRows, memberCount, publishedPlan, messageRows, tips, instagramMedia, activityPosts] =
+    await Promise.all([
     prisma.gofast_container_memberships.findMany({
       where: { containerAthleteId: host.id },
       orderBy: { joinedAt: 'desc' },
@@ -273,6 +271,7 @@ export async function loadAthleteCommunityForHost(
     }),
     listPublishedAthleteTips(host.id, 6),
     listPublicInstagramMedia(host.id, 5),
+    listPublishedActivityPosts(host.id, 20),
   ]);
 
   return {
@@ -308,16 +307,7 @@ export async function loadAthleteCommunityForHost(
     messages: messageRows.map(mapContainerMessageRow),
     tips,
     instagramMedia,
-    lastActivity: publicPage?.lastRun
-      ? {
-          activityName: publicPage.lastRun.activityName,
-          startTime: publicPage.lastRun.startTime!,
-          distanceMiles: publicPage.lastRun.distanceMiles,
-          durationSeconds: publicPage.lastRun.durationSeconds,
-          activityType: publicPage.lastRun.activityType,
-          source: publicPage.lastRun.source ?? null,
-        }
-      : null,
+    activityPosts,
   };
 }
 

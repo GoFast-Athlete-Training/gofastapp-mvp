@@ -1,7 +1,8 @@
 import type { AthleteTipPayload } from '@/lib/gofast-with-me/athlete-tips';
+import type { ActivityPostPayload } from '@/lib/gofast-with-me/activity-posts';
 import type { ContainerHubMessage } from '@/lib/gofast-with-me/container-hub-service';
 
-export type CommunityFeedItemKind = 'dailylog' | 'tip' | 'run' | 'training';
+export type CommunityFeedItemKind = 'dailylog' | 'tip' | 'run' | 'activity';
 
 export type CommunityFeedDailyLogItem = {
   kind: 'dailylog';
@@ -31,34 +32,26 @@ export type CommunityFeedRunItem = {
   };
 };
 
-export type CommunityFeedTrainingItem = {
-  kind: 'training';
+export type CommunityFeedActivityItem = {
+  kind: 'activity';
   id: string;
   sortAt: string;
-  activity: {
-    activityName: string | null;
-    startTime: string;
-    distanceMiles: number | null;
-    durationSeconds: number | null;
-    activityType: string | null;
-    source: string | null;
-  };
+  post: ActivityPostPayload;
 };
 
 export type CommunityFeedItem =
   | CommunityFeedDailyLogItem
   | CommunityFeedTipItem
   | CommunityFeedRunItem
-  | CommunityFeedTrainingItem;
+  | CommunityFeedActivityItem;
 
 /** @deprecated use CommunityFeedDailyLogItem */
 export type CommunityFeedUpdateItem = CommunityFeedDailyLogItem;
 
-export type CommunityLastActivity = CommunityFeedTrainingItem['activity'];
-
 export type ComposeCommunityFeedInput = {
   updateMessages: ContainerHubMessage[];
   tips: AthleteTipPayload[];
+  activityPosts: ActivityPostPayload[];
   upcomingRuns: {
     id: string;
     title: string;
@@ -66,7 +59,6 @@ export type ComposeCommunityFeedInput = {
     meetUpPoint: string;
     gorunPath: string;
   }[];
-  lastActivity?: CommunityLastActivity | null;
   /** Cap items returned (newest first after sort). */
   limit?: number;
 };
@@ -79,9 +71,19 @@ function formatDuration(seconds: number | null): string | null {
   return `${m}m`;
 }
 
-/** Merge daily logs, tips, training, and runs into one reverse-chronological feed. */
+/** Merge activity posts, daily logs, tips, and runs into one reverse-chronological feed. */
 export function composeCommunityFeed(input: ComposeCommunityFeedInput): CommunityFeedItem[] {
   const items: CommunityFeedItem[] = [];
+
+  for (const post of input.activityPosts) {
+    const sortAt = post.publishedAt || post.activity.startTime;
+    items.push({
+      kind: 'activity',
+      id: `activity-${post.id}`,
+      sortAt,
+      post,
+    });
+  }
 
   for (const message of input.updateMessages) {
     items.push({
@@ -100,15 +102,6 @@ export function composeCommunityFeed(input: ComposeCommunityFeedInput): Communit
       id: `tip-${tip.id}`,
       sortAt,
       tip,
-    });
-  }
-
-  if (input.lastActivity?.startTime) {
-    items.push({
-      kind: 'training',
-      id: 'training-latest',
-      sortAt: input.lastActivity.startTime,
-      activity: input.lastActivity,
     });
   }
 
@@ -138,8 +131,8 @@ export function communityFeedItemLabel(kind: CommunityFeedItemKind): string {
       return 'Tip';
     case 'run':
       return 'Run';
-    case 'training':
-      return 'Latest training';
+    case 'activity':
+      return 'Activity';
     default:
       return 'Post';
   }

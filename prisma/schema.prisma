@@ -197,6 +197,7 @@ model Athlete {
   athlete_appnotification_devices     athlete_appnotification_devices[]
   gofast_with_me              gofast_with_me?
   athlete_tips                athlete_tips[]
+  athlete_activity_posts      athlete_activity_posts[]
   athlete_instagram_media     athlete_instagram_media[]
   sponsorship_candidate sponsorship_candidates?
 }
@@ -344,6 +345,24 @@ model athlete_tips {
   @@index([athleteId, sortOrder])
   @@index([athleteId, isPublished])
   @@map("athlete_tips")
+}
+
+/// Athlete-authored social overlay on a synced activity — caption, photo, hub publish.
+model athlete_activity_posts {
+  id                 String             @id @default(cuid())
+  athleteId          String
+  activityId         String             @unique
+  caption            String?            @db.Text
+  photoUrl           String?
+  showMatchedWorkout Boolean            @default(true)
+  publishedAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  athlete            Athlete            @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  activity           athlete_activities @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([athleteId, publishedAt])
+  @@map("athlete_activity_posts")
 }
 
 /// Public-safe Instagram media snapshot for hydrating athlete public/community surfaces.
@@ -514,6 +533,7 @@ model athlete_activities {
   city_run_activity_links city_run_activity_links[]
   athlete_race_result athlete_race_results?
   workout_segment_laps workout_segment_laps[]
+  activity_post        athlete_activity_posts?
 
   @@index([athleteId, ingestionStatus])
 }

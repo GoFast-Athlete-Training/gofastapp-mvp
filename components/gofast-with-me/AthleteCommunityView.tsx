@@ -18,6 +18,7 @@ import { applyFollowerPreviewMode } from '@/lib/gofast-with-me/athlete-community
 import { composeCommunityFeed } from '@/lib/gofast-with-me/community-feed';
 import TopNav from '@/components/shared/TopNav';
 import AthleteCommunityFeed from '@/components/gofast-with-me/AthleteCommunityFeed';
+import AthleteCommunityDurableChrome from '@/components/gofast-with-me/AthleteCommunityDurableChrome';
 import AthleteCommunityHubStubs from '@/components/gofast-with-me/AthleteCommunityHubStubs';
 import AthleteCommunityProfilePanel from '@/components/gofast-with-me/AthleteCommunityProfilePanel';
 import GoFastWithMeHubFeed from '@/components/gofast-with-me/GoFastWithMeHubFeed';
@@ -115,8 +116,8 @@ export default function AthleteCommunityView({ handle }: Props) {
     return composeCommunityFeed({
       updateMessages,
       tips: community.tips,
+      activityPosts: community.activityPosts ?? [],
       upcomingRuns: community.upcomingRuns,
-      lastActivity: community.lastActivity,
     });
   }, [community, updateMessages]);
 
@@ -327,10 +328,17 @@ export default function AthleteCommunityView({ handle }: Props) {
           </div>
         ) : (
           <div className="space-y-6">
+            <AthleteCommunityDurableChrome
+              community={community}
+              firstName={firstName}
+              displayAsOwner={displayAsOwner}
+              hasTrainingFor={hasTrainingFor}
+            />
+
             <div>
               <h2 className="text-lg font-bold text-gray-900">Feed</h2>
               <p className="text-sm text-gray-500 mt-1">
-                Daily logs, tips, training, and runs from {firstName}.
+                Activities, daily logs, tips, and runs from {firstName}.
               </p>
             </div>
 
@@ -340,7 +348,6 @@ export default function AthleteCommunityView({ handle }: Props) {
               community={community}
               firstName={firstName}
               displayAsOwner={displayAsOwner}
-              hasTrainingFor={hasTrainingFor}
             />
 
             {!displayAsOwner && !displayAsFollower && !previewFollower ? (

@@ -38,6 +38,45 @@ export default function AthleteCommunityFeed({ items, hostFirstName, emptyMessag
   return (
     <section className="space-y-3" aria-label="Community feed">
       {items.map((item) => {
+        if (item.kind === 'activity') {
+          const { post } = item;
+          const { activity } = post;
+          const distance = formatTrainingDistance(activity.distanceMiles);
+          const duration = formatTrainingDuration(activity.durationSeconds);
+          const stats = [distance, duration].filter(Boolean).join(' · ');
+          return (
+            <article
+              key={item.id}
+              className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm overflow-hidden"
+            >
+              <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-800">
+                {communityFeedItemLabel(item.kind)} from {hostFirstName}
+              </p>
+              {post.photoUrl ? (
+                <img
+                  src={post.photoUrl}
+                  alt=""
+                  className="mt-3 -mx-4 w-[calc(100%+2rem)] max-h-72 object-cover"
+                />
+              ) : null}
+              <h3 className="mt-2 text-base font-semibold text-gray-900">
+                {activity.activityName?.trim() || 'Workout'}
+              </h3>
+              {stats ? <p className="mt-1 text-sm text-gray-700">{stats}</p> : null}
+              {post.matchedWorkout ? (
+                <p className="mt-2 text-xs text-emerald-800 bg-emerald-50 rounded-lg px-3 py-2">
+                  Planned: {post.matchedWorkout.title}
+                  {post.matchedWorkout.planName ? ` · ${post.matchedWorkout.planName}` : ''}
+                </p>
+              ) : null}
+              {post.caption ? (
+                <p className="mt-2 text-sm text-gray-800 whitespace-pre-wrap">{post.caption}</p>
+              ) : null}
+              <p className="mt-2 text-xs text-gray-400">{formatWhen(activity.startTime)}</p>
+            </article>
+          );
+        }
+
         if (item.kind === 'dailylog') {
           return (
             <article
@@ -75,28 +114,6 @@ export default function AthleteCommunityFeed({ items, hostFirstName, emptyMessag
                 />
               ) : null}
               <p className="mt-2 text-xs text-gray-400">{formatWhen(item.sortAt)}</p>
-            </article>
-          );
-        }
-
-        if (item.kind === 'training') {
-          const { activity } = item;
-          const distance = formatTrainingDistance(activity.distanceMiles);
-          const duration = formatTrainingDuration(activity.durationSeconds);
-          const stats = [distance, duration].filter(Boolean).join(' · ');
-          return (
-            <article
-              key={item.id}
-              className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-sm"
-            >
-              <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-800">
-                {communityFeedItemLabel(item.kind)}
-              </p>
-              <h3 className="mt-1 text-base font-semibold text-gray-900">
-                {activity.activityName?.trim() || 'Recent workout'}
-              </h3>
-              {stats ? <p className="mt-1 text-sm text-gray-700">{stats}</p> : null}
-              <p className="mt-2 text-xs text-gray-500">{formatWhen(activity.startTime)}</p>
             </article>
           );
         }
