@@ -34,6 +34,7 @@ test('composeCommunityFeed merges and sorts reverse-chronologically', () => {
         updatedAt: '2026-08-15T10:00:00.000Z',
       },
     ],
+    activityPosts: [],
     upcomingRuns: [
       {
         id: 'r1',
@@ -51,24 +52,39 @@ test('composeCommunityFeed merges and sorts reverse-chronologically', () => {
   assert.equal(feed[2]?.kind, 'dailylog');
 });
 
-test('composeCommunityFeed includes latest training activity', () => {
+test('composeCommunityFeed includes published activity posts only via input', () => {
   const feed = composeCommunityFeed({
     updateMessages: [],
     tips: [],
     upcomingRuns: [],
-    lastActivity: {
-      activityName: 'Morning Run',
-      startTime: '2026-08-16T07:00:00.000Z',
-      distanceMiles: 6.2,
-      durationSeconds: 3180,
-      activityType: 'Run',
-      source: 'strava',
-    },
+    activityPosts: [
+      {
+        id: 'p1',
+        activityId: 'a1',
+        caption: 'Felt strong today',
+        photoUrl: 'https://example.com/photo.jpg',
+        showMatchedWorkout: true,
+        publishedAt: '2026-08-16T08:00:00.000Z',
+        activity: {
+          activityName: 'Morning Run',
+          startTime: '2026-08-16T07:00:00.000Z',
+          distanceMiles: 6.2,
+          durationSeconds: 3180,
+          activityType: 'Run',
+        },
+        matchedWorkout: {
+          title: 'Easy 6',
+          workoutType: 'EasyRun',
+          planName: 'Marathon Block',
+        },
+      },
+    ],
   });
 
   assert.equal(feed.length, 1);
-  assert.equal(feed[0]?.kind, 'training');
-  if (feed[0]?.kind === 'training') {
-    assert.equal(feed[0].activity.activityName, 'Morning Run');
+  assert.equal(feed[0]?.kind, 'activity');
+  if (feed[0]?.kind === 'activity') {
+    assert.equal(feed[0].post.caption, 'Felt strong today');
+    assert.equal(feed[0].post.matchedWorkout?.title, 'Easy 6');
   }
 });

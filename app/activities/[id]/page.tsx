@@ -3,12 +3,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Activity, Flag } from "lucide-react";
+import { ArrowLeft, Activity, Flag, Share2 } from "lucide-react";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import MarkActivityAsRaceSheet from "@/components/races/MarkActivityAsRaceSheet";
+import ShareActivityToHubSheet from "@/components/activities/ShareActivityToHubSheet";
 import { auth } from "@/lib/firebase";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
+import { LocalStorageAPI } from "@/lib/localstorage";
+import type { ActivityPostOwnerPayload } from "@/lib/gofast-with-me/activity-posts";
 import { metersToMiDisplay } from "@/lib/training/workout-preview-payload";
 import {
   formatPaceTargetRangeDisplay,
@@ -77,6 +80,9 @@ export default function ActivityDetailPage() {
   const [activity, setActivity] = useState<ActivityPayload | null>(null);
   const [matched, setMatched] = useState<MatchedWorkoutPayload | null>(null);
   const [markRaceOpen, setMarkRaceOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [hubPost, setHubPost] = useState<ActivityPostOwnerPayload | null>(null);
+  const [athleteId, setAthleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
@@ -117,6 +123,29 @@ export default function ActivityDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const id = LocalStorageAPI.getAthleteId();
+    setAthleteId(id);
+    if (!id) return;
+    void (async () => {
+      try {
+        const u = auth.currentUser;
+        if (!u) return;
+        const token = await u.getIdToken();
+        const res = await fetch(
+          `/api/athlete/${encodeURIComponent(id)}/activity-posts?activityId=${encodeURIComponent(activityId)}`,
+          { headers: athleteBearerFetchHeaders(token) }
+        );
+        const json = (await res.json()) as {
+          post?: ActivityPostOwnerPayload | null;
+        };
+        if (res.ok) setHubPost(json.post ?? null);
+      } catch {
+        /* optional */
+      }
+    })();
+  }, [activityId]);
 
   async function handleDeleteActivity() {
     if (
@@ -278,6 +307,29 @@ export default function ActivityDetailPage() {
                     </div>
                   ) : null}
                 </div>
+
+                {athleteId ? (
+                  <div className="rounded-xl border border-orange-200 bg-orange-50/50 p-5 mb-6">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h2 className="text-sm font-semibold text-orange-900">GoFast With Me hub</h2>
+                        <p className="mt-1 text-sm text-orange-800/90">
+                          {hubPost?.isPublished
+                            ? 'This activity is on your member feed.'
+                            : 'Share a photo and caption so followers see this workout.'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShareOpen(true)}
+                        className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+                      >
+                        <Share2 className="h-4 w-4" aria-hidden />
+                        {hubPost?.isPublished ? 'Edit hub post' : 'Share to hub'}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
 
                 {matched ? (
                   <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/40 p-6 mb-6">
@@ -453,6 +505,22 @@ export default function ActivityDetailPage() {
           "Activity"
         }
       />
+
+      {shareOpen && athleteId && activity ? (
+        <ShareActivityToHubSheet
+          athleteId={athleteId}
+          activityId={activityId}
+          activityLabel={
+            activity.activityName?.trim() ||
+            activity.activityType?.replace(/_/g, " ") ||
+            "Activity"
+          }
+          hasMatchedWorkout={Boolean(matched)}
+          existingPost={hubPost}
+          onClose={() => setShareOpen(false)}
+          onPublished={(post) => setHubPost(post)}
+        />
+      ) : null}
     </div>
   );
 }
