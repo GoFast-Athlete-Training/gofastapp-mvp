@@ -36,7 +36,7 @@ function isRunningActivityType(activityType: string | null | undefined): boolean
 
 const workoutMatchInclude = {
   segments: { orderBy: { stepOrder: "asc" as const } },
-  workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true } },
+  workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true, name: true } },
 };
 
 type WorkoutMatchRow = Awaited<
@@ -99,7 +99,24 @@ function workoutScoreInput(workout: WorkoutMatchRow) {
     workoutType: workout.workoutType,
     dayAssigned: workout.dayAssigned,
     planId: workout.planId,
+    catalogueName: workout.workout_catalogue?.name ?? null,
   };
+}
+
+function logGarminWorkoutMatchAttempt(payload: {
+  activityId: string;
+  plannedWorkoutId: string | null;
+  rawGarminWorkoutName: string | null;
+  rawPlannedWorkoutName: string | null;
+  catalogueName?: string | null;
+  garminNameProperty: string;
+  titleMatch: boolean;
+  matchCandidateFound: boolean;
+  relationshipPersisted: boolean;
+  plannedWorkoutMarkedCompleted: boolean;
+  error?: string;
+}) {
+  console.log("GARMIN WORKOUT MATCH ATTEMPT", payload);
 }
 
 /** Pick a single planned workout from scored nearby candidates. */
@@ -220,6 +237,28 @@ export async function tryMatchActivityToTrainingWorkout(
     return { matched: false };
   }
 
+  const alreadyLinked = await prisma.workouts.findFirst({
+    where: { matchedActivityId: athleteActivityId },
+    select: { id: true, title: true },
+  });
+  if (alreadyLinked) {
+    if (activity.ingestionStatus !== "MATCHED") {
+      await setIngestion("MATCHED");
+    }
+    logGarminWorkoutMatchAttempt({
+      activityId: athleteActivityId,
+      plannedWorkoutId: alreadyLinked.id,
+      rawGarminWorkoutName: activity.activityName,
+      rawPlannedWorkoutName: alreadyLinked.title,
+      garminNameProperty: "athlete_activities.activityName",
+      titleMatch: true,
+      matchCandidateFound: true,
+      relationshipPersisted: true,
+      plannedWorkoutMarkedCompleted: true,
+    });
+    return { matched: true, workoutId: alreadyLinked.id };
+  }
+
   const summaryBlob = activity.summaryData as Record<string, unknown> | null;
   const garminWorkoutId = extractGarminWorkoutIdFromSummary(summaryBlob);
 
@@ -266,6 +305,17 @@ export async function tryMatchActivityToTrainingWorkout(
   }
 
   if (!candidate) {
+    logGarminWorkoutMatchAttempt({
+      activityId: athleteActivityId,
+      plannedWorkoutId: null,
+      rawGarminWorkoutName: activity.activityName,
+      rawPlannedWorkoutName: null,
+      garminNameProperty: "athlete_activities.activityName",
+      titleMatch: false,
+      matchCandidateFound: false,
+      relationshipPersisted: false,
+      plannedWorkoutMarkedCompleted: false,
+    });
     await setIngestion("UNMATCHED");
     return { matched: false };
   }
@@ -281,6 +331,8 @@ export async function tryMatchActivityToTrainingWorkout(
             workoutType: candidate.workoutType,
             dayAssigned: candidate.dayAssigned,
             planId: candidate.planId,
+            catalogueName: candidate.workout_catalogue?.name ?? null,
+            estimatedDistanceInMeters: candidate.estimatedDistanceInMeters,
           })
           ? 1
           : 0;
@@ -338,13 +390,56 @@ export async function tryMatchActivityToTrainingWorkout(
         workoutTitle: candidate.title,
         reasonLabels: scored.reasonLabels,
       });
-      const { workoutId } = await applyActivityToWorkout({
-        workout: candidate,
-        activity,
-      });
-      return { matched: true, workoutId };
+      try {
+        const { workoutId } = await applyActivityToWorkout({
+          workout: candidate,
+          activity,
+        });
+        logGarminWorkoutMatchAttempt({
+          activityId: athleteActivityId,
+          plannedWorkoutId: candidate.id,
+          rawGarminWorkoutName: activity.activityName,
+          rawPlannedWorkoutName: candidate.title,
+          catalogueName: candidate.workout_catalogue?.name ?? null,
+          garminNameProperty: "athlete_activities.activityName",
+          titleMatch: titleMatchCount === 1,
+          matchCandidateFound: true,
+          relationshipPersisted: true,
+          plannedWorkoutMarkedCompleted: true,
+        });
+        return { matched: true, workoutId };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logGarminWorkoutMatchAttempt({
+          activityId: athleteActivityId,
+          plannedWorkoutId: candidate.id,
+          rawGarminWorkoutName: activity.activityName,
+          rawPlannedWorkoutName: candidate.title,
+          catalogueName: candidate.workout_catalogue?.name ?? null,
+          garminNameProperty: "athlete_activities.activityName",
+          titleMatch: titleMatchCount === 1,
+          matchCandidateFound: true,
+          relationshipPersisted: false,
+          plannedWorkoutMarkedCompleted: false,
+          error: message,
+        });
+        throw error;
+      }
     }
 
+    logGarminWorkoutMatchAttempt({
+      activityId: athleteActivityId,
+      plannedWorkoutId: candidate.id,
+      rawGarminWorkoutName: activity.activityName,
+      rawPlannedWorkoutName: candidate.title,
+      catalogueName: candidate.workout_catalogue?.name ?? null,
+      garminNameProperty: "athlete_activities.activityName",
+      titleMatch: titleMatchCount === 1,
+      matchCandidateFound: true,
+      relationshipPersisted: false,
+      plannedWorkoutMarkedCompleted: false,
+      error: `awaiting_manual_match reasons=${(scored?.reasonLabels ?? []).join(",")}`,
+    });
     console.log("ℹ️ planned workout candidate found; awaiting manual match", {
       athleteActivityId,
       workoutId: candidate.id,

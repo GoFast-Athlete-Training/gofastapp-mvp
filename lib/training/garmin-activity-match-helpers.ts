@@ -121,6 +121,7 @@ export function garminTitleForWorkout(workout: {
 export function normalizeGarminMatchText(value: string | null | undefined): string {
   return (value ?? "")
     .toLowerCase()
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
     .replace(/\s+/g, " ")
     .trim();
 }

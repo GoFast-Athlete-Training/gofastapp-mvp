@@ -149,6 +149,7 @@ export function scoreActivityCandidateForWorkout(params: {
     workoutType?: string | null;
     dayAssigned?: string | null;
     planId?: string | null;
+    catalogueName?: string | null;
   };
   activity: ActivityCandidateInput;
 }): ScoredActivityCandidate | null {
@@ -175,6 +176,8 @@ export function scoreActivityCandidateForWorkout(params: {
       workoutType: workout.workoutType,
       dayAssigned: workout.dayAssigned,
       planId: workout.planId,
+      catalogueName: workout.catalogueName,
+      estimatedDistanceInMeters: workout.estimatedDistanceInMeters,
     })
   ) {
     reasons.push("title_match");
@@ -229,6 +232,7 @@ export function scoreAndSortActivityCandidates(params: {
     workoutType?: string | null;
     dayAssigned?: string | null;
     planId?: string | null;
+    catalogueName?: string | null;
   };
   activities: ActivityCandidateInput[];
 }): ScoredActivityCandidate[] {

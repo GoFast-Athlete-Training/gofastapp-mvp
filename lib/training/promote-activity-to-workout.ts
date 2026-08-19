@@ -109,6 +109,7 @@ export async function promoteUnmatchedRunningActivityToWorkout(
       workoutType: true,
       dayAssigned: true,
       planId: true,
+      workout_catalogue: { select: { name: true } },
     },
   });
 
@@ -128,7 +129,13 @@ export async function promoteUnmatchedRunningActivityToWorkout(
 
   const plausiblePlanned = plannedNearby
     .map((workout) =>
-      scoreActivityCandidateForWorkout({ workout, activity: activityInput })
+      scoreActivityCandidateForWorkout({
+        workout: {
+          ...workout,
+          catalogueName: workout.workout_catalogue?.name ?? null,
+        },
+        activity: activityInput,
+      })
     )
     .filter(
       (scored): scored is ScoredActivityCandidate =>

@@ -153,6 +153,37 @@ test("activityNameContainsPushedWorkoutTitle matches stored catalogue title on a
   );
 });
 
+test("activityNameContainsPushedWorkoutTitle matches en-dash catalogue against hyphen activity", () => {
+  assert.equal(
+    activityNameContainsPushedWorkoutTitle({
+      activityName: "Bloomington - GF W14: 2-1 Tempo (Tue)",
+      workoutTitle: "2–1 Tempo",
+      weekNumber: 14,
+      workoutType: "Tempo",
+      dayAssigned: "Tuesday",
+      planId: "plan-1",
+      catalogueName: "2–1 Tempo",
+    }),
+    true
+  );
+});
+
+test("activityNameContainsPushedWorkoutTitle matches pushed catalogue long-run title", () => {
+  assert.equal(
+    activityNameContainsPushedWorkoutTitle({
+      activityName: "Arlington County - GF W13: Long Run (Sat)",
+      workoutTitle: "Saturday Long run 19.6 miles",
+      weekNumber: 13,
+      workoutType: "LongRun",
+      dayAssigned: "Saturday",
+      planId: "plan-1",
+      catalogueName: "Long Run",
+      estimatedDistanceInMeters: 19.6 * 1609.34,
+    }),
+    true
+  );
+});
+
 test("activityLocalYmdFromSummary uses Garmin local offset when present", () => {
   assert.equal(
     activityLocalYmdFromSummary(new Date("2026-05-23T02:00:00.000Z"), {

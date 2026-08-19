@@ -465,11 +465,6 @@ export async function applyActivityToWorkout(params: {
     hrDeltaBpm = Math.round(hrTargetMid - activity.averageHeartRate);
   }
 
-  const detailBlob =
-    activity.detailData != null && typeof activity.detailData === "object"
-      ? (activity.detailData as object)
-      : undefined;
-
   await prisma.workouts.update({
     where: { id: workout.id },
     data: {
@@ -480,7 +475,6 @@ export async function applyActivityToWorkout(params: {
         summaryBlob != null && typeof summaryBlob === "object"
           ? (summaryBlob as object)
           : undefined,
-      completedActivityDetailJson: detailBlob,
       actualDistanceMeters: distanceMeters,
       actualAvgPaceSecPerMile: paceSecPerMile,
       actualAverageHeartRate: activity.averageHeartRate,
@@ -528,8 +522,10 @@ export async function applyActivityToWorkout(params: {
     console.error("workout_complete push:", err);
   }
 
-  if (detailBlob) {
+  try {
     await syncActivityDetailToLinkedWorkout(activity.id);
+  } catch (detailErr) {
+    console.warn("activity detail/segment persist after match:", detailErr);
   }
 
   await applyMatchCreditsFromWorkoutRow({ workout, activity });

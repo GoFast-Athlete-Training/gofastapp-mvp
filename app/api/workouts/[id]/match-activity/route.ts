@@ -19,7 +19,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 const workoutMatchInclude = {
   segments: { orderBy: { stepOrder: "asc" as const } },
-  workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true } },
+  workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true, name: true } },
   matched_activity: {
     select: {
       id: true,
@@ -195,6 +195,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
         workoutType: workout.workoutType,
         dayAssigned: workout.dayAssigned,
         planId: workout.planId,
+        catalogueName: workout.workout_catalogue?.name ?? null,
       },
       activities: runningActivities.map((a) => ({
         id: a.id,

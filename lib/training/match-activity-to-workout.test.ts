@@ -135,6 +135,38 @@ test("selectPlannedWorkoutCandidate auto-match eligible for Falmouth tempo title
   );
 });
 
+test("selectPlannedWorkoutCandidate matches Saturday long run by catalogue push title", () => {
+  const longRunWorkout = {
+    ...tempoWorkout,
+    id: "w-long",
+    title: "Saturday Long run 19.6 miles",
+    weekNumber: 13,
+    date: new Date("2026-08-15T12:00:00.000Z"),
+    estimatedDistanceInMeters: 19.6 * 1609.34,
+    workoutType: "LongRun",
+    dayAssigned: "Saturday",
+    workout_catalogue: { name: "Long Run", workBasePaceOffsetSecPerMile: null },
+  };
+  const result = selectPlannedWorkoutCandidate({
+    planCandidates: [longRunWorkout as never],
+    activity: baseActivity({
+      activityName: "Arlington County - GF W13: Long Run (Sat)",
+      startTime: new Date("2026-08-15T10:45:20.000Z"),
+      distance: 29213.77,
+    }),
+  });
+  assert.ok(result.candidate);
+  assert.equal(result.candidate!.id, "w-long");
+  assert.equal(result.titleMatchCount, 1);
+  assert.equal(
+    canAutoMatchPlannedWorkout({
+      scored: result.scored,
+      titleMatchCount: result.titleMatchCount,
+    }),
+    true
+  );
+});
+
 test("same-day close distance without title does not qualify for auto-match", () => {
   const scored = scoreActivityCandidateForWorkout({
     workout: tempoWorkout,

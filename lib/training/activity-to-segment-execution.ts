@@ -273,6 +273,12 @@ export async function parseActivityToSegmentExecution(params: {
   }
 
   if (!workout.segments.length) {
+    await recordAlignmentFailure({
+      activityId: params.activityId,
+      workout,
+      lapCount: 0,
+      segmentCount: 0,
+    });
     return {
       ok: false,
       status: "NO_SEGMENTS",
