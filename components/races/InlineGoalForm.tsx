@@ -10,7 +10,8 @@ import {
 } from "@/lib/goal-time-input";
 
 export type RaceForGoal = {
-  id: string;
+  /** athlete_races.id — identity for goal bolt */
+  athleteRaceId: string;
   name: string;
   raceDate: string;
   distanceLabel: string | null;
@@ -23,7 +24,9 @@ export type InlineGoalRow = {
   goalTime?: string | null;
   goalRacePace?: number | null;
   goalPace5K?: number | null;
+  athleteRaceId?: string | null;
   raceRegistryId?: string | null;
+  athlete_race?: { id: string } | null;
   race_registry?: { id: string } | null;
 };
 
@@ -93,7 +96,7 @@ export function InlineGoalForm({
     try {
       const payload = {
         goalTime: v.goalTime,
-        raceRegistryId: race.id,
+        athleteRaceId: race.athleteRaceId,
         name: race.name,
         distance: race.distanceLabel ?? undefined,
         targetByDate: race.raceDate,

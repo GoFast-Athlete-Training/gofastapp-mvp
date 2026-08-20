@@ -29,6 +29,21 @@ export async function GET(request: NextRequest) {
       where,
       orderBy: { targetByDate: "asc" },
       include: {
+        athlete_race: {
+          select: {
+            id: true,
+            raceRegistryId: true,
+            name: true,
+            distanceLabel: true,
+            distanceMeters: true,
+            raceDate: true,
+            city: true,
+            state: true,
+            race_registry: {
+              select: { slug: true, logoUrl: true },
+            },
+          },
+        },
         race_registry: {
           select: {
             id: true,
@@ -68,6 +83,7 @@ export async function POST(request: NextRequest) {
       goalTime?: string | null;
       targetByDate?: string;
       raceRegistryId?: string | null;
+      athleteRaceId?: string | null;
       status?: string;
       whyGoal?: string | null;
       successLooksLike?: string | null;
@@ -96,6 +112,7 @@ export async function POST(request: NextRequest) {
         goalTime: body.goalTime,
         targetByDate,
         raceRegistryId: body.raceRegistryId,
+        athleteRaceId: body.athleteRaceId,
         status: body.status,
         whyGoal: body.whyGoal,
         successLooksLike: body.successLooksLike,

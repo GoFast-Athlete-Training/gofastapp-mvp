@@ -55,7 +55,9 @@ type GoalRow = {
   goalTime?: string | null;
   goalRacePace?: number | null;
   goalPace5K?: number | null;
+  athleteRaceId?: string | null;
   raceRegistryId?: string | null;
+  athlete_race?: { id: string } | null;
   race_registry?: { id: string } | null;
 };
 
@@ -275,7 +277,10 @@ export default function MyRacePage() {
         const goals = gRes.data.goals ?? [];
         const g =
           goals.find(
-            (x) => x.raceRegistryId === raceRegistryId || x.race_registry?.id === raceRegistryId
+            (x) =>
+              (su && x.athleteRaceId === su.id) ||
+              x.raceRegistryId === raceRegistryId ||
+              x.race_registry?.id === raceRegistryId
           ) ?? null;
         setGoal(g);
 
@@ -327,8 +332,23 @@ export default function MyRacePage() {
     setMakingGoal(true);
     setMakeGoalError(null);
     try {
+      let athleteRaceId = signup?.id;
+      if (!athleteRaceId) {
+        const claimRes = await api.post<{ signup?: Signup; athleteRaces?: Signup[] }>(
+          "/race-signups",
+          { raceRegistryId: race.id }
+        );
+        athleteRaceId =
+          claimRes.data.signup?.id ?? claimRes.data.athleteRaces?.[0]?.id ?? undefined;
+        if (athleteRaceId) {
+          setSignup({ id: athleteRaceId, raceRegistryId: race.id });
+        }
+      }
+      if (!athleteRaceId) {
+        throw new Error("Add this race to My Races first");
+      }
       const res = await api.post<{ goal: GoalRow }>("/goals", {
-        raceRegistryId: race.id,
+        athleteRaceId,
         name: race.name,
         distance: race.distanceLabel ?? undefined,
         targetByDate: race.raceDate,
@@ -629,7 +649,17 @@ export default function MyRacePage() {
               </button>
               {goalExpanded ? (
                 <div className="px-5 pb-5 border-t border-orange-100">
-                  <RacePlanSection race={race} goal={goal} onGoalSaved={setGoal} />
+                  <RacePlanSection
+                    race={{
+                      athleteRaceId: signup!.id,
+                      name: race.name,
+                      raceDate: race.raceDate,
+                      distanceLabel: race.distanceLabel,
+                      distanceMeters: race.distanceMeters,
+                    }}
+                    goal={goal}
+                    onGoalSaved={setGoal}
+                  />
                 </div>
               ) : null}
             </section>

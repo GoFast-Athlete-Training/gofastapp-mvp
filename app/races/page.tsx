@@ -12,36 +12,51 @@ import {
   formatRaceListDate,
 } from "@/lib/races-display";
 import DiscoverRacesSection from "@/components/races/DiscoverRacesSection";
-type RaceRegistryRow = {
-  id: string;
-  name: string;
-  slug: string | null;
-  distanceLabel: string | null;
-  distanceMeters: number | null;
-  raceDate: string;
-  city: string | null;
-  state: string | null;
-  registrationUrl: string | null;
-  startTime?: string | null;
-  logoUrl?: string | null;
-  raceType?: string;
-  distanceMiles?: number;
-};
+import {
+  InlineGoalForm,
+  type InlineGoalRow,
+  type RaceForGoal,
+} from "@/components/races/InlineGoalForm";
+import { pickHeroAthleteRace } from "@/lib/races/my-races-hero";
 
-type Signup = {
+type ApiAthleteRace = {
   id: string;
   raceRegistryId: string;
-  race_registry: RaceRegistryRow;
-  calendarRole?: "PRIMARY" | "OTHER";
-  positionRelativeToPrimary?: "BEFORE" | "ON" | "AFTER" | "UNKNOWN";
+  name: string;
+  raceDate: string;
+  distanceLabel: string | null;
+  distanceMeters: number | null;
+  city: string | null;
+  state: string | null;
+  race_registry?: {
+    id: string;
+    slug: string | null;
+    logoUrl: string | null;
+  } | null;
 };
 
-type GoalRow = {
-  id: string;
+type AthleteRaceRow = {
+  athleteRaceId: string;
+  raceRegistryId: string;
+  name: string;
+  raceDate: string;
+  distanceLabel: string | null;
+  distanceMeters: number | null;
+  city: string | null;
+  state: string | null;
+  slug: string | null;
+  logoUrl: string | null;
+};
+
+type GoalRow = InlineGoalRow & {
   name?: string | null;
-  goalTime?: string | null;
-  raceRegistryId?: string | null;
-  race_registry?: { id: string; name?: string | null } | null;
+  athlete_race?: {
+    id: string;
+    name: string;
+    raceDate: string;
+    distanceLabel: string | null;
+    distanceMeters: number | null;
+  } | null;
 };
 
 type ActivePlanSummary = {
@@ -51,9 +66,38 @@ type ActivePlanSummary = {
   totalWeeks: number | null;
 };
 
-function personalRaceHref(r: RaceRegistryRow): string {
-  const s = r.slug?.trim();
-  return s ? `/myrace/${encodeURIComponent(s)}` : `/race-hub/${r.id}`;
+function isoRaceDate(value: string | Date): string {
+  return typeof value === "string" ? value : new Date(value).toISOString();
+}
+
+function normalizeAthleteRace(raw: ApiAthleteRace): AthleteRaceRow {
+  return {
+    athleteRaceId: raw.id,
+    raceRegistryId: raw.raceRegistryId,
+    name: raw.name,
+    raceDate: isoRaceDate(raw.raceDate),
+    distanceLabel: raw.distanceLabel ?? null,
+    distanceMeters: raw.distanceMeters ?? null,
+    city: raw.city ?? null,
+    state: raw.state ?? null,
+    slug: raw.race_registry?.slug ?? null,
+    logoUrl: raw.race_registry?.logoUrl ?? null,
+  };
+}
+
+function personalRaceHref(row: AthleteRaceRow): string {
+  const s = row.slug?.trim();
+  return s ? `/myrace/${encodeURIComponent(s)}` : `/race-hub/${row.raceRegistryId}`;
+}
+
+function raceForGoal(row: AthleteRaceRow): RaceForGoal {
+  return {
+    athleteRaceId: row.athleteRaceId,
+    name: row.name,
+    raceDate: row.raceDate,
+    distanceLabel: row.distanceLabel,
+    distanceMeters: row.distanceMeters,
+  };
 }
 
 function countdownChipLabel(iso: string): string {
@@ -87,11 +131,10 @@ function heroPrimaryCta(
   return { href: myRaceHref, label: "Set a goal →" };
 }
 
-/** Next 6 calendar months from today, each a compact card with race list. */
 function NextSixMonthsRaceCards({
-  upcomingSignups,
+  upcomingRaces,
 }: {
-  upcomingSignups: Signup[];
+  upcomingRaces: AthleteRaceRow[];
 }) {
   const windowMonths = useMemo(() => {
     const d0 = new Date();
@@ -104,23 +147,21 @@ function NextSixMonthsRaceCards({
   }, []);
 
   const byMonth = useMemo(() => {
-    const m = new Map<string, Signup[]>();
-    for (const su of upcomingSignups) {
-      const rd = new Date(su.race_registry.raceDate);
+    const m = new Map<string, AthleteRaceRow[]>();
+    for (const row of upcomingRaces) {
+      const rd = new Date(row.raceDate);
       const key = `${rd.getFullYear()}-${rd.getMonth()}`;
       const list = m.get(key) ?? [];
-      list.push(su);
+      list.push(row);
       m.set(key, list);
     }
     for (const [, list] of m) {
       list.sort(
-        (a, b) =>
-          new Date(a.race_registry.raceDate).getTime() -
-          new Date(b.race_registry.raceDate).getTime()
+        (a, b) => new Date(a.raceDate).getTime() - new Date(b.raceDate).getTime()
       );
     }
     return m;
-  }, [upcomingSignups]);
+  }, [upcomingRaces]);
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
@@ -143,17 +184,17 @@ function NextSixMonthsRaceCards({
               <p className="text-[11px] text-gray-400 mt-auto">—</p>
             ) : (
               <ul className="space-y-1.5 flex-1">
-                {races.map((su) => {
-                  const dayNum = new Date(su.race_registry.raceDate).getDate();
+                {races.map((row) => {
+                  const dayNum = new Date(row.raceDate).getDate();
                   return (
-                    <li key={su.id}>
+                    <li key={row.athleteRaceId}>
                       <Link
-                        href={personalRaceHref(su.race_registry)}
+                        href={personalRaceHref(row)}
                         className="text-[11px] text-orange-800 hover:text-orange-950 hover:underline font-medium flex gap-1 min-w-0"
-                        title={su.race_registry.name}
+                        title={row.name}
                       >
                         <span className="text-gray-500 tabular-nums shrink-0">{dayNum}</span>
-                        <span className="truncate">{su.race_registry.name}</span>
+                        <span className="truncate">{row.name}</span>
                       </Link>
                     </li>
                   );
@@ -167,57 +208,82 @@ function NextSixMonthsRaceCards({
   );
 }
 
-function SignupRaceCard({
-  signup,
-  goalSummary,
+function AthleteRaceCard({
+  row,
+  goal,
+  unboltedGoal,
+  associating,
+  onAssociate,
+  onGoalSaved,
   onRemove,
   removing,
 }: {
-  signup: Signup;
-  goalSummary?: { goalTime: string | null };
-  onRemove: (id: string) => void;
+  row: AthleteRaceRow;
+  goal: GoalRow | null;
+  unboltedGoal: GoalRow | null;
+  associating: boolean;
+  onAssociate: (athleteRaceId: string, goalId: string) => void;
+  onGoalSaved: (goal: InlineGoalRow) => void;
+  onRemove: (athleteRaceId: string) => void;
   removing: boolean;
 }) {
-  const r = signup.race_registry;
+  const showAssociate =
+    unboltedGoal?.id && !goal && !unboltedGoal.athleteRaceId?.trim();
+
   return (
     <li className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm relative">
       <button
         type="button"
-        onClick={() => onRemove(signup.id)}
+        onClick={() => onRemove(row.athleteRaceId)}
         disabled={removing}
         className="absolute top-2 right-2 p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-50"
         aria-label="Remove from My Races"
       >
         <X className="w-4 h-4" />
       </button>
-      <p className="font-semibold text-gray-900 pr-7 leading-snug text-sm">{r.name}</p>
-      <p className="font-medium text-orange-600 text-[11px] mt-1">{countdownLabel(r.raceDate)}</p>
-      {goalSummary?.goalTime ? (
-        <p className="text-gray-800 text-xs mt-1">
-          Goal: <span className="font-mono font-semibold">{goalSummary.goalTime}</span>
-        </p>
-      ) : null}
+      <p className="font-semibold text-gray-900 pr-7 leading-snug text-sm">{row.name}</p>
+      <p className="font-medium text-orange-600 text-[11px] mt-1">
+        {countdownLabel(row.raceDate)}
+      </p>
       <p className="text-gray-500 flex items-center gap-1 text-[11px] mt-1">
         <Calendar className="w-3 h-3 shrink-0" />
-        {formatRaceListDate(r.raceDate)}
+        {formatRaceListDate(row.raceDate)}
       </p>
-      {(r.city || r.state) && (
+      {(row.city || row.state) && (
         <p className="text-gray-500 flex items-center gap-1 text-[11px] mt-0.5">
           <MapPin className="w-3 h-3 shrink-0" />
-          {[r.city, r.state].filter(Boolean).join(", ")}
+          {[row.city, row.state].filter(Boolean).join(", ")}
         </p>
       )}
       <p className="text-gray-600 text-[11px] mt-1.5">
-        {r.distanceLabel?.trim() ||
-          (r.distanceMeters != null
-            ? `${(r.distanceMeters / 1609.344).toFixed(1)} mi`
-            : r.distanceMiles != null
-              ? `${r.distanceMiles} mi · ${r.raceType ?? "—"}`
-              : "—")}
+        {row.distanceLabel?.trim() ||
+          (row.distanceMeters != null
+            ? `${(row.distanceMeters / 1609.344).toFixed(1)} mi`
+            : "—")}
       </p>
+
+      {showAssociate ? (
+        <button
+          type="button"
+          disabled={associating}
+          onClick={() => onAssociate(row.athleteRaceId, unboltedGoal!.id)}
+          className="mt-2.5 inline-flex items-center justify-center rounded-lg border border-orange-300 bg-orange-50 px-2.5 py-1.5 text-xs font-semibold text-orange-900 hover:bg-orange-100 disabled:opacity-50"
+        >
+          {associating ? "Linking…" : "Use this race for my goal"}
+        </button>
+      ) : goal ? (
+        <div className="mt-2.5">
+          <InlineGoalForm
+            race={raceForGoal(row)}
+            goal={goal}
+            onSaved={onGoalSaved}
+          />
+        </div>
+      ) : null}
+
       <div className="mt-2.5">
         <Link
-          href={personalRaceHref(r)}
+          href={personalRaceHref(row)}
           className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-2.5 py-1.5"
         >
           Get Ready →
@@ -229,17 +295,23 @@ function SignupRaceCard({
 
 export default function MyRacesPage() {
   const router = useRouter();
-  const [signups, setSignups] = useState<Signup[]>([]);
+  const [myRaces, setMyRaces] = useState<AthleteRaceRow[]>([]);
   const [goals, setGoals] = useState<GoalRow[]>([]);
+  const [primaryPlanAthleteRaceId, setPrimaryPlanAthleteRaceId] = useState<string | null>(
+    null
+  );
   const [activePlanSummary, setActivePlanSummary] = useState<ActivePlanSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [removingSignupId, setRemovingSignupId] = useState<string | null>(null);
+  const [removingRaceId, setRemovingRaceId] = useState<string | null>(null);
+  const [associatingRaceId, setAssociatingRaceId] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
       const [suRes, gRes, upRes, calRes] = await Promise.all([
-        api.get<{ signups: Signup[] }>("/race-signups"),
+        api.get<{ signups?: ApiAthleteRace[]; athleteRaces?: ApiAthleteRace[] }>(
+          "/race-signups"
+        ),
         api.get<{ goals: GoalRow[] }>("/goals?status=ACTIVE").catch(() => ({ data: { goals: [] } })),
         api
           .get<{ activePlanSummary?: ActivePlanSummary | null }>("/training/upcoming?limit=1")
@@ -248,35 +320,17 @@ export default function MyRacesPage() {
           })),
         api
           .get<{
-            calendar?: {
-              signups: Signup[];
-              primaryGoalRaceRegistryId: string | null;
-            };
+            calendar?: { primaryPlanAthleteRaceId?: string | null };
           }>("/race-calendar")
           .catch(() => ({ data: { calendar: undefined } })),
       ]);
-      const calendarSignups = calRes.data?.calendar?.signups;
-      const baseSignups = suRes.data.signups ?? [];
-      if (calendarSignups?.length) {
-        const roleByRegistry = new Map(
-          calendarSignups.map((s) => [s.raceRegistryId, s] as const)
-        );
-        setSignups(
-          baseSignups.map((s) => {
-            const hydrated = roleByRegistry.get(s.raceRegistryId);
-            return hydrated
-              ? {
-                  ...s,
-                  calendarRole: hydrated.calendarRole,
-                  positionRelativeToPrimary: hydrated.positionRelativeToPrimary,
-                }
-              : s;
-          })
-        );
-      } else {
-        setSignups(baseSignups);
-      }
+      const raw =
+        suRes.data.athleteRaces ?? suRes.data.signups ?? [];
+      setMyRaces(raw.map(normalizeAthleteRace));
       setGoals(gRes.data.goals ?? []);
+      setPrimaryPlanAthleteRaceId(
+        calRes.data?.calendar?.primaryPlanAthleteRaceId ?? null
+      );
       const s = upRes.data?.activePlanSummary;
       setActivePlanSummary(
         s && typeof s.name === "string"
@@ -290,8 +344,9 @@ export default function MyRacesPage() {
       );
     } catch (e) {
       console.error(e);
-      setSignups([]);
+      setMyRaces([]);
       setGoals([]);
+      setPrimaryPlanAthleteRaceId(null);
       setActivePlanSummary(null);
     } finally {
       setLoading(false);
@@ -309,77 +364,104 @@ export default function MyRacesPage() {
     return () => unsub();
   }, [router]);
 
-  const goalByRegistryId = useMemo(() => {
+  const goalByAthleteRaceId = useMemo(() => {
     const m = new Map<string, GoalRow>();
     for (const g of goals) {
-      const rid = g.raceRegistryId ?? g.race_registry?.id;
-      if (rid) m.set(rid, g);
+      const arId = g.athleteRaceId ?? g.athlete_race?.id;
+      if (arId) m.set(arId, g);
     }
     return m;
   }, [goals]);
 
-  const { upcomingSignups, pastSignups } = useMemo(() => {
-    const up: Signup[] = [];
-    const past: Signup[] = [];
-    for (const s of signups) {
-      if (daysUntilRace(s.race_registry.raceDate) >= 0) up.push(s);
-      else past.push(s);
+  const unboltedGoal = useMemo(
+    () => goals.find((g) => !g.athleteRaceId?.trim()) ?? null,
+    [goals]
+  );
+
+  const { upcomingRaces, pastRaces } = useMemo(() => {
+    const up: AthleteRaceRow[] = [];
+    const past: AthleteRaceRow[] = [];
+    for (const row of myRaces) {
+      if (daysUntilRace(row.raceDate) >= 0) up.push(row);
+      else past.push(row);
     }
-    return { upcomingSignups: up, pastSignups: past };
-  }, [signups]);
+    return { upcomingRaces: up, pastRaces: past };
+  }, [myRaces]);
 
   const upcomingSorted = useMemo(
     () =>
-      [...upcomingSignups].sort(
-        (a, b) =>
-          new Date(a.race_registry.raceDate).getTime() -
-          new Date(b.race_registry.raceDate).getTime()
+      [...upcomingRaces].sort(
+        (a, b) => new Date(a.raceDate).getTime() - new Date(b.raceDate).getTime()
       ),
-    [upcomingSignups]
+    [upcomingRaces]
   );
 
-  const goalRaceId = goals[0]?.raceRegistryId ?? goals[0]?.race_registry?.id ?? null;
+  const heroRace = useMemo(() => {
+    const picked = pickHeroAthleteRace({
+      upcoming: upcomingSorted.map((r) => ({
+        athleteRaceId: r.athleteRaceId,
+        raceDate: r.raceDate,
+      })),
+      primaryPlanAthleteRaceId,
+      goalAthleteRaceId: goals.find((g) => g.athleteRaceId)?.athleteRaceId ?? null,
+    });
+    if (!picked) return null;
+    return upcomingSorted.find((r) => r.athleteRaceId === picked.athleteRaceId) ?? null;
+  }, [upcomingSorted, primaryPlanAthleteRaceId, goals]);
 
-  const { heroSignup, otherSignups } = useMemo(() => {
-    let hero: Signup | null = null;
-    if (goalRaceId) {
-      hero = upcomingSorted.find((s) => s.raceRegistryId === goalRaceId) ?? null;
-    }
-    if (!hero && upcomingSorted.length > 0) {
-      hero = upcomingSorted[0] ?? null;
-    }
-    const others = upcomingSorted.filter((s) => s.id !== hero?.id);
-    return { heroSignup: hero, otherSignups: others };
-  }, [upcomingSorted, goalRaceId]);
-
-  const goalOnCalendar = Boolean(
-    goalRaceId && upcomingSignups.some((s) => s.raceRegistryId === goalRaceId)
+  const otherRaces = useMemo(
+    () => upcomingSorted.filter((r) => r.athleteRaceId !== heroRace?.athleteRaceId),
+    [upcomingSorted, heroRace]
   );
 
   const signedRaceIds = useMemo(
-    () => new Set(signups.map((s) => s.raceRegistryId)),
-    [signups]
+    () => new Set(myRaces.map((r) => r.raceRegistryId)),
+    [myRaces]
   );
 
-  async function onRemove(signupId: string) {
-    setRemovingSignupId(signupId);
+  async function onRemove(athleteRaceId: string) {
+    setRemovingRaceId(athleteRaceId);
     try {
-      await api.delete(`/race-signups/${signupId}`);
-      setSignups((prev) => prev.filter((s) => s.id !== signupId));
+      await api.delete(`/race-signups/${athleteRaceId}`);
+      setMyRaces((prev) => prev.filter((r) => r.athleteRaceId !== athleteRaceId));
     } catch (e) {
       console.error(e);
     } finally {
-      setRemovingSignupId(null);
+      setRemovingRaceId(null);
     }
   }
 
-  const heroGoal = heroSignup ? goalByRegistryId.get(heroSignup.raceRegistryId) ?? null : null;
+  async function onAssociateGoal(athleteRaceId: string, goalId: string) {
+    setAssociatingRaceId(athleteRaceId);
+    try {
+      await api.patch(`/race-signups/${athleteRaceId}`, { goalId });
+      await loadAll();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setAssociatingRaceId(null);
+    }
+  }
+
+  function onGoalSaved(updated: InlineGoalRow) {
+    setGoals((prev) => {
+      const idx = prev.findIndex((g) => g.id === updated.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...updated } as GoalRow;
+        return next;
+      }
+      return [...prev, updated as GoalRow];
+    });
+  }
+
+  const heroGoal = heroRace ? goalByAthleteRaceId.get(heroRace.athleteRaceId) ?? null : null;
 
   return (
     <div className="space-y-8">
       {loading ? (
         <p className="text-gray-500 text-sm">Loading your races…</p>
-      ) : signups.length === 0 ? (
+      ) : myRaces.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-200 bg-white/80 px-4 py-10 text-center text-sm text-gray-600">
           <div className="flex justify-end mb-4">
             <Link
@@ -414,24 +496,23 @@ export default function MyRacesPage() {
               >
                 Find more races →
               </Link>
-              {pastSignups.length > 0 ? (
+              {pastRaces.length > 0 ? (
                 <details className="group rounded-lg border border-gray-200 bg-white px-2 py-1.5 sm:max-w-xs sm:text-right">
                   <summary className="cursor-pointer list-none text-xs font-medium text-gray-600 hover:text-gray-900 [&::-webkit-details-marker]:hidden">
-                    Past races ({pastSignups.length})
+                    Past races ({pastRaces.length})
                   </summary>
                   <ul className="mt-2 space-y-1 text-left border-t border-gray-100 pt-2 max-h-40 overflow-y-auto">
-                    {[...pastSignups]
+                    {[...pastRaces]
                       .sort(
                         (a, b) =>
-                          new Date(b.race_registry.raceDate).getTime() -
-                          new Date(a.race_registry.raceDate).getTime()
+                          new Date(b.raceDate).getTime() - new Date(a.raceDate).getTime()
                       )
-                      .map((s) => (
-                        <li key={s.id} className="text-xs text-gray-700">
+                      .map((row) => (
+                        <li key={row.athleteRaceId} className="text-xs text-gray-700">
                           <span className="text-gray-400 tabular-nums mr-1">
-                            {formatRaceListDate(s.race_registry.raceDate)}
+                            {formatRaceListDate(row.raceDate)}
                           </span>
-                          {s.race_registry.name}
+                          {row.name}
                         </li>
                       ))}
                   </ul>
@@ -439,33 +520,26 @@ export default function MyRacesPage() {
               ) : null}
             </div>
           </div>
-          {goals.length > 0 && goalRaceId && !goalOnCalendar && upcomingSignups.length > 0 ? (
+
+          {unboltedGoal && upcomingRaces.length > 0 ? (
             <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-              Your active goal is for a race that isn&apos;t on this calendar yet.{" "}
+              You have an active goal that isn&apos;t linked to a race yet. Pick a race below and
+              tap{" "}
+              <span className="font-semibold">Use this race for my goal</span>, or{" "}
               <Link href="/races/find" className="font-semibold underline">
-                Add it
-              </Link>{" "}
-              or adjust your goal on the primary race below.
+                find another race
+              </Link>
+              .
             </p>
           ) : null}
 
-          {goals.length > 0 && upcomingSignups.length === 0 ? (
-            <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-              You have an active goal, but no upcoming races on your calendar.{" "}
-              <Link href="/races/find" className="font-semibold underline">
-                Find the race
-              </Link>{" "}
-              and add it.
-            </p>
-          ) : null}
-
-          {heroSignup ? (
+          {heroRace ? (
             <section className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50/80 via-white to-white p-5 sm:p-6 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-                {heroSignup.race_registry.logoUrl ? (
+                {heroRace.logoUrl ? (
                   <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl border border-orange-100 bg-white overflow-hidden shrink-0 shadow-sm">
                     <img
-                      src={heroSignup.race_registry.logoUrl}
+                      src={heroRace.logoUrl}
                       alt=""
                       className="w-full h-full object-contain"
                     />
@@ -478,38 +552,60 @@ export default function MyRacesPage() {
                       {heroGoal?.goalTime?.trim() ? "Goal race" : "Up next"}
                     </p>
                     <span className="inline-flex items-center rounded-full bg-orange-100 text-orange-900 px-2.5 py-0.5 text-xs font-bold tabular-nums">
-                      {countdownChipLabel(heroSignup.race_registry.raceDate)}
+                      {countdownChipLabel(heroRace.raceDate)}
                     </span>
                   </div>
                   <h2 className="mt-1.5 text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
-                    {heroSignup.race_registry.name}
+                    {heroRace.name}
                   </h2>
                   <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-gray-600">
                     <span className="inline-flex items-center gap-1">
                       <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                      {formatRaceListDate(heroSignup.race_registry.raceDate)}
+                      {formatRaceListDate(heroRace.raceDate)}
                     </span>
-                    {heroSignup.race_registry.city || heroSignup.race_registry.state ? (
+                    {heroRace.city || heroRace.state ? (
                       <span className="inline-flex items-center gap-1">
                         <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                        {[heroSignup.race_registry.city, heroSignup.race_registry.state]
-                          .filter(Boolean)
-                          .join(", ")}
+                        {[heroRace.city, heroRace.state].filter(Boolean).join(", ")}
                       </span>
                     ) : null}
-                    {heroSignup.race_registry.distanceLabel?.trim() ? (
+                    {heroRace.distanceLabel?.trim() ? (
                       <span className="font-medium text-gray-800">
-                        {heroSignup.race_registry.distanceLabel}
+                        {heroRace.distanceLabel}
                       </span>
                     ) : null}
                   </div>
 
+                  {heroGoal ? (
+                    <div className="mt-3">
+                      <InlineGoalForm
+                        race={raceForGoal(heroRace)}
+                        goal={heroGoal}
+                        onSaved={onGoalSaved}
+                      />
+                    </div>
+                  ) : unboltedGoal ? (
+                    <button
+                      type="button"
+                      disabled={associatingRaceId === heroRace.athleteRaceId}
+                      onClick={() => onAssociateGoal(heroRace.athleteRaceId, unboltedGoal.id)}
+                      className="mt-3 inline-flex items-center justify-center rounded-lg border border-orange-300 bg-white px-3 py-2 text-sm font-semibold text-orange-900 hover:bg-orange-50 disabled:opacity-50"
+                    >
+                      {associatingRaceId === heroRace.athleteRaceId
+                        ? "Linking…"
+                        : "Use this race for my goal"}
+                    </button>
+                  ) : (
+                    <div className="mt-3">
+                      <InlineGoalForm
+                        race={raceForGoal(heroRace)}
+                        goal={null}
+                        onSaved={onGoalSaved}
+                      />
+                    </div>
+                  )}
+
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {heroGoal?.goalTime?.trim() ? (
-                      <span className="inline-flex items-center rounded-full bg-orange-100 text-orange-900 px-2.5 py-1 text-xs font-bold tabular-nums">
-                        Goal {heroGoal.goalTime.trim()}
-                      </span>
-                    ) : null}
                     {activePlanSummary?.hasSchedule &&
                     activePlanSummary.weekNumber != null &&
                     activePlanSummary.totalWeeks != null ? (
@@ -524,7 +620,7 @@ export default function MyRacesPage() {
                       const primary = heroPrimaryCta(
                         heroGoal,
                         activePlanSummary,
-                        personalRaceHref(heroSignup.race_registry)
+                        personalRaceHref(heroRace)
                       );
                       return (
                         <>
@@ -535,13 +631,13 @@ export default function MyRacesPage() {
                             {primary.label}
                           </Link>
                           <Link
-                            href={`/race-hub/${heroSignup.race_registry.id}`}
+                            href={`/race-hub/${heroRace.raceRegistryId}`}
                             className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50"
                           >
                             Race hub →
                           </Link>
                           <Link
-                            href={personalRaceHref(heroSignup.race_registry)}
+                            href={personalRaceHref(heroRace)}
                             className="inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:underline"
                           >
                             Race prep
@@ -555,39 +651,41 @@ export default function MyRacesPage() {
             </section>
           ) : null}
 
-          {otherSignups.length > 0 ? (
+          {otherRaces.length > 0 ? (
             <section>
               <h2 className="text-sm font-semibold text-gray-700 mb-1">
-                {heroSignup ? "Races along the way" : "Your races"}
+                {heroRace ? "Races along the way" : "Your races"}
               </h2>
               <p className="text-xs text-gray-500 mb-3">
-                {heroSignup
+                {heroRace
                   ? "Other upcoming races on your calendar before your goal race."
                   : "Upcoming races on your calendar."}
               </p>
               <ul className="grid gap-3 sm:grid-cols-2">
-                {otherSignups.map((s) => (
-                  <SignupRaceCard
-                    key={s.id}
-                    signup={s}
-                    goalSummary={{
-                      goalTime: goalByRegistryId.get(s.raceRegistryId)?.goalTime?.trim() || null,
-                    }}
+                {otherRaces.map((row) => (
+                  <AthleteRaceCard
+                    key={row.athleteRaceId}
+                    row={row}
+                    goal={goalByAthleteRaceId.get(row.athleteRaceId) ?? null}
+                    unboltedGoal={unboltedGoal}
+                    associating={associatingRaceId === row.athleteRaceId}
+                    onAssociate={onAssociateGoal}
+                    onGoalSaved={onGoalSaved}
                     onRemove={onRemove}
-                    removing={removingSignupId === s.id}
+                    removing={removingRaceId === row.athleteRaceId}
                   />
                 ))}
               </ul>
             </section>
           ) : null}
 
-          {upcomingSignups.length > 0 ? (
+          {upcomingRaces.length > 0 ? (
             <section className="pt-6 border-t border-gray-100">
               <h2 className="text-sm font-semibold text-gray-700 mb-0.5">Next few months</h2>
               <p className="text-xs text-gray-500 mb-3">
                 Quick view — tap a race to open your dashboard.
               </p>
-              <NextSixMonthsRaceCards upcomingSignups={upcomingSignups} />
+              <NextSixMonthsRaceCards upcomingRaces={upcomingRaces} />
             </section>
           ) : null}
 

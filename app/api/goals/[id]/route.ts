@@ -23,6 +23,23 @@ const raceSelect = {
   state: true,
 } as const;
 
+const athleteRaceSelect = {
+  id: true,
+  raceRegistryId: true,
+  name: true,
+  distanceLabel: true,
+  distanceMeters: true,
+  raceDate: true,
+  city: true,
+  state: true,
+  race_registry: { select: { slug: true, logoUrl: true } },
+} as const;
+
+const goalInclude = {
+  athlete_race: { select: athleteRaceSelect },
+  race_registry: { select: raceSelect },
+} as const;
+
 /** GET /api/goals/[id] */
 export async function GET(
   request: NextRequest,
@@ -35,7 +52,7 @@ export async function GET(
 
     const goal = await prisma.athleteGoal.findFirst({
       where: { id, athleteId: athlete!.id },
-      include: { race_registry: { select: raceSelect } },
+      include: goalInclude,
     });
     if (!goal) {
       return NextResponse.json({ error: "Goal not found" }, { status: 404 });
@@ -67,6 +84,7 @@ export async function PUT(
       goalTime?: string | null;
       targetByDate?: string;
       raceRegistryId?: string | null;
+      athleteRaceId?: string | null;
       status?: string;
       whyGoal?: string | null;
       successLooksLike?: string | null;
@@ -92,6 +110,7 @@ export async function PUT(
       patch.targetByDate = d;
     }
     if (body.raceRegistryId !== undefined) patch.raceRegistryId = body.raceRegistryId;
+    if (body.athleteRaceId !== undefined) patch.athleteRaceId = body.athleteRaceId;
     if (body.status !== undefined) patch.status = body.status;
     if (body.whyGoal !== undefined) patch.whyGoal = body.whyGoal;
     if (body.successLooksLike !== undefined) patch.successLooksLike = body.successLooksLike;
@@ -137,7 +156,7 @@ export async function DELETE(
     const goal = await prisma.athleteGoal.update({
       where: { id },
       data: { status: "ARCHIVED", updatedAt: new Date() },
-      include: { race_registry: { select: raceSelect } },
+      include: goalInclude,
     });
     return NextResponse.json({ goal });
   } catch (err: unknown) {
