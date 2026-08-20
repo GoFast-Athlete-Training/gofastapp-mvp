@@ -10,39 +10,6 @@ function generateId(): string {
   return `c${timestamp}${random}`;
 }
 
-/** Minimal athlete row for auth/session — avoids selecting removed or optional profile columns. */
-export const athleteAuthSelect = {
-  id: true,
-  firebaseId: true,
-  email: true,
-  firstName: true,
-} as const;
-
-export type AthleteAuthRecord = {
-  id: string;
-  firebaseId: string;
-  email: string | null;
-  firstName: string | null;
-};
-
-export async function getAthleteAuthById(
-  athleteId: string
-): Promise<AthleteAuthRecord | null> {
-  return prisma.athlete.findUnique({
-    where: { id: athleteId },
-    select: athleteAuthSelect,
-  });
-}
-
-export async function getAthleteAuthByFirebaseId(
-  firebaseId: string
-): Promise<AthleteAuthRecord | null> {
-  return prisma.athlete.findUnique({
-    where: { firebaseId },
-    select: athleteAuthSelect,
-  });
-}
-
 export async function getAthleteById(athleteId: string) {
   return prisma.athlete.findUnique({
     where: { id: athleteId },

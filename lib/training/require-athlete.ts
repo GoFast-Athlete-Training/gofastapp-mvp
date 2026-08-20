@@ -1,13 +1,9 @@
 import { adminAuth } from "@/lib/firebaseAdmin";
-import {
-  getAthleteAuthByFirebaseId,
-  getAthleteAuthById,
-  type AthleteAuthRecord,
-} from "@/lib/domain-athlete";
+import { getAthleteByFirebaseId, getAthleteById } from "@/lib/domain-athlete";
 import { ATHLETE_ID_HEADER } from "@/lib/gofast-request-headers";
 
 export type RequireAthleteFromBearerSuccess = {
-  athlete: AthleteAuthRecord;
+  athlete: NonNullable<Awaited<ReturnType<typeof getAthleteById>>>;
 };
 
 export type RequireAthleteFromBearerFailure = {
@@ -16,13 +12,13 @@ export type RequireAthleteFromBearerFailure = {
 };
 
 type AthleteLookup = {
-  getAthleteById: typeof getAthleteAuthById;
-  getAthleteByFirebaseId: typeof getAthleteAuthByFirebaseId;
+  getAthleteById: typeof getAthleteById;
+  getAthleteByFirebaseId: typeof getAthleteByFirebaseId;
 };
 
 const defaultLookups: AthleteLookup = {
-  getAthleteById: getAthleteAuthById,
-  getAthleteByFirebaseId: getAthleteAuthByFirebaseId,
+  getAthleteById,
+  getAthleteByFirebaseId,
 };
 
 /**

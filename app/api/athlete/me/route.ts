@@ -2,10 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebaseAdmin";
-import {
-  deleteAthleteAccount,
-  getAthleteAuthByFirebaseId,
-} from "@/lib/domain-athlete";
+import { deleteAthleteAccount, getAthleteByFirebaseId } from "@/lib/domain-athlete";
 import { touchAthleteLastSeen } from "@/lib/touch-athlete-last-seen";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 
@@ -18,7 +15,7 @@ export async function GET(request: Request) {
 
   try {
     const decoded = await adminAuth.verifyIdToken(authHeader.substring(7));
-    const athlete = await getAthleteAuthByFirebaseId(decoded.uid);
+    const athlete = await getAthleteByFirebaseId(decoded.uid);
     if (!athlete) {
       return NextResponse.json({ success: false, error: "Athlete not found" }, { status: 404 });
     }
