@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { goalAthleteRaceSelect } from '@/lib/goal-race-display';
 
 export type PrimaryRaceSnapshot = {
   id: string;
@@ -21,46 +22,14 @@ export async function derivePrimaryRaceForAthlete(
       where: { athleteId, status: 'ACTIVE' },
       orderBy: { targetByDate: 'asc' },
       include: {
-        athlete_race: {
-          select: {
-            id: true,
-            raceRegistryId: true,
-            name: true,
-            raceDate: true,
-            distanceLabel: true,
-            city: true,
-            state: true,
-          },
-        },
-        race_registry: {
-          select: {
-            id: true,
-            slug: true,
-            name: true,
-            raceDate: true,
-            distanceLabel: true,
-            city: true,
-            state: true,
-          },
-        },
+        athlete_race: { select: goalAthleteRaceSelect },
       },
     }),
     prisma.training_plans.findFirst({
       where: { athleteId, lifecycleStatus: 'ACTIVE' },
       orderBy: { updatedAt: 'desc' },
       include: {
-        primary_athlete_race: true,
-        race_registry: {
-          select: {
-            id: true,
-            slug: true,
-            name: true,
-            raceDate: true,
-            distanceLabel: true,
-            city: true,
-            state: true,
-          },
-        },
+        athlete_race: { select: goalAthleteRaceSelect },
       },
     }),
     prisma.athlete_races.findFirst({
@@ -69,42 +38,34 @@ export async function derivePrimaryRaceForAthlete(
         raceDate: { gte: new Date() },
       },
       orderBy: { raceDate: 'asc' },
-      include: {
-        race_registry: {
-          select: {
-            id: true,
-            slug: true,
-            logoUrl: true,
-          },
-        },
-      },
+      select: goalAthleteRaceSelect,
     }),
   ]);
 
-  const planPrimary = activePlan?.primary_athlete_race;
+  const planPrimary = activePlan?.athlete_race;
   const raceFromPlan = planPrimary
     ? {
         id: planPrimary.raceRegistryId,
-        slug: activePlan?.race_registry?.slug ?? null,
+        slug: planPrimary.slug,
         name: planPrimary.name,
         raceDate: planPrimary.raceDate,
         distanceLabel: planPrimary.distanceLabel,
         city: planPrimary.city,
         state: planPrimary.state,
       }
-    : activePlan?.race_registry ?? null;
+    : null;
 
   const raceFromGoal = activeGoal?.athlete_race
     ? {
         id: activeGoal.athlete_race.raceRegistryId,
-        slug: activeGoal.race_registry?.slug ?? null,
+        slug: activeGoal.athlete_race.slug,
         name: activeGoal.athlete_race.name,
         raceDate: activeGoal.athlete_race.raceDate,
         distanceLabel: activeGoal.athlete_race.distanceLabel,
         city: activeGoal.athlete_race.city,
         state: activeGoal.athlete_race.state,
       }
-    : activeGoal?.race_registry ?? null;
+    : null;
 
   const race =
     raceFromPlan ??
@@ -112,7 +73,7 @@ export async function derivePrimaryRaceForAthlete(
     (futureSignup
       ? {
           id: futureSignup.raceRegistryId,
-          slug: futureSignup.race_registry.slug,
+          slug: futureSignup.slug,
           name: futureSignup.name,
           raceDate: futureSignup.raceDate,
           distanceLabel: futureSignup.distanceLabel,
@@ -137,7 +98,7 @@ export async function derivePrimaryRaceForAthlete(
 
 /**
  * Copy active goal + primary race display values into Athlete snapshot columns.
- * Source of truth remains AthleteGoal / training_plans / race_registry relationships.
+ * Source of truth remains AthleteGoal / training_plans / athlete_races relationships.
  */
 function snapshotNeedsRepair(params: {
   athlete: {
@@ -157,7 +118,7 @@ function snapshotNeedsRepair(params: {
     name: string | null;
     goalTime: string | null;
     targetByDate: Date;
-    race_registry: { name: string } | null;
+    athlete_race: { name: string } | null;
   } | null;
   primaryRace: PrimaryRaceSnapshot | null;
 }): boolean {
@@ -169,7 +130,7 @@ function snapshotNeedsRepair(params: {
     if (goalTime !== snapTime) return true;
     if ((activeGoal.name ?? null) !== (athlete.primaryGoalNameSnapshot ?? null)) return true;
     if (
-      (activeGoal.race_registry?.name ?? null) !==
+      (activeGoal.athlete_race?.name ?? null) !==
       (athlete.primaryGoalRaceNameSnapshot ?? null)
     ) {
       return true;
@@ -230,7 +191,7 @@ export async function syncAthleteProfileSnapshot(athleteId: string): Promise<voi
       where: { athleteId, status: 'ACTIVE' },
       orderBy: { targetByDate: 'asc' },
       include: {
-        race_registry: { select: { name: true } },
+        athlete_race: { select: { name: true } },
       },
     }),
     derivePrimaryRaceForAthlete(athleteId),
@@ -242,7 +203,7 @@ export async function syncAthleteProfileSnapshot(athleteId: string): Promise<voi
       primaryGoalNameSnapshot: activeGoal?.name ?? null,
       primaryGoalTimeSnapshot: activeGoal?.goalTime ?? null,
       primaryGoalTargetByDateSnapshot: activeGoal?.targetByDate ?? null,
-      primaryGoalRaceNameSnapshot: activeGoal?.race_registry?.name ?? null,
+      primaryGoalRaceNameSnapshot: activeGoal?.athlete_race?.name ?? null,
       primaryRaceRegistryIdSnapshot: primaryRace?.id ?? null,
       primaryRaceSlugSnapshot: primaryRace?.slug ?? null,
       primaryRaceNameSnapshot: primaryRace?.name ?? null,
@@ -280,7 +241,7 @@ export async function ensureAthleteProfileSnapshot(athleteId: string): Promise<b
       where: { athleteId, status: 'ACTIVE' },
       orderBy: { targetByDate: 'asc' },
       include: {
-        race_registry: { select: { name: true } },
+        athlete_race: { select: { name: true } },
       },
     }),
     derivePrimaryRaceForAthlete(athleteId),

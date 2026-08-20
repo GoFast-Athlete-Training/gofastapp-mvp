@@ -205,14 +205,24 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
     ? await prisma.athleteGoal.findFirst({
         where: { id: inputGoalId, athleteId },
         include: {
-          race_registry: {
-            select: { id: true, name: true, distanceMeters: true, distanceLabel: true, raceDate: true },
+          athlete_race: {
+            select: {
+              id: true,
+              raceRegistryId: true,
+              name: true,
+              distanceMeters: true,
+              distanceLabel: true,
+              raceDate: true,
+            },
           },
         },
       })
     : null;
 
-  if (goal && goal.raceRegistryId && goal.raceRegistryId !== raceRegistryId) {
+  if (
+    goal?.athlete_race?.raceRegistryId &&
+    goal.athlete_race.raceRegistryId !== raceRegistryId
+  ) {
     throw new Error("Goal does not match this race");
   }
 
@@ -248,7 +258,9 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
   const distKey = goal
     ? normalizeDistanceForPace(
         String(goal.distance ?? ""),
-        goal.race_registry?.distanceMeters != null ? Number(goal.race_registry.distanceMeters) : null
+        goal.athlete_race?.distanceMeters != null
+          ? Number(goal.athlete_race.distanceMeters)
+          : null
       )
     : normalizeDistanceForPace("", reg.distanceMeters != null ? Number(reg.distanceMeters) : null);
   const distanceLabel = distKey;
@@ -294,7 +306,7 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
     }
   }
 
-  const raceDate = goal?.race_registry?.raceDate ?? reg.raceDate ?? goal?.targetByDate;
+  const raceDate = goal?.athlete_race?.raceDate ?? reg.raceDate ?? goal?.targetByDate;
   const resolvedAthleteRaceId =
     inputSignupId ||
     (await prisma.athlete_races.findUnique({
@@ -385,19 +397,25 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
 
   const analysis =
     goal && finishTimeSeconds != null
-      ? analyzeRaceResult(result, goal, goal.race_registry?.name ?? reg.name)
+      ? analyzeRaceResult(result, goal, goal.athlete_race?.name ?? reg.name)
       : null;
 
-  return { result, analysis, goal, raceName: goal?.race_registry?.name ?? reg.name };
+  return { result, analysis, goal, raceName: goal?.athlete_race?.name ?? reg.name };
 }
 
 /**
  * Log finish for a goal (modal): same pipeline as the sheet, keyed by goal.
  */
 export async function createRaceResult(athleteId: string, input: CreateRaceResultInput) {
-  const g = await prisma.athleteGoal.findFirst({ where: { id: input.goalId, athleteId } });
+  const g = await prisma.athleteGoal.findFirst({
+    where: { id: input.goalId, athleteId },
+    include: {
+      athlete_race: { select: { raceRegistryId: true } },
+    },
+  });
   if (!g) throw new Error("Goal not found");
-  if (!g.raceRegistryId) {
+  const raceRegistryId = g.athlete_race?.raceRegistryId ?? null;
+  if (!raceRegistryId) {
     throw new Error("Link this goal to a race in profile before logging a result");
   }
   if (!String(input.officialFinishTime).trim()) {
@@ -411,7 +429,7 @@ export async function createRaceResult(athleteId: string, input: CreateRaceResul
     throw new Error(msg);
   }
   return saveRaceResultExtended(athleteId, {
-    raceRegistryId: g.raceRegistryId,
+    raceRegistryId,
     goalId: input.goalId,
     officialFinishTime: input.officialFinishTime,
     chipTime: null,

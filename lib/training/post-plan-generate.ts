@@ -28,18 +28,16 @@ export async function planGeneratePostHandler(
 
     const plan = await prisma.training_plans.findFirst({
       where: { id: trainingPlanId, athleteId: athlete.id },
-      include: {
-        race_registry: true,
-      },
+      include: { athlete_race: true },
     });
 
     if (!plan) {
       return NextResponse.json({ error: "Plan not found" }, { status: 404 });
     }
 
-    if (!plan.race_registry) {
+    if (!plan.athlete_race) {
       return NextResponse.json(
-        { error: "Plan must have a race" },
+        { error: "Plan must have athleteRaceId set before generation" },
         { status: 400 }
       );
     }

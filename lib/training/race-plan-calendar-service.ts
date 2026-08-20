@@ -12,6 +12,14 @@ import {
   type PlanDaySchedule,
   type PlanWeekSchedule,
 } from "@/lib/training/plan-schedule-schema";
+import {
+  alongWaySnapToCalendarEntry,
+  buildPlanRaceSnapshots,
+  mainSnapToCalendarEntry,
+  parseAthleteRaceAlongWaySnaps,
+  parseAthleteRaceMainSnap,
+  planRaceSnapshotsToPrismaJson,
+} from "@/lib/training/plan-race-snapshots";
 import { utcDateOnly, ymdFromDate, currentTrainingWeekNumber } from "@/lib/training/plan-utils";
 
 export type PlanRaceCalendarEntry = {
@@ -136,7 +144,7 @@ function athleteRaceToEntry(
   };
 }
 
-/** Load athlete races in plan window; primary from plan.primaryAthleteRaceId. */
+/** Load athlete races in plan window; terminal race from plan.athleteRaceId. */
 export async function resolvePlanRaceCalendar(params: {
   athleteId: string;
   trainingPlanId: string;
@@ -145,59 +153,73 @@ export async function resolvePlanRaceCalendar(params: {
   const plan = await prisma.training_plans.findFirst({
     where: { id: params.trainingPlanId, athleteId: params.athleteId },
     include: {
-      primary_athlete_race: true,
-      race_registry: {
-        select: {
-          id: true,
-          name: true,
-          raceDate: true,
-          distanceMeters: true,
-          distanceLabel: true,
-        },
-      },
+      athlete_race: true,
     },
   });
   if (!plan) {
     throw new Error("Plan not found");
   }
 
-  let primaryRow = plan.primary_athlete_race;
-  if (!primaryRow && plan.raceId) {
-    primaryRow = await prisma.athlete_races.findUnique({
-      where: {
-        athleteId_raceRegistryId: {
-          athleteId: params.athleteId,
-          raceRegistryId: plan.raceId,
-        },
-      },
+  const mainRow = plan.athlete_race;
+  if (!mainRow) {
+    throw new Error("Plan has no terminal athlete race (athleteRaceId required)");
+  }
+
+  const includedSet =
+    params.includedSecondaryAthleteRaceIds != null
+      ? new Set(params.includedSecondaryAthleteRaceIds)
+      : null;
+
+  const frozenMain = parseAthleteRaceMainSnap(plan.athleteRaceMainSnap);
+  const frozenAlong = parseAthleteRaceAlongWaySnaps(plan.athleteRaceAlongWaySnaps);
+
+  if (frozenMain && frozenMain.sourceAthleteRaceId === mainRow.id) {
+    const primary = mainSnapToCalendarEntry(frozenMain) as PlanRaceCalendarEntry;
+    const secondaries = frozenAlong.map((snap) => {
+      const entry = alongWaySnapToCalendarEntry(snap) as PlanRaceCalendarEntry;
+      if (includedSet != null && !includedSet.has(entry.athleteRaceId)) {
+        return { ...entry, inclusion: "EXCLUDED" as const };
+      }
+      return entry;
     });
+    return { primary, secondaries };
   }
 
-  if (!primaryRow && plan.race_registry) {
-    primaryRow = {
-      id: "synthetic-primary",
-      athleteId: params.athleteId,
-      raceRegistryId: plan.race_registry.id,
-      name: plan.race_registry.name,
-      raceDate: plan.race_registry.raceDate,
-      distanceMeters: plan.race_registry.distanceMeters,
-      distanceLabel: plan.race_registry.distanceLabel,
-      city: null,
-      state: null,
-      selfDeclaredAt: plan.startDate,
-      notifyEnabled: true,
-      createdAt: plan.createdAt,
-      updatedAt: plan.updatedAt,
-    };
-  }
+  const allRaces = await prisma.athlete_races.findMany({
+    where: { athleteId: params.athleteId },
+    orderBy: { raceDate: "asc" },
+  });
 
-  if (!primaryRow) {
-    throw new Error("Plan has no primary athlete race");
-  }
+  const snapshots = buildPlanRaceSnapshots({
+    mainRow,
+    planStart: plan.startDate,
+    allAthleteRaces: allRaces,
+    includedAlongWayIds: includedSet,
+  });
 
-  const primary = athleteRaceToEntry(primaryRow, "PRIMARY", "INCLUDED");
-  const startMs = utcDateOnly(plan.startDate).getTime();
-  const endMs = utcDateOnly(primary.raceDate).getTime();
+  const primary = mainSnapToCalendarEntry(snapshots.athleteRaceMainSnap) as PlanRaceCalendarEntry;
+  const secondaries = snapshots.athleteRaceAlongWaySnaps.map((snap) => {
+    const entry = alongWaySnapToCalendarEntry(snap) as PlanRaceCalendarEntry;
+    if (includedSet != null && !includedSet.has(entry.athleteRaceId)) {
+      return { ...entry, inclusion: "EXCLUDED" as const };
+    }
+    return entry;
+  });
+
+  return { primary, secondaries };
+}
+
+/** Persist plan-level race snapshots from live athlete_races rows. */
+export async function persistPlanRaceSnapshots(params: {
+  trainingPlanId: string;
+  athleteId: string;
+  includedSecondaryAthleteRaceIds?: string[] | null;
+}): Promise<void> {
+  const plan = await prisma.training_plans.findFirst({
+    where: { id: params.trainingPlanId, athleteId: params.athleteId },
+    include: { athlete_race: true },
+  });
+  if (!plan?.athlete_race) return;
 
   const allRaces = await prisma.athlete_races.findMany({
     where: { athleteId: params.athleteId },
@@ -209,17 +231,20 @@ export async function resolvePlanRaceCalendar(params: {
       ? new Set(params.includedSecondaryAthleteRaceIds)
       : null;
 
-  const secondaries: PlanRaceCalendarEntry[] = [];
-  for (const row of allRaces) {
-    if (row.id === primary.athleteRaceId) continue;
-    const dMs = utcDateOnly(row.raceDate).getTime();
-    if (dMs < startMs || dMs > endMs) continue;
-    const inclusion =
-      includedSet == null || includedSet.has(row.id) ? "INCLUDED" : "EXCLUDED";
-    secondaries.push(athleteRaceToEntry(row, "SECONDARY", inclusion));
-  }
+  const snapshots = buildPlanRaceSnapshots({
+    mainRow: plan.athlete_race,
+    planStart: plan.startDate,
+    allAthleteRaces: allRaces,
+    includedAlongWayIds: includedSet,
+  });
 
-  return { primary, secondaries };
+  await prisma.training_plans.update({
+    where: { id: plan.id },
+    data: {
+      ...planRaceSnapshotsToPrismaJson(snapshots),
+      updatedAt: new Date(),
+    },
+  });
 }
 
 export function previewPlanRaceCollision(params: {
@@ -430,19 +455,19 @@ export function imprintPlanRaceCalendarOnSchedule(params: {
 export async function listSecondaryCandidatesForPlan(params: {
   athleteId: string;
   planStart: Date;
-  primaryRaceDate: Date;
-  primaryAthleteRaceId: string | null;
+  terminalRaceDate: Date;
+  athleteRaceId: string | null;
 }) {
   const races = await prisma.athlete_races.findMany({
     where: { athleteId: params.athleteId },
     orderBy: { raceDate: "asc" },
   });
   const startMs = utcDateOnly(params.planStart).getTime();
-  const endMs = utcDateOnly(params.primaryRaceDate).getTime();
+  const endMs = utcDateOnly(params.terminalRaceDate).getTime();
   const todayMs = utcDateOnly(new Date()).getTime();
 
   return races.filter((r) => {
-    if (params.primaryAthleteRaceId && r.id === params.primaryAthleteRaceId) return false;
+    if (params.athleteRaceId && r.id === params.athleteRaceId) return false;
     const dMs = utcDateOnly(r.raceDate).getTime();
     return dMs >= startMs && dMs <= endMs && dMs >= todayMs;
   });
@@ -454,10 +479,7 @@ export async function findActivePlanForAthlete(athleteId: string) {
     where: { athleteId, lifecycleStatus: TrainingPlanLifecycle.ACTIVE },
     orderBy: { updatedAt: "desc" },
     include: {
-      primary_athlete_race: true,
-      race_registry: {
-        select: { id: true, name: true, raceDate: true, distanceMeters: true, distanceLabel: true },
-      },
+      athlete_race: true,
     },
   });
 }
@@ -465,7 +487,6 @@ export async function findActivePlanForAthlete(athleteId: string) {
 export async function athleteRaceAffectsActivePlan(params: {
   athleteId: string;
   athleteRaceId: string;
-  raceRegistryId: string;
   raceDate: Date;
 }): Promise<{
   affectsPlan: boolean;
@@ -478,24 +499,18 @@ export async function athleteRaceAffectsActivePlan(params: {
     return { affectsPlan: false, planId: null, weekNumber: null, planName: null };
   }
 
-  const primaryId = plan.primaryAthleteRaceId;
-  const primaryRegistryId = plan.primary_athlete_race?.raceRegistryId ?? plan.raceId;
-  if (
-    params.athleteRaceId === primaryId ||
-    params.raceRegistryId === primaryRegistryId
-  ) {
+  if (params.athleteRaceId === plan.athleteRaceId) {
     return { affectsPlan: false, planId: plan.id, weekNumber: null, planName: plan.name };
   }
 
-  const primaryDate =
-    plan.primary_athlete_race?.raceDate ?? plan.race_registry?.raceDate ?? null;
-  if (!primaryDate) {
+  const terminalDate = plan.athlete_race?.raceDate ?? null;
+  if (!terminalDate) {
     return { affectsPlan: false, planId: plan.id, weekNumber: null, planName: plan.name };
   }
 
   const raceMs = utcDateOnly(params.raceDate).getTime();
   const startMs = utcDateOnly(plan.startDate).getTime();
-  const endMs = utcDateOnly(primaryDate).getTime();
+  const endMs = utcDateOnly(terminalDate).getTime();
   if (raceMs < startMs || raceMs > endMs) {
     return { affectsPlan: false, planId: plan.id, weekNumber: null, planName: plan.name };
   }

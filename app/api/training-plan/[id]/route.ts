@@ -9,6 +9,8 @@ import { archiveOtherActivePlans, cascadeLinkedGoalAfterPlanArchived } from "@/l
 import { validatePreferredTempoInterval } from "@/lib/training/preferred-tempo-interval";
 import { cleanupPlanWorkoutsBeforeDelete } from "@/lib/training/plan-delete-cleanup";
 import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
+import { resolvePlanTerminalRaceDisplay } from "@/lib/training/plan-race-snapshots";
+import { persistPlanRaceSnapshots } from "@/lib/training/race-plan-calendar-service";
 import {
   computeRaceReadiness,
   deriveKCoefficient,
@@ -39,6 +41,16 @@ export async function GET(request: NextRequest, context: Ctx) {
     const plan = await prisma.training_plans.findFirst({
       where: { id, athleteId: auth.athlete.id },
       include: {
+        athlete_race: {
+          select: {
+            id: true,
+            raceRegistryId: true,
+            name: true,
+            raceDate: true,
+            distanceMeters: true,
+            distanceLabel: true,
+          },
+        },
         race_registry: {
           select: {
             id: true,
@@ -150,18 +162,23 @@ export async function GET(request: NextRequest, context: Ctx) {
       select: { weeklyMileageTarget: true },
     });
 
+    const terminalRace = resolvePlanTerminalRaceDisplay(plan);
+
     const serialized = {
       ...plan,
       startDate: ymdFromDate(plan.startDate),
-      race_registry: plan.race_registry
+      race_registry: terminalRace
         ? {
-            ...plan.race_registry,
-            raceDate: ymdFromDate(plan.race_registry.raceDate),
+            id: terminalRace.raceRegistryId,
+            name: terminalRace.name,
+            raceDate: ymdFromDate(terminalRace.raceDate),
+            distanceMeters: terminalRace.distanceMeters,
+            distanceLabel: terminalRace.distanceLabel,
           }
         : null,
     };
 
-    const race = plan.race_registry;
+    const race = terminalRace;
     const goalFinishTime =
       plan.athlete_goal?.goalTime?.trim() ||
       plan.goalRaceTime?.trim() ||
@@ -241,7 +258,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     const { id } = await context.params;
     const existing = await prisma.training_plans.findFirst({
       where: { id, athleteId: auth.athlete.id },
-      include: { race_registry: true },
+      include: { athlete_race: true },
     });
     if (!existing) {
       return NextResponse.json({ error: "Plan not found" }, { status: 404 });
@@ -309,8 +326,9 @@ export async function PATCH(request: NextRequest, context: Ctx) {
             return NextResponse.json({ error: "Invalid startDate" }, { status: 400 });
           }
           data.startDate = d;
-          if (existing.race_registry) {
-            data.totalWeeks = totalWeeksFromDates(d, existing.race_registry.raceDate);
+          const terminalDate = existing.athlete_race?.raceDate;
+          if (terminalDate) {
+            data.totalWeeks = totalWeeksFromDates(d, terminalDate);
           }
         }
         if (body.currentWeeklyMileage != null) {
@@ -326,16 +344,15 @@ export async function PATCH(request: NextRequest, context: Ctx) {
           }
           data.athleteGoalId = gid;
         }
-        if (body.primaryAthleteRaceId != null) {
-          const arId = String(body.primaryAthleteRaceId).trim();
+        if (body.athleteRaceId != null) {
+          const arId = String(body.athleteRaceId).trim();
           const ar = await prisma.athlete_races.findFirst({
             where: { id: arId, athleteId: auth.athlete.id },
           });
           if (!ar) {
             return NextResponse.json({ error: "Athlete race not found" }, { status: 404 });
           }
-          data.primaryAthleteRaceId = ar.id;
-          data.raceId = ar.raceRegistryId;
+          data.athleteRaceId = ar.id;
           const startForWeeks =
             (data.startDate as Date | undefined) ?? existing.startDate;
           data.totalWeeks = totalWeeksFromDates(startForWeeks, ar.raceDate);
@@ -453,6 +470,16 @@ export async function PATCH(request: NextRequest, context: Ctx) {
       where: { id },
       data: data as object,
       include: {
+        athlete_race: {
+          select: {
+            id: true,
+            raceRegistryId: true,
+            name: true,
+            raceDate: true,
+            distanceMeters: true,
+            distanceLabel: true,
+          },
+        },
         race_registry: {
           select: {
             id: true,
@@ -479,6 +506,13 @@ export async function PATCH(request: NextRequest, context: Ctx) {
       await cascadeLinkedGoalAfterPlanArchived(id, auth.athlete.id);
     }
 
+    if (!scheduleLocked && (body.athleteRaceId != null || body.startDate != null)) {
+      await persistPlanRaceSnapshots({
+        trainingPlanId: id,
+        athleteId: auth.athlete.id,
+      });
+    }
+
     const athleteRow = await prisma.athlete.findUnique({
       where: { id: auth.athlete.id },
       select: { fiveKPace: true },
@@ -487,12 +521,18 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     const serialized = {
       ...planRow,
       startDate: ymdFromDate(planRow.startDate),
-      race_registry: planRow.race_registry
-        ? {
-            ...planRow.race_registry,
-            raceDate: ymdFromDate(planRow.race_registry.raceDate),
-          }
-        : null,
+      race_registry: (() => {
+        const terminal = resolvePlanTerminalRaceDisplay(planRow);
+        return terminal
+          ? {
+              id: terminal.raceRegistryId,
+              name: terminal.name,
+              raceDate: ymdFromDate(terminal.raceDate),
+              distanceMeters: terminal.distanceMeters,
+              distanceLabel: terminal.distanceLabel,
+            }
+          : null;
+      })(),
     };
 
     return NextResponse.json({

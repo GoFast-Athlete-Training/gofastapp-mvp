@@ -31,7 +31,7 @@ import type {
   GoFastWithMeTrainingFor,
   GoFastWithMeTrainingSummary,
 } from '@/lib/gofast-with-me/training-for-types';
-import { athleteCommunityRelationship } from '@/lib/gofast-with-me/athlete-community-access';
+import { parseAthleteRaceMainSnap } from '@/lib/training/plan-race-snapshots';
 
 export type ContainerHubMessage = MappedContainerMessage;
 export type { GoFastWithMeChasingGoal, GoFastWithMeTrainingFor, GoFastWithMeTrainingSummary };
@@ -102,15 +102,24 @@ type PlanWeekRace = {
 };
 
 function raceForPlanWeeks(plan: {
-  primary_athlete_race?: PlanWeekRace | null;
+  athlete_race?: PlanWeekRace | null;
+  athleteRaceMainSnap?: unknown;
   race_registry: PlanWeekRace | null;
 }): PlanWeekRace | null {
-  const snap = plan.primary_athlete_race;
+  const snap = plan.athlete_race;
   if (snap) {
     return {
       name: snap.name,
       raceDate: snap.raceDate,
       distanceMeters: snap.distanceMeters,
+    };
+  }
+  const mainSnap = parseAthleteRaceMainSnap(plan.athleteRaceMainSnap);
+  if (mainSnap) {
+    return {
+      name: mainSnap.name,
+      raceDate: new Date(mainSnap.raceDate),
+      distanceMeters: mainSnap.distanceMeters,
     };
   }
   return plan.race_registry;
@@ -125,7 +134,8 @@ async function buildPlanStripFromTrainingPlan(plan: {
   totalWeeks: number;
   planSchedule: unknown;
   race_registry: PlanWeekRace | null;
-  primary_athlete_race?: PlanWeekRace | null;
+  athlete_race?: PlanWeekRace | null;
+  athleteRaceMainSnap?: unknown;
 }): Promise<HubPlanStrip | null> {
   if (!plan.planSchedule) return null;
 
@@ -191,7 +201,7 @@ async function loadHubPlanStrip(
       race_registry: {
         select: { name: true, raceDate: true, distanceMeters: true },
       },
-      primary_athlete_race: {
+      athlete_race: {
         select: { name: true, raceDate: true, distanceMeters: true },
       },
     },

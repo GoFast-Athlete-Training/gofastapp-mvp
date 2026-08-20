@@ -5,8 +5,6 @@ import { formatRaceListDate } from "@/lib/races-display";
 
 export type SecondaryRaceCandidate = {
   athleteRaceId: string;
-  /** @deprecated alias */
-  signupId: string;
   raceRegistryId: string;
   race: {
     name: string;

@@ -62,7 +62,6 @@ export async function POST(request: NextRequest) {
     const planImpact = await athleteRaceAffectsActivePlan({
       athleteId: athlete!.id,
       athleteRaceId: athleteRace.id,
-      raceRegistryId: athleteRace.raceRegistryId,
       raceDate: athleteRace.raceDate,
     });
 

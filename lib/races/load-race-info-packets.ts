@@ -60,8 +60,8 @@ export async function loadRaceInfoPacketsForAthlete(
     prisma.athleteGoal.findFirst({
       where: {
         athleteId,
-        raceRegistryId,
         status: "ACTIVE",
+        athlete_race: { is: { raceRegistryId } },
       },
       orderBy: { updatedAt: "desc" },
       select: { goalTime: true },

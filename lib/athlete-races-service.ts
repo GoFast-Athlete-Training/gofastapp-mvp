@@ -29,6 +29,8 @@ export type AthleteRaceRow = {
   distanceLabel: string | null;
   city: string | null;
   state: string | null;
+  slug: string | null;
+  logoUrl: string | null;
   selfDeclaredAt: Date;
   notifyEnabled: boolean;
   createdAt: Date;
@@ -53,6 +55,8 @@ export function snapshotDataFromRegistry(race: {
   distanceLabel: string | null;
   city: string | null;
   state: string | null;
+  slug: string | null;
+  logoUrl: string | null;
 }) {
   return {
     name: race.name,
@@ -61,6 +65,8 @@ export function snapshotDataFromRegistry(race: {
     distanceLabel: race.distanceLabel,
     city: race.city,
     state: race.state,
+    slug: race.slug,
+    logoUrl: race.logoUrl,
   };
 }
 

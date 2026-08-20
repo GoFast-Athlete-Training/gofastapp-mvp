@@ -297,9 +297,7 @@ export default function MyRacesPage() {
   const router = useRouter();
   const [myRaces, setMyRaces] = useState<AthleteRaceRow[]>([]);
   const [goals, setGoals] = useState<GoalRow[]>([]);
-  const [primaryPlanAthleteRaceId, setPrimaryPlanAthleteRaceId] = useState<string | null>(
-    null
-  );
+  const [planAthleteRaceId, setPlanAthleteRaceId] = useState<string | null>(null);
   const [activePlanSummary, setActivePlanSummary] = useState<ActivePlanSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [removingRaceId, setRemovingRaceId] = useState<string | null>(null);
@@ -320,7 +318,7 @@ export default function MyRacesPage() {
           })),
         api
           .get<{
-            calendar?: { primaryPlanAthleteRaceId?: string | null };
+            calendar?: { planAthleteRaceId?: string | null };
           }>("/race-calendar")
           .catch(() => ({ data: { calendar: undefined } })),
       ]);
@@ -328,9 +326,7 @@ export default function MyRacesPage() {
         suRes.data.athleteRaces ?? suRes.data.signups ?? [];
       setMyRaces(raw.map(normalizeAthleteRace));
       setGoals(gRes.data.goals ?? []);
-      setPrimaryPlanAthleteRaceId(
-        calRes.data?.calendar?.primaryPlanAthleteRaceId ?? null
-      );
+      setPlanAthleteRaceId(calRes.data?.calendar?.planAthleteRaceId ?? null);
       const s = upRes.data?.activePlanSummary;
       setActivePlanSummary(
         s && typeof s.name === "string"
@@ -346,7 +342,7 @@ export default function MyRacesPage() {
       console.error(e);
       setMyRaces([]);
       setGoals([]);
-      setPrimaryPlanAthleteRaceId(null);
+      setPlanAthleteRaceId(null);
       setActivePlanSummary(null);
     } finally {
       setLoading(false);
@@ -402,12 +398,12 @@ export default function MyRacesPage() {
         athleteRaceId: r.athleteRaceId,
         raceDate: r.raceDate,
       })),
-      primaryPlanAthleteRaceId,
+      planAthleteRaceId,
       goalAthleteRaceId: goals.find((g) => g.athleteRaceId)?.athleteRaceId ?? null,
     });
     if (!picked) return null;
     return upcomingSorted.find((r) => r.athleteRaceId === picked.athleteRaceId) ?? null;
-  }, [upcomingSorted, primaryPlanAthleteRaceId, goals]);
+  }, [upcomingSorted, planAthleteRaceId, goals]);
 
   const otherRaces = useMemo(
     () => upcomingSorted.filter((r) => r.athleteRaceId !== heroRace?.athleteRaceId),

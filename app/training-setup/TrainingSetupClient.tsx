@@ -25,14 +25,24 @@ type RaceRegistryLite = {
   state?: string | null;
 };
 
+type GoalAthleteRaceLite = {
+  raceRegistryId: string;
+  name: string;
+  raceDate: string;
+  distanceMeters?: number | null;
+  distanceLabel?: string | null;
+  city?: string | null;
+  state?: string | null;
+};
+
 type GoalRow = {
   id: string;
   status: string;
   goalTime: string | null;
-  raceRegistryId: string | null;
+  athleteRaceId: string | null;
   targetByDate: string;
   name?: string | null;
-  race_registry: RaceRegistryLite | null;
+  athlete_race: GoalAthleteRaceLite | null;
 };
 
 type SignupRow = {
@@ -46,12 +56,12 @@ function goalTimeReady(g: GoalRow): boolean {
 }
 
 function goalRaceReady(g: GoalRow): boolean {
-  return !!g.raceRegistryId && !!g.race_registry;
+  return !!g.athlete_race?.raceRegistryId;
 }
 
 function isQualifyingGoal(g: GoalRow): boolean {
   if (g.status !== "ACTIVE" || !goalRaceReady(g) || !goalTimeReady(g)) return false;
-  const rd = g.race_registry?.raceDate;
+  const rd = g.athlete_race?.raceDate;
   if (!rd || raceCalendarBeforeTodayUtc(rd)) return false;
   return true;
 }
@@ -190,12 +200,12 @@ export default function TrainingSetupClient() {
 
   /** Presets compatible with the current wizard goal race distance (or all if distance unknown). */
   const presetsForWizardGoal = useMemo(() => {
-    const dm = wizardGoal?.race_registry?.distanceMeters;
+    const dm = wizardGoal?.athlete_race?.distanceMeters;
     if (dm == null || !Number.isFinite(Number(dm))) {
       return prodPresets;
     }
     return prodPresets.filter((p) => presetMatchesDistance(p.targetDistanceLabel, Number(dm)));
-  }, [prodPresets, wizardGoal?.race_registry?.distanceMeters, wizardGoal?.id]);
+  }, [prodPresets, wizardGoal?.athlete_race?.distanceMeters, wizardGoal?.id]);
 
   const futureSignups = useMemo(
     () =>
@@ -214,8 +224,8 @@ export default function TrainingSetupClient() {
           g.status === "ACTIVE" &&
           goalRaceReady(g) &&
           goalTimeReady(g) &&
-          !!g.race_registry?.raceDate &&
-          raceCalendarBeforeTodayUtc(g.race_registry.raceDate)
+          !!g.athlete_race?.raceDate &&
+          raceCalendarBeforeTodayUtc(g.athlete_race.raceDate)
       ),
     [goals]
   );
@@ -411,9 +421,9 @@ export default function TrainingSetupClient() {
   }, [startDate]);
 
   useEffect(() => {
-    if (planNameTouched || !wizardGoal?.race_registry?.name) return;
-    setPlanName(suggestPlanName(wizardGoal.race_registry.name, athleteFirstName));
-  }, [wizardGoal?.id, wizardGoal?.race_registry?.name, athleteFirstName, planNameTouched]);
+    if (planNameTouched || !wizardGoal?.athlete_race?.name) return;
+    setPlanName(suggestPlanName(wizardGoal.athlete_race.name, athleteFirstName));
+  }, [wizardGoal?.id, wizardGoal?.athlete_race?.name, athleteFirstName, planNameTouched]);
 
   function beginWizardForGoal(g: GoalRow) {
     setWizardGoal(g);
@@ -446,7 +456,7 @@ export default function TrainingSetupClient() {
   }
 
   async function createPlan(opts?: { forceReplace?: boolean }) {
-    if (!wizardGoal?.race_registry || !wizardGoal.raceRegistryId) {
+    if (!wizardGoal?.athlete_race?.raceRegistryId) {
       setFormError(null);
       setCreateFeedback("goals");
       return;
@@ -511,7 +521,7 @@ export default function TrainingSetupClient() {
         },
         body: JSON.stringify({
           athleteGoalId: wizardGoal.id,
-          raceRegistryId: wizardGoal.raceRegistryId,
+          raceRegistryId: wizardGoal.athlete_race.raceRegistryId,
           name: trimmedPlanName,
           startDate: new Date(startDate).toISOString(),
           fiveKPace: fiveKPaceOut,
@@ -562,8 +572,8 @@ export default function TrainingSetupClient() {
     );
   }
 
-  if (wizardGoal && wizardGoal.race_registry && wizardGoal.raceRegistryId) {
-    const rr = wizardGoal.race_registry;
+  if (wizardGoal && wizardGoal.athlete_race?.raceRegistryId) {
+    const rr = wizardGoal.athlete_race;
     const goalDistanceLine = raceDistanceDisplayForGoal(rr);
 
     const weeklyN = baselineWeeklyMileage.trim() === "" ? NaN : Number(baselineWeeklyMileage);
@@ -993,19 +1003,19 @@ export default function TrainingSetupClient() {
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
                       Complete
                     </p>
-                    <div className="mb-1 font-medium text-gray-900">{g.race_registry?.name ?? "Race"}</div>
+                    <div className="mb-1 font-medium text-gray-900">{g.athlete_race?.name ?? "Race"}</div>
                     <div className="text-xs text-gray-600 mb-3">
-                      {g.race_registry
-                        ? `${formatRaceWhen(g.race_registry.raceDate)} · Goal time ${g.goalTime}`
+                      {g.athlete_race
+                        ? `${formatRaceWhen(g.athlete_race.raceDate)} · Goal time ${g.goalTime}`
                         : g.goalTime}
                     </div>
                     <p className="text-sm text-gray-700 mb-3">
                       That race date has passed. Log your result or browse for your next one.
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {g.raceRegistryId ? (
+                      {g.athlete_race?.raceRegistryId ? (
                         <Link
-                          href={`/race-hub/${g.raceRegistryId}`}
+                          href={`/race-hub/${g.athlete_race?.raceRegistryId}`}
                           className="inline-flex justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
                         >
                           Log your result
@@ -1032,11 +1042,11 @@ export default function TrainingSetupClient() {
                   className="rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm"
                 >
                   <div className="mb-2 font-medium text-gray-900">
-                    {g.race_registry?.name ?? "Race"}
+                    {g.athlete_race?.name ?? "Race"}
                   </div>
                   <div className="text-xs text-gray-600">
-                    {g.race_registry
-                      ? `${formatRaceWhen(g.race_registry.raceDate)} · Goal time ${g.goalTime}`
+                    {g.athlete_race
+                      ? `${formatRaceWhen(g.athlete_race.raceDate)} · Goal time ${g.goalTime}`
                       : g.goalTime}
                   </div>
                   <button

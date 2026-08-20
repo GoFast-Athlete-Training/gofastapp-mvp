@@ -35,7 +35,7 @@ type ActiveGoalSummary = {
   name: string | null;
   goalTime: string | null;
   targetByDate: string;
-  race_registry: { name: string; raceDate: string } | null;
+  athlete_race: { name: string; raceDate: string } | null;
 };
 
 export default function ProfilePage() {
@@ -271,7 +271,7 @@ export default function ProfilePage() {
         {activeGoalSummary ? (
           <div className="mt-4 rounded-xl border border-orange-200/80 bg-white/90 p-4 text-sm text-gray-800">
             <p className="font-semibold text-gray-900">
-              {activeGoalSummary.race_registry?.name?.trim() ||
+              {activeGoalSummary.athlete_race?.name?.trim() ||
                 activeGoalSummary.name?.trim() ||
                 'Active goal'}
             </p>
@@ -286,7 +286,7 @@ export default function ProfilePage() {
             <p className="mt-1 text-gray-600">
               Race day:{' '}
               {new Date(
-                activeGoalSummary.race_registry?.raceDate || activeGoalSummary.targetByDate
+                activeGoalSummary.athlete_race?.raceDate || activeGoalSummary.targetByDate
               ).toLocaleDateString(undefined, {
                 weekday: 'short',
                 month: 'short',

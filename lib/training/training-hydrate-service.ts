@@ -5,6 +5,7 @@
 import { TrainingPlanLifecycle } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { metersToMiles } from "@/lib/pace-utils";
+import { goalAthleteRaceSelect } from "@/lib/goal-race-display";
 import { loadPlanMileageSnapshot, type PlanMileageSnapshot } from "@/lib/training/plan-mileage-metrics";
 import { evaluateLightAdaptive, type LightAdaptiveEvaluation } from "@/lib/training/light-adaptive-service";
 import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
@@ -47,20 +48,39 @@ export type TrainingHydrateSnapshot = {
   lightAdaptive: LightAdaptiveEvaluation | null;
 };
 
+type RaceHydrateSource = {
+  id: string;
+  name: string;
+  raceDate: Date;
+  distanceLabel: string | null;
+  distanceMeters: number | null;
+};
+
+function athleteRaceToHydrateSource(
+  row: {
+    raceRegistryId: string;
+    name: string;
+    raceDate: Date;
+    distanceLabel: string | null;
+    distanceMeters: number | null;
+  } | null | undefined
+): RaceHydrateSource | null {
+  if (!row) return null;
+  return {
+    id: row.raceRegistryId,
+    name: row.name,
+    raceDate: row.raceDate,
+    distanceLabel: row.distanceLabel,
+    distanceMeters: row.distanceMeters,
+  };
+}
+
 async function getActiveGoalWithRace(athleteId: string) {
   return prisma.athleteGoal.findFirst({
     where: { athleteId, status: "ACTIVE" },
     orderBy: { targetByDate: "asc" },
     include: {
-      race_registry: {
-        select: {
-          id: true,
-          name: true,
-          raceDate: true,
-          distanceLabel: true,
-          distanceMeters: true,
-        },
-      },
+      athlete_race: { select: goalAthleteRaceSelect },
     },
   });
 }
@@ -137,15 +157,7 @@ export async function loadTrainingHydrateSnapshot(
       where: { athleteId, lifecycleStatus: TrainingPlanLifecycle.ACTIVE },
       orderBy: { updatedAt: "desc" },
       include: {
-        race_registry: {
-          select: {
-            id: true,
-            name: true,
-            raceDate: true,
-            distanceLabel: true,
-            distanceMeters: true,
-          },
-        },
+        athlete_race: { select: goalAthleteRaceSelect },
         athlete_goal: {
           select: {
             id: true,
@@ -153,15 +165,7 @@ export async function loadTrainingHydrateSnapshot(
             goalRacePace: true,
             goalPace5K: true,
             distance: true,
-            race_registry: {
-              select: {
-                id: true,
-                name: true,
-                raceDate: true,
-                distanceLabel: true,
-                distanceMeters: true,
-              },
-            },
+            athlete_race: { select: goalAthleteRaceSelect },
           },
         },
       },
@@ -209,16 +213,16 @@ export async function loadTrainingHydrateSnapshot(
   };
 
   if (!plan) {
-    const raceReg = goal?.race_registry ?? null;
-    const distanceMiles = raceDistanceMilesFromRegistry(raceReg?.distanceMeters ?? null);
+    const race = athleteRaceToHydrateSource(goal?.athlete_race);
+    const distanceMiles = raceDistanceMilesFromRegistry(race?.distanceMeters ?? null);
     const current5k = athlete?.fiveKPace?.trim() || null;
     const current5kSecPerMile = parsePaceStringToSecPerMile(current5k);
     const goalFinishTime = goal?.goalTime?.trim() || null;
     const resolvedGoalPace = resolveGoalRacePace({
       goalTime: goalFinishTime,
       dbGoalRacePaceSecPerMile: goal?.goalRacePace ?? null,
-      distanceMeters: raceReg?.distanceMeters ?? null,
-      distanceLabel: raceReg?.distanceLabel ?? null,
+      distanceMeters: race?.distanceMeters ?? null,
+      distanceLabel: race?.distanceLabel ?? null,
       goalDistance: goal?.distance ?? null,
     });
     const goalPaceSecPerMile = resolvedGoalPace.goalPaceSecPerMile;
@@ -234,13 +238,13 @@ export async function loadTrainingHydrateSnapshot(
 
     return {
       ...empty,
-      goalRace: raceReg
+      goalRace: race
         ? {
-            name: raceReg.name ?? null,
-            raceDate: raceReg.raceDate?.toISOString() ?? null,
-            distanceLabel: raceReg.distanceLabel ?? null,
+            name: race.name ?? null,
+            raceDate: race.raceDate?.toISOString() ?? null,
+            distanceLabel: race.distanceLabel ?? null,
             distanceMiles,
-            raceRegistryId: raceReg.id ?? null,
+            raceRegistryId: race.id ?? null,
           }
         : null,
       goalFinishTime,
@@ -260,9 +264,9 @@ export async function loadTrainingHydrateSnapshot(
 
   const linkedGoal = plan.athlete_goal ?? goal;
   const race =
-    plan.race_registry ??
-    linkedGoal?.race_registry ??
-    goal?.race_registry ??
+    athleteRaceToHydrateSource(plan.athlete_race) ??
+    athleteRaceToHydrateSource(linkedGoal?.athlete_race) ??
+    athleteRaceToHydrateSource(goal?.athlete_race) ??
     null;
 
   const distanceMiles =

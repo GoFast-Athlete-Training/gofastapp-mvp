@@ -42,22 +42,6 @@ enum PlanCustomWorkoutVisibility {
 }
 
 /// Role of a race inside a specific training plan timeline.
-enum TrainingPlanRaceEventRole {
-  PRIMARY
-  SECONDARY
-}
-
-enum TrainingPlanRaceEventSource {
-  GOAL
-  CALENDAR
-  ATHLETE
-}
-
-enum TrainingPlanRaceEventInclusion {
-  INCLUDED
-  EXCLUDED
-}
-
 model Athlete {
   id                      String                   @id @default(uuid())
   firebaseId              String                   @unique
@@ -680,10 +664,8 @@ model race_registry {
   run_crew_specific_races  run_crew_specific_races[]
   run_crews                run_crews[]
   training_plans           training_plans[]
-  training_plan_race_events training_plan_race_events[]
   training_cohorts         training_cohorts[]
   training_cohort_memberships training_cohort_memberships[]
-  athlete_goals            AthleteGoal[]
   athlete_races            athlete_races[]
   athlete_race_results     athlete_race_results[]
   race_memberships         race_memberships[]
@@ -733,7 +715,6 @@ model AthleteGoal {
   goalRacePace     Int?
   goalPace5K       Int?
   targetByDate     DateTime
-  raceRegistryId   String?
   athleteRaceId    String?
   status           String         @default("ACTIVE")
   whyGoal          String?        @db.Text
@@ -743,14 +724,12 @@ model AthleteGoal {
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   Athlete          Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  race_registry    race_registry? @relation(fields: [raceRegistryId], references: [id], onDelete: SetNull)
   athlete_race     athlete_races? @relation(fields: [athleteRaceId], references: [id], onDelete: SetNull)
   training_plans   training_plans[]
   athlete_race_results athlete_race_results[]
 
   @@index([athleteId])
   @@index([athleteId, status])
-  @@index([raceRegistryId])
   @@index([athleteRaceId])
   @@map("athlete_goals")
 }
@@ -767,6 +746,10 @@ model athlete_races {
   distanceLabel    String?
   city             String?
   state            String?
+  /// Snapshot at claim — public slug for content links.
+  slug             String?
+  /// Snapshot at claim — race logo for athlete-scoped display.
+  logoUrl          String?
   selfDeclaredAt   DateTime @default(now())
   notifyEnabled    Boolean  @default(true)
   createdAt        DateTime @default(now())
@@ -775,8 +758,7 @@ model athlete_races {
   Athlete                   Athlete                     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   race_registry             race_registry               @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
   athlete_race_result       athlete_race_results?
-  training_plan_race_events training_plan_race_events[]
-  training_plans_primary    training_plans[]            @relation("PlanPrimaryAthleteRace")
+  training_plans            training_plans[]            @relation("PlanAthleteRace")
   athlete_goals             AthleteGoal[]
 
   @@unique([athleteId, raceRegistryId])
@@ -1968,7 +1950,11 @@ model training_plans {
   id                   String                 @id
   athleteId            String
   raceId               String?
-  primaryAthleteRaceId String?
+  athleteRaceId        String?
+  /// Frozen target race snapshot at plan create / reassignment / generation.
+  athleteRaceMainSnap  Json?
+  /// Frozen in-window context races (before terminal) at plan create / reassignment / generation.
+  athleteRaceAlongWaySnaps Json?
   athleteGoalId        String?
   /// Optional link to the training cohort this plan was created through
   cohortId             String?
@@ -2026,7 +2012,7 @@ model training_plans {
   planned_workouts     workouts[]
   Athlete              Athlete                @relation(fields: [athleteId], references: [id])
   race_registry        race_registry?         @relation(fields: [raceId], references: [id])
-  primary_athlete_race athlete_races?         @relation("PlanPrimaryAthleteRace", fields: [primaryAthleteRaceId], references: [id], onDelete: SetNull)
+  athlete_race         athlete_races?         @relation("PlanAthleteRace", fields: [athleteRaceId], references: [id], onDelete: SetNull)
   athlete_goal         AthleteGoal?           @relation(fields: [athleteGoalId], references: [id], onDelete: SetNull)
   pace_adjustment_logs pace_adjustment_log[]
   training_plan_preset training_plan_preset? @relation(fields: [presetId], references: [id])
@@ -2034,36 +2020,12 @@ model training_plans {
   cohort_membership    training_cohort_memberships?
   public_training_plans_as_source public_training_plans[] @relation("PublicPlanSource")
   plan_custom_workouts plan_custom_workouts[]
-  plan_race_events     training_plan_race_events[]
-
   @@index([athleteGoalId])
-  @@index([primaryAthleteRaceId])
+  @@index([athleteRaceId])
   @@index([athleteId, lifecycleStatus])
   @@index([presetId])
   @@index([cohortId])
   @@index([publicVisibility, publicPublishedAt])
-}
-
-/// Races included in a training plan timeline (primary goal race + secondary calendar events).
-model training_plan_race_events {
-  id                  String                         @id @default(cuid())
-  trainingPlanId      String
-  raceRegistryId      String
-  athleteRaceId       String?
-  role                TrainingPlanRaceEventRole
-  source              TrainingPlanRaceEventSource    @default(CALENDAR)
-  inclusion           TrainingPlanRaceEventInclusion @default(INCLUDED)
-  createdAt           DateTime                       @default(now())
-  updatedAt           DateTime                       @updatedAt
-
-  training_plans training_plans @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
-  race_registry  race_registry  @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
-  athlete_race   athlete_races? @relation(fields: [athleteRaceId], references: [id], onDelete: SetNull)
-
-  @@unique([trainingPlanId, raceRegistryId])
-  @@index([trainingPlanId])
-  @@index([raceRegistryId])
-  @@map("training_plan_race_events")
 }
 
 /// Athlete-authored global training plan — publish layer above a materialized training_plans row.

@@ -1,5 +1,6 @@
 import { syncAthleteProfileSnapshot } from "@/lib/athlete-profile-snapshot";
 import { claimAthleteRace, findAthleteRaceByRegistry } from "@/lib/athlete-races-service";
+import { goalAthleteRaceSelect } from "@/lib/goal-race-display";
 import { prisma } from "@/lib/prisma";
 import { MOTIVATION_ICON_SLUGS } from "@/lib/goals-motivation-icons";
 import {
@@ -11,6 +12,10 @@ import {
 export { deriveGoalPaces } from "@/lib/pace-utils";
 
 const MOTIVATION_ICON_SET = new Set<string>(MOTIVATION_ICON_SLUGS);
+
+const goalInclude = {
+  athlete_race: { select: goalAthleteRaceSelect },
+} as const;
 
 export function normalizeMotivationIcon(raw: string | null | undefined): string | null {
   if (raw == null || raw === "") return null;
@@ -28,31 +33,7 @@ export async function getActiveGoals(athleteId: string) {
   return prisma.athleteGoal.findMany({
     where: { athleteId, status: "ACTIVE" },
     orderBy: { targetByDate: "asc" },
-    include: {
-      athlete_race: {
-        select: {
-          id: true,
-          name: true,
-          distanceLabel: true,
-          distanceMeters: true,
-          raceDate: true,
-          city: true,
-          state: true,
-          raceRegistryId: true,
-        },
-      },
-      race_registry: {
-        select: {
-          id: true,
-          name: true,
-          distanceLabel: true,
-          distanceMeters: true,
-          raceDate: true,
-          city: true,
-          state: true,
-        },
-      },
-    },
+    include: goalInclude,
   });
 }
 
@@ -66,7 +47,6 @@ export async function getPrimaryGoalForWorkout(athleteId: string) {
     take: 1,
     include: {
       athlete_race: { select: { distanceMeters: true } },
-      race_registry: { select: { distanceMeters: true } },
     },
   });
 
@@ -78,10 +58,7 @@ export async function getPrimaryGoalForWorkout(athleteId: string) {
     (g.goalRacePace == null || g.goalPace5K == null)
   ) {
     try {
-      const regM =
-        g.athlete_race?.distanceMeters ??
-        g.race_registry?.distanceMeters ??
-        null;
+      const regM = g.athlete_race?.distanceMeters ?? null;
       const { goalRacePace, goalPace5K } = deriveGoalPaces({
         distance: g.distance,
         goalTime: g.goalTime,
@@ -107,6 +84,7 @@ export type CreateGoalInput = {
   distance: string;
   goalTime?: string | null;
   targetByDate: Date;
+  /** Claim/find athlete_races row — not persisted on goal directly. */
   raceRegistryId?: string | null;
   athleteRaceId?: string | null;
   status?: string;
@@ -121,9 +99,13 @@ async function resolveAthleteRaceForGoal(
   input: Pick<CreateGoalInput, "athleteRaceId" | "raceRegistryId">
 ) {
   if (input.athleteRaceId) {
-    return prisma.athlete_races.findFirst({
+    const row = await prisma.athlete_races.findFirst({
       where: { id: input.athleteRaceId, athleteId },
     });
+    if (!row) {
+      throw new Error("Athlete race not found");
+    }
+    return row;
   }
   if (input.raceRegistryId) {
     const existing = await findAthleteRaceByRegistry({
@@ -140,13 +122,11 @@ export async function createGoal(athleteId: string, input: CreateGoalInput) {
   let targetByDate = input.targetByDate;
   let distance = input.distance.trim();
   let distanceMiles: number | null = null;
-  let athleteRaceId: string | null = input.athleteRaceId ?? null;
-  let raceRegistryId: string | null = input.raceRegistryId ?? null;
+  let athleteRaceId: string | null = null;
 
   const athleteRace = await resolveAthleteRaceForGoal(athleteId, input);
   if (athleteRace) {
     athleteRaceId = athleteRace.id;
-    raceRegistryId = athleteRace.raceRegistryId;
     distanceMiles =
       athleteRace.distanceMeters != null
         ? metersToMiles(athleteRace.distanceMeters)
@@ -158,22 +138,6 @@ export async function createGoal(athleteId: string, input: CreateGoalInput) {
       );
     }
     targetByDate = athleteRace.raceDate;
-  } else if (input.raceRegistryId) {
-    const race = await prisma.race_registry.findUnique({
-      where: { id: input.raceRegistryId },
-      select: { raceDate: true, distanceMeters: true, distanceLabel: true },
-    });
-    if (race) {
-      distanceMiles =
-        race.distanceMeters != null ? metersToMiles(race.distanceMeters) : null;
-      if (!distance) {
-        distance = normalizeDistanceForPace(
-          race.distanceLabel?.trim() ?? "",
-          distanceMiles
-        );
-      }
-      targetByDate = race.raceDate;
-    }
   }
 
   if (!distance) {
@@ -204,7 +168,6 @@ export async function createGoal(athleteId: string, input: CreateGoalInput) {
       goalPace5K,
       targetByDate,
       athleteRaceId,
-      raceRegistryId,
       status: input.status ?? "ACTIVE",
       whyGoal,
       successLooksLike,
@@ -212,31 +175,7 @@ export async function createGoal(athleteId: string, input: CreateGoalInput) {
       motivationIcon,
       updatedAt: new Date(),
     },
-    include: {
-      athlete_race: {
-        select: {
-          id: true,
-          name: true,
-          distanceLabel: true,
-          distanceMeters: true,
-          raceDate: true,
-          city: true,
-          state: true,
-          raceRegistryId: true,
-        },
-      },
-      race_registry: {
-        select: {
-          id: true,
-          name: true,
-          distanceLabel: true,
-          distanceMeters: true,
-          raceDate: true,
-          city: true,
-          state: true,
-        },
-      },
-    },
+    include: goalInclude,
   });
 
   await syncAthleteProfileSnapshot(athleteId);
@@ -249,6 +188,7 @@ export type UpdateGoalInput = Partial<{
   distance: string;
   goalTime: string | null;
   targetByDate: Date;
+  /** Claim/find athlete_races row — not persisted on goal directly. */
   raceRegistryId: string | null;
   athleteRaceId: string | null;
   status: string;
@@ -266,8 +206,7 @@ export async function updateGoal(
   const existing = await prisma.athleteGoal.findFirst({
     where: { id: goalId, athleteId },
     include: {
-      athlete_race: { select: { distanceMeters: true, raceDate: true, distanceLabel: true } },
-      race_registry: {
+      athlete_race: {
         select: { distanceMeters: true, raceDate: true, distanceLabel: true },
       },
     },
@@ -280,36 +219,45 @@ export async function updateGoal(
   let distanceMiles =
     existing.athlete_race?.distanceMeters != null
       ? metersToMiles(existing.athlete_race.distanceMeters)
-      : existing.race_registry?.distanceMeters != null
-        ? metersToMiles(existing.race_registry.distanceMeters)
-        : null;
+      : null;
 
-  let athleteRaceId = patch.athleteRaceId;
-  let raceRegistryId = patch.raceRegistryId;
+  let athleteRaceId: string | null | undefined = undefined;
+  let targetByDate = patch.targetByDate;
 
   if (patch.athleteRaceId !== undefined) {
     if (patch.athleteRaceId) {
       const ar = await prisma.athlete_races.findFirst({
         where: { id: patch.athleteRaceId, athleteId },
       });
-      if (ar) {
-        athleteRaceId = ar.id;
-        raceRegistryId = ar.raceRegistryId;
-        distanceMiles =
-          ar.distanceMeters != null ? metersToMiles(ar.distanceMeters) : null;
+      if (!ar) {
+        throw new Error("Athlete race not found");
+      }
+      athleteRaceId = ar.id;
+      distanceMiles =
+        ar.distanceMeters != null ? metersToMiles(ar.distanceMeters) : null;
+      if (patch.targetByDate === undefined) {
+        targetByDate = ar.raceDate;
       }
     } else {
       athleteRaceId = null;
+      distanceMiles = null;
     }
   } else if (patch.raceRegistryId !== undefined) {
     if (patch.raceRegistryId) {
-      const race = await prisma.race_registry.findUnique({
-        where: { id: patch.raceRegistryId },
-        select: { distanceMeters: true, raceDate: true },
+      const ar = await resolveAthleteRaceForGoal(athleteId, {
+        raceRegistryId: patch.raceRegistryId,
       });
+      if (!ar) {
+        throw new Error("Race not found");
+      }
+      athleteRaceId = ar.id;
       distanceMiles =
-        race?.distanceMeters != null ? metersToMiles(race.distanceMeters) : null;
+        ar.distanceMeters != null ? metersToMiles(ar.distanceMeters) : null;
+      if (patch.targetByDate === undefined) {
+        targetByDate = ar.raceDate;
+      }
     } else {
+      athleteRaceId = null;
       distanceMiles = null;
     }
   }
@@ -331,8 +279,7 @@ export async function updateGoal(
       }),
       ...(patch.distance !== undefined && { distance: patch.distance }),
       ...(patch.goalTime !== undefined && { goalTime: patch.goalTime?.trim() || null }),
-      ...(patch.targetByDate !== undefined && { targetByDate: patch.targetByDate }),
-      ...(raceRegistryId !== undefined && { raceRegistryId }),
+      ...(targetByDate !== undefined && { targetByDate }),
       ...(athleteRaceId !== undefined && { athleteRaceId }),
       ...(patch.status !== undefined && { status: patch.status }),
       ...(patch.whyGoal !== undefined && { whyGoal: trimText(patch.whyGoal) }),
@@ -349,31 +296,7 @@ export async function updateGoal(
       goalPace5K,
       updatedAt: new Date(),
     },
-    include: {
-      athlete_race: {
-        select: {
-          id: true,
-          name: true,
-          distanceLabel: true,
-          distanceMeters: true,
-          raceDate: true,
-          city: true,
-          state: true,
-          raceRegistryId: true,
-        },
-      },
-      race_registry: {
-        select: {
-          id: true,
-          name: true,
-          distanceLabel: true,
-          distanceMeters: true,
-          raceDate: true,
-          city: true,
-          state: true,
-        },
-      },
-    },
+    include: goalInclude,
   });
 
   await syncAthleteProfileSnapshot(athleteId);

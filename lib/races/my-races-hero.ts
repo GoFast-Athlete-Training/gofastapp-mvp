@@ -9,14 +9,14 @@ export type HeroRaceCandidate = {
 
 export function pickHeroAthleteRace(params: {
   upcoming: HeroRaceCandidate[];
-  primaryPlanAthleteRaceId: string | null;
+  planAthleteRaceId: string | null;
   goalAthleteRaceId: string | null;
 }): HeroRaceCandidate | null {
-  const { upcoming, primaryPlanAthleteRaceId, goalAthleteRaceId } = params;
+  const { upcoming, planAthleteRaceId, goalAthleteRaceId } = params;
   if (upcoming.length === 0) return null;
 
-  if (primaryPlanAthleteRaceId) {
-    const byPlan = upcoming.find((r) => r.athleteRaceId === primaryPlanAthleteRaceId);
+  if (planAthleteRaceId) {
+    const byPlan = upcoming.find((r) => r.athleteRaceId === planAthleteRaceId);
     if (byPlan) return byPlan;
   }
 

@@ -61,6 +61,7 @@ import {
 import { getRacePhase, raceCalendarDaysFromTodayUtc } from '@/lib/race-calendar-phase';
 import { formatPlannedWorkoutTitle } from '@/lib/training/workout-display-title';
 import { normalizeDistanceForPace } from '@/lib/pace-utils';
+import { goalRaceFromGoal } from '@/lib/goal-race-display';
 import {
   buildLongEffortEvidenceFromRun,
   computeRaceReadiness,
@@ -690,21 +691,21 @@ export default function AthleteHomePage() {
         )
       : null;
 
-  const primaryRaceRegistryId =
-    primaryGoal?.race_registry?.id ??
-    (typeof primaryGoal?.raceRegistryId === 'string' ? primaryGoal.raceRegistryId : null);
+  const goalRace = goalRaceFromGoal(primaryGoal);
+
+  const primaryRaceRegistryId = goalRace?.id ?? null;
   const primarySignupIdForGoalRace =
     primaryRaceRegistryId != null
       ? raceSignups.find((s) => s.race_registry.id === primaryRaceRegistryId)?.id ?? null
       : null;
   const primaryRaceYmdForSheet =
-    primaryGoal?.race_registry?.raceDate != null
-      ? ymdFromDate(new Date(primaryGoal.race_registry.raceDate))
+    goalRace?.raceDate != null
+      ? ymdFromDate(new Date(goalRace.raceDate))
       : primaryGoal?.targetByDate != null
         ? ymdFromDate(new Date(primaryGoal.targetByDate))
         : '';
 
-  const goalRaceIsoStr = raceDateToIsoString(primaryGoal?.race_registry?.raceDate);
+  const goalRaceIsoStr = raceDateToIsoString(goalRace?.raceDate);
   const goalPhase = getRacePhase(goalRaceIsoStr);
   const goalDaysUntil = raceCalendarDaysFromTodayUtc(goalRaceIsoStr);
 
@@ -749,7 +750,7 @@ export default function AthleteHomePage() {
         })
       : null;
 
-  const raceName = primaryGoal?.race_registry?.name ?? null;
+  const raceName = goalRace?.name ?? null;
   const raceDateStr =
     primaryGoal?.targetByDate != null
       ? new Date(primaryGoal.targetByDate).toLocaleDateString('en-US', {
@@ -812,7 +813,7 @@ export default function AthleteHomePage() {
     goalDaysUntil >= 1 &&
     goalDaysUntil <= 7 &&
     primaryRaceRegistryId != null &&
-    primaryGoal?.race_registry != null;
+    goalRace != null;
 
   const showSignupDayBeforeBanner =
     !raceDaySignupForHome &&
@@ -874,8 +875,8 @@ export default function AthleteHomePage() {
     primaryGoal != null
       ? normalizeDistanceForPace(
           String(primaryGoal.distance ?? ''),
-          primaryGoal.race_registry?.distanceMeters != null
-            ? Number(primaryGoal.race_registry.distanceMeters)
+          goalRace?.distanceMeters != null
+            ? Number(goalRace.distanceMeters)
             : null
         )
       : null;
@@ -883,9 +884,9 @@ export default function AthleteHomePage() {
   const eventMilesForProjection =
     distanceKeyForProjection && RACE_DISTANCES_MILES[distanceKeyForProjection] != null
       ? RACE_DISTANCES_MILES[distanceKeyForProjection]
-      : primaryGoal?.race_registry?.distanceMeters != null &&
-          Number.isFinite(Number(primaryGoal.race_registry.distanceMeters))
-        ? Number(primaryGoal.race_registry.distanceMeters) / 1609.344
+      : goalRace?.distanceMeters != null &&
+          Number.isFinite(Number(goalRace.distanceMeters))
+        ? Number(goalRace.distanceMeters) / 1609.344
         : null;
 
   const longEffortEvidence =
@@ -910,8 +911,8 @@ export default function AthleteHomePage() {
           goalTime: primaryGoal.goalTime,
           dbGoalRacePaceSecPerMile:
             typeof primaryGoal.goalRacePace === 'number' ? primaryGoal.goalRacePace : null,
-          distanceMeters: primaryGoal.race_registry?.distanceMeters ?? null,
-          distanceLabel: primaryGoal.race_registry?.distanceLabel ?? null,
+          distanceMeters: goalRace?.distanceMeters ?? null,
+          distanceLabel: goalRace?.distanceLabel ?? null,
           goalDistance: primaryGoal.distance ?? null,
         })
       : null;
@@ -932,18 +933,18 @@ export default function AthleteHomePage() {
       : null;
 
   const raceLogoUrl =
-    typeof primaryGoal?.race_registry?.logoUrl === 'string' && primaryGoal.race_registry.logoUrl.trim()
-      ? primaryGoal.race_registry.logoUrl.trim()
+    typeof goalRace?.logoUrl === 'string' && goalRace.logoUrl.trim()
+      ? goalRace.logoUrl.trim()
       : null;
-  const raceCity = primaryGoal?.race_registry?.city ?? null;
-  const raceState = primaryGoal?.race_registry?.state ?? null;
+  const raceCity = goalRace?.city ?? null;
+  const raceState = goalRace?.state ?? null;
   const raceCityState =
     [raceCity, raceState].filter((x) => x && String(x).trim()).join(', ') || null;
 
   // Slug-based link to the personal race page for goal management
   const goalRaceSlug =
-    typeof primaryGoal?.race_registry?.slug === 'string' && primaryGoal.race_registry.slug.trim()
-      ? primaryGoal.race_registry.slug.trim()
+    typeof goalRace?.slug === 'string' && goalRace.slug.trim()
+      ? goalRace.slug.trim()
       : null;
   const goalRaceHref = goalRaceSlug ? `/myrace/${goalRaceSlug}` : '/races';
 
@@ -1003,7 +1004,7 @@ export default function AthleteHomePage() {
             {primaryGoal &&
             goalPhase === 'race_day' &&
             primaryRaceRegistryId &&
-            primaryGoal.race_registry ? (
+            goalRace ? (
               <div className="mb-4 rounded-2xl border-2 border-violet-400 bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-6 text-white shadow-lg">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex gap-4 min-w-0">
@@ -1013,11 +1014,11 @@ export default function AthleteHomePage() {
                         Today is race day
                       </p>
                       <h2 className="mt-2 text-2xl font-extrabold leading-tight">
-                        {primaryGoal.race_registry.name}
+                        {goalRace.name}
                       </h2>
-                      {primaryGoal.race_registry.distanceLabel ? (
+                      {goalRace.distanceLabel ? (
                         <p className="mt-1 text-lg font-semibold text-violet-100">
-                          {primaryGoal.race_registry.distanceLabel}
+                          {goalRace.distanceLabel}
                         </p>
                       ) : null}
                       <p className="mt-3 text-xl font-bold text-white">
@@ -1028,11 +1029,11 @@ export default function AthleteHomePage() {
                         !
                       </p>
                       {(() => {
-                        const city = primaryGoal.race_registry.city;
-                        const st = primaryGoal.race_registry.state;
+                        const city = goalRace.city;
+                        const st = goalRace.state;
                         const loc =
                           [city, st].filter((x) => x && String(x).trim()).join(', ') || null;
-                        const stTime = primaryGoal.race_registry.startTime?.trim();
+                        const stTime = undefined;
                         if (!loc && !stTime) return null;
                         return (
                           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-violet-100">
@@ -1122,7 +1123,7 @@ export default function AthleteHomePage() {
             ) : primaryGoal &&
               goalPhase === 'post_early' &&
               primaryRaceRegistryId &&
-              primaryGoal.race_registry ? (
+              goalRace ? (
               <div className="mb-4 rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-5 shadow-sm">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex gap-3 min-w-0">
@@ -1132,11 +1133,11 @@ export default function AthleteHomePage() {
                         You just raced
                       </p>
                       <h2 className="mt-2 text-xl font-bold text-gray-900">
-                        {primaryGoal.race_registry.name}
+                        {goalRace.name}
                       </h2>
-                      {primaryGoal.race_registry.distanceLabel ? (
+                      {goalRace.distanceLabel ? (
                         <p className="text-sm text-emerald-900/90">
-                          {primaryGoal.race_registry.distanceLabel}
+                          {goalRace.distanceLabel}
                         </p>
                       ) : null}
                       <p className="mt-2 text-sm text-gray-700">
@@ -1184,7 +1185,7 @@ export default function AthleteHomePage() {
                 </div>
               </div>
             ) : showGoalRaceWeekBanner &&
-              primaryGoal?.race_registry &&
+              goalRace &&
               primaryRaceRegistryId &&
               goalDaysUntil != null ? (
               <div className="mb-4 rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-5 shadow-sm">
@@ -1194,11 +1195,11 @@ export default function AthleteHomePage() {
                       Race in {goalDaysUntil} day{goalDaysUntil === 1 ? '' : 's'}
                     </p>
                     <h2 className="mt-1 text-lg font-bold text-gray-900">
-                      {primaryGoal.race_registry.name}
+                      {goalRace.name}
                     </h2>
-                    {primaryGoal.race_registry.distanceLabel ? (
+                    {goalRace.distanceLabel ? (
                       <p className="text-sm text-gray-600">
-                        {primaryGoal.race_registry.distanceLabel}
+                        {goalRace.distanceLabel}
                       </p>
                     ) : null}
                     <p className="mt-2 text-sm text-gray-700">
@@ -1937,7 +1938,7 @@ export default function AthleteHomePage() {
           open={logResultOpen}
           onClose={() => setLogResultOpen(false)}
           raceRegistryId={primaryRaceRegistryId}
-          raceName={String(primaryGoal.race_registry?.name || 'Your race')}
+          raceName={String(goalRace?.name || 'Your race')}
           raceDateYmd={primaryRaceYmdForSheet}
           goalId={primaryGoal.id}
           signupId={primarySignupIdForGoalRace}

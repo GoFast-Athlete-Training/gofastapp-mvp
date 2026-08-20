@@ -17,6 +17,19 @@ type RaceRegistry = {
   state?: string | null;
 };
 
+type GoalAthleteRace = {
+  id: string;
+  raceRegistryId: string;
+  name: string;
+  distanceLabel: string | null;
+  distanceMeters: number | null;
+  raceDate: string | Date;
+  city?: string | null;
+  state?: string | null;
+  slug?: string | null;
+  logoUrl?: string | null;
+};
+
 type AthleteGoalRow = {
   id: string;
   athleteId: string;
@@ -26,15 +39,32 @@ type AthleteGoalRow = {
   goalTime: string | null;
   goalRacePace: number | null;
   goalPace5K: number | null;
-  raceRegistryId: string | null;
+  athleteRaceId: string | null;
   targetByDate: string;
   status: string;
   whyGoal?: string | null;
   successLooksLike?: string | null;
   completionFeeling?: string | null;
   motivationIcon?: string | null;
-  race_registry?: RaceRegistry | null;
+  athlete_race?: GoalAthleteRace | null;
 };
+
+function athleteRaceToRegistry(r: GoalAthleteRace): RaceRegistry {
+  return {
+    id: r.raceRegistryId,
+    name: r.name,
+    distanceLabel: r.distanceLabel,
+    distanceMeters: r.distanceMeters,
+    raceDate:
+      typeof r.raceDate === "string" ? r.raceDate : r.raceDate.toISOString(),
+    city: r.city,
+    state: r.state,
+  };
+}
+
+function goalRaceRegistry(goal: AthleteGoalRow | null | undefined): RaceRegistry | null {
+  return goal?.athlete_race ? athleteRaceToRegistry(goal.athlete_race) : null;
+}
 
 const DISTANCE_OPTIONS = [
   { label: "5K", value: "5k" },
@@ -364,13 +394,14 @@ export default function GoalSetter({
         const g = list[0] ?? null;
         setGoal(g);
         if (g) {
-          setGoalName(g.name?.trim() || g.race_registry?.name || "");
+          setGoalName(g.name?.trim() || g.athlete_race?.name || "");
           const parts = parseGoalTimeToParts(g.goalTime);
           setGoalHours(parts.h);
           setGoalMinutes(parts.m);
           setGoalSeconds(parts.s);
-          if (g.race_registry) {
-            setSelectedRace(g.race_registry);
+          const goalRace = goalRaceRegistry(g);
+          if (goalRace) {
+            setSelectedRace(goalRace);
             setShowRaceSearch(false);
           } else {
             setSelectedRace(null);
@@ -391,8 +422,8 @@ export default function GoalSetter({
         if (rid) {
           let needsPrefill = false;
           if (!g) needsPrefill = true;
-          else if (!g.raceRegistryId) needsPrefill = true;
-          else if (g.raceRegistryId === rid && !g.race_registry) needsPrefill = true;
+          else if (!g.athlete_race) needsPrefill = true;
+          else if (g.athlete_race.raceRegistryId === rid) needsPrefill = true;
           if (needsPrefill) {
             api
               .get<{
@@ -581,9 +612,10 @@ export default function GoalSetter({
       setGoalHours(parts.h);
       setGoalMinutes(parts.m);
       setGoalSeconds(parts.s);
-      setGoalName(goal.name?.trim() || goal.race_registry?.name || "");
-      if (goal.race_registry) {
-        setSelectedRace(goal.race_registry);
+      setGoalName(goal.name?.trim() || goal.athlete_race?.name || "");
+      const editRace = goalRaceRegistry(goal);
+      if (editRace) {
+        setSelectedRace(editRace);
         setShowRaceSearch(false);
       } else {
         setSelectedRace(null);
@@ -599,9 +631,9 @@ export default function GoalSetter({
       setGoalHours(parts.h);
       setGoalMinutes(parts.m);
       setGoalSeconds(parts.s);
-      setGoalName(goal.name?.trim() || goal.race_registry?.name || "");
-      setSelectedRace(goal.race_registry ?? null);
-      setShowRaceSearch(!goal.race_registry);
+      setGoalName(goal.name?.trim() || goal.athlete_race?.name || "");
+      setSelectedRace(goalRaceRegistry(goal));
+      setShowRaceSearch(!goal.athlete_race);
       setError(null);
       setRaceSearchQuery("");
       setRaceSearchResults([]);
@@ -655,8 +687,9 @@ export default function GoalSetter({
           targetByDate,
         });
         setGoal(res.data.goal);
-        if (res.data.goal.race_registry) {
-          setSelectedRace(res.data.goal.race_registry);
+        const savedRace = goalRaceRegistry(res.data.goal);
+        if (savedRace) {
+          setSelectedRace(savedRace);
         }
       }
 
@@ -774,7 +807,7 @@ export default function GoalSetter({
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="text-xl font-bold text-gray-900">
-                {goal.race_registry?.name ||
+                {goal.athlete_race?.name ||
                   goal.name?.trim() ||
                   "Your active race goal"}
               </h2>
@@ -782,12 +815,12 @@ export default function GoalSetter({
                 {distanceDisplayLabel(normalizeDistanceToValue(goal.distance))}
                 {goal.goalTime ? ` · ${goal.goalTime}` : ""}
               </p>
-              {goal.race_registry && (
+              {goal.athlete_race && (
                 <p className="mt-2 text-sm text-gray-700">
-                  Race day: {formatRaceDateDisplay(goal.race_registry.raceDate)}
+                  Race day: {formatRaceDateDisplay(goal.athlete_race.raceDate)}
                 </p>
               )}
-              {!goal.race_registry && (
+              {!goal.athlete_race && (
                 <p className="mt-2 text-sm text-amber-800">
                   No race linked — edit to pick a race.
                 </p>

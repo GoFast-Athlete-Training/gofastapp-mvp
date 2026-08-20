@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { metersToMiles } from "@/lib/pace-utils";
+import { goalAthleteRaceSelect, goalRaceRegistryId } from "@/lib/goal-race-display";
 
 function normalizeSlug(raw: string): string {
   return (raw || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -70,21 +71,12 @@ export async function GET(
           where: { athleteId: workout.athleteId, status: "ACTIVE" },
           orderBy: { targetByDate: "asc" },
           include: {
-            race_registry: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-                raceDate: true,
-                city: true,
-                state: true,
-                distanceMeters: true,
-                distanceLabel: true,
-              },
-            },
+            athlete_race: { select: goalAthleteRaceSelect },
           },
         })
       : null;
+
+    const goalRace = primaryGoal?.athlete_race ?? null;
 
     const now = new Date();
     const upcoming = workout.city_runs.find((r) => r.date >= now) ?? workout.city_runs[0] ?? null;
@@ -127,22 +119,22 @@ export async function GET(
             distance: primaryGoal.distance,
             goalTime: primaryGoal.goalTime,
             targetByDate: primaryGoal.targetByDate.toISOString(),
-            raceRegistryId: primaryGoal.raceRegistryId,
+            raceRegistryId: goalRaceRegistryId(primaryGoal),
           }
         : null,
-      goalRace: primaryGoal?.race_registry
+      goalRace: goalRace
         ? {
-            id: primaryGoal.race_registry.id,
-            name: primaryGoal.race_registry.name,
-            slug: primaryGoal.race_registry.slug,
-            raceDate: primaryGoal.race_registry.raceDate.toISOString(),
-            city: primaryGoal.race_registry.city,
-            state: primaryGoal.race_registry.state,
-            distanceMeters: primaryGoal.race_registry.distanceMeters,
-            distanceLabel: primaryGoal.race_registry.distanceLabel,
+            id: goalRace.raceRegistryId,
+            name: goalRace.name,
+            slug: goalRace.slug,
+            raceDate: goalRace.raceDate.toISOString(),
+            city: goalRace.city,
+            state: goalRace.state,
+            distanceMeters: goalRace.distanceMeters,
+            distanceLabel: goalRace.distanceLabel,
             distanceMiles:
-              primaryGoal.race_registry.distanceMeters != null
-                ? metersToMiles(primaryGoal.race_registry.distanceMeters)
+              goalRace.distanceMeters != null
+                ? metersToMiles(goalRace.distanceMeters)
                 : null,
           }
         : null,

@@ -13,6 +13,7 @@ import {
   utcDateOnly,
   ymdFromDate,
 } from "@/lib/training/plan-utils";
+import { resolvePlanTerminalRaceDisplay } from "@/lib/training/plan-race-snapshots";
 import { TrainingPlanLifecycle } from "@prisma/client";
 import { metersToMiles } from "@/lib/pace-utils";
 
@@ -80,13 +81,27 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { updatedAt: "desc" },
       include: {
-        race_registry: {
-          select: { raceDate: true, name: true, distanceMeters: true },
+        athlete_race: {
+          select: {
+            id: true,
+            raceRegistryId: true,
+            name: true,
+            raceDate: true,
+            distanceMeters: true,
+            distanceLabel: true,
+          },
         },
       },
     });
 
-    const race = plan?.race_registry ?? null;
+    const terminal = plan ? resolvePlanTerminalRaceDisplay(plan) : null;
+    const race = terminal
+      ? {
+          raceDate: terminal.raceDate,
+          name: terminal.name,
+          distanceMeters: terminal.distanceMeters,
+        }
+      : null;
     type Acc = {
       dateKey: string;
       title: string;

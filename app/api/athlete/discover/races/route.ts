@@ -2,6 +2,42 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { goalAthleteRaceSelect } from '@/lib/goal-race-display';
+
+type DiscoverRace = {
+  id: string;
+  name: string;
+  distanceLabel: string | null;
+  distanceMeters: number | null;
+  raceDate: Date | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+};
+
+function athleteRaceToDiscoverRace(
+  row: {
+    raceRegistryId: string;
+    name: string;
+    distanceLabel: string | null;
+    distanceMeters: number | null;
+    raceDate: Date;
+    city: string | null;
+    state: string | null;
+  },
+  country: string | null = null
+): DiscoverRace {
+  return {
+    id: row.raceRegistryId,
+    name: row.name,
+    distanceLabel: row.distanceLabel,
+    distanceMeters: row.distanceMeters,
+    raceDate: row.raceDate,
+    city: row.city,
+    state: row.state,
+    country,
+  };
+}
 
 /**
  * GET /api/athlete/discover/races
@@ -19,10 +55,11 @@ export async function GET() {
       prisma.training_plans.findMany({
         where: {
           lifecycleStatus: 'ACTIVE',
-          raceId: { not: null },
+          OR: [{ raceId: { not: null } }, { athleteRaceId: { not: null } }],
           Athlete: baseAthlete,
         },
         select: {
+          athlete_race: { select: goalAthleteRaceSelect },
           race_registry: {
             select: {
               id: true,
@@ -40,35 +77,32 @@ export async function GET() {
       prisma.athleteGoal.findMany({
         where: {
           status: 'ACTIVE',
-          raceRegistryId: { not: null },
+          athleteRaceId: { not: null },
           Athlete: baseAthlete,
         },
         select: {
-          race_registry: {
-            select: {
-              id: true,
-              name: true,
-              distanceLabel: true,
-              distanceMeters: true,
-              raceDate: true,
-              city: true,
-              state: true,
-              country: true,
-            },
-          },
+          athlete_race: { select: goalAthleteRaceSelect },
         },
       }),
     ]);
 
-    const map = new Map<string, (typeof fromPlans)[0]['race_registry']>();
+    const map = new Map<string, DiscoverRace>();
     for (const row of fromPlans) {
-      if (row.race_registry) {
+      if (row.athlete_race) {
+        map.set(
+          row.athlete_race.raceRegistryId,
+          athleteRaceToDiscoverRace(row.athlete_race, null)
+        );
+      } else if (row.race_registry) {
         map.set(row.race_registry.id, row.race_registry);
       }
     }
     for (const row of fromGoals) {
-      if (row.race_registry) {
-        map.set(row.race_registry.id, row.race_registry);
+      if (row.athlete_race) {
+        map.set(
+          row.athlete_race.raceRegistryId,
+          athleteRaceToDiscoverRace(row.athlete_race, null)
+        );
       }
     }
 

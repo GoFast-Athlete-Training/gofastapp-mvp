@@ -17,6 +17,10 @@ import { claimAthleteRace, findAthleteRaceByRegistry } from "@/lib/athlete-races
 import {
   listSecondaryCandidatesForPlan,
 } from "@/lib/training/race-plan-calendar-service";
+import {
+  buildPlanRaceSnapshots,
+  planRaceSnapshotsToPrismaJson,
+} from "@/lib/training/plan-race-snapshots";
 
 /**
  * POST /api/training-plan
@@ -33,7 +37,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       raceRegistryId,
-      primaryAthleteRaceId: bodyPrimaryAthleteRaceId,
+      athleteRaceId: bodyAthleteRaceId,
       athleteGoalId: bodyGoalId,
       startDate: startRaw,
       name,
@@ -58,11 +62,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "startDate is required" }, { status: 400 });
     }
     if (
-      !bodyPrimaryAthleteRaceId &&
+      !bodyAthleteRaceId &&
       (!raceRegistryId || typeof raceRegistryId !== "string")
     ) {
       return NextResponse.json(
-        { error: "primaryAthleteRaceId or raceRegistryId is required" },
+        { error: "athleteRaceId or raceRegistryId is required" },
         { status: 400 }
       );
     }
@@ -82,7 +86,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (!goal.raceRegistryId && !goal.athleteRaceId) {
+    if (!goal.athleteRaceId && !raceRegistryId) {
       return NextResponse.json(
         { error: "Goal must have a race before creating a training plan" },
         { status: 400 }
@@ -95,10 +99,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    let primaryAthleteRace =
-      typeof bodyPrimaryAthleteRaceId === "string" && bodyPrimaryAthleteRaceId.trim()
+    let terminalAthleteRace =
+      typeof bodyAthleteRaceId === "string" && bodyAthleteRaceId.trim()
         ? await prisma.athlete_races.findFirst({
-            where: { id: bodyPrimaryAthleteRaceId.trim(), athleteId: athlete.id },
+            where: { id: bodyAthleteRaceId.trim(), athleteId: athlete.id },
           })
         : goal.athleteRaceId
           ? await prisma.athlete_races.findFirst({
@@ -111,22 +115,22 @@ export async function POST(request: NextRequest) {
               })
             : null;
 
-    if (!primaryAthleteRace && raceRegistryId) {
-      primaryAthleteRace = await claimAthleteRace({
+    if (!terminalAthleteRace && raceRegistryId) {
+      terminalAthleteRace = await claimAthleteRace({
         athleteId: athlete.id,
         raceRegistryId,
       });
     }
 
-    if (!primaryAthleteRace) {
+    if (!terminalAthleteRace) {
       return NextResponse.json(
-        { error: "Pick a terminal race for this plan (primaryAthleteRaceId or raceRegistryId)" },
+        { error: "Pick a terminal race for this plan (athleteRaceId or raceRegistryId)" },
         { status: 400 }
       );
     }
 
     const race = await prisma.race_registry.findUnique({
-      where: { id: primaryAthleteRace.raceRegistryId },
+      where: { id: terminalAthleteRace.raceRegistryId },
     });
     if (!race) {
       return NextResponse.json({ error: "Race not found" }, { status: 404 });
@@ -134,8 +138,8 @@ export async function POST(request: NextRequest) {
 
     if (
       raceRegistryId &&
-      raceRegistryId !== primaryAthleteRace.raceRegistryId &&
-      !bodyPrimaryAthleteRaceId
+      raceRegistryId !== terminalAthleteRace.raceRegistryId &&
+      !bodyAthleteRaceId
     ) {
       return NextResponse.json(
         { error: "raceRegistryId must match the selected terminal athlete race" },
@@ -254,6 +258,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const allAthleteRaces = await prisma.athlete_races.findMany({
+      where: { athleteId: athlete.id },
+      orderBy: { raceDate: "asc" },
+    });
+    const raceSnapshots = buildPlanRaceSnapshots({
+      mainRow: terminalAthleteRace,
+      planStart: startDate,
+      allAthleteRaces,
+    });
+
     const now = new Date();
     const plan = await prisma.$transaction(async (tx) => {
       if (existingActive) {
@@ -272,8 +286,8 @@ export async function POST(request: NextRequest) {
         data: {
           id: randomUUID(),
           athleteId: athlete.id,
-          raceId: race.id,
-          primaryAthleteRaceId: primaryAthleteRace.id,
+          athleteRaceId: terminalAthleteRace.id,
+          ...planRaceSnapshotsToPrismaJson(raceSnapshots),
           athleteGoalId,
           name: planName,
           startDate,
@@ -310,8 +324,8 @@ export async function POST(request: NextRequest) {
     const secondaryCandidates = await listSecondaryCandidatesForPlan({
       athleteId: athlete.id,
       planStart: startDate,
-      primaryRaceDate: raceDate,
-      primaryAthleteRaceId: primaryAthleteRace.id,
+      terminalRaceDate: raceDate,
+      athleteRaceId: terminalAthleteRace.id,
     });
 
     return NextResponse.json({
@@ -319,7 +333,6 @@ export async function POST(request: NextRequest) {
       athleteFiveKPace: athleteFiveKPaceAfter,
       secondaryCandidates: secondaryCandidates.map((ar) => ({
         athleteRaceId: ar.id,
-        signupId: ar.id,
         raceRegistryId: ar.raceRegistryId,
         race: {
           name: ar.name,

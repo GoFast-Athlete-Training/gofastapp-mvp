@@ -10,54 +10,25 @@ import {
 import { resolvePublicActions } from '@/lib/gofast-with-me/resolve-public-actions';
 import { listPublishedAthleteTips } from '@/lib/gofast-with-me/athlete-tips';
 import { listPublicInstagramMedia } from '@/lib/gofast-with-me/instagram-hydration';
+import {
+  buildPublicTrainingFor,
+  serializePublicAthleteRace,
+} from '@/lib/gofast-with-me/public-training-for';
 
 const METERS_PER_MILE = 1609.344;
 
 const athleteRaceSnapshotSelect = {
   id: true,
+  raceRegistryId: true,
   name: true,
   raceDate: true,
   city: true,
   state: true,
   distanceLabel: true,
   distanceMeters: true,
+  slug: true,
+  logoUrl: true,
 } as const;
-
-type AthleteRaceSnapshotFields = {
-  name: string;
-  raceDate: Date;
-  city: string | null;
-  state: string | null;
-  distanceLabel: string | null;
-  distanceMeters: number | null;
-};
-
-type RegistryRaceFields = {
-  name?: string;
-  slug?: string | null;
-  raceDate?: Date;
-  city?: string | null;
-  state?: string | null;
-  distanceLabel?: string | null;
-  distanceMeters?: number | null;
-};
-
-function raceDisplayFromAthleteRace(params: {
-  snapshot?: AthleteRaceSnapshotFields | null;
-  registry?: RegistryRaceFields | null;
-}) {
-  const snap = params.snapshot;
-  const reg = params.registry;
-  return {
-    name: snap?.name ?? reg?.name ?? null,
-    raceDate: snap?.raceDate ?? reg?.raceDate ?? null,
-    city: snap?.city ?? reg?.city ?? null,
-    state: snap?.state ?? reg?.state ?? null,
-    distanceLabel: snap?.distanceLabel ?? reg?.distanceLabel ?? null,
-    distanceMeters: snap?.distanceMeters ?? reg?.distanceMeters ?? null,
-    slug: reg?.slug ?? null,
-  };
-}
 
 export type PublicAthletePayload = Awaited<ReturnType<typeof loadPublicAthletePage>>;
 
@@ -128,10 +99,10 @@ export async function loadPublicAthletePage(rawHandle: string) {
   const weekStart = startOfWeekMonday(now);
 
   const [
-    raceSignupRows,
+    athleteRaceRows,
     upcomingRunsRaw,
     plan,
-    chasing,
+    activeGoal,
     lastActivity,
     workoutRows,
     weeklyAggregate,
@@ -140,22 +111,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
   ] = await Promise.all([
     prisma.athlete_races.findMany({
       where: { athleteId: athlete.id },
-      include: {
-        race_registry: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            raceDate: true,
-            city: true,
-            state: true,
-            distanceMeters: true,
-            distanceLabel: true,
-            isActive: true,
-            isCancelled: true,
-          },
-        },
-      },
+      select: athleteRaceSnapshotSelect,
       orderBy: { raceDate: 'asc' },
       take: 24,
     }),
@@ -187,19 +143,9 @@ export async function loadPublicAthletePage(rawHandle: string) {
         name: true,
         startDate: true,
         totalWeeks: true,
-        primaryAthleteRaceId: true,
-        primary_athlete_race: { select: athleteRaceSnapshotSelect },
-        race_registry: {
-          select: {
-            name: true,
-            slug: true,
-            raceDate: true,
-            city: true,
-            state: true,
-            distanceLabel: true,
-            distanceMeters: true,
-          },
-        },
+        athleteRaceId: true,
+        athlete_race: { select: athleteRaceSnapshotSelect },
+        athleteGoalId: true,
       },
     }),
     prisma.athleteGoal.findFirst({
@@ -207,15 +153,16 @@ export async function loadPublicAthletePage(rawHandle: string) {
       orderBy: { targetByDate: 'asc' },
       include: {
         athlete_race: { select: athleteRaceSnapshotSelect },
-        race_registry: {
+        training_plans: {
+          where: { publicVisibility: 'PUBLIC' },
+          orderBy: { publicPublishedAt: 'desc' },
           select: {
+            id: true,
+            athleteRaceId: true,
             name: true,
-            slug: true,
-            raceDate: true,
-            city: true,
-            state: true,
-            distanceLabel: true,
-            distanceMeters: true,
+            publicSlug: true,
+            publicDescription: true,
+            totalWeeks: true,
           },
         },
       },
@@ -251,26 +198,14 @@ export async function loadPublicAthletePage(rawHandle: string) {
     listPublicInstagramMedia(athlete.id, 5),
   ]);
 
-  const signedUpRaces = raceSignupRows
-    .filter((row) => row.race_registry?.isActive && !row.race_registry.isCancelled)
-    .map((row) => {
-      const display = raceDisplayFromAthleteRace({
-        snapshot: row,
-        registry: row.race_registry,
-      });
-      const raceDate = display.raceDate ?? row.raceDate;
-      return {
-        id: row.raceRegistryId,
-        athleteRaceId: row.id,
-        name: display.name ?? row.name,
-        slug: display.slug,
-        raceDate: raceDate.toISOString(),
-        city: display.city,
-        state: display.state,
-        distanceMeters: display.distanceMeters,
-        distanceLabel: display.distanceLabel,
-      };
-    });
+  const athleteRaces = athleteRaceRows.map(serializePublicAthleteRace);
+
+  // Temporary compatibility alias for existing app consumers. Canonical public
+  // consumers use athleteRaces and athleteRaceId.
+  const signedUpRaces = athleteRaces.map((race) => ({
+    ...race,
+    id: race.raceRegistryId,
+  }));
 
   // Pull RSVP stats for the upcoming runs in a single round-trip
   const runIds = upcomingRunsRaw.map((r) => r.id);
@@ -327,49 +262,49 @@ export async function loadPublicAthletePage(rawHandle: string) {
     };
   });
 
-  const planRace = plan
-    ? raceDisplayFromAthleteRace({
-        snapshot: plan.primary_athlete_race,
-        registry: plan.race_registry,
-      })
-    : null;
+  const planRace = plan?.athlete_race ?? null;
 
   const trainingSummary = plan
     ? {
         planName: plan.name,
         startDate: plan.startDate.toISOString(),
         totalWeeks: plan.totalWeeks,
-        primaryAthleteRaceId:
-          plan.primaryAthleteRaceId ?? plan.primary_athlete_race?.id ?? null,
+        athleteRaceId: plan.athleteRaceId ?? plan.athlete_race?.id ?? null,
         raceName: planRace?.name ?? null,
-        raceDate: planRace?.raceDate?.toISOString() ?? null,
+        raceDate: planRace?.raceDate.toISOString() ?? null,
         raceCity: planRace?.city ?? null,
         raceState: planRace?.state ?? null,
         raceDistanceLabel: planRace?.distanceLabel ?? null,
       }
     : null;
 
-  const chasingRace = chasing
-    ? raceDisplayFromAthleteRace({
-        snapshot: chasing.athlete_race,
-        registry: chasing.race_registry,
-      })
-    : null;
+  const goalAthleteRace = activeGoal?.athlete_race ?? null;
+  const trainingFor =
+    activeGoal && goalAthleteRace
+      ? buildPublicTrainingFor({
+          goal: activeGoal,
+          athleteRace: goalAthleteRace,
+          publicPlans: activeGoal.training_plans,
+        })
+      : null;
 
-  const primaryChasingGoal = chasing
+  // Temporary compatibility alias for existing app consumers. Canonical public
+  // consumers use trainingFor.
+  const primaryChasingGoal = activeGoal
     ? {
-        id: chasing.id,
-        athleteRaceId: chasing.athleteRaceId ?? chasing.athlete_race?.id ?? null,
-        name: chasing.name,
-        distance: chasing.distance,
-        goalTime: chasing.goalTime,
-        targetByDate: chasing.targetByDate.toISOString(),
-        raceName: chasingRace?.name ?? null,
-        raceSlug: chasingRace?.slug ?? null,
-        raceDate: chasingRace?.raceDate?.toISOString() ?? null,
-        raceCity: chasingRace?.city ?? null,
-        raceState: chasingRace?.state ?? null,
-        raceDistanceLabel: chasingRace?.distanceLabel ?? null,
+        id: activeGoal.id,
+        athleteRaceId: activeGoal.athleteRaceId ?? activeGoal.athlete_race?.id ?? null,
+        name: activeGoal.name,
+        distance: activeGoal.distance,
+        goalTime: activeGoal.goalTime,
+        targetByDate: activeGoal.targetByDate.toISOString(),
+        raceName: goalAthleteRace?.name ?? null,
+        raceSlug: goalAthleteRace?.slug ?? null,
+        raceLogoUrl: goalAthleteRace?.logoUrl ?? null,
+        raceDate: goalAthleteRace?.raceDate?.toISOString() ?? null,
+        raceCity: goalAthleteRace?.city ?? null,
+        raceState: goalAthleteRace?.state ?? null,
+        raceDistanceLabel: goalAthleteRace?.distanceLabel ?? null,
       }
     : null;
 
@@ -494,16 +429,16 @@ export async function loadPublicAthletePage(rawHandle: string) {
         };
       }
     }
-    const upcomingSignup = signedUpRaces.find((race) => new Date(race.raceDate) >= now);
-    if (upcomingSignup) {
+    const upcomingAthleteRace = athleteRaces.find((race) => new Date(race.raceDate) >= now);
+    if (upcomingAthleteRace) {
       return {
-        source: 'signup' as const,
-        name: upcomingSignup.name,
-        raceDate: upcomingSignup.raceDate,
-        city: upcomingSignup.city,
-        state: upcomingSignup.state,
-        distanceLabel: upcomingSignup.distanceLabel,
-        slug: upcomingSignup.slug,
+        source: 'athleteRace' as const,
+        name: upcomingAthleteRace.name,
+        raceDate: upcomingAthleteRace.raceDate,
+        city: upcomingAthleteRace.city,
+        state: upcomingAthleteRace.state,
+        distanceLabel: upcomingAthleteRace.distanceLabel,
+        slug: upcomingAthleteRace.slug,
       };
     }
     return null;
@@ -543,6 +478,8 @@ export async function loadPublicAthletePage(rawHandle: string) {
       instagramUsername: athlete.instagramUsername,
       instagramConnected: Boolean(athlete.instagramUserId),
     },
+    trainingFor,
+    athleteRaces,
     trainingSummary,
     primaryChasingGoal,
     lastRun,

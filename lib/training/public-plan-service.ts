@@ -9,7 +9,7 @@ import { metersToMiles } from "@/lib/pace-utils";
 import { loadCatalogueTitleByIdForWeekSchedule } from "@/lib/training/catalogue-title-map";
 import { planScheduleDaysForWeek } from "@/lib/training/plan-schedule";
 import { effectiveTrainingWeekCount } from "@/lib/training/plan-utils";
-import { appendSlugSuffix, slugifyPlanSlug } from "@/lib/training/public-plan-slug";
+import { resolvePlanTerminalRaceDisplay } from "@/lib/training/plan-race-snapshots";
 
 export { slugifyPlanSlug } from "@/lib/training/public-plan-slug";
 
@@ -111,11 +111,14 @@ export async function getPublicPlanBySlug(
           distanceMeters: true,
         },
       },
-      primary_athlete_race: {
+      athlete_race: {
         select: {
+          id: true,
+          raceRegistryId: true,
           name: true,
           raceDate: true,
           distanceMeters: true,
+          distanceLabel: true,
         },
       },
       training_plan_preset: {
@@ -309,6 +312,16 @@ export function mapPublicPlanApiResponse(plan: {
   publicVisibility: PublicTrainingPlanVisibility | null;
   publicPublishedAt: Date | null;
   totalWeeks: number;
+  athleteRaceId?: string | null;
+  athleteRaceMainSnap?: unknown;
+  athlete_race?: {
+    id: string;
+    raceRegistryId: string;
+    name: string;
+    raceDate: Date;
+    distanceMeters: number | null;
+    distanceLabel: string | null;
+  } | null;
   Athlete: {
     id: string;
     firstName: string | null;
@@ -318,6 +331,7 @@ export function mapPublicPlanApiResponse(plan: {
   };
   race_registry: { name: string; distanceLabel: string | null } | null;
 }) {
+  const terminal = resolvePlanTerminalRaceDisplay(plan);
   return {
     id: plan.id,
     slug: plan.publicSlug,
@@ -326,9 +340,10 @@ export function mapPublicPlanApiResponse(plan: {
     visibility: plan.publicVisibility,
     publishedAt: plan.publicPublishedAt?.toISOString() ?? null,
     durationWeeks: plan.totalWeeks,
-    targetDistanceLabel: plan.race_registry?.distanceLabel ?? null,
+    targetDistanceLabel:
+      terminal?.distanceLabel ?? plan.race_registry?.distanceLabel ?? null,
     author: plan.Athlete,
-    raceName: plan.race_registry?.name ?? null,
+    raceName: terminal?.name ?? plan.race_registry?.name ?? null,
   };
 }
 

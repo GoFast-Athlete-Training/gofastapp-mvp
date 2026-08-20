@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { updateGoal } from "@/lib/goal-service";
+import { goalAthleteRaceSelect } from "@/lib/goal-race-display";
 import { prisma } from "@/lib/prisma";
 
 async function athleteFromRequest(request: NextRequest) {
@@ -13,31 +14,8 @@ async function athleteFromRequest(request: NextRequest) {
   return { athlete: auth.athlete };
 }
 
-const raceSelect = {
-  id: true,
-  name: true,
-  distanceLabel: true,
-  distanceMeters: true,
-  raceDate: true,
-  city: true,
-  state: true,
-} as const;
-
-const athleteRaceSelect = {
-  id: true,
-  raceRegistryId: true,
-  name: true,
-  distanceLabel: true,
-  distanceMeters: true,
-  raceDate: true,
-  city: true,
-  state: true,
-  race_registry: { select: { slug: true, logoUrl: true } },
-} as const;
-
 const goalInclude = {
-  athlete_race: { select: athleteRaceSelect },
-  race_registry: { select: raceSelect },
+  athlete_race: { select: goalAthleteRaceSelect },
 } as const;
 
 /** GET /api/goals/[id] */

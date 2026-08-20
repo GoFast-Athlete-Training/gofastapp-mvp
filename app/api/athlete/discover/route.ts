@@ -3,10 +3,20 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import type { DiscoverRunnerCard } from '@/lib/find-runners-types';
+import { goalAthleteRaceSelect } from '@/lib/goal-race-display';
+
+type GoalRaceSnapshot = {
+  raceRegistryId: string;
+  name: string;
+  distanceLabel: string | null;
+  distanceMeters: number | null;
+  raceDate: Date;
+};
 
 function pickDisplayRace(
   plan: {
     raceId: string | null;
+    athlete_race: GoalRaceSnapshot | null;
     race_registry: {
       id: string;
       name: string;
@@ -16,49 +26,50 @@ function pickDisplayRace(
     } | null;
   } | null,
   goal: {
-    raceRegistryId: string | null;
     goalTime: string | null;
-    race_registry: {
-      id: string;
-      name: string;
-      distanceLabel: string | null;
-      distanceMeters: number | null;
-      raceDate: Date | null;
-    } | null;
+    athlete_race: GoalRaceSnapshot | null;
   } | null
 ): { race: DiscoverRunnerCard['race']; goalTime: string | null } {
-  if (plan?.race_registry) {
-    const r = plan.race_registry;
-    let goalTime: string | null = null;
-    if (goal?.race_registry?.id === r.id && goal.goalTime) {
-      goalTime = goal.goalTime;
-    } else if (goal?.raceRegistryId === r.id && goal.goalTime) {
-      goalTime = goal.goalTime;
-    }
+  const planRace = plan?.athlete_race
+    ? {
+        id: plan.athlete_race.raceRegistryId,
+        name: plan.athlete_race.name,
+        distanceLabel: plan.athlete_race.distanceLabel,
+        distanceMeters: plan.athlete_race.distanceMeters,
+        raceDate: plan.athlete_race.raceDate,
+      }
+    : plan?.race_registry;
+
+  if (planRace) {
+    const goalRaceId = goal?.athlete_race?.raceRegistryId ?? null;
+    const goalTime =
+      goalRaceId === planRace.id && goal?.goalTime ? goal.goalTime : null;
     return {
       race: {
-        id: r.id,
-        name: r.name,
-        distanceLabel: r.distanceLabel,
-        distanceMeters: r.distanceMeters,
-        raceDate: r.raceDate ? r.raceDate.toISOString() : null,
+        id: planRace.id,
+        name: planRace.name,
+        distanceLabel: planRace.distanceLabel,
+        distanceMeters: planRace.distanceMeters,
+        raceDate: planRace.raceDate ? planRace.raceDate.toISOString() : null,
       },
       goalTime,
     };
   }
-  if (goal?.race_registry) {
-    const r = goal.race_registry;
+
+  if (goal?.athlete_race) {
+    const r = goal.athlete_race;
     return {
       race: {
-        id: r.id,
+        id: r.raceRegistryId,
         name: r.name,
         distanceLabel: r.distanceLabel,
         distanceMeters: r.distanceMeters,
-        raceDate: r.raceDate ? r.raceDate.toISOString() : null,
+        raceDate: r.raceDate.toISOString(),
       },
       goalTime: goal.goalTime ?? null,
     };
   }
+
   return { race: null, goalTime: goal?.goalTime ?? null };
 }
 
@@ -108,12 +119,21 @@ export async function GET(request: Request) {
         OR: [
           {
             training_plans: {
-              some: { raceId, lifecycleStatus: 'ACTIVE' as const },
+              some: {
+                lifecycleStatus: 'ACTIVE' as const,
+                OR: [
+                  { raceId },
+                  { athlete_race: { is: { raceRegistryId: raceId } } },
+                ],
+              },
             },
           },
           {
             athlete_goals: {
-              some: { raceRegistryId: raceId, status: 'ACTIVE' },
+              some: {
+                status: 'ACTIVE',
+                athlete_race: { is: { raceRegistryId: raceId } },
+              },
             },
           },
         ],
@@ -147,6 +167,7 @@ export async function GET(request: Request) {
             take: 1,
             select: {
               raceId: true,
+              athlete_race: { select: goalAthleteRaceSelect },
               race_registry: {
                 select: {
                   id: true,
@@ -163,17 +184,8 @@ export async function GET(request: Request) {
             orderBy: { targetByDate: 'asc' },
             take: 1,
             select: {
-              raceRegistryId: true,
               goalTime: true,
-              race_registry: {
-                select: {
-                  id: true,
-                  name: true,
-                  distanceLabel: true,
-                  distanceMeters: true,
-                  raceDate: true,
-                },
-              },
+              athlete_race: { select: goalAthleteRaceSelect },
             },
           },
         },

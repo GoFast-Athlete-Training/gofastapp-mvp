@@ -108,15 +108,13 @@ test("imprintPlanRaceCalendarOnSchedule is no-op with zero secondary events", ()
   assert.ok(longRuns.length > 0);
 });
 
-test("filterSignupsInPlanWindow keeps races between start and primary inclusive", () => {
+test("filterSignupsInPlanWindow keeps races between start and terminal inclusive", () => {
   const signups: HydratedRaceCalendarSignup[] = [
     {
       athleteRaceId: "s1",
-      signupId: "s1",
       raceRegistryId: "early",
       goalId: null,
-      calendarRole: "OTHER",
-      positionRelativeToPrimary: "BEFORE",
+      positionRelativeToPlanRace: "BEFORE",
       race: {
         id: "early",
         slug: null,
@@ -131,11 +129,9 @@ test("filterSignupsInPlanWindow keeps races between start and primary inclusive"
     },
     {
       athleteRaceId: "s2",
-      signupId: "s2",
       raceRegistryId: "primary",
       goalId: "g1",
-      calendarRole: "PRIMARY",
-      positionRelativeToPrimary: "ON",
+      positionRelativeToPlanRace: "ON",
       race: {
         id: "primary",
         slug: null,

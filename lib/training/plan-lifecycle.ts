@@ -22,20 +22,20 @@ export async function cascadeLinkedGoalAfterPlanArchived(
     where: { id: planId, athleteId },
     select: {
       athleteGoalId: true,
-      race_registry: { select: { raceDate: true } },
+      athlete_race: { select: { raceDate: true } },
     },
   });
   if (!plan?.athleteGoalId) return;
 
-  let raceDate = plan.race_registry?.raceDate ?? null;
+  let raceDate = plan.athlete_race?.raceDate ?? null;
   const goalRow = await prisma.athleteGoal.findFirst({
     where: { id: plan.athleteGoalId, athleteId },
-    include: { race_registry: { select: { raceDate: true } } },
+    include: { athlete_race: { select: { raceDate: true } } },
   });
   if (!goalRow || goalRow.status !== "ACTIVE") return;
 
   if (raceDate == null) {
-    raceDate = goalRow.race_registry?.raceDate ?? null;
+    raceDate = goalRow.athlete_race?.raceDate ?? null;
   }
 
   const racePast = isRaceCalendarBeforeTodayUtc(raceDate);

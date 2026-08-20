@@ -5,11 +5,9 @@ import Link from "next/link";
 import api from "@/lib/api";
 import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 
-type RaceRegistry = {
-  id: string;
+type GoalAthleteRace = {
+  raceRegistryId: string;
   name: string;
-  raceType: string;
-  distanceMiles: number;
   distanceLabel?: string | null;
   distanceMeters?: number | null;
   raceDate: string;
@@ -29,7 +27,7 @@ type GoalRow = {
   successLooksLike?: string | null;
   completionFeeling?: string | null;
   motivationIcon?: string | null;
-  race_registry?: RaceRegistry | null;
+  athlete_race?: GoalAthleteRace | null;
 };
 
 function formatSecPerMile(sec: number): string {
@@ -62,7 +60,7 @@ function mindsetIsEmpty(g: GoalRow): boolean {
 
 function hasRaceOrTarget(g: GoalRow): boolean {
   return Boolean(
-    g.race_registry ||
+    g.athlete_race ||
       g.goalTime?.trim() ||
       (g.distance?.trim() && g.distance.trim() !== "")
   );
@@ -168,8 +166,8 @@ export default function GoalOverview({ variant }: GoalOverviewProps) {
   const resolvedGoalRacePace = resolveGoalRacePace({
     goalTime: goal.goalTime,
     dbGoalRacePaceSecPerMile: goal.goalRacePace,
-    distanceMeters: goal.race_registry?.distanceMeters ?? null,
-    distanceLabel: goal.race_registry?.distanceLabel ?? null,
+    distanceMeters: goal.athlete_race?.distanceMeters ?? null,
+    distanceLabel: goal.athlete_race?.distanceLabel ?? null,
     goalDistance: goal.distance,
   });
 
@@ -235,15 +233,15 @@ export default function GoalOverview({ variant }: GoalOverviewProps) {
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Race & target</p>
               {hasRaceOrTarget(goal) ? (
                 <div className="mt-2 text-sm text-gray-800 space-y-1">
-                  {goal.race_registry ? (
+                  {goal.athlete_race ? (
                     <>
-                      <p className="font-medium">{goal.race_registry.name}</p>
-                      {(goal.race_registry.city || goal.race_registry.state) && (
+                      <p className="font-medium">{goal.athlete_race.name}</p>
+                      {(goal.athlete_race.city || goal.athlete_race.state) && (
                         <p className="text-gray-600">
-                          {[goal.race_registry.city, goal.race_registry.state].filter(Boolean).join(", ")}
+                          {[goal.athlete_race.city, goal.athlete_race.state].filter(Boolean).join(", ")}
                         </p>
                       )}
-                      <p className="text-gray-600">Race day: {formatDate(goal.race_registry.raceDate)}</p>
+                      <p className="text-gray-600">Race day: {formatDate(goal.athlete_race.raceDate)}</p>
                     </>
                   ) : (
                     <p className="text-gray-700">Target date: {formatDate(goal.targetByDate)}</p>

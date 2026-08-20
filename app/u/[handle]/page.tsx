@@ -33,14 +33,10 @@ export async function generateMetadata({
     data.athlete.lastName,
     data.athlete.gofastHandle,
   );
-  const chasing =
-    data.trainingSummary?.raceName ??
-    data.primaryChasingGoal?.raceName ??
-    data.primaryChasingGoal?.name ??
-    null;
+  const trainingFor = data.trainingFor?.athleteRace.name ?? null;
   const handleStr = data.athlete.gofastHandle ? ` (@${data.athlete.gofastHandle})` : '';
-  const title = chasing
-    ? `${name}${handleStr} · Chasing ${chasing} on GoFast`
+  const title = trainingFor
+    ? `${name}${handleStr} · Training for ${trainingFor} on GoFast`
     : `${name}${handleStr} on GoFast`;
 
   const about =
@@ -50,7 +46,7 @@ export async function generateMetadata({
     null;
   const descParts: string[] = [];
   if (about) descParts.push(about.slice(0, 140));
-  else if (chasing) descParts.push(`Chasing ${chasing}.`);
+  else if (trainingFor) descParts.push(`Training for ${trainingFor}.`);
   if (data.upcomingRuns.length > 0) {
     descParts.push(
       data.upcomingRuns.length === 1

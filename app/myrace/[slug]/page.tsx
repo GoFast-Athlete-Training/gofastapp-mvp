@@ -393,7 +393,7 @@ export default function MyRacePage() {
 
   const locationText = [race.city, race.state].filter(Boolean).join(", ") || null;
   const isGoalRace = Boolean(
-    goal && (goal.raceRegistryId === race.id || goal.race_registry?.id === race.id)
+    goal && goal.athlete_race?.raceRegistryId === race.id
   );
   const hasSignup = Boolean(signup);
   const goalTimeDisplay = goal?.goalTime?.trim() || null;

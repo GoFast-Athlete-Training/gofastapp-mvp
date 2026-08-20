@@ -60,6 +60,7 @@ type PlanPresetSummary = {
 
 type PlanDetail = {
   id: string;
+  athleteRaceId?: string | null;
   presetId?: string | null;
   name: string;
   totalWeeks: number;
@@ -173,7 +174,7 @@ export default function TrainingSetupPlanPage({
   const [claimedRaces, setClaimedRaces] = useState<
     Array<{ id: string; name: string; raceDate: string; distanceLabel: string | null }>
   >([]);
-  const [primaryAthleteRaceId, setPrimaryAthleteRaceId] = useState<string>("");
+  const [athleteRaceId, setAthleteRaceId] = useState<string>("");
   async function getToken() {
     const u = auth.currentUser;
     if (!u) throw new Error("Sign in required");
@@ -191,7 +192,9 @@ export default function TrainingSetupPlanPage({
         planId,
         token
       );
-      setPlan(plan as PlanDetail);
+      const detail = plan as PlanDetail;
+      setPlan(detail);
+      setAthleteRaceId(detail.athleteRaceId ?? "");
       setAthleteWeeklyTargetPreference(weeklyMileageTargetPreference);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
@@ -216,8 +219,7 @@ export default function TrainingSetupPlanPage({
         candidates?: SecondaryRaceCandidate[];
       };
       const candidates = (data.candidates ?? []).map((c) => ({
-        athleteRaceId: c.athleteRaceId ?? c.signupId,
-        signupId: c.signupId ?? c.athleteRaceId,
+        athleteRaceId: c.athleteRaceId,
         raceRegistryId: c.raceRegistryId,
         race: {
           name: c.race.name,
@@ -618,7 +620,7 @@ export default function TrainingSetupPlanPage({
         preferredLongRunDow: preferredLongRunDowLocal,
         preferredTempoDow: preferredTempoDowLocal,
         preferredIntervalDow: preferredIntervalDowLocal,
-        ...(primaryAthleteRaceId ? { primaryAthleteRaceId } : {}),
+        ...(athleteRaceId ? { athleteRaceId } : {}),
       }),
     });
     const patchData = await patchRes.json();
@@ -991,8 +993,8 @@ export default function TrainingSetupPlanPage({
                 </p>
                 <select
                   className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
-                  value={primaryAthleteRaceId}
-                  onChange={(e) => setPrimaryAthleteRaceId(e.target.value)}
+                  value={athleteRaceId}
+                  onChange={(e) => setAthleteRaceId(e.target.value)}
                 >
                   <option value="">
                     Use plan default ({plan.race_registry?.name ?? "race"})

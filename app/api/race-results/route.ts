@@ -49,10 +49,10 @@ export async function GET(request: NextRequest) {
       if (result?.goalId) {
         const g = await prisma.athleteGoal.findFirst({
           where: { id: result.goalId, athleteId: athlete.id },
-          include: { race_registry: { select: { name: true } } },
+          include: { athlete_race: { select: { name: true } } },
         });
         if (g) {
-          analysis = analyzeRaceResult(result, g, g.race_registry?.name ?? "Your race");
+          analysis = analyzeRaceResult(result, g, g.athlete_race?.name ?? "Your race");
         }
       }
       return NextResponse.json({ result, analysis });

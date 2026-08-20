@@ -109,7 +109,7 @@ async function deriveGoalForAthlete(athleteId: string): Promise<AthleteProfileGo
     where: { athleteId, status: 'ACTIVE' },
     orderBy: { targetByDate: 'asc' },
     include: {
-      race_registry: { select: { name: true } },
+      athlete_race: { select: { name: true } },
     },
   });
 
@@ -119,7 +119,7 @@ async function deriveGoalForAthlete(athleteId: string): Promise<AthleteProfileGo
     name: goal.name,
     goalTime: goal.goalTime,
     targetByDate: goal.targetByDate.toISOString(),
-    raceName: goal.race_registry?.name ?? null,
+    raceName: goal.athlete_race?.name ?? null,
   };
 }
 

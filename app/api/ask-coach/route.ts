@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { prisma } from "@/lib/prisma";
+import { goalAthleteRaceSelect } from "@/lib/goal-race-display";
 import { askReikiCoach } from "@/lib/coach/reiki-coach";
 import { metersToMiles } from "@/lib/pace-utils";
 
@@ -25,16 +25,7 @@ export async function POST(request: NextRequest) {
       where: { athleteId: athlete.id, status: "ACTIVE" },
       orderBy: { targetByDate: "asc" },
       include: {
-        race_registry: {
-          select: {
-            name: true,
-            raceDate: true,
-            city: true,
-            state: true,
-            distanceMeters: true,
-            distanceLabel: true,
-          },
-        },
+        athlete_race: { select: goalAthleteRaceSelect },
       },
     });
 
@@ -46,8 +37,8 @@ export async function POST(request: NextRequest) {
       if (activeGoal.targetByDate) {
         bits.push(`Target by: ${activeGoal.targetByDate.toISOString().slice(0, 10)}`);
       }
-      if (activeGoal.race_registry) {
-        const r = activeGoal.race_registry;
+      if (activeGoal.athlete_race) {
+        const r = activeGoal.athlete_race;
         const dist =
           r.distanceLabel?.trim() ||
           (r.distanceMeters != null

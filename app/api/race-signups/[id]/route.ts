@@ -55,7 +55,6 @@ export async function PATCH(
         where: { id: goalId },
         data: {
           athleteRaceId: athleteRace.id,
-          raceRegistryId: athleteRace.raceRegistryId,
           updatedAt: new Date(),
         },
       });

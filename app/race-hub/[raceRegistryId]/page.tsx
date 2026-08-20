@@ -161,13 +161,10 @@ function RaceHubPageInner() {
               id: string;
               name?: string | null;
               goalTime?: string | null;
-              raceRegistryId?: string | null;
-              race_registry?: { id: string; name?: string | null };
+              athlete_race?: { raceRegistryId: string; name?: string | null } | null;
             }[]
           | undefined) ?? [];
-      const goalMatch = goals.find(
-        (g) => g.raceRegistryId === id || g.race_registry?.id === id
-      );
+      const goalMatch = goals.find((g) => g.athlete_race?.raceRegistryId === id);
       setHubGoalId(goalMatch?.id ?? null);
 
       return { canAccessHub: true, loadedRace };

@@ -35,6 +35,7 @@ import {
 import { parseCoachPlanOverview } from "@/lib/training/preset-strategy";
 import {
   imprintPlanRaceCalendarOnSchedule,
+  persistPlanRaceSnapshots,
   resolvePlanRaceCalendar,
 } from "@/lib/training/race-plan-calendar-service";
 
@@ -65,17 +66,16 @@ export async function executePlanGenerate(params: {
   const planRow = await prisma.training_plans.findFirst({
     where: { id: plan.id, athleteId },
     include: {
-      race_registry: true,
-      primary_athlete_race: true,
+      athlete_race: true,
       athlete_goal: { select: { goalTime: true, goalRacePace: true, distance: true } },
     },
   });
   if (!planRow) {
     throw new Error("Plan not found");
   }
-  const race = planRow.primary_athlete_race ?? planRow.race_registry;
+  const race = planRow.athlete_race;
   if (!race) {
-    throw new Error("Plan not found or has no linked race");
+    throw new Error("Plan must have athleteRaceId set before generation");
   }
   if (!planRow.presetId) {
     throw new Error(
@@ -241,6 +241,12 @@ export async function executePlanGenerate(params: {
     calendar,
   });
 
+  await persistPlanRaceSnapshots({
+    trainingPlanId: plan.id,
+    athleteId,
+    includedSecondaryAthleteRaceIds: includedIds,
+  });
+
   const secondaryRaceDistanceMilesByRegistryId = new Map<string, number>();
   for (const ev of calendar.secondaries.filter((e) => e.inclusion === "INCLUDED")) {
     if (ev.distanceMeters != null && Number.isFinite(ev.distanceMeters)) {
@@ -361,8 +367,8 @@ export async function executePlanGenerate(params: {
     goalTime: mergedGoalTime,
     dbGoalRacePaceSecPerMile: planRow.athlete_goal?.goalRacePace ?? null,
     planGoalRacePace: planRow.goalRacePace ?? null,
-    distanceMeters: planRow.race_registry?.distanceMeters ?? null,
-    distanceLabel: planRow.race_registry?.distanceLabel ?? null,
+    distanceMeters: race.distanceMeters ?? null,
+    distanceLabel: race.distanceLabel ?? null,
     goalDistance: planRow.athlete_goal?.distance ?? null,
   });
   const imprintPace =

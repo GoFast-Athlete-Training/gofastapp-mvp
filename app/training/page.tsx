@@ -207,7 +207,7 @@ export default function TrainingHubPage() {
           id: plan.id,
           name: plan.name,
           raceName: plan.race_registry?.name ?? null,
-          raceId: plan.raceId ?? null,
+          raceId: plan.race_registry?.id ?? null,
           raceDate:
             typeof plan.race_registry?.raceDate === "string"
               ? plan.race_registry.raceDate
@@ -217,8 +217,8 @@ export default function TrainingHubPage() {
         });
         setWeekDays([]);
         // Probe whether the athlete already logged a result + reflection
-        if (plan.raceId) {
-          fetch(`/api/race-results?raceRegistryId=${encodeURIComponent(plan.raceId)}`, {
+        if (plan.race_registry?.id) {
+          fetch(`/api/race-results?raceRegistryId=${encodeURIComponent(plan.race_registry.id)}`, {
             headers: { Authorization: `Bearer ${token}` },
           })
             .then((r) => r.json() as Promise<{ results?: Array<{ id: string; officialFinishTime?: string | null; reflection?: string | null }> }>)

@@ -32,11 +32,7 @@ export default async function OgImage({
     ? displayNameFor(data.athlete.firstName, data.athlete.lastName, data.athlete.gofastHandle)
     : 'GoFast runner';
   const handleLine = data?.athlete.gofastHandle ? `@${data.athlete.gofastHandle}` : '';
-  const chasing =
-    data?.trainingSummary?.raceName ??
-    data?.primaryChasingGoal?.raceName ??
-    data?.primaryChasingGoal?.name ??
-    null;
+  const trainingFor = data?.trainingFor?.athleteRace.name ?? null;
   const upcomingCount = data?.upcomingRuns.length ?? 0;
   const heroPhoto = data
     ? publicHeroPhotoUrl(
@@ -190,7 +186,7 @@ export default async function OgImage({
                 {handleLine}
               </div>
             )}
-            {chasing && (
+            {trainingFor && (
               <div
                 style={{
                   fontSize: 30,
@@ -214,7 +210,7 @@ export default async function OgImage({
                     display: 'flex',
                   }}
                 >
-                  Chasing
+                  Training for
                 </span>
                 <span
                   style={{
@@ -223,7 +219,7 @@ export default async function OgImage({
                     display: 'flex',
                   }}
                 >
-                  {chasing}
+                  {trainingFor}
                 </span>
               </div>
             )}

@@ -432,14 +432,26 @@ export async function adoptPublicTrainingPlan(
 
   const race = await prisma.race_registry.findUnique({
     where: { id: input.raceRegistryId },
+    select: {
+      id: true,
+      name: true,
+      raceDate: true,
+      distanceMeters: true,
+      distanceLabel: true,
+      city: true,
+      state: true,
+      slug: true,
+      logoUrl: true,
+    },
   });
   if (!race) throw new Error("Race not found");
 
   const goal = await prisma.athleteGoal.findFirst({
     where: { id: input.athleteGoalId, athleteId: input.athleteId },
+    include: { athlete_race: { select: { raceRegistryId: true } } },
   });
   if (!goal) throw new Error("Goal not found");
-  if (goal.raceRegistryId !== race.id) {
+  if (goal.athlete_race?.raceRegistryId !== race.id) {
     throw new Error("Goal must match the selected race");
   }
   const gt = goal.goalTime?.trim();
@@ -489,7 +501,7 @@ export async function adoptPublicTrainingPlan(
   const snapshot = publicPlan.customWorkoutSnapshot as PublicPlanCustomWorkoutSnapshot | null;
 
   const result = await prisma.$transaction(async (tx) => {
-    await tx.athlete_races.upsert({
+    const athleteRace = await tx.athlete_races.upsert({
       where: {
         athleteId_raceRegistryId: {
           athleteId: input.athleteId,
@@ -505,9 +517,16 @@ export async function adoptPublicTrainingPlan(
         distanceLabel: race.distanceLabel,
         city: race.city,
         state: race.state,
+        slug: race.slug,
+        logoUrl: race.logoUrl,
         updatedAt: new Date(),
       },
       update: { updatedAt: new Date() },
+    });
+
+    await tx.athleteGoal.update({
+      where: { id: goal.id },
+      data: { athleteRaceId: athleteRace.id, updatedAt: new Date() },
     });
 
     const existingActive = await tx.training_plans.findFirst({
@@ -542,7 +561,7 @@ export async function adoptPublicTrainingPlan(
       data: {
         id: randomUUID(),
         athleteId: input.athleteId,
-        raceId: race.id,
+        athleteRaceId: athleteRace.id,
         athleteGoalId: goal.id,
         name: planName,
         startDate,
