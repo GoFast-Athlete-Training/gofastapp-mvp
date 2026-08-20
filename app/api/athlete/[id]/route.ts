@@ -47,7 +47,11 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    await ensureAthleteProfileSnapshot(id);
+    try {
+      await ensureAthleteProfileSnapshot(id);
+    } catch (err) {
+      console.error('GET /api/athlete/[id] snapshot repair failed:', err);
+    }
 
     let athleteRow;
     try {
@@ -65,7 +69,12 @@ export async function GET(
       athleteRow as Record<string, unknown> & { id: string; garmin_access_token?: string | null }
     );
 
-    const leaderContext = await buildLeaderContext(id);
+    let leaderContext = null;
+    try {
+      leaderContext = await buildLeaderContext(id);
+    } catch (err) {
+      console.error('GET /api/athlete/[id] leader context failed:', err);
+    }
 
     return NextResponse.json({
       success: true,
@@ -75,6 +84,7 @@ export async function GET(
       },
     });
   } catch (err) {
+    console.error('GET /api/athlete/[id]:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
