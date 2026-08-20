@@ -10,7 +10,8 @@
     },
     {
       "path": "/api/cron/auto-push-garmin",
-      "schedule": "0 5 * * *"
+      "schedule": "0 5 * * *",
+      "timezone": "America/New_York"
     },
     {
       "path": "/api/cron/auto-push-garmin-backup",

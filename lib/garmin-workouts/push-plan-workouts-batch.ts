@@ -29,6 +29,8 @@ export type PushPlanWorkoutsBatchOptions = {
   runLabel: string;
   /** Weekly pre-push: force library-only rows onto the Training Calendar. */
   recoverLibraryOnly?: boolean;
+  /** Daily cron fallback: only rows not yet on the Garmin Training Calendar. */
+  unsentOnly?: boolean;
   athleteIds?: string[];
 };
 
@@ -121,6 +123,7 @@ export async function pushPlanWorkoutsInDateRange(
     candidateLimit = 40,
     runLabel,
     recoverLibraryOnly = false,
+    unsentOnly = false,
     athleteIds,
   } = options;
 
@@ -129,6 +132,7 @@ export async function pushPlanWorkoutsInDateRange(
     dateEnd: dateEnd.toISOString(),
     candidateLimit,
     recoverLibraryOnly,
+    unsentOnly,
     athleteFilterCount: athleteIds?.length ?? null,
   });
 
@@ -137,6 +141,7 @@ export async function pushPlanWorkoutsInDateRange(
       planId: { not: null },
       athleteId: { not: null },
       date: { gte: dateStart, lte: dateEnd },
+      ...(unsentOnly ? { garminScheduleId: null } : {}),
       Athlete: {
         garmin_access_token: { not: null },
         garmin_user_id: { not: null },
