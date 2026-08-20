@@ -17,6 +17,7 @@ import {
 } from "./segment-summary";
 
 const M400 = 400 / 1609.34;
+const M1200 = 1200 / 1609.34;
 
 function seg(
   stepOrder: number,
@@ -135,6 +136,11 @@ test("expandSegmentsForGarminPush stretches collapsed flat reps into repeatCount
 
 test("milesToDisplayMeters snaps 400m track reps to 400 not 401", () => {
   assert.equal(milesToDisplayMeters(M400), 400);
+});
+
+test("1200m track distance displays as 1200m", () => {
+  assert.equal(milesToDisplayMeters(M1200), 1200);
+  assert.equal(formatSegmentDistance(M1200), "1200m");
 });
 
 test("distance labels keep tenths for non-whole long runs", () => {

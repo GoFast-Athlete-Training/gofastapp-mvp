@@ -23,6 +23,10 @@ import {
   type PaceResolutionContext,
 } from "@/lib/training/pace-key-resolver";
 import type { PaceProfile } from "@/lib/training/preset-strategy";
+import {
+  catalogueSegmentDistanceMiles,
+  isTempoWorkSegmentList,
+} from "@/lib/training/catalogue-segment-distance";
 
 /** One materialized segment step (matches legacy API / DB segment row shape). */
 export type WorkoutStep = {
@@ -261,7 +265,7 @@ function parseIntervalBlockRepeatPayload(v: unknown): IntervalBlockRepeatPayload
 
 /**
  * Tempo — repeat a mile-based sequence with optional timed jog between whole cycles.
- * Same envelope as intervals blockRepeat; segments use `miles` instead of `distanceMeters`.
+ * Same envelope as intervals blockRepeat; segments may use `miles` or `distanceMeters`.
  */
 type TempoBlockRepeatPayload = {
   layout: "blockRepeat";
@@ -283,9 +287,14 @@ function parseTempoBlockRepeatPayload(v: unknown): TempoBlockRepeatPayload | nul
   const parsedSegs: TempoBlockRepeatPayload["segments"] = [];
   for (const row of segments) {
     if (row == null || typeof row !== "object" || Array.isArray(row)) return null;
-    const r = row as { miles?: unknown; paceOffsetSecPerMile?: unknown; paceKey?: unknown };
-    const mi = Number(r.miles);
-    if (!Number.isFinite(mi) || mi <= 0) return null;
+    const r = row as {
+      miles?: unknown;
+      distanceMeters?: unknown;
+      paceOffsetSecPerMile?: unknown;
+      paceKey?: unknown;
+    };
+    const miles = catalogueSegmentDistanceMiles(r);
+    if (miles == null) return null;
     let paceOffsetSecPerMile: number | null = null;
     if (Object.prototype.hasOwnProperty.call(r, "paceOffsetSecPerMile")) {
       const raw = r.paceOffsetSecPerMile;
@@ -296,7 +305,7 @@ function parseTempoBlockRepeatPayload(v: unknown): TempoBlockRepeatPayload | nul
       }
     }
     parsedSegs.push({
-      miles: round(mi, 4),
+      miles,
       paceOffsetSecPerMile,
       paceKey: typeof r.paceKey === "string" ? r.paceKey : null,
     });
@@ -769,7 +778,7 @@ export function prescribe(params: {
       if (out.length > 0) return out;
     }
 
-    if (isMilesWorkSegmentList(tj)) {
+    if (isTempoWorkSegmentList(tj)) {
       const warmupM = entry.warmupMiles != null && entry.warmupMiles > 0 ? round(entry.warmupMiles, 2) : 0;
       const cooldownM =
         entry.cooldownMiles != null && entry.cooldownMiles > 0 ? round(entry.cooldownMiles, 2) : 0;
@@ -786,7 +795,8 @@ export function prescribe(params: {
       }
       let sumSeg = 0;
       for (const seg of tj) {
-        const m = round(Math.max(0, Number(seg.miles)), 2);
+        const resolvedMiles = catalogueSegmentDistanceMiles(seg);
+        const m = round(Math.max(0, resolvedMiles ?? 0), 2);
         if (m <= 0) continue;
         const repsRaw = (seg as { reps?: unknown }).reps;
         const reps = Math.max(1, Math.round(Number(repsRaw) || 1));

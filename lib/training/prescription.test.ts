@@ -178,3 +178,75 @@ test("fallback tempo template bookends are distance-only", () => {
     assert.equal(seg.targets, undefined, `${seg.title} should be OPEN (no targets)`);
   }
 });
+
+const M400 = 400 / 1609.34;
+
+test("Tempo mile-list materializes rolling-hills 400/400/400 from distanceMeters", () => {
+  const steps = prescribe({
+    entry: baseCatalogue({
+      workoutType: "Tempo",
+      workPaceOffsetSecPerMile: 30,
+      segmentPaceDist: [
+        { distanceMeters: 400, paceKey: "threshold" },
+        { distanceMeters: 400, paceKey: "steady" },
+        { distanceMeters: 400, paceKey: "threshold" },
+      ] as unknown as workout_catalogue["segmentPaceDist"],
+    }),
+    scheduleMiles: 3.25,
+    anchorSecondsPerMile: ANCHOR_SEC,
+    paceProfile: {
+      threshold: { anchor: "current5k", offsetSecPerMile: 30 },
+      steady: { anchor: "current5k", offsetSecPerMile: 45 },
+    },
+  });
+  const tempoSteps = steps.filter((s) => s.title === "Tempo");
+  assert.equal(tempoSteps.length, 3, "expected three distinct tempo segments");
+  for (const s of tempoSteps) {
+    assert.ok(s.durationValue > 0.2 && s.durationValue < 0.3, "each step ~400m in miles");
+    assert.ok(s.targets?.length, "tempo steps should have pace targets");
+  }
+});
+
+test("Tempo blockRepeat accepts distanceMeters segments", () => {
+  const steps = prescribe({
+    entry: baseCatalogue({
+      workoutType: "Tempo",
+      workPaceOffsetSecPerMile: 30,
+      segmentPaceDist: {
+        layout: "blockRepeat",
+        segments: [
+          { distanceMeters: 400, paceKey: "threshold" },
+          { distanceMeters: 400, paceKey: "steady" },
+          { distanceMeters: 400, paceKey: "threshold" },
+        ],
+        repeatCount: 2,
+        recoveryBetweenCyclesSeconds: 90,
+      } as unknown as workout_catalogue["segmentPaceDist"],
+    }),
+    scheduleMiles: 8,
+    anchorSecondsPerMile: ANCHOR_SEC,
+    paceProfile: {
+      threshold: { anchor: "current5k", offsetSecPerMile: 30 },
+      steady: { anchor: "current5k", offsetSecPerMile: 45 },
+    },
+  });
+  const tempoSteps = steps.filter((s) => s.title === "Tempo");
+  assert.equal(tempoSteps.length, 6, "2 cycles × 3 segments");
+  const recoveries = steps.filter((s) => s.title === "Recovery");
+  assert.equal(recoveries.length, 1, "one recovery between two cycles");
+  assert.equal(recoveries[0]!.durationValue, 1.5, "90s → 1.5 min");
+});
+
+test("Tempo with invalid segmentPaceDist still falls back to sustained block", () => {
+  const steps = prescribe({
+    entry: baseCatalogue({
+      workoutType: "Tempo",
+      workPaceOffsetSecPerMile: 30,
+      segmentPaceDist: [{ notDistance: true }] as unknown as workout_catalogue["segmentPaceDist"],
+    }),
+    scheduleMiles: 6,
+    anchorSecondsPerMile: ANCHOR_SEC,
+  });
+  const tempoSteps = steps.filter((s) => s.title === "Tempo");
+  assert.equal(tempoSteps.length, 1, "sustained tempo fallback");
+});
