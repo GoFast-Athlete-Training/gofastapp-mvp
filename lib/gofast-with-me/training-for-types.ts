@@ -2,6 +2,7 @@ export type GoFastWithMeTrainingSummary = {
   planName: string;
   startDate: string;
   totalWeeks: number;
+  primaryAthleteRaceId?: string | null;
   raceName: string | null;
   raceDate: string | null;
   raceCity: string | null;
@@ -10,6 +11,7 @@ export type GoFastWithMeTrainingSummary = {
 };
 
 export type GoFastWithMeChasingGoal = {
+  athleteRaceId?: string | null;
   name: string | null;
   distance: string;
   goalTime: string | null;

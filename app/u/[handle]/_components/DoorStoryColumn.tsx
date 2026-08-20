@@ -34,15 +34,13 @@ function Section({
   );
 }
 
-export default function DoorStoryColumn({ gofastWithMe, profileBio }: Props) {
+export default function DoorStoryColumn({ gofastWithMe }: Props) {
   const photoUrl = gofastWithMe?.gofastWithMePhotoUrl?.trim() || null;
   const photoFocus = photoFocusStyle(
     gofastWithMe?.gofastWithMePhotoFocusX,
     gofastWithMe?.gofastWithMePhotoFocusY,
     gofastWithMe?.gofastWithMePhotoZoom
   );
-  const about =
-    gofastWithMe?.gofastWithMeBio?.trim() || profileBio?.trim() || null;
   const welcome = gofastWithMe?.welcome?.trim() || null;
   const whatYoullSee = gofastWithMe?.whatYoullSeeHere?.trim() || null;
   const achievements = gofastWithMe?.myAchievements?.trim() || null;
@@ -73,9 +71,7 @@ export default function DoorStoryColumn({ gofastWithMe, profileBio }: Props) {
         <p className="text-xs font-medium text-stone-500">{focusParts.join(' · ')}</p>
       ) : null}
 
-      {about ? <Section label="About you">{about}</Section> : null}
-
-      {whatYoullSee ? <Section label="What you&apos;ll see">{whatYoullSee}</Section> : null}
+      {whatYoullSee ? <Section label={"What you'll see"}>{whatYoullSee}</Section> : null}
 
       {achievements ? <Section label="Achievements">{achievements}</Section> : null}
     </div>

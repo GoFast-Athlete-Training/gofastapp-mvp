@@ -1,10 +1,15 @@
 import Link from 'next/link';
 import { Flag, Trophy } from 'lucide-react';
+import {
+  filterDoorCalendarRaces,
+  resolveDoorGoalRace,
+} from '@/lib/gofast-with-me/public-door-sidebar';
 
 type TrainingSummary = {
   planName: string;
   startDate: string;
   totalWeeks: number;
+  primaryAthleteRaceId?: string | null;
   raceName: string | null;
   raceDate: string | null;
   raceCity: string | null;
@@ -13,6 +18,7 @@ type TrainingSummary = {
 };
 
 type ChasingGoal = {
+  athleteRaceId?: string | null;
   name: string | null;
   distance: string;
   goalTime: string | null;
@@ -22,10 +28,12 @@ type ChasingGoal = {
   raceCity: string | null;
   raceState: string | null;
   raceDistanceLabel: string | null;
+  raceSlug?: string | null;
 };
 
 type SignedUpRace = {
   id: string;
+  athleteRaceId?: string | null;
   name: string;
   slug: string | null;
   raceDate: string;
@@ -73,57 +81,50 @@ export default function DoorSidebar({
   signedUpRaces,
   containerMemberCount = 0,
 }: Props) {
-  let raceName: string | null = null;
-  let raceDate: string | null = null;
-  let distanceLabel: string | null = null;
-  let planName: string | null = null;
+  const primaryPlan = publishedPlans.find((p) => p.slug?.trim()) ?? null;
+  const goalRace = resolveDoorGoalRace({
+    primaryChasingGoal,
+    trainingSummary,
+    signedUpRaces,
+  });
+  const calendarRaces = filterDoorCalendarRaces(signedUpRaces, goalRace);
 
-  if (trainingSummary) {
-    raceName = trainingSummary.raceName;
-    raceDate = trainingSummary.raceDate;
-    distanceLabel = trainingSummary.raceDistanceLabel;
-    planName = trainingSummary.planName;
-  } else if (primaryChasingGoal) {
-    raceName = primaryChasingGoal.raceName ?? primaryChasingGoal.name;
-    raceDate = primaryChasingGoal.raceDate ?? primaryChasingGoal.targetByDate;
-    distanceLabel = primaryChasingGoal.raceDistanceLabel ?? primaryChasingGoal.distance;
-  }
-
-  const primaryPlan = publishedPlans[0] ?? null;
-  const futureRaces = signedUpRaces
-    .filter((r) => new Date(r.raceDate) >= new Date())
-    .slice(0, 8);
-
-  const hasTraining = Boolean(raceName || planName || primaryPlan);
-  const hasCalendar = futureRaces.length > 0;
+  const hasGoalRace = Boolean(goalRace);
+  const hasPlan = Boolean(primaryPlan);
+  const hasCalendar = calendarRaces.length > 0;
   const hasMembers = containerMemberCount > 0;
 
-  if (!hasTraining && !hasCalendar && !hasMembers) return null;
+  if (!hasGoalRace && !hasPlan && !hasCalendar && !hasMembers) return null;
 
-  const raceMeta = [formatRaceDate(raceDate), distanceLabel].filter(Boolean).join(' · ');
+  const goalMeta = goalRace
+    ? [formatRaceDate(goalRace.raceDate), goalRace.distanceLabel?.trim()].filter(Boolean).join(' · ')
+    : null;
 
   return (
     <aside className="space-y-8">
-      {hasTraining ? (
+      {hasGoalRace && goalRace ? (
         <div>
           <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-orange-700 mb-2">
             <Trophy className="w-3.5 h-3.5" />
-            Training for
+            Goal race
           </div>
-          {raceName ? (
-            <p className="text-lg font-bold text-stone-900 leading-snug">{raceName}</p>
-          ) : planName ? (
-            <p className="text-lg font-bold text-stone-900 leading-snug">{planName}</p>
-          ) : null}
-          {raceMeta ? <p className="mt-1 text-sm text-stone-600">{raceMeta}</p> : null}
-          {primaryPlan ? (
-            <Link
-              href={`/plans/${encodeURIComponent(primaryPlan.slug)}`}
-              className="mt-3 inline-flex text-sm font-semibold text-orange-700 hover:text-orange-800"
-            >
-              See my plan →
-            </Link>
-          ) : null}
+          <p className="text-lg font-bold text-stone-900 leading-snug">{goalRace.name}</p>
+          {goalMeta ? <p className="mt-1 text-sm text-stone-600">{goalMeta}</p> : null}
+        </div>
+      ) : null}
+
+      {hasPlan && primaryPlan ? (
+        <div>
+          <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-stone-500 mb-2">
+            My Training Plan
+          </div>
+          <p className="text-sm font-semibold text-stone-900 leading-snug">{primaryPlan.title}</p>
+          <Link
+            href={`/plans/${encodeURIComponent(primaryPlan.slug)}`}
+            className="mt-3 inline-flex text-sm font-semibold text-orange-700 hover:text-orange-800"
+          >
+            See my plan →
+          </Link>
         </div>
       ) : null}
 
@@ -134,7 +135,7 @@ export default function DoorSidebar({
             On the calendar
           </div>
           <ul className="space-y-3">
-            {futureRaces.map((race) => {
+            {calendarRaces.map((race) => {
               const meta = [formatRaceShort(race.raceDate), race.distanceLabel?.trim()]
                 .filter(Boolean)
                 .join(' · ');
@@ -145,7 +146,7 @@ export default function DoorSidebar({
                 </>
               );
               return (
-                <li key={race.id}>
+                <li key={race.athleteRaceId ?? race.id}>
                   {race.slug ? (
                     <Link href={`/join/race/${race.slug}`} className="block hover:opacity-80">
                       {inner}

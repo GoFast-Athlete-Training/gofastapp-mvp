@@ -14,6 +14,7 @@ import { listPublicInstagramMedia } from '@/lib/gofast-with-me/instagram-hydrati
 const METERS_PER_MILE = 1609.344;
 
 const athleteRaceSnapshotSelect = {
+  id: true,
   name: true,
   raceDate: true,
   city: true,
@@ -186,6 +187,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
         name: true,
         startDate: true,
         totalWeeks: true,
+        primaryAthleteRaceId: true,
         primary_athlete_race: { select: athleteRaceSnapshotSelect },
         race_registry: {
           select: {
@@ -259,6 +261,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
       const raceDate = display.raceDate ?? row.raceDate;
       return {
         id: row.raceRegistryId,
+        athleteRaceId: row.id,
         name: display.name ?? row.name,
         slug: display.slug,
         raceDate: raceDate.toISOString(),
@@ -336,6 +339,8 @@ export async function loadPublicAthletePage(rawHandle: string) {
         planName: plan.name,
         startDate: plan.startDate.toISOString(),
         totalWeeks: plan.totalWeeks,
+        primaryAthleteRaceId:
+          plan.primaryAthleteRaceId ?? plan.primary_athlete_race?.id ?? null,
         raceName: planRace?.name ?? null,
         raceDate: planRace?.raceDate?.toISOString() ?? null,
         raceCity: planRace?.city ?? null,
@@ -351,22 +356,22 @@ export async function loadPublicAthletePage(rawHandle: string) {
       })
     : null;
 
-  const primaryChasingGoal =
-    !trainingSummary && chasing
-      ? {
-          id: chasing.id,
-          name: chasing.name,
-          distance: chasing.distance,
-          goalTime: chasing.goalTime,
-          targetByDate: chasing.targetByDate.toISOString(),
-          raceName: chasingRace?.name ?? null,
-          raceSlug: chasingRace?.slug ?? null,
-          raceDate: chasingRace?.raceDate?.toISOString() ?? null,
-          raceCity: chasingRace?.city ?? null,
-          raceState: chasingRace?.state ?? null,
-          raceDistanceLabel: chasingRace?.distanceLabel ?? null,
-        }
-      : null;
+  const primaryChasingGoal = chasing
+    ? {
+        id: chasing.id,
+        athleteRaceId: chasing.athleteRaceId ?? chasing.athlete_race?.id ?? null,
+        name: chasing.name,
+        distance: chasing.distance,
+        goalTime: chasing.goalTime,
+        targetByDate: chasing.targetByDate.toISOString(),
+        raceName: chasingRace?.name ?? null,
+        raceSlug: chasingRace?.slug ?? null,
+        raceDate: chasingRace?.raceDate?.toISOString() ?? null,
+        raceCity: chasingRace?.city ?? null,
+        raceState: chasingRace?.state ?? null,
+        raceDistanceLabel: chasingRace?.distanceLabel ?? null,
+      }
+    : null;
 
   const lastRun =
     lastActivity?.startTime != null
