@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
+import { prisma } from "@/lib/prisma";
 import { goalAthleteRaceSelect } from "@/lib/goal-race-display";
 import { askReikiCoach } from "@/lib/coach/reiki-coach";
 import { metersToMiles } from "@/lib/pace-utils";
