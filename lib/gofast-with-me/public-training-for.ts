@@ -9,6 +9,9 @@ export type PublicAthleteRaceSnapshot = {
   distanceMeters: number | null;
   slug: string | null;
   logoUrl: string | null;
+  goalName?: string | null;
+  goalDistance?: string | null;
+  goalTime?: string | null;
 };
 
 export type PublicPlanForGoal = {
@@ -32,22 +35,20 @@ export function serializePublicAthleteRace(row: PublicAthleteRaceSnapshot) {
     state: row.state,
     distanceMeters: row.distanceMeters,
     distanceLabel: row.distanceLabel,
+    goalTime: row.goalTime ?? null,
+    goalName: row.goalName ?? null,
+    goalDistance: row.goalDistance ?? null,
   };
 }
 
 export function buildPublicTrainingFor(input: {
-  goal: {
-    id: string;
-    name: string | null;
-    distance: string;
-    goalTime: string | null;
-    targetByDate: Date;
-  };
-  athleteRace: PublicAthleteRaceSnapshot | null;
+  athleteRace: PublicAthleteRaceSnapshot;
   publicPlans: PublicPlanForGoal[];
 }) {
   const race = input.athleteRace;
-  if (!race) return null;
+  if (!race.goalTime?.trim() && !race.goalName?.trim() && !race.goalDistance?.trim()) {
+    return null;
+  }
 
   const publicPlan =
     input.publicPlans.find(
@@ -57,11 +58,11 @@ export function buildPublicTrainingFor(input: {
   return {
     athleteRace: serializePublicAthleteRace(race),
     goal: {
-      id: input.goal.id,
-      name: input.goal.name,
-      distance: input.goal.distance,
-      goalTime: input.goal.goalTime,
-      targetByDate: input.goal.targetByDate.toISOString(),
+      id: race.id,
+      name: race.goalName,
+      distance: race.goalDistance ?? "",
+      goalTime: race.goalTime,
+      targetByDate: race.raceDate.toISOString(),
     },
     publicPlan: publicPlan
       ? {

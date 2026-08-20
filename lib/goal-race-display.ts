@@ -1,6 +1,6 @@
 /**
- * Shared goal ↔ athlete_race hydration helpers.
- * Canonical chain: AthleteGoal.athleteRaceId → athlete_races snapshot → race_registry (catalog only).
+ * Shared athlete_races hydration helpers.
+ * Canonical: goal fields live on athlete_races; race_registry is catalog only.
  */
 
 export const goalAthleteRaceSelect = {
@@ -14,6 +14,16 @@ export const goalAthleteRaceSelect = {
   state: true,
   slug: true,
   logoUrl: true,
+  goalName: true,
+  goalDescription: true,
+  goalDistance: true,
+  goalTime: true,
+  goalRacePace: true,
+  goalPace5K: true,
+  whyGoal: true,
+  successLooksLike: true,
+  completionFeeling: true,
+  motivationIcon: true,
 } as const;
 
 export type GoalAthleteRaceSnapshot = {
@@ -27,12 +37,22 @@ export type GoalAthleteRaceSnapshot = {
   state: string | null;
   slug: string | null;
   logoUrl: string | null;
+  goalName?: string | null;
+  goalDescription?: string | null;
+  goalDistance?: string | null;
+  goalTime?: string | null;
+  goalRacePace?: number | null;
+  goalPace5K?: number | null;
+  whyGoal?: string | null;
+  successLooksLike?: string | null;
+  completionFeeling?: string | null;
+  motivationIcon?: string | null;
 };
 
 export function goalRaceRegistryId(
-  goal: { athlete_race?: Pick<GoalAthleteRaceSnapshot, "raceRegistryId"> | null }
+  race: Pick<GoalAthleteRaceSnapshot, "raceRegistryId"> | null | undefined
 ): string | null {
-  return goal.athlete_race?.raceRegistryId ?? null;
+  return race?.raceRegistryId ?? null;
 }
 
 export type GoalRaceDisplay = {
@@ -64,14 +84,26 @@ export function goalRaceDisplayFromAthleteRace(
   };
 }
 
-/** UI/API helper: resolve goal race display from nested athlete_race only. */
+/** UI/API helper: resolve race display from athlete_races row or legacy goal wrapper. */
 export function goalRaceFromGoal(
-  goal:
-    | {
-        athlete_race?: GoalAthleteRaceSnapshot | null;
-      }
+  goalOrRace:
+    | GoalAthleteRaceSnapshot
+    | { athlete_race?: GoalAthleteRaceSnapshot | null }
     | null
     | undefined
 ): GoalRaceDisplay | null {
-  return goalRaceDisplayFromAthleteRace(goal?.athlete_race);
+  if (!goalOrRace) return null;
+  if ("athlete_race" in goalOrRace) {
+    return goalRaceDisplayFromAthleteRace(goalOrRace.athlete_race ?? null);
+  }
+  return goalRaceDisplayFromAthleteRace(goalOrRace as GoalAthleteRaceSnapshot);
+}
+
+export function hasGoalOnRace(
+  race: Pick<GoalAthleteRaceSnapshot, "goalTime" | "goalName" | "goalDistance"> | null | undefined
+): boolean {
+  if (!race) return false;
+  return Boolean(
+    race.goalTime?.trim() || race.goalName?.trim() || race.goalDistance?.trim()
+  );
 }

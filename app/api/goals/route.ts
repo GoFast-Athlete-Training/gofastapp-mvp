@@ -2,9 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { createGoal } from "@/lib/goal-service";
-import { goalAthleteRaceSelect } from "@/lib/goal-race-display";
-import { prisma } from "@/lib/prisma";
+import { createRaceGoal, listAthleteRaceGoals } from "@/lib/athlete-race-goal";
 
 async function athleteFromRequest(request: NextRequest) {
   const auth = await requireAthleteFromBearer(request);
@@ -14,28 +12,13 @@ async function athleteFromRequest(request: NextRequest) {
   return { athlete: auth.athlete };
 }
 
-const goalInclude = {
-  athlete_race: { select: goalAthleteRaceSelect },
-} as const;
-
-/** GET /api/goals — list goals for authenticated athlete (?status=ACTIVE default, or ALL) */
+/** GET /api/goals — list race goals for authenticated athlete */
 export async function GET(request: NextRequest) {
   try {
     const { athlete, error } = await athleteFromRequest(request);
     if (error) return error;
 
-    const status = request.nextUrl.searchParams.get("status");
-    const where =
-      status === "ALL"
-        ? { athleteId: athlete!.id }
-        : { athleteId: athlete!.id, status: status ?? "ACTIVE" };
-
-    const goals = await prisma.athleteGoal.findMany({
-      where,
-      orderBy: { targetByDate: "asc" },
-      include: goalInclude,
-    });
-
+    const goals = await listAthleteRaceGoals(athlete!.id);
     return NextResponse.json({ goals });
   } catch (err: unknown) {
     console.error("GET /api/goals:", err);
@@ -46,7 +29,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/** POST /api/goals — create goal (derives goalRacePace / goalPace5K) */
+/** POST /api/goals — set goal on a claimed race */
 export async function POST(request: NextRequest) {
   try {
     const { athlete, error } = await athleteFromRequest(request);
@@ -72,24 +55,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const targetByDate = body.targetByDate
-      ? new Date(body.targetByDate)
-      : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
-
-    if (Number.isNaN(targetByDate.getTime())) {
-      return NextResponse.json({ error: "Invalid targetByDate" }, { status: 400 });
+    if (!body.athleteRaceId && !body.raceRegistryId) {
+      return NextResponse.json(
+        { error: "athleteRaceId or raceRegistryId is required" },
+        { status: 400 }
+      );
     }
 
     try {
-      const goal = await createGoal(athlete!.id, {
+      const goal = await createRaceGoal(athlete!.id, {
         name: body.name,
         description: body.description,
         distance: body.distance ?? "",
         goalTime: body.goalTime,
-        targetByDate,
         raceRegistryId: body.raceRegistryId,
         athleteRaceId: body.athleteRaceId,
-        status: body.status,
         whyGoal: body.whyGoal,
         successLooksLike: body.successLooksLike,
         completionFeeling: body.completionFeeling,

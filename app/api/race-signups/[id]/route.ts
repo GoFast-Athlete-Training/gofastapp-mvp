@@ -12,7 +12,7 @@ async function athleteFromRequest(request: NextRequest) {
   return { athlete: auth.athlete };
 }
 
-/** PATCH /api/race-signups/[id] — attach goal to athlete race via AthleteGoal.athleteRaceId */
+/** PATCH /api/race-signups/[id] — legacy no-op; goal lives on athlete_races row. */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -26,43 +26,11 @@ export async function PATCH(
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
-    const body = await request.json().catch(() => ({}));
-    if (!Object.prototype.hasOwnProperty.call(body, "goalId")) {
-      return NextResponse.json({ error: "goalId required (string or null)" }, { status: 400 });
-    }
-    const goalId =
-      body.goalId == null
-        ? null
-        : typeof body.goalId === "string" && body.goalId.trim()
-          ? body.goalId.trim()
-          : null;
-
     const athleteRace = await prisma.athlete_races.findFirst({
       where: { id, athleteId: athlete!.id },
     });
     if (!athleteRace) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-
-    if (goalId) {
-      const goal = await prisma.athleteGoal.findFirst({
-        where: { id: goalId, athleteId: athlete!.id },
-      });
-      if (!goal) {
-        return NextResponse.json({ error: "Goal not found" }, { status: 404 });
-      }
-      await prisma.athleteGoal.update({
-        where: { id: goalId },
-        data: {
-          athleteRaceId: athleteRace.id,
-          updatedAt: new Date(),
-        },
-      });
-    } else {
-      await prisma.athleteGoal.updateMany({
-        where: { athleteId: athlete!.id, athleteRaceId: athleteRace.id },
-        data: { athleteRaceId: null, updatedAt: new Date() },
-      });
     }
 
     const signup = await prisma.athlete_races.findUnique({
@@ -78,13 +46,11 @@ export async function PATCH(
             city: true,
             state: true,
             country: true,
+            slug: true,
+            logoUrl: true,
             registrationUrl: true,
+            startTime: true,
           },
-        },
-        athlete_goals: {
-          where: goalId ? { id: goalId } : { athleteRaceId: athleteRace.id },
-          select: { id: true, goalTime: true, name: true },
-          take: 1,
         },
       },
     });

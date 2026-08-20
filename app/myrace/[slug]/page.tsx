@@ -57,7 +57,7 @@ type GoalRow = {
   goalPace5K?: number | null;
   athleteRaceId?: string | null;
   raceRegistryId?: string | null;
-  athlete_race?: { id: string } | null;
+  athlete_race?: { id: string; raceRegistryId?: string } | null;
   race_registry?: { id: string } | null;
 };
 
@@ -79,6 +79,7 @@ type TrainingPlanRow = {
   id: string;
   name: string;
   athleteGoalId: string | null;
+  athleteRaceId: string | null;
 };
 
 type ChatterPreviewMessage = {
@@ -285,7 +286,9 @@ export default function MyRacePage() {
         setGoal(g);
 
         const plans = plansRes.data.plans ?? [];
-        const planForGoal = g?.id ? plans.find((p) => p.athleteGoalId === g.id) ?? null : null;
+        const planForGoal = g?.id
+          ? plans.find((p) => p.athleteRaceId === g.id || p.athleteGoalId === g.id) ?? null
+          : null;
 
         const summary = upcomingRes.data.activePlanSummary ?? null;
         const sessions = upcomingRes.data.sessions ?? [];

@@ -16,7 +16,7 @@ type GoalRaceSnapshot = {
 function pickDisplayRace(
   plan: {
     raceId: string | null;
-    athlete_race: GoalRaceSnapshot | null;
+    athlete_race: (GoalRaceSnapshot & { goalTime?: string | null }) | null;
     race_registry: {
       id: string;
       name: string;
@@ -25,10 +25,10 @@ function pickDisplayRace(
       raceDate: Date | null;
     } | null;
   } | null,
-  goal: {
-    goalTime: string | null;
-    athlete_race: GoalRaceSnapshot | null;
-  } | null
+  primaryRace: (GoalRaceSnapshot & {
+    goalTime?: string | null;
+    goalDistance?: string | null;
+  }) | null
 ): { race: DiscoverRunnerCard['race']; goalTime: string | null } {
   const planRace = plan?.athlete_race
     ? {
@@ -37,13 +37,20 @@ function pickDisplayRace(
         distanceLabel: plan.athlete_race.distanceLabel,
         distanceMeters: plan.athlete_race.distanceMeters,
         raceDate: plan.athlete_race.raceDate,
+        goalTime: plan.athlete_race.goalTime ?? null,
       }
-    : plan?.race_registry;
+    : plan?.race_registry
+      ? {
+          id: plan.race_registry.id,
+          name: plan.race_registry.name,
+          distanceLabel: plan.race_registry.distanceLabel,
+          distanceMeters: plan.race_registry.distanceMeters,
+          raceDate: plan.race_registry.raceDate,
+          goalTime: null as string | null,
+        }
+      : null;
 
   if (planRace) {
-    const goalRaceId = goal?.athlete_race?.raceRegistryId ?? null;
-    const goalTime =
-      goalRaceId === planRace.id && goal?.goalTime ? goal.goalTime : null;
     return {
       race: {
         id: planRace.id,
@@ -52,25 +59,24 @@ function pickDisplayRace(
         distanceMeters: planRace.distanceMeters,
         raceDate: planRace.raceDate ? planRace.raceDate.toISOString() : null,
       },
-      goalTime,
+      goalTime: planRace.goalTime,
     };
   }
 
-  if (goal?.athlete_race) {
-    const r = goal.athlete_race;
+  if (primaryRace) {
     return {
       race: {
-        id: r.raceRegistryId,
-        name: r.name,
-        distanceLabel: r.distanceLabel,
-        distanceMeters: r.distanceMeters,
-        raceDate: r.raceDate.toISOString(),
+        id: primaryRace.raceRegistryId,
+        name: primaryRace.name,
+        distanceLabel: primaryRace.distanceLabel,
+        distanceMeters: primaryRace.distanceMeters,
+        raceDate: primaryRace.raceDate.toISOString(),
       },
-      goalTime: goal.goalTime ?? null,
+      goalTime: primaryRace.goalTime ?? null,
     };
   }
 
-  return { race: null, goalTime: goal?.goalTime ?? null };
+  return { race: null, goalTime: null };
 }
 
 /**
@@ -129,10 +135,14 @@ export async function GET(request: Request) {
             },
           },
           {
-            athlete_goals: {
+            athlete_races: {
               some: {
-                status: 'ACTIVE',
-                athlete_race: { is: { raceRegistryId: raceId } },
+                raceRegistryId: raceId,
+                OR: [
+                  { goalTime: { not: null } },
+                  { goalDistance: { not: null } },
+                  { goalName: { not: null } },
+                ],
               },
             },
           },
@@ -179,13 +189,24 @@ export async function GET(request: Request) {
               },
             },
           },
-          athlete_goals: {
-            where: { status: 'ACTIVE' },
-            orderBy: { targetByDate: 'asc' },
+          athlete_races: {
+            where: {
+              OR: [
+                { goalTime: { not: null } },
+                { goalDistance: { not: null } },
+                { goalName: { not: null } },
+              ],
+            },
+            orderBy: { raceDate: 'asc' },
             take: 1,
             select: {
+              raceRegistryId: true,
+              name: true,
+              distanceLabel: true,
+              distanceMeters: true,
+              raceDate: true,
               goalTime: true,
-              athlete_race: { select: goalAthleteRaceSelect },
+              goalDistance: true,
             },
           },
         },
@@ -226,8 +247,8 @@ export async function GET(request: Request) {
 
     const runners: DiscoverRunnerCard[] = athletes.map((a) => {
       const plan = a.training_plans[0] ?? null;
-      const goal = a.athlete_goals[0] ?? null;
-      const { race, goalTime } = pickDisplayRace(plan, goal);
+      const primaryRace = a.athlete_races[0] ?? null;
+      const { race, goalTime } = pickDisplayRace(plan, primaryRace);
 
       const nr = nextRunByAthlete.get(a.id);
       let nextRun: DiscoverRunnerCard['nextRun'] = null;

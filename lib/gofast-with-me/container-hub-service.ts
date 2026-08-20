@@ -10,6 +10,9 @@ import {
 import { effectiveTrainingWeekCount } from '@/lib/training/plan-utils';
 import type { PublicPlanWeek } from '@/lib/training/public-plan-service';
 import {
+  athleteCommunityRelationship,
+} from '@/lib/gofast-with-me/athlete-community-access';
+import {
   containerMessageInclude,
   mapContainerMessageRow,
   type MappedContainerMessage,

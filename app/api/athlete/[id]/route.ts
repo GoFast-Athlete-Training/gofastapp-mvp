@@ -4,7 +4,6 @@ import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteById, updateAthlete } from '@/lib/domain-athlete';
 import { syncAthleteFiveKPaceToActivePlan } from '@/lib/training/plan-lifecycle';
-import { ensureAthleteProfileSnapshot } from '@/lib/athlete-profile-snapshot';
 import { buildAthleteForClient } from '@/lib/athlete-for-client';
 import { buildLeaderContext } from '@/lib/run-club-leader-context';
 
@@ -47,26 +46,8 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    try {
-      await ensureAthleteProfileSnapshot(id);
-    } catch (err) {
-      console.error('GET /api/athlete/[id] snapshot repair failed:', err);
-    }
-
-    let athleteRow;
-    try {
-      athleteRow = await getAthleteById(id);
-    } catch (err) {
-      console.error('Prisma error:', err);
-      return NextResponse.json({ error: 'DB error' }, { status: 500 });
-    }
-
-    if (!athleteRow) {
-      return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
-    }
-
     const athleteForClient = await buildAthleteForClient(
-      athleteRow as Record<string, unknown> & { id: string; garmin_access_token?: string | null }
+      athlete as Record<string, unknown> & { id: string; garmin_access_token?: string | null }
     );
 
     let leaderContext = null;

@@ -1,9 +1,11 @@
 /**
  * Hydrate athlete race calendar from athlete_races snapshots (working set).
+ * Goal fields live on each athlete_races row.
  */
 
 import { prisma } from "@/lib/prisma";
 import { utcDateOnly } from "@/lib/training/plan-utils";
+import { hasGoalOnRace } from "@/lib/goal-race-display";
 
 export type HydratedRaceCalendarSignup = {
   athleteRaceId: string;
@@ -57,13 +59,6 @@ export async function loadHydratedRaceCalendar(
     }),
     prisma.athlete_races.findMany({
       where: { athleteId },
-      include: {
-        athlete_goals: {
-          where: { status: "ACTIVE" },
-          select: { id: true, goalTime: true, name: true },
-          take: 1,
-        },
-      },
       orderBy: { raceDate: "asc" },
     }),
   ]);
@@ -75,11 +70,11 @@ export async function loadHydratedRaceCalendar(
   const planRaceDate = planRaceRow?.raceDate ?? null;
 
   const hydrated: HydratedRaceCalendarSignup[] = athleteRaces.map((ar) => {
-    const goal = ar.athlete_goals[0] ?? null;
+    const hasGoal = hasGoalOnRace(ar);
     return {
       athleteRaceId: ar.id,
       raceRegistryId: ar.raceRegistryId,
-      goalId: goal?.id ?? null,
+      goalId: hasGoal ? ar.id : null,
       positionRelativeToPlanRace: positionRelativeToPlanRace(ar.raceDate, planRaceDate),
       race: {
         id: ar.raceRegistryId,
@@ -102,13 +97,11 @@ export async function loadHydratedRaceCalendar(
       utcDateOnly(new Date(h.race.raceDate)).getTime() >= todayMs
   );
 
-  const planGoal = planRaceRow?.athlete_goals[0] ?? null;
-
   return {
     planAthleteRaceId,
-    primaryGoalId: planGoal?.id ?? null,
-    primaryGoalName: planGoal?.name ?? planRaceRow?.name ?? null,
-    primaryGoalTime: planGoal?.goalTime ?? null,
+    primaryGoalId: planRaceRow && hasGoalOnRace(planRaceRow) ? planRaceRow.id : null,
+    primaryGoalName: planRaceRow?.goalName ?? planRaceRow?.name ?? null,
+    primaryGoalTime: planRaceRow?.goalTime ?? null,
     signups: hydrated,
     secondaryCandidates,
   };

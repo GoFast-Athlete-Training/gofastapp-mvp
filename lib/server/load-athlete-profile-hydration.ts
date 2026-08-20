@@ -1,9 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import {
-  derivePrimaryRaceForAthlete,
-  ensureAthleteProfileSnapshot,
-  type PrimaryRaceSnapshot,
-} from '@/lib/athlete-profile-snapshot';
+import { loadPrimaryRaceWithGoal } from '@/lib/athlete-profile-snapshot';
 import { normalizeHandle } from '@/lib/server/load-public-athlete-page';
 
 export type AthleteProfileGoal = {
@@ -21,12 +17,21 @@ export type AthleteProfileHydration = {
     bio: string | null;
     picture: string | null;
   };
-  primaryRace: PrimaryRaceSnapshot | null;
+  primaryRace: {
+    id: string;
+    athleteRaceId: string;
+    slug: string | null;
+    name: string;
+    date: string | null;
+    distanceLabel: string | null;
+    city: string | null;
+    state: string | null;
+  } | null;
   goal: AthleteProfileGoal | null;
   current5kpace: string | null;
 };
 
-const profileSnapshotSelect = {
+const profileSelect = {
   id: true,
   gofastHandle: true,
   firstName: true,
@@ -34,93 +39,11 @@ const profileSnapshotSelect = {
   bio: true,
   photoURL: true,
   fiveKPace: true,
-  primaryGoalNameSnapshot: true,
-  primaryGoalTimeSnapshot: true,
-  primaryGoalTargetByDateSnapshot: true,
-  primaryGoalRaceNameSnapshot: true,
-  primaryRaceRegistryIdSnapshot: true,
-  primaryRaceSlugSnapshot: true,
-  primaryRaceNameSnapshot: true,
-  primaryRaceDateSnapshot: true,
-  primaryRaceDistanceLabelSnapshot: true,
-  primaryRaceCitySnapshot: true,
-  primaryRaceStateSnapshot: true,
 } as const;
-
-type AthleteProfileSnapshotRow = {
-  id: string;
-  gofastHandle: string | null;
-  firstName: string | null;
-  lastName: string | null;
-  bio: string | null;
-  photoURL: string | null;
-  fiveKPace: string | null;
-  primaryGoalNameSnapshot: string | null;
-  primaryGoalTimeSnapshot: string | null;
-  primaryGoalTargetByDateSnapshot: Date | null;
-  primaryGoalRaceNameSnapshot: string | null;
-  primaryRaceRegistryIdSnapshot: string | null;
-  primaryRaceSlugSnapshot: string | null;
-  primaryRaceNameSnapshot: string | null;
-  primaryRaceDateSnapshot: Date | null;
-  primaryRaceDistanceLabelSnapshot: string | null;
-  primaryRaceCitySnapshot: string | null;
-  primaryRaceStateSnapshot: string | null;
-};
 
 function athleteDisplayName(firstName: string | null, lastName: string | null): string {
   const name = [firstName, lastName].filter(Boolean).join(' ').trim();
   return name || 'Runner';
-}
-
-function primaryRaceFromSnapshot(
-  athlete: AthleteProfileSnapshotRow
-): PrimaryRaceSnapshot | null {
-  if (!athlete.primaryRaceRegistryIdSnapshot || !athlete.primaryRaceNameSnapshot) return null;
-  return {
-    id: athlete.primaryRaceRegistryIdSnapshot,
-    slug: athlete.primaryRaceSlugSnapshot,
-    name: athlete.primaryRaceNameSnapshot,
-    date: athlete.primaryRaceDateSnapshot?.toISOString() ?? null,
-    distanceLabel: athlete.primaryRaceDistanceLabelSnapshot,
-    city: athlete.primaryRaceCitySnapshot,
-    state: athlete.primaryRaceStateSnapshot,
-  };
-}
-
-function goalFromSnapshot(athlete: AthleteProfileSnapshotRow): AthleteProfileGoal | null {
-  const hasGoal =
-    athlete.primaryGoalTimeSnapshot?.trim() ||
-    athlete.primaryGoalNameSnapshot?.trim() ||
-    athlete.primaryGoalRaceNameSnapshot?.trim();
-
-  if (!hasGoal) return null;
-
-  return {
-    name: athlete.primaryGoalNameSnapshot,
-    goalTime: athlete.primaryGoalTimeSnapshot,
-    targetByDate: athlete.primaryGoalTargetByDateSnapshot?.toISOString() ?? null,
-    raceName: athlete.primaryGoalRaceNameSnapshot,
-  };
-}
-
-async function deriveGoalForAthlete(athleteId: string): Promise<AthleteProfileGoal | null> {
-  const goal = await prisma.athleteGoal.findFirst({
-    where: { athleteId, status: 'ACTIVE' },
-    orderBy: { targetByDate: 'asc' },
-    include: {
-      athlete_race: { select: { name: true } },
-    },
-  });
-
-  if (!goal) return null;
-
-  return {
-    name: goal.name,
-    goalTime: goal.goalTime,
-    targetByDate: goal.targetByDate.toISOString(),
-    raceName: goal.athlete_race?.name ?? null,
-  };
 }
 
 export async function loadAthleteProfileHydrationByHandle(
@@ -131,7 +54,7 @@ export async function loadAthleteProfileHydrationByHandle(
 
   const athlete = await prisma.athlete.findFirst({
     where: { gofastHandle: { equals: handle, mode: 'insensitive' } },
-    select: profileSnapshotSelect,
+    select: profileSelect,
   });
 
   if (!athlete) return null;
@@ -142,11 +65,9 @@ export async function loadAthleteProfileHydrationByHandle(
 export async function loadAthleteProfileHydrationById(
   athleteId: string
 ): Promise<AthleteProfileHydration | null> {
-  await ensureAthleteProfileSnapshot(athleteId);
-
   const athlete = await prisma.athlete.findUnique({
     where: { id: athleteId },
-    select: profileSnapshotSelect,
+    select: profileSelect,
   });
 
   if (!athlete) return null;
@@ -155,15 +76,17 @@ export async function loadAthleteProfileHydrationById(
 }
 
 async function buildAthleteProfileHydration(
-  athlete: AthleteProfileSnapshotRow
+  athlete: {
+    id: string;
+    gofastHandle: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    bio: string | null;
+    photoURL: string | null;
+    fiveKPace: string | null;
+  }
 ): Promise<AthleteProfileHydration> {
-  const snappedGoal = goalFromSnapshot(athlete);
-  const snappedRace = primaryRaceFromSnapshot(athlete);
-
-  const [derivedGoal, derivedRace] = await Promise.all([
-    snappedGoal ? Promise.resolve(null) : deriveGoalForAthlete(athlete.id),
-    snappedRace ? Promise.resolve(null) : derivePrimaryRaceForAthlete(athlete.id),
-  ]);
+  const { race, goal } = await loadPrimaryRaceWithGoal(athlete.id);
 
   return {
     athlete: {
@@ -173,8 +96,15 @@ async function buildAthleteProfileHydration(
       bio: athlete.bio,
       picture: athlete.photoURL,
     },
-    primaryRace: snappedRace ?? derivedRace,
-    goal: snappedGoal ?? derivedGoal,
+    primaryRace: race,
+    goal: goal
+      ? {
+          name: goal.name,
+          goalTime: goal.goalTime,
+          targetByDate: goal.targetByDate,
+          raceName: goal.raceName,
+        }
+      : null,
     current5kpace: athlete.fiveKPace?.trim() || null,
   };
 }

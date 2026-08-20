@@ -49,7 +49,7 @@ type PlanDetailHub = {
   currentFiveKPace?: string | null;
   _count?: { planned_workouts: number };
   raceId?: string | null;
-  race_registry: { name: string; raceDate?: string } | null;
+  race_registry: { id?: string; name: string; raceDate?: string } | null;
 };
 
 type GoalRacePaceResolved = {
@@ -207,7 +207,7 @@ export default function TrainingHubPage() {
           id: plan.id,
           name: plan.name,
           raceName: plan.race_registry?.name ?? null,
-          raceId: plan.race_registry?.id ?? null,
+          raceId: plan.raceId ?? plan.race_registry?.id ?? null,
           raceDate:
             typeof plan.race_registry?.raceDate === "string"
               ? plan.race_registry.raceDate
@@ -217,8 +217,9 @@ export default function TrainingHubPage() {
         });
         setWeekDays([]);
         // Probe whether the athlete already logged a result + reflection
-        if (plan.race_registry?.id) {
-          fetch(`/api/race-results?raceRegistryId=${encodeURIComponent(plan.race_registry.id)}`, {
+        const raceRegistryId = plan.raceId ?? plan.race_registry?.id;
+        if (raceRegistryId) {
+          fetch(`/api/race-results?raceRegistryId=${encodeURIComponent(raceRegistryId)}`, {
             headers: { Authorization: `Bearer ${token}` },
           })
             .then((r) => r.json() as Promise<{ results?: Array<{ id: string; officialFinishTime?: string | null; reflection?: string | null }> }>)

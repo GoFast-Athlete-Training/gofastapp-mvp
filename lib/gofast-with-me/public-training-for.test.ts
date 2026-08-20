@@ -13,20 +13,14 @@ const mcm = {
   distanceMeters: 42195,
   slug: 'marine-corps-marathon',
   logoUrl: 'https://example.com/mcm.png',
-};
-
-const goal = {
-  id: 'goal-mcm',
-  name: 'Break 3:05',
-  distance: 'Marathon',
+  goalName: 'Break 3:05',
+  goalDistance: 'Marathon',
   goalTime: '3:05:00',
-  targetByDate: new Date('2026-10-25T12:00:00.000Z'),
 };
 
 describe('buildPublicTrainingFor', () => {
   it('hydrates the public declaration from athlete-scoped snapshots', () => {
     const result = buildPublicTrainingFor({
-      goal,
       athleteRace: mcm,
       publicPlans: [
         {
@@ -48,7 +42,6 @@ describe('buildPublicTrainingFor', () => {
 
   it('does not attach a public plan for a different athlete race', () => {
     const result = buildPublicTrainingFor({
-      goal,
       athleteRace: mcm,
       publicPlans: [
         {
@@ -65,10 +58,9 @@ describe('buildPublicTrainingFor', () => {
     assert.equal(result?.publicPlan, null);
   });
 
-  it('returns no race card for a goal without an athlete race', () => {
+  it('returns null when race has no goal fields', () => {
     const result = buildPublicTrainingFor({
-      goal,
-      athleteRace: null,
+      athleteRace: { ...mcm, goalTime: null, goalName: null, goalDistance: null },
       publicPlans: [],
     });
 

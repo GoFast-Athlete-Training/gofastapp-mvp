@@ -157,10 +157,11 @@ function toDateInputValue(iso: string): string {
 }
 
 /** Race registry dates are calendar days stored as UTC midnight — format in UTC so e.g. 2026-04-20Z is never shown as Apr 19 in US timezones. */
-function formatRaceDateDisplay(iso: string): string {
+function formatRaceDateDisplay(iso: string | Date): string {
   try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return iso;
+    const raw = typeof iso === "string" ? iso : iso.toISOString();
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return raw;
     return d.toLocaleDateString(undefined, {
       weekday: "short",
       year: "numeric",
@@ -169,7 +170,7 @@ function formatRaceDateDisplay(iso: string): string {
       timeZone: "UTC",
     });
   } catch {
-    return iso;
+    return typeof iso === "string" ? iso : iso.toISOString();
   }
 }
 

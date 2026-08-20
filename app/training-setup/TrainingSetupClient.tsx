@@ -70,6 +70,7 @@ type ActivePlanLite = {
   id: string;
   name: string;
   athleteGoalId: string | null;
+  athleteRaceId: string | null;
   lifecycleStatus: string;
   planSchedule: unknown;
   _count?: { planned_workouts: number };
@@ -467,7 +468,7 @@ export default function TrainingSetupClient() {
     }
 
     const conflicting = activePlans.find(
-      (p) => p.lifecycleStatus === "ACTIVE" && p.athleteGoalId === wizardGoal.id
+      (p) => p.lifecycleStatus === "ACTIVE" && p.athleteRaceId === wizardGoal.athleteRaceId
     );
     const mayReplace = replaceGoalAcknowledged || opts?.forceReplace === true;
     if (conflicting && !mayReplace) {
@@ -520,7 +521,7 @@ export default function TrainingSetupClient() {
           ...athleteBearerFetchHeaders(token),
         },
         body: JSON.stringify({
-          athleteGoalId: wizardGoal.id,
+          athleteRaceId: wizardGoal.athleteRaceId ?? wizardGoal.id,
           raceRegistryId: wizardGoal.athlete_race.raceRegistryId,
           name: trimmedPlanName,
           startDate: new Date(startDate).toISOString(),
@@ -574,7 +575,15 @@ export default function TrainingSetupClient() {
 
   if (wizardGoal && wizardGoal.athlete_race?.raceRegistryId) {
     const rr = wizardGoal.athlete_race;
-    const goalDistanceLine = raceDistanceDisplayForGoal(rr);
+    const goalDistanceLine = raceDistanceDisplayForGoal({
+      id: rr.raceRegistryId,
+      name: rr.name,
+      raceDate: rr.raceDate,
+      distanceMeters: rr.distanceMeters,
+      distanceLabel: rr.distanceLabel,
+      city: rr.city,
+      state: rr.state,
+    });
 
     const weeklyN = baselineWeeklyMileage.trim() === "" ? NaN : Number(baselineWeeklyMileage);
     const baseMilesPreset = selectedPreset?.baseMiles;

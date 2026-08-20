@@ -11,42 +11,14 @@ export function isRaceCalendarBeforeTodayUtc(raceDate: Date | null | undefined):
 }
 
 /**
- * When a plan is archived: if it still points at an ACTIVE goal, set goal to COMPLETED
- * (race day is in the past) or ARCHIVED (mid-plan / future race).
+ * When a plan is archived: goals live on athlete_races and stay as history.
+ * No separate goal status to cascade.
  */
 export async function cascadeLinkedGoalAfterPlanArchived(
-  planId: string,
-  athleteId: string
+  _planId: string,
+  _athleteId: string
 ): Promise<void> {
-  const plan = await prisma.training_plans.findFirst({
-    where: { id: planId, athleteId },
-    select: {
-      athleteGoalId: true,
-      athlete_race: { select: { raceDate: true } },
-    },
-  });
-  if (!plan?.athleteGoalId) return;
-
-  let raceDate = plan.athlete_race?.raceDate ?? null;
-  const goalRow = await prisma.athleteGoal.findFirst({
-    where: { id: plan.athleteGoalId, athleteId },
-    include: { athlete_race: { select: { raceDate: true } } },
-  });
-  if (!goalRow || goalRow.status !== "ACTIVE") return;
-
-  if (raceDate == null) {
-    raceDate = goalRow.athlete_race?.raceDate ?? null;
-  }
-
-  const racePast = isRaceCalendarBeforeTodayUtc(raceDate);
-
-  await prisma.athleteGoal.update({
-    where: { id: goalRow.id },
-    data: {
-      status: racePast ? "COMPLETED" : "ARCHIVED",
-      updatedAt: new Date(),
-    },
-  });
+  /* no-op — goal is on athlete_races row */
 }
 
 /** Mark every ACTIVE plan for this athlete as OLD_PLAN_UNUSED (explicit replace, not archive). */

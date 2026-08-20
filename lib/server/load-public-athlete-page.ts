@@ -28,6 +28,9 @@ const athleteRaceSnapshotSelect = {
   distanceMeters: true,
   slug: true,
   logoUrl: true,
+  goalName: true,
+  goalDistance: true,
+  goalTime: true,
 } as const;
 
 export type PublicAthletePayload = Awaited<ReturnType<typeof loadPublicAthletePage>>;
@@ -102,7 +105,6 @@ export async function loadPublicAthletePage(rawHandle: string) {
     athleteRaceRows,
     upcomingRunsRaw,
     plan,
-    activeGoal,
     lastActivity,
     workoutRows,
     weeklyAggregate,
@@ -145,26 +147,6 @@ export async function loadPublicAthletePage(rawHandle: string) {
         totalWeeks: true,
         athleteRaceId: true,
         athlete_race: { select: athleteRaceSnapshotSelect },
-        athleteGoalId: true,
-      },
-    }),
-    prisma.athleteGoal.findFirst({
-      where: { athleteId: athlete.id, status: 'ACTIVE' },
-      orderBy: { targetByDate: 'asc' },
-      include: {
-        athlete_race: { select: athleteRaceSnapshotSelect },
-        training_plans: {
-          where: { publicVisibility: 'PUBLIC' },
-          orderBy: { publicPublishedAt: 'desc' },
-          select: {
-            id: true,
-            athleteRaceId: true,
-            name: true,
-            publicSlug: true,
-            publicDescription: true,
-            totalWeeks: true,
-          },
-        },
       },
     }),
     prisma.athlete_activities.findFirst({
@@ -264,6 +246,35 @@ export async function loadPublicAthletePage(rawHandle: string) {
 
   const planRace = plan?.athlete_race ?? null;
 
+  const primaryAthleteRace =
+    planRace ??
+    athleteRaceRows.find(
+      (r) =>
+        r.raceDate >= now &&
+        (r.goalTime?.trim() || r.goalName?.trim() || r.goalDistance?.trim())
+    ) ??
+    athleteRaceRows.find((r) => r.raceDate >= now) ??
+    null;
+
+  const publicPlansForRace = primaryAthleteRace
+    ? await prisma.training_plans.findMany({
+        where: {
+          athleteId: athlete.id,
+          athleteRaceId: primaryAthleteRace.id,
+          publicVisibility: 'PUBLIC',
+        },
+        orderBy: { publicPublishedAt: 'desc' },
+        select: {
+          id: true,
+          athleteRaceId: true,
+          name: true,
+          publicSlug: true,
+          publicDescription: true,
+          totalWeeks: true,
+        },
+      })
+    : [];
+
   const trainingSummary = plan
     ? {
         planName: plan.name,
@@ -278,33 +289,28 @@ export async function loadPublicAthletePage(rawHandle: string) {
       }
     : null;
 
-  const goalAthleteRace = activeGoal?.athlete_race ?? null;
-  const trainingFor =
-    activeGoal && goalAthleteRace
-      ? buildPublicTrainingFor({
-          goal: activeGoal,
-          athleteRace: goalAthleteRace,
-          publicPlans: activeGoal.training_plans,
-        })
-      : null;
+  const trainingFor = primaryAthleteRace
+    ? buildPublicTrainingFor({
+        athleteRace: primaryAthleteRace,
+        publicPlans: publicPlansForRace,
+      })
+    : null;
 
-  // Temporary compatibility alias for existing app consumers. Canonical public
-  // consumers use trainingFor.
-  const primaryChasingGoal = activeGoal
+  const primaryChasingGoal = primaryAthleteRace
     ? {
-        id: activeGoal.id,
-        athleteRaceId: activeGoal.athleteRaceId ?? activeGoal.athlete_race?.id ?? null,
-        name: activeGoal.name,
-        distance: activeGoal.distance,
-        goalTime: activeGoal.goalTime,
-        targetByDate: activeGoal.targetByDate.toISOString(),
-        raceName: goalAthleteRace?.name ?? null,
-        raceSlug: goalAthleteRace?.slug ?? null,
-        raceLogoUrl: goalAthleteRace?.logoUrl ?? null,
-        raceDate: goalAthleteRace?.raceDate?.toISOString() ?? null,
-        raceCity: goalAthleteRace?.city ?? null,
-        raceState: goalAthleteRace?.state ?? null,
-        raceDistanceLabel: goalAthleteRace?.distanceLabel ?? null,
+        id: primaryAthleteRace.id,
+        athleteRaceId: primaryAthleteRace.id,
+        name: primaryAthleteRace.goalName,
+        distance: primaryAthleteRace.goalDistance ?? '',
+        goalTime: primaryAthleteRace.goalTime,
+        targetByDate: primaryAthleteRace.raceDate.toISOString(),
+        raceName: primaryAthleteRace.name,
+        raceSlug: primaryAthleteRace.slug,
+        raceLogoUrl: primaryAthleteRace.logoUrl,
+        raceDate: primaryAthleteRace.raceDate.toISOString(),
+        raceCity: primaryAthleteRace.city,
+        raceState: primaryAthleteRace.state,
+        raceDistanceLabel: primaryAthleteRace.distanceLabel,
       }
     : null;
 

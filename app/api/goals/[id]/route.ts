@@ -2,9 +2,11 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { updateGoal } from "@/lib/goal-service";
-import { goalAthleteRaceSelect } from "@/lib/goal-race-display";
-import { prisma } from "@/lib/prisma";
+import {
+  clearRaceGoal,
+  getAthleteRaceGoalById,
+  updateRaceGoal,
+} from "@/lib/athlete-race-goal";
 
 async function athleteFromRequest(request: NextRequest) {
   const auth = await requireAthleteFromBearer(request);
@@ -14,11 +16,7 @@ async function athleteFromRequest(request: NextRequest) {
   return { athlete: auth.athlete };
 }
 
-const goalInclude = {
-  athlete_race: { select: goalAthleteRaceSelect },
-} as const;
-
-/** GET /api/goals/[id] */
+/** GET /api/goals/[id] — id is athleteRaceId */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -28,10 +26,7 @@ export async function GET(
     if (error) return error;
     const { id } = await params;
 
-    const goal = await prisma.athleteGoal.findFirst({
-      where: { id, athleteId: athlete!.id },
-      include: goalInclude,
-    });
+    const goal = await getAthleteRaceGoalById(athlete!.id, id);
     if (!goal) {
       return NextResponse.json({ error: "Goal not found" }, { status: 404 });
     }
@@ -45,7 +40,7 @@ export async function GET(
   }
 }
 
-/** PUT /api/goals/[id] */
+/** PUT /api/goals/[id] — id is athleteRaceId */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -75,28 +70,19 @@ export async function PUT(
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const patch: Parameters<typeof updateGoal>[2] = {};
+    const patch: Parameters<typeof updateRaceGoal>[2] = {};
     if (body.name !== undefined) patch.name = body.name;
     if (body.description !== undefined) patch.description = body.description;
     if (body.distance !== undefined) patch.distance = body.distance;
     if (body.goalTime !== undefined) patch.goalTime = body.goalTime;
-    if (body.targetByDate !== undefined) {
-      const d = new Date(body.targetByDate);
-      if (Number.isNaN(d.getTime())) {
-        return NextResponse.json({ error: "Invalid targetByDate" }, { status: 400 });
-      }
-      patch.targetByDate = d;
-    }
     if (body.raceRegistryId !== undefined) patch.raceRegistryId = body.raceRegistryId;
-    if (body.athleteRaceId !== undefined) patch.athleteRaceId = body.athleteRaceId;
-    if (body.status !== undefined) patch.status = body.status;
     if (body.whyGoal !== undefined) patch.whyGoal = body.whyGoal;
     if (body.successLooksLike !== undefined) patch.successLooksLike = body.successLooksLike;
     if (body.completionFeeling !== undefined) patch.completionFeeling = body.completionFeeling;
     if (body.motivationIcon !== undefined) patch.motivationIcon = body.motivationIcon;
 
     try {
-      const goal = await updateGoal(id, athlete!.id, patch);
+      const goal = await updateRaceGoal(id, athlete!.id, patch);
       if (!goal) {
         return NextResponse.json({ error: "Goal not found" }, { status: 404 });
       }
@@ -114,7 +100,7 @@ export async function PUT(
   }
 }
 
-/** DELETE /api/goals/[id] — soft-delete to ARCHIVED */
+/** DELETE /api/goals/[id] — clear goal fields on athlete race */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -124,18 +110,10 @@ export async function DELETE(
     if (error) return error;
     const { id } = await params;
 
-    const existing = await prisma.athleteGoal.findFirst({
-      where: { id, athleteId: athlete!.id },
-    });
-    if (!existing) {
+    const goal = await clearRaceGoal(id, athlete!.id);
+    if (!goal) {
       return NextResponse.json({ error: "Goal not found" }, { status: 404 });
     }
-
-    const goal = await prisma.athleteGoal.update({
-      where: { id },
-      data: { status: "ARCHIVED", updatedAt: new Date() },
-      include: goalInclude,
-    });
     return NextResponse.json({ goal });
   } catch (err: unknown) {
     console.error("DELETE /api/goals/[id]:", err);

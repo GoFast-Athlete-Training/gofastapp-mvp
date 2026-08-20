@@ -10,6 +10,7 @@ import { loadCatalogueTitleByIdForWeekSchedule } from "@/lib/training/catalogue-
 import { planScheduleDaysForWeek } from "@/lib/training/plan-schedule";
 import { effectiveTrainingWeekCount } from "@/lib/training/plan-utils";
 import { resolvePlanTerminalRaceDisplay } from "@/lib/training/plan-race-snapshots";
+import { appendSlugSuffix, slugifyPlanSlug } from "@/lib/training/public-plan-slug";
 
 export { slugifyPlanSlug } from "@/lib/training/public-plan-slug";
 
@@ -329,9 +330,17 @@ export function mapPublicPlanApiResponse(plan: {
     gofastHandle: string | null;
     photoURL: string | null;
   };
-  race_registry: { name: string; distanceLabel: string | null } | null;
+  race_registry: {
+    id?: string;
+    name: string;
+    raceDate?: Date;
+    distanceMeters?: number | null;
+    distanceLabel: string | null;
+  } | null;
 }) {
-  const terminal = resolvePlanTerminalRaceDisplay(plan);
+  const terminal = resolvePlanTerminalRaceDisplay(
+    plan as Parameters<typeof resolvePlanTerminalRaceDisplay>[0]
+  );
   return {
     id: plan.id,
     slug: plan.publicSlug,

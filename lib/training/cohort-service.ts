@@ -420,10 +420,18 @@ export async function joinTrainingCohort(
       name: `${race.name} goal`,
       distance: race.distanceLabel ?? "Marathon",
       goalTime: gt,
-      targetByDate: race.raceDate,
       raceRegistryId: race.id,
-      status: "ACTIVE",
     });
+    if (!goal) {
+      throw new Error("Failed to set goal on race");
+    }
+
+    const athleteRace = await tx.athlete_races.findFirst({
+      where: { id: goal.id, athleteId },
+    });
+    if (!athleteRace) {
+      throw new Error("Athlete race not found after goal create");
+    }
 
     const existingActive = await tx.training_plans.findFirst({
       where: {
@@ -455,7 +463,8 @@ export async function joinTrainingCohort(
         id: randomUUID(),
         athleteId,
         raceId: race.id,
-        athleteGoalId: goal.id,
+        athleteRaceId: athleteRace.id,
+        athleteGoalId: null,
         cohortId: cohort.id,
         name: planName,
         startDate,
@@ -484,7 +493,7 @@ export async function joinTrainingCohort(
       update: { trainingPlanId: plan.id },
     });
 
-    return { plan, member, goalId: goal.id };
+    return { plan, member, goalId: athleteRace.id };
   });
 
   await upsertRaceMembershipFromSignup(athleteId, race.id);

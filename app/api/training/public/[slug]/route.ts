@@ -3,7 +3,8 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { metersToMiles } from "@/lib/pace-utils";
-import { goalAthleteRaceSelect, goalRaceRegistryId } from "@/lib/goal-race-display";
+import { getPrimaryAthleteRaceForAthlete } from "@/lib/athlete-race-goal";
+import { goalRaceRegistryId } from "@/lib/goal-race-display";
 
 function normalizeSlug(raw: string): string {
   return (raw || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -66,17 +67,11 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const primaryGoal = workout.athleteId
-      ? await prisma.athleteGoal.findFirst({
-          where: { athleteId: workout.athleteId, status: "ACTIVE" },
-          orderBy: { targetByDate: "asc" },
-          include: {
-            athlete_race: { select: goalAthleteRaceSelect },
-          },
-        })
+    const primaryRace = workout.athleteId
+      ? await getPrimaryAthleteRaceForAthlete(workout.athleteId)
       : null;
 
-    const goalRace = primaryGoal?.athlete_race ?? null;
+    const goalRace = primaryRace;
 
     const now = new Date();
     const upcoming = workout.city_runs.find((r) => r.date >= now) ?? workout.city_runs[0] ?? null;
@@ -112,14 +107,14 @@ export async function GET(
             bio: workout.Athlete.bio,
           }
         : null,
-      goal: primaryGoal
+      goal: primaryRace
         ? {
-            id: primaryGoal.id,
-            name: primaryGoal.name,
-            distance: primaryGoal.distance,
-            goalTime: primaryGoal.goalTime,
-            targetByDate: primaryGoal.targetByDate.toISOString(),
-            raceRegistryId: goalRaceRegistryId(primaryGoal),
+            id: primaryRace.id,
+            name: primaryRace.goalName,
+            distance: primaryRace.goalDistance ?? "",
+            goalTime: primaryRace.goalTime,
+            targetByDate: primaryRace.raceDate.toISOString(),
+            raceRegistryId: goalRaceRegistryId(primaryRace),
           }
         : null,
       goalRace: goalRace

@@ -103,19 +103,6 @@ model Athlete {
   /// 400m benchmark expressed as seconds per 100m (not raw 400m time). Swim pace anchor for plan materialization.
   FourHunMSwPace          Int?
   weeklyMileage           Int?
-  /// Profile hydration snapshot: copied from active goal for quick reads.
-  primaryGoalNameSnapshot            String?
-  primaryGoalTimeSnapshot            String?
-  primaryGoalTargetByDateSnapshot    DateTime?
-  primaryGoalRaceNameSnapshot        String?
-  /// Profile hydration snapshot: copied from primary race for quick reads.
-  primaryRaceRegistryIdSnapshot      String?
-  primaryRaceSlugSnapshot            String?
-  primaryRaceNameSnapshot            String?
-  primaryRaceDateSnapshot            DateTime?
-  primaryRaceDistanceLabelSnapshot   String?
-  primaryRaceCitySnapshot            String?
-  primaryRaceStateSnapshot           String?
   role                    AthleteRole               @default(USER)
   runClubId               String?
   createdAt               DateTime                 @default(now())
@@ -750,6 +737,17 @@ model athlete_races {
   slug             String?
   /// Snapshot at claim — race logo for athlete-scoped display.
   logoUrl          String?
+  /// Goal fields — every claimed race carries the athlete's goal for that race.
+  goalName             String?
+  goalDescription      String?  @db.Text
+  goalDistance         String?
+  goalTime             String?
+  goalRacePace         Int?
+  goalPace5K           Int?
+  whyGoal              String?  @db.Text
+  successLooksLike     String?  @db.Text
+  completionFeeling    String?  @db.Text
+  motivationIcon       String?
   selfDeclaredAt   DateTime @default(now())
   notifyEnabled    Boolean  @default(true)
   createdAt        DateTime @default(now())

@@ -20,13 +20,9 @@ const sampleAthleteRace = {
   logoUrl: "https://cdn.example/mcm.png",
 };
 
-test("goalRaceRegistryId resolves from nested athlete_race only", () => {
-  assert.equal(
-    goalRaceRegistryId({ athlete_race: sampleAthleteRace }),
-    "reg-mcm"
-  );
-  assert.equal(goalRaceRegistryId({ athlete_race: null }), null);
-  assert.equal(goalRaceRegistryId({}), null);
+test("goalRaceRegistryId resolves from athlete_race row", () => {
+  assert.equal(goalRaceRegistryId(sampleAthleteRace), "reg-mcm");
+  assert.equal(goalRaceRegistryId(null), null);
 });
 
 test("goalRaceDisplayFromAthleteRace maps snapshot fields without registration URL", () => {

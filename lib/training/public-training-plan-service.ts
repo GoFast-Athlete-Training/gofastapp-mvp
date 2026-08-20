@@ -446,16 +446,16 @@ export async function adoptPublicTrainingPlan(
   });
   if (!race) throw new Error("Race not found");
 
-  const goal = await prisma.athleteGoal.findFirst({
-    where: { id: input.athleteGoalId, athleteId: input.athleteId },
-    include: { athlete_race: { select: { raceRegistryId: true } } },
+  const athleteRace = await prisma.athlete_races.findFirst({
+    where: {
+      id: input.athleteGoalId,
+      athleteId: input.athleteId,
+      raceRegistryId: race.id,
+    },
   });
-  if (!goal) throw new Error("Goal not found");
-  if (goal.athlete_race?.raceRegistryId !== race.id) {
-    throw new Error("Goal must match the selected race");
-  }
-  const gt = goal.goalTime?.trim();
-  if (!gt) throw new Error("Goal must have a goal time");
+  if (!athleteRace) throw new Error("Goal not found for this race");
+  const gt = athleteRace.goalTime?.trim();
+  if (!gt) throw new Error("Race must have a goal time");
 
   const startDate = input.startDate;
   if (Number.isNaN(startDate.getTime())) throw new Error("Invalid start date");
@@ -488,10 +488,10 @@ export async function adoptPublicTrainingPlan(
       : 26.21875;
   const resolvedGoalPace = resolveGoalRacePace({
     goalTime: gt,
-    dbGoalRacePaceSecPerMile: goal.goalRacePace ?? null,
+    dbGoalRacePaceSecPerMile: athleteRace.goalRacePace ?? null,
     distanceMeters: race.distanceMeters ?? null,
     distanceLabel: race.distanceLabel ?? null,
-    goalDistance: goal.distance ?? null,
+    goalDistance: athleteRace.goalDistance ?? null,
   });
   const imprintedGoalPace =
     resolvedGoalPace.goalPaceDisplay ??
@@ -501,7 +501,7 @@ export async function adoptPublicTrainingPlan(
   const snapshot = publicPlan.customWorkoutSnapshot as PublicPlanCustomWorkoutSnapshot | null;
 
   const result = await prisma.$transaction(async (tx) => {
-    const athleteRace = await tx.athlete_races.upsert({
+    const athleteRaceRow = await tx.athlete_races.upsert({
       where: {
         athleteId_raceRegistryId: {
           athleteId: input.athleteId,
@@ -519,14 +519,14 @@ export async function adoptPublicTrainingPlan(
         state: race.state,
         slug: race.slug,
         logoUrl: race.logoUrl,
+        goalTime: athleteRace.goalTime,
+        goalDistance: athleteRace.goalDistance,
+        goalRacePace: athleteRace.goalRacePace,
+        goalPace5K: athleteRace.goalPace5K,
+        goalName: athleteRace.goalName,
         updatedAt: new Date(),
       },
       update: { updatedAt: new Date() },
-    });
-
-    await tx.athleteGoal.update({
-      where: { id: goal.id },
-      data: { athleteRaceId: athleteRace.id, updatedAt: new Date() },
     });
 
     const existingActive = await tx.training_plans.findFirst({
@@ -561,8 +561,8 @@ export async function adoptPublicTrainingPlan(
       data: {
         id: randomUUID(),
         athleteId: input.athleteId,
-        athleteRaceId: athleteRace.id,
-        athleteGoalId: goal.id,
+        athleteRaceId: athleteRaceRow.id,
+        athleteGoalId: null,
         name: planName,
         startDate,
         totalWeeks,
@@ -602,7 +602,7 @@ export async function adoptPublicTrainingPlan(
       }
     }
 
-    return { plan, copiedCount, goalId: goal.id };
+    return { plan, copiedCount, goalId: athleteRace.id };
   });
 
   await upsertRaceMembershipFromSignup(input.athleteId, race.id);

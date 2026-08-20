@@ -35,8 +35,8 @@ export function athleteRaceRowToPlanSnap(row: AthleteRaceSnapSource): AthleteRac
     raceDate: row.raceDate.toISOString(),
     distanceMeters: row.distanceMeters,
     distanceLabel: row.distanceLabel,
-    city: row.city,
-    state: row.state,
+    city: row.city ?? null,
+    state: row.state ?? null,
   };
 }
 

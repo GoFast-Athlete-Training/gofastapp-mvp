@@ -38,7 +38,6 @@ export async function POST(request: NextRequest) {
     const {
       raceRegistryId,
       athleteRaceId: bodyAthleteRaceId,
-      athleteGoalId: bodyGoalId,
       startDate: startRaw,
       name,
       currentWeeklyMileage,
@@ -51,16 +50,6 @@ export async function POST(request: NextRequest) {
     } = body;
     const body5k = bodyFiveK ?? bodyLegacy5k;
 
-    if (!bodyGoalId || typeof bodyGoalId !== "string") {
-      return NextResponse.json(
-        { error: "athleteGoalId is required — pick an active goal in training setup" },
-        { status: 400 }
-      );
-    }
-
-    if (!startRaw) {
-      return NextResponse.json({ error: "startDate is required" }, { status: 400 });
-    }
     if (
       !bodyAthleteRaceId &&
       (!raceRegistryId || typeof raceRegistryId !== "string")
@@ -71,60 +60,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const goal = await prisma.athleteGoal.findFirst({
-      where: {
-        id: bodyGoalId,
-        athleteId: athlete.id,
-      },
-    });
-    if (!goal) {
-      return NextResponse.json({ error: "Goal not found" }, { status: 404 });
+    if (!startRaw) {
+      return NextResponse.json({ error: "startDate is required" }, { status: 400 });
     }
-    if (goal.status !== "ACTIVE") {
-      return NextResponse.json(
-        { error: "Goal must be ACTIVE to create a training plan" },
-        { status: 400 }
-      );
-    }
-    if (!goal.athleteRaceId && !raceRegistryId) {
-      return NextResponse.json(
-        { error: "Goal must have a race before creating a training plan" },
-        { status: 400 }
-      );
-    }
-    const gt = typeof goal.goalTime === "string" ? goal.goalTime.trim() : "";
-    if (!gt) {
-      return NextResponse.json(
-        { error: "Goal must have a goal time set — finish your goal in Goals first" },
-        { status: 400 }
-      );
-    }
+
     let terminalAthleteRace =
       typeof bodyAthleteRaceId === "string" && bodyAthleteRaceId.trim()
         ? await prisma.athlete_races.findFirst({
             where: { id: bodyAthleteRaceId.trim(), athleteId: athlete.id },
           })
-        : goal.athleteRaceId
-          ? await prisma.athlete_races.findFirst({
-              where: { id: goal.athleteRaceId, athleteId: athlete.id },
+        : raceRegistryId
+          ? await findAthleteRaceByRegistry({
+              athleteId: athlete.id,
+              raceRegistryId,
             })
-          : raceRegistryId
-            ? await findAthleteRaceByRegistry({
-                athleteId: athlete.id,
-                raceRegistryId,
-              })
-            : null;
+          : null;
 
     if (!terminalAthleteRace && raceRegistryId) {
-      terminalAthleteRace = await claimAthleteRace({
+      const claimed = await claimAthleteRace({
         athleteId: athlete.id,
         raceRegistryId,
+      });
+      terminalAthleteRace = await prisma.athlete_races.findFirst({
+        where: { id: claimed.id, athleteId: athlete.id },
       });
     }
 
     if (!terminalAthleteRace) {
       return NextResponse.json(
         { error: "Pick a terminal race for this plan (athleteRaceId or raceRegistryId)" },
+        { status: 400 }
+      );
+    }
+
+    const gt =
+      typeof terminalAthleteRace.goalTime === "string"
+        ? terminalAthleteRace.goalTime.trim()
+        : "";
+    if (!gt) {
+      return NextResponse.json(
+        { error: "Race must have a goal time set — finish your goal first" },
         { status: 400 }
       );
     }
@@ -162,18 +137,16 @@ export async function POST(request: NextRequest) {
 
     const totalWeeks = totalWeeksFromDates(startDate, raceDate);
 
-    const athleteGoalId = goal.id;
-
     const raceDistanceMilesForPace =
       race.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
         ? metersToMiles(Number(race.distanceMeters))
         : 26.21875;
     const resolvedGoalPace = resolveGoalRacePace({
       goalTime: gt,
-      dbGoalRacePaceSecPerMile: goal.goalRacePace ?? null,
+      dbGoalRacePaceSecPerMile: terminalAthleteRace.goalRacePace ?? null,
       distanceMeters: race.distanceMeters ?? null,
       distanceLabel: race.distanceLabel ?? null,
-      goalDistance: goal.distance ?? null,
+      goalDistance: terminalAthleteRace.goalDistance ?? null,
     });
     const imprintedGoalPace =
       resolvedGoalPace.goalPaceDisplay ??
@@ -288,7 +261,7 @@ export async function POST(request: NextRequest) {
           athleteId: athlete.id,
           athleteRaceId: terminalAthleteRace.id,
           ...planRaceSnapshotsToPrismaJson(raceSnapshots),
-          athleteGoalId,
+          athleteGoalId: null,
           name: planName,
           startDate,
           totalWeeks,

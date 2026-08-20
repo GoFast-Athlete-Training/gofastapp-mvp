@@ -6,6 +6,7 @@ import { TrainingPlanLifecycle } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { metersToMiles } from "@/lib/pace-utils";
 import { goalAthleteRaceSelect } from "@/lib/goal-race-display";
+import { getPrimaryAthleteRaceForAthlete } from "@/lib/athlete-race-goal";
 import { loadPlanMileageSnapshot, type PlanMileageSnapshot } from "@/lib/training/plan-mileage-metrics";
 import { evaluateLightAdaptive, type LightAdaptiveEvaluation } from "@/lib/training/light-adaptive-service";
 import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
@@ -75,14 +76,28 @@ function athleteRaceToHydrateSource(
   };
 }
 
-async function getActiveGoalWithRace(athleteId: string) {
-  return prisma.athleteGoal.findFirst({
-    where: { athleteId, status: "ACTIVE" },
-    orderBy: { targetByDate: "asc" },
-    include: {
-      athlete_race: { select: goalAthleteRaceSelect },
+async function getPrimaryRaceGoal(athleteId: string) {
+  const row = await getPrimaryAthleteRaceForAthlete(athleteId);
+  if (!row) return null;
+  return {
+    id: row.id,
+    goalTime: row.goalTime,
+    goalRacePace: row.goalRacePace,
+    goalPace5K: row.goalPace5K,
+    distance: row.goalDistance,
+    athlete_race: {
+      id: row.id,
+      raceRegistryId: row.raceRegistryId,
+      name: row.name,
+      raceDate: row.raceDate,
+      distanceMeters: row.distanceMeters,
+      distanceLabel: row.distanceLabel,
+      city: row.city,
+      state: row.state,
+      slug: row.slug,
+      logoUrl: row.logoUrl,
     },
-  });
+  };
 }
 
 function buildHydratePredictorFields(params: {
@@ -158,19 +173,9 @@ export async function loadTrainingHydrateSnapshot(
       orderBy: { updatedAt: "desc" },
       include: {
         athlete_race: { select: goalAthleteRaceSelect },
-        athlete_goal: {
-          select: {
-            id: true,
-            goalTime: true,
-            goalRacePace: true,
-            goalPace5K: true,
-            distance: true,
-            athlete_race: { select: goalAthleteRaceSelect },
-          },
-        },
       },
     }),
-    getActiveGoalWithRace(athleteId),
+    getPrimaryRaceGoal(athleteId),
   ]);
 
   const emptyRaceReadiness = computeRaceReadiness({
@@ -262,7 +267,16 @@ export async function loadTrainingHydrateSnapshot(
     };
   }
 
-  const linkedGoal = plan.athlete_goal ?? goal;
+  const linkedGoal = plan.athlete_race
+    ? {
+        id: plan.athlete_race.id,
+        goalTime: plan.athlete_race.goalTime,
+        goalRacePace: plan.athlete_race.goalRacePace,
+        goalPace5K: plan.athlete_race.goalPace5K,
+        distance: plan.athlete_race.goalDistance,
+        athlete_race: plan.athlete_race,
+      }
+    : goal;
   const race =
     athleteRaceToHydrateSource(plan.athlete_race) ??
     athleteRaceToHydrateSource(linkedGoal?.athlete_race) ??
