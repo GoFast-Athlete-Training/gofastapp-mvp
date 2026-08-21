@@ -201,10 +201,10 @@ export default function DiscoverRacesSection({
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => void onAddToCalendar(race.id, race.name)}
+                onClick={() => void onClaimRace(race.id, race.name)}
                 className="mt-3 inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white text-xs font-semibold px-2.5 py-1.5 w-full"
               >
-                {busy ? "Adding…" : "Add →"}
+                {busy ? "Saving…" : "I'm running this race"}
               </button>
             </li>
           );
