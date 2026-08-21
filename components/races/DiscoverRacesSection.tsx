@@ -129,7 +129,7 @@ export default function DiscoverRacesSection({
         <div>
           <h2 className="text-sm font-semibold text-gray-700">Discover races</h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            Popular upcoming races — add to your calendar
+            Upcoming races — add one to your calendar
           </p>
         </div>
         <Link
@@ -153,25 +153,42 @@ export default function DiscoverRacesSection({
               key={race.id}
               className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm flex flex-col"
             >
-              <Link href={hubHrefForCatalogRace(race)} className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold text-orange-700">
-                  {dateLine}
-                  {distance ? ` · ${distance}` : ""}
-                </p>
-                <p className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2 mt-1">
-                  {race.name}
-                </p>
-                {location ? (
-                  <p className="text-[11px] text-gray-500 mt-0.5">{location}</p>
+              <Link
+                href={hubHrefForCatalogRace(race)}
+                className="flex min-w-0 flex-1 items-start gap-3"
+              >
+                {race.logoUrl ? (
+                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-gray-100 bg-gray-100">
+                    <img
+                      src={race.logoUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
                 ) : null}
-                {tagline ? (
-                  <p className="text-xs font-medium text-gray-700 mt-1.5 line-clamp-2">{tagline}</p>
-                ) : null}
-                {descriptionPreview && descriptionPreview !== tagline ? (
-                  <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-snug">
-                    {descriptionPreview}
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-semibold text-orange-700">
+                    {dateLine}
+                    {distance ? ` · ${distance}` : ""}
                   </p>
-                ) : null}
+                  <p className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2 mt-1">
+                    {race.name}
+                  </p>
+                  {location ? (
+                    <p className="text-[11px] text-gray-500 mt-0.5">{location}</p>
+                  ) : null}
+                  {tagline ? (
+                    <p className="text-xs font-medium text-gray-700 mt-1.5 line-clamp-2">
+                      {tagline}
+                    </p>
+                  ) : null}
+                  {descriptionPreview && descriptionPreview !== tagline ? (
+                    <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-snug">
+                      {descriptionPreview}
+                    </p>
+                  ) : null}
+                </div>
               </Link>
               <button
                 type="button"

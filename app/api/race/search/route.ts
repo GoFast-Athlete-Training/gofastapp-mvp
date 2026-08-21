@@ -36,7 +36,7 @@ async function searchRaces(
     where,
     select: raceSearchSelect,
     take,
-    orderBy: { raceDate: order },
+    orderBy: [{ raceDate: order }, { name: 'asc' }, { id: 'asc' }],
   });
 }
 
