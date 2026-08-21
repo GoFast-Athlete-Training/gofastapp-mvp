@@ -6,13 +6,12 @@ import Link from 'next/link';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
-import { LocalStorageAPI } from '@/lib/localstorage';
 import {
   goFastWithConfirmPath,
   goFastWithSignupPath,
-  headlineForTarget,
   type GoFastWithTarget,
 } from '@/lib/gofast-with-me/gofast-with-bridge';
+import { followAthleteHeadline } from '@/lib/gofast-with-me/resolve-public-actions';
 import { athleteCommunityPath } from '@/lib/gofast-with-me/athlete-community-routes';
 import { runnerPublicLandingUrl } from '@/lib/gofast-with-me/runner-public-url';
 import {
@@ -21,7 +20,7 @@ import {
   GoFastWithTargetCard,
 } from '@/components/gofast-with-me/GoFastWithBridgeShell';
 
-export default function GoFastWithFrontDoorPage() {
+export default function GoFastWithFollowExplainerPage() {
   const params = useParams();
   const router = useRouter();
   const handle = (params?.handle as string)?.trim() || '';
@@ -57,8 +56,6 @@ export default function GoFastWithFrontDoorPage() {
       setLoading(false);
       return;
     }
-
-    LocalStorageAPI.setGwmFollowIntentHandle(handle);
 
     let cancelled = false;
 
@@ -104,8 +101,9 @@ export default function GoFastWithFrontDoorPage() {
 
   if (!target) return null;
 
-  const headline = headlineForTarget(target);
   const slug = target.slug || handle;
+  const followHeadline = followAthleteHeadline(target.firstName, target.displayName);
+  const firstName = target.firstName?.trim() || target.displayName;
 
   const handlePrimary = () => {
     if (isSelf) return;
@@ -121,17 +119,29 @@ export default function GoFastWithFrontDoorPage() {
   };
 
   return (
-    <GoFastWithBridgeShell>
+    <GoFastWithBridgeShell backHref={runnerPublicLandingUrl(slug)} backLabel="Back to public page">
       <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
-        <GoFastWithTargetCard target={target} headline={headline} />
+        <GoFastWithTargetCard target={target} headline={followHeadline} />
 
-        <section className="mb-6 text-left space-y-3">
-          <h2 className="text-sm font-semibold text-gray-900">What you&apos;ll get</h2>
-          <ul className="text-sm text-gray-600 space-y-2 list-disc pl-5">
-            <li>See their training, runs, and updates when they publish them.</li>
-            <li>Join specific runs or training plans from their public page.</li>
-            <li>Stay connected in the GoFast app after you confirm here.</li>
-          </ul>
+        <section className="mb-6 text-left space-y-4 text-gray-700">
+          <p className="text-base leading-relaxed">
+            You can read {firstName}&apos;s public GoFast With Me page without an account. Following
+            is the next step if you want their follower community inside GoFast.
+          </p>
+
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900 mb-2">What following unlocks</h2>
+            <ul className="text-sm space-y-2 list-disc pl-5">
+              <li>Their follower community hub — training updates, GoRuns, tips, and Chatter.</li>
+              <li>A free connection to stay in their running journey after you confirm.</li>
+              <li>Participation in community conversation — not just the public landing page.</li>
+            </ul>
+          </div>
+
+          <p className="text-sm text-gray-600 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+            Following is free. It is not paid coaching, private training-plan enrollment, or
+            automatic program signup.
+          </p>
         </section>
 
         <GoFastWithAppAllusion />
@@ -142,7 +152,7 @@ export default function GoFastWithFrontDoorPage() {
           ) : isMember ? (
             <>
               <p className="text-sm text-emerald-800 font-medium text-center">
-                You&apos;re GoFasting with {target.firstName?.trim() || target.displayName}.
+                You&apos;re already following {firstName}.
               </p>
               <button
                 type="button"
@@ -158,7 +168,7 @@ export default function GoFastWithFrontDoorPage() {
               onClick={handlePrimary}
               className="w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-600"
             >
-              {isAuthenticated ? 'Continue' : headline}
+              {isAuthenticated ? 'Continue to confirm follow' : 'Continue to sign up or sign in'}
             </button>
           )}
 

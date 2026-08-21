@@ -63,11 +63,6 @@ function redirectToGofastWithConfirmIfIntent(
   router: ReturnType<typeof useRouter>,
   redirect?: string | null
 ): boolean {
-  const handle = LocalStorageAPI.getGwmFollowIntentHandle();
-  if (handle) {
-    router.replace(`/gofast-with/${encodeURIComponent(handle)}/confirm`);
-    return true;
-  }
   if (redirect?.startsWith('/gofast-with/') && redirect.includes('/confirm')) {
     router.replace(redirect);
     return true;

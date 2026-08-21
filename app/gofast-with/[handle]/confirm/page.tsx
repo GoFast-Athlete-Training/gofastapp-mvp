@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
-import { LocalStorageAPI } from '@/lib/localstorage';
 import {
   goFastWithFrontDoorPath,
   goFastWithSignupPath,
@@ -35,12 +34,6 @@ export default function GoFastWithConfirmPage() {
     if (!handle) {
       setError('Missing handle');
       setLoading(false);
-      return;
-    }
-
-    const intent = LocalStorageAPI.getGwmFollowIntentHandle();
-    if (!intent || intent !== handle) {
-      router.replace(goFastWithFrontDoorPath(handle));
       return;
     }
 
@@ -105,7 +98,6 @@ export default function GoFastWithConfirmPage() {
       if (!res.data?.success) {
         throw new Error(res.data?.error || 'Could not connect');
       }
-      LocalStorageAPI.removeGwmFollowIntent();
       const slug = res.data.slug || handle;
       router.replace(athleteCommunityPath(slug));
     } catch (err: unknown) {
@@ -116,7 +108,6 @@ export default function GoFastWithConfirmPage() {
   };
 
   const handleNotNow = () => {
-    LocalStorageAPI.removeGwmFollowIntent();
     router.push(goFastWithFrontDoorPath(handle));
   };
 

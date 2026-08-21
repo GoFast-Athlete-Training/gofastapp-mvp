@@ -15,6 +15,7 @@ import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import {
   goFastWithConfirmPath,
+  goFastWithFollowProfileCreatePath,
   goFastWithFrontDoorPath,
   headlineForTarget,
   type GoFastWithTarget,
@@ -92,8 +93,6 @@ export default function GoFastWithSignupExplainerPage() {
       return;
     }
 
-    LocalStorageAPI.setGwmFollowIntentHandle(handle);
-
     (async () => {
       try {
         const res = await api.get(`/follow/${encodeURIComponent(handle)}`);
@@ -117,25 +116,41 @@ export default function GoFastWithSignupExplainerPage() {
   }, [handle]);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (user && LocalStorageAPI.getAthleteId()) {
-        router.replace(goFastWithConfirmPath(handle));
+    if (!handle) return;
+
+    let cancelled = false;
+
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user || cancelled) return;
+      try {
+        const { gofastHandle } = await bootstrapAthleteAfterAuth();
+        if (cancelled) return;
+        router.replace(
+          gofastHandle
+            ? goFastWithConfirmPath(handle)
+            : goFastWithFollowProfileCreatePath(handle)
+        );
+      } catch {
+        // Stay on signup — user can retry auth manually.
       }
     });
-    return () => unsub();
+
+    return () => {
+      cancelled = true;
+      unsub();
+    };
   }, [handle, router]);
 
   const afterAuth = async (uid: string, email: string | null) => {
     const { athleteId, gofastHandle } = await bootstrapAthleteAfterAuth();
     localStorage.setItem('firebaseId', uid);
     localStorage.setItem('email', email || '');
-    LocalStorageAPI.setGwmFollowIntentHandle(handle);
 
-    if (gofastHandle) {
-      router.push(goFastWithConfirmPath(handle));
-    } else {
-      router.push('/athlete-create-profile');
-    }
+    router.push(
+      gofastHandle
+        ? goFastWithConfirmPath(handle)
+        : goFastWithFollowProfileCreatePath(handle)
+    );
   };
 
   const handleGoogleSignUp = async () => {
@@ -143,7 +158,6 @@ export default function GoFastWithSignupExplainerPage() {
     try {
       setLoading(true);
       setError(null);
-      LocalStorageAPI.setGwmFollowIntentHandle(handle);
       const user = await signInWithGoogle();
       const token = await user.getIdToken(true);
       localStorage.setItem('firebaseToken', token);
@@ -164,7 +178,6 @@ export default function GoFastWithSignupExplainerPage() {
     try {
       setLoading(true);
       setError(null);
-      LocalStorageAPI.setGwmFollowIntentHandle(handle);
       const result = await createUserWithEmailAndPassword(
         auth,
         emailData.email,

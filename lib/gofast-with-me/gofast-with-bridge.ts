@@ -1,5 +1,5 @@
 import { getGoFastAppPublicUrl } from '@/lib/gofast-app-public-url';
-import { goFastWithPersonHeadline } from '@/lib/gofast-with-me/resolve-public-actions';
+import { followAthleteHeadline } from '@/lib/gofast-with-me/resolve-public-actions';
 
 export type GoFastWithTarget = {
   hostAthleteId: string;
@@ -31,13 +31,17 @@ export function goFastWithConfirmPath(slug: string): string {
   return `/gofast-with/${encodeURIComponent(slug)}/confirm`;
 }
 
+export function goFastWithFollowProfileCreatePath(slug: string): string {
+  return `/athlete-create-profile?redirect=${encodeURIComponent(goFastWithConfirmPath(slug))}`;
+}
+
 export function goFastWithFrontDoorUrl(slug: string, appBase?: string): string {
   const base = (appBase ?? getGoFastAppPublicUrl()).replace(/\/$/, '');
   return `${base}${goFastWithFrontDoorPath(slug)}`;
 }
 
 export function headlineForTarget(target: Pick<GoFastWithTarget, 'firstName' | 'displayName'>): string {
-  return goFastWithPersonHeadline(target.firstName, target.displayName);
+  return followAthleteHeadline(target.firstName, target.displayName);
 }
 
 export function getAppOpenUrl(): string {

@@ -29,7 +29,7 @@ export function resolvePublicActions(input: ResolvePublicActionsInput): PublicAc
   const slug = resolvePublicSlug(input.gofastSlugSnapshot, input.gofastHandle);
   if (slug) {
     actions.push({
-      label: goFastWithPersonHeadline(input.hostFirstName, fallbackName),
+      label: followAthleteHeadline(input.hostFirstName, fallbackName),
       href: goFastWithFrontDoorUrl(slug, appBase),
     });
   }
@@ -72,6 +72,12 @@ export function publicHeroPhotoUrl(
   return profilePhotoURL?.trim() || null;
 }
 
+export function followAthleteHeadline(firstName: string | null, fallbackName: string): string {
+  const name = firstName?.trim() || fallbackName.trim();
+  return name ? `Follow ${name} on GoFast` : 'Follow on GoFast';
+}
+
+/** @deprecated Prefer followAthleteHeadline for public landing CTAs */
 export function goFastWithPersonHeadline(firstName: string | null, fallbackName: string): string {
   const name = firstName?.trim() || fallbackName.trim();
   return name ? `Join ${name} in Going Fast` : 'Join in Going Fast';

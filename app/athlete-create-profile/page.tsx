@@ -230,13 +230,8 @@ function AthleteCreateProfileInner() {
             const joinIntentHandle = localStorage.getItem('runCrewJoinIntentHandle');
             if (joinIntent && joinIntentHandle) {
               nextPath = `/join/runcrew/${joinIntentHandle}/confirm`;
-            } else {
-              const followIntentHandle = LocalStorageAPI.getGwmFollowIntentHandle();
-              if (followIntentHandle) {
-                nextPath = `/gofast-with/${encodeURIComponent(followIntentHandle)}/confirm`;
-              } else if (redirectParam && redirectParam.startsWith('/')) {
-                nextPath = redirectParam;
-              }
+            } else if (redirectParam && redirectParam.startsWith('/')) {
+              nextPath = redirectParam;
             }
           }
         }
