@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { parseRaceTimeToSeconds, raceTimeToGoalPaceSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 import { normalizeDistanceForPace } from "@/lib/pace-utils";
-import type { AthleteGoal, athlete_race_results } from "@prisma/client";
+import type { athlete_race_results } from "@prisma/client";
+import { athleteRaceGoalSelect, type AthleteRaceGoalRow } from "@/lib/athlete-race-goal";
 
 export type RaceResultAnalysis = {
   headline: string;
@@ -10,6 +11,8 @@ export type RaceResultAnalysis = {
   goalBeatFlag: boolean;
   deltaDisplay: string | null;
 };
+
+type GoalSnapshot = Pick<AthleteRaceGoalRow, "goalTime" | "goalDistance" | "distanceMeters" | "distanceLabel" | "name" | "raceDate">;
 
 /** Format total seconds to H:MM:SS or M:SS */
 export function formatSecondsAsRaceTime(totalSec: number): string {
@@ -41,7 +44,7 @@ export function analyzeRaceResult(
     athlete_race_results,
     "finishTimeSeconds" | "goalTimeSeconds" | "goalAchieved" | "prAchieved" | "officialFinishTime"
   >,
-  goal: Pick<AthleteGoal, "goalTime" | "distance">,
+  goal: Pick<GoalSnapshot, "goalTime" | "goalDistance">,
   raceName: string
 ): RaceResultAnalysis {
   const finishSec = result.finishTimeSeconds;
@@ -102,7 +105,8 @@ export function analyzeRaceResult(
 }
 
 export type CreateRaceResultInput = {
-  goalId: string;
+  /** athlete_races.id */
+  athleteRaceId: string;
   officialFinishTime: string;
   howFeltRating?: number | null;
   notes?: string | null;
@@ -112,10 +116,12 @@ export type CreateRaceResultInput = {
 
 export type SaveRaceResultExtendedInput = {
   raceRegistryId: string;
-  goalId?: string | null;
-  /** @deprecated alias — athlete_races.id */
-  signupId?: string | null;
+  /** athlete_races.id */
   athleteRaceId?: string | null;
+  /** @deprecated alias for athleteRaceId */
+  signupId?: string | null;
+  /** @deprecated alias — same as athleteRaceId after goal cutover */
+  goalId?: string | null;
   officialFinishTime?: string | null;
   chipTime?: string | null;
   gunTime?: string | null;
@@ -144,13 +150,24 @@ function trimOrNull(v: string | null | undefined): string | null {
   return t.length ? t : null;
 }
 
+async function loadAthleteRaceGoal(
+  athleteId: string,
+  athleteRaceId: string | null | undefined
+): Promise<AthleteRaceGoalRow | null> {
+  if (!athleteRaceId?.trim()) return null;
+  return prisma.athlete_races.findFirst({
+    where: { id: athleteRaceId.trim(), athleteId },
+    select: athleteRaceGoalSelect,
+  });
+}
+
 /**
  * Full save (LogRaceResultSheet + simple modal): upsert row, goal/PR analysis when a finish time is present.
  */
 export async function saveRaceResultExtended(athleteId: string, input: SaveRaceResultExtendedInput) {
   const {
     raceRegistryId,
-    goalId: inputGoalId,
+    goalId: inputGoalIdLegacy,
     signupId: inputSignupIdLegacy,
     athleteRaceId: inputAthleteRaceId,
     officialFinishTime,
@@ -165,7 +182,8 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
     racePhotoUrls: inputRacePhotoUrls,
   } = input;
 
-  const inputSignupId = inputAthleteRaceId ?? inputSignupIdLegacy ?? null;
+  const resolvedAthleteRaceIdInput =
+    inputAthleteRaceId ?? inputSignupIdLegacy ?? inputGoalIdLegacy ?? null;
 
   const racePhotoUrls = normalizeRacePhotoUrls(inputRacePhotoUrls);
 
@@ -201,29 +219,10 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
     throw new Error("Race not found");
   }
 
-  const goal = inputGoalId
-    ? await prisma.athleteGoal.findFirst({
-        where: { id: inputGoalId, athleteId },
-        include: {
-          athlete_race: {
-            select: {
-              id: true,
-              raceRegistryId: true,
-              name: true,
-              distanceMeters: true,
-              distanceLabel: true,
-              raceDate: true,
-            },
-          },
-        },
-      })
-    : null;
+  const athleteRace = await loadAthleteRaceGoal(athleteId, resolvedAthleteRaceIdInput);
 
-  if (
-    goal?.athlete_race?.raceRegistryId &&
-    goal.athlete_race.raceRegistryId !== raceRegistryId
-  ) {
-    throw new Error("Goal does not match this race");
+  if (athleteRace?.raceRegistryId && athleteRace.raceRegistryId !== raceRegistryId) {
+    throw new Error("Race signup does not match this race");
   }
 
   let displayTime =
@@ -255,12 +254,10 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
 
   const finishTimeSeconds = parseRaceTimeToSeconds(displayTime);
 
-  const distKey = goal
+  const distKey = athleteRace
     ? normalizeDistanceForPace(
-        String(goal.distance ?? ""),
-        goal.athlete_race?.distanceMeters != null
-          ? Number(goal.athlete_race.distanceMeters)
-          : null
+        String(athleteRace.goalDistance ?? ""),
+        athleteRace.distanceMeters != null ? Number(athleteRace.distanceMeters) : null
       )
     : normalizeDistanceForPace("", reg.distanceMeters != null ? Number(reg.distanceMeters) : null);
   const distanceLabel = distKey;
@@ -268,8 +265,8 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
   let goalTimeSeconds: number | null = null;
   let goalTimeDeltaSeconds: number | null = null;
   let goalAchieved = false;
-  if (goal && finishTimeSeconds != null) {
-    goalTimeSeconds = parseOptionalGoalTimeSeconds(goal.goalTime);
+  if (athleteRace && finishTimeSeconds != null) {
+    goalTimeSeconds = parseOptionalGoalTimeSeconds(athleteRace.goalTime);
     if (goalTimeSeconds != null) {
       goalTimeDeltaSeconds = finishTimeSeconds - goalTimeSeconds;
       goalAchieved = finishTimeSeconds <= goalTimeSeconds;
@@ -306,12 +303,14 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
     }
   }
 
-  const raceDate = goal?.athlete_race?.raceDate ?? reg.raceDate ?? goal?.targetByDate;
+  const raceDate = athleteRace?.raceDate ?? reg.raceDate ?? null;
   const resolvedAthleteRaceId =
-    inputSignupId ||
-    (await prisma.athlete_races.findUnique({
-      where: { athleteId_raceRegistryId: { athleteId, raceRegistryId } },
-    }))?.id;
+    resolvedAthleteRaceIdInput ||
+    (
+      await prisma.athlete_races.findUnique({
+        where: { athleteId_raceRegistryId: { athleteId, raceRegistryId } },
+      })
+    )?.id;
 
   const agPlace =
     ageGroupPlace != null && Number.isFinite(ageGroupPlace) ? Math.floor(ageGroupPlace) : null;
@@ -349,9 +348,9 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
     chipTime: chipEffective,
     gunTime: gunEffective,
     finishTimeSeconds,
-    goalTimeSeconds: goal && finishTimeSeconds != null ? goalTimeSeconds : null,
-    goalTimeDeltaSeconds: goal && finishTimeSeconds != null ? goalTimeDeltaSeconds : null,
-    goalAchieved: finishTimeSeconds != null && goal ? goalAchieved : false,
+    goalTimeSeconds: athleteRace && finishTimeSeconds != null ? goalTimeSeconds : null,
+    goalTimeDeltaSeconds: athleteRace && finishTimeSeconds != null ? goalTimeDeltaSeconds : null,
+    goalAchieved: finishTimeSeconds != null && athleteRace ? goalAchieved : false,
     prAchieved: finishTimeSeconds != null && prAchieved,
     previousPrSeconds:
       finishTimeSeconds != null && prAchieved && previousPrSeconds != null ? previousPrSeconds : null,
@@ -368,8 +367,6 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
     source,
   };
 
-  const resolvedGoalId = goal?.id ?? null;
-
   const result = await prisma.athlete_race_results.upsert({
     where: {
       athleteId_raceRegistryId: { athleteId, raceRegistryId },
@@ -377,47 +374,34 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
     create: {
       athleteId,
       raceRegistryId,
-      goalId: resolvedGoalId,
       athleteRaceId: resolvedAthleteRaceId,
       ...data,
     },
     update: {
       ...data,
-      goalId: resolvedGoalId,
       athleteRaceId: resolvedAthleteRaceId ?? undefined,
     },
   });
 
-  if (goal && finishTimeSeconds != null) {
-    await prisma.athleteGoal.update({
-      where: { id: goal.id },
-      data: { status: "COMPLETED", updatedAt: new Date() },
-    });
-  }
-
   const analysis =
-    goal && finishTimeSeconds != null
-      ? analyzeRaceResult(result, goal, goal.athlete_race?.name ?? reg.name)
+    athleteRace && finishTimeSeconds != null
+      ? analyzeRaceResult(result, athleteRace, athleteRace.name ?? reg.name)
       : null;
 
-  return { result, analysis, goal, raceName: goal?.athlete_race?.name ?? reg.name };
+  return {
+    result,
+    analysis,
+    athleteRace,
+    raceName: athleteRace?.name ?? reg.name,
+  };
 }
 
 /**
- * Log finish for a goal (modal): same pipeline as the sheet, keyed by goal.
+ * Log finish for a race row (modal): same pipeline as the sheet, keyed by athleteRaceId.
  */
 export async function createRaceResult(athleteId: string, input: CreateRaceResultInput) {
-  const g = await prisma.athleteGoal.findFirst({
-    where: { id: input.goalId, athleteId },
-    include: {
-      athlete_race: { select: { raceRegistryId: true } },
-    },
-  });
-  if (!g) throw new Error("Goal not found");
-  const raceRegistryId = g.athlete_race?.raceRegistryId ?? null;
-  if (!raceRegistryId) {
-    throw new Error("Link this goal to a race in profile before logging a result");
-  }
+  const athleteRace = await loadAthleteRaceGoal(athleteId, input.athleteRaceId);
+  if (!athleteRace) throw new Error("Race not found");
   if (!String(input.officialFinishTime).trim()) {
     throw new Error("Finish time is required");
   }
@@ -429,8 +413,8 @@ export async function createRaceResult(athleteId: string, input: CreateRaceResul
     throw new Error(msg);
   }
   return saveRaceResultExtended(athleteId, {
-    raceRegistryId,
-    goalId: input.goalId,
+    raceRegistryId: athleteRace.raceRegistryId,
+    athleteRaceId: input.athleteRaceId,
     officialFinishTime: input.officialFinishTime,
     chipTime: null,
     gunTime: null,
@@ -441,13 +425,18 @@ export async function createRaceResult(athleteId: string, input: CreateRaceResul
   });
 }
 
-export async function getRaceResultByGoalId(athleteId: string, goalId: string) {
+export async function getRaceResultByAthleteRaceId(athleteId: string, athleteRaceId: string) {
   return prisma.athlete_race_results.findFirst({
-    where: { athleteId, goalId },
+    where: { athleteId, athleteRaceId },
     include: {
       race_registry: { select: { id: true, name: true, distanceLabel: true } },
     },
   });
+}
+
+/** @deprecated goalId === athleteRaceId after cutover */
+export async function getRaceResultByGoalId(athleteId: string, goalId: string) {
+  return getRaceResultByAthleteRaceId(athleteId, goalId);
 }
 
 export async function listRaceResultsByRegistry(athleteId: string, raceRegistryId: string) {
@@ -492,7 +481,11 @@ export async function updateRaceResultReflection(
 }
 
 /** Update time, activity link, and optional fields for an existing result row. */
-export async function updateRaceResultById(athleteId: string, resultId: string, patch: Partial<SaveRaceResultExtendedInput>) {
+export async function updateRaceResultById(
+  athleteId: string,
+  resultId: string,
+  patch: Partial<SaveRaceResultExtendedInput>
+) {
   const row = await prisma.athlete_race_results.findFirst({
     where: { id: resultId, athleteId },
   });
@@ -501,13 +494,14 @@ export async function updateRaceResultById(athleteId: string, resultId: string, 
   }
   return saveRaceResultExtended(athleteId, {
     raceRegistryId: patch.raceRegistryId ?? row.raceRegistryId,
-    goalId: patch.goalId !== undefined ? patch.goalId : row.goalId,
     athleteRaceId:
       patch.athleteRaceId !== undefined
         ? patch.athleteRaceId
         : patch.signupId !== undefined
           ? patch.signupId
-          : row.athleteRaceId,
+          : patch.goalId !== undefined
+            ? patch.goalId
+            : row.athleteRaceId,
     officialFinishTime: patch.officialFinishTime !== undefined ? patch.officialFinishTime : row.officialFinishTime,
     chipTime: patch.chipTime !== undefined ? patch.chipTime : row.chipTime,
     gunTime: patch.gunTime !== undefined ? patch.gunTime : row.gunTime,

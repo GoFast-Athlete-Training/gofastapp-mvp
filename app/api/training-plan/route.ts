@@ -24,7 +24,7 @@ import {
 
 /**
  * POST /api/training-plan
- * Create a training plan. Requires an explicit AthleteGoal (race + goal time); no silent goal inference.
+ * Create a training plan. Requires athleteRaceId (race + goal time on that row).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -261,7 +261,6 @@ export async function POST(request: NextRequest) {
           athleteId: athlete.id,
           athleteRaceId: terminalAthleteRace.id,
           ...planRaceSnapshotsToPrismaJson(raceSnapshots),
-          athleteGoalId: null,
           name: planName,
           startDate,
           totalWeeks,
@@ -357,7 +356,7 @@ export async function GET(request: NextRequest) {
         startDate: true,
         totalWeeks: true,
         raceId: true,
-        athleteGoalId: true,
+        athleteRaceId: true,
         phases: true,
         planSchedule: true,
         weeklyMileageTarget: true,

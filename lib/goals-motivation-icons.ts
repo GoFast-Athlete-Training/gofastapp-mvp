@@ -1,4 +1,4 @@
-/** Curated slugs stored on AthleteGoal.motivationIcon; keep in sync with normalizeMotivationIcon in goal-service. */
+/** Curated slugs stored on athlete_races.motivationIcon; keep in sync with normalizeMotivationIcon in goal-service. */
 export const MOTIVATION_ICON_SLUGS = [
   "sparkles",
   "trophy",

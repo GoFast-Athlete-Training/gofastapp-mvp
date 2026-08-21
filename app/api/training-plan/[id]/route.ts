@@ -49,6 +49,10 @@ export async function GET(request: NextRequest, context: Ctx) {
             raceDate: true,
             distanceMeters: true,
             distanceLabel: true,
+            goalTime: true,
+            goalRacePace: true,
+            goalPace5K: true,
+            goalDistance: true,
           },
         },
         race_registry: {
@@ -58,15 +62,6 @@ export async function GET(request: NextRequest, context: Ctx) {
             raceDate: true,
             distanceMeters: true,
             distanceLabel: true,
-          },
-        },
-        athlete_goal: {
-          select: {
-            id: true,
-            goalTime: true,
-            goalRacePace: true,
-            goalPace5K: true,
-            distance: true,
           },
         },
         _count: { select: { planned_workouts: true } },
@@ -180,16 +175,16 @@ export async function GET(request: NextRequest, context: Ctx) {
 
     const race = terminalRace;
     const goalFinishTime =
-      plan.athlete_goal?.goalTime?.trim() ||
+      plan.athlete_race?.goalTime?.trim() ||
       plan.goalRaceTime?.trim() ||
       null;
     const resolvedGoalPace = resolveGoalRacePace({
       goalTime: goalFinishTime,
-      dbGoalRacePaceSecPerMile: plan.athlete_goal?.goalRacePace ?? null,
+      dbGoalRacePaceSecPerMile: plan.athlete_race?.goalRacePace ?? null,
       planGoalRacePace: plan.goalRacePace,
       distanceMeters: race?.distanceMeters ?? null,
       distanceLabel: race?.distanceLabel ?? null,
-      goalDistance: plan.athlete_goal?.distance ?? null,
+      goalDistance: plan.athlete_race?.goalDistance ?? null,
     });
 
     const fiveKSecPerMile = parsePaceStringToSecPerMile(athleteRow?.fiveKPace ?? null);
@@ -210,7 +205,7 @@ export async function GET(request: NextRequest, context: Ctx) {
       current5kSecPerMile: fiveKSecPerMile,
       goalFinishSec: parseGoalTimeToSeconds(goalFinishTime),
       goalPaceSecPerMile: resolvedGoalPace.goalPaceSecPerMile,
-      goalPace5KSecPerMile: plan.athlete_goal?.goalPace5K ?? null,
+      goalPace5KSecPerMile: plan.athlete_race?.goalPace5K ?? null,
       eventMiles: resolvedGoalPace.raceDistanceMiles,
       evidence: null,
       gofastLongRunCapability,
@@ -334,16 +329,6 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         if (body.currentWeeklyMileage != null) {
           data.currentWeeklyMileage = Number(body.currentWeeklyMileage);
         }
-        if (body.athleteGoalId != null) {
-          const gid = String(body.athleteGoalId);
-          const g = await prisma.athleteGoal.findFirst({
-            where: { id: gid, athleteId: auth.athlete.id },
-          });
-          if (!g) {
-            return NextResponse.json({ error: "Goal not found" }, { status: 404 });
-          }
-          data.athleteGoalId = gid;
-        }
         if (body.athleteRaceId != null) {
           const arId = String(body.athleteRaceId).trim();
           const ar = await prisma.athlete_races.findFirst({
@@ -356,6 +341,8 @@ export async function PATCH(request: NextRequest, context: Ctx) {
           const startForWeeks =
             (data.startDate as Date | undefined) ?? existing.startDate;
           data.totalWeeks = totalWeeksFromDates(startForWeeks, ar.raceDate);
+        } else if (body.athleteRaceId === null) {
+          data.athleteRaceId = null;
         }
         if ("presetId" in body) {
           const raw = body.presetId;
@@ -478,6 +465,10 @@ export async function PATCH(request: NextRequest, context: Ctx) {
             raceDate: true,
             distanceMeters: true,
             distanceLabel: true,
+            goalTime: true,
+            goalRacePace: true,
+            goalPace5K: true,
+            goalDistance: true,
           },
         },
         race_registry: {
@@ -487,15 +478,6 @@ export async function PATCH(request: NextRequest, context: Ctx) {
             raceDate: true,
             distanceMeters: true,
             distanceLabel: true,
-          },
-        },
-        athlete_goal: {
-          select: {
-            id: true,
-            goalTime: true,
-            goalRacePace: true,
-            goalPace5K: true,
-            distance: true,
           },
         },
         _count: { select: { planned_workouts: true } },

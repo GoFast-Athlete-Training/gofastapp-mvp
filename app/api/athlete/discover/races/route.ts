@@ -51,7 +51,7 @@ export async function GET() {
       isGoFastContainer: true,
     };
 
-    const [fromPlans, fromGoals] = await Promise.all([
+    const [fromPlans, fromRaces] = await Promise.all([
       prisma.training_plans.findMany({
         where: {
           lifecycleStatus: 'ACTIVE',
@@ -74,14 +74,19 @@ export async function GET() {
           },
         },
       }),
-      prisma.athleteGoal.findMany({
+      prisma.athlete_races.findMany({
         where: {
-          status: 'ACTIVE',
-          athleteRaceId: { not: null },
+          goalTime: { not: null },
           Athlete: baseAthlete,
         },
         select: {
-          athlete_race: { select: goalAthleteRaceSelect },
+          raceRegistryId: true,
+          name: true,
+          distanceLabel: true,
+          distanceMeters: true,
+          raceDate: true,
+          city: true,
+          state: true,
         },
       }),
     ]);
@@ -97,13 +102,8 @@ export async function GET() {
         map.set(row.race_registry.id, row.race_registry);
       }
     }
-    for (const row of fromGoals) {
-      if (row.athlete_race) {
-        map.set(
-          row.athlete_race.raceRegistryId,
-          athleteRaceToDiscoverRace(row.athlete_race, null)
-        );
-      }
+    for (const row of fromRaces) {
+      map.set(row.raceRegistryId, athleteRaceToDiscoverRace(row, null));
     }
 
     const races = Array.from(map.values()).sort((a, b) => {

@@ -15,15 +15,15 @@ export default function AdoptPublicPlanPanel({ slug, planTitle, presetTitle }: P
   const router = useRouter();
   const [startDate, setStartDate] = useState("");
   const [raceRegistryId, setRaceRegistryId] = useState("");
-  const [athleteGoalId, setAthleteGoalId] = useState("");
+  const [athleteRaceId, setAthleteRaceId] = useState("");
   const [replaceActivePlan, setReplaceActivePlan] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsReplace, setNeedsReplace] = useState(false);
 
   const handleAdopt = async () => {
-    if (!raceRegistryId || !athleteGoalId || !startDate) {
-      setError("Pick your race, goal, and start date in Goals first, then enter them here.");
+    if (!raceRegistryId || !athleteRaceId || !startDate) {
+      setError("Pick your race, set a goal time in My Races, then enter the IDs below.");
       return;
     }
     setLoading(true);
@@ -31,7 +31,7 @@ export default function AdoptPublicPlanPanel({ slug, planTitle, presetTitle }: P
     try {
       const res = await api.post(`/public-training-plans/${encodeURIComponent(slug)}/adopt`, {
         raceRegistryId,
-        athleteGoalId,
+        athleteRaceId,
         startDate,
         replaceActivePlan: replaceActivePlan || needsReplace,
       });
@@ -66,7 +66,7 @@ export default function AdoptPublicPlanPanel({ slug, planTitle, presetTitle }: P
         )}
       </p>
       <p className="mt-3 text-sm text-gray-600">
-        Set up an active goal with a race and goal time first, then enter the IDs below (from Goals)
+        Set up a race with a goal time in My Races first, then enter the IDs below
         or adopt from the app after signing in.
       </p>
       <div className="mt-4 space-y-3">
@@ -79,10 +79,10 @@ export default function AdoptPublicPlanPanel({ slug, planTitle, presetTitle }: P
           />
         </label>
         <label className="block text-sm">
-          <span className="font-medium text-gray-700">Athlete goal ID</span>
+          <span className="font-medium text-gray-700">Athlete race ID</span>
           <input
-            value={athleteGoalId}
-            onChange={(e) => setAthleteGoalId(e.target.value)}
+            value={athleteRaceId}
+            onChange={(e) => setAthleteRaceId(e.target.value)}
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
           />
         </label>
@@ -116,15 +116,15 @@ export default function AdoptPublicPlanPanel({ slug, planTitle, presetTitle }: P
           {loading ? "Building your plan…" : "Use this plan"}
         </button>
         <Link
-          href="/goals"
+          href="/races"
           className="rounded-xl border border-emerald-300 bg-white px-5 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
         >
-          Set up goal
+          My Races
         </Link>
       </div>
       {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
       <p className="mt-2 text-xs text-gray-500">
-        Goal time comes from your active AthleteGoal — no need to enter it here.
+        Goal time comes from your My Races row — no need to enter it here.
       </p>
     </section>
   );

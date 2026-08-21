@@ -80,7 +80,7 @@ type PlanDetail = {
     distanceMeters: number | null;
     distanceLabel: string | null;
   } | null;
-  athlete_goal?: { id: string } | null;
+  athlete_race?: { id: string } | null;
 };
 
 function hasSchedule(p: PlanDetail): boolean {
@@ -907,7 +907,7 @@ export default function TrainingPlanDayPreviewPage() {
           raceRegistryId={planRace.id}
           raceName={planRace.name}
           raceDateYmd={planRaceYmd}
-          goalId={planDetail?.athlete_goal?.id ?? null}
+          goalId={planDetail?.athlete_race?.id ?? null}
           signupId={null}
           onSaved={() => {
             void load();

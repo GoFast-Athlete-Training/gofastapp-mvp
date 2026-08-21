@@ -44,15 +44,16 @@ export async function GET(request: NextRequest) {
   const raceRegistryId = request.nextUrl.searchParams.get("raceRegistryId");
   try {
     if (goalId?.trim()) {
-      const result = await getRaceResultByGoalId(athlete.id, goalId.trim());
+      const athleteRaceId = goalId.trim();
+      const result = await getRaceResultByGoalId(athlete.id, athleteRaceId);
       let analysis = null;
-      if (result?.goalId) {
-        const g = await prisma.athleteGoal.findFirst({
-          where: { id: result.goalId, athleteId: athlete.id },
-          include: { athlete_race: { select: { name: true } } },
+      if (result?.athleteRaceId) {
+        const ar = await prisma.athlete_races.findFirst({
+          where: { id: result.athleteRaceId, athleteId: athlete.id },
+          select: { goalTime: true, goalDistance: true, name: true },
         });
-        if (g) {
-          analysis = analyzeRaceResult(result, g, g.athlete_race?.name ?? "Your race");
+        if (ar) {
+          analysis = analyzeRaceResult(result, ar, ar.name ?? "Your race");
         }
       }
       return NextResponse.json({ result, analysis });
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
       const officialFinishTime =
         typeof body.officialFinishTime === "string" ? body.officialFinishTime : "";
       const out = await createRaceResult(athlete.id, {
-        goalId,
+        athleteRaceId: goalId,
         officialFinishTime,
         howFeltRating: typeof body.howFeltRating === "number" ? body.howFeltRating : null,
         notes: typeof body.notes === "string" ? body.notes : null,

@@ -464,7 +464,6 @@ export async function joinTrainingCohort(
         athleteId,
         raceId: race.id,
         athleteRaceId: athleteRace.id,
-        athleteGoalId: null,
         cohortId: cohort.id,
         name: planName,
         startDate,

@@ -69,7 +69,6 @@ function isQualifyingGoal(g: GoalRow): boolean {
 type ActivePlanLite = {
   id: string;
   name: string;
-  athleteGoalId: string | null;
   athleteRaceId: string | null;
   lifecycleStatus: string;
   planSchedule: unknown;
@@ -168,7 +167,10 @@ function suggestPlanName(raceName: string, firstName: string | null): string {
 export default function TrainingSetupClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const goalIdFromUrl = searchParams.get("goalId")?.trim() ?? "";
+  const athleteRaceIdFromUrl =
+    searchParams.get("athleteRaceId")?.trim() ||
+    searchParams.get("goalId")?.trim() ||
+    "";
 
   const [ready, setReady] = useState(false);
   const [loadingOrientation, setLoadingOrientation] = useState(true);
@@ -371,12 +373,12 @@ export default function TrainingSetupClient() {
 
   useEffect(() => {
     if (!ready || loadingOrientation || qualifyingGoals.length === 0) return;
-    if (!goalIdFromUrl) return;
-    const g = qualifyingGoals.find((x) => x.id === goalIdFromUrl);
+    if (!athleteRaceIdFromUrl) return;
+    const g = qualifyingGoals.find((x) => x.id === athleteRaceIdFromUrl);
     if (g) {
       setWizardGoal(g);
     }
-  }, [ready, loadingOrientation, qualifyingGoals, goalIdFromUrl]);
+  }, [ready, loadingOrientation, qualifyingGoals, athleteRaceIdFromUrl]);
 
   useEffect(() => {
     if (!ready || !wizardGoal || loadingOrientation) return;
@@ -437,7 +439,7 @@ export default function TrainingSetupClient() {
     setReplaceBlockPlan(null);
     const today = new Date();
     setStartDate(today.toISOString().split("T")[0]);
-    router.replace(`/training-setup?goalId=${encodeURIComponent(g.id)}`, { scroll: false });
+    router.replace(`/training-setup?athleteRaceId=${encodeURIComponent(g.id)}`, { scroll: false });
   }
 
   function exitWizard() {

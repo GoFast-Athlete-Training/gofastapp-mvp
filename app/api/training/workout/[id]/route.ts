@@ -152,11 +152,11 @@ export async function GET(request: NextRequest, context: Ctx) {
               lifecycleStatus: true,
               planSchedule: true,
               easyRunConfig: true,
-              athlete_goal: {
+              athlete_race: {
                 select: {
                   goalTime: true,
                   goalRacePace: true,
-                  distance: true,
+                  goalDistance: true,
                 },
               },
               race_registry: {
@@ -228,18 +228,18 @@ export async function GET(request: NextRequest, context: Ctx) {
         });
 
         const dm = workout.training_plans?.race_registry?.distanceMeters;
-        const linkedGoal = workout.training_plans?.athlete_goal ?? null;
+        const linkedRace = workout.training_plans?.athlete_race ?? null;
         const goalFinishTime =
-          linkedGoal?.goalTime?.trim() ||
+          linkedRace?.goalTime?.trim() ||
           workout.training_plans?.goalRaceTime?.trim() ||
           null;
         const racePaceSecondsPerMile = resolveGoalRacePace({
           goalTime: goalFinishTime,
-          dbGoalRacePaceSecPerMile: linkedGoal?.goalRacePace ?? null,
+          dbGoalRacePaceSecPerMile: linkedRace?.goalRacePace ?? null,
           planGoalRacePace: workout.training_plans?.goalRacePace ?? null,
           distanceMeters: dm != null ? Number(dm) : null,
           distanceLabel: workout.training_plans?.race_registry?.distanceLabel ?? null,
-          goalDistance: linkedGoal?.distance ?? null,
+          goalDistance: linkedRace?.goalDistance ?? null,
         }).goalPaceSecPerMile;
 
         if (workout.catalogueWorkoutId && workout.workout_catalogue) {

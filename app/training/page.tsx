@@ -117,6 +117,13 @@ export default function TrainingHubPage() {
   const [weekDays, setWeekDays] = useState<PlanDayCard[]>([]);
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [legacyPlanReselect, setLegacyPlanReselect] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [myRacesForPick, setMyRacesForPick] = useState<
+    { id: string; name: string; raceDate: string; goalTime: string | null }[]
+  >([]);
   const [hubError, setHubError] = useState<string | null>(null);
   const [planMenuOpen, setPlanMenuOpen] = useState(false);
   const [selectedDayKey, setSelectedDayKey] = useState<string>("");
@@ -176,6 +183,8 @@ export default function TrainingHubPage() {
   const loadHub = useCallback(async () => {
     setLoading(true);
     setHubError(null);
+    setLegacyPlanReselect(null);
+    setMyRacesForPick([]);
     setPlanDetail(null);
     setRaceReadiness(null);
     setPastRacePlan(null);
@@ -190,9 +199,57 @@ export default function TrainingHubPage() {
       });
       const listData = await listRes.json();
       if (!listRes.ok || !Array.isArray(listData.plans) || listData.plans.length === 0) {
+        const racesRes = await fetch("/api/race-signups", {
+          headers: athleteBearerFetchHeaders(token),
+        });
+        const racesData = await racesRes.json();
+        const rows = (racesData.athleteRaces ?? racesData.signups ?? []) as Array<{
+          id: string;
+          name: string;
+          raceDate: string;
+          goalTime?: string | null;
+        }>;
+        setMyRacesForPick(
+          rows.map((r) => ({
+            id: r.id,
+            name: r.name,
+            raceDate: String(r.raceDate),
+            goalTime: r.goalTime?.trim() || null,
+          }))
+        );
         return;
       }
-      const planId = (listData.plans[0] as { id: string }).id;
+      const activePlan = listData.plans[0] as {
+        id: string;
+        name?: string;
+        athleteRaceId?: string | null;
+      };
+      if (!activePlan.athleteRaceId) {
+        setLegacyPlanReselect({
+          id: activePlan.id,
+          name: activePlan.name?.trim() || "Your training plan",
+        });
+        const racesRes = await fetch("/api/race-signups", {
+          headers: athleteBearerFetchHeaders(token),
+        });
+        const racesData = await racesRes.json();
+        const rows = (racesData.athleteRaces ?? racesData.signups ?? []) as Array<{
+          id: string;
+          name: string;
+          raceDate: string;
+          goalTime?: string | null;
+        }>;
+        setMyRacesForPick(
+          rows.map((r) => ({
+            id: r.id,
+            name: r.name,
+            raceDate: String(r.raceDate),
+            goalTime: r.goalTime?.trim() || null,
+          }))
+        );
+        return;
+      }
+      const planId = activePlan.id;
       const { plan: raw, athleteFiveKPace: athPace, goalRacePaceResolved: resolvedPace, raceReadiness: readiness } =
         await fetchTrainingPlanDetail(planId, token);
       const plan = raw as PlanDetailHub;
@@ -477,17 +534,70 @@ export default function TrainingHubPage() {
           </p>
         )}
 
-        {authReady && !loading && !planDetail && !pastRacePlan && (
-          <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm mb-8">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">No active plan yet</h2>
-            <p className="text-sm text-gray-600 mb-6">
-              Start a plan from your race goal, or log a workout without a full schedule.
+        {authReady && !loading && legacyPlanReselect && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 shadow-sm mb-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Training setup changed</h2>
+            <p className="text-sm text-gray-700 mb-4">
+              We simplified how races and training plans connect. Please select the race
+              you&apos;re training for again. Your existing plan ({legacyPlanReselect.name})
+              stays available until your replacement is ready.
             </p>
+            {myRacesForPick.length === 0 ? (
+              <Link
+                href="/races/find"
+                className="inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+              >
+                Add a race in My Races
+              </Link>
+            ) : (
+              <ul className="space-y-2">
+                {myRacesForPick.map((r) => (
+                  <li key={r.id}>
+                    <Link
+                      href={`/training-setup?athleteRaceId=${encodeURIComponent(r.id)}&replacePlanId=${encodeURIComponent(legacyPlanReselect.id)}`}
+                      className="flex items-center justify-between rounded-xl border border-amber-300 bg-white px-4 py-3 text-sm font-semibold text-gray-900 hover:bg-amber-100/60"
+                    >
+                      <span>{r.name}</span>
+                      <span className="text-xs font-normal text-gray-500">
+                        {r.goalTime ? `Goal ${r.goalTime}` : "Set goal on race"}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {authReady && !loading && !planDetail && !pastRacePlan && !legacyPlanReselect && (
+          <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm mb-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Choose a race to train for</h2>
+            <p className="text-sm text-gray-600 mb-6">
+              Training follows one active plan tied to a race in My Races. Pick your race, set a
+              goal time, then build your plan.
+            </p>
+            {myRacesForPick.length > 0 ? (
+              <ul className="space-y-2 mb-6">
+                {myRacesForPick.map((r) => (
+                  <li key={r.id}>
+                    <Link
+                      href={`/training-setup?athleteRaceId=${encodeURIComponent(r.id)}`}
+                      className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-900 hover:bg-orange-50"
+                    >
+                      <span>{r.name}</span>
+                      <span className="text-xs font-normal text-gray-500">
+                        {r.goalTime ? `Goal ${r.goalTime}` : "Set goal first"}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             <Link
-              href="/training-setup"
+              href="/races"
               className="inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
             >
-              Start or connect a plan
+              Go to My Races
             </Link>
           </div>
         )}

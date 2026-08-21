@@ -78,7 +78,6 @@ type UpcomingSession = {
 type TrainingPlanRow = {
   id: string;
   name: string;
-  athleteGoalId: string | null;
   athleteRaceId: string | null;
 };
 
@@ -287,7 +286,7 @@ export default function MyRacePage() {
 
         const plans = plansRes.data.plans ?? [];
         const planForGoal = g?.id
-          ? plans.find((p) => p.athleteRaceId === g.id || p.athleteGoalId === g.id) ?? null
+          ? plans.find((p) => p.athleteRaceId === g.id) ?? null
           : null;
 
         const summary = upcomingRes.data.activePlanSummary ?? null;

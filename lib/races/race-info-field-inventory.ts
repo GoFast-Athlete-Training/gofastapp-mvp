@@ -50,7 +50,7 @@ export const RACE_INFO_FIELD_INVENTORY: RaceInfoFieldSource[] = [
   {
     packet: "trainingTips",
     companyTables: ["race_course_segments"],
-    mvpFields: ["course_segments.runTip", "training_plans", "athlete_goals.goalTime"],
+    mvpFields: ["course_segments.runTip", "training_plans", "athlete_races.goalTime"],
     notes: "Structured tips from segments; plan progress from active training_plans.",
   },
   {

@@ -17,7 +17,6 @@ import {
   type InlineGoalRow,
   type RaceForGoal,
 } from "@/components/races/InlineGoalForm";
-import { pickHeroAthleteRace } from "@/lib/races/my-races-hero";
 
 type ApiAthleteRace = {
   id: string;
@@ -28,6 +27,9 @@ type ApiAthleteRace = {
   distanceMeters: number | null;
   city: string | null;
   state: string | null;
+  goalTime?: string | null;
+  goalRacePace?: number | null;
+  goalPace5K?: number | null;
   race_registry?: {
     id: string;
     slug: string | null;
@@ -46,25 +48,22 @@ type AthleteRaceRow = {
   state: string | null;
   slug: string | null;
   logoUrl: string | null;
+  goalTime: string | null;
+  goalRacePace: number | null;
+  goalPace5K: number | null;
 };
 
-type GoalRow = InlineGoalRow & {
-  name?: string | null;
-  athlete_race?: {
-    id: string;
-    name: string;
-    raceDate: string;
-    distanceLabel: string | null;
-    distanceMeters: number | null;
-  } | null;
-};
-
-type ActivePlanSummary = {
-  name: string;
-  hasSchedule: boolean;
-  weekNumber: number | null;
-  totalWeeks: number | null;
-};
+function goalFromRace(row: AthleteRaceRow): InlineGoalRow | null {
+  if (!row.goalTime?.trim()) return null;
+  return {
+    id: row.athleteRaceId,
+    goalTime: row.goalTime,
+    goalRacePace: row.goalRacePace,
+    goalPace5K: row.goalPace5K,
+    athleteRaceId: row.athleteRaceId,
+    raceRegistryId: row.raceRegistryId,
+  };
+}
 
 function isoRaceDate(value: string | Date): string {
   return typeof value === "string" ? value : new Date(value).toISOString();
@@ -82,6 +81,9 @@ function normalizeAthleteRace(raw: ApiAthleteRace): AthleteRaceRow {
     state: raw.state ?? null,
     slug: raw.race_registry?.slug ?? null,
     logoUrl: raw.race_registry?.logoUrl ?? null,
+    goalTime: raw.goalTime?.trim() || null,
+    goalRacePace: raw.goalRacePace ?? null,
+    goalPace5K: raw.goalPace5K ?? null,
   };
 }
 
@@ -111,21 +113,13 @@ function countdownChipLabel(iso: string): string {
 }
 
 function heroPrimaryCta(
-  heroGoal: GoalRow | null,
-  activePlanSummary: ActivePlanSummary | null,
+  row: AthleteRaceRow,
   myRaceHref: string
 ): { href: string; label: string } {
-  if (
-    activePlanSummary?.hasSchedule &&
-    activePlanSummary.weekNumber != null &&
-    activePlanSummary.totalWeeks != null
-  ) {
-    return { href: "/training", label: "View training →" };
-  }
-  if (heroGoal?.goalTime?.trim() && heroGoal.id) {
+  if (row.goalTime?.trim()) {
     return {
-      href: `/training-setup?goalId=${encodeURIComponent(heroGoal.id)}`,
-      label: "Build a plan →",
+      href: `/training-setup?athleteRaceId=${encodeURIComponent(row.athleteRaceId)}`,
+      label: "Train for this race →",
     };
   }
   return { href: myRaceHref, label: "Set a goal →" };
@@ -210,25 +204,16 @@ function NextSixMonthsRaceCards({
 
 function AthleteRaceCard({
   row,
-  goal,
-  unboltedGoal,
-  associating,
-  onAssociate,
   onGoalSaved,
   onRemove,
   removing,
 }: {
   row: AthleteRaceRow;
-  goal: GoalRow | null;
-  unboltedGoal: GoalRow | null;
-  associating: boolean;
-  onAssociate: (athleteRaceId: string, goalId: string) => void;
-  onGoalSaved: (goal: InlineGoalRow) => void;
+  onGoalSaved: (row: AthleteRaceRow, goal: InlineGoalRow) => void;
   onRemove: (athleteRaceId: string) => void;
   removing: boolean;
 }) {
-  const showAssociate =
-    unboltedGoal?.id && !goal && !unboltedGoal.athleteRaceId?.trim();
+  const goal = goalFromRace(row);
 
   return (
     <li className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm relative">
@@ -262,26 +247,33 @@ function AthleteRaceCard({
             : "—")}
       </p>
 
-      {showAssociate ? (
-        <button
-          type="button"
-          disabled={associating}
-          onClick={() => onAssociate(row.athleteRaceId, unboltedGoal!.id)}
-          className="mt-2.5 inline-flex items-center justify-center rounded-lg border border-orange-300 bg-orange-50 px-2.5 py-1.5 text-xs font-semibold text-orange-900 hover:bg-orange-100 disabled:opacity-50"
-        >
-          {associating ? "Linking…" : "Use this race for my goal"}
-        </button>
-      ) : goal ? (
+      {goal ? (
         <div className="mt-2.5">
           <InlineGoalForm
             race={raceForGoal(row)}
             goal={goal}
-            onSaved={onGoalSaved}
+            onSaved={(updated) => onGoalSaved(row, updated)}
           />
         </div>
-      ) : null}
+      ) : (
+        <div className="mt-2.5">
+          <InlineGoalForm
+            race={raceForGoal(row)}
+            goal={null}
+            onSaved={(updated) => onGoalSaved(row, updated)}
+          />
+        </div>
+      )}
 
-      <div className="mt-2.5">
+      <div className="mt-2.5 flex flex-wrap gap-2">
+        {row.goalTime?.trim() ? (
+          <Link
+            href={`/training-setup?athleteRaceId=${encodeURIComponent(row.athleteRaceId)}`}
+            className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
+          >
+            Train for this race
+          </Link>
+        ) : null}
         <Link
           href={personalRaceHref(row)}
           className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-2.5 py-1.5"
@@ -296,54 +288,20 @@ function AthleteRaceCard({
 export default function MyRacesPage() {
   const router = useRouter();
   const [myRaces, setMyRaces] = useState<AthleteRaceRow[]>([]);
-  const [goals, setGoals] = useState<GoalRow[]>([]);
-  const [planAthleteRaceId, setPlanAthleteRaceId] = useState<string | null>(null);
-  const [activePlanSummary, setActivePlanSummary] = useState<ActivePlanSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [removingRaceId, setRemovingRaceId] = useState<string | null>(null);
-  const [associatingRaceId, setAssociatingRaceId] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [suRes, gRes, upRes, calRes] = await Promise.all([
-        api.get<{ signups?: ApiAthleteRace[]; athleteRaces?: ApiAthleteRace[] }>(
-          "/race-signups"
-        ),
-        api.get<{ goals: GoalRow[] }>("/goals?status=ACTIVE").catch(() => ({ data: { goals: [] } })),
-        api
-          .get<{ activePlanSummary?: ActivePlanSummary | null }>("/training/upcoming?limit=1")
-          .catch(() => ({
-            data: { activePlanSummary: undefined as ActivePlanSummary | null | undefined },
-          })),
-        api
-          .get<{
-            calendar?: { planAthleteRaceId?: string | null };
-          }>("/race-calendar")
-          .catch(() => ({ data: { calendar: undefined } })),
-      ]);
-      const raw =
-        suRes.data.athleteRaces ?? suRes.data.signups ?? [];
-      setMyRaces(raw.map(normalizeAthleteRace));
-      setGoals(gRes.data.goals ?? []);
-      setPlanAthleteRaceId(calRes.data?.calendar?.planAthleteRaceId ?? null);
-      const s = upRes.data?.activePlanSummary;
-      setActivePlanSummary(
-        s && typeof s.name === "string"
-          ? {
-              name: s.name,
-              hasSchedule: Boolean(s.hasSchedule),
-              weekNumber: s.weekNumber ?? null,
-              totalWeeks: s.totalWeeks ?? null,
-            }
-          : null
+      const suRes = await api.get<{ signups?: ApiAthleteRace[]; athleteRaces?: ApiAthleteRace[] }>(
+        "/race-signups"
       );
+      const raw = suRes.data.athleteRaces ?? suRes.data.signups ?? [];
+      setMyRaces(raw.map(normalizeAthleteRace));
     } catch (e) {
       console.error(e);
       setMyRaces([]);
-      setGoals([]);
-      setPlanAthleteRaceId(null);
-      setActivePlanSummary(null);
     } finally {
       setLoading(false);
     }
@@ -359,20 +317,6 @@ export default function MyRacesPage() {
     });
     return () => unsub();
   }, [router]);
-
-  const goalByAthleteRaceId = useMemo(() => {
-    const m = new Map<string, GoalRow>();
-    for (const g of goals) {
-      const arId = g.athleteRaceId ?? g.athlete_race?.id;
-      if (arId) m.set(arId, g);
-    }
-    return m;
-  }, [goals]);
-
-  const unboltedGoal = useMemo(
-    () => goals.find((g) => !g.athleteRaceId?.trim()) ?? null,
-    [goals]
-  );
 
   const { upcomingRaces, pastRaces } = useMemo(() => {
     const up: AthleteRaceRow[] = [];
@@ -392,18 +336,7 @@ export default function MyRacesPage() {
     [upcomingRaces]
   );
 
-  const heroRace = useMemo(() => {
-    const picked = pickHeroAthleteRace({
-      upcoming: upcomingSorted.map((r) => ({
-        athleteRaceId: r.athleteRaceId,
-        raceDate: r.raceDate,
-      })),
-      planAthleteRaceId,
-      goalAthleteRaceId: goals.find((g) => g.athleteRaceId)?.athleteRaceId ?? null,
-    });
-    if (!picked) return null;
-    return upcomingSorted.find((r) => r.athleteRaceId === picked.athleteRaceId) ?? null;
-  }, [upcomingSorted, planAthleteRaceId, goals]);
+  const heroRace = useMemo(() => upcomingSorted[0] ?? null, [upcomingSorted]);
 
   const otherRaces = useMemo(
     () => upcomingSorted.filter((r) => r.athleteRaceId !== heroRace?.athleteRaceId),
@@ -427,31 +360,22 @@ export default function MyRacesPage() {
     }
   }
 
-  async function onAssociateGoal(athleteRaceId: string, goalId: string) {
-    setAssociatingRaceId(athleteRaceId);
-    try {
-      await api.patch(`/race-signups/${athleteRaceId}`, { goalId });
-      await loadAll();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setAssociatingRaceId(null);
-    }
+  function onGoalSaved(row: AthleteRaceRow, updated: InlineGoalRow) {
+    setMyRaces((prev) =>
+      prev.map((r) =>
+        r.athleteRaceId === row.athleteRaceId
+          ? {
+              ...r,
+              goalTime: updated.goalTime?.trim() || null,
+              goalRacePace: updated.goalRacePace ?? null,
+              goalPace5K: updated.goalPace5K ?? null,
+            }
+          : r
+      )
+    );
   }
 
-  function onGoalSaved(updated: InlineGoalRow) {
-    setGoals((prev) => {
-      const idx = prev.findIndex((g) => g.id === updated.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = { ...next[idx], ...updated } as GoalRow;
-        return next;
-      }
-      return [...prev, updated as GoalRow];
-    });
-  }
-
-  const heroGoal = heroRace ? goalByAthleteRaceId.get(heroRace.athleteRaceId) ?? null : null;
+  const heroGoal = heroRace ? goalFromRace(heroRace) : null;
 
   return (
     <div className="space-y-8">
@@ -517,18 +441,6 @@ export default function MyRacesPage() {
             </div>
           </div>
 
-          {unboltedGoal && upcomingRaces.length > 0 ? (
-            <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-              You have an active goal that isn&apos;t linked to a race yet. Pick a race below and
-              tap{" "}
-              <span className="font-semibold">Use this race for my goal</span>, or{" "}
-              <Link href="/races/find" className="font-semibold underline">
-                find another race
-              </Link>
-              .
-            </p>
-          ) : null}
-
           {heroRace ? (
             <section className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50/80 via-white to-white p-5 sm:p-6 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-start gap-4">
@@ -577,45 +489,23 @@ export default function MyRacesPage() {
                       <InlineGoalForm
                         race={raceForGoal(heroRace)}
                         goal={heroGoal}
-                        onSaved={onGoalSaved}
+                        onSaved={(updated) => onGoalSaved(heroRace, updated)}
                       />
                     </div>
-                  ) : unboltedGoal ? (
-                    <button
-                      type="button"
-                      disabled={associatingRaceId === heroRace.athleteRaceId}
-                      onClick={() => onAssociateGoal(heroRace.athleteRaceId, unboltedGoal.id)}
-                      className="mt-3 inline-flex items-center justify-center rounded-lg border border-orange-300 bg-white px-3 py-2 text-sm font-semibold text-orange-900 hover:bg-orange-50 disabled:opacity-50"
-                    >
-                      {associatingRaceId === heroRace.athleteRaceId
-                        ? "Linking…"
-                        : "Use this race for my goal"}
-                    </button>
                   ) : (
                     <div className="mt-3">
                       <InlineGoalForm
                         race={raceForGoal(heroRace)}
                         goal={null}
-                        onSaved={onGoalSaved}
+                        onSaved={(updated) => onGoalSaved(heroRace, updated)}
                       />
                     </div>
                   )}
 
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {activePlanSummary?.hasSchedule &&
-                    activePlanSummary.weekNumber != null &&
-                    activePlanSummary.totalWeeks != null ? (
-                      <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-900 px-2.5 py-1 text-xs font-bold">
-                        Week {activePlanSummary.weekNumber} of {activePlanSummary.totalWeeks}
-                      </span>
-                    ) : null}
-                  </div>
-
                   <div className="mt-4 flex flex-wrap gap-2">
                     {(() => {
                       const primary = heroPrimaryCta(
-                        heroGoal,
-                        activePlanSummary,
+                        heroRace,
                         personalRaceHref(heroRace)
                       );
                       return (
@@ -662,10 +552,6 @@ export default function MyRacesPage() {
                   <AthleteRaceCard
                     key={row.athleteRaceId}
                     row={row}
-                    goal={goalByAthleteRaceId.get(row.athleteRaceId) ?? null}
-                    unboltedGoal={unboltedGoal}
-                    associating={associatingRaceId === row.athleteRaceId}
-                    onAssociate={onAssociateGoal}
                     onGoalSaved={onGoalSaved}
                     onRemove={onRemove}
                     removing={removingRaceId === row.athleteRaceId}

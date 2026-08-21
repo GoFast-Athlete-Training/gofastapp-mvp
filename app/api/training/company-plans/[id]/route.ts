@@ -36,12 +36,12 @@ export async function GET(
           distanceLabel: true,
         },
       },
-      athlete_goal: {
+      athlete_race: {
         select: {
           id: true,
           goalTime: true,
           goalRacePace: true,
-          distance: true,
+          goalDistance: true,
         },
       },
       training_plan_preset: true,
@@ -139,12 +139,12 @@ export async function PATCH(
             distanceLabel: true,
           },
         },
-        athlete_goal: {
+        athlete_race: {
           select: {
             id: true,
             goalTime: true,
             goalRacePace: true,
-            distance: true,
+            goalDistance: true,
           },
         },
         training_plan_preset: {

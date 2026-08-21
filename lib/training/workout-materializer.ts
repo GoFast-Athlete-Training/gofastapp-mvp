@@ -141,11 +141,11 @@ async function buildPrescriptionSteps(params: {
     ReturnType<
       typeof prisma.training_plans.findFirst<{
         include: {
-          athlete_goal: {
+          athlete_race: {
             select: {
               goalTime: true;
               goalRacePace: true;
-              distance: true;
+              goalDistance: true;
             };
           };
         };
@@ -211,14 +211,14 @@ async function buildPrescriptionSteps(params: {
 
   const anchorSecPerMile = anchorSecondsPerMileFromPlanPace(plan.currentFiveKPace ?? null);
   const goalFinishTime =
-    plan.athlete_goal?.goalTime?.trim() || plan.goalRaceTime?.trim() || null;
+    plan.athlete_race?.goalTime?.trim() || plan.goalRaceTime?.trim() || null;
   const racePaceSec = resolveGoalRacePace({
     goalTime: goalFinishTime,
-    dbGoalRacePaceSecPerMile: plan.athlete_goal?.goalRacePace ?? null,
+    dbGoalRacePaceSecPerMile: plan.athlete_race?.goalRacePace ?? null,
     planGoalRacePace: plan.goalRacePace ?? null,
     distanceMeters: race?.distanceMeters ?? null,
     distanceLabel: race?.distanceLabel ?? null,
-    goalDistance: plan.athlete_goal?.distance ?? null,
+    goalDistance: plan.athlete_race?.goalDistance ?? null,
   }).goalPaceSecPerMile;
 
   const paceProfile = parsePaceProfileFromJson(
@@ -251,11 +251,11 @@ export async function materializeWorkoutForPlanDay(params: {
   const plan = await prisma.training_plans.findFirst({
     where: { id: planId, athleteId },
     include: {
-      athlete_goal: {
+      athlete_race: {
         select: {
           goalTime: true,
           goalRacePace: true,
-          distance: true,
+          goalDistance: true,
         },
       },
       race_registry: {

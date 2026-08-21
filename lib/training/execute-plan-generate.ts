@@ -67,7 +67,6 @@ export async function executePlanGenerate(params: {
     where: { id: plan.id, athleteId },
     include: {
       athlete_race: true,
-      athlete_goal: { select: { goalTime: true, goalRacePace: true, distance: true } },
     },
   });
   if (!planRow) {
@@ -361,15 +360,15 @@ export async function executePlanGenerate(params: {
 
   const mergedGoalTime =
     planRow.goalRaceTime?.trim() ||
-    planRow.athlete_goal?.goalTime?.trim() ||
+    planRow.athlete_race?.goalTime?.trim() ||
     null;
   const resolvedGoalPace = resolveGoalRacePace({
     goalTime: mergedGoalTime,
-    dbGoalRacePaceSecPerMile: planRow.athlete_goal?.goalRacePace ?? null,
+    dbGoalRacePaceSecPerMile: planRow.athlete_race?.goalRacePace ?? null,
     planGoalRacePace: planRow.goalRacePace ?? null,
     distanceMeters: race.distanceMeters ?? null,
     distanceLabel: race.distanceLabel ?? null,
-    goalDistance: planRow.athlete_goal?.distance ?? null,
+    goalDistance: planRow.athlete_race?.goalDistance ?? null,
   });
   const imprintPace =
     resolvedGoalPace.goalPaceDisplay ??

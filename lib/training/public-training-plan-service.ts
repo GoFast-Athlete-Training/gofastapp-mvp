@@ -46,7 +46,7 @@ export type AdoptPublicPlanInput = {
   slug: string;
   athleteId: string;
   raceRegistryId: string;
-  athleteGoalId: string;
+  athleteRaceId: string;
   startDate: Date;
   fiveKPace?: string | null;
   weeklyMileage?: number | null;
@@ -448,7 +448,7 @@ export async function adoptPublicTrainingPlan(
 
   const athleteRace = await prisma.athlete_races.findFirst({
     where: {
-      id: input.athleteGoalId,
+      id: input.athleteRaceId,
       athleteId: input.athleteId,
       raceRegistryId: race.id,
     },
@@ -562,7 +562,6 @@ export async function adoptPublicTrainingPlan(
         id: randomUUID(),
         athleteId: input.athleteId,
         athleteRaceId: athleteRaceRow.id,
-        athleteGoalId: null,
         name: planName,
         startDate,
         totalWeeks,

@@ -32,7 +32,7 @@ export async function loadRaceInfoPacketsForAthlete(
 
   if (!race) return null;
 
-  const [signup, plan, goal] = await Promise.all([
+  const [signup, plan] = await Promise.all([
     prisma.athlete_races.findUnique({
       where: {
         athleteId_raceRegistryId: {
@@ -40,6 +40,7 @@ export async function loadRaceInfoPacketsForAthlete(
           raceRegistryId,
         },
       },
+      select: { goalTime: true },
     }),
     prisma.training_plans.findFirst({
       where: {
@@ -56,15 +57,6 @@ export async function loadRaceInfoPacketsForAthlete(
         goalRaceTime: true,
         race_registry: { select: { raceDate: true } },
       },
-    }),
-    prisma.athleteGoal.findFirst({
-      where: {
-        athleteId,
-        status: "ACTIVE",
-        athlete_race: { is: { raceRegistryId } },
-      },
-      orderBy: { updatedAt: "desc" },
-      select: { goalTime: true },
     }),
   ]);
 
@@ -110,7 +102,7 @@ export async function loadRaceInfoPacketsForAthlete(
       planName: plan?.name ?? null,
       weekNumber: weekCtx.weekNumber,
       totalWeeks: weekCtx.totalWeeks,
-      goalTime: goal?.goalTime?.trim() || plan?.goalRaceTime?.trim() || null,
+      goalTime: signup?.goalTime?.trim() || plan?.goalRaceTime?.trim() || null,
     },
   };
 
