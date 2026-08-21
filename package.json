@@ -32,7 +32,8 @@
     "db:fix-monday-race-totalweeks": "tsx scripts/fix-monday-race-totalweeks.ts",
     "verify:race-load-followups": "tsx scripts/verify-race-load-followups.ts",
     "reprocess:activity-segments": "tsx scripts/reprocess-activity-segment-execution.ts",
-    "test:sponsorship": "tsx --test lib/sponsorship/stripe-webhook-service.test.ts lib/sponsorship/company-finance-projection-client.test.ts lib/sponsorship/commitment-service.test.ts"
+    "test:sponsorship": "tsx --test lib/sponsorship/stripe-webhook-service.test.ts lib/sponsorship/company-finance-projection-client.test.ts lib/sponsorship/commitment-service.test.ts",
+    "test:athlete-races": "tsx --test lib/athlete-race-claim.test.ts lib/training/race-plan-calendar-service.test.ts"
   },
   "dependencies": {
     "@gofast/shared-db": "file:./packages/shared-db",

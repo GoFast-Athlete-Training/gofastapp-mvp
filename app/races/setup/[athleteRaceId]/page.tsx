@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
@@ -26,16 +26,12 @@ export default function RaceSetupPage({
   params: Promise<{ athleteRaceId: string }>;
 }) {
   const router = useRouter();
-  const [athleteRaceId, setAthleteRaceId] = useState<string | null>(null);
+  const { athleteRaceId } = use(params);
   const [athleteRace, setAthleteRace] = useState<AthleteRaceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [goal, setGoal] = useState<InlineGoalRow | null>(null);
-
-  useEffect(() => {
-    void params.then((p) => setAthleteRaceId(p.athleteRaceId));
-  }, [params]);
 
   const load = useCallback(async () => {
     if (!athleteRaceId) return;

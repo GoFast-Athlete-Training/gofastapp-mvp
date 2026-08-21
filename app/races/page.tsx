@@ -295,7 +295,7 @@ export default function MyRacesPage() {
     setLoading(true);
     try {
       const suRes = await api.get<{ signups?: ApiAthleteRace[]; athleteRaces?: ApiAthleteRace[] }>(
-        "/race-signups"
+        "/athlete-races"
       );
       const raw = suRes.data.athleteRaces ?? suRes.data.signups ?? [];
       setMyRaces(raw.map(normalizeAthleteRace));
@@ -351,7 +351,7 @@ export default function MyRacesPage() {
   async function onRemove(athleteRaceId: string) {
     setRemovingRaceId(athleteRaceId);
     try {
-      await api.delete(`/race-signups/${athleteRaceId}`);
+      await api.delete(`/athlete-races/${athleteRaceId}`);
       setMyRaces((prev) => prev.filter((r) => r.athleteRaceId !== athleteRaceId));
     } catch (e) {
       console.error(e);

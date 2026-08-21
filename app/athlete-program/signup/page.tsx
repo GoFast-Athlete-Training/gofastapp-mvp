@@ -185,11 +185,22 @@ export default function AthleteProgramSignupPage() {
               GoFast Amateur Athlete Program
             </p>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              {authMode === 'signup' ? 'Create your GoFast account' : 'Sign in to continue'}
+              {authMode === 'signup' ? 'Join GoFast' : 'Welcome back'}
             </h1>
-            <p className="text-sm text-gray-600">
-              After signup you&apos;ll finish your athlete profile, then enter GoFast With Me to build your community.
+            <p className="text-sm text-gray-600 leading-relaxed">
+              {authMode === 'signup'
+                ? 'Create your free GoFast account to start the Amateur Athlete Program — training, runs, and your own GoFast With Me community, all in one app.'
+                : 'Sign in with your GoFast account to pick up where you left off in the Amateur Athlete Program.'}
             </p>
+          </div>
+
+          <div className="mb-6 rounded-xl border border-orange-100 bg-orange-50/80 px-4 py-3 text-left text-sm text-gray-700">
+            <p className="font-semibold text-gray-900 mb-2">What happens after you join</p>
+            <ol className="space-y-1.5 list-decimal list-inside text-gray-600">
+              <li>Set up your athlete profile and @handle</li>
+              <li>Enter GoFast With Me and build your public page</li>
+              <li>Share your link and grow your following</li>
+            </ol>
           </div>
 
           {error ? (
@@ -206,7 +217,7 @@ export default function AthleteProgramSignupPage() {
                 disabled={loading}
                 className="w-full flex items-center justify-center gap-3 rounded-xl border-2 border-gray-300 bg-white px-6 py-3 font-semibold text-gray-900 hover:bg-gray-50 disabled:opacity-50"
               >
-                {loading ? 'Working…' : 'Continue with Google'}
+                {loading ? 'Joining…' : 'Join with Google'}
               </button>
               <button
                 type="button"
@@ -214,7 +225,7 @@ export default function AthleteProgramSignupPage() {
                 disabled={loading}
                 className="w-full rounded-xl bg-orange-500 px-6 py-3 font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
               >
-                Continue with email
+                Join with email
               </button>
               <button
                 type="button"
@@ -225,8 +236,8 @@ export default function AthleteProgramSignupPage() {
                 className="w-full text-sm text-gray-600 hover:text-gray-900"
               >
                 {authMode === 'signup'
-                  ? 'Already have an account? Sign in'
-                  : 'Need an account? Sign up'}
+                  ? 'Already on GoFast? Sign in'
+                  : 'New to GoFast? Create an account'}
               </button>
             </div>
           ) : (
@@ -292,7 +303,11 @@ export default function AthleteProgramSignupPage() {
                   disabled={loading}
                   className="flex-1 rounded-xl bg-orange-500 py-3 font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
                 >
-                  {loading ? 'Working…' : authMode === 'signup' ? 'Sign up' : 'Sign in'}
+                  {loading
+                    ? 'Joining…'
+                    : authMode === 'signup'
+                      ? 'Join GoFast'
+                      : 'Sign in'}
                 </button>
               </div>
             </form>

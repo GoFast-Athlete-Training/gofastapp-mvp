@@ -142,7 +142,7 @@ export default function RaceHubJoinConfirmPage() {
     setJoinError(null);
 
     try {
-      await api.post("/race-signups", { raceRegistryId: race.id });
+      await api.post("/athlete-races", { raceRegistryId: race.id });
 
       localStorage.removeItem(RACE_HUB_JOIN_INTENT_KEY);
       localStorage.removeItem(RACE_HUB_JOIN_INTENT_SLUG_KEY);
