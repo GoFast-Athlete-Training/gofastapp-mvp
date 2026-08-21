@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -11,7 +11,7 @@ import { clubManagerActivatePath, clubManagerHubPath } from '@/lib/club-manager-
 
 type ProfileStep = 'intro' | 'form' | 'success';
 
-export default function AthleteCreateProfilePage() {
+function AthleteCreateProfileInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectParam = searchParams?.get('redirect')?.trim() ?? null;
@@ -539,5 +539,19 @@ export default function AthleteCreateProfilePage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function AthleteCreateProfilePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
+        </div>
+      }
+    >
+      <AthleteCreateProfileInner />
+    </Suspense>
   );
 }
