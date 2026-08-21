@@ -5,7 +5,13 @@ import {
   finalizePaidCommitment,
   getCommitmentById,
 } from "@/lib/sponsorship/commitment-service";
-import { SponsorCommitmentPaymentStatus, type sponsor_commitments } from "@prisma/client";
+import { loadPaymentIntentDetails } from "@/lib/sponsorship/payment-intent-details";
+import {
+  SponsorCommitmentPaymentLifecycle,
+  SponsorCommitmentPaymentStatus,
+  type sponsor_commitments,
+} from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import type Stripe from "stripe";
 
 export class StripeWebhookValidationError extends Error {
@@ -87,6 +93,42 @@ export type BrandPartnershipCheckoutResult = {
   sponsorCommitmentId?: string;
 };
 
+export async function handleBrandPartnershipChargeRefunded(
+  event: Stripe.Event,
+  charge: Stripe.Charge,
+): Promise<{ handled: boolean }> {
+  const metadata = charge.metadata ?? {};
+  if (metadata.type !== "brand_partnership") {
+    return { handled: false };
+  }
+
+  const sponsorCommitmentId = metadata.sponsorCommitmentId?.trim();
+  if (!sponsorCommitmentId) {
+    throw new StripeWebhookValidationError("Missing sponsorCommitmentId metadata on refund");
+  }
+
+  await prisma.sponsor_commitments.updateMany({
+    where: {
+      id: sponsorCommitmentId,
+      paymentStatus: SponsorCommitmentPaymentStatus.PAID,
+    },
+    data: {
+      paymentStatus: SponsorCommitmentPaymentStatus.REFUNDED,
+      updatedAt: new Date(),
+    },
+  });
+
+  await prisma.sponsor_commitment_payments.updateMany({
+    where: { sponsorCommitmentId },
+    data: {
+      lifecycle: SponsorCommitmentPaymentLifecycle.REFUNDED,
+      updatedAt: new Date(),
+    },
+  });
+
+  return { handled: true };
+}
+
 export async function handleBrandPartnershipCheckoutCompleted(
   event: Stripe.Event,
   session: Stripe.Checkout.Session,
@@ -104,11 +146,18 @@ export async function handleBrandPartnershipCheckoutCompleted(
   validateCommitmentAgainstCheckoutSession(commitment, session);
 
   const amountPaidCents = session.amount_total ?? 0;
+  const paymentIntentId = resolvePaymentIntentId(session);
+  const chargeDetails = await loadPaymentIntentDetails(paymentIntentId);
+
   const { commitment: activatedCommitment, newlyActivated } = await finalizePaidCommitment({
     commitmentId: sponsorCommitmentId,
     amountPaidCents,
     stripeCheckoutSessionId: session.id,
-    stripePaymentIntentId: resolvePaymentIntentId(session),
+    stripePaymentIntentId: paymentIntentId,
+    stripeChargeId: chargeDetails.chargeId,
+    stripeTransferId: chargeDetails.transferId,
+    stripeApplicationFeeId: chargeDetails.applicationFeeId,
+    stripeProcessingFeeCents: chargeDetails.processingFeeCents,
     paidAt: new Date(),
   });
 

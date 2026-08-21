@@ -1,6 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { sendAppNotification } from "@/lib/app-notifications/send";
 import {
+  AthletePayoutSetupRequiredError,
+  requireAthletePayoutDestination,
+} from "@/lib/sponsorship/athlete-stripe-connect-service";
+import {
+  attachCheckoutSessionToPayment,
+  createCheckoutPendingPayment,
+  finalizeCommitmentPayment,
+} from "@/lib/sponsorship/commitment-payment-service";
+import {
   getCandidateForPurchase,
   validateCandidatePurchaseIdentity,
 } from "@/lib/sponsorship/candidate-service";
@@ -29,6 +38,12 @@ export type CreateCheckoutPendingInput = {
   currency?: string;
   athleteShareCents?: number | null;
   platformShareCents?: number | null;
+  stripeBrandCustomerId?: string | null;
+  stripeConnectAccountId?: string | null;
+  payoutConfigKey?: string | null;
+  payoutConfigVersion?: number | null;
+  athleteSharePercent?: number | null;
+  platformSharePercent?: number | null;
   stripeCheckoutSessionId?: string | null;
 };
 
@@ -37,6 +52,10 @@ export type FinalizePaidInput = {
   amountPaidCents: number;
   stripeCheckoutSessionId?: string | null;
   stripePaymentIntentId?: string | null;
+  stripeChargeId?: string | null;
+  stripeTransferId?: string | null;
+  stripeApplicationFeeId?: string | null;
+  stripeProcessingFeeCents?: number | null;
   paidAt?: Date;
 };
 
@@ -114,7 +133,27 @@ export async function createCheckoutPendingCommitment(
     throw new Error("Candidate already has an overlapping paid commitment");
   }
 
-  return prisma.sponsor_commitments.create({
+  const athleteConnectAccountId = await requireAthletePayoutDestination(candidate.athleteId);
+
+  if (
+    input.stripeConnectAccountId?.trim() &&
+    input.stripeConnectAccountId.trim() !== athleteConnectAccountId
+  ) {
+    throw new Error("Athlete payout destination mismatch");
+  }
+
+  if (!input.payoutConfigKey?.trim() || typeof input.payoutConfigVersion !== "number") {
+    throw new Error("Payout config snapshot is required");
+  }
+  if (
+    typeof input.athleteSharePercent !== "number" ||
+    typeof input.platformSharePercent !== "number" ||
+    input.athleteSharePercent + input.platformSharePercent !== 100
+  ) {
+    throw new Error("Invalid payout split snapshot");
+  }
+
+  const commitment = await prisma.sponsor_commitments.create({
     data: {
       candidateId: candidate.id,
       candidateCodeSnapshot: candidate.code,
@@ -133,17 +172,42 @@ export async function createCheckoutPendingCommitment(
       currency: input.currency ?? "usd",
       athleteShareCents: input.athleteShareCents ?? null,
       platformShareCents: input.platformShareCents ?? null,
+      stripeBrandCustomerId: input.stripeBrandCustomerId ?? null,
+      stripeConnectAccountId: athleteConnectAccountId,
+      payoutConfigKey: input.payoutConfigKey.trim(),
+      payoutConfigVersion: input.payoutConfigVersion,
+      athleteSharePercent: input.athleteSharePercent,
+      platformSharePercent: input.platformSharePercent,
       paymentStatus: SponsorCommitmentPaymentStatus.CHECKOUT_PENDING,
       status: SponsorCommitmentStatus.DRAFT,
       stripeCheckoutSessionId: input.stripeCheckoutSessionId ?? null,
     },
   });
+
+  await createCheckoutPendingPayment({
+    sponsorCommitmentId: commitment.id,
+    stripeBrandCustomerId: input.stripeBrandCustomerId ?? null,
+    stripeConnectAccountId: athleteConnectAccountId,
+    grossAmountCents: input.quotedAmountCents,
+    athleteShareCents: input.athleteShareCents ?? 0,
+    platformShareCents: input.platformShareCents ?? 0,
+    currency: input.currency ?? "usd",
+    payoutConfigKey: input.payoutConfigKey.trim(),
+    payoutConfigVersion: input.payoutConfigVersion,
+    athleteSharePercent: input.athleteSharePercent,
+    platformSharePercent: input.platformSharePercent,
+    stripeCheckoutSessionId: input.stripeCheckoutSessionId ?? null,
+  });
+
+  return commitment;
 }
 
 export async function attachCheckoutSessionToCommitment(
   commitmentId: string,
   stripeCheckoutSessionId: string,
 ): Promise<sponsor_commitments> {
+  await attachCheckoutSessionToPayment(commitmentId, stripeCheckoutSessionId);
+
   return prisma.sponsor_commitments.update({
     where: { id: commitmentId },
     data: {
@@ -202,6 +266,20 @@ export async function finalizePaidCommitment(
     },
     include: { candidate: true },
   });
+
+  if (input.stripeCheckoutSessionId) {
+    await finalizeCommitmentPayment({
+      sponsorCommitmentId: existing.id,
+      stripeCheckoutSessionId: input.stripeCheckoutSessionId,
+      stripePaymentIntentId: input.stripePaymentIntentId ?? null,
+      stripeChargeId: input.stripeChargeId ?? null,
+      stripeTransferId: input.stripeTransferId ?? null,
+      stripeApplicationFeeId: input.stripeApplicationFeeId ?? null,
+      stripeProcessingFeeCents: input.stripeProcessingFeeCents ?? null,
+      paidAt,
+      transferredAt: input.stripeTransferId ? paidAt : null,
+    });
+  }
 
   await notifyAthleteOfNewSponsorship(updated);
 
@@ -439,4 +517,4 @@ export async function activateStartedSponsorCommitments(now = new Date()): Promi
   return result.count;
 }
 
-export { deriveRuntimeStatus };
+export { deriveRuntimeStatus, AthletePayoutSetupRequiredError };

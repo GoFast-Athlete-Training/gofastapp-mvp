@@ -3,6 +3,8 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebaseAdmin";
 import { fetchAthleteSpendEarningsFromCompany } from "@/lib/advertising/company-platform-client";
+import { fetchAthleteSponsorshipEarningsFromSponsorManage } from "@/lib/advertising/sponsor-manage-client";
+import { getAthleteConnectStatus } from "@/lib/sponsorship/athlete-stripe-connect-service";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -40,17 +42,19 @@ export async function GET(request: Request) {
     const days = daysRaw ? Number.parseInt(daysRaw, 10) : 30;
     const windowDays = Number.isFinite(days) ? days : 30;
 
-    const earnings = await fetchAthleteSpendEarningsFromCompany(
-      athlete.id,
-      authHeader,
-      windowDays
-    );
+    const [spendEarnings, sponsorshipEarnings, connectStatus] = await Promise.all([
+      fetchAthleteSpendEarningsFromCompany(athlete.id, authHeader, windowDays),
+      fetchAthleteSponsorshipEarningsFromSponsorManage(athlete.id, authHeader),
+      getAthleteConnectStatus(athlete),
+    ]);
 
     return NextResponse.json({
       success: true,
       eligible: true,
       handle: athlete.gofastHandle,
-      earnings,
+      earnings: spendEarnings,
+      sponsorshipEarnings,
+      connectStatus,
     });
   } catch (error: unknown) {
     console.error("[me/advertising-earnings]", error);

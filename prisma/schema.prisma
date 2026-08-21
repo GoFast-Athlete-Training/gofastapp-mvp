@@ -113,6 +113,13 @@ model Athlete {
   avgWeeklyMilesSnapshot  Float?
   /// When avgWeeklyMilesSnapshot was last written by the mileage cron.
   mileageSnapshotUpdatedAt DateTime?
+  /// Stripe Express Connect — athlete sponsorship payout destination.
+  stripeConnectAccountId        String?   @map("stripe_connect_account_id")
+  stripeConnectChargesEnabled     Boolean   @default(false) @map("stripe_connect_charges_enabled")
+  stripeConnectPayoutsEnabled     Boolean   @default(false) @map("stripe_connect_payouts_enabled")
+  stripeConnectDetailsSubmitted   Boolean   @default(false) @map("stripe_connect_details_submitted")
+  stripeConnectRequirementsJson   Json?     @map("stripe_connect_requirements_json")
+  stripeConnectOnboardedAt        DateTime? @map("stripe_connect_onboarded_at")
   /// Club Manager UX state — welcomed clubs (first-ack), not membership authority.
   clubManagerState        Json?
   go_fast_companies       go_fast_companies        @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -145,7 +152,6 @@ model Athlete {
   bike_workouts           bike_workout[]
   swim_workouts           swim_workout[]
   tri_workouts            tri_workout[]
-  athlete_goals           AthleteGoal[]
   athlete_races           athlete_races[]
   athlete_race_results    athlete_race_results[]
   race_memberships        race_memberships[]
@@ -199,6 +205,14 @@ enum SponsorCommitmentStatus {
   CANCELED
 }
 
+enum SponsorCommitmentPaymentLifecycle {
+  CHECKOUT_PENDING
+  PAID
+  TRANSFERRED
+  REFUNDED
+  FAILED
+}
+
 /// Athlete (or future surface) eligible for Brand Partnerships inventory.
 model sponsorship_candidates {
   id                 String                     @id @default(uuid())
@@ -244,6 +258,12 @@ model sponsor_commitments {
   currency                String                         @default("usd")
   athleteShareCents       Int?
   platformShareCents      Int?
+  stripeBrandCustomerId   String?
+  stripeConnectAccountId  String?
+  payoutConfigKey         String?
+  payoutConfigVersion     Int?
+  athleteSharePercent     Int?
+  platformSharePercent    Int?
   paymentStatus           SponsorCommitmentPaymentStatus @default(UNPAID)
   status                  SponsorCommitmentStatus          @default(DRAFT)
   stripeCheckoutSessionId String?                        @unique
@@ -253,6 +273,7 @@ model sponsor_commitments {
   updatedAt               DateTime                       @updatedAt
 
   candidate sponsorship_candidates @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  payments  sponsor_commitment_payments[]
 
   @@index([candidateId, status])
   @@index([candidateId, startsAt, endsAt])
@@ -260,6 +281,39 @@ model sponsor_commitments {
   @@index([paymentStatus])
   @@index([brandId])
   @@map("sponsor_commitments")
+}
+
+/// Commitment-scoped payment/transaction record (mirrors run_program_registration_success_payments).
+model sponsor_commitment_payments {
+  id                       String                            @id @default(uuid())
+  sponsorCommitmentId      String
+  stripeBrandCustomerId    String?
+  stripeCheckoutSessionId  String?                           @unique
+  stripePaymentIntentId    String?                           @unique
+  stripeChargeId           String?                           @unique
+  stripeTransferId         String?
+  stripeApplicationFeeId   String?
+  stripeProcessingFeeCents Int?
+  stripeConnectAccountId   String?
+  grossAmountCents         Int
+  athleteShareCents        Int
+  platformShareCents       Int
+  currency                 String                            @default("usd")
+  payoutConfigKey          String?
+  payoutConfigVersion      Int?
+  athleteSharePercent      Int?
+  platformSharePercent     Int?
+  lifecycle                SponsorCommitmentPaymentLifecycle @default(CHECKOUT_PENDING)
+  paidAt                   DateTime?
+  transferredAt            DateTime?
+  createdAt                DateTime                          @default(now())
+  updatedAt                DateTime                          @updatedAt
+
+  commitment sponsor_commitments @relation(fields: [sponsorCommitmentId], references: [id], onDelete: Cascade)
+
+  @@index([sponsorCommitmentId])
+  @@index([lifecycle])
+  @@map("sponsor_commitment_payments")
 }
 
 /// Athlete-scoped GoFast With Me — public invite identity (not the human Athlete profile).
@@ -691,36 +745,6 @@ model race_registry_course_segments {
   @@index([raceRegistryId])
 }
 
-/// Universal athlete goal (1:N). Goal paces derived and stored on create/update.
-model AthleteGoal {
-  id               String         @id @default(cuid())
-  athleteId        String
-  name             String?
-  description      String?        @db.Text
-  distance         String
-  goalTime         String?
-  goalRacePace     Int?
-  goalPace5K       Int?
-  targetByDate     DateTime
-  athleteRaceId    String?
-  status           String         @default("ACTIVE")
-  whyGoal          String?        @db.Text
-  successLooksLike String?        @db.Text
-  completionFeeling String?     @db.Text
-  motivationIcon   String?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  Athlete          Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  athlete_race     athlete_races? @relation(fields: [athleteRaceId], references: [id], onDelete: SetNull)
-  training_plans   training_plans[]
-  athlete_race_results athlete_race_results[]
-
-  @@index([athleteId])
-  @@index([athleteId, status])
-  @@index([athleteRaceId])
-  @@map("athlete_goals")
-}
-
 /// Athlete's claimed race snapshot — working set for training (origin: race_registry).
 model athlete_races {
   id               String   @id @default(cuid())
@@ -757,7 +781,6 @@ model athlete_races {
   race_registry             race_registry               @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
   athlete_race_result       athlete_race_results?
   training_plans            training_plans[]            @relation("PlanAthleteRace")
-  athlete_goals             AthleteGoal[]
 
   @@unique([athleteId, raceRegistryId])
   @@index([athleteId])
@@ -772,14 +795,13 @@ model athlete_race_results {
   athleteId              String
   raceRegistryId         String
   athleteRaceId          String?  @unique
-  goalId                 String?  @unique
   /// Primary display time — chip or net when that is the official "finish" (string "H:MM:SS" or "MM:SS").
   officialFinishTime     String?
   chipTime               String?
   gunTime                String?
   /// Net finish in seconds (for goal / PR analysis).
   finishTimeSeconds      Int?
-  /// Goal time in seconds (snapshot from AthleteGoal.goalTime at log time).
+  /// Goal time in seconds (snapshot from athlete_races.goalTime at log time).
   goalTimeSeconds        Int?
   /// finishTimeSeconds - goalTimeSeconds; negative = beat goal (faster).
   goalTimeDeltaSeconds   Int?
@@ -810,13 +832,11 @@ model athlete_race_results {
   Athlete              Athlete            @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   race_registry        race_registry      @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
   athlete_race         athlete_races?        @relation(fields: [athleteRaceId], references: [id], onDelete: SetNull)
-  athlete_goal         AthleteGoal?        @relation(fields: [goalId], references: [id], onDelete: SetNull)
   athlete_activity     athlete_activities?  @relation(fields: [garminActivityId], references: [id], onDelete: SetNull)
 
   @@unique([athleteId, raceRegistryId])
   @@index([athleteId])
   @@index([raceRegistryId])
-  @@index([goalId])
   @@map("athlete_race_results")
 }
 
@@ -1953,7 +1973,6 @@ model training_plans {
   athleteRaceMainSnap  Json?
   /// Frozen in-window context races (before terminal) at plan create / reassignment / generation.
   athleteRaceAlongWaySnaps Json?
-  athleteGoalId        String?
   /// Optional link to the training cohort this plan was created through
   cohortId             String?
   /// Optional link to a training_plan_preset; null = generation uses hardcoded defaults
@@ -2011,14 +2030,12 @@ model training_plans {
   Athlete              Athlete                @relation(fields: [athleteId], references: [id])
   race_registry        race_registry?         @relation(fields: [raceId], references: [id])
   athlete_race         athlete_races?         @relation("PlanAthleteRace", fields: [athleteRaceId], references: [id], onDelete: SetNull)
-  athlete_goal         AthleteGoal?           @relation(fields: [athleteGoalId], references: [id], onDelete: SetNull)
   pace_adjustment_logs pace_adjustment_log[]
   training_plan_preset training_plan_preset? @relation(fields: [presetId], references: [id])
   training_cohort      training_cohorts?     @relation(fields: [cohortId], references: [id], onDelete: SetNull)
   cohort_membership    training_cohort_memberships?
   public_training_plans_as_source public_training_plans[] @relation("PublicPlanSource")
   plan_custom_workouts plan_custom_workouts[]
-  @@index([athleteGoalId])
   @@index([athleteRaceId])
   @@index([athleteId, lifecycleStatus])
   @@index([presetId])

@@ -7,6 +7,7 @@ import {
 } from "@/lib/sponsorship/brand-partnership-auth";
 import {
   attachCheckoutSessionToCommitment,
+  AthletePayoutSetupRequiredError,
   createCheckoutPendingCommitment,
   listCommitmentsForBrand,
 } from "@/lib/sponsorship/commitment-service";
@@ -30,6 +31,11 @@ type CreateCommitmentBody = {
   currency?: string;
   athleteShareCents?: number;
   platformShareCents?: number;
+  stripeBrandCustomerId?: string;
+  payoutConfigKey?: string;
+  payoutConfigVersion?: number;
+  athleteSharePercent?: number;
+  platformSharePercent?: number;
   stripeCheckoutSessionId?: string;
 };
 
@@ -114,6 +120,11 @@ export async function POST(request: NextRequest) {
       currency: body.currency,
       athleteShareCents: body.athleteShareCents ?? null,
       platformShareCents: body.platformShareCents ?? null,
+      stripeBrandCustomerId: body.stripeBrandCustomerId ?? null,
+      payoutConfigKey: body.payoutConfigKey ?? null,
+      payoutConfigVersion: body.payoutConfigVersion ?? null,
+      athleteSharePercent: body.athleteSharePercent ?? null,
+      platformSharePercent: body.platformSharePercent ?? null,
       stripeCheckoutSessionId: body.stripeCheckoutSessionId ?? null,
     });
 
@@ -135,9 +146,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Commitment creation failed";
     const status =
+      error instanceof AthletePayoutSetupRequiredError ||
       message.includes("not eligible") ||
       message.includes("overlapping") ||
-      message.includes("mismatch")
+      message.includes("mismatch") ||
+      message.includes("Payout config") ||
+      message.includes("payout")
         ? 409
         : 500;
     console.error("POST /api/sponsor-commitments:", error);

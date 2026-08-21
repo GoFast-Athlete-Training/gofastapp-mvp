@@ -4,6 +4,7 @@ import {
   CompanyFinanceProjectionError,
 } from "@/lib/sponsorship/company-finance-projection-client";
 import {
+  handleBrandPartnershipChargeRefunded,
   handleBrandPartnershipCheckoutCompleted,
   StripeWebhookValidationError,
 } from "@/lib/sponsorship/stripe-webhook-service";
@@ -43,18 +44,24 @@ export async function POST(request: Request) {
   }
 
   try {
-    if (event.type !== "checkout.session.completed") {
-      return NextResponse.json({ received: true, ignored: true, eventType: event.type });
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const result = await handleBrandPartnershipCheckoutCompleted(event, session);
+
+      return NextResponse.json({
+        received: true,
+        handled: result.handled,
+        newlyActivated: result.newlyActivated,
+      });
     }
 
-    const session = event.data.object as Stripe.Checkout.Session;
-    const result = await handleBrandPartnershipCheckoutCompleted(event, session);
+    if (event.type === "charge.refunded") {
+      const charge = event.data.object as Stripe.Charge;
+      const result = await handleBrandPartnershipChargeRefunded(event, charge);
+      return NextResponse.json({ received: true, handled: result.handled, eventType: event.type });
+    }
 
-    return NextResponse.json({
-      received: true,
-      handled: result.handled,
-      newlyActivated: result.newlyActivated,
-    });
+    return NextResponse.json({ received: true, ignored: true, eventType: event.type });
   } catch (error: unknown) {
     if (error instanceof StripeWebhookValidationError) {
       console.warn("STRIPE WEBHOOK: validation failed:", error.message);
