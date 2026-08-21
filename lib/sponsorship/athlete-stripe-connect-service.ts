@@ -8,6 +8,22 @@ import {
 import type { Athlete } from "@prisma/client";
 import Stripe from "stripe";
 
+type AthleteConnectStatusSource = AthleteConnectSnapshot & {
+  stripeConnectOnboardedAt: Date | null;
+};
+
+/** Prisma select for routes that hydrate connect readiness without loading full Athlete rows. */
+export const athleteConnectStatusSelect = {
+  stripeConnectAccountId: true,
+  stripeConnectChargesEnabled: true,
+  stripeConnectPayoutsEnabled: true,
+  stripeConnectDetailsSubmitted: true,
+  stripeConnectRequirementsJson: true,
+  stripeConnectOnboardedAt: true,
+} as const;
+
+export type { AthleteConnectStatusSource };
+
 function getStripe(): Stripe {
   const secretKey = process.env.STRIPE_SECRET_KEY;
   if (!secretKey) throw new Error("STRIPE_SECRET_KEY is not configured");
@@ -21,7 +37,7 @@ export class AthletePayoutSetupRequiredError extends Error {
   }
 }
 
-function athleteConnectSnapshot(athlete: Athlete): AthleteConnectSnapshot {
+function athleteConnectSnapshot(athlete: AthleteConnectSnapshot): AthleteConnectSnapshot {
   return {
     stripeConnectAccountId: athlete.stripeConnectAccountId,
     stripeConnectChargesEnabled: athlete.stripeConnectChargesEnabled,
@@ -143,7 +159,7 @@ export async function createAthleteConnectAccountSession(input: {
   return session.client_secret;
 }
 
-export async function getAthleteConnectStatus(athlete: Athlete | null) {
+export async function getAthleteConnectStatus(athlete: AthleteConnectStatusSource | null) {
   if (!athlete) {
     return {
       ready: false,

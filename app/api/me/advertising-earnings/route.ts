@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebaseAdmin";
 import { fetchAthleteSpendEarningsFromCompany } from "@/lib/advertising/company-platform-client";
 import { fetchAthleteSponsorshipEarningsFromSponsorManage } from "@/lib/advertising/sponsor-manage-client";
-import { getAthleteConnectStatus } from "@/lib/sponsorship/athlete-stripe-connect-service";
+import { getAthleteConnectStatus, athleteConnectStatusSelect } from "@/lib/sponsorship/athlete-stripe-connect-service";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -21,7 +21,12 @@ export async function GET(request: Request) {
     const decoded = await adminAuth.verifyIdToken(authHeader.substring(7));
     const athlete = await prisma.athlete.findFirst({
       where: { firebaseId: decoded.uid },
-      select: { id: true, isGoFastContainer: true, gofastHandle: true },
+      select: {
+        id: true,
+        isGoFastContainer: true,
+        gofastHandle: true,
+        ...athleteConnectStatusSelect,
+      },
     });
 
     if (!athlete) {
