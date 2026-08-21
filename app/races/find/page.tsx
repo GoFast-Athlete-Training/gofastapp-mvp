@@ -331,17 +331,17 @@ export default function RacesFindPage() {
                 Get Ready →
               </Link>
               <span className="inline-flex items-center rounded-full bg-green-50 text-green-800 text-xs font-medium px-3 py-1">
-                On my calendar
+                In My Races
               </span>
             </>
           ) : (
             <button
               type="button"
               disabled={busy}
-              onClick={() => onAddToCalendar(race.id)}
+              onClick={() => void onClaimRace(race.id)}
               className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white text-sm font-medium px-4 py-2"
             >
-              {busy ? "Saving…" : "Add to my race calendar"}
+              {busy ? "Saving…" : "I'm running this race"}
             </button>
           )}
           {registrationClosed && registrationStatusLabel ? (
@@ -355,8 +355,9 @@ export default function RacesFindPage() {
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-sm text-orange-600 font-medium hover:underline"
+              title="Official race registration — separate from adding to My Races"
             >
-              Register
+              Register with organizer
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           ) : null}
@@ -385,13 +386,29 @@ export default function RacesFindPage() {
       if (addId && !addIntentHandled.current) {
         addIntentHandled.current = true;
         void (async () => {
-          await onAddToCalendar(addId);
-          router.replace("/races");
+          setSubmittingRaceId(addId);
+          try {
+            const { data } = await api.post<{
+              athleteRace?: AthleteRaceRow;
+              signup?: AthleteRaceRow;
+            }>("/athlete-races", { raceRegistryId: addId });
+            const athleteRace = data.athleteRace ?? data.signup;
+            if (athleteRace?.id) {
+              router.replace(`/races/setup/${encodeURIComponent(athleteRace.id)}`);
+            } else {
+              router.replace("/races/find");
+            }
+          } catch (e) {
+            console.error(e);
+            router.replace("/races/find");
+          } finally {
+            setSubmittingRaceId(null);
+          }
         })();
       }
     });
     return () => unsub();
-  }, [router, onAddToCalendar]);
+  }, [router]);
 
   return (
     <div>
@@ -399,7 +416,8 @@ export default function RacesFindPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Find a race</h1>
           <p className="text-gray-600 text-sm mt-1 max-w-xl">
-            Add a race to your calendar, then set your goal from your race page.{" "}
+            Select a race you&apos;re running — we&apos;ll add it to My Races, then you can set a
+            goal or skip for now.{" "}
             <Link href="/races" className="text-orange-600 font-medium hover:underline">
               My Races
             </Link>
