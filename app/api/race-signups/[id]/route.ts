@@ -76,7 +76,7 @@ export async function DELETE(
           {
             error:
               "This race is tied to your active training plan. Confirm to delete the plan and remove the race.",
-            activePlanId: result.activePlanId,
+            trainingPlanId: result.trainingPlanId,
             requiresPlanDelete: true,
           },
           { status: 409 }

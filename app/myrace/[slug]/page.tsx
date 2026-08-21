@@ -48,6 +48,8 @@ type Signup = {
   id: string;
   raceRegistryId: string;
   isPrimaryRace?: boolean;
+  trainingPlanId?: string | null;
+  goalTime?: string | null;
 };
 
 type GoalRow = {
@@ -162,6 +164,7 @@ export default function MyRacePage() {
   const [makeGoalError, setMakeGoalError] = useState<string | null>(null);
   const [goalExpanded, setGoalExpanded] = useState(false);
   const [activePlanSummary, setActivePlanSummary] = useState<ActivePlanSummary | null>(null);
+  const [trainingPlanId, setTrainingPlanId] = useState<string | null>(null);
   const [nextSession, setNextSession] = useState<UpcomingSession | null>(null);
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
   const [removingGoal, setRemovingGoal] = useState(false);
@@ -292,13 +295,17 @@ export default function MyRacePage() {
         setGoal(g);
 
         const plans = plansRes.data.plans ?? [];
-        const planForGoal = g?.id
-          ? plans.find((p) => p.athleteRaceId === g.id) ?? null
+        const athleteRaceId = su?.id ?? null;
+        const planForRace = athleteRaceId
+          ? plans.find((p) => p.athleteRaceId === athleteRaceId) ?? null
           : null;
+        const resolvedTrainingPlanId =
+          su?.trainingPlanId ?? planForRace?.id ?? null;
+        setTrainingPlanId(resolvedTrainingPlanId);
 
         const summary = upcomingRes.data.activePlanSummary ?? null;
         const sessions = upcomingRes.data.sessions ?? [];
-        if (planForGoal && summary) {
+        if (resolvedTrainingPlanId && summary) {
           setActivePlanSummary(summary);
           setNextSession(sessions[0] ?? null);
         } else {
@@ -313,6 +320,7 @@ export default function MyRacePage() {
       } catch {
         setSignup(null);
         setGoal(null);
+        setTrainingPlanId(null);
         setActivePlanSummary(null);
         setNextSession(null);
       } finally {
@@ -404,8 +412,10 @@ export default function MyRacePage() {
 
   const locationText = [race.city, race.state].filter(Boolean).join(", ") || null;
   const isGoalRace = Boolean(signup?.isPrimaryRace);
+  const hasPlanForRace = Boolean(trainingPlanId);
   const hasSignup = Boolean(signup);
-  const goalTimeDisplay = goal?.goalTime?.trim() || null;
+  const goalTimeDisplay =
+    goal?.goalTime?.trim() || signup?.goalTime?.trim() || null;
   const resolvedGoalRacePace = resolveGoalRacePace({
     goalTime: goal?.goalTime,
     dbGoalRacePaceSecPerMile: goal?.goalRacePace ?? null,
@@ -474,13 +484,14 @@ export default function MyRacePage() {
         </div>
       ) : (
         <>
-          {isGoalRace ? (
+          {hasPlanForRace || isGoalRace ? (
             <section className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white p-5 shadow-sm">
               <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-900 flex items-center gap-2">
                 <Zap className="w-4 h-4" />
                 Training
               </h2>
-              {activePlanSummary?.hasSchedule &&
+              {hasPlanForRace &&
+              activePlanSummary?.hasSchedule &&
               activePlanSummary.weekNumber != null &&
               activePlanSummary.totalWeeks != null ? (
                 <>
@@ -502,6 +513,18 @@ export default function MyRacePage() {
                     View full plan →
                   </Link>
                 </>
+              ) : hasPlanForRace ? (
+                <>
+                  <p className="mt-2 text-sm text-gray-800">
+                    You already have a training plan for this race — finish setup or review your schedule.
+                  </p>
+                  <Link
+                    href={`/training-setup/${encodeURIComponent(trainingPlanId!)}`}
+                    className="mt-4 inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                  >
+                    View plan →
+                  </Link>
+                </>
               ) : goalTimeDisplay ? (
                 <>
                   <p className="mt-2 text-sm text-gray-800">
@@ -509,7 +532,7 @@ export default function MyRacePage() {
                     build the plan to get race-ready.
                   </p>
                   <Link
-                    href={`/training-setup?goalId=${encodeURIComponent(goal!.id)}`}
+                    href={`/training-setup?athleteRaceId=${encodeURIComponent(signup!.id)}`}
                     className="mt-4 inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
                   >
                     Build a training plan →

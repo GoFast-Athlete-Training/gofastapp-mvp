@@ -8,6 +8,10 @@ import {
   listAthleteRacesForAthlete,
   serializeAthleteRaceClaimResponse,
 } from "@/lib/athlete-race-claim";
+import {
+  findActiveTrainingPlanForAthlete,
+  hydrateAthleteRacesWithTrainingPlan,
+} from "@/lib/athlete-primary-race";
 
 async function athleteFromRequest(request: NextRequest) {
   const auth = await requireAthleteFromBearer(request);
@@ -23,9 +27,13 @@ export async function GET(request: NextRequest) {
     const { athlete, error } = await athleteFromRequest(request);
     if (error) return error;
 
-    const athleteRaces = await listAthleteRacesForAthlete(athlete!.id);
+    const [athleteRaces, activePlan] = await Promise.all([
+      listAthleteRacesForAthlete(athlete!.id),
+      findActiveTrainingPlanForAthlete(athlete!.id),
+    ]);
+    const hydrated = hydrateAthleteRacesWithTrainingPlan(athleteRaces, activePlan);
 
-    return NextResponse.json({ signups: athleteRaces, athleteRaces });
+    return NextResponse.json({ signups: hydrated, athleteRaces: hydrated });
   } catch (err: unknown) {
     console.error("GET /api/race-signups:", err);
     return NextResponse.json(

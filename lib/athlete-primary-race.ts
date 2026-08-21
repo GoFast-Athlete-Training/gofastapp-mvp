@@ -1,35 +1,38 @@
 /**
  * Goal race canon — one explicit primary athlete_races row per athlete.
- * Independent of GoFast plan; plan creation snaps primary to terminal race.
+ * Plan link lives on training_plans.athleteRaceId → athlete_races.id (training_plans.id).
  */
 
 import { prisma } from "@/lib/prisma";
 import { TrainingPlanLifecycle } from "@prisma/client";
 
-export type AthleteRaceContext = {
-  primaryAthleteRaceId: string | null;
-  planAthleteRaceId: string | null;
-  activePlanId: string | null;
+export type ActiveTrainingPlanRef = {
+  id: string;
+  athleteRaceId: string | null;
 };
 
-export async function getAthleteRaceContext(athleteId: string): Promise<AthleteRaceContext> {
-  const [primaryRow, activePlan] = await Promise.all([
-    prisma.athlete_races.findFirst({
-      where: { athleteId, isPrimaryRace: true },
-      select: { id: true },
-    }),
-    prisma.training_plans.findFirst({
-      where: { athleteId, lifecycleStatus: TrainingPlanLifecycle.ACTIVE },
-      orderBy: { updatedAt: "desc" },
-      select: { id: true, athleteRaceId: true },
-    }),
-  ]);
+/** Active training plan for an athlete (most recently updated ACTIVE row). */
+export async function findActiveTrainingPlanForAthlete(
+  athleteId: string
+): Promise<ActiveTrainingPlanRef | null> {
+  return prisma.training_plans.findFirst({
+    where: { athleteId, lifecycleStatus: TrainingPlanLifecycle.ACTIVE },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true, athleteRaceId: true },
+  });
+}
 
-  return {
-    primaryAthleteRaceId: primaryRow?.id ?? null,
-    planAthleteRaceId: activePlan?.athleteRaceId ?? null,
-    activePlanId: activePlan?.id ?? null,
-  };
+/** Attach trainingPlanId to the athlete_races row the active plan points at. */
+export function hydrateAthleteRacesWithTrainingPlan<T extends { id: string }>(
+  athleteRaces: T[],
+  activePlan: ActiveTrainingPlanRef | null
+): (T & { trainingPlanId: string | null })[] {
+  const planRaceId = activePlan?.athleteRaceId ?? null;
+  const planId = activePlan?.id ?? null;
+  return athleteRaces.map((row) => ({
+    ...row,
+    trainingPlanId: planRaceId && row.id === planRaceId ? planId : null,
+  }));
 }
 
 /** Mark one row as the athlete's Goal race; clears any previous primary. */

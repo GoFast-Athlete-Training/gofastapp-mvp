@@ -18,6 +18,7 @@ import {
   type RaceForGoal,
 } from "@/components/races/InlineGoalForm";
 import { pickHeroAthleteRace } from "@/lib/races/my-races-hero";
+import { trainingPlanCtaForRace } from "@/lib/races/training-plan-cta";
 
 type ApiAthleteRace = {
   id: string;
@@ -32,6 +33,7 @@ type ApiAthleteRace = {
   goalRacePace?: number | null;
   goalPace5K?: number | null;
   isPrimaryRace?: boolean;
+  trainingPlanId?: string | null;
   race_registry?: {
     id: string;
     slug: string | null;
@@ -54,6 +56,7 @@ type AthleteRaceRow = {
   goalRacePace: number | null;
   goalPace5K: number | null;
   isPrimaryRace: boolean;
+  trainingPlanId: string | null;
 };
 
 function goalFromRace(row: AthleteRaceRow): InlineGoalRow | null {
@@ -88,6 +91,7 @@ function normalizeAthleteRace(raw: ApiAthleteRace): AthleteRaceRow {
     goalRacePace: raw.goalRacePace ?? null,
     goalPace5K: raw.goalPace5K ?? null,
     isPrimaryRace: raw.isPrimaryRace ?? false,
+    trainingPlanId: raw.trainingPlanId ?? null,
   };
 }
 
@@ -116,17 +120,13 @@ function countdownChipLabel(iso: string): string {
   return `${w} week${w === 1 ? "" : "s"} to go`;
 }
 
-function heroPrimaryCta(
-  row: AthleteRaceRow,
-  myRaceHref: string
-): { href: string; label: string } {
-  if (row.goalTime?.trim()) {
-    return {
-      href: `/training-setup?athleteRaceId=${encodeURIComponent(row.athleteRaceId)}`,
-      label: "Train for this race →",
-    };
-  }
-  return { href: myRaceHref, label: "Set a goal →" };
+function heroPrimaryCta(row: AthleteRaceRow, myRaceHref: string): { href: string; label: string } {
+  return trainingPlanCtaForRace({
+    athleteRaceId: row.athleteRaceId,
+    trainingPlanId: row.trainingPlanId,
+    goalTime: row.goalTime,
+    myRaceHref,
+  });
 }
 
 function NextSixMonthsRaceCards({
@@ -301,12 +301,19 @@ function AthleteRaceCard({
             Make this my Goal race
           </button>
         )}
-        {row.goalTime?.trim() ? (
+        {row.goalTime?.trim() || row.trainingPlanId ? (
           <Link
-            href={`/training-setup?athleteRaceId=${encodeURIComponent(row.athleteRaceId)}`}
+            href={
+              trainingPlanCtaForRace({
+                athleteRaceId: row.athleteRaceId,
+                trainingPlanId: row.trainingPlanId,
+                goalTime: row.goalTime,
+                myRaceHref: personalRaceHref(row),
+              }).href
+            }
             className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
           >
-            Train for this race
+            {row.trainingPlanId ? "View plan" : "Train for this race"}
           </Link>
         ) : null}
         <Link
@@ -331,11 +338,6 @@ function AthleteRaceCard({
 export default function MyRacesPage() {
   const router = useRouter();
   const [myRaces, setMyRaces] = useState<AthleteRaceRow[]>([]);
-  const [raceContext, setRaceContext] = useState({
-    primaryAthleteRaceId: null as string | null,
-    planAthleteRaceId: null as string | null,
-    activePlanId: null as string | null,
-  });
   const [loading, setLoading] = useState(true);
   const [removingRaceId, setRemovingRaceId] = useState<string | null>(null);
   const [markingPrimaryRaceId, setMarkingPrimaryRaceId] = useState<string | null>(null);
@@ -346,17 +348,9 @@ export default function MyRacesPage() {
       const suRes = await api.get<{
         signups?: ApiAthleteRace[];
         athleteRaces?: ApiAthleteRace[];
-        primaryAthleteRaceId?: string | null;
-        planAthleteRaceId?: string | null;
-        activePlanId?: string | null;
       }>("/athlete-races");
       const raw = suRes.data.athleteRaces ?? suRes.data.signups ?? [];
       setMyRaces(raw.map(normalizeAthleteRace));
-      setRaceContext({
-        primaryAthleteRaceId: suRes.data.primaryAthleteRaceId ?? null,
-        planAthleteRaceId: suRes.data.planAthleteRaceId ?? null,
-        activePlanId: suRes.data.activePlanId ?? null,
-      });
     } catch (e) {
       console.error(e);
       setMyRaces([]);
@@ -399,13 +393,13 @@ export default function MyRacesPage() {
       upcoming: upcomingSorted.map((r) => ({
         athleteRaceId: r.athleteRaceId,
         raceDate: r.raceDate,
+        isPrimaryRace: r.isPrimaryRace,
+        trainingPlanId: r.trainingPlanId,
       })),
-      primaryAthleteRaceId: raceContext.primaryAthleteRaceId,
-      planAthleteRaceId: raceContext.planAthleteRaceId,
     });
     if (!picked) return null;
     return upcomingSorted.find((r) => r.athleteRaceId === picked.athleteRaceId) ?? null;
-  }, [upcomingSorted, raceContext.primaryAthleteRaceId, raceContext.planAthleteRaceId]);
+  }, [upcomingSorted]);
 
   const otherRaces = useMemo(
     () => upcomingSorted.filter((r) => r.athleteRaceId !== heroRace?.athleteRaceId),
@@ -651,9 +645,7 @@ export default function MyRacesPage() {
                             href={primary.href}
                             className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-orange-600 shadow-sm"
                           >
-                            {heroRace.goalTime?.trim()
-                              ? "Build a GoFast plan →"
-                              : primary.label}
+                            {primary.label}
                           </Link>
                           <Link
                             href={`/race-hub/${heroRace.raceRegistryId}`}

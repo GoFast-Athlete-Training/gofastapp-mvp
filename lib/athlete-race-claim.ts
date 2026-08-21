@@ -103,7 +103,7 @@ export async function removeAthleteRaceWithSideEffects(params: {
 }): Promise<
   | { ok: true }
   | { ok: false; reason: "not_found" }
-  | { ok: false; reason: "active_plan_requires_confirmation"; activePlanId: string }
+  | { ok: false; reason: "active_plan_requires_confirmation"; trainingPlanId: string }
 > {
   const existing = await getAthleteRaceForAthlete(params.athleteId, params.athleteRaceId);
   if (!existing) return { ok: false, reason: "not_found" };
@@ -121,7 +121,7 @@ export async function removeAthleteRaceWithSideEffects(params: {
     return {
       ok: false,
       reason: "active_plan_requires_confirmation",
-      activePlanId: activePlan.id,
+      trainingPlanId: activePlan.id,
     };
   }
 
