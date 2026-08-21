@@ -46,7 +46,7 @@ type CatalogRace = {
   description?: string | null;
 };
 
-type Signup = {
+type AthleteRaceRow = {
   id: string;
   raceRegistryId: string;
   race_registry: Pick<CatalogRace, "id">;
@@ -63,7 +63,7 @@ function isFeaturedCandidate(race: CatalogRace): boolean {
 
 export default function RacesFindPage() {
   const router = useRouter();
-  const [signups, setSignups] = useState<Signup[]>([]);
+  const [myRaces, setMyRaces] = useState<AthleteRaceRow[]>([]);
   const [catalog, setCatalog] = useState<CatalogRace[]>([]);
   const [featuredPool, setFeaturedPool] = useState<CatalogRace[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -81,8 +81,8 @@ export default function RacesFindPage() {
   const addIntentHandled = useRef(false);
 
   const signedRaceIds = useMemo(
-    () => new Set(signups.map((s) => s.raceRegistryId)),
-    [signups]
+    () => new Set(myRaces.map((s) => s.raceRegistryId)),
+    [myRaces]
   );
 
   const hasActiveFilters = Boolean(
@@ -104,13 +104,15 @@ export default function RacesFindPage() {
     return catalog.filter((r) => !featuredIds.has(r.id));
   }, [catalog, featuredRaces]);
 
-  const loadSignups = useCallback(async () => {
+  const loadMyRaces = useCallback(async () => {
     try {
-      const { data } = await api.get<{ signups: Signup[] }>("/race-signups");
-      setSignups(data.signups ?? []);
+      const { data } = await api.get<{ athleteRaces?: AthleteRaceRow[]; signups?: AthleteRaceRow[] }>(
+        "/athlete-races"
+      );
+      setMyRaces(data.athleteRaces ?? data.signups ?? []);
     } catch (e) {
       console.error(e);
-      setSignups([]);
+      setMyRaces([]);
     }
   }, []);
 
@@ -176,9 +178,9 @@ export default function RacesFindPage() {
   }, [searchQuery]);
 
   useEffect(() => {
-    loadSignups();
+    loadMyRaces();
     loadFeaturedPool();
-  }, [loadSignups, loadFeaturedPool]);
+  }, [loadMyRaces, loadFeaturedPool]);
 
   useEffect(() => {
     loadCatalog();
@@ -188,24 +190,30 @@ export default function RacesFindPage() {
     loadPast();
   }, [loadPast]);
 
-  const onAddToCalendar = useCallback(async (raceId: string) => {
-    setSubmittingRaceId(raceId);
-    try {
-      const { data } = await api.post<{ signup: Signup }>("/race-signups", {
-        raceRegistryId: raceId,
-      });
-      if (data.signup) {
-        setSignups((prev) => {
-          const rest = prev.filter((s) => s.raceRegistryId !== raceId);
-          return [...rest, data.signup];
-        });
+  const onClaimRace = useCallback(
+    async (raceRegistryId: string) => {
+      setSubmittingRaceId(raceRegistryId);
+      try {
+        const { data } = await api.post<{ athleteRace?: AthleteRaceRow; signup?: AthleteRaceRow }>(
+          "/athlete-races",
+          { raceRegistryId }
+        );
+        const athleteRace = data.athleteRace ?? data.signup;
+        if (athleteRace?.id) {
+          setMyRaces((prev) => {
+            const rest = prev.filter((s) => s.raceRegistryId !== raceRegistryId);
+            return [...rest, athleteRace];
+          });
+          router.push(`/races/setup/${encodeURIComponent(athleteRace.id)}`);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setSubmittingRaceId(null);
       }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setSubmittingRaceId(null);
-    }
-  }, []);
+    },
+    [router]
+  );
 
   const renderCatalogCard = (
     race: CatalogRace,

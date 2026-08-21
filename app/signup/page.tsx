@@ -115,11 +115,22 @@ function routeAfterAthleteResolved(
   }
 
   if (!hasHandle) {
-    router.replace('/athlete-create-profile');
+    const redirect = opts.redirect?.trim();
+    const profilePath =
+      redirect && redirect.startsWith('/')
+        ? `/athlete-create-profile?redirect=${encodeURIComponent(redirect)}`
+        : '/athlete-create-profile';
+    router.replace(profilePath);
     return;
   }
 
   if (redirectToGofastWithConfirmIfIntent(router, opts.redirect)) return;
+
+  const redirect = opts.redirect?.trim();
+  if (redirect && redirect.startsWith('/')) {
+    router.replace(redirect);
+    return;
+  }
 
   router.replace('/welcome');
 }
@@ -140,7 +151,7 @@ function SignupPageContent() {
   const runCrewHandle = searchParams?.get('handle') || null;
   const redirectParam = searchParams?.get('redirect');
   const authParam = searchParams?.get('auth');
-  
+
   // Detect club leader intent from URL param (passed from splash page)
   const isClubLeaderIntent = searchParams?.get('intent') === 'club-leader';
   const isClubManagerMode = isClubManagerSignupMode(mode);

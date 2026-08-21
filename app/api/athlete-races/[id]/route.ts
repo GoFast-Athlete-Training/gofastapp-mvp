@@ -15,8 +15,8 @@ async function athleteFromRequest(request: NextRequest) {
   return { athlete: auth.athlete };
 }
 
-/** PATCH /api/race-signups/[id] — legacy no-op; goal lives on athlete_races row. */
-export async function PATCH(
+/** GET /api/athlete-races/[id] — single athlete-owned race row */
+export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -37,9 +37,9 @@ export async function PATCH(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ signup: athleteRace, athleteRace });
+    return NextResponse.json({ athleteRace, signup: athleteRace });
   } catch (err: unknown) {
-    console.error("PATCH /api/race-signups/[id]:", err);
+    console.error("GET /api/athlete-races/[id]:", err);
     return NextResponse.json(
       { error: "Server error", details: err instanceof Error ? err.message : "Unknown" },
       { status: 500 }
@@ -47,7 +47,7 @@ export async function PATCH(
   }
 }
 
-/** DELETE /api/race-signups/[id] — @deprecated alias for DELETE /api/athlete-races/[id] */
+/** DELETE /api/athlete-races/[id] — remove claimed athlete race */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -71,7 +71,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
-    console.error("DELETE /api/race-signups/[id]:", err);
+    console.error("DELETE /api/athlete-races/[id]:", err);
     return NextResponse.json(
       { error: "Server error", details: err instanceof Error ? err.message : "Unknown" },
       { status: 500 }

@@ -6,8 +6,8 @@ import {
   imprintPlanRaceCalendarOnSchedule,
   type PlanRaceCalendarEntry,
 } from "@/lib/training/race-plan-calendar-service";
-import { filterSignupsInPlanWindow } from "@/lib/training/race-calendar-hydrate";
-import type { HydratedRaceCalendarSignup } from "@/lib/training/race-calendar-hydrate";
+import { filterAthleteRacesInPlanWindow } from "@/lib/training/race-calendar-hydrate";
+import type { HydratedRaceCalendarAthleteRace } from "@/lib/training/race-calendar-hydrate";
 
 const baseInput = {
   planStartDate: new Date("2026-05-20T00:00:00.000Z"),
@@ -108,12 +108,15 @@ test("imprintPlanRaceCalendarOnSchedule is no-op with zero secondary events", ()
   assert.ok(longRuns.length > 0);
 });
 
-test("filterSignupsInPlanWindow keeps races between start and terminal inclusive", () => {
-  const signups: HydratedRaceCalendarSignup[] = [
+test("filterAthleteRacesInPlanWindow keeps races between start and terminal inclusive", () => {
+  const athleteRaces: HydratedRaceCalendarAthleteRace[] = [
     {
       athleteRaceId: "s1",
       raceRegistryId: "early",
-      goalId: null,
+      goalTime: null,
+      goalName: null,
+      hasGoal: false,
+      isPlanTarget: false,
       positionRelativeToPlanRace: "BEFORE",
       race: {
         id: "early",
@@ -130,7 +133,10 @@ test("filterSignupsInPlanWindow keeps races between start and terminal inclusive
     {
       athleteRaceId: "s2",
       raceRegistryId: "primary",
-      goalId: "g1",
+      goalTime: "3:30:00",
+      goalName: "Goal Marathon",
+      hasGoal: true,
+      isPlanTarget: true,
       positionRelativeToPlanRace: "ON",
       race: {
         id: "primary",
@@ -146,8 +152,8 @@ test("filterSignupsInPlanWindow keeps races between start and terminal inclusive
     },
   ];
 
-  const inWindow = filterSignupsInPlanWindow(
-    signups,
+  const inWindow = filterAthleteRacesInPlanWindow(
+    athleteRaces,
     new Date("2026-05-20T00:00:00.000Z"),
     new Date("2026-10-24T00:00:00.000Z")
   );

@@ -1,10 +1,10 @@
+/** GET /api/race-calendar — athlete-owned race calendar from athlete_races */
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { loadHydratedRaceCalendar } from "@/lib/training/race-calendar-hydrate";
 
-/** GET /api/race-calendar — primary goal race + full signup calendar */
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAthleteFromBearer(request);

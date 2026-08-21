@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -13,6 +13,8 @@ type ProfileStep = 'intro' | 'form' | 'success';
 
 export default function AthleteCreateProfilePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectParam = searchParams?.get('redirect')?.trim() ?? null;
   const [step, setStep] = useState<ProfileStep>('intro');
   const [nextRouteAfterSuccess, setNextRouteAfterSuccess] = useState<string>('/goals');
   const [formData, setFormData] = useState({
@@ -59,7 +61,11 @@ export default function AthleteCreateProfilePage() {
         const profRes = await api.get(`/athlete/${athleteId}`);
         const handle = profRes.data?.athlete?.gofastHandle?.trim();
         if (handle && !cancelled) {
-          router.replace('/welcome');
+          router.replace(
+            redirectParam && redirectParam.startsWith('/')
+              ? redirectParam
+              : '/welcome'
+          );
         }
       } catch (err) {
         console.warn('PROFILE CREATE: Could not check existing handle', err);
@@ -70,7 +76,7 @@ export default function AthleteCreateProfilePage() {
       cancelled = true;
       unsubscribe();
     };
-  }, [router]);
+  }, [router, redirectParam]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({
@@ -228,6 +234,8 @@ export default function AthleteCreateProfilePage() {
               const followIntentHandle = LocalStorageAPI.getGwmFollowIntentHandle();
               if (followIntentHandle) {
                 nextPath = `/gofast-with/${encodeURIComponent(followIntentHandle)}/confirm`;
+              } else if (redirectParam && redirectParam.startsWith('/')) {
+                nextPath = redirectParam;
               }
             }
           }

@@ -17,7 +17,7 @@ async function athleteFromRequest(request: NextRequest) {
   return { athlete: auth.athlete };
 }
 
-/** GET /api/race-signups — @deprecated alias for GET /api/athlete-races */
+/** GET /api/athlete-races — my claimed athlete races (working set) */
 export async function GET(request: NextRequest) {
   try {
     const { athlete, error } = await athleteFromRequest(request);
@@ -25,9 +25,13 @@ export async function GET(request: NextRequest) {
 
     const athleteRaces = await listAthleteRacesForAthlete(athlete!.id);
 
-    return NextResponse.json({ signups: athleteRaces, athleteRaces });
+    return NextResponse.json({
+      athleteRaces,
+      /** @deprecated compatibility alias — use athleteRaces */
+      signups: athleteRaces,
+    });
   } catch (err: unknown) {
-    console.error("GET /api/race-signups:", err);
+    console.error("GET /api/athlete-races:", err);
     return NextResponse.json(
       { error: "Server error", details: err instanceof Error ? err.message : "Unknown" },
       { status: 500 }
@@ -35,7 +39,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/** POST /api/race-signups — @deprecated alias for POST /api/athlete-races */
+/** POST /api/athlete-races — body { raceRegistryId } — claim catalog race (idempotent) */
 export async function POST(request: NextRequest) {
   try {
     const { athlete, error } = await athleteFromRequest(request);
@@ -59,7 +63,7 @@ export async function POST(request: NextRequest) {
     if (isRaceNotFoundError(err)) {
       return NextResponse.json({ error: "Race not found" }, { status: 404 });
     }
-    console.error("POST /api/race-signups:", err);
+    console.error("POST /api/athlete-races:", err);
     return NextResponse.json(
       {
         error: "Server error",
