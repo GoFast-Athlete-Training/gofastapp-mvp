@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { formatRaceListDate } from "@/lib/races-display";
 import {
@@ -38,6 +39,7 @@ export default function DiscoverRacesSection({
   signedRaceIds,
   onRaceAdded,
 }: DiscoverRacesSectionProps) {
+  const router = useRouter();
   const [catalog, setCatalog] = useState<CatalogRace[]>([]);
   const [loading, setLoading] = useState(true);
   const [submittingRaceId, setSubmittingRaceId] = useState<string | null>(null);
@@ -71,18 +73,21 @@ export default function DiscoverRacesSection({
     return catalog.filter((r) => !signedRaceIds.has(r.id)).slice(0, 3);
   }, [catalog, signedRaceIds]);
 
-  async function onAddToCalendar(raceRegistryId: string, raceName: string) {
+  async function onClaimRace(raceRegistryId: string, raceName: string) {
     setSubmittingRaceId(raceRegistryId);
     setAdjustPrompt(null);
     try {
       const { data } = await api.post<{
+        athleteRace?: { id: string };
+        signup?: { id: string };
         planImpact?: {
           affectsPlan: boolean;
           planId: string | null;
           weekNumber: number | null;
         };
         impactPreview?: { nearbyChanges?: string[] } | null;
-      }>("/race-signups", { raceRegistryId });
+      }>("/athlete-races", { raceRegistryId });
+      const athleteRace = data.athleteRace ?? data.signup;
       onRaceAdded?.();
       void loadCatalog();
       if (data.planImpact?.affectsPlan && data.planImpact.planId) {
@@ -92,6 +97,9 @@ export default function DiscoverRacesSection({
           raceName,
           impactSummary: data.impactPreview?.nearbyChanges ?? [],
         });
+      }
+      if (athleteRace?.id) {
+        router.push(`/races/setup/${encodeURIComponent(athleteRace.id)}`);
       }
     } catch (e) {
       console.error(e);
@@ -129,7 +137,7 @@ export default function DiscoverRacesSection({
         <div>
           <h2 className="text-sm font-semibold text-gray-700">Discover races</h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            Upcoming races — add one to your calendar
+            Upcoming races — tap when you&apos;re running one
           </p>
         </div>
         <Link
