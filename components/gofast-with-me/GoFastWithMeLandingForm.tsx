@@ -442,9 +442,26 @@ export default function GoFastWithMeLandingForm({
           </label>
 
           <label className="block">
-            <span className="text-sm font-semibold text-gray-900">About you</span>
+            <span className="text-sm font-semibold text-gray-900">What you&apos;ll see</span>
             <span className="block text-xs text-gray-500 mt-0.5">
-              Describe yourself so people know what kind of runner you are and why they should follow.
+              What kinds of content you&apos;ll post — plan updates, race notes, training tips, and so on.
+            </span>
+            <textarea
+              value={values.whatYoullSeeHere}
+              onChange={(e) => {
+                setValues((v) => ({ ...v, whatYoullSeeHere: e.target.value }));
+                setSaveStatus('idle');
+                setError(null);
+              }}
+              rows={3}
+              className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-semibold text-gray-900">About me</span>
+            <span className="block text-xs text-gray-500 mt-0.5">
+              Describe yourself so people know what kind of athlete you are and why they should follow.
             </span>
             <textarea
               value={values.gofastWithMeBio}
@@ -467,51 +484,44 @@ export default function GoFastWithMeLandingForm({
             ) : null}
           </label>
 
-          <label className="block">
-            <span className="text-sm font-semibold text-gray-900">What you&apos;ll see</span>
-            <span className="block text-xs text-gray-500 mt-0.5">
-              What kinds of content you&apos;ll post — plan updates, race notes, training tips, and so on.
-            </span>
-            <textarea
-              value={values.whatYoullSeeHere}
-              onChange={(e) => {
-                setValues((v) => ({ ...v, whatYoullSeeHere: e.target.value }));
-                setSaveStatus('idle');
-                setError(null);
-              }}
-              rows={3}
-              className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-            />
-          </label>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="text-sm font-semibold text-gray-900">Sport focus</span>
-              <input
-                value={values.sportFocus}
-                onChange={(e) => {
-                  setValues((v) => ({ ...v, sportFocus: e.target.value }));
-                  setSaveStatus('idle');
-                  setError(null);
-                }}
-                className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-semibold text-gray-900">Specific focus (optional)</span>
-              <span className="block text-xs text-gray-500 mt-0.5">
-                Distance, specialty, or angle: 5K, marathon, trail, nutrition, beginner plans.
-              </span>
-              <input
-                value={values.modelFocus}
-                onChange={(e) => {
-                  setValues((v) => ({ ...v, modelFocus: e.target.value }));
-                  setSaveStatus('idle');
-                  setError(null);
-                }}
-                className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-              />
-            </label>
+          <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">Focus</h3>
+              <p className="mt-0.5 text-xs text-gray-500">
+                These appear together in the About section of your public page.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-sm font-semibold text-gray-900">Sport</span>
+                <input
+                  value={values.sportFocus}
+                  onChange={(e) => {
+                    setValues((v) => ({ ...v, sportFocus: e.target.value }));
+                    setSaveStatus('idle');
+                    setError(null);
+                  }}
+                  className="mt-1.5 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold text-gray-900">
+                  Specialty or distance (optional)
+                </span>
+                <span className="block text-xs text-gray-500 mt-0.5">
+                  For example: 5K, marathon, trail, nutrition, or beginner plans.
+                </span>
+                <input
+                  value={values.modelFocus}
+                  onChange={(e) => {
+                    setValues((v) => ({ ...v, modelFocus: e.target.value }));
+                    setSaveStatus('idle');
+                    setError(null);
+                  }}
+                  className="mt-1.5 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+            </div>
           </div>
 
           <label className="block">
