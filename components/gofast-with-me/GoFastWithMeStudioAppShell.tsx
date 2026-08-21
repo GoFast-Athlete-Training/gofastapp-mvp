@@ -8,6 +8,7 @@ import {
   Layout,
   LayoutDashboard,
   Users,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import TopNav from '@/components/shared/TopNav';
@@ -22,6 +23,7 @@ const NAV_ICONS: Record<StudioView, LucideIcon> = {
   dashboard: LayoutDashboard,
   page: Layout,
   community: Users,
+  payouts: Wallet,
   workouts: CalendarDays,
   content: BookOpen,
 };

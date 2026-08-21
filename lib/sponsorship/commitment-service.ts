@@ -80,8 +80,42 @@ export type AthleteSponsorshipHistoryRow = {
   status: SponsorCommitmentStatus;
   paymentStatus: SponsorCommitmentPaymentStatus;
   amountPaidCents: number | null;
+  athleteShareCents: number | null;
   paidAt: string | null;
 };
+
+export function mapSponsorshipHistoryRow(
+  row: Pick<
+    sponsor_commitments,
+    | "id"
+    | "brandNameSnapshot"
+    | "brandLogoUrlSnapshot"
+    | "creativeUrl"
+    | "ctaUrl"
+    | "startsAt"
+    | "endsAt"
+    | "status"
+    | "paymentStatus"
+    | "amountPaidCents"
+    | "athleteShareCents"
+    | "paidAt"
+  >,
+): AthleteSponsorshipHistoryRow {
+  return {
+    commitmentId: row.id,
+    brandNameSnapshot: row.brandNameSnapshot,
+    brandLogoUrlSnapshot: row.brandLogoUrlSnapshot,
+    creativeUrl: row.creativeUrl,
+    ctaUrl: row.ctaUrl,
+    startsAt: row.startsAt.toISOString(),
+    endsAt: row.endsAt.toISOString(),
+    status: row.status,
+    paymentStatus: row.paymentStatus,
+    amountPaidCents: row.amountPaidCents,
+    athleteShareCents: row.athleteShareCents,
+    paidAt: row.paidAt?.toISOString() ?? null,
+  };
+}
 
 function deriveRuntimeStatus(
   startsAt: Date,
@@ -469,19 +503,7 @@ export async function listAthleteSponsorshipHistory(
     orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }],
   });
 
-  return rows.map((row) => ({
-    commitmentId: row.id,
-    brandNameSnapshot: row.brandNameSnapshot,
-    brandLogoUrlSnapshot: row.brandLogoUrlSnapshot,
-    creativeUrl: row.creativeUrl,
-    ctaUrl: row.ctaUrl,
-    startsAt: row.startsAt.toISOString(),
-    endsAt: row.endsAt.toISOString(),
-    status: row.status,
-    paymentStatus: row.paymentStatus,
-    amountPaidCents: row.amountPaidCents,
-    paidAt: row.paidAt?.toISOString() ?? null,
-  }));
+  return rows.map(mapSponsorshipHistoryRow);
 }
 
 export async function expireEndedSponsorCommitments(now = new Date()): Promise<number> {

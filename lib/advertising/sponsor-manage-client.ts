@@ -2,10 +2,12 @@ export type AthleteSponsorshipEarnings = {
   source: "sponsorship_destination_charge";
   totalCreditedAthleteShareCents: number;
   creditedSponsorshipCount: number;
-  payoutReady: boolean;
-  connectState: string;
   label: string;
   detail: string;
+  /** @deprecated Prod merges live connect status; GSM totals only. */
+  payoutReady?: boolean;
+  /** @deprecated Prod merges live connect status; GSM totals only. */
+  connectState?: string;
 };
 
 function resolveSponsorManageUrl(): string | null {

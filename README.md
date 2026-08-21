@@ -59,6 +59,8 @@ cp .env.example .env.local
 - Firebase Admin credentials
 - Database URL
 - Garmin OAuth credentials
+- Stripe: `STRIPE_SECRET_KEY`, `STRIPE_CONNECT_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (embedded Connect onboarding in GoFast With Me Studio)
+- Sponsorship: `GOFAST_SPONSOR_MANAGE_URL` (credited earnings totals)
 
 4. Generate Prisma client:
 ```bash
