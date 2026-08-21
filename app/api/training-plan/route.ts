@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
+import { snapPrimaryRaceToPlanTerminal } from "@/lib/athlete-primary-race";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
@@ -276,6 +277,11 @@ export async function POST(request: NextRequest) {
           updatedAt: now,
         },
       });
+    });
+
+    await snapPrimaryRaceToPlanTerminal({
+      athleteId: athlete.id,
+      athleteRaceId: terminalAthleteRace.id,
     });
 
     if (syncAthleteBaseline === true || syncAthleteBaseline === "true") {

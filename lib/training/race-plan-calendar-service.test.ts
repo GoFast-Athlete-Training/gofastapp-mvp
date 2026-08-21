@@ -116,6 +116,7 @@ test("filterAthleteRacesInPlanWindow keeps races between start and terminal incl
       goalTime: null,
       goalName: null,
       hasGoal: false,
+      isPrimaryRace: false,
       isPlanTarget: false,
       positionRelativeToPlanRace: "BEFORE",
       race: {
@@ -136,6 +137,7 @@ test("filterAthleteRacesInPlanWindow keeps races between start and terminal incl
       goalTime: "3:30:00",
       goalName: "Goal Marathon",
       hasGoal: true,
+      isPrimaryRace: true,
       isPlanTarget: true,
       positionRelativeToPlanRace: "ON",
       race: {

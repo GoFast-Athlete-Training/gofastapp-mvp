@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { createGoal } from "@/lib/goal-service";
 import { upsertRaceMembershipFromSignup } from "@/lib/race-container-membership";
 import { syncAthleteProfileSnapshot } from "@/lib/athlete-profile-snapshot";
+import { snapPrimaryRaceToPlanTerminal } from "@/lib/athlete-primary-race";
 import {
   currentTrainingWeekNumber,
   totalWeeksFromDates,
@@ -497,6 +498,10 @@ export async function joinTrainingCohort(
 
   await upsertRaceMembershipFromSignup(athleteId, race.id);
   await syncAthleteProfileSnapshot(athleteId);
+  await snapPrimaryRaceToPlanTerminal({
+    athleteId,
+    athleteRaceId: result.plan.athleteRaceId!,
+  });
 
   const weeklyMileageTarget = prefs?.weeklyMileageTarget ?? 45;
   await executePlanGenerate({

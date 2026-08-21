@@ -61,11 +61,27 @@ export async function DELETE(
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
-    const removed = await removeAthleteRaceWithSideEffects({
+    const deleteActivePlan =
+      request.nextUrl.searchParams.get("deleteActivePlan") === "true";
+
+    const result = await removeAthleteRaceWithSideEffects({
       athleteId: athlete!.id,
       athleteRaceId: id,
+      deleteActivePlanIfTargeted: deleteActivePlan,
     });
-    if (!removed) {
+
+    if (!result.ok) {
+      if (result.reason === "active_plan_requires_confirmation") {
+        return NextResponse.json(
+          {
+            error:
+              "This race is tied to your active training plan. Confirm to delete the plan and remove the race.",
+            activePlanId: result.activePlanId,
+            requiresPlanDelete: true,
+          },
+          { status: 409 }
+        );
+      }
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 

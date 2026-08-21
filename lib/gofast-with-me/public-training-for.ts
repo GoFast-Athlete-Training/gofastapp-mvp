@@ -12,6 +12,7 @@ export type PublicAthleteRaceSnapshot = {
   goalName?: string | null;
   goalDistance?: string | null;
   goalTime?: string | null;
+  isPrimaryRace?: boolean;
 };
 
 export type PublicPlanForGoal = {
@@ -38,15 +39,20 @@ export function serializePublicAthleteRace(row: PublicAthleteRaceSnapshot) {
     goalTime: row.goalTime ?? null,
     goalName: row.goalName ?? null,
     goalDistance: row.goalDistance ?? null,
+    isPrimaryRace: row.isPrimaryRace ?? false,
   };
 }
 
 export function buildPublicTrainingFor(input: {
   athleteRace: PublicAthleteRaceSnapshot;
   publicPlans: PublicPlanForGoal[];
+  isPrimaryRace?: boolean;
 }) {
   const race = input.athleteRace;
-  if (!race.goalTime?.trim() && !race.goalName?.trim() && !race.goalDistance?.trim()) {
+  const hasGoalFields = Boolean(
+    race.goalTime?.trim() || race.goalName?.trim() || race.goalDistance?.trim()
+  );
+  if (!hasGoalFields && !input.isPrimaryRace) {
     return null;
   }
 
@@ -56,12 +62,15 @@ export function buildPublicTrainingFor(input: {
     ) ?? null;
 
   return {
-    athleteRace: serializePublicAthleteRace(race),
+    athleteRace: serializePublicAthleteRace({
+      ...race,
+      isPrimaryRace: input.isPrimaryRace ?? race.isPrimaryRace ?? false,
+    }),
     goal: {
       id: race.id,
-      name: race.goalName,
-      distance: race.goalDistance ?? "",
-      goalTime: race.goalTime,
+      name: race.goalName ?? race.name,
+      distance: race.goalDistance ?? race.distanceLabel ?? "",
+      goalTime: race.goalTime ?? null,
       targetByDate: race.raceDate.toISOString(),
     },
     publicPlan: publicPlan

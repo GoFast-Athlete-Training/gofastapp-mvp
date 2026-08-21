@@ -31,6 +31,7 @@ const athleteRaceSnapshotSelect = {
   goalName: true,
   goalDistance: true,
   goalTime: true,
+  isPrimaryRace: true,
 } as const;
 
 export type PublicAthletePayload = Awaited<ReturnType<typeof loadPublicAthletePage>>;
@@ -245,8 +246,10 @@ export async function loadPublicAthletePage(rawHandle: string) {
   });
 
   const planRace = plan?.athlete_race ?? null;
+  const explicitPrimary = athleteRaceRows.find((r) => r.isPrimaryRace) ?? null;
 
   const primaryAthleteRace =
+    explicitPrimary ??
     planRace ??
     athleteRaceRows.find(
       (r) =>
@@ -293,6 +296,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
     ? buildPublicTrainingFor({
         athleteRace: primaryAthleteRace,
         publicPlans: publicPlansForRace,
+        isPrimaryRace: Boolean(primaryAthleteRace.isPrimaryRace),
       })
     : null;
 

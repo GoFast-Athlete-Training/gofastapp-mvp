@@ -3,6 +3,10 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import {
+  clearPrimaryAthleteRace,
+  setPrimaryAthleteRace,
+} from "@/lib/athlete-primary-race";
+import {
   getAthleteRaceById,
   removeAthleteRaceWithSideEffects,
 } from "@/lib/athlete-race-claim";
@@ -47,6 +51,51 @@ export async function GET(
   }
 }
 
+/** PATCH /api/athlete-races/[id] — mark/unmark Goal race */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { athlete, error } = await athleteFromRequest(request);
+    if (error) return error;
+
+    const { id } = await params;
+    if (!id) {
+      return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const isPrimaryRace = body.isPrimaryRace;
+
+    if (isPrimaryRace === true) {
+      const athleteRace = await setPrimaryAthleteRace({
+        athleteId: athlete!.id,
+        athleteRaceId: id,
+      });
+      return NextResponse.json({ athleteRace, signup: athleteRace });
+    }
+
+    if (isPrimaryRace === false) {
+      const athleteRace = await clearPrimaryAthleteRace({
+        athleteId: athlete!.id,
+        athleteRaceId: id,
+      });
+      return NextResponse.json({ athleteRace, signup: athleteRace });
+    }
+
+    return NextResponse.json(
+      { error: "isPrimaryRace true or false is required" },
+      { status: 400 }
+    );
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Update failed";
+    const status = msg.includes("not found") || msg.includes("Not the current") ? 404 : 500;
+    console.error("PATCH /api/athlete-races/[id]:", err);
+    return NextResponse.json({ error: msg }, { status });
+  }
+}
+
 /** DELETE /api/athlete-races/[id] — remove claimed athlete race */
 export async function DELETE(
   request: NextRequest,
@@ -61,11 +110,27 @@ export async function DELETE(
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
-    const removed = await removeAthleteRaceWithSideEffects({
+    const deleteActivePlan =
+      request.nextUrl.searchParams.get("deleteActivePlan") === "true";
+
+    const result = await removeAthleteRaceWithSideEffects({
       athleteId: athlete!.id,
       athleteRaceId: id,
+      deleteActivePlanIfTargeted: deleteActivePlan,
     });
-    if (!removed) {
+
+    if (!result.ok) {
+      if (result.reason === "active_plan_requires_confirmation") {
+        return NextResponse.json(
+          {
+            error:
+              "This race is tied to your active training plan. Confirm to delete the plan and remove the race.",
+            activePlanId: result.activePlanId,
+            requiresPlanDelete: true,
+          },
+          { status: 409 }
+        );
+      }
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 

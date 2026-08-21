@@ -47,6 +47,7 @@ type RaceExtras = {
 type Signup = {
   id: string;
   raceRegistryId: string;
+  isPrimaryRace?: boolean;
 };
 
 type GoalRow = {
@@ -261,7 +262,10 @@ export default function MyRacePage() {
       setLoadingUser(true);
       try {
         const [suRes, gRes, plansRes, upcomingRes] = await Promise.all([
-          api.get<{ signups: Signup[] }>("/race-signups"),
+          api.get<{
+            signups: Signup[];
+            athleteRaces?: Signup[];
+          }>("/athlete-races"),
           api.get<{ goals: GoalRow[] }>("/goals?status=ACTIVE").catch(() => ({ data: { goals: [] as const } })),
           api
             .get<{ plans?: TrainingPlanRow[] }>("/training-plan?status=active")
@@ -272,7 +276,10 @@ export default function MyRacePage() {
             )
             .catch(() => ({ data: { sessions: [], activePlanSummary: null } })),
         ]);
-        const su = (suRes.data.signups ?? []).find((s) => s.raceRegistryId === raceRegistryId) ?? null;
+        const su =
+          (suRes.data.athleteRaces ?? suRes.data.signups ?? []).find(
+            (s) => s.raceRegistryId === raceRegistryId
+          ) ?? null;
         setSignup(su);
         const goals = gRes.data.goals ?? [];
         const g =
@@ -336,12 +343,12 @@ export default function MyRacePage() {
     try {
       let athleteRaceId = signup?.id;
       if (!athleteRaceId) {
-        const claimRes = await api.post<{ signup?: Signup; athleteRaces?: Signup[] }>(
-          "/race-signups",
+        const claimRes = await api.post<{ signup?: Signup; athleteRace?: Signup }>(
+          "/athlete-races",
           { raceRegistryId: race.id }
         );
         athleteRaceId =
-          claimRes.data.signup?.id ?? claimRes.data.athleteRaces?.[0]?.id ?? undefined;
+          claimRes.data.athleteRace?.id ?? claimRes.data.signup?.id ?? undefined;
         if (athleteRaceId) {
           setSignup({ id: athleteRaceId, raceRegistryId: race.id });
         }
@@ -349,14 +356,12 @@ export default function MyRacePage() {
       if (!athleteRaceId) {
         throw new Error("Add this race to My Races first");
       }
-      const res = await api.post<{ goal: GoalRow }>("/goals", {
-        athleteRaceId,
-        name: race.name,
-        distance: race.distanceLabel ?? undefined,
-        targetByDate: race.raceDate,
+      await api.patch(`/athlete-races/${encodeURIComponent(athleteRaceId)}`, {
+        isPrimaryRace: true,
       });
-      setGoal(res.data.goal);
-      setGoalExpanded(true);
+      setSignup((prev) =>
+        prev ? { ...prev, id: athleteRaceId!, isPrimaryRace: true } : { id: athleteRaceId!, raceRegistryId: race.id, isPrimaryRace: true }
+      );
       if (race.id) void loadSignupAndGoal(race.id);
     } catch (err: unknown) {
       setMakeGoalError(err instanceof Error ? err.message : "Failed — try again");
@@ -366,15 +371,19 @@ export default function MyRacePage() {
   }
 
   async function handleRemoveGoal() {
-    if (!goal?.id) return;
+    if (!signup?.id) return;
     setRemovingGoal(true);
     setRemoveGoalError(null);
     try {
-      await api.delete(`/goals/${encodeURIComponent(goal.id)}`);
-      router.push("/races");
+      await api.patch(`/athlete-races/${encodeURIComponent(signup.id)}`, {
+        isPrimaryRace: false,
+      });
+      setSignup((prev) => (prev ? { ...prev, isPrimaryRace: false } : prev));
     } catch (err: unknown) {
-      setRemoveGoalError(err instanceof Error ? err.message : "Could not remove goal");
+      setRemoveGoalError(err instanceof Error ? err.message : "Could not unmark Goal race");
+    } finally {
       setRemovingGoal(false);
+      setRemoveConfirmOpen(false);
     }
   }
 
@@ -394,9 +403,7 @@ export default function MyRacePage() {
   }
 
   const locationText = [race.city, race.state].filter(Boolean).join(", ") || null;
-  const isGoalRace = Boolean(
-    goal && goal.athlete_race?.raceRegistryId === race.id
-  );
+  const isGoalRace = Boolean(signup?.isPrimaryRace);
   const hasSignup = Boolean(signup);
   const goalTimeDisplay = goal?.goalTime?.trim() || null;
   const resolvedGoalRacePace = resolveGoalRacePace({
@@ -610,7 +617,8 @@ export default function MyRacePage() {
           {!isGoalRace ? (
             <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <p className="text-sm text-gray-700 mb-3">
-                Make this your goal race to set a target time and build a training plan around it.
+                Mark this as your Goal race so friends can cheer you on — with or without a GoFast
+                training plan.
               </p>
               <button
                 type="button"
@@ -676,12 +684,13 @@ export default function MyRacePage() {
                   className="inline-flex items-center gap-2 text-xs font-medium text-gray-400 hover:text-red-700"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  Remove as goal race
+                  Remove as Goal race
                 </button>
               ) : (
                 <div className="rounded-lg border border-gray-100 bg-gray-50/80 px-4 py-3">
                   <p className="text-sm text-gray-700">
-                    Archive your goal for this race?
+                    Unmark this as your Goal race? Your race stays in My Races and any time goal
+                    you set is kept.
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <button

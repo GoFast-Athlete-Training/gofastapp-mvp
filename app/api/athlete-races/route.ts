@@ -8,6 +8,7 @@ import {
   listAthleteRacesForAthlete,
   serializeAthleteRaceClaimResponse,
 } from "@/lib/athlete-race-claim";
+import { getAthleteRaceContext } from "@/lib/athlete-primary-race";
 
 async function athleteFromRequest(request: NextRequest) {
   const auth = await requireAthleteFromBearer(request);
@@ -23,10 +24,14 @@ export async function GET(request: NextRequest) {
     const { athlete, error } = await athleteFromRequest(request);
     if (error) return error;
 
-    const athleteRaces = await listAthleteRacesForAthlete(athlete!.id);
+    const [athleteRaces, context] = await Promise.all([
+      listAthleteRacesForAthlete(athlete!.id),
+      getAthleteRaceContext(athlete!.id),
+    ]);
 
     return NextResponse.json({
       athleteRaces,
+      ...context,
       /** @deprecated compatibility alias — use athleteRaces */
       signups: athleteRaces,
     });

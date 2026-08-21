@@ -772,6 +772,8 @@ model athlete_races {
   successLooksLike     String?  @db.Text
   completionFeeling    String?  @db.Text
   motivationIcon       String?
+  /// Athlete-selected Goal race for cheer-on / public primary — at most one per athlete.
+  isPrimaryRace    Boolean  @default(false)
   selfDeclaredAt   DateTime @default(now())
   notifyEnabled    Boolean  @default(true)
   createdAt        DateTime @default(now())
@@ -786,6 +788,7 @@ model athlete_races {
   @@index([athleteId])
   @@index([raceRegistryId])
   @@index([raceDate])
+  @@index([athleteId, isPrimaryRace])
   @@map("athlete_races")
 }
 

@@ -18,6 +18,8 @@ import {
   findActivePlanForAthlete,
   previewPlanRaceCollision,
 } from "@/lib/training/race-plan-calendar-service";
+import { cleanupPlanWorkoutsBeforeDelete } from "@/lib/training/plan-delete-cleanup";
+import { TrainingPlanLifecycle } from "@prisma/client";
 
 export type AthleteRacePlanImpact = Awaited<ReturnType<typeof athleteRaceAffectsActivePlan>>;
 export type AthleteRaceImpactPreview = ReturnType<typeof previewPlanRaceCollision> | null;
@@ -93,16 +95,46 @@ export async function getAthleteRaceById(params: {
   return getAthleteRaceForAthlete(params.athleteId, params.athleteRaceId);
 }
 
-/** Remove athlete race and race-hub membership. */
+/** Remove athlete race and race-hub membership. Optionally delete active plan targeting this race first. */
 export async function removeAthleteRaceWithSideEffects(params: {
   athleteId: string;
   athleteRaceId: string;
-}): Promise<boolean> {
+  deleteActivePlanIfTargeted?: boolean;
+}): Promise<
+  | { ok: true }
+  | { ok: false; reason: "not_found" }
+  | { ok: false; reason: "active_plan_requires_confirmation"; activePlanId: string }
+> {
   const existing = await getAthleteRaceForAthlete(params.athleteId, params.athleteRaceId);
-  if (!existing) return false;
+  if (!existing) return { ok: false, reason: "not_found" };
+
+  const activePlan = await prisma.training_plans.findFirst({
+    where: {
+      athleteId: params.athleteId,
+      lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+      athleteRaceId: params.athleteRaceId,
+    },
+    select: { id: true },
+  });
+
+  if (activePlan && !params.deleteActivePlanIfTargeted) {
+    return {
+      ok: false,
+      reason: "active_plan_requires_confirmation",
+      activePlanId: activePlan.id,
+    };
+  }
+
+  if (activePlan && params.deleteActivePlanIfTargeted) {
+    await cleanupPlanWorkoutsBeforeDelete({
+      planId: activePlan.id,
+      athleteId: params.athleteId,
+    });
+    await prisma.training_plans.delete({ where: { id: activePlan.id } });
+  }
 
   const deleted = await deleteAthleteRace(params);
-  if (!deleted) return false;
+  if (!deleted) return { ok: false, reason: "not_found" };
 
   await prisma.race_memberships.deleteMany({
     where: {
@@ -112,5 +144,5 @@ export async function removeAthleteRaceWithSideEffects(params: {
     },
   });
 
-  return true;
+  return { ok: true };
 }

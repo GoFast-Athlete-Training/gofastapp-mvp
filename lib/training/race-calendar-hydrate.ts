@@ -13,6 +13,7 @@ export type HydratedRaceCalendarAthleteRace = {
   goalTime: string | null;
   goalName: string | null;
   hasGoal: boolean;
+  isPrimaryRace: boolean;
   positionRelativeToPlanRace: "BEFORE" | "ON" | "AFTER" | "UNKNOWN";
   isPlanTarget: boolean;
   race: {
@@ -76,6 +77,7 @@ export function mapAthleteRaceToCalendarRow(
     logoUrl: string | null;
     goalTime: string | null;
     goalName: string | null;
+    isPrimaryRace?: boolean;
   },
   planRaceDate: Date | null,
   planAthleteRaceId: string | null
@@ -87,6 +89,7 @@ export function mapAthleteRaceToCalendarRow(
     goalTime: ar.goalTime,
     goalName: ar.goalName,
     hasGoal,
+    isPrimaryRace: ar.isPrimaryRace ?? false,
     positionRelativeToPlanRace: positionRelativeToPlanRace(ar.raceDate, planRaceDate),
     isPlanTarget: planAthleteRaceId != null && ar.id === planAthleteRaceId,
     race: {

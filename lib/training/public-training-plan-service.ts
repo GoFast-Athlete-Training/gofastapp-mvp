@@ -18,6 +18,7 @@ import { executePlanGenerate } from "@/lib/training/execute-plan-generate";
 import { totalWeeksFromDates } from "@/lib/training/plan-utils";
 import { upsertRaceMembershipFromSignup } from "@/lib/race-container-membership";
 import { syncAthleteProfileSnapshot } from "@/lib/athlete-profile-snapshot";
+import { snapPrimaryRaceToPlanTerminal } from "@/lib/athlete-primary-race";
 import {
   buildCustomWorkoutSnapshot,
   buildPreviewSnapshot,
@@ -606,6 +607,10 @@ export async function adoptPublicTrainingPlan(
 
   await upsertRaceMembershipFromSignup(input.athleteId, race.id);
   await syncAthleteProfileSnapshot(input.athleteId);
+  await snapPrimaryRaceToPlanTerminal({
+    athleteId: input.athleteId,
+    athleteRaceId: result.plan.athleteRaceId!,
+  });
 
   const preset = await prisma.training_plan_preset.findUnique({
     where: { id: publicPlan.sourcePresetId },

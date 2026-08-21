@@ -1,69 +1,57 @@
-import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
-import { buildPublicTrainingFor } from '@/lib/gofast-with-me/public-training-for';
+import assert from "node:assert/strict";
+import test from "node:test";
+import { buildPublicTrainingFor } from "@/lib/gofast-with-me/public-training-for";
 
-const mcm = {
-  id: 'athlete-race-mcm',
-  raceRegistryId: 'registry-mcm',
-  name: 'Marine Corps Marathon',
-  raceDate: new Date('2026-10-25T12:00:00.000Z'),
-  city: 'Arlington',
-  state: 'VA',
-  distanceLabel: 'Marathon',
+const baseRace = {
+  id: "ar-1",
+  raceRegistryId: "rr-1",
+  name: "Marine Corps Marathon",
+  raceDate: new Date("2026-10-25T00:00:00.000Z"),
+  city: "Arlington",
+  state: "VA",
+  distanceLabel: "Marathon",
   distanceMeters: 42195,
-  slug: 'marine-corps-marathon',
-  logoUrl: 'https://example.com/mcm.png',
-  goalName: 'Break 3:05',
-  goalDistance: 'Marathon',
-  goalTime: '3:05:00',
+  slug: "marine-corps-marathon",
+  logoUrl: null,
 };
 
-describe('buildPublicTrainingFor', () => {
-  it('hydrates the public declaration from athlete-scoped snapshots', () => {
-    const result = buildPublicTrainingFor({
-      athleteRace: mcm,
-      publicPlans: [
-        {
-          id: 'plan-mcm',
-          athleteRaceId: mcm.id,
-          name: 'MCM 3:05 Build',
-          publicSlug: 'mcm-305-build',
-          publicDescription: null,
-          totalWeeks: 18,
-        },
-      ],
-    });
-
-    assert.equal(result?.athleteRace.athleteRaceId, mcm.id);
-    assert.equal(result?.athleteRace.slug, mcm.slug);
-    assert.equal(result?.goal.goalTime, '3:05:00');
-    assert.equal(result?.publicPlan?.slug, 'mcm-305-build');
+test("buildPublicTrainingFor returns primary race without goal fields", () => {
+  const result = buildPublicTrainingFor({
+    athleteRace: baseRace,
+    publicPlans: [],
+    isPrimaryRace: true,
   });
+  assert.ok(result);
+  assert.equal(result!.athleteRace.isPrimaryRace, true);
+  assert.equal(result!.goal.name, "Marine Corps Marathon");
+  assert.equal(result!.goal.goalTime, null);
+  assert.equal(result!.publicPlan, null);
+});
 
-  it('does not attach a public plan for a different athlete race', () => {
-    const result = buildPublicTrainingFor({
-      athleteRace: mcm,
-      publicPlans: [
-        {
-          id: 'plan-other',
-          athleteRaceId: 'athlete-race-boston',
-          name: 'Boston Build',
-          publicSlug: 'boston-build',
-          publicDescription: null,
-          totalWeeks: 16,
-        },
-      ],
-    });
-
-    assert.equal(result?.publicPlan, null);
+test("buildPublicTrainingFor returns null for non-primary race without goal", () => {
+  const result = buildPublicTrainingFor({
+    athleteRace: baseRace,
+    publicPlans: [],
+    isPrimaryRace: false,
   });
+  assert.equal(result, null);
+});
 
-  it('returns null when race has no goal fields', () => {
-    const result = buildPublicTrainingFor({
-      athleteRace: { ...mcm, goalTime: null, goalName: null, goalDistance: null },
-      publicPlans: [],
-    });
-
-    assert.equal(result, null);
+test("buildPublicTrainingFor includes public plan when present", () => {
+  const result = buildPublicTrainingFor({
+    athleteRace: { ...baseRace, goalTime: "2:59:00" },
+    publicPlans: [
+      {
+        id: "plan-1",
+        athleteRaceId: "ar-1",
+        name: "MCM Build",
+        publicSlug: "mcm-build",
+        publicDescription: "18 weeks",
+        totalWeeks: 18,
+      },
+    ],
+    isPrimaryRace: true,
   });
+  assert.ok(result?.publicPlan);
+  assert.equal(result!.publicPlan!.slug, "mcm-build");
 });

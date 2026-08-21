@@ -31,6 +31,7 @@ export type AthleteRaceRow = {
   state: string | null;
   slug: string | null;
   logoUrl: string | null;
+  isPrimaryRace: boolean;
   selfDeclaredAt: Date;
   notifyEnabled: boolean;
   createdAt: Date;

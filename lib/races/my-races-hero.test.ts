@@ -7,29 +7,29 @@ const upcoming = [
   { athleteRaceId: "mcm", raceDate: "2026-10-25T00:00:00.000Z" },
 ];
 
-test("pickHeroAthleteRace prefers active plan athleteRaceId", () => {
+test("pickHeroAthleteRace prefers explicit primaryAthleteRaceId", () => {
   const hero = pickHeroAthleteRace({
     upcoming,
-    planAthleteRaceId: "mcm",
-    goalAthleteRaceId: "boulder",
+    primaryAthleteRaceId: "mcm",
+    planAthleteRaceId: "boulder",
   });
   assert.equal(hero?.athleteRaceId, "mcm");
 });
 
-test("pickHeroAthleteRace falls back to goal bolt when no plan FK", () => {
+test("pickHeroAthleteRace falls back to plan FK when no primary", () => {
   const hero = pickHeroAthleteRace({
     upcoming,
-    planAthleteRaceId: null,
-    goalAthleteRaceId: "boulder",
+    primaryAthleteRaceId: null,
+    planAthleteRaceId: "mcm",
   });
-  assert.equal(hero?.athleteRaceId, "boulder");
+  assert.equal(hero?.athleteRaceId, "mcm");
 });
 
 test("pickHeroAthleteRace falls back to nearest upcoming", () => {
   const hero = pickHeroAthleteRace({
     upcoming,
+    primaryAthleteRaceId: null,
     planAthleteRaceId: null,
-    goalAthleteRaceId: null,
   });
   assert.equal(hero?.athleteRaceId, "boulder");
 });

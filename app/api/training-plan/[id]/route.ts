@@ -11,6 +11,7 @@ import { cleanupPlanWorkoutsBeforeDelete } from "@/lib/training/plan-delete-clea
 import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import { resolvePlanTerminalRaceDisplay } from "@/lib/training/plan-race-snapshots";
 import { persistPlanRaceSnapshots } from "@/lib/training/race-plan-calendar-service";
+import { snapPrimaryRaceToPlanTerminal } from "@/lib/athlete-primary-race";
 import {
   computeRaceReadiness,
   deriveKCoefficient,
@@ -492,6 +493,16 @@ export async function PATCH(request: NextRequest, context: Ctx) {
       await persistPlanRaceSnapshots({
         trainingPlanId: id,
         athleteId: auth.athlete.id,
+      });
+    }
+
+    if (
+      planRow.lifecycleStatus === TrainingPlanLifecycle.ACTIVE &&
+      planRow.athleteRaceId
+    ) {
+      await snapPrimaryRaceToPlanTerminal({
+        athleteId: auth.athlete.id,
+        athleteRaceId: planRow.athleteRaceId,
       });
     }
 
