@@ -75,6 +75,22 @@ function openBookendStepFields(): Pick<WorkoutStep, "targets"> | object {
   return {};
 }
 
+/**
+ * Long-run progression bookends: null/undefined → 15% open warmup/cooldown;
+ * explicit 0 opts out; positive values are absolute miles.
+ */
+function longRunProgressionBookendMiles(
+  authored: number | null | undefined,
+  totalMiles: number
+): number {
+  if (authored != null && Number.isFinite(Number(authored))) {
+    const v = Number(authored);
+    if (v <= 0) return 0;
+    return round(v, 2);
+  }
+  return round(totalMiles * 0.15, 2);
+}
+
 function isBookendSegmentTitle(title: string): boolean {
   const t = (title || "").toLowerCase();
   return t.includes("warm") || t.includes("cool");
@@ -476,9 +492,28 @@ export function prescribe(params: {
 
     const wj = entry.segmentPaceDist;
     if (isMilesWorkSegmentList(wj)) {
-      const warmupM = entry.warmupMiles != null && entry.warmupMiles > 0 ? round(entry.warmupMiles, 2) : 0;
-      const cooldownM =
-        entry.cooldownMiles != null && entry.cooldownMiles > 0 ? round(entry.cooldownMiles, 2) : 0;
+      const warmupM = longRunProgressionBookendMiles(entry.warmupMiles, totalMiles);
+      const cooldownM = longRunProgressionBookendMiles(entry.cooldownMiles, totalMiles);
+      const workBudget = Math.max(0, round(totalMiles - warmupM - cooldownM, 2));
+
+      type ParsedProgSeg = {
+        miles: number;
+        paceOffsetSecPerMile?: number | null;
+        paceKey?: string | null;
+      };
+      const parsedSegs: ParsedProgSeg[] = [];
+      let sumSeg = 0;
+      for (const seg of wj) {
+        const m = round(Math.max(0, Number(seg.miles)), 2);
+        if (m <= 0) continue;
+        const row = seg as ParsedProgSeg;
+        parsedSegs.push({ ...row, miles: m });
+        sumSeg += m;
+      }
+
+      const scale =
+        sumSeg > workBudget && sumSeg > 0 && workBudget > 0 ? workBudget / sumSeg : 1;
+
       let order = 1;
       const out: WorkoutStep[] = [];
       if (warmupM > 0) {
@@ -490,17 +525,12 @@ export function prescribe(params: {
           ...openBookendStepFields(),
         });
       }
-      let sumSeg = 0;
-      for (const seg of wj) {
-        const m = round(Math.max(0, Number(seg.miles)), 2);
+      let scaledSum = 0;
+      for (const seg of parsedSegs) {
+        const m = round(seg.miles * scale, 2);
         if (m <= 0) continue;
-        sumSeg += m;
-        const row = seg as {
-          miles?: number;
-          paceOffsetSecPerMile?: number | null;
-          paceKey?: string | null;
-        };
-        const p = resolveSegmentPaceSecPerMile(row, paceCtx);
+        scaledSum += m;
+        const p = resolveSegmentPaceSecPerMile(seg, paceCtx);
         const segTitle =
           p != null && Math.abs(p - mpP) <= 8
             ? "Goal marathon pace"
@@ -515,10 +545,7 @@ export function prescribe(params: {
           ...targetsOrOpen(p),
         });
       }
-      const remain = round(
-        Math.max(0, totalMiles - warmupM - cooldownM - sumSeg),
-        2
-      );
+      const remain = round(Math.max(0, workBudget - scaledSum), 2);
       if (remain > 0.05) {
         out.push({
           stepOrder: order++,

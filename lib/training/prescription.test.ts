@@ -250,3 +250,80 @@ test("Tempo with invalid segmentPaceDist still falls back to sustained block", (
   const tempoSteps = steps.filter((s) => s.title === "Tempo");
   assert.equal(tempoSteps.length, 1, "sustained tempo fallback");
 });
+
+function totalDistanceMiles(steps: ReturnType<typeof prescribe>): number {
+  return steps
+    .filter((s) => s.durationType === "DISTANCE")
+    .reduce((sum, s) => sum + s.durationValue, 0);
+}
+
+test("LongRun progression defaults null bookends to 15% open warmup and cooldown", () => {
+  const steps = prescribe({
+    entry: baseCatalogue({
+      workoutType: "LongRun",
+      workPaceOffsetSecPerMile: 90,
+      warmupMiles: null,
+      cooldownMiles: null,
+      segmentPaceDist: [
+        { miles: 2, paceOffsetSecPerMile: 60 },
+        { miles: 2, paceOffsetSecPerMile: 45 },
+        { miles: 2, paceOffsetSecPerMile: 30 },
+      ] as unknown as workout_catalogue["segmentPaceDist"],
+    }),
+    scheduleMiles: 12,
+    anchorSecondsPerMile: ANCHOR_SEC,
+  });
+  const warmup = steps.find((s) => s.title === "Warmup");
+  const cooldown = steps.find((s) => s.title === "Cooldown");
+  assert.ok(warmup, "expected default warmup");
+  assert.ok(cooldown, "expected default cooldown");
+  assert.equal(warmup!.durationValue, 1.8, "15% of 12 mi");
+  assert.equal(cooldown!.durationValue, 1.8, "15% of 12 mi");
+  assert.equal(warmup!.targets, undefined, "warmup is OPEN");
+  assert.equal(cooldown!.targets, undefined, "cooldown is OPEN");
+  assert.equal(steps[0]!.title, "Warmup", "must not start with hard-paced work");
+});
+
+test("LongRun progression explicit zero bookends skip warmup and cooldown", () => {
+  const steps = prescribe({
+    entry: baseCatalogue({
+      workoutType: "LongRun",
+      warmupMiles: 0,
+      cooldownMiles: 0,
+      workPaceOffsetSecPerMile: 90,
+      segmentPaceDist: [
+        { miles: 3, paceOffsetSecPerMile: 60 },
+      ] as unknown as workout_catalogue["segmentPaceDist"],
+    }),
+    scheduleMiles: 10,
+    anchorSecondsPerMile: ANCHOR_SEC,
+  });
+  assert.equal(steps.find((s) => s.title === "Warmup"), undefined);
+  assert.equal(steps.find((s) => s.title === "Cooldown"), undefined);
+});
+
+test("LongRun progression scales authored segments to fit scheduled distance", () => {
+  const scheduleMiles = 10;
+  const steps = prescribe({
+    entry: baseCatalogue({
+      workoutType: "LongRun",
+      warmupMiles: null,
+      cooldownMiles: null,
+      workPaceOffsetSecPerMile: 90,
+      segmentPaceDist: [
+        { miles: 4, paceOffsetSecPerMile: 60 },
+        { miles: 4, paceOffsetSecPerMile: 45 },
+        { miles: 4, paceOffsetSecPerMile: 30 },
+      ] as unknown as workout_catalogue["segmentPaceDist"],
+    }),
+    scheduleMiles,
+    anchorSecondsPerMile: ANCHOR_SEC,
+  });
+  const total = totalDistanceMiles(steps);
+  assert.ok(
+    total <= scheduleMiles + 0.06,
+    `total ${total} should not exceed schedule ${scheduleMiles}`
+  );
+  assert.ok(steps.some((s) => s.title === "Warmup"));
+  assert.ok(steps.some((s) => s.title === "Cooldown"));
+});
