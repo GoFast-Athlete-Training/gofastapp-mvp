@@ -780,10 +780,14 @@ export default function TrainingSetupClient() {
                     athleteRaceId: wizardGoal.id,
                     name: rr.name,
                     raceDate: rr.raceDate,
-                    distanceLabel: rr.distanceLabel,
-                    distanceMeters: rr.distanceMeters,
+                    distanceLabel: rr.distanceLabel ?? null,
+                    distanceMeters: rr.distanceMeters ?? null,
                   }}
-                  goal={wizardGoal}
+                  goal={{
+                    id: wizardGoal.id,
+                    goalTime: wizardGoal.goalTime,
+                    athleteRaceId: wizardGoal.athleteRaceId,
+                  }}
                   onSaved={handleInitiateGoalSaved}
                 />
                 <button
