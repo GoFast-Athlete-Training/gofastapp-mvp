@@ -35,6 +35,11 @@ import {
 import PlanSecondaryRacesReview, {
   type SecondaryRaceCandidate,
 } from "@/components/training/PlanSecondaryRacesReview";
+import { AddedRacePlanPrompt } from "@/components/training/AddedRacePlanPrompt";
+import {
+  isAddedRacePromptDismissed,
+  type PlanRaceEventsPayload,
+} from "@/lib/training/added-race-plan-regen";
 
 type PlanWeekRow =
   | { weekNumber: number; phase: string; schedule: string }
@@ -168,6 +173,10 @@ export default function TrainingSetupPlanPage({
     number | null
   >(null);
   const [secondaryCandidates, setSecondaryCandidates] = useState<SecondaryRaceCandidate[]>([]);
+  const [snappedAthleteRaceIds, setSnappedAthleteRaceIds] = useState<string[]>([]);
+  const [pendingRaceCandidates, setPendingRaceCandidates] = useState<SecondaryRaceCandidate[]>([]);
+  const [terminalRaceName, setTerminalRaceName] = useState<string | null>(null);
+  const [handledPendingRaceIds, setHandledPendingRaceIds] = useState<Set<string>>(new Set());
   const [includedSecondaryAthleteRaceIds, setIncludedSecondaryAthleteRaceIds] = useState<Set<string>>(
     new Set()
   );
@@ -215,9 +224,7 @@ export default function TrainingSetupPlanPage({
         headers: athleteBearerFetchHeaders(token),
       });
       if (!res.ok) return;
-      const data = (await res.json()) as {
-        candidates?: SecondaryRaceCandidate[];
-      };
+      const data = (await res.json()) as PlanRaceEventsPayload;
       const candidates = (data.candidates ?? []).map((c) => ({
         athleteRaceId: c.athleteRaceId,
         raceRegistryId: c.raceRegistryId,
@@ -227,8 +234,25 @@ export default function TrainingSetupPlanPage({
           distanceLabel: c.race.distanceLabel ?? null,
         },
       }));
+      const pending = (data.pendingCandidates ?? []).map((c) => ({
+        athleteRaceId: c.athleteRaceId,
+        raceRegistryId: c.raceRegistryId,
+        race: {
+          name: c.race.name,
+          raceDate: c.race.raceDate,
+          distanceLabel: c.race.distanceLabel ?? null,
+        },
+      }));
       setSecondaryCandidates(candidates);
-      setIncludedSecondaryAthleteRaceIds(new Set(candidates.map((c) => c.athleteRaceId)));
+      setSnappedAthleteRaceIds(data.snappedAthleteRaceIds ?? []);
+      setPendingRaceCandidates(pending);
+      setTerminalRaceName(data.terminalRace?.name ?? null);
+      setIncludedSecondaryAthleteRaceIds(
+        new Set([
+          ...(data.snappedAthleteRaceIds ?? []),
+          ...(data.pendingCandidates ?? []).map((c) => c.athleteRaceId),
+        ])
+      );
     } catch {
       setSecondaryCandidates([]);
       setIncludedSecondaryAthleteRaceIds(new Set());
@@ -765,7 +789,48 @@ export default function TrainingSetupPlanPage({
             {formatPlanDateDisplay(plan.startDate)}
           </p>
 
-          {adjustRaceFromSignup && hasSchedule ? (
+          {pendingRaceCandidates
+            .filter(
+              (c) =>
+                !isAddedRacePromptDismissed(c.athleteRaceId) &&
+                !handledPendingRaceIds.has(c.athleteRaceId)
+            )
+            .map((candidate) => (
+              <AddedRacePlanPrompt
+                key={candidate.athleteRaceId}
+                className="mb-4"
+                planId={planId}
+                getToken={getToken}
+                addedRaceAthleteRaceId={candidate.athleteRaceId}
+                addedRaceName={candidate.race.name}
+                terminalRaceName={terminalRaceName}
+                weeklyMileageTarget={
+                  resolveTargetMiles() ??
+                  (plan.weeklyMileageTarget != null
+                    ? Math.round(Number(plan.weeklyMileageTarget))
+                    : athleteWeeklyTargetPreference ?? 40)
+                }
+                minWeeklyMiles={presetMinWeeklyMiles}
+                snappedAthleteRaceIds={snappedAthleteRaceIds}
+                pendingAthleteRaceIds={pendingRaceCandidates.map((c) => c.athleteRaceId)}
+                onSuccess={async () => {
+                  setHandledPendingRaceIds((prev) =>
+                    new Set(prev).add(candidate.athleteRaceId)
+                  );
+                  setRegenerationSuccess(true);
+                  setPlanScheduleEpoch((epoch) => epoch + 1);
+                  await loadPlan({ quiet: true });
+                  await loadPlanRaceEvents();
+                }}
+                onDismiss={() => {
+                  setHandledPendingRaceIds((prev) =>
+                    new Set(prev).add(candidate.athleteRaceId)
+                  );
+                }}
+              />
+            ))}
+
+          {adjustRaceFromSignup && hasSchedule && pendingRaceCandidates.length === 0 ? (
             <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
               <p className="font-medium">Adjust your plan for the new race</p>
               <p className="mt-1 text-amber-900/90">

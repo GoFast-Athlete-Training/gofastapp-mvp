@@ -5,13 +5,19 @@ import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { prisma } from "@/lib/prisma";
 import { listSecondaryCandidatesForPlan } from "@/lib/training/race-plan-calendar-service";
 import { parseAthleteRaceMainSnap } from "@/lib/training/plan-race-snapshots";
+import { currentTrainingWeekNumber } from "@/lib/training/plan-utils";
+import {
+  computePendingCandidates,
+  getSnappedAthleteRaceIds,
+  serializePlanRaceEventCandidate,
+} from "@/lib/training/plan-pending-races";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-/** GET /api/training-plan/[id]/race-events — secondary bolt-on candidates */
-export async function GET(_request: NextRequest, context: Ctx) {
+/** GET /api/training-plan/[id]/race-events — secondary bolt-on + pending detection */
+export async function GET(request: NextRequest, context: Ctx) {
   try {
-    const auth = await requireAthleteFromBearer(_request);
+    const auth = await requireAthleteFromBearer(request);
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -41,17 +47,48 @@ export async function GET(_request: NextRequest, context: Ctx) {
       athleteRaceId: plan.athleteRaceId,
     });
 
-    const candidates = rawCandidates.map((ar) => ({
-      athleteRaceId: ar.id,
-      raceRegistryId: ar.raceRegistryId,
-      race: {
-        name: ar.name,
-        raceDate: ar.raceDate.toISOString(),
-        distanceLabel: ar.distanceLabel,
-      },
-    }));
+    const candidates = rawCandidates.map(serializePlanRaceEventCandidate);
+    const snappedAthleteRaceIds = getSnappedAthleteRaceIds(plan.athleteRaceAlongWaySnaps);
+    const pendingCandidates = computePendingCandidates(candidates, snappedAthleteRaceIds);
+    const needsRegenerate = pendingCandidates.length > 0;
 
-    return NextResponse.json({ candidates });
+    const terminalRace = plan.athlete_race
+      ? {
+          athleteRaceId: plan.athlete_race.id,
+          name: plan.athlete_race.name,
+        }
+      : mainSnap
+        ? {
+            athleteRaceId: mainSnap.sourceAthleteRaceId,
+            name: mainSnap.name,
+          }
+        : null;
+
+    const focusAthleteRaceId = request.nextUrl.searchParams
+      .get("focusAthleteRaceId")
+      ?.trim();
+    let focusWeekNumber: number | null = null;
+    if (focusAthleteRaceId) {
+      const focusRow =
+        rawCandidates.find((ar) => ar.id === focusAthleteRaceId) ??
+        (plan.athlete_race?.id === focusAthleteRaceId ? plan.athlete_race : null);
+      if (focusRow) {
+        focusWeekNumber = currentTrainingWeekNumber(
+          plan.startDate,
+          plan.totalWeeks,
+          focusRow.raceDate
+        );
+      }
+    }
+
+    return NextResponse.json({
+      candidates,
+      snappedAthleteRaceIds,
+      pendingCandidates,
+      needsRegenerate,
+      terminalRace,
+      focusWeekNumber,
+    });
   } catch (e: unknown) {
     console.error("GET /api/training-plan/[id]/race-events", e);
     return NextResponse.json(

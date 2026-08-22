@@ -29,6 +29,7 @@ const REGENERATE_PATCH_KEYS = new Set([
   "preferredLongRunDow",
   "preferredTempoDow",
   "preferredIntervalDow",
+  "athleteRaceId",
 ]);
 
 /** `id` = `training_plans.id` (see `lib/training/persisted-training-plan.ts` for generate vs week/workout flows). */
@@ -286,7 +287,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         return NextResponse.json(
           {
             error:
-              "After the training schedule is generated, only lifecycleStatus, currentFiveKPace, weeklyMileageTarget, and training-day preferences can be updated",
+              "After the training schedule is generated, only lifecycleStatus, currentFiveKPace, athleteRaceId, weeklyMileageTarget, and training-day preferences can be updated",
           },
           { status: 400 }
         );
@@ -315,7 +316,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
       let finalTempo = existing.preferredTempoDow ?? null;
       let finalInterval = existing.preferredIntervalDow ?? null;
 
-      if (!scheduleLocked) {
+        if (!scheduleLocked) {
         if (body.startDate != null) {
           const d = new Date(body.startDate);
           if (Number.isNaN(d.getTime())) {
@@ -329,21 +330,6 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         }
         if (body.currentWeeklyMileage != null) {
           data.currentWeeklyMileage = Number(body.currentWeeklyMileage);
-        }
-        if (body.athleteRaceId != null) {
-          const arId = String(body.athleteRaceId).trim();
-          const ar = await prisma.athlete_races.findFirst({
-            where: { id: arId, athleteId: auth.athlete.id },
-          });
-          if (!ar) {
-            return NextResponse.json({ error: "Athlete race not found" }, { status: 404 });
-          }
-          data.athleteRaceId = ar.id;
-          const startForWeeks =
-            (data.startDate as Date | undefined) ?? existing.startDate;
-          data.totalWeeks = totalWeeksFromDates(startForWeeks, ar.raceDate);
-        } else if (body.athleteRaceId === null) {
-          data.athleteRaceId = null;
         }
         if ("presetId" in body) {
           const raw = body.presetId;
@@ -361,6 +347,21 @@ export async function PATCH(request: NextRequest, context: Ctx) {
             data.presetId = pid;
           }
         }
+      }
+      if (body.athleteRaceId != null) {
+        const arId = String(body.athleteRaceId).trim();
+        const ar = await prisma.athlete_races.findFirst({
+          where: { id: arId, athleteId: auth.athlete.id },
+        });
+        if (!ar) {
+          return NextResponse.json({ error: "Athlete race not found" }, { status: 404 });
+        }
+        data.athleteRaceId = ar.id;
+        const startForWeeks =
+          (data.startDate as Date | undefined) ?? existing.startDate;
+        data.totalWeeks = totalWeeksFromDates(startForWeeks, ar.raceDate);
+      } else if (body.athleteRaceId === null && !scheduleLocked) {
+        data.athleteRaceId = null;
       }
       if (Array.isArray(body.preferredDays)) {
         nextPreferredDays = body.preferredDays
@@ -489,7 +490,11 @@ export async function PATCH(request: NextRequest, context: Ctx) {
       await cascadeLinkedGoalAfterPlanArchived(id, auth.athlete.id);
     }
 
-    if (!scheduleLocked && (body.athleteRaceId != null || body.startDate != null)) {
+    if (
+      !scheduleLocked ||
+      body.athleteRaceId != null ||
+      body.startDate != null
+    ) {
       await persistPlanRaceSnapshots({
         trainingPlanId: id,
         athleteId: auth.athlete.id,

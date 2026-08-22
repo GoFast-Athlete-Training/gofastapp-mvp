@@ -3,9 +3,17 @@
 import { useCallback, useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
 import api from "@/lib/api";
+import { auth } from "@/lib/firebase";
 import { formatRaceListDate } from "@/lib/races-display";
 import { InlineGoalForm, type InlineGoalRow } from "@/components/races/InlineGoalForm";
+import { AddedRacePlanPrompt } from "@/components/training/AddedRacePlanPrompt";
+import {
+  fetchPlanRaceEvents,
+  isAddedRacePromptDismissed,
+} from "@/lib/training/added-race-plan-regen";
+import { fetchTrainingPlanDetail } from "@/lib/training/fetch-plan-week-client";
 
 type AthleteRaceDetail = {
   id: string;
@@ -32,6 +40,15 @@ export default function RaceSetupPage({
   const [error, setError] = useState<string | null>(null);
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [goal, setGoal] = useState<InlineGoalRow | null>(null);
+  const [activePlanId, setActivePlanId] = useState<string | null>(null);
+  const [terminalRaceName, setTerminalRaceName] = useState<string | null>(null);
+  const [snappedAthleteRaceIds, setSnappedAthleteRaceIds] = useState<string[]>([]);
+  const [pendingAthleteRaceIds, setPendingAthleteRaceIds] = useState<string[]>([]);
+  const [focusWeekNumber, setFocusWeekNumber] = useState<number | null>(null);
+  const [weeklyMileageTarget, setWeeklyMileageTarget] = useState(40);
+  const [minWeeklyMiles, setMinWeeklyMiles] = useState<number | undefined>(undefined);
+  const [showAddedRacePrompt, setShowAddedRacePrompt] = useState(false);
+  const [promptHandled, setPromptHandled] = useState(false);
 
   const load = useCallback(async () => {
     if (!athleteRaceId) return;
@@ -54,6 +71,60 @@ export default function RaceSetupPage({
         });
         setShowGoalForm(true);
       }
+
+      let user = auth.currentUser;
+      if (!user) {
+        user = await new Promise<typeof auth.currentUser>((resolve) => {
+          const unsub = onAuthStateChanged(auth, (u) => {
+            unsub();
+            resolve(u);
+          });
+        });
+      }
+      if (!user) return;
+
+      const token = await user.getIdToken();
+
+      const listRes = await api.get<{
+        athleteRaces?: Array<{ id: string; trainingPlanId?: string | null }>;
+      }>("/athlete-races");
+      const planId =
+        listRes.data.athleteRaces?.find((r) => r.trainingPlanId)?.trainingPlanId ?? null;
+      setActivePlanId(planId ?? null);
+      if (!planId) return;
+
+      const [raceEvents, planDetail] = await Promise.all([
+        fetchPlanRaceEvents(planId, token, { focusAthleteRaceId: athleteRaceId }),
+        fetchTrainingPlanDetail(planId, token),
+      ]);
+
+      const target =
+        (planDetail.plan as { weeklyMileageTarget?: number | null }).weeklyMileageTarget ??
+        planDetail.weeklyMileageTargetPreference ??
+        40;
+      setWeeklyMileageTarget(
+        typeof target === "number" && Number.isFinite(target) ? Math.round(target) : 40
+      );
+      const presetMin = (
+        planDetail.plan as {
+          training_plan_preset?: { minWeeklyMiles?: number | null } | null;
+        }
+      ).training_plan_preset?.minWeeklyMiles;
+      if (typeof presetMin === "number" && Number.isFinite(presetMin)) {
+        setMinWeeklyMiles(Math.round(presetMin));
+      }
+
+      if (!raceEvents) return;
+
+      setTerminalRaceName(raceEvents.terminalRace?.name ?? null);
+      setSnappedAthleteRaceIds(raceEvents.snappedAthleteRaceIds ?? []);
+      const pending = (raceEvents.pendingCandidates ?? []).map((c) => c.athleteRaceId);
+      setPendingAthleteRaceIds(pending);
+      setFocusWeekNumber(raceEvents.focusWeekNumber ?? null);
+
+      const isPending = pending.includes(athleteRaceId);
+      const dismissed = isAddedRacePromptDismissed(athleteRaceId);
+      setShowAddedRacePrompt(isPending && !dismissed);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load race");
       setAthleteRace(null);
@@ -106,6 +177,28 @@ export default function RaceSetupPage({
           {athleteRace.distanceLabel ? ` · ${athleteRace.distanceLabel}` : ""}
         </p>
       </div>
+
+      {showAddedRacePrompt && activePlanId && !promptHandled ? (
+        <AddedRacePlanPrompt
+          className="mt-6"
+          planId={activePlanId}
+          getToken={async () => {
+            const user = auth.currentUser;
+            if (!user) throw new Error("Sign in required");
+            return user.getIdToken();
+          }}
+          addedRaceAthleteRaceId={athleteRaceId}
+          addedRaceName={athleteRace.name}
+          weekNumber={focusWeekNumber}
+          terminalRaceName={terminalRaceName}
+          weeklyMileageTarget={weeklyMileageTarget}
+          minWeeklyMiles={minWeeklyMiles}
+          snappedAthleteRaceIds={snappedAthleteRaceIds}
+          pendingAthleteRaceIds={pendingAthleteRaceIds}
+          onSuccess={() => setPromptHandled(true)}
+          onDismiss={() => setShowAddedRacePrompt(false)}
+        />
+      ) : null}
 
       {!showGoalForm ? (
         <div className="mt-8 space-y-3">
