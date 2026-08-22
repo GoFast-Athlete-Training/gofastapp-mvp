@@ -313,7 +313,7 @@ function AthleteRaceCard({
             }
             className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
           >
-            {row.trainingPlanId ? "View plan" : "Train for this race"}
+            {row.trainingPlanId ? "View plan" : "Add a plan"}
           </Link>
         ) : null}
         <Link

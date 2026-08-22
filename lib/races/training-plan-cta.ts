@@ -15,7 +15,7 @@ export function trainingPlanCtaForRace(params: {
   if (params.goalTime?.trim()) {
     return {
       href: `/training-setup?athleteRaceId=${encodeURIComponent(params.athleteRaceId)}`,
-      label: "Build a GoFast plan →",
+      label: "Add a plan",
     };
   }
   return { href: params.myRaceHref, label: "Set a goal →" };

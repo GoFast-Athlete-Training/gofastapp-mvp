@@ -117,6 +117,7 @@ export default function TrainingHubPage() {
   const [weekDays, setWeekDays] = useState<PlanDayCard[]>([]);
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [legacyPlanReselect, setLegacyPlanReselect] = useState<{
     id: string;
     name: string;
@@ -478,6 +479,41 @@ export default function TrainingHubPage() {
     }
   }
 
+  async function archiveActivePlan() {
+    if (!planDetail) return;
+    if (
+      !window.confirm(
+        `Archive "${planDetail.name}"? It stays in your history but won't be your active plan.`
+      )
+    ) {
+      return;
+    }
+    setArchiving(true);
+    try {
+      const u = auth.currentUser;
+      if (!u) return;
+      const token = await u.getIdToken();
+      const res = await fetch(`/api/training-plan/${planDetail.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...athleteBearerFetchHeaders(token),
+        },
+        body: JSON.stringify({ lifecycleStatus: "ARCHIVED" }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Could not archive plan");
+      }
+      setPlanMenuOpen(false);
+      await loadHub();
+    } catch (e) {
+      setHubError(e instanceof Error ? e.message : "Could not archive plan");
+    } finally {
+      setArchiving(false);
+    }
+  }
+
   async function deleteActivePlan() {
     if (!planDetail) return;
     if (
@@ -616,7 +652,7 @@ export default function TrainingHubPage() {
                     >
                       <span>{r.name}</span>
                       <span className="text-xs font-normal text-gray-500">
-                        {r.goalTime ? `Goal ${r.goalTime}` : "Set goal on race"}
+                        {r.goalTime ? `Goal ${r.goalTime}` : "Set goal on race"} · Add a plan
                       </span>
                     </Link>
                   </li>
@@ -643,7 +679,7 @@ export default function TrainingHubPage() {
                     >
                       <span>{r.name}</span>
                       <span className="text-xs font-normal text-gray-500">
-                        {r.goalTime ? `Goal ${r.goalTime}` : "Set goal first"}
+                        {r.goalTime ? `Goal ${r.goalTime}` : "Set goal first"} · Add a plan
                       </span>
                     </Link>
                   </li>
@@ -936,7 +972,18 @@ export default function TrainingHubPage() {
                         <div className="my-1 border-t border-gray-100" />
                         <button
                           type="button"
-                          disabled={deleting}
+                          disabled={archiving || deleting}
+                          onClick={() => {
+                            setPlanMenuOpen(false);
+                            void archiveActivePlan();
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          {archiving ? "Archiving…" : "Archive this plan"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deleting || archiving}
                           onClick={() => {
                             setPlanMenuOpen(false);
                             void deleteActivePlan();

@@ -535,7 +535,7 @@ export default function MyRacePage() {
                     href={`/training-setup?athleteRaceId=${encodeURIComponent(signup!.id)}`}
                     className="mt-4 inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
                   >
-                    Build a training plan →
+                    Add a plan →
                   </Link>
                 </>
               ) : (

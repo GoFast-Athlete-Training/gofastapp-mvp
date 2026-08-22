@@ -15,6 +15,7 @@ import {
 } from "@/lib/training/preset-distance-match";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import { AthletePresetIngestForm } from "@/components/training/AthletePresetIngestForm";
+import { InlineGoalForm, type InlineGoalRow } from "@/components/races/InlineGoalForm";
 
 type RaceRegistryLite = {
   id: string;
@@ -163,6 +164,57 @@ function suggestPlanName(raceName: string, firstName: string | null): string {
   if (!race) return "My Training Plan";
   if (firstName?.trim()) return `${firstName.trim()}'s ${race} Build`;
   return `${race} Build`;
+}
+
+function signupToGoalRow(s: SignupRow): GoalRow | null {
+  const rr = s.race_registry;
+  if (!rr?.raceDate || raceCalendarBeforeTodayUtc(rr.raceDate)) return null;
+  return {
+    id: s.id,
+    status: "ACTIVE",
+    goalTime: null,
+    athleteRaceId: s.id,
+    targetByDate: rr.raceDate,
+    athlete_race: {
+      raceRegistryId: s.raceRegistryId,
+      name: rr.name,
+      raceDate: rr.raceDate,
+      distanceMeters: rr.distanceMeters ?? null,
+      distanceLabel: rr.distanceLabel ?? null,
+      city: rr.city ?? null,
+      state: rr.state ?? null,
+    },
+  };
+}
+
+function athleteRaceApiToGoalRow(row: {
+  id: string;
+  raceRegistryId: string;
+  name: string;
+  raceDate: string;
+  distanceMeters?: number | null;
+  distanceLabel?: string | null;
+  city?: string | null;
+  state?: string | null;
+  goalTime?: string | null;
+}): GoalRow | null {
+  if (raceCalendarBeforeTodayUtc(row.raceDate)) return null;
+  return {
+    id: row.id,
+    status: "ACTIVE",
+    goalTime: row.goalTime?.trim() || null,
+    athleteRaceId: row.id,
+    targetByDate: row.raceDate,
+    athlete_race: {
+      raceRegistryId: row.raceRegistryId,
+      name: row.name,
+      raceDate: row.raceDate,
+      distanceMeters: row.distanceMeters ?? null,
+      distanceLabel: row.distanceLabel ?? null,
+      city: row.city ?? null,
+      state: row.state ?? null,
+    },
+  };
 }
 
 export default function TrainingSetupClient() {
@@ -378,13 +430,44 @@ export default function TrainingSetupClient() {
   }, [ready, loadOrientation]);
 
   useEffect(() => {
-    if (!ready || loadingOrientation || qualifyingGoals.length === 0) return;
-    if (!athleteRaceIdFromUrl) return;
-    const g = qualifyingGoals.find((x) => x.id === athleteRaceIdFromUrl);
-    if (g) {
-      setWizardGoal(g);
+    if (!ready || loadingOrientation || !athleteRaceIdFromUrl || wizardGoal) return;
+
+    const fromGoals = goals.find(
+      (g) => g.id === athleteRaceIdFromUrl || g.athleteRaceId === athleteRaceIdFromUrl
+    );
+    if (fromGoals && goalRaceReady(fromGoals) && !raceCalendarBeforeTodayUtc(fromGoals.athlete_race!.raceDate)) {
+      setWizardGoal(fromGoals);
+      return;
     }
-  }, [ready, loadingOrientation, qualifyingGoals, athleteRaceIdFromUrl]);
+
+    const fromSignup = signups
+      .map(signupToGoalRow)
+      .find((g) => g?.id === athleteRaceIdFromUrl);
+    if (fromSignup) {
+      setWizardGoal(fromSignup);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch(`/api/athlete-races/${encodeURIComponent(athleteRaceIdFromUrl)}`, {
+          headers: athleteBearerFetchHeaders(token),
+        });
+        const data = (await res.json()) as { athleteRace?: Parameters<typeof athleteRaceApiToGoalRow>[0] };
+        if (cancelled || !res.ok || !data.athleteRace) return;
+        const row = athleteRaceApiToGoalRow(data.athleteRace);
+        if (row) setWizardGoal(row);
+      } catch {
+        /* optional fetch */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, loadingOrientation, athleteRaceIdFromUrl, goals, signups, wizardGoal]);
 
   useEffect(() => {
     if (!ready || !wizardGoal || loadingOrientation) return;
@@ -437,6 +520,8 @@ export default function TrainingSetupClient() {
   function beginWizardForGoal(g: GoalRow) {
     setWizardGoal(g);
     setSelectedPreset(null);
+    setSelectedAthletePresetId(null);
+    setPresetPickMode("choose");
     setPlanName("");
     setPlanNameTouched(false);
     setFormError(null);
@@ -445,7 +530,23 @@ export default function TrainingSetupClient() {
     setReplaceBlockPlan(null);
     const today = new Date();
     setStartDate(today.toISOString().split("T")[0]);
-    router.replace(`/training-setup?athleteRaceId=${encodeURIComponent(g.id)}`, { scroll: false });
+    const qs = new URLSearchParams({ athleteRaceId: g.id });
+    if (replacingFromAddedRace) qs.set("retireActivePlan", retireActivePlanFromUrl);
+    router.replace(`/training-setup?${qs.toString()}`, { scroll: false });
+  }
+
+  function handleInitiateGoalSaved(updated: InlineGoalRow) {
+    if (!wizardGoal) return;
+    const gt = updated.goalTime?.trim() || null;
+    setWizardGoal((prev) => (prev ? { ...prev, goalTime: gt } : prev));
+    setGoals((prev) => {
+      const idx = prev.findIndex((g) => g.id === wizardGoal.id);
+      if (idx < 0) return prev;
+      const next = [...prev];
+      next[idx] = { ...next[idx]!, goalTime: gt };
+      return next;
+    });
+    void loadOrientation();
   }
 
   function exitWizard() {
@@ -637,6 +738,8 @@ export default function TrainingSetupClient() {
       (presetPickMode === "catalog" && !selectedPreset) ||
       (presetPickMode === "custom" && !selectedAthletePresetId);
 
+    const needsGoalTimeStep = !goalTimeReady(wizardGoal);
+
     function onSelectPreset(p: PresetForWizard) {
       setSelectedPreset(p);
       setSelectedAthletePresetId(null);
@@ -664,7 +767,34 @@ export default function TrainingSetupClient() {
               {goalDistanceLine ? ` · ${goalDistanceLine}` : ""}.
             </p>
 
-            {stepChoosePreset ? (
+            {needsGoalTimeStep ? (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-amber-100 bg-amber-50/80 p-4 text-sm text-gray-800">
+                  <p className="font-medium text-gray-900">Set a goal time first</p>
+                  <p className="mt-1 text-gray-700">
+                    Add a plan needs a finish-time goal for {rr.name}.
+                  </p>
+                </div>
+                <InlineGoalForm
+                  race={{
+                    athleteRaceId: wizardGoal.id,
+                    name: rr.name,
+                    raceDate: rr.raceDate,
+                    distanceLabel: rr.distanceLabel,
+                    distanceMeters: rr.distanceMeters,
+                  }}
+                  goal={wizardGoal}
+                  onSaved={handleInitiateGoalSaved}
+                />
+                <button
+                  type="button"
+                  onClick={exitWizard}
+                  className="text-sm font-medium text-orange-600 hover:text-orange-800"
+                >
+                  ← Back
+                </button>
+              </div>
+            ) : stepChoosePreset ? (
               <>
                 {presetPickMode === "choose" ? (
                   <>
@@ -1141,7 +1271,7 @@ export default function TrainingSetupClient() {
                     onClick={() => beginWizardForGoal(g)}
                     className="mt-3 w-full rounded-lg bg-orange-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-orange-600"
                   >
-                    Train for this goal
+                    Add a plan
                   </button>
                 </li>
               ))}

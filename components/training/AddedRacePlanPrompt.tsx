@@ -20,8 +20,6 @@ export type AddedRacePlanPromptProps = {
   className?: string;
 };
 
-type RetireMode = "park" | "archive";
-
 export function AddedRacePlanPrompt({
   planId,
   getToken,
@@ -38,19 +36,19 @@ export function AddedRacePlanPrompt({
   className = "",
 }: AddedRacePlanPromptProps) {
   const router = useRouter();
-  const [step, setStep] = useState<"prompt" | "retire">("prompt");
   const [busy, setBusy] = useState<"cruise" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const terminalLabel = terminalRaceName?.trim() || "your goal race";
   const isRegenerating = busy != null;
 
-  function goToSetup(retireActivePlan: RetireMode) {
+  function goToAddPlan() {
     const qs = new URLSearchParams({
       athleteRaceId: addedRaceAthleteRaceId,
-      retireActivePlan,
+      retireActivePlan: "park",
     });
     router.push(`/training-setup?${qs.toString()}`);
+    onSuccess?.();
   }
 
   async function handleCruise() {
@@ -83,44 +81,6 @@ export function AddedRacePlanPrompt({
     onDismiss?.();
   }
 
-  if (step === "retire") {
-    return (
-      <div
-        className={`rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 ${className}`}
-      >
-        <p className="font-medium text-amber-950">
-          You already have a plan for {terminalLabel}.
-        </p>
-        <p className="mt-2 text-amber-900/90">
-          What should we do with it before building for {addedRaceName}?
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => goToSetup("park")}
-            className="inline-flex items-center rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
-          >
-            Pick this up later
-          </button>
-          <button
-            type="button"
-            onClick={() => goToSetup("archive")}
-            className="inline-flex items-center rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950 hover:bg-amber-100/80"
-          >
-            Archive it
-          </button>
-          <button
-            type="button"
-            onClick={() => setStep("prompt")}
-            className="inline-flex items-center rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950 hover:bg-amber-100/80"
-          >
-            ← Back
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       className={`rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 ${className}`}
@@ -130,8 +90,8 @@ export function AddedRacePlanPrompt({
         {weekNumber != null ? ` It falls in your current plan (week ${weekNumber}).` : " It falls in your current plan."}
       </p>
       <p className="mt-2 text-amber-900/90">
-        Make this your main training race for a new build, or keep training for {terminalLabel} and
-        we&apos;ll overlay this race on your schedule.
+        Add a new plan for {addedRaceName}, or keep training for {terminalLabel} and we&apos;ll
+        overlay this race on your schedule.
       </p>
 
       {isRegenerating ? (
@@ -140,11 +100,11 @@ export function AddedRacePlanPrompt({
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setStep("retire")}
+            onClick={goToAddPlan}
             disabled={isRegenerating}
             className="inline-flex items-center rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
           >
-            Make this my main training race
+            Add a plan for {addedRaceName}
           </button>
           <button
             type="button"

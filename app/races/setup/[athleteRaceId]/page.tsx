@@ -155,6 +155,12 @@ export default function RaceSetupPage({
   const location = [athleteRace.city, athleteRace.state].filter(Boolean).join(", ");
   const dateLine = formatRaceListDate(athleteRace.raceDate);
 
+  function addPlanHref() {
+    const qs = new URLSearchParams({ athleteRaceId });
+    if (activePlanId) qs.set("retireActivePlan", "park");
+    return `/training-setup?${qs.toString()}`;
+  }
+
   return (
     <div className="max-w-lg">
       <Link href="/races/find" className="text-sm text-orange-600 font-medium hover:underline">
@@ -203,10 +209,16 @@ export default function RaceSetupPage({
       {!showGoalForm ? (
         <div className="mt-8 space-y-3">
           <p className="text-sm text-gray-700">What&apos;s next?</p>
+          <Link
+            href={addPlanHref()}
+            className="flex w-full items-center justify-center rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-600"
+          >
+            Add a plan
+          </Link>
           <button
             type="button"
             onClick={() => setShowGoalForm(true)}
-            className="w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-600"
+            className="w-full rounded-xl border border-orange-300 bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-900 hover:bg-orange-100"
           >
             Set a goal
           </button>
@@ -238,7 +250,9 @@ export default function RaceSetupPage({
               distanceMeters: athleteRace.distanceMeters,
             }}
             goal={goal}
-            onSaved={() => router.push("/races")}
+            onSaved={() => {
+              router.push(addPlanHref());
+            }}
           />
           <button
             type="button"
