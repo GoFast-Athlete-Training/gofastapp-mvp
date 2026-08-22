@@ -8,6 +8,7 @@ import {
 } from "@/lib/training/public-plan-service";
 import { effectiveTrainingWeekCount } from "@/lib/training/plan-utils";
 import PublicPlanWeekViewer from "@/components/training/PublicPlanWeekViewer";
+import PublicPlanAdoptSection from "@/components/training/PublicPlanAdoptSection";
 import { athletePublicLandingUrl } from "@/lib/gofast-with-me/athlete-community-routes";
 
 export const dynamic = "force-dynamic";
@@ -71,6 +72,18 @@ export default async function PublicTrainingPlanPage({
     race_registry: plan.race_registry,
   });
 
+  const raceRegistryId =
+    plan.athlete_race?.raceRegistryId ?? plan.raceId ?? plan.race_registry?.id ?? null;
+  const raceName = plan.athlete_race?.name ?? plan.race_registry?.name ?? null;
+  const raceDateIso =
+    plan.athlete_race?.raceDate?.toISOString() ??
+    plan.race_registry?.raceDate?.toISOString() ??
+    null;
+  const distanceLabel =
+    plan.athlete_race?.distanceLabel ?? plan.race_registry?.distanceLabel ?? null;
+  const distanceMeters =
+    plan.athlete_race?.distanceMeters ?? plan.race_registry?.distanceMeters ?? null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-gradient-to-br from-violet-900 via-violet-800 to-indigo-900 text-white">
@@ -119,6 +132,19 @@ export default async function PublicTrainingPlanPage({
 
       <main className="max-w-3xl mx-auto px-5 py-10 space-y-8">
         <PublicPlanWeekViewer weeks={weeks} totalWeeks={effectiveWeeks} />
+
+        {raceRegistryId && raceName && raceDateIso ? (
+          <PublicPlanAdoptSection
+            slug={slug}
+            planTitle={plan.name}
+            raceRegistryId={raceRegistryId}
+            raceName={raceName}
+            raceDate={raceDateIso}
+            distanceLabel={distanceLabel}
+            distanceMeters={distanceMeters}
+            sourceAuthorAthleteId={author.id}
+          />
+        ) : null}
 
         {plan.training_plan_preset?.publicDescription ? (
           <section className="rounded-2xl border border-gray-200 bg-white p-6">

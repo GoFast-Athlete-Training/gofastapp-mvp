@@ -3,14 +3,26 @@
  * Source of truth: training_plans (name + planSchedule + publicSlug).
  */
 
-import { PublicTrainingPlanVisibility, Prisma } from "@prisma/client";
+import {
+  PublicTrainingPlanVisibility,
+  Prisma,
+  PlanCustomWorkoutVisibility,
+  TrainingPlanLifecycle,
+  WorkoutType,
+} from "@prisma/client";
+import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { metersToMiles } from "@/lib/pace-utils";
 import { loadCatalogueTitleByIdForWeekSchedule } from "@/lib/training/catalogue-title-map";
 import { planScheduleDaysForWeek } from "@/lib/training/plan-schedule";
-import { effectiveTrainingWeekCount } from "@/lib/training/plan-utils";
+import { effectiveTrainingWeekCount, totalWeeksFromDates } from "@/lib/training/plan-utils";
 import { resolvePlanTerminalRaceDisplay } from "@/lib/training/plan-race-snapshots";
 import { appendSlugSuffix, slugifyPlanSlug } from "@/lib/training/public-plan-slug";
+import { goalRacePaceDisplayString, resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
+import { executePlanGenerate } from "@/lib/training/execute-plan-generate";
+import { upsertRaceMembershipFromSignup } from "@/lib/race-container-membership";
+import { syncAthleteProfileSnapshot } from "@/lib/athlete-profile-snapshot";
+import { snapPrimaryRaceToPlanTerminal } from "@/lib/athlete-primary-race";
 
 export { slugifyPlanSlug } from "@/lib/training/public-plan-slug";
 
@@ -106,6 +118,7 @@ export async function getPublicPlanBySlug(
       Athlete: { select: authorSelect },
       race_registry: {
         select: {
+          id: true,
           name: true,
           distanceLabel: true,
           raceDate: true,
@@ -353,6 +366,14 @@ export function mapPublicPlanApiResponse(plan: {
       terminal?.distanceLabel ?? plan.race_registry?.distanceLabel ?? null,
     author: plan.Athlete,
     raceName: terminal?.name ?? plan.race_registry?.name ?? null,
+    raceRegistryId:
+      plan.athlete_race?.raceRegistryId ??
+      (plan.race_registry as { id?: string } | null)?.id ??
+      null,
+    raceDate:
+      plan.athlete_race?.raceDate?.toISOString() ??
+      plan.race_registry?.raceDate?.toISOString() ??
+      null,
   };
 }
 
@@ -419,4 +440,262 @@ export async function updatePublicTrainingPlanBySlug(
       race_registry: { select: { name: true, distanceLabel: true } },
     },
   });
+}
+
+export type AdoptPublishedPlanInput = {
+  slug: string;
+  athleteId: string;
+  athleteRaceId: string;
+  startDate: Date;
+  goalTime: string;
+  fiveKPace?: string | null;
+  weeklyMileage?: number | null;
+  replaceActivePlan?: boolean;
+};
+
+export type AdoptPublishedPlanResult = {
+  trainingPlanId: string;
+  athleteRaceId: string;
+  copiedCustomWorkoutCount: number;
+};
+
+function resolveSourceRaceRegistryId(plan: {
+  raceId: string | null;
+  athlete_race: { raceRegistryId: string } | null;
+}): string | null {
+  return plan.athlete_race?.raceRegistryId ?? plan.raceId ?? null;
+}
+
+export async function adoptPublishedPlanBySlug(
+  input: AdoptPublishedPlanInput
+): Promise<AdoptPublishedPlanResult> {
+  const sourcePlan = await getPublicPlanBySlug(input.slug);
+  if (
+    !sourcePlan ||
+    sourcePlan.publicVisibility !== PublicTrainingPlanVisibility.PUBLIC
+  ) {
+    throw new Error("Public training plan not found or not adoptable");
+  }
+  if (!sourcePlan.presetId) {
+    throw new Error("Public training plan not found or not adoptable");
+  }
+  if (!sourcePlan.planSchedule) {
+    throw new Error("Published plan has no schedule to adopt");
+  }
+  if (sourcePlan.athleteId === input.athleteId) {
+    throw new Error("You cannot adopt your own published plan");
+  }
+
+  const sourceRaceRegistryId = resolveSourceRaceRegistryId(sourcePlan);
+  if (!sourceRaceRegistryId) {
+    throw new Error("Published plan is missing a target race");
+  }
+
+  const race = await prisma.race_registry.findUnique({
+    where: { id: sourceRaceRegistryId },
+    select: {
+      id: true,
+      name: true,
+      raceDate: true,
+      distanceMeters: true,
+      distanceLabel: true,
+    },
+  });
+  if (!race) throw new Error("Race not found");
+
+  const goalTime = input.goalTime?.trim();
+  if (!goalTime) throw new Error("Goal time is required");
+
+  const athleteRace = await prisma.athlete_races.findFirst({
+    where: {
+      id: input.athleteRaceId,
+      athleteId: input.athleteId,
+      raceRegistryId: race.id,
+    },
+  });
+  if (!athleteRace) {
+    throw new Error("You must add this race to My Races before adopting this plan");
+  }
+
+  const startDate = input.startDate;
+  if (Number.isNaN(startDate.getTime())) throw new Error("Invalid start date");
+  if (startDate >= race.raceDate) {
+    throw new Error("Plan start date must be before race date");
+  }
+
+  const athlete = await prisma.athlete.findUnique({ where: { id: input.athleteId } });
+  if (!athlete) throw new Error("Athlete not found");
+
+  const prefs = await prisma.trainingPreferences.findUnique({
+    where: { athleteId: input.athleteId },
+  });
+
+  const preferredDays = sourcePlan.preferredDays?.length
+    ? sourcePlan.preferredDays
+    : prefs?.preferredDays?.length
+      ? prefs.preferredDays
+      : [];
+
+  const fiveKPace = input.fiveKPace?.trim() || athlete.fiveKPace || null;
+  const weeklyResolved =
+    input.weeklyMileage ?? athlete.weeklyMileage ?? null;
+  const totalWeeks = totalWeeksFromDates(startDate, race.raceDate);
+
+  const raceDistanceMiles =
+    race.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
+      ? metersToMiles(Number(race.distanceMeters))
+      : 26.21875;
+  const resolvedGoalPace = resolveGoalRacePace({
+    goalTime,
+    dbGoalRacePaceSecPerMile: athleteRace.goalRacePace ?? null,
+    distanceMeters: race.distanceMeters ?? null,
+    distanceLabel: race.distanceLabel ?? null,
+    goalDistance: athleteRace.goalDistance ?? null,
+  });
+  const imprintedGoalPace =
+    resolvedGoalPace.goalPaceDisplay ??
+    goalRacePaceDisplayString(goalTime, raceDistanceMiles);
+
+  const sourceCustomWorkouts = await prisma.plan_custom_workouts.findMany({
+    where: { trainingPlanId: sourcePlan.id },
+    orderBy: [{ weekNumber: "asc" }, { dow: "asc" }],
+  });
+
+  const planName = `${sourcePlan.name} — my build`;
+
+  const result = await prisma.$transaction(async (tx) => {
+    const athleteRaceRow = await tx.athlete_races.update({
+      where: { id: athleteRace.id },
+      data: {
+        goalTime,
+        goalRacePace: resolvedGoalPace.goalPaceSecPerMile ?? athleteRace.goalRacePace,
+        updatedAt: new Date(),
+      },
+    });
+
+    const existingActive = await tx.training_plans.findFirst({
+      where: {
+        athleteId: input.athleteId,
+        lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+      },
+      select: { id: true },
+    });
+
+    if (existingActive && !input.replaceActivePlan) {
+      throw new Error(
+        "You already have an active training plan. Confirm replace to adopt this plan."
+      );
+    }
+
+    if (existingActive) {
+      await tx.training_plans.updateMany({
+        where: {
+          athleteId: input.athleteId,
+          lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+        },
+        data: {
+          lifecycleStatus: TrainingPlanLifecycle.PARKED,
+          updatedAt: new Date(),
+        },
+      });
+    }
+
+    const now = new Date();
+    const plan = await tx.training_plans.create({
+      data: {
+        id: randomUUID(),
+        athleteId: input.athleteId,
+        raceId: race.id,
+        athleteRaceId: athleteRaceRow.id,
+        name: planName,
+        startDate,
+        totalWeeks,
+        currentWeeklyMileage: weeklyResolved,
+        weeklyMileageTarget: prefs?.weeklyMileageTarget ?? null,
+        currentFiveKPace: fiveKPace,
+        goalRaceTime: goalTime,
+        ...(imprintedGoalPace ? { goalRacePace: imprintedGoalPace } : {}),
+        lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+        preferredDays,
+        preferredLongRunDow: sourcePlan.preferredLongRunDow,
+        preferredTempoDow: sourcePlan.preferredTempoDow,
+        preferredIntervalDow: sourcePlan.preferredIntervalDow,
+        preferredQualityDays: sourcePlan.preferredQualityDays ?? [],
+        presetId: sourcePlan.presetId,
+        updatedAt: now,
+      },
+    });
+
+    let copiedCount = 0;
+    for (const w of sourceCustomWorkouts) {
+      await tx.plan_custom_workouts.create({
+        data: {
+          trainingPlanId: plan.id,
+          authorAthleteId: input.athleteId,
+          sourceCustomWorkoutId: w.id,
+          weekNumber: w.weekNumber,
+          dow: w.dow,
+          title: w.title,
+          description: w.description,
+          workoutType: w.workoutType as WorkoutType,
+          content: (w.content ?? null) as Prisma.InputJsonValue,
+          leaderNotes: w.leaderNotes,
+          visibility: PlanCustomWorkoutVisibility.PRIVATE,
+          updatedAt: now,
+        },
+      });
+      copiedCount += 1;
+    }
+
+    return { plan, copiedCount, athleteRaceId: athleteRaceRow.id };
+  });
+
+  if (fiveKPace || weeklyResolved != null) {
+    await prisma.athlete.update({
+      where: { id: input.athleteId },
+      data: {
+        ...(fiveKPace ? { fiveKPace } : {}),
+        ...(weeklyResolved != null ? { weeklyMileage: weeklyResolved } : {}),
+        updatedAt: new Date(),
+      },
+    });
+  }
+
+  await upsertRaceMembershipFromSignup(input.athleteId, race.id);
+  await syncAthleteProfileSnapshot(input.athleteId);
+  await snapPrimaryRaceToPlanTerminal({
+    athleteId: input.athleteId,
+    athleteRaceId: result.athleteRaceId,
+  });
+
+  const preset = await prisma.training_plan_preset.findUnique({
+    where: { id: sourcePlan.presetId! },
+    select: { minWeeklyMiles: true },
+  });
+
+  const weeklyMileageTarget = prefs?.weeklyMileageTarget ?? 45;
+  await executePlanGenerate({
+    athleteId: input.athleteId,
+    athleteFiveKPace: fiveKPace,
+    athleteWeeklyMileage: weeklyResolved,
+    plan: {
+      id: result.plan.id,
+      presetId: sourcePlan.presetId!,
+      startDate: result.plan.startDate,
+      preferredDays: result.plan.preferredDays ?? [],
+      preferredLongRunDow: result.plan.preferredLongRunDow ?? null,
+      preferredTempoDow: result.plan.preferredTempoDow ?? null,
+      preferredIntervalDow: result.plan.preferredIntervalDow ?? null,
+      currentFiveKPace: result.plan.currentFiveKPace,
+      weeklyMileageTarget: result.plan.weeklyMileageTarget,
+    },
+    weeklyMileageTarget,
+    minWeeklyMiles: preset?.minWeeklyMiles ?? 40,
+  });
+
+  return {
+    trainingPlanId: result.plan.id,
+    athleteRaceId: result.athleteRaceId,
+    copiedCustomWorkoutCount: result.copiedCount,
+  };
 }

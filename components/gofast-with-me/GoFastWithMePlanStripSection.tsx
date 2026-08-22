@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import PublicPlanWeekViewer from '@/components/training/PublicPlanWeekViewer';
+import AdoptThisPlanPanel from '@/components/training/AdoptThisPlanPanel';
 import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
 
 type Props = {
@@ -15,6 +16,13 @@ export default function GoFastWithMePlanStripSection({
   hostFirstName,
   isHost,
 }: Props) {
+  const canAdopt =
+    publishedPlan.isPublic &&
+    !isHost &&
+    !!publishedPlan.raceRegistryId &&
+    !!publishedPlan.raceName &&
+    !!publishedPlan.raceDate;
+
   return (
     <div className="space-y-3">
       <div className="px-1">
@@ -41,8 +49,21 @@ export default function GoFastWithMePlanStripSection({
           {publishedPlan.name}
         </Link>
         {' · '}
-        Join the journey on this plan.
+        See the full build on this plan.
       </p>
+      {canAdopt ? (
+        <AdoptThisPlanPanel
+          slug={publishedPlan.slug}
+          planTitle={publishedPlan.name}
+          raceRegistryId={publishedPlan.raceRegistryId!}
+          raceName={publishedPlan.raceName!}
+          raceDate={publishedPlan.raceDate!}
+          distanceLabel={publishedPlan.distanceLabel}
+          distanceMeters={publishedPlan.distanceMeters}
+          sourceAuthorAthleteId={publishedPlan.sourceAuthorAthleteId}
+          className="mx-1"
+        />
+      ) : null}
     </div>
   );
 }
