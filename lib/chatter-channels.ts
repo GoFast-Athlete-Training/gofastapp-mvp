@@ -36,6 +36,78 @@ function authorLabel(firstName: string | null, lastName: string | null): string 
   return parts.length > 0 ? parts.join(' ') : 'Someone';
 }
 
+/** Count union branches for tests — one per non-empty channel id list. */
+export function countLastMessageUnionBranches(
+  clubIds: string[],
+  crewIds: string[],
+  raceIds: string[]
+): number {
+  let count = 0;
+  if (clubIds.length > 0) count += 1;
+  if (crewIds.length > 0) count += 1;
+  if (raceIds.length > 0) count += 1;
+  return count;
+}
+
+export function rowsToLastMessageMap(rows: LastMessageRow[]): Map<string, LastMessageRow> {
+  return new Map(rows.map((row) => [`${row.channel_type}:${row.channel_id}`, row]));
+}
+
+function buildLastMessageUnionParts(
+  clubIds: string[],
+  crewIds: string[],
+  raceIds: string[]
+): Prisma.Sql[] {
+  const parts: Prisma.Sql[] = [];
+
+  if (clubIds.length > 0) {
+    parts.push(Prisma.sql`
+      SELECT
+        'run_club'::text AS channel_type,
+        m."runClubId" AS channel_id,
+        m.content,
+        m."createdAt" AS created_at,
+        a."firstName" AS first_name,
+        a."lastName" AS last_name
+      FROM run_club_messages m
+      INNER JOIN "Athlete" a ON a.id = m."athleteId"
+      WHERE m."runClubId" IN (${Prisma.join(clubIds)})
+    `);
+  }
+
+  if (crewIds.length > 0) {
+    parts.push(Prisma.sql`
+      SELECT
+        'run_crew'::text AS channel_type,
+        m."runCrewId" AS channel_id,
+        m.content,
+        m."createdAt" AS created_at,
+        a."firstName" AS first_name,
+        a."lastName" AS last_name
+      FROM run_crew_messages m
+      INNER JOIN "Athlete" a ON a.id = m."athleteId"
+      WHERE m."runCrewId" IN (${Prisma.join(crewIds)})
+    `);
+  }
+
+  if (raceIds.length > 0) {
+    parts.push(Prisma.sql`
+      SELECT
+        'race_hub'::text AS channel_type,
+        m."raceId" AS channel_id,
+        m.content,
+        m."createdAt" AS created_at,
+        a."firstName" AS first_name,
+        a."lastName" AS last_name
+      FROM race_messages m
+      INNER JOIN "Athlete" a ON a.id = m."athleteId"
+      WHERE m."raceId" IN (${Prisma.join(raceIds)})
+    `);
+  }
+
+  return parts;
+}
+
 /**
  * Neon pooler + Prisma serverless uses connection_limit=1. Never fan out parallel
  * Prisma calls in one request — they contend for the single pool slot (P2024).
@@ -129,63 +201,25 @@ async function batchLastMessages(
   crewIds: string[],
   raceIds: string[]
 ): Promise<Map<string, LastMessageRow>> {
-  const parts: Prisma.Sql[] = [];
-
-  if (clubIds.length > 0) {
-    parts.push(Prisma.sql`
-      SELECT DISTINCT ON (m."runClubId")
-        'run_club'::text AS channel_type,
-        m."runClubId" AS channel_id,
-        m.content,
-        m."createdAt" AS created_at,
-        a."firstName" AS first_name,
-        a."lastName" AS last_name
-      FROM run_club_messages m
-      INNER JOIN "Athlete" a ON a.id = m."athleteId"
-      WHERE m."runClubId" IN (${Prisma.join(clubIds)})
-      ORDER BY m."runClubId", m."createdAt" DESC
-    `);
-  }
-
-  if (crewIds.length > 0) {
-    parts.push(Prisma.sql`
-      SELECT DISTINCT ON (m."runCrewId")
-        'run_crew'::text AS channel_type,
-        m."runCrewId" AS channel_id,
-        m.content,
-        m."createdAt" AS created_at,
-        a."firstName" AS first_name,
-        a."lastName" AS last_name
-      FROM run_crew_messages m
-      INNER JOIN "Athlete" a ON a.id = m."athleteId"
-      WHERE m."runCrewId" IN (${Prisma.join(crewIds)})
-      ORDER BY m."runCrewId", m."createdAt" DESC
-    `);
-  }
-
-  if (raceIds.length > 0) {
-    parts.push(Prisma.sql`
-      SELECT DISTINCT ON (m."raceId")
-        'race_hub'::text AS channel_type,
-        m."raceId" AS channel_id,
-        m.content,
-        m."createdAt" AS created_at,
-        a."firstName" AS first_name,
-        a."lastName" AS last_name
-      FROM race_messages m
-      INNER JOIN "Athlete" a ON a.id = m."athleteId"
-      WHERE m."raceId" IN (${Prisma.join(raceIds)})
-      ORDER BY m."raceId", m."createdAt" DESC
-    `);
-  }
-
+  const parts = buildLastMessageUnionParts(clubIds, crewIds, raceIds);
   if (parts.length === 0) return new Map();
 
-  const rows = await prisma.$queryRaw<LastMessageRow[]>(
-    Prisma.join(parts, ' UNION ALL ')
-  );
+  const union =
+    parts.length === 1 ? parts[0]! : Prisma.join(parts, Prisma.sql` UNION ALL `);
 
-  return new Map(rows.map((row) => [`${row.channel_type}:${row.channel_id}`, row]));
+  const rows = await prisma.$queryRaw<LastMessageRow[]>(Prisma.sql`
+    SELECT DISTINCT ON (channel_type, channel_id)
+      channel_type,
+      channel_id,
+      content,
+      created_at,
+      first_name,
+      last_name
+    FROM (${union}) AS combined
+    ORDER BY channel_type, channel_id, created_at DESC
+  `);
+
+  return rowsToLastMessageMap(rows);
 }
 
 export async function listChatterChannelsForAthlete(athleteId: string): Promise<ChatterChannelRow[]> {
