@@ -126,6 +126,10 @@ export default function TrainingHubPage() {
   >([]);
   const [hubError, setHubError] = useState<string | null>(null);
   const [planMenuOpen, setPlanMenuOpen] = useState(false);
+  const [parkedPlans, setParkedPlans] = useState<
+    { id: string; name: string; race_registry?: { name: string } | null }[]
+  >([]);
+  const [restoringParkedId, setRestoringParkedId] = useState<string | null>(null);
   const [selectedDayKey, setSelectedDayKey] = useState<string>("");
   const [pushingGarmin, setPushingGarmin] = useState(false);
   const [garminPushMessage, setGarminPushMessage] = useState<string | null>(null);
@@ -190,14 +194,32 @@ export default function TrainingHubPage() {
     setPastRacePlan(null);
     setPastRaceResultStatus(null);
     setWeekDays([]);
+    setParkedPlans([]);
     try {
       const u = auth.currentUser;
       if (!u) return;
       const token = await u.getIdToken();
-      const listRes = await fetch("/api/training-plan?status=active", {
-        headers: athleteBearerFetchHeaders(token),
-      });
+      const [listRes, parkedRes] = await Promise.all([
+        fetch("/api/training-plan?status=active", {
+          headers: athleteBearerFetchHeaders(token),
+        }),
+        fetch("/api/training-plan?status=parked", {
+          headers: athleteBearerFetchHeaders(token),
+        }),
+      ]);
       const listData = await listRes.json();
+      const parkedData = await parkedRes.json();
+      if (parkedRes.ok && Array.isArray(parkedData.plans)) {
+        setParkedPlans(
+          parkedData.plans.map(
+            (p: { id: string; name: string; race_registry?: { name: string } | null }) => ({
+              id: p.id,
+              name: p.name?.trim() || "Parked plan",
+              race_registry: p.race_registry ?? null,
+            })
+          )
+        );
+      }
       if (!listRes.ok || !Array.isArray(listData.plans) || listData.plans.length === 0) {
         const racesRes = await fetch("/api/race-signups", {
           headers: athleteBearerFetchHeaders(token),
@@ -419,6 +441,41 @@ export default function TrainingHubPage() {
       return;
     }
     router.push(`/training/day/${day.dateKey}`);
+  }
+
+  async function restoreParkedPlan(parkedPlanId: string) {
+    const parked = parkedPlans.find((p) => p.id === parkedPlanId);
+    if (
+      !window.confirm(
+        `Restore "${parked?.name ?? "this plan"}" as your active plan? Your current plan will be parked.`
+      )
+    ) {
+      return;
+    }
+    setRestoringParkedId(parkedPlanId);
+    try {
+      const u = auth.currentUser;
+      if (!u) return;
+      const token = await u.getIdToken();
+      const res = await fetch(`/api/training-plan/${parkedPlanId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...athleteBearerFetchHeaders(token),
+        },
+        body: JSON.stringify({ restoreAsActive: true }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Could not restore plan");
+      }
+      setPlanMenuOpen(false);
+      await loadHub();
+    } catch (e) {
+      setHubError(e instanceof Error ? e.message : "Could not restore plan");
+    } finally {
+      setRestoringParkedId(null);
+    }
   }
 
   async function deleteActivePlan() {
@@ -855,6 +912,28 @@ export default function TrainingHubPage() {
                         >
                           Edit weekly miles
                         </Link>
+                        {parkedPlans.length > 0 ? (
+                          <>
+                            <div className="my-1 border-t border-gray-100" />
+                            <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                              Parked plans
+                            </p>
+                            {parkedPlans.map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                disabled={restoringParkedId != null}
+                                onClick={() => void restoreParkedPlan(p.id)}
+                                className="w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                              >
+                                {restoringParkedId === p.id
+                                  ? "Restoring…"
+                                  : `Restore ${p.race_registry?.name ?? p.name}`}
+                              </button>
+                            ))}
+                          </>
+                        ) : null}
+                        <div className="my-1 border-t border-gray-100" />
                         <button
                           type="button"
                           disabled={deleting}

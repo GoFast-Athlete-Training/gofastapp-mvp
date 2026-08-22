@@ -1,3 +1,7 @@
+/**
+ * Plan lifecycle — ACTIVE, PARKED, ARCHIVED.
+ */
+
 import { prisma } from "@/lib/prisma";
 import { TrainingPlanLifecycle } from "@prisma/client";
 import { utcDateOnly } from "@/lib/training/plan-utils";
@@ -21,8 +25,8 @@ export async function cascadeLinkedGoalAfterPlanArchived(
   /* no-op — goal is on athlete_races row */
 }
 
-/** Mark every ACTIVE plan for this athlete as OLD_PLAN_UNUSED (explicit replace, not archive). */
-export async function markOtherActivePlansAsUnused(
+/** Mark every ACTIVE plan for this athlete as PARKED (explicit replace, not archive). */
+export async function parkOtherActivePlans(
   athleteId: string,
   exceptPlanId?: string | null
 ): Promise<void> {
@@ -33,11 +37,14 @@ export async function markOtherActivePlansAsUnused(
       ...(exceptPlanId ? { NOT: { id: exceptPlanId } } : {}),
     },
     data: {
-      lifecycleStatus: TrainingPlanLifecycle.OLD_PLAN_UNUSED,
+      lifecycleStatus: TrainingPlanLifecycle.PARKED,
       updatedAt: new Date(),
     },
   });
 }
+
+/** @deprecated use parkOtherActivePlans */
+export const markOtherActivePlansAsUnused = parkOtherActivePlans;
 
 /** Archive every ACTIVE plan for this athlete except the given id (if provided). */
 export async function archiveOtherActivePlans(
@@ -68,6 +75,62 @@ export async function archiveOtherActivePlans(
   await Promise.all(
     toArchive.map((p) => cascadeLinkedGoalAfterPlanArchived(p.id, athleteId))
   );
+}
+
+export type RetireActivePlanMode = "park" | "archive";
+
+/** Retire the current ACTIVE plan when replacing with a new one. */
+export async function retireActivePlanForReplace(
+  athleteId: string,
+  mode: RetireActivePlanMode
+): Promise<void> {
+  if (mode === "archive") {
+    await archiveOtherActivePlans(athleteId);
+  } else {
+    await parkOtherActivePlans(athleteId);
+  }
+}
+
+/** Reactivate a PARKED plan; park the current ACTIVE plan. */
+export async function restoreParkedPlan(params: {
+  athleteId: string;
+  parkedPlanId: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const parked = await prisma.training_plans.findFirst({
+    where: {
+      id: params.parkedPlanId,
+      athleteId: params.athleteId,
+      lifecycleStatus: TrainingPlanLifecycle.PARKED,
+    },
+    select: { id: true },
+  });
+  if (!parked) {
+    return { ok: false, error: "Parked plan not found" };
+  }
+
+  const now = new Date();
+  await prisma.$transaction(async (tx) => {
+    await tx.training_plans.updateMany({
+      where: {
+        athleteId: params.athleteId,
+        lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+        NOT: { id: params.parkedPlanId },
+      },
+      data: {
+        lifecycleStatus: TrainingPlanLifecycle.PARKED,
+        updatedAt: now,
+      },
+    });
+    await tx.training_plans.update({
+      where: { id: params.parkedPlanId },
+      data: {
+        lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+        updatedAt: now,
+      },
+    });
+  });
+
+  return { ok: true };
 }
 
 /** Copy Athlete.fiveKPace onto the single ACTIVE training plan (if any). */

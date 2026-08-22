@@ -22,11 +22,13 @@ import {
   catalogueIdsFromPreset,
   catalogueSelectForGeneration,
   mapPositionRow,
-  presetToPlanGenConfig,
-  trainingPlanPresetInclude,
   type LoadedPresetInclude,
   type CatalogueGenerationRowSelection,
 } from "@/lib/training/plan-generate-presets-loader";
+import {
+  blueprintToPlanGenConfig,
+  loadPlanBlueprintForGenerate,
+} from "@/lib/training/resolve-plan-blueprint";
 import type { CatalogueMileEstimateInput } from "@/lib/training/catalogue-mile-estimate";
 import {
   assertScheduleEasyDaysHaveCatalogue,
@@ -76,37 +78,27 @@ export async function executePlanGenerate(params: {
   if (!race) {
     throw new Error("Plan must have athleteRaceId set before generation");
   }
-  if (!planRow.presetId) {
+  if (!planRow.presetId && !planRow.athletePresetId) {
     throw new Error(
-      "This plan has no training preset linked — re-create your plan or contact support."
+      "This plan has no training blueprint linked — re-create your plan or contact support."
     );
   }
 
-  const [prefs, rawPreset] = await Promise.all([
-    prisma.trainingPreferences.findUnique({ where: { athleteId } }),
-    prisma.training_plan_preset.findUnique({
-      where: { id: planRow.presetId },
-      include: trainingPlanPresetInclude,
-    }),
-  ]);
-
-  if (
-    rawPreset == null ||
-    rawPreset.baseMiles == null ||
-    rawPreset.peakMiles == null ||
-    rawPreset.taperMiles == null ||
-    rawPreset.minWeeklyMiles == null
-  ) {
-    throw new Error("Preset is incomplete (volume fields missing).");
+  const blueprint = await loadPlanBlueprintForGenerate({
+    athleteId,
+    planId: plan.id,
+  });
+  if (!blueprint) {
+    throw new Error("Training blueprint not found or incomplete.");
   }
 
-  const presetLabel =
-    (typeof rawPreset.slug === "string" && rawPreset.slug.trim()) ||
-    (typeof rawPreset.title === "string" && rawPreset.title.trim()) ||
-    planRow.presetId;
+  const prefs = await prisma.trainingPreferences.findUnique({ where: { athleteId } });
+  const rawPreset = blueprint.rotationPreset;
+  const vol = blueprint.volumePreset;
 
-  const planConfig = presetToPlanGenConfig(rawPreset);
-  const vol = rawPreset;
+  const presetLabel = blueprint.label;
+
+  const planConfig = blueprintToPlanGenConfig(blueprint);
 
   const longRunPositions =
     rawPreset.longRunConfig?.positions.map(mapPositionRow) ?? [];

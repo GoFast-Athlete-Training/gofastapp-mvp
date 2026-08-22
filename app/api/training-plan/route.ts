@@ -7,7 +7,6 @@ import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { totalWeeksFromDates } from "@/lib/training/plan-utils";
 import { TrainingPlanLifecycle } from "@prisma/client";
-import { markOtherActivePlansAsUnused } from "@/lib/training/plan-lifecycle";
 import { goalRacePaceDisplayString, resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import { metersToMiles } from "@/lib/pace-utils";
 import {
@@ -47,7 +46,9 @@ export async function POST(request: NextRequest) {
       current5KPace: bodyLegacy5k,
       syncAthleteBaseline,
       presetId: bodyPresetId,
+      athletePresetId: bodyAthletePresetId,
       replaceActivePlan,
+      retireActivePlan: bodyRetireActivePlan,
     } = body;
     const body5k = bodyFiveK ?? bodyLegacy5k;
 
@@ -184,35 +185,63 @@ export async function POST(request: NextRequest) {
         ? name.trim()
         : `Training — ${race.name}`;
 
-    if (bodyPresetId == null || bodyPresetId === "") {
+    if (bodyPresetId == null && bodyAthletePresetId == null) {
       return NextResponse.json(
         {
           error:
-            "presetId is required — pick a training blueprint in setup (your coach publishes these in GoFast Company).",
+            "presetId or athletePresetId is required — pick a training blueprint in setup.",
         },
         { status: 400 }
       );
     }
 
-    const pid = String(bodyPresetId).trim();
-    const preset = await prisma.training_plan_preset.findUnique({
-      where: { id: pid },
-      select: { id: true, targetDistanceLabel: true },
-    });
-    if (!preset) {
-      return NextResponse.json({ error: "presetId not found" }, { status: 400 });
-    }
-    const raceMeters = race.distanceMeters;
-    if (!presetMatchesDistance(preset.targetDistanceLabel, raceMeters)) {
-      const raceLabel = snapDistanceLabelFromMeters(raceMeters);
+    if (bodyPresetId != null && bodyAthletePresetId != null) {
       return NextResponse.json(
-        {
-          error: `This training level is built for a ${preset.targetDistanceLabel ?? "specific distance"}. Your goal race${raceLabel ? ` (${raceLabel})` : ""} does not match.`,
-        },
-        { status: 422 }
+        { error: "Provide presetId or athletePresetId, not both" },
+        { status: 400 }
       );
     }
-    const presetIdResolved = preset.id;
+
+    let presetIdResolved: string | null = null;
+    let athletePresetIdResolved: string | null = null;
+
+    if (bodyAthletePresetId != null && String(bodyAthletePresetId).trim()) {
+      const apId = String(bodyAthletePresetId).trim();
+      const athletePreset = await prisma.athlete_presets.findFirst({
+        where: { id: apId, athleteId: athlete.id },
+        select: { id: true, sourcePresetId: true },
+      });
+      if (!athletePreset) {
+        return NextResponse.json({ error: "athletePresetId not found" }, { status: 404 });
+      }
+      if (!athletePreset.sourcePresetId) {
+        return NextResponse.json(
+          { error: "Athlete preset needs a GoFast workout template (sourcePresetId)" },
+          { status: 422 }
+        );
+      }
+      athletePresetIdResolved = athletePreset.id;
+    } else if (bodyPresetId != null && bodyPresetId !== "") {
+      const pid = String(bodyPresetId).trim();
+      const preset = await prisma.training_plan_preset.findUnique({
+        where: { id: pid },
+        select: { id: true, targetDistanceLabel: true },
+      });
+      if (!preset) {
+        return NextResponse.json({ error: "presetId not found" }, { status: 400 });
+      }
+      const raceMeters = race.distanceMeters;
+      if (!presetMatchesDistance(preset.targetDistanceLabel, raceMeters)) {
+        const raceLabel = snapDistanceLabelFromMeters(raceMeters);
+        return NextResponse.json(
+          {
+            error: `This training level is built for a ${preset.targetDistanceLabel ?? "specific distance"}. Your goal race${raceLabel ? ` (${raceLabel})` : ""} does not match.`,
+          },
+          { status: 422 }
+        );
+      }
+      presetIdResolved = preset.id;
+    }
 
     const existingActive = await prisma.training_plans.findFirst({
       where: {
@@ -245,16 +274,31 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     const plan = await prisma.$transaction(async (tx) => {
       if (existingActive) {
-        await tx.training_plans.updateMany({
-          where: {
-            athleteId: athlete.id,
-            lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
-          },
-          data: {
-            lifecycleStatus: TrainingPlanLifecycle.OLD_PLAN_UNUSED,
-            updatedAt: now,
-          },
-        });
+        const retireMode =
+          bodyRetireActivePlan === "archive" ? "archive" : "park";
+        if (retireMode === "archive") {
+          await tx.training_plans.updateMany({
+            where: {
+              athleteId: athlete.id,
+              lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+            },
+            data: {
+              lifecycleStatus: TrainingPlanLifecycle.ARCHIVED,
+              updatedAt: now,
+            },
+          });
+        } else {
+          await tx.training_plans.updateMany({
+            where: {
+              athleteId: athlete.id,
+              lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+            },
+            data: {
+              lifecycleStatus: TrainingPlanLifecycle.PARKED,
+              updatedAt: now,
+            },
+          });
+        }
       }
       return tx.training_plans.create({
         data: {
@@ -274,6 +318,7 @@ export async function POST(request: NextRequest) {
           lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
           preferredDays,
           presetId: presetIdResolved,
+          athletePresetId: athletePresetIdResolved,
           updatedAt: now,
         },
       });
@@ -341,14 +386,16 @@ export async function GET(request: NextRequest) {
     const lifecycleFilter =
       statusParam === "active"
         ? TrainingPlanLifecycle.ACTIVE
-        : statusParam === "archived"
-          ? {
-              in: [
-                TrainingPlanLifecycle.ARCHIVED,
-                TrainingPlanLifecycle.OLD_PLAN_UNUSED,
-              ],
-            }
-          : null;
+        : statusParam === "parked"
+          ? TrainingPlanLifecycle.PARKED
+          : statusParam === "archived"
+            ? {
+                in: [
+                  TrainingPlanLifecycle.ARCHIVED,
+                  TrainingPlanLifecycle.PARKED,
+                ],
+              }
+            : null;
 
     const plans = await prisma.training_plans.findMany({
       where: {

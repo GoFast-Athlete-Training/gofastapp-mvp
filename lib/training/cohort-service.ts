@@ -452,7 +452,7 @@ export async function joinTrainingCohort(
       await tx.training_plans.updateMany({
         where: { athleteId, lifecycleStatus: TrainingPlanLifecycle.ACTIVE },
         data: {
-          lifecycleStatus: TrainingPlanLifecycle.OLD_PLAN_UNUSED,
+          lifecycleStatus: TrainingPlanLifecycle.PARKED,
           updatedAt: new Date(),
         },
       });

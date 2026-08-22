@@ -1,13 +1,11 @@
 import { prisma } from "@/lib/prisma";
 
 export type EnsurePlanPresetOutcome =
-  | { ok: true; presetId: string }
+  | { ok: true; kind: "catalog" | "athlete"; presetId: string | null; athletePresetId: string | null }
   | { ok: false; kind: "plan_not_found" | "preset_not_assigned" };
 
 /**
- * Preset linkage is explicit: coaches assign `training_plans.presetId` (Company) or
- * athletes choose a published blueprint at plan creation (`POST /api/training-plan` with presetId).
- * This helper does not invent or persist a default preset.
+ * Plan must link to a staff catalog preset and/or an athlete-owned blueprint before generate.
  */
 export async function ensureTrainingPlanPresetLinked(params: {
   planId: string;
@@ -15,9 +13,16 @@ export async function ensureTrainingPlanPresetLinked(params: {
 }): Promise<EnsurePlanPresetOutcome> {
   const plan = await prisma.training_plans.findFirst({
     where: { id: params.planId, athleteId: params.athleteId },
-    select: { presetId: true },
+    select: { presetId: true, athletePresetId: true },
   });
   if (!plan) return { ok: false, kind: "plan_not_found" };
-  if (!plan.presetId) return { ok: false, kind: "preset_not_assigned" };
-  return { ok: true, presetId: plan.presetId };
+  if (!plan.presetId && !plan.athletePresetId) {
+    return { ok: false, kind: "preset_not_assigned" };
+  }
+  return {
+    ok: true,
+    kind: plan.athletePresetId ? "athlete" : "catalog",
+    presetId: plan.presetId,
+    athletePresetId: plan.athletePresetId,
+  };
 }

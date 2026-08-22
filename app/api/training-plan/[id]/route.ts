@@ -12,6 +12,7 @@ import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import { resolvePlanTerminalRaceDisplay } from "@/lib/training/plan-race-snapshots";
 import { persistPlanRaceSnapshots } from "@/lib/training/race-plan-calendar-service";
 import { snapPrimaryRaceToPlanTerminal } from "@/lib/athlete-primary-race";
+import { restoreParkedPlan } from "@/lib/training/plan-lifecycle";
 import {
   computeRaceReadiness,
   deriveKCoefficient,
@@ -271,6 +272,33 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         (existing.planSchedule as unknown[]).length > 0);
 
     const body = await request.json();
+
+    if (body.restoreAsActive === true) {
+      const result = await restoreParkedPlan({
+        athleteId: auth.athlete.id,
+        parkedPlanId: id,
+      });
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: 404 });
+      }
+      const planRow = await prisma.training_plans.findFirst({
+        where: { id, athleteId: auth.athlete.id },
+        include: {
+          athlete_race: {
+            select: {
+              id: true,
+              raceRegistryId: true,
+              name: true,
+              raceDate: true,
+              distanceMeters: true,
+              distanceLabel: true,
+            },
+          },
+        },
+      });
+      return NextResponse.json({ plan: planRow, restored: true });
+    }
+
     const patchKeys = Object.keys(body);
     if (patchKeys.length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });

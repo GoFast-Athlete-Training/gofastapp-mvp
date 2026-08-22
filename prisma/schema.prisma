@@ -19,8 +19,13 @@ enum AthleteRole {
 enum TrainingPlanLifecycle {
   ACTIVE
   ARCHIVED
-  /// Plan replaced or abandoned before natural completion — not a completed lifecycle.
-  OLD_PLAN_UNUSED
+  /// Plan paused on purpose — athlete can pick up later (replaces OLD_PLAN_UNUSED).
+  PARKED
+}
+
+enum AthletePresetFitnessPhase {
+  PEAK
+  BASE
 }
 
 enum CoachReviewStatus {
@@ -148,6 +153,7 @@ model Athlete {
   city_runs               city_runs[]
   routes                  routes[]
   training_plans          training_plans[]
+  athlete_presets         athlete_presets[]
   workouts                workouts[]
   bike_workouts           bike_workout[]
   swim_workouts           swim_workout[]
@@ -1733,6 +1739,47 @@ model training_plan_preset {
   training_plans  training_plans[]
   training_cohorts training_cohorts[]
   public_training_plans public_training_plans[]
+  athlete_presets_as_source athlete_presets[] @relation("AthletePresetSource")
+  athlete_presets_as_promoted athlete_presets[] @relation("AthletePresetPromoted")
+}
+
+/// Athlete-owned training blueprint — never mixed into staff catalog until promoted.
+model athlete_presets {
+  id              String   @id @default(cuid())
+  athleteId       String
+  title           String
+  description     String?
+  objectiveOfPlan String?
+
+  cycleLen          Int    @default(4)
+  minWeeklyMiles    Int    @default(40)
+  maxWeeklyMiles    Int?
+  baseMiles         Float
+  peakMiles         Float
+  taperMiles        Float
+  tempoIdealDow     Int    @default(2)
+  intervalIdealDow  Int    @default(4)
+  longRunDefaultDow Int    @default(6)
+
+  trainingHistory  String?
+  fitnessPhase     AthletePresetFitnessPhase @default(BASE)
+  ageYearsSnapshot Int?
+  genderSnapshot   String?
+
+  sourcePresetId   String?
+  promotedPresetId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  athlete          Athlete               @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  sourcePreset     training_plan_preset? @relation("AthletePresetSource", fields: [sourcePresetId], references: [id], onDelete: SetNull)
+  promotedPreset   training_plan_preset? @relation("AthletePresetPromoted", fields: [promotedPresetId], references: [id], onDelete: SetNull)
+  training_plans   training_plans[]
+
+  @@index([athleteId])
+  @@index([sourcePresetId])
+  @@map("athlete_presets")
 }
 
 /// Standalone swim training preset — separate from run `training_plan_preset`; future triathlon presets compose swim/bike/run.
@@ -2000,8 +2047,10 @@ model training_plans {
   athleteRaceAlongWaySnaps Json?
   /// Optional link to the training cohort this plan was created through
   cohortId             String?
-  /// Optional link to a training_plan_preset; null = generation uses hardcoded defaults
+  /// Optional link to a training_plan_preset; null when athletePresetId is set.
   presetId             String?
+  /// Athlete-owned blueprint; mutually exclusive with presetId for generation.
+  athletePresetId      String?
   name                 String
   currentWeeklyMileage Int?
   /// Athlete weekly mileage target (miles); falls back at generation time
@@ -2057,6 +2106,7 @@ model training_plans {
   athlete_race         athlete_races?         @relation("PlanAthleteRace", fields: [athleteRaceId], references: [id], onDelete: SetNull)
   pace_adjustment_logs pace_adjustment_log[]
   training_plan_preset training_plan_preset? @relation(fields: [presetId], references: [id])
+  athlete_preset       athlete_presets?      @relation(fields: [athletePresetId], references: [id], onDelete: SetNull)
   training_cohort      training_cohorts?     @relation(fields: [cohortId], references: [id], onDelete: SetNull)
   cohort_membership    training_cohort_memberships?
   public_training_plans_as_source public_training_plans[] @relation("PublicPlanSource")
@@ -2064,6 +2114,7 @@ model training_plans {
   @@index([athleteRaceId])
   @@index([athleteId, lifecycleStatus])
   @@index([presetId])
+  @@index([athletePresetId])
   @@index([cohortId])
   @@index([publicVisibility, publicPublishedAt])
 }

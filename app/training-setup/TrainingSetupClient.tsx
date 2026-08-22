@@ -14,6 +14,7 @@ import {
   snapDistanceLabelFromMeters,
 } from "@/lib/training/preset-distance-match";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
+import { AthletePresetIngestForm } from "@/components/training/AthletePresetIngestForm";
 
 type RaceRegistryLite = {
   id: string;
@@ -171,6 +172,9 @@ export default function TrainingSetupClient() {
     searchParams.get("athleteRaceId")?.trim() ||
     searchParams.get("goalId")?.trim() ||
     "";
+  const retireActivePlanFromUrl =
+    searchParams.get("retireActivePlan") === "archive" ? "archive" : "park";
+  const replacingFromAddedRace = searchParams.has("retireActivePlan");
 
   const [ready, setReady] = useState(false);
   const [loadingOrientation, setLoadingOrientation] = useState(true);
@@ -198,6 +202,8 @@ export default function TrainingSetupClient() {
   /** Presets from prod API; athlete picks one before baseline step. */
   const [prodPresets, setProdPresets] = useState<PresetForWizard[]>([]);
   const [selectedPreset, setSelectedPreset] = useState<PresetForWizard | null>(null);
+  const [presetPickMode, setPresetPickMode] = useState<"choose" | "catalog" | "custom">("choose");
+  const [selectedAthletePresetId, setSelectedAthletePresetId] = useState<string | null>(null);
 
   const qualifyingGoals = useMemo(() => goals.filter(isQualifyingGoal), [goals]);
 
@@ -445,6 +451,8 @@ export default function TrainingSetupClient() {
   function exitWizard() {
     setWizardGoal(null);
     setSelectedPreset(null);
+    setSelectedAthletePresetId(null);
+    setPresetPickMode("choose");
     setFormError(null);
     setCreateFeedback(null);
     setReplaceGoalAcknowledged(false);
@@ -482,7 +490,7 @@ export default function TrainingSetupClient() {
     setReplaceBlockPlan(null);
     if (opts?.forceReplace) setReplaceGoalAcknowledged(true);
 
-    if (!selectedPreset?.id) {
+    if (!selectedPreset?.id && !selectedAthletePresetId) {
       setCreateFeedback("preset");
       return;
     }
@@ -516,6 +524,7 @@ export default function TrainingSetupClient() {
     setCreateFeedback(null);
     try {
       const token = await getToken();
+      const hasOtherActivePlan = activePlans.some((p) => p.lifecycleStatus === "ACTIVE");
       const res = await fetch("/api/training-plan", {
         method: "POST",
         headers: {
@@ -533,7 +542,17 @@ export default function TrainingSetupClient() {
               ? null
               : Number(baselineWeeklyMileage),
           syncAthleteBaseline: true,
-          presetId: selectedPreset.id,
+          ...(selectedAthletePresetId
+            ? { athletePresetId: selectedAthletePresetId }
+            : { presetId: selectedPreset!.id }),
+          ...(hasOtherActivePlan || replacingFromAddedRace
+            ? {
+                replaceActivePlan: true,
+                retireActivePlan: replacingFromAddedRace
+                  ? retireActivePlanFromUrl
+                  : "park",
+              }
+            : {}),
         }),
       });
       let data: { error?: string; plan?: { id: string } } = {};
@@ -613,12 +632,25 @@ export default function TrainingSetupClient() {
         )
       ) : null;
 
+    const stepChoosePreset =
+      presetPickMode === "choose" ||
+      (presetPickMode === "catalog" && !selectedPreset) ||
+      (presetPickMode === "custom" && !selectedAthletePresetId);
+
     function onSelectPreset(p: PresetForWizard) {
       setSelectedPreset(p);
+      setSelectedAthletePresetId(null);
       setFormError(null);
     }
 
-    const stepChoosePreset = !selectedPreset;
+    const baselinePresetTitle =
+      selectedPreset?.title ?? (selectedAthletePresetId ? "Your blueprint" : "");
+
+    async function getTokenForIngest() {
+      const u = auth.currentUser;
+      if (!u) throw new Error("Sign in required");
+      return u.getIdToken();
+    }
 
     return (
       <AthleteAppShell>
@@ -634,66 +666,108 @@ export default function TrainingSetupClient() {
 
             {stepChoosePreset ? (
               <>
-                <div className="mb-6 rounded-xl border border-orange-100 bg-orange-50/80 p-4 text-sm text-gray-800">
-                  <p className="text-lg font-semibold text-gray-900">
-                    Welcome back{athleteFirstName ? `, ${athleteFirstName}` : ""}
-                  </p>
-                  <p className="mt-2 font-medium text-gray-900">Pick how you want to train</p>
-                  <p className="mt-1 leading-relaxed text-gray-700">
-                    Pick your training level below. We&apos;re in beta — Elite is ready now, with more
-                    levels coming soon.
-                  </p>
-                </div>
-                <div className="space-y-4">
-                  {loadingOrientation ? (
-                    <p className="text-sm text-gray-600">Loading your training level…</p>
-                  ) : prodPresets.length === 0 ? (
-                    <div className="text-sm text-red-900">
-                      <p className="font-medium text-red-950">Training level not available</p>
-                      <p className="mt-2 leading-relaxed text-red-900/95">
-                        No training levels are set up in this environment yet. Check back shortly or
-                        contact support.
+                {presetPickMode === "choose" ? (
+                  <>
+                    <div className="mb-6 rounded-xl border border-orange-100 bg-orange-50/80 p-4 text-sm text-gray-800">
+                      <p className="text-lg font-semibold text-gray-900">
+                        Welcome back{athleteFirstName ? `, ${athleteFirstName}` : ""}
                       </p>
+                      <p className="mt-2 font-medium text-gray-900">How do you want to build?</p>
+                      <p className="mt-1 leading-relaxed text-gray-700">
+                        Use a GoFast training level, or create your own blueprint from your profile
+                        and recent training.
+                      </p>
+                      {replacingFromAddedRace ? (
+                        <p className="mt-2 text-xs text-amber-900/90">
+                          Your current plan will be{" "}
+                          {retireActivePlanFromUrl === "archive" ? "archived" : "parked"} when you
+                          finish setup.
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="grid gap-3">
                       <button
                         type="button"
-                        onClick={() => void loadOrientation()}
-                        className="mt-3 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800"
+                        onClick={() => setPresetPickMode("catalog")}
+                        className="rounded-xl border-2 border-gray-200 bg-gray-50 p-4 text-left hover:border-orange-400 hover:bg-orange-50/50"
                       >
-                        Retry
+                        <p className="font-semibold text-gray-900">Use a GoFast preset</p>
+                        <p className="mt-1 text-sm text-gray-600">
+                          Coach-built training levels for your race distance.
+                        </p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPresetPickMode("custom")}
+                        className="rounded-xl border-2 border-gray-200 bg-gray-50 p-4 text-left hover:border-orange-400 hover:bg-orange-50/50"
+                      >
+                        <p className="font-semibold text-gray-900">Create my own</p>
+                        <p className="mt-1 text-sm text-gray-600">
+                          Peak or base block from your profile — no persona wizard.
+                        </p>
                       </button>
                     </div>
-                  ) : presetsForWizardGoal.length === 0 ? (
-                    <div className="text-sm text-amber-950">
-                      <p className="font-medium text-amber-950">No level for this race distance</p>
-                      <p className="mt-2 leading-relaxed text-amber-900/95">
-                        There isn&apos;t a training level for this goal&apos;s distance yet. Try another race
-                        or contact support.
-                      </p>
+                  </>
+                ) : presetPickMode === "custom" ? (
+                  <AthletePresetIngestForm
+                    getToken={getTokenForIngest}
+                    templatePresets={presetsForWizardGoal}
+                    raceDistanceMeters={rr.distanceMeters ?? null}
+                    defaultTitle={suggestPlanName(rr.name, athleteFirstName)}
+                    onCreated={(ap) => {
+                      setSelectedAthletePresetId(ap.id);
+                      setSelectedPreset(null);
+                      if (!planNameTouched) {
+                        setPlanName(ap.title);
+                      }
+                    }}
+                    onCancel={() => setPresetPickMode("choose")}
+                  />
+                ) : (
+                  <>
+                    <div className="mb-6 rounded-xl border border-orange-100 bg-orange-50/80 p-4 text-sm text-gray-800">
+                      <p className="font-medium text-gray-900">Pick a GoFast training level</p>
+                      <button
+                        type="button"
+                        onClick={() => setPresetPickMode("choose")}
+                        className="mt-2 text-sm font-medium text-orange-600 hover:text-orange-800"
+                      >
+                        ← Back
+                      </button>
                     </div>
-                  ) : (
-                    <ul className="grid gap-3 sm:grid-cols-1">
-                      {presetsForWizardGoal.map((p) => {
-                        const blurb = p.publicDescription ?? p.description;
-                        return (
-                          <li key={p.id}>
-                            <button
-                              type="button"
-                              onClick={() => onSelectPreset(p)}
-                              className="w-full rounded-xl border-2 border-gray-200 bg-gray-50 p-4 text-left transition hover:border-orange-400 hover:bg-orange-50/50 sm:p-5"
-                            >
-                              <p className="text-lg font-semibold text-gray-900">{p.title}</p>
-                              {blurb ? (
-                                <p className="mt-2 text-sm leading-relaxed text-gray-600">{blurb}</p>
-                              ) : (
-                                <p className="mt-2 text-xs text-gray-500">Tap anywhere on this card to continue.</p>
-                              )}
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
+                    <div className="space-y-4">
+                      {loadingOrientation ? (
+                        <p className="text-sm text-gray-600">Loading your training level…</p>
+                      ) : presetsForWizardGoal.length === 0 ? (
+                        <div className="text-sm text-amber-950">
+                          <p className="font-medium">No level for this race distance</p>
+                        </div>
+                      ) : (
+                        <ul className="grid gap-3 sm:grid-cols-1">
+                          {presetsForWizardGoal.map((p) => {
+                            const blurb = p.publicDescription ?? p.description;
+                            return (
+                              <li key={p.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => onSelectPreset(p)}
+                                  className="w-full rounded-xl border-2 border-gray-200 bg-gray-50 p-4 text-left transition hover:border-orange-400 hover:bg-orange-50/50 sm:p-5"
+                                >
+                                  <p className="text-lg font-semibold text-gray-900">{p.title}</p>
+                                  {blurb ? (
+                                    <p className="mt-2 text-sm leading-relaxed text-gray-600">
+                                      {blurb}
+                                    </p>
+                                  ) : null}
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                  </>
+                )}
               </>
             ) : (
               <>
@@ -705,18 +779,20 @@ export default function TrainingSetupClient() {
                 </div>
 
                 <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-500">
-                  {selectedPreset.title}
+                  {baselinePresetTitle}
                 </p>
 
                 <button
                   type="button"
                   onClick={() => {
                     setSelectedPreset(null);
+                    setSelectedAthletePresetId(null);
+                    setPresetPickMode("choose");
                     setFormError(null);
                   }}
                   className="mb-5 text-sm font-medium text-orange-600 hover:text-orange-800"
                 >
-                  ← Change level
+                  ← Change blueprint
                 </button>
 
                 <div className="space-y-4">

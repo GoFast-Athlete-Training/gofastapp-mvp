@@ -551,7 +551,7 @@ export async function adoptPublicTrainingPlan(
           lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
         },
         data: {
-          lifecycleStatus: TrainingPlanLifecycle.OLD_PLAN_UNUSED,
+          lifecycleStatus: TrainingPlanLifecycle.PARKED,
           updatedAt: new Date(),
         },
       });
