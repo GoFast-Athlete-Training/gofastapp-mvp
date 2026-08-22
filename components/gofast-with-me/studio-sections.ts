@@ -33,7 +33,7 @@ export const STUDIO_BIN_DESCRIPTIONS: Record<StudioSection, string> = {
   community: 'Daily log and Chatter — how you feel today and follower conversation',
   payouts: 'Stripe Connect setup and sponsorship earnings credited to your Stripe balance',
   workouts: 'Runs and training — public plan, GoRun With Me, and workout sharing',
-  content: 'Durable tips and thinking — nutrition, routes, training thoughts, and future blog',
+  content: 'Durable tips and myRunRoutes — nutrition, training thoughts, and shared routes',
 };
 
 export function isWelcomeContentComplete(values: GoFastWithMeLandingValues): boolean {

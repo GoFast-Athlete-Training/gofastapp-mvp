@@ -1,8 +1,9 @@
 import type { AthleteTipPayload } from '@/lib/gofast-with-me/athlete-tips';
+import type { AthleteRunRoutePayload } from '@/lib/gofast-with-me/athlete-run-routes';
 import type { ActivityPostPayload } from '@/lib/gofast-with-me/activity-posts';
 import type { ContainerHubMessage } from '@/lib/gofast-with-me/container-hub-service';
 
-export type CommunityFeedItemKind = 'dailylog' | 'tip' | 'run' | 'activity';
+export type CommunityFeedItemKind = 'dailylog' | 'tip' | 'myrunroute' | 'run' | 'activity';
 
 export type CommunityFeedDailyLogItem = {
   kind: 'dailylog';
@@ -17,6 +18,13 @@ export type CommunityFeedTipItem = {
   id: string;
   sortAt: string;
   tip: AthleteTipPayload;
+};
+
+export type CommunityFeedMyRunRouteItem = {
+  kind: 'myrunroute';
+  id: string;
+  sortAt: string;
+  runRoute: AthleteRunRoutePayload;
 };
 
 export type CommunityFeedRunItem = {
@@ -42,6 +50,7 @@ export type CommunityFeedActivityItem = {
 export type CommunityFeedItem =
   | CommunityFeedDailyLogItem
   | CommunityFeedTipItem
+  | CommunityFeedMyRunRouteItem
   | CommunityFeedRunItem
   | CommunityFeedActivityItem;
 
@@ -51,6 +60,7 @@ export type CommunityFeedUpdateItem = CommunityFeedDailyLogItem;
 export type ComposeCommunityFeedInput = {
   updateMessages: ContainerHubMessage[];
   tips: AthleteTipPayload[];
+  runRoutes: AthleteRunRoutePayload[];
   activityPosts: ActivityPostPayload[];
   upcomingRuns: {
     id: string;
@@ -105,6 +115,16 @@ export function composeCommunityFeed(input: ComposeCommunityFeedInput): Communit
     });
   }
 
+  for (const runRoute of input.runRoutes) {
+    const sortAt = runRoute.publishedAt ?? runRoute.updatedAt ?? runRoute.createdAt;
+    items.push({
+      kind: 'myrunroute',
+      id: `myrunroute-${runRoute.id}`,
+      sortAt,
+      runRoute,
+    });
+  }
+
   const now = Date.now();
   for (const run of input.upcomingRuns) {
     const runTime = new Date(run.date).getTime();
@@ -129,6 +149,8 @@ export function communityFeedItemLabel(kind: CommunityFeedItemKind): string {
       return 'Daily log';
     case 'tip':
       return 'Tip';
+    case 'myrunroute':
+      return 'Route';
     case 'run':
       return 'Run';
     case 'activity':

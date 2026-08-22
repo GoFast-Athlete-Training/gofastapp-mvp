@@ -116,6 +116,7 @@ export default function AthleteCommunityView({ handle }: Props) {
     return composeCommunityFeed({
       updateMessages,
       tips: community.tips,
+      runRoutes: community.runRoutes ?? [],
       activityPosts: community.activityPosts ?? [],
       upcomingRuns: community.upcomingRuns,
     });

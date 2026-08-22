@@ -9,6 +9,7 @@ import {
 } from '@/lib/gofast-with-me/gofast-with-me-service';
 import { resolvePublicActions } from '@/lib/gofast-with-me/resolve-public-actions';
 import { listPublishedAthleteTips } from '@/lib/gofast-with-me/athlete-tips';
+import { listPublishedAthleteRunRoutes } from '@/lib/gofast-with-me/athlete-run-routes';
 import { listPublicInstagramMedia } from '@/lib/gofast-with-me/instagram-hydration';
 import {
   buildPublicTrainingFor,
@@ -110,6 +111,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
     workoutRows,
     weeklyAggregate,
     athleteTips,
+    athleteRunRoutes,
     instagramMedia,
   ] = await Promise.all([
     prisma.athlete_races.findMany({
@@ -178,6 +180,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
       _sum: { distance: true },
     }),
     listPublishedAthleteTips(athlete.id, 6),
+    listPublishedAthleteRunRoutes(athlete.id, 6),
     listPublicInstagramMedia(athlete.id, 5),
   ]);
 
@@ -498,6 +501,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
     upcomingWorkouts,
     upcomingRuns,
     athleteTips,
+    athleteRunRoutes,
     instagramMedia,
     activeSponsorship,
   };

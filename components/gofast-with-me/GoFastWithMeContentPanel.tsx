@@ -5,6 +5,7 @@ import { BookOpen, ExternalLink, Lightbulb, MapPin, Trash2 } from 'lucide-react'
 import api from '@/lib/api';
 import type { AthleteTipMediaType, AthleteTipPayload } from '@/lib/gofast-with-me/athlete-tips';
 import TipMediaPicker from '@/components/gofast-with-me/TipMediaPicker';
+import GoFastWithMeRoutesPanel from '@/components/gofast-with-me/GoFastWithMeRoutesPanel';
 
 type Props = {
   athleteId: string;
@@ -146,7 +147,7 @@ export default function GoFastWithMeCmsContentSection({
       <div>
         <h2 className="text-lg font-bold text-gray-900">Tips &amp; Thinking</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Short tips you talk about — training, nutrition, routes. Add a photo or video when it helps.
+          Durable tips and myRunRoutes — training thoughts and routes you want followers to see.
         </p>
       </div>
 
@@ -284,13 +285,10 @@ export default function GoFastWithMeCmsContentSection({
         )}
       </section>
 
+      <GoFastWithMeRoutesPanel athleteId={athleteId} />
+
+      {(onOpenWorkouts || onOpenCommunity) ? (
       <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-3">
-        <div>
-          <h4 className="text-sm font-semibold text-gray-900">Still planned</h4>
-          <p className="text-xs text-gray-600 mt-1">
-            myRunRoutes and longer blog posts can follow this same athlete-owned content pattern.
-          </p>
-        </div>
         <div className="flex flex-wrap gap-2">
           {onOpenWorkouts ? (
             <button
@@ -323,6 +321,7 @@ export default function GoFastWithMeCmsContentSection({
           </a>
         </div>
       </div>
+      ) : null}
     </section>
   );
 }

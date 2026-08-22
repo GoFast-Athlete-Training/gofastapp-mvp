@@ -34,6 +34,7 @@ test('composeCommunityFeed merges and sorts reverse-chronologically', () => {
         updatedAt: '2026-08-15T10:00:00.000Z',
       },
     ],
+    runRoutes: [],
     activityPosts: [],
     upcomingRuns: [
       {
@@ -56,6 +57,7 @@ test('composeCommunityFeed includes published activity posts only via input', ()
   const feed = composeCommunityFeed({
     updateMessages: [],
     tips: [],
+    runRoutes: [],
     upcomingRuns: [],
     activityPosts: [
       {

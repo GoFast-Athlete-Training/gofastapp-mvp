@@ -118,6 +118,54 @@ export default function AthleteCommunityFeed({ items, hostFirstName, emptyMessag
           );
         }
 
+        if (item.kind === 'myrunroute') {
+          const { runRoute } = item;
+          const route = runRoute.route;
+          const mapUrl = route.mapImageUrl || route.stravaMapUrl;
+          const meta = [
+            route.distanceMiles != null ? `${route.distanceMiles} mi` : null,
+            route.routeNeighborhood,
+            route.citySlug,
+          ]
+            .filter(Boolean)
+            .join(' · ');
+          return (
+            <article
+              key={item.id}
+              className="rounded-2xl border border-violet-200 bg-white p-4 shadow-sm overflow-hidden"
+            >
+              <p className="text-[10px] font-bold uppercase tracking-wide text-violet-700">
+                {communityFeedItemLabel(item.kind)} from {hostFirstName}
+              </p>
+              <h3 className="mt-1 text-base font-semibold text-gray-900">{route.name}</h3>
+              {runRoute.caption ? (
+                <p className="mt-2 text-sm text-gray-700 whitespace-pre-wrap">{runRoute.caption}</p>
+              ) : null}
+              {mapUrl ? (
+                <img
+                  src={mapUrl}
+                  alt=""
+                  className="mt-3 max-h-48 w-full rounded-xl object-cover"
+                />
+              ) : null}
+              {meta ? <p className="mt-2 text-xs text-gray-600">{meta}</p> : null}
+              {route.stravaUrl ? (
+                <a
+                  href={route.stravaUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-block text-xs font-semibold text-orange-700 hover:underline"
+                >
+                  View on Strava
+                </a>
+              ) : null}
+              <p className="mt-2 text-xs text-gray-400">{formatWhen(item.sortAt)}</p>
+            </article>
+          );
+        }
+
+        if (item.kind !== 'run') return null;
+
         const href = item.run.gorunPath.startsWith('/')
           ? item.run.gorunPath
           : `/${item.run.gorunPath}`;
