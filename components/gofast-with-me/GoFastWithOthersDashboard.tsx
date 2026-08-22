@@ -30,6 +30,7 @@ import {
 } from "@/lib/gofast-with-me/studio-intro";
 import {
   isWelcomeContentComplete,
+  type ContentEditorFocus,
   type StudioSection,
   type StudioView,
 } from "@/components/gofast-with-me/studio-sections";
@@ -86,6 +87,7 @@ export default function GoFastWithOthersDashboard() {
   const [noHandle, setNoHandle] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeView, setActiveView] = useState<StudioView>("dashboard");
+  const [contentFocus, setContentFocus] = useState<ContentEditorFocus | null>(null);
   const [followerCount, setFollowerCount] = useState<number | null>(null);
   const [shareHubStatus, setShareHubStatus] = useState<ShareHubStatus | null>(null);
   const [introDismissed, setIntroDismissed] = useState(false);
@@ -100,9 +102,26 @@ export default function GoFastWithOthersDashboard() {
       landingValues.whatYoullSeeHere?.trim()
   );
 
-  const openWorkspace = useCallback((section: StudioSection) => {
+  const openWorkspace = useCallback((section: StudioSection, focus?: ContentEditorFocus) => {
     setActiveView(section);
+    if (section === 'content') {
+      setContentFocus(focus ?? 'tip');
+    } else {
+      setContentFocus(null);
+    }
   }, []);
+
+  const handleViewChange = useCallback(
+    (view: StudioView, options?: { contentFocus?: ContentEditorFocus }) => {
+      setActiveView(view);
+      if (view === 'content') {
+        setContentFocus(options?.contentFocus ?? 'tip');
+      } else {
+        setContentFocus(null);
+      }
+    },
+    []
+  );
 
   const refreshShareHubStatus = useCallback(async () => {
     try {
@@ -245,7 +264,8 @@ export default function GoFastWithOthersDashboard() {
   const studioShell = (content: React.ReactNode) => (
     <GoFastWithMeStudioAppShell
       activeView={activeView}
-      onViewChange={setActiveView}
+      contentFocus={contentFocus}
+      onViewChange={handleViewChange}
       pageNeedsAction={!isWelcomeComplete}
     >
       <div className="px-4 sm:px-6 py-6 max-w-6xl mx-auto">{content}</div>
@@ -392,6 +412,7 @@ export default function GoFastWithOthersDashboard() {
           <GoFastWithMeCmsContentSection
             athleteId={athleteId}
             liveUrl={liveUrl}
+            initialFocus={contentFocus ?? 'tip'}
             onOpenWorkouts={() => openWorkspace("workouts")}
             onOpenCommunity={() => openWorkspace("community")}
           />

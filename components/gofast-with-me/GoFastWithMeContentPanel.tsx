@@ -7,9 +7,12 @@ import type { AthleteTipMediaType, AthleteTipPayload } from '@/lib/gofast-with-m
 import TipMediaPicker from '@/components/gofast-with-me/TipMediaPicker';
 import GoFastWithMeRoutesPanel from '@/components/gofast-with-me/GoFastWithMeRoutesPanel';
 
+import type { ContentEditorFocus } from '@/components/gofast-with-me/studio-sections';
+
 type Props = {
   athleteId: string;
   liveUrl: string;
+  initialFocus?: ContentEditorFocus;
   onOpenWorkouts?: () => void;
   onOpenCommunity?: () => void;
 };
@@ -57,6 +60,7 @@ function draftToApiBody(draft: TipDraft) {
 export default function GoFastWithMeCmsContentSection({
   athleteId,
   liveUrl,
+  initialFocus = 'tip',
   onOpenWorkouts,
   onOpenCommunity,
 }: Props) {
@@ -84,6 +88,14 @@ export default function GoFastWithMeCmsContentSection({
   useEffect(() => {
     void loadTips();
   }, [loadTips]);
+
+  useEffect(() => {
+    const targetId = initialFocus === 'route' ? 'myrunroutes' : 'tips';
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [initialFocus, athleteId]);
 
   const createTip = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,9 +157,13 @@ export default function GoFastWithMeCmsContentSection({
   return (
     <section id="content" className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">Tips &amp; Thinking</h2>
+        <h2 className="text-lg font-bold text-gray-900">
+          {initialFocus === 'route' ? 'Routes' : 'Tips'}
+        </h2>
         <p className="text-sm text-gray-600 mt-1">
-          Durable tips and myRunRoutes — training thoughts and routes you want followers to see.
+          {initialFocus === 'route'
+            ? 'Share routes you love — Strava links or favorites from the city catalog.'
+            : 'Durable tips — training thoughts and notes you want followers to revisit.'}
         </p>
       </div>
 
@@ -168,7 +184,11 @@ export default function GoFastWithMeCmsContentSection({
         </div>
       ) : null}
 
-      <form onSubmit={(e) => void createTip(e)} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+      <form
+        id="tips"
+        onSubmit={(e) => void createTip(e)}
+        className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-4"
+      >
         <div className="flex items-start gap-2">
           <Lightbulb className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
           <div>

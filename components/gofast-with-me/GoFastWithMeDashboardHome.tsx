@@ -1,8 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Copy, ExternalLink, Users } from 'lucide-react';
-import { STUDIO_CENTRAL_LABEL, type StudioSection } from '@/components/gofast-with-me/studio-sections';
+import { BookOpen, CalendarDays, Copy, ExternalLink, MapPin, PenLine, Users } from 'lucide-react';
+import {
+  STUDIO_CENTRAL_LABEL,
+  type ContentEditorFocus,
+  type StudioSection,
+} from '@/components/gofast-with-me/studio-sections';
 import GoFastWithMeUrlEditor from '@/components/profile/GoFastWithMeUrlEditor';
 import {
   athleteCommunityPath,
@@ -25,9 +29,34 @@ export type DashboardMetrics = {
 type Props = {
   metrics: DashboardMetrics;
   visitorHeadline: string;
-  onOpenWorkspace: (section: StudioSection) => void;
+  onOpenWorkspace: (section: StudioSection, focus?: ContentEditorFocus) => void;
   onUrlUpdated?: (slug: string, usesHandle: boolean) => void;
 };
+
+const BUILD_CONTENT_ACTIONS = [
+  {
+    title: 'Daily log',
+    description: 'How you\u2019re feeling today \u2014 spills into the member feed.',
+    section: 'community' as const,
+  },
+  {
+    title: 'Tip',
+    description: 'Evergreen training thoughts followers can come back to.',
+    section: 'content' as const,
+    focus: 'tip' as const,
+  },
+  {
+    title: 'Route',
+    description: 'Share a Strava route or feature one from the catalog.',
+    section: 'content' as const,
+    focus: 'route' as const,
+  },
+  {
+    title: 'Run / training',
+    description: 'Pick the plan or workout followers see on your community.',
+    section: 'workouts' as const,
+  },
+] as const;
 
 type SetupStatus = 'not_started' | 'in_progress' | 'ready';
 
@@ -215,84 +244,91 @@ export default function GoFastWithMeDashboardHome({
         </section>
       </div>
 
-      <aside className="mt-5 space-y-3 rounded-xl border border-gray-200 bg-white p-5 lg:col-span-5 lg:mt-0 lg:sticky lg:top-6">
+      <aside className="mt-5 space-y-5 rounded-xl border border-gray-200 bg-white p-5 lg:col-span-5 lg:mt-0 lg:sticky lg:top-6">
         <div>
-          <h3 className="text-sm font-bold text-gray-900">Arrange and see what your community sees</h3>
+          <h3 className="text-sm font-bold text-gray-900">Build content</h3>
           <p className="text-xs text-gray-600 mt-0.5">
-            Choose what shows up, then check how it looks to followers.
+            Pick what you want to create — each type opens its own editor.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <a
-            href={followerPreviewPath}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-semibold text-orange-800 hover:bg-orange-100"
-          >
-            See what followers see
-            <ExternalLink className="h-3.5 w-3.5" />
-          </a>
-          <a
-            href={publicCommunityPath}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-100"
-          >
-            Open public community
-            <ExternalLink className="h-3.5 w-3.5" />
-          </a>
-        </div>
         <div className="grid gap-2">
-          <ArrangeShortcutCard
-            title="Daily log"
-            description="How you're feeling today — spills into the member feed."
-            action="Open Daily log"
-            onClick={() => onOpenWorkspace('community')}
-          />
-          <ArrangeShortcutCard
-            title="Topics"
-            description="Publish tips and thinking by topic."
-            action="Open Tips"
-            onClick={() => onOpenWorkspace('content')}
-          />
-          <ArrangeShortcutCard
-            title="Next blog"
-            description="Longer posts live in Tips & Thinking."
-            action="Open Tips"
-            onClick={() => onOpenWorkspace('content')}
-          />
-          <ArrangeShortcutCard
-            title="Next run"
-            description="Pick the run or workout followers see on your community."
-            action="Open Runs"
-            onClick={() => onOpenWorkspace('workouts')}
-          />
+          {BUILD_CONTENT_ACTIONS.map((action) => (
+            <BuildContentButton
+              key={action.title}
+              title={action.title}
+              description={action.description}
+              onClick={() =>
+                onOpenWorkspace(
+                  action.section,
+                  'focus' in action ? action.focus : undefined
+                )
+              }
+            />
+          ))}
+        </div>
+
+        <div className="border-t border-gray-100 pt-4 space-y-2">
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500">Preview</h4>
+            <p className="text-xs text-gray-600 mt-0.5">Check how your community looks to followers.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={followerPreviewPath}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800 hover:bg-orange-100"
+            >
+              See what followers see
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+            <a
+              href={publicCommunityPath}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-100"
+            >
+              Open public community
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
         </div>
       </aside>
     </div>
   );
 }
 
-function ArrangeShortcutCard({
+const BUILD_CONTENT_ICONS = {
+  'Daily log': PenLine,
+  Tip: BookOpen,
+  Route: MapPin,
+  'Run / training': CalendarDays,
+} as const;
+
+function BuildContentButton({
   title,
   description,
-  action,
   onClick,
 }: {
-  title: string;
+  title: keyof typeof BUILD_CONTENT_ICONS;
   description: string;
-  action: string;
   onClick: () => void;
 }) {
+  const Icon = BUILD_CONTENT_ICONS[title];
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-left transition hover:border-orange-200 hover:bg-orange-50"
+      className="flex w-full items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-left transition hover:border-orange-200 hover:bg-orange-50"
     >
-      <p className="text-sm font-semibold text-gray-900">{title}</p>
-      <p className="mt-1 text-xs leading-relaxed text-gray-600">{description}</p>
-      <p className="mt-2 text-xs font-semibold text-orange-700">{action} →</p>
+      <span className="rounded-lg bg-white p-2 text-orange-700 ring-1 ring-gray-200">
+        <Icon className="h-4 w-4 shrink-0" aria-hidden />
+      </span>
+      <span className="min-w-0">
+        <p className="text-sm font-semibold text-gray-900">{title}</p>
+        <p className="mt-1 text-xs leading-relaxed text-gray-600">{description}</p>
+      </span>
     </button>
   );
 }
