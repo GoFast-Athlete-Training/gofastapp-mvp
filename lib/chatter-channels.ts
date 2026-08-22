@@ -205,7 +205,7 @@ async function batchLastMessages(
   if (parts.length === 0) return new Map();
 
   const union =
-    parts.length === 1 ? parts[0]! : Prisma.join(parts, Prisma.sql` UNION ALL `);
+    parts.length === 1 ? parts[0]! : Prisma.join(parts, ' UNION ALL ');
 
   const rows = await prisma.$queryRaw<LastMessageRow[]>(Prisma.sql`
     SELECT DISTINCT ON (channel_type, channel_id)
