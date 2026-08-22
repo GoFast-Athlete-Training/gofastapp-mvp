@@ -17,8 +17,18 @@ export type ChatterChannelRow = {
 };
 
 type UnreadCountRow = {
+  channel_type: ChatterChannelType;
   channel_id: string;
   unread_count: number;
+};
+
+type LastMessageRow = {
+  channel_type: ChatterChannelType;
+  channel_id: string;
+  content: string;
+  created_at: Date;
+  first_name: string | null;
+  last_name: string | null;
 };
 
 function authorLabel(firstName: string | null, lastName: string | null): string {
@@ -26,174 +36,213 @@ function authorLabel(firstName: string | null, lastName: string | null): string 
   return parts.length > 0 ? parts.join(' ') : 'Someone';
 }
 
-async function batchRunClubUnreadCounts(
+/**
+ * Neon pooler + Prisma serverless uses connection_limit=1. Never fan out parallel
+ * Prisma calls in one request — they contend for the single pool slot (P2024).
+ */
+async function batchUnreadCounts(
   athleteId: string,
-  clubIds: string[]
-): Promise<Map<string, number>> {
-  if (clubIds.length === 0) return new Map();
-
-  const rows = await prisma.$queryRaw<UnreadCountRow[]>(Prisma.sql`
-    SELECT m."runClubId" AS channel_id,
-           COUNT(*)::int AS unread_count
-    FROM run_club_messages m
-    LEFT JOIN chatter_channel_reads r
-      ON r."channelId" = m."runClubId"
-      AND r."channelType" = 'run_club'
-      AND r."athleteId" = ${athleteId}
-    WHERE m."runClubId" IN (${Prisma.join(clubIds)})
-      AND m."athleteId" <> ${athleteId}
-      AND m."createdAt" > COALESCE(r."lastReadAt", TIMESTAMP '1970-01-01')
-    GROUP BY m."runClubId"
-  `);
-
-  return new Map(rows.map((row) => [row.channel_id, row.unread_count]));
-}
-
-async function batchRunCrewUnreadCounts(
-  athleteId: string,
-  crewIds: string[]
-): Promise<Map<string, number>> {
-  if (crewIds.length === 0) return new Map();
-
-  const rows = await prisma.$queryRaw<UnreadCountRow[]>(Prisma.sql`
-    SELECT m."runCrewId" AS channel_id,
-           COUNT(*)::int AS unread_count
-    FROM run_crew_messages m
-    LEFT JOIN chatter_channel_reads r
-      ON r."channelId" = m."runCrewId"
-      AND r."channelType" = 'run_crew'
-      AND r."athleteId" = ${athleteId}
-    WHERE m."runCrewId" IN (${Prisma.join(crewIds)})
-      AND m."athleteId" <> ${athleteId}
-      AND m."createdAt" > COALESCE(r."lastReadAt", TIMESTAMP '1970-01-01')
-    GROUP BY m."runCrewId"
-  `);
-
-  return new Map(rows.map((row) => [row.channel_id, row.unread_count]));
-}
-
-async function batchRaceHubUnreadCounts(
-  athleteId: string,
+  clubIds: string[],
+  crewIds: string[],
   raceIds: string[]
-): Promise<Map<string, number>> {
-  if (raceIds.length === 0) return new Map();
+): Promise<{
+  club: Map<string, number>;
+  crew: Map<string, number>;
+  race: Map<string, number>;
+}> {
+  const parts: Prisma.Sql[] = [];
 
-  const rows = await prisma.$queryRaw<UnreadCountRow[]>(Prisma.sql`
-    SELECT m."raceId" AS channel_id,
-           COUNT(*)::int AS unread_count
-    FROM race_messages m
-    LEFT JOIN chatter_channel_reads r
-      ON r."channelId" = m."raceId"
-      AND r."channelType" = 'race_hub'
-      AND r."athleteId" = ${athleteId}
-    WHERE m."raceId" IN (${Prisma.join(raceIds)})
-      AND m."athleteId" <> ${athleteId}
-      AND m."createdAt" > COALESCE(r."lastReadAt", TIMESTAMP '1970-01-01')
-    GROUP BY m."raceId"
-  `);
+  if (clubIds.length > 0) {
+    parts.push(Prisma.sql`
+      SELECT 'run_club'::text AS channel_type,
+             m."runClubId" AS channel_id,
+             COUNT(*)::int AS unread_count
+      FROM run_club_messages m
+      LEFT JOIN chatter_channel_reads r
+        ON r."channelId" = m."runClubId"
+        AND r."channelType" = 'run_club'
+        AND r."athleteId" = ${athleteId}
+      WHERE m."runClubId" IN (${Prisma.join(clubIds)})
+        AND m."athleteId" <> ${athleteId}
+        AND m."createdAt" > COALESCE(r."lastReadAt", TIMESTAMP '1970-01-01')
+      GROUP BY m."runClubId"
+    `);
+  }
 
-  return new Map(rows.map((row) => [row.channel_id, row.unread_count]));
+  if (crewIds.length > 0) {
+    parts.push(Prisma.sql`
+      SELECT 'run_crew'::text AS channel_type,
+             m."runCrewId" AS channel_id,
+             COUNT(*)::int AS unread_count
+      FROM run_crew_messages m
+      LEFT JOIN chatter_channel_reads r
+        ON r."channelId" = m."runCrewId"
+        AND r."channelType" = 'run_crew'
+        AND r."athleteId" = ${athleteId}
+      WHERE m."runCrewId" IN (${Prisma.join(crewIds)})
+        AND m."athleteId" <> ${athleteId}
+        AND m."createdAt" > COALESCE(r."lastReadAt", TIMESTAMP '1970-01-01')
+      GROUP BY m."runCrewId"
+    `);
+  }
+
+  if (raceIds.length > 0) {
+    parts.push(Prisma.sql`
+      SELECT 'race_hub'::text AS channel_type,
+             m."raceId" AS channel_id,
+             COUNT(*)::int AS unread_count
+      FROM race_messages m
+      LEFT JOIN chatter_channel_reads r
+        ON r."channelId" = m."raceId"
+        AND r."channelType" = 'race_hub'
+        AND r."athleteId" = ${athleteId}
+      WHERE m."raceId" IN (${Prisma.join(raceIds)})
+        AND m."athleteId" <> ${athleteId}
+        AND m."createdAt" > COALESCE(r."lastReadAt", TIMESTAMP '1970-01-01')
+      GROUP BY m."raceId"
+    `);
+  }
+
+  if (parts.length === 0) {
+    return { club: new Map(), crew: new Map(), race: new Map() };
+  }
+
+  const rows = await prisma.$queryRaw<UnreadCountRow[]>(
+    Prisma.join(parts, ' UNION ALL ')
+  );
+
+  const club = new Map<string, number>();
+  const crew = new Map<string, number>();
+  const race = new Map<string, number>();
+
+  for (const row of rows) {
+    if (row.channel_type === 'run_club') club.set(row.channel_id, row.unread_count);
+    if (row.channel_type === 'run_crew') crew.set(row.channel_id, row.unread_count);
+    if (row.channel_type === 'race_hub') race.set(row.channel_id, row.unread_count);
+  }
+
+  return { club, crew, race };
+}
+
+async function batchLastMessages(
+  clubIds: string[],
+  crewIds: string[],
+  raceIds: string[]
+): Promise<Map<string, LastMessageRow>> {
+  const parts: Prisma.Sql[] = [];
+
+  if (clubIds.length > 0) {
+    parts.push(Prisma.sql`
+      SELECT DISTINCT ON (m."runClubId")
+        'run_club'::text AS channel_type,
+        m."runClubId" AS channel_id,
+        m.content,
+        m."createdAt" AS created_at,
+        a."firstName" AS first_name,
+        a."lastName" AS last_name
+      FROM run_club_messages m
+      INNER JOIN "Athlete" a ON a.id = m."athleteId"
+      WHERE m."runClubId" IN (${Prisma.join(clubIds)})
+      ORDER BY m."runClubId", m."createdAt" DESC
+    `);
+  }
+
+  if (crewIds.length > 0) {
+    parts.push(Prisma.sql`
+      SELECT DISTINCT ON (m."runCrewId")
+        'run_crew'::text AS channel_type,
+        m."runCrewId" AS channel_id,
+        m.content,
+        m."createdAt" AS created_at,
+        a."firstName" AS first_name,
+        a."lastName" AS last_name
+      FROM run_crew_messages m
+      INNER JOIN "Athlete" a ON a.id = m."athleteId"
+      WHERE m."runCrewId" IN (${Prisma.join(crewIds)})
+      ORDER BY m."runCrewId", m."createdAt" DESC
+    `);
+  }
+
+  if (raceIds.length > 0) {
+    parts.push(Prisma.sql`
+      SELECT DISTINCT ON (m."raceId")
+        'race_hub'::text AS channel_type,
+        m."raceId" AS channel_id,
+        m.content,
+        m."createdAt" AS created_at,
+        a."firstName" AS first_name,
+        a."lastName" AS last_name
+      FROM race_messages m
+      INNER JOIN "Athlete" a ON a.id = m."athleteId"
+      WHERE m."raceId" IN (${Prisma.join(raceIds)})
+      ORDER BY m."raceId", m."createdAt" DESC
+    `);
+  }
+
+  if (parts.length === 0) return new Map();
+
+  const rows = await prisma.$queryRaw<LastMessageRow[]>(
+    Prisma.join(parts, ' UNION ALL ')
+  );
+
+  return new Map(rows.map((row) => [`${row.channel_type}:${row.channel_id}`, row]));
 }
 
 export async function listChatterChannelsForAthlete(athleteId: string): Promise<ChatterChannelRow[]> {
-  const [clubMemberships, crewMemberships, raceMemberships] = await Promise.all([
-    prisma.run_club_memberships.findMany({
-      where: { athleteId, status: 'active' },
-      include: {
-        run_clubs: {
-          select: {
-            id: true,
-            slug: true,
-            name: true,
-            logoUrl: true,
-          },
+  const clubMemberships = await prisma.run_club_memberships.findMany({
+    where: { athleteId, status: 'active' },
+    include: {
+      run_clubs: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          logoUrl: true,
         },
       },
-    }),
-    prisma.run_crew_memberships.findMany({
-      where: { athleteId },
-      include: {
-        run_crews: {
-          select: {
-            id: true,
-            name: true,
-            logo: true,
-            handle: true,
-          },
+    },
+  });
+
+  const crewMemberships = await prisma.run_crew_memberships.findMany({
+    where: { athleteId },
+    include: {
+      run_crews: {
+        select: {
+          id: true,
+          name: true,
+          logo: true,
+          handle: true,
         },
       },
-    }),
-    prisma.race_memberships.findMany({
-      where: { athleteId },
-      include: {
-        race_registry: {
-          select: {
-            id: true,
-            slug: true,
-            name: true,
-            logoUrl: true,
-          },
+    },
+  });
+
+  const raceMemberships = await prisma.race_memberships.findMany({
+    where: { athleteId },
+    include: {
+      race_registry: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          logoUrl: true,
         },
       },
-    }),
-  ]);
+    },
+  });
 
   const clubIds = clubMemberships.map((membership) => membership.run_clubs.id);
   const crewIds = crewMemberships.map((membership) => membership.run_crews.id);
   const raceIds = raceMemberships.map((membership) => membership.race_registry.id);
 
-  const [
-    clubLastMessages,
-    crewLastMessages,
-    raceLastMessages,
-    clubUnread,
-    crewUnread,
-    raceUnread,
-  ] = await Promise.all([
-    clubIds.length
-      ? prisma.run_club_messages.findMany({
-          where: { runClubId: { in: clubIds } },
-          orderBy: { createdAt: 'desc' },
-          distinct: ['runClubId'],
-          include: {
-            Athlete: { select: { firstName: true, lastName: true } },
-          },
-        })
-      : Promise.resolve([]),
-    crewIds.length
-      ? prisma.run_crew_messages.findMany({
-          where: { runCrewId: { in: crewIds } },
-          orderBy: { createdAt: 'desc' },
-          distinct: ['runCrewId'],
-          include: {
-            Athlete: { select: { firstName: true, lastName: true } },
-          },
-        })
-      : Promise.resolve([]),
-    raceIds.length
-      ? prisma.race_messages.findMany({
-          where: { raceId: { in: raceIds } },
-          orderBy: { createdAt: 'desc' },
-          distinct: ['raceId'],
-          include: {
-            Athlete: { select: { firstName: true, lastName: true } },
-          },
-        })
-      : Promise.resolve([]),
-    batchRunClubUnreadCounts(athleteId, clubIds),
-    batchRunCrewUnreadCounts(athleteId, crewIds),
-    batchRaceHubUnreadCounts(athleteId, raceIds),
-  ]);
-
-  const clubLastMap = new Map(clubLastMessages.map((message) => [message.runClubId, message]));
-  const crewLastMap = new Map(crewLastMessages.map((message) => [message.runCrewId, message]));
-  const raceLastMap = new Map(raceLastMessages.map((message) => [message.raceId, message]));
+  const lastMessageMap = await batchLastMessages(clubIds, crewIds, raceIds);
+  const unread = await batchUnreadCounts(athleteId, clubIds, crewIds, raceIds);
 
   const channels: ChatterChannelRow[] = [];
 
   for (const membership of clubMemberships) {
     const club = membership.run_clubs;
-    const lastMessage = clubLastMap.get(club.id);
+    const lastMessage = lastMessageMap.get(`run_club:${club.id}`);
 
     channels.push({
       type: 'run_club',
@@ -202,18 +251,18 @@ export async function listChatterChannelsForAthlete(athleteId: string): Promise<
       name: club.name,
       logoUrl: club.logoUrl,
       lastMessage: lastMessage?.content ?? null,
-      lastMessageAt: lastMessage?.createdAt.toISOString() ?? null,
+      lastMessageAt: lastMessage?.created_at.toISOString() ?? null,
       lastAuthorName: lastMessage
-        ? authorLabel(lastMessage.Athlete.firstName, lastMessage.Athlete.lastName)
+        ? authorLabel(lastMessage.first_name, lastMessage.last_name)
         : null,
-      unreadCount: clubUnread.get(club.id) ?? 0,
+      unreadCount: unread.club.get(club.id) ?? 0,
       viewerRole: membership.role,
     });
   }
 
   for (const membership of crewMemberships) {
     const crew = membership.run_crews;
-    const lastMessage = crewLastMap.get(crew.id);
+    const lastMessage = lastMessageMap.get(`run_crew:${crew.id}`);
 
     channels.push({
       type: 'run_crew',
@@ -222,18 +271,18 @@ export async function listChatterChannelsForAthlete(athleteId: string): Promise<
       name: crew.name,
       logoUrl: crew.logo,
       lastMessage: lastMessage?.content ?? null,
-      lastMessageAt: lastMessage?.createdAt.toISOString() ?? null,
+      lastMessageAt: lastMessage?.created_at.toISOString() ?? null,
       lastAuthorName: lastMessage
-        ? authorLabel(lastMessage.Athlete.firstName, lastMessage.Athlete.lastName)
+        ? authorLabel(lastMessage.first_name, lastMessage.last_name)
         : null,
-      unreadCount: crewUnread.get(crew.id) ?? 0,
+      unreadCount: unread.crew.get(crew.id) ?? 0,
       viewerRole: membership.role,
     });
   }
 
   for (const membership of raceMemberships) {
     const race = membership.race_registry;
-    const lastMessage = raceLastMap.get(race.id);
+    const lastMessage = lastMessageMap.get(`race_hub:${race.id}`);
 
     channels.push({
       type: 'race_hub',
@@ -242,11 +291,11 @@ export async function listChatterChannelsForAthlete(athleteId: string): Promise<
       name: race.name,
       logoUrl: race.logoUrl,
       lastMessage: lastMessage?.content ?? null,
-      lastMessageAt: lastMessage?.createdAt.toISOString() ?? null,
+      lastMessageAt: lastMessage?.created_at.toISOString() ?? null,
       lastAuthorName: lastMessage
-        ? authorLabel(lastMessage.Athlete.firstName, lastMessage.Athlete.lastName)
+        ? authorLabel(lastMessage.first_name, lastMessage.last_name)
         : null,
-      unreadCount: raceUnread.get(race.id) ?? 0,
+      unreadCount: unread.race.get(race.id) ?? 0,
       viewerRole: membership.role,
     });
   }

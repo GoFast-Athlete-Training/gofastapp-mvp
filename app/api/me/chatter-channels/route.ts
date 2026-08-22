@@ -3,10 +3,7 @@ export const maxDuration = 30;
 
 import { NextResponse } from 'next/server';
 import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
-import {
-  listChatterChannelsForAthlete,
-  totalChatterUnread,
-} from '@/lib/chatter-channels';
+import { listChatterChannelsForAthlete } from '@/lib/chatter-channels';
 
 /**
  * GET /api/me/chatter-channels

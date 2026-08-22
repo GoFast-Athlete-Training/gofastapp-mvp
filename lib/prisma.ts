@@ -25,6 +25,10 @@ function withRecommendedNeonDatabaseUrl(raw: string | undefined): string | undef
     if (!q.has('connection_limit')) {
       q.set('connection_limit', '1');
     }
+    const poolTimeout = Number(q.get('pool_timeout'));
+    if (!Number.isFinite(poolTimeout) || poolTimeout < 20) {
+      q.set('pool_timeout', '20');
+    }
     const ct = Number(q.get('connect_timeout'));
     if (!Number.isFinite(ct) || ct < 15) {
       q.set('connect_timeout', '30');
