@@ -519,10 +519,14 @@ export default function MyRacePage() {
                     You already have a training plan for this race — finish setup or review your schedule.
                   </p>
                   <Link
-                    href={`/training-setup/${encodeURIComponent(trainingPlanId!)}`}
+                    href={
+                      activePlanSummary?.hasSchedule
+                        ? "/training"
+                        : `/training-setup/${encodeURIComponent(trainingPlanId!)}`
+                    }
                     className="mt-4 inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
                   >
-                    View plan →
+                    {activePlanSummary?.hasSchedule ? "View plan →" : "Finish plan setup →"}
                   </Link>
                 </>
               ) : goalTimeDisplay ? (

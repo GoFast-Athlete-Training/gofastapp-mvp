@@ -175,15 +175,12 @@ export default function TrainingSetupPlanPage({
   const [secondaryCandidates, setSecondaryCandidates] = useState<SecondaryRaceCandidate[]>([]);
   const [snappedAthleteRaceIds, setSnappedAthleteRaceIds] = useState<string[]>([]);
   const [pendingRaceCandidates, setPendingRaceCandidates] = useState<SecondaryRaceCandidate[]>([]);
-  const [terminalRaceName, setTerminalRaceName] = useState<string | null>(null);
   const [handledPendingRaceIds, setHandledPendingRaceIds] = useState<Set<string>>(new Set());
   const [includedSecondaryAthleteRaceIds, setIncludedSecondaryAthleteRaceIds] = useState<Set<string>>(
     new Set()
   );
-  const [claimedRaces, setClaimedRaces] = useState<
-    Array<{ id: string; name: string; raceDate: string; distanceLabel: string | null }>
-  >([]);
-  const [athleteRaceId, setAthleteRaceId] = useState<string>("");
+  const [archiving, setArchiving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   async function getToken() {
     const u = auth.currentUser;
     if (!u) throw new Error("Sign in required");
@@ -203,7 +200,6 @@ export default function TrainingSetupPlanPage({
       );
       const detail = plan as PlanDetail;
       setPlan(detail);
-      setAthleteRaceId(detail.athleteRaceId ?? "");
       setAthleteWeeklyTargetPreference(weeklyMileageTargetPreference);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
@@ -246,7 +242,6 @@ export default function TrainingSetupPlanPage({
       setSecondaryCandidates(candidates);
       setSnappedAthleteRaceIds(data.snappedAthleteRaceIds ?? []);
       setPendingRaceCandidates(pending);
-      setTerminalRaceName(data.terminalRace?.name ?? null);
       setIncludedSecondaryAthleteRaceIds(
         new Set([
           ...(data.snappedAthleteRaceIds ?? []),
@@ -263,30 +258,6 @@ export default function TrainingSetupPlanPage({
     if (!authReady) return;
     void loadPlanRaceEvents();
   }, [authReady, loadPlanRaceEvents]);
-
-  useEffect(() => {
-    if (!authReady) return;
-    void (async () => {
-      try {
-        const token = await getToken();
-        const res = await fetch("/api/race-signups", {
-          headers: athleteBearerFetchHeaders(token),
-        });
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          athleteRaces?: Array<{
-            id: string;
-            name: string;
-            raceDate: string;
-            distanceLabel: string | null;
-          }>;
-        };
-        setClaimedRaces(data.athleteRaces ?? []);
-      } catch {
-        setClaimedRaces([]);
-      }
-    })();
-  }, [authReady, planId]);
 
   useEffect(() => {
     if (!plan) return;
@@ -644,7 +615,6 @@ export default function TrainingSetupPlanPage({
         preferredLongRunDow: preferredLongRunDowLocal,
         preferredTempoDow: preferredTempoDowLocal,
         preferredIntervalDow: preferredIntervalDowLocal,
-        ...(athleteRaceId ? { athleteRaceId } : {}),
       }),
     });
     const patchData = await patchRes.json();
@@ -721,6 +691,68 @@ export default function TrainingSetupPlanPage({
     }
   }
 
+  async function archivePlan() {
+    if (!plan) return;
+    if (
+      !window.confirm(
+        `Archive "${plan.name}"? It stays in your history but won't be your active plan.`
+      )
+    ) {
+      return;
+    }
+    setArchiving(true);
+    setError(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/training-plan/${planId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...athleteBearerFetchHeaders(token),
+        },
+        body: JSON.stringify({ lifecycleStatus: "ARCHIVED" }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Could not archive plan");
+      }
+      router.push("/training");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not archive plan");
+    } finally {
+      setArchiving(false);
+    }
+  }
+
+  async function deletePlan() {
+    if (!plan) return;
+    if (
+      !window.confirm(
+        "Delete this training plan permanently? Workouts will stay on your log but won't be tied to this plan."
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    setError(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/training-plan/${planId}`, {
+        method: "DELETE",
+        headers: athleteBearerFetchHeaders(token),
+      });
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string };
+        throw new Error(data.error ?? "Could not delete plan");
+      }
+      router.push("/training-setup");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete plan");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   function goPrevWeek() {
     setWeekNumber((n) => Math.max(1, n - 1));
   }
@@ -780,7 +812,9 @@ export default function TrainingSetupPlanPage({
           </h1>
           {plan.race_registry && (
             <p className="mb-4 text-sm text-gray-600">
-              Race: {plan.race_registry.name} —{" "}
+              This plan is for{" "}
+              <span className="font-medium text-gray-900">{plan.race_registry.name}</span>
+              {" — "}
               {formatPlanDateDisplay(plan.race_registry.raceDate)}
             </p>
           )}
@@ -803,7 +837,7 @@ export default function TrainingSetupPlanPage({
                 getToken={getToken}
                 addedRaceAthleteRaceId={candidate.athleteRaceId}
                 addedRaceName={candidate.race.name}
-                terminalRaceName={terminalRaceName}
+                planRaceName={plan.race_registry?.name ?? null}
                 weeklyMileageTarget={
                   resolveTargetMiles() ??
                   (plan.weeklyMileageTarget != null
@@ -845,7 +879,7 @@ export default function TrainingSetupPlanPage({
                 }}
                 className="mt-3 inline-flex rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
               >
-                Edit preferences & regenerate
+                Edit weekly miles & regenerate
               </button>
             </div>
           ) : null}
@@ -922,7 +956,7 @@ export default function TrainingSetupPlanPage({
                   }}
                   className="mt-4 text-sm font-semibold text-orange-600 hover:text-orange-700"
                 >
-                  Edit preferences & regenerate
+                  Edit weekly miles & regenerate
                 </button>
               </div>
 
@@ -1004,7 +1038,7 @@ export default function TrainingSetupPlanPage({
           <div className="mb-6 space-y-6">
             <div className="rounded-xl border border-orange-100 bg-orange-50/80 p-4 text-sm text-gray-800">
               <p className="font-medium text-gray-900">
-                {hasSchedule ? "Edit training preferences" : "Choose your training preferences"}
+                {hasSchedule ? "Edit weekly miles & training days" : "Choose your training preferences"}
               </p>
               <p className="mt-2 leading-relaxed text-gray-700">
                 {hasSchedule
@@ -1049,30 +1083,6 @@ export default function TrainingSetupPlanPage({
                 </ul>
               </div>
             )}
-
-            {(showPreferencesEditor || !hasSchedule) && claimedRaces.length > 1 ? (
-              <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm">
-                <p className="font-medium text-gray-900">Plan terminal race</p>
-                <p className="mt-1 text-gray-600">
-                  Which claimed race is this training block built toward?
-                </p>
-                <select
-                  className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
-                  value={athleteRaceId}
-                  onChange={(e) => setAthleteRaceId(e.target.value)}
-                >
-                  <option value="">
-                    Use plan default ({plan.race_registry?.name ?? "race"})
-                  </option>
-                  {claimedRaces.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                      {r.distanceLabel ? ` · ${r.distanceLabel}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
 
             {(showPreferencesEditor || !hasSchedule) && secondaryCandidates.length > 0 ? (
               <PlanSecondaryRacesReview
@@ -1341,7 +1351,7 @@ export default function TrainingSetupPlanPage({
             <p className="mb-4 text-sm text-red-600">{error}</p>
           )}
 
-          <div className="flex flex-wrap gap-4 text-sm text-gray-500">
+          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
             <Link href="/training-setup" className="hover:text-orange-600">
               New plan
             </Link>
@@ -1351,6 +1361,26 @@ export default function TrainingSetupPlanPage({
             <Link href="/workouts" className="hover:text-orange-600">
               Workouts
             </Link>
+            {hasSchedule ? (
+              <>
+                <button
+                  type="button"
+                  disabled={archiving || deleting}
+                  onClick={() => void archivePlan()}
+                  className="hover:text-gray-800 disabled:opacity-50"
+                >
+                  {archiving ? "Archiving…" : "Archive this plan"}
+                </button>
+                <button
+                  type="button"
+                  disabled={deleting || archiving}
+                  onClick={() => void deletePlan()}
+                  className="text-red-700 hover:text-red-800 disabled:opacity-50"
+                >
+                  {deleting ? "Deleting…" : "Delete plan"}
+                </button>
+              </>
+            ) : null}
           </div>
         </div>
       </div>

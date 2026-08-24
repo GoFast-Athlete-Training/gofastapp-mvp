@@ -16,6 +16,7 @@ import {
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import { AthletePresetIngestForm } from "@/components/training/AthletePresetIngestForm";
 import { InlineGoalForm, type InlineGoalRow } from "@/components/races/InlineGoalForm";
+import { fetchTrainingPlanDetail } from "@/lib/training/fetch-plan-week-client";
 
 type RaceRegistryLite = {
   id: string;
@@ -256,8 +257,21 @@ export default function TrainingSetupClient() {
   const [selectedPreset, setSelectedPreset] = useState<PresetForWizard | null>(null);
   const [presetPickMode, setPresetPickMode] = useState<"choose" | "catalog" | "custom">("choose");
   const [selectedAthletePresetId, setSelectedAthletePresetId] = useState<string | null>(null);
+  /** When switching to a different race: null = show fork, same-shape | create-own */
+  const [changeRaceForkChoice, setChangeRaceForkChoice] = useState<
+    null | "same-shape" | "create-own"
+  >(null);
+  const [loadingSameShape, setLoadingSameShape] = useState(false);
 
   const qualifyingGoals = useMemo(() => goals.filter(isQualifyingGoal), [goals]);
+
+  const activePlanForOtherRace = useMemo(() => {
+    if (!wizardGoal) return null;
+    const wizardRaceId = wizardGoal.athleteRaceId ?? wizardGoal.id;
+    const active = activePlans.find((p) => p.lifecycleStatus === "ACTIVE");
+    if (!active?.athleteRaceId || active.athleteRaceId === wizardRaceId) return null;
+    return active;
+  }, [activePlans, wizardGoal]);
 
   /** Presets compatible with the current wizard goal race distance (or all if distance unknown). */
   const presetsForWizardGoal = useMemo(() => {
@@ -528,6 +542,7 @@ export default function TrainingSetupClient() {
     setCreateFeedback(null);
     setReplaceGoalAcknowledged(false);
     setReplaceBlockPlan(null);
+    setChangeRaceForkChoice(null);
     const today = new Date();
     setStartDate(today.toISOString().split("T")[0]);
     const qs = new URLSearchParams({ athleteRaceId: g.id });
@@ -558,6 +573,7 @@ export default function TrainingSetupClient() {
     setCreateFeedback(null);
     setReplaceGoalAcknowledged(false);
     setReplaceBlockPlan(null);
+    setChangeRaceForkChoice(null);
     router.replace("/training-setup", { scroll: false });
   }
 
@@ -687,6 +703,62 @@ export default function TrainingSetupClient() {
     );
   }
 
+  async function applySameShapeFromActivePlan() {
+    const active = activePlanForOtherRace;
+    if (!active) return;
+    setLoadingSameShape(true);
+    setFormError(null);
+    try {
+      const token = await getToken();
+      const { plan } = await fetchTrainingPlanDetail(active.id, token);
+      const detail = plan as {
+        presetId?: string | null;
+        athletePresetId?: string | null;
+        weeklyMileageTarget?: number | null;
+        currentFiveKPace?: string | null;
+        training_plan_preset?: { title?: string } | null;
+      };
+      if (detail.athletePresetId) {
+        setSelectedAthletePresetId(detail.athletePresetId);
+        setSelectedPreset(null);
+      } else if (detail.presetId) {
+        const match = prodPresets.find((p) => p.id === detail.presetId);
+        if (match) {
+          setSelectedPreset(match);
+          setSelectedAthletePresetId(null);
+        } else {
+          setFormError(
+            "Could not load your current plan blueprint. Try Create your own instead."
+          );
+          return;
+        }
+      } else {
+        setFormError(
+          "Your current plan has no blueprint to reuse. Try Create your own instead."
+        );
+        return;
+      }
+      if (
+        detail.weeklyMileageTarget != null &&
+        Number.isFinite(Number(detail.weeklyMileageTarget))
+      ) {
+        setBaselineWeeklyMileage(String(Math.round(Number(detail.weeklyMileageTarget))));
+      }
+      if (detail.currentFiveKPace?.trim()) {
+        const parts = parseFiveKPaceToParts(detail.currentFiveKPace);
+        setPaceMin(parts.min);
+        setPaceSec(parts.sec);
+      }
+      setChangeRaceForkChoice("same-shape");
+      setReplaceGoalAcknowledged(true);
+      setPresetPickMode("choose");
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : "Could not load your current plan");
+    } finally {
+      setLoadingSameShape(false);
+    }
+  }
+
   if (!ready) {
     return (
       <AthleteAppShell>
@@ -733,12 +805,22 @@ export default function TrainingSetupClient() {
         )
       ) : null;
 
-    const stepChoosePreset =
-      presetPickMode === "choose" ||
-      (presetPickMode === "catalog" && !selectedPreset) ||
-      (presetPickMode === "custom" && !selectedAthletePresetId);
-
     const needsGoalTimeStep = !goalTimeReady(wizardGoal);
+
+    const showChangeRaceFork =
+      Boolean(activePlanForOtherRace) &&
+      changeRaceForkChoice === null &&
+      !needsGoalTimeStep;
+
+    const hasBlueprintSelected =
+      selectedPreset != null || selectedAthletePresetId != null;
+
+    const stepChoosePreset =
+      !showChangeRaceFork &&
+      !hasBlueprintSelected &&
+      (presetPickMode === "choose" ||
+        (presetPickMode === "catalog" && !selectedPreset) ||
+        (presetPickMode === "custom" && !selectedAthletePresetId));
 
     function onSelectPreset(p: PresetForWizard) {
       setSelectedPreset(p);
@@ -790,6 +872,65 @@ export default function TrainingSetupClient() {
                   }}
                   onSaved={handleInitiateGoalSaved}
                 />
+                <button
+                  type="button"
+                  onClick={exitWizard}
+                  className="text-sm font-medium text-orange-600 hover:text-orange-800"
+                >
+                  ← Back
+                </button>
+              </div>
+            ) : showChangeRaceFork && activePlanForOtherRace ? (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-orange-100 bg-orange-50/80 p-4 text-sm text-gray-800">
+                  <p className="font-medium text-gray-900">
+                    Switch training to {rr.name}?
+                  </p>
+                  <p className="mt-2 leading-relaxed text-gray-700">
+                    You have an active plan for{" "}
+                    <span className="font-medium text-gray-900">
+                      {activePlanForOtherRace.race_registry?.name ?? "another race"}
+                    </span>
+                    . Starting a plan for {rr.name} will park that plan.
+                  </p>
+                  {replacingFromAddedRace ? (
+                    <p className="mt-2 text-xs text-amber-900/90">
+                      Your current plan will be parked when you finish setup.
+                    </p>
+                  ) : null}
+                </div>
+                <div className="grid gap-3">
+                  <button
+                    type="button"
+                    disabled={loadingSameShape}
+                    onClick={() => void applySameShapeFromActivePlan()}
+                    className="rounded-xl border-2 border-orange-300 bg-orange-50 p-4 text-left hover:border-orange-400 hover:bg-orange-50/80 disabled:opacity-60"
+                  >
+                    <p className="font-semibold text-gray-900">Keep this build</p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Same training level and weekly preferences — new race date and window.
+                    </p>
+                    {loadingSameShape ? (
+                      <p className="mt-2 text-xs font-medium text-orange-800">Loading…</p>
+                    ) : null}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={loadingSameShape}
+                    onClick={() => {
+                      setChangeRaceForkChoice("create-own");
+                      setPresetPickMode("choose");
+                      setFormError(null);
+                    }}
+                    className="rounded-xl border-2 border-gray-200 bg-gray-50 p-4 text-left hover:border-orange-400 hover:bg-orange-50/50 disabled:opacity-60"
+                  >
+                    <p className="font-semibold text-gray-900">Create your own</p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Pick a different GoFast level or build your own blueprint.
+                    </p>
+                  </button>
+                </div>
+                {formError ? <p className="text-sm text-red-600">{formError}</p> : null}
                 <button
                   type="button"
                   onClick={exitWizard}

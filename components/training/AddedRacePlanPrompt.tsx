@@ -10,6 +10,9 @@ export type AddedRacePlanPromptProps = {
   addedRaceAthleteRaceId: string;
   addedRaceName: string;
   weekNumber?: number | null;
+  /** Current plan's race name (not "goal race" — plan may differ from public flag). */
+  planRaceName?: string | null;
+  /** @deprecated use planRaceName */
   terminalRaceName?: string | null;
   weeklyMileageTarget: number;
   minWeeklyMiles?: number;
@@ -26,6 +29,7 @@ export function AddedRacePlanPrompt({
   addedRaceAthleteRaceId,
   addedRaceName,
   weekNumber,
+  planRaceName,
   terminalRaceName,
   weeklyMileageTarget,
   minWeeklyMiles,
@@ -39,7 +43,8 @@ export function AddedRacePlanPrompt({
   const [busy, setBusy] = useState<"cruise" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const terminalLabel = terminalRaceName?.trim() || "your goal race";
+  const planRaceLabel =
+    planRaceName?.trim() || terminalRaceName?.trim() || "this plan's race";
   const isRegenerating = busy != null;
 
   function goToAddPlan() {
@@ -90,7 +95,7 @@ export function AddedRacePlanPrompt({
         {weekNumber != null ? ` It falls in your current plan (week ${weekNumber}).` : " It falls in your current plan."}
       </p>
       <p className="mt-2 text-amber-900/90">
-        Add a new plan for {addedRaceName}, or keep training for {terminalLabel} and we&apos;ll
+        Add a new plan for {addedRaceName}, or keep training for {planRaceLabel} and we&apos;ll
         overlay this race on your schedule.
       </p>
 
@@ -112,7 +117,7 @@ export function AddedRacePlanPrompt({
             disabled={isRegenerating}
             className="inline-flex items-center rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950 hover:bg-amber-100/80 disabled:opacity-60"
           >
-            Keep training for {terminalLabel}
+            Keep training for {planRaceLabel}
           </button>
           <button
             type="button"

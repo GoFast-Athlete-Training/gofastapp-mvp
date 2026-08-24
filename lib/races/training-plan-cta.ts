@@ -8,7 +8,7 @@ export function trainingPlanCtaForRace(params: {
 }): { href: string; label: string } {
   if (params.trainingPlanId) {
     return {
-      href: `/training-setup/${encodeURIComponent(params.trainingPlanId)}`,
+      href: "/training",
       label: "View plan →",
     };
   }

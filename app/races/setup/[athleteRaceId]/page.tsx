@@ -197,6 +197,7 @@ export default function RaceSetupPage({
           addedRaceName={athleteRace.name}
           weekNumber={focusWeekNumber}
           terminalRaceName={terminalRaceName}
+          planRaceName={terminalRaceName}
           weeklyMileageTarget={weeklyMileageTarget}
           minWeeklyMiles={minWeeklyMiles}
           snappedAthleteRaceIds={snappedAthleteRaceIds}
