@@ -8,6 +8,7 @@ import {
 } from "@/lib/training/prescription";
 import { PACE_ANCHOR_CURRENT_BUILDUP, PACE_ANCHOR_MP_SIMULATION } from "@/lib/training/goal-pace-calculator";
 import { getTrainingPaces, paceTargetFromSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
+import { effectivePaceProfileForPreset } from "@/lib/training/pace-key-resolver";
 
 const ANCHOR_SEC = 420; // 7:00/mi 5K anchor
 
@@ -326,4 +327,73 @@ test("LongRun progression scales authored segments to fit scheduled distance", (
   );
   assert.ok(steps.some((s) => s.title === "Warmup"));
   assert.ok(steps.some((s) => s.title === "Cooldown"));
+});
+
+test("LongRun paceKey without authored preset profile resolves targets via canonical fallback", () => {
+  const anchorSec = 386; // 6:26/mi
+  const paceProfile = effectivePaceProfileForPreset({
+    paceProfile: null,
+    athletePersonaCapability: null,
+  });
+  const steps = prescribe({
+    entry: baseCatalogue({
+      workoutType: "LongRun",
+      warmupMiles: 2,
+      cooldownMiles: 2,
+      workPaceOffsetSecPerMile: null,
+      segmentPaceDist: [
+        { miles: 3.5, paceKey: "moderate" },
+        { miles: 3, paceKey: "threshold" },
+        { miles: 3, paceKey: "threshold" },
+      ] as unknown as workout_catalogue["segmentPaceDist"],
+    }),
+    scheduleMiles: 19.6,
+    anchorSecondsPerMile: anchorSec,
+    paceProfile,
+  });
+
+  const workSteps = steps.filter((s) => s.title.toLowerCase().includes("long run"));
+  assert.equal(workSteps.length, 4, "3 progression segments + remainder filler");
+  assert.equal(workSteps[0]!.durationValue, 3.5);
+  assert.equal(workSteps[1]!.durationValue, 3);
+  assert.equal(workSteps[2]!.durationValue, 3);
+  assert.ok(workSteps[0]!.targets?.length, "moderate segment should have pace targets");
+  assert.ok(workSteps[1]!.targets?.length, "threshold segment should have pace targets");
+  assert.ok(workSteps[2]!.targets?.length, "threshold segment should have pace targets");
+
+  const moderateTarget = workSteps[0]!.targets!.find((t) => t.type === "PACE")!;
+  const thresholdTarget = workSteps[1]!.targets!.find((t) => t.type === "PACE")!;
+  const fromModerate = paceTargetFromSecondsPerMile(anchorSec + 60);
+  const fromThreshold = paceTargetFromSecondsPerMile(anchorSec + 20);
+  assert.equal(moderateTarget.valueLow, fromModerate.valueLow);
+  assert.equal(thresholdTarget.valueLow, fromThreshold.valueLow);
+  assert.notEqual(moderateTarget.valueLow, thresholdTarget.valueLow);
+
+  assert.equal(steps.find((s) => s.title === "Warmup")!.durationValue, 2);
+  assert.equal(steps.find((s) => s.title === "Cooldown")!.durationValue, 2);
+  assert.equal(totalDistanceMiles(steps), 19.6);
+});
+
+test("LongRun paceKey with explicit preset profile uses authored offsets", () => {
+  const anchorSec = 386;
+  const steps = prescribe({
+    entry: baseCatalogue({
+      workoutType: "LongRun",
+      warmupMiles: 2,
+      cooldownMiles: 2,
+      segmentPaceDist: [
+        { miles: 3, paceKey: "moderate" },
+      ] as unknown as workout_catalogue["segmentPaceDist"],
+    }),
+    scheduleMiles: 8,
+    anchorSecondsPerMile: anchorSec,
+    paceProfile: {
+      moderate: { anchor: "current5k", offsetSecPerMile: 45 },
+    },
+  });
+  const work = steps.find((s) => s.title === "Long run");
+  assert.ok(work?.targets?.length);
+  const paceTarget = work!.targets!.find((t) => t.type === "PACE")!;
+  const custom = paceTargetFromSecondsPerMile(anchorSec + 45);
+  assert.equal(paceTarget.valueLow, custom.valueLow);
 });

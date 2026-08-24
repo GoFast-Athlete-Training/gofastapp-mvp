@@ -24,7 +24,8 @@ import { resolveGoalRacePace } from "./goal-pace-calculator";
 import { EASY_RUN_NOT_CONFIGURED } from "./run-type-config-validation";
 import { ensureWorkoutPrescriptionNarrative } from "./prescription-narrative-service";
 import { loadCatalogueTitleByIdFromPlanSchedule } from "./catalogue-title-map";
-import { parsePaceProfileFromJson } from "./pace-key-resolver";
+import { effectivePaceProfileForPreset } from "./pace-key-resolver";
+import type { PresetStrategyFields } from "./preset-strategy";
 
 export class MaterializeWorkoutError extends Error {
   constructor(message: string) {
@@ -221,10 +222,18 @@ async function buildPrescriptionSteps(params: {
     goalDistance: plan.athlete_race?.goalDistance ?? null,
   }).goalPaceSecPerMile;
 
-  const paceProfile = parsePaceProfileFromJson(
-    (plan as { training_plan_preset?: { paceProfile?: unknown } | null }).training_plan_preset
-      ?.paceProfile ?? null
-  );
+  const preset = (plan as {
+    training_plan_preset?: {
+      paceProfile?: unknown;
+      athletePersonaCapability?: string | null;
+    } | null;
+  }).training_plan_preset;
+  const paceProfile = effectivePaceProfileForPreset({
+    paceProfile: preset?.paceProfile ?? null,
+    athletePersonaCapability:
+      (preset?.athletePersonaCapability as PresetStrategyFields["athletePersonaCapability"]) ??
+      null,
+  });
 
   return prescribe({
     entry: catalogueEntryForDay,
@@ -267,7 +276,7 @@ export async function materializeWorkoutForPlanDay(params: {
         },
       },
       training_plan_preset: {
-        select: { paceProfile: true },
+        select: { paceProfile: true, athletePersonaCapability: true },
       },
     },
   });

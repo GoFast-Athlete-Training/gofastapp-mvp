@@ -1,4 +1,8 @@
-import type { PaceProfile } from "@/lib/training/preset-strategy";
+import {
+  defaultPaceProfileForCapability,
+  type PaceProfile,
+  type PresetStrategyFields,
+} from "@/lib/training/preset-strategy";
 import { getTrainingPaces } from "@/lib/workout-generator/pace-calculator";
 
 export type PaceResolutionContext = {
@@ -48,4 +52,19 @@ export function resolveCataloguePaceSecPerMile(params: {
 export function parsePaceProfileFromJson(raw: unknown): PaceProfile | null {
   if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return null;
   return raw as PaceProfile;
+}
+
+/**
+ * Preset pace profile for materialization: authored profile wins; otherwise canonical
+ * defaults from athletePersonaCapability (null capability → standard competitive offsets).
+ */
+export function effectivePaceProfileForPreset(params: {
+  paceProfile: unknown;
+  athletePersonaCapability?: PresetStrategyFields["athletePersonaCapability"] | null;
+}): PaceProfile {
+  const parsed = parsePaceProfileFromJson(params.paceProfile);
+  if (parsed && Object.keys(parsed).length > 0) {
+    return parsed;
+  }
+  return defaultPaceProfileForCapability(params.athletePersonaCapability ?? null);
 }
