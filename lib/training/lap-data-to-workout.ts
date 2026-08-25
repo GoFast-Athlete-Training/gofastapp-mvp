@@ -2,8 +2,8 @@
  * Map derived Garmin laps to workout segment rows, persist workout_segment_laps,
  * and refresh segment + workout-level aggregates.
  *
- * Structured workouts (Intervals/Tempo): lap[i] → segment row i only when counts match.
- * Easy/LongRun: mile-chunk auto alignment when lap count matches prescription totals.
+ * Walk segments by stepOrder and consume laps in order. repeatCount on a row
+ * means that many consecutive laps (e.g. 400×8 → eight 400m laps on one segment).
  *
  * @deprecated Prefer parseActivityToSegmentExecution() for the activity-to-segment pipeline.
  */
@@ -11,7 +11,6 @@
 import { Prisma } from "@prisma/client";
 import type { DerivedLap } from "./lap-converter";
 import { parseActivityToSegmentExecution } from "./activity-to-segment-execution";
-import { requiresDetailForTargetAnalysis } from "./structured-workout-types";
 
 type BaseSeg = {
   id: string;
@@ -24,7 +23,7 @@ type BaseSeg = {
   paceTargetEncodingVersion: number;
 };
 
-export type LapAssignmentMode = "step" | "auto" | "distance" | "unassigned";
+export type LapAssignmentMode = "step" | "distance" | "unassigned";
 
 export type LapAssignment = {
   mode: LapAssignmentMode;
@@ -41,7 +40,7 @@ function emptyBySegment(
   return m;
 }
 
-/** One Garmin lap per materialized segment row (stepOrder). */
+/** One Garmin lap per materialized segment row when counts happen to match. */
 function assignStructuredLaps(
   derived: DerivedLap[],
   baseSegments: BaseSeg[]
@@ -61,47 +60,18 @@ function isBookendTitle(title: string): boolean {
   return t.includes("warm") || t.includes("cool");
 }
 
-/** Expected auto-lap count per segment row (Easy/LongRun mile boundaries). */
-function expectedAutoLapCountForSegment(seg: BaseSeg): number {
+function perRepDistanceMiles(seg: BaseSeg): number {
   const dt = String(seg.durationType).toUpperCase();
-  if (dt === "TIME") return 1;
   if (dt !== "DISTANCE") return 0;
-
-  const miles = seg.durationValue * Math.max(1, seg.repeatCount ?? 1);
-  if (!Number.isFinite(miles) || miles <= 0) return 0;
-  if (miles < 0.9) return 1;
-  if (isBookendTitle(seg.title)) {
-    return Math.max(1, Math.round(miles));
-  }
-  return Math.max(1, Math.round(miles));
+  return seg.durationValue;
 }
 
-/** Consecutive mile chunks per segment when total laps match prescription. */
-function assignContinuousRunLaps(
-  derived: DerivedLap[],
-  baseSegments: BaseSeg[]
-): LapAssignment | null {
-  const sorted = [...baseSegments].sort((a, b) => a.stepOrder - b.stepOrder);
-  const totalNeed = sorted.reduce(
-    (a, s) => a + expectedAutoLapCountForSegment(s),
-    0
-  );
-  if (totalNeed <= 0 || totalNeed !== derived.length) return null;
-
-  const byAuto = emptyBySegment(baseSegments);
-  let idx = 0;
-  for (const seg of sorted) {
-    const need = expectedAutoLapCountForSegment(seg);
-    if (need === 0) continue;
-    const chunk = derived.slice(idx, idx + need);
-    if (chunk.length !== need) return null;
-    idx += need;
-    for (const d of chunk) {
-      byAuto.get(seg.id)!.push(d);
-    }
-  }
-  if (idx !== derived.length) return null;
-  return { mode: "auto", bySegment: byAuto };
+/** Track-style rep block: repeatCount > 1 and each rep is sub-mile. */
+function isRepeatedShortRepSegment(seg: BaseSeg): boolean {
+  const reps = Math.max(1, seg.repeatCount ?? 1);
+  if (reps <= 1) return false;
+  const perRep = perRepDistanceMiles(seg);
+  return perRep > 0 && perRep < 0.9;
 }
 
 function prescribedDistanceMiles(seg: BaseSeg): number {
@@ -110,11 +80,26 @@ function prescribedDistanceMiles(seg: BaseSeg): number {
   return seg.durationValue * Math.max(1, seg.repeatCount ?? 1);
 }
 
+/** Max mile-boundary laps for a continuous (non-rep-block) distance segment. */
+function maxMileBoundaryLapsForSegment(seg: BaseSeg): number {
+  const dt = String(seg.durationType).toUpperCase();
+  if (dt === "TIME") return 1;
+  if (dt !== "DISTANCE") return 0;
+
+  const miles = prescribedDistanceMiles(seg);
+  if (!Number.isFinite(miles) || miles <= 0) return 0;
+  if (miles < 0.9) return 1;
+  if (isBookendTitle(seg.title)) {
+    return Math.max(1, Math.round(miles));
+  }
+  return Math.max(1, Math.round(miles));
+}
+
 /**
- * Walk segments in order; consume consecutive laps by cumulative distance.
- * Accepts early-advance short laps (e.g. 0.7 mi of a 1.5 mi warmup).
+ * Walk segments in stepOrder; consume consecutive laps until each step is filled.
+ * repeatCount rows consume one lap per rep (Garmin exploded WorkoutRepeatStep).
  */
-function assignByDistanceConsumption(
+function assignByStepOrderConsumption(
   derived: DerivedLap[],
   baseSegments: BaseSeg[]
 ): LapAssignment | null {
@@ -124,15 +109,24 @@ function assignByDistanceConsumption(
   const bySeg = emptyBySegment(baseSegments);
   let lapIdx = 0;
 
-  for (let segIdx = 0; segIdx < sorted.length; segIdx++) {
-    const seg = sorted[segIdx]!;
-    const dt = String(seg.durationType).toUpperCase();
-
+  for (const seg of sorted) {
     if (lapIdx >= derived.length) break;
+
+    const dt = String(seg.durationType).toUpperCase();
 
     if (dt === "TIME") {
       bySeg.get(seg.id)!.push(derived[lapIdx]!);
       lapIdx++;
+      continue;
+    }
+
+    if (isRepeatedShortRepSegment(seg)) {
+      const reps = Math.max(1, seg.repeatCount ?? 1);
+      for (let r = 0; r < reps; r++) {
+        if (lapIdx >= derived.length) break;
+        bySeg.get(seg.id)!.push(derived[lapIdx]!);
+        lapIdx++;
+      }
       continue;
     }
 
@@ -153,6 +147,7 @@ function assignByDistanceConsumption(
       }
 
       const earlyAdvanceShortLap =
+        isBookendTitle(seg.title) &&
         chunk.length === 1 &&
         totalMiles > 0 &&
         totalMiles < targetMiles * 0.95;
@@ -161,8 +156,8 @@ function assignByDistanceConsumption(
 
       if (totalMiles >= targetMiles * 0.85) break;
 
-      const maxLapsForSegment = expectedAutoLapCountForSegment(seg);
-      if (maxLapsForSegment > 0 && chunk.length >= maxLapsForSegment) break;
+      const maxLaps = maxMileBoundaryLapsForSegment(seg);
+      if (maxLaps > 0 && chunk.length >= maxLaps) break;
     }
 
     if (chunk.length === 0) return null;
@@ -171,7 +166,6 @@ function assignByDistanceConsumption(
     }
   }
 
-  // Remaining laps attach to the final segment (over-distance on last step).
   if (lapIdx < derived.length) {
     const lastSeg = sorted[sorted.length - 1]!;
     while (lapIdx < derived.length) {
@@ -187,36 +181,26 @@ function assignByDistanceConsumption(
 }
 
 /**
- * Assign laps to segments. Returns null when alignment cannot be trusted
- * (structured: no guessing; continuous: no fallback dump to first segment).
+ * Assign laps to segments. Returns null when alignment cannot be trusted.
  */
 export function assignLapsToSegments(
   derived: DerivedLap[],
   baseSegments: BaseSeg[],
-  workoutType: string
+  _workoutType?: string
 ): LapAssignment | null {
   if (derived.length === 0 || baseSegments.length === 0) return null;
 
-  if (requiresDetailForTargetAnalysis(workoutType)) {
-    const structured = assignStructuredLaps(derived, baseSegments);
-    if (structured) return structured;
-    return assignByDistanceConsumption(derived, baseSegments);
-  }
+  const structured = assignStructuredLaps(derived, baseSegments);
+  if (structured) return structured;
 
-  const auto = assignContinuousRunLaps(derived, baseSegments);
-  if (auto) return auto;
-
-  const distance = assignByDistanceConsumption(derived, baseSegments);
-  if (distance) return distance;
-
-  return assignStructuredLaps(derived, baseSegments);
+  return assignByStepOrderConsumption(derived, baseSegments);
 }
 
 /** @internal */
 export function assignLapsForTest(
   derived: DerivedLap[],
   segments: BaseSeg[],
-  workoutType: string
+  workoutType?: string
 ): LapAssignment | null {
   return assignLapsToSegments(derived, segments, workoutType);
 }

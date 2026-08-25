@@ -20,8 +20,12 @@ import {
 } from "@/lib/training/workout-activity-match-candidates";
 import {
   applyActivityToWorkout,
-  reassignActivityToWorkout,
 } from "./apply-activity-to-workout";
+import {
+  applyActivityToPlannedWorkout,
+  plannedDayConsumedByOtherActivity,
+  reassignActivityToPlannedWorkout,
+} from "./match-planned-workout";
 
 export {
   computeMatchedWorkoutPaceCredits,
@@ -34,6 +38,18 @@ function isRunningActivityType(activityType: string | null | undefined): boolean
   return RUNNING_ACTIVITY_TYPES.has(activityType.toUpperCase());
 }
 
+const plannedMatchInclude = {
+  segments: { orderBy: { stepOrder: "asc" as const } },
+  workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true, name: true } },
+};
+
+type PlannedMatchRow = Awaited<
+  ReturnType<
+    typeof prisma.planned_workouts.findFirst<{ include: typeof plannedMatchInclude }>
+  >
+> &
+  object;
+
 const workoutMatchInclude = {
   segments: { orderBy: { stepOrder: "asc" as const } },
   workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true, name: true } },
@@ -44,13 +60,9 @@ type WorkoutMatchRow = Awaited<
 > &
   object;
 
-function isPlannedWorkout(workout: { planId: string | null }): boolean {
-  return workout.planId != null;
-}
-
 /** Planned workouts support manual match; ingest may still auto-link high-confidence candidates. */
 export function isManualMatchOnlyWorkout(workout: { planId: string | null }): boolean {
-  return isPlannedWorkout(workout);
+  return workout.planId != null;
 }
 
 /** True when a single planned-workout candidate is safe to auto-link on ingest. */
@@ -89,6 +101,20 @@ function activityCandidateInput(activity: {
   };
 }
 
+function plannedScoreInput(planned: PlannedMatchRow) {
+  return {
+    id: planned.id,
+    title: planned.title,
+    weekNumber: planned.weekNumber,
+    date: planned.date,
+    estimatedDistanceInMeters: planned.estimatedDistanceInMeters,
+    workoutType: planned.workoutType,
+    dayAssigned: planned.dayAssigned,
+    planId: planned.planId,
+    catalogueName: planned.workout_catalogue?.name ?? null,
+  };
+}
+
 function workoutScoreInput(workout: WorkoutMatchRow) {
   return {
     id: workout.id,
@@ -121,7 +147,7 @@ function logGarminWorkoutMatchAttempt(payload: {
 
 /** Pick a single planned workout from scored nearby candidates. */
 export function selectPlannedWorkoutCandidate(params: {
-  planCandidates: WorkoutMatchRow[];
+  planCandidates: PlannedMatchRow[];
   activity: {
     id: string;
     activityName: string | null;
@@ -135,24 +161,24 @@ export function selectPlannedWorkoutCandidate(params: {
   };
   athleteActivityId?: string;
 }): {
-  candidate: WorkoutMatchRow | null;
+  candidate: PlannedMatchRow | null;
   scored: ScoredActivityCandidate | null;
   titleMatchCount: number;
 } {
   const activityInput = activityCandidateInput(params.activity);
 
   const scoredRows = params.planCandidates
-    .map((workout) => ({
-      workout,
+    .map((planned) => ({
+      planned,
       scored: scoreActivityCandidateForWorkout({
-        workout: workoutScoreInput(workout),
+        workout: plannedScoreInput(planned),
         activity: activityInput,
       }),
     }))
     .filter(
       (
         row
-      ): row is { workout: WorkoutMatchRow; scored: ScoredActivityCandidate } =>
+      ): row is { planned: PlannedMatchRow; scored: ScoredActivityCandidate } =>
         row.scored != null
     );
 
@@ -161,9 +187,9 @@ export function selectPlannedWorkoutCandidate(params: {
   );
 
   if (highConfidence.length === 1) {
-    const { workout, scored } = highConfidence[0]!;
+    const { planned, scored } = highConfidence[0]!;
     const titleMatchCount = scored.reasons.includes("title_match") ? 1 : 0;
-    return { candidate: workout, scored, titleMatchCount };
+    return { candidate: planned, scored, titleMatchCount };
   }
 
   if (highConfidence.length > 1) {
@@ -172,7 +198,7 @@ export function selectPlannedWorkoutCandidate(params: {
     );
     if (titleMatches.length === 1) {
       return {
-        candidate: titleMatches[0]!.workout,
+        candidate: titleMatches[0]!.planned,
         scored: titleMatches[0]!.scored,
         titleMatchCount: 1,
       };
@@ -180,7 +206,7 @@ export function selectPlannedWorkoutCandidate(params: {
     console.warn("⚠️ ambiguous high-confidence Garmin planned matches", {
       athleteActivityId: params.athleteActivityId,
       activityName: params.activity.activityName,
-      candidateWorkoutIds: highConfidence.map(({ workout }) => workout.id),
+      candidatePlannedWorkoutIds: highConfidence.map(({ planned }) => planned.id),
     });
     return { candidate: null, scored: null, titleMatchCount: 0 };
   }
@@ -190,7 +216,7 @@ export function selectPlannedWorkoutCandidate(params: {
   );
   if (titleMatches.length === 1) {
     return {
-      candidate: titleMatches[0]!.workout,
+      candidate: titleMatches[0]!.planned,
       scored: titleMatches[0]!.scored,
       titleMatchCount: 1,
     };
@@ -199,7 +225,7 @@ export function selectPlannedWorkoutCandidate(params: {
     console.warn("⚠️ ambiguous Garmin title match; leaving activity unmatched", {
       athleteActivityId: params.athleteActivityId,
       activityName: params.activity.activityName,
-      candidateWorkoutIds: titleMatches.map(({ workout }) => workout.id),
+      candidatePlannedWorkoutIds: titleMatches.map(({ planned }) => planned.id),
     });
   }
 
@@ -262,32 +288,42 @@ export async function tryMatchActivityToTrainingWorkout(
   const summaryBlob = activity.summaryData as Record<string, unknown> | null;
   const garminWorkoutId = extractGarminWorkoutIdFromSummary(summaryBlob);
 
-  let candidate: WorkoutMatchRow | null = null;
+  let plannedCandidate: PlannedMatchRow | null = null;
+  let standaloneCandidate: WorkoutMatchRow | null = null;
   let precomputedScored: ScoredActivityCandidate | null = null;
   let precomputedTitleMatchCount = 0;
 
   if (garminWorkoutId != null) {
-    candidate = await prisma.workouts.findFirst({
+    plannedCandidate = await prisma.planned_workouts.findFirst({
       where: {
         athleteId: activity.athleteId,
         garminWorkoutId,
-        matchedActivityId: null,
       },
-      include: workoutMatchInclude,
+      include: plannedMatchInclude,
     });
+
+    if (!plannedCandidate) {
+      standaloneCandidate = await prisma.workouts.findFirst({
+        where: {
+          athleteId: activity.athleteId,
+          garminWorkoutId,
+          matchedActivityId: null,
+          planId: null,
+        },
+        include: workoutMatchInclude,
+      });
+    }
   }
 
-  if (!candidate) {
+  if (!plannedCandidate && !standaloneCandidate) {
     const activityYmd = activityLocalYmdFromSummary(activity.startTime, summaryBlob);
     const { start, end } = activityMatchCandidateUtcRange(activityYmd);
-    const planCandidates = await prisma.workouts.findMany({
+    const planCandidates = await prisma.planned_workouts.findMany({
       where: {
         athleteId: activity.athleteId,
-        planId: { not: null },
-        matchedActivityId: null,
         date: { gte: start, lt: end },
       },
-      include: workoutMatchInclude,
+      include: plannedMatchInclude,
       orderBy: [{ garminWorkoutId: "desc" }, { updatedAt: "desc" }],
     });
 
@@ -299,12 +335,12 @@ export async function tryMatchActivityToTrainingWorkout(
       },
       athleteActivityId,
     });
-    candidate = selected.candidate;
+    plannedCandidate = selected.candidate;
     precomputedScored = selected.scored;
     precomputedTitleMatchCount = selected.titleMatchCount;
   }
 
-  if (!candidate) {
+  if (!plannedCandidate && !standaloneCandidate) {
     logGarminWorkoutMatchAttempt({
       activityId: athleteActivityId,
       plannedWorkoutId: null,
@@ -320,19 +356,33 @@ export async function tryMatchActivityToTrainingWorkout(
     return { matched: false };
   }
 
-  if (isPlannedWorkout(candidate)) {
+  if (plannedCandidate) {
+    if (
+      await plannedDayConsumedByOtherActivity({
+        plannedWorkoutId: plannedCandidate.id,
+        activityId: activity.id,
+      })
+    ) {
+      console.warn("⚠️ planned day already matched to another activity", {
+        athleteActivityId,
+        plannedWorkoutId: plannedCandidate.id,
+      });
+      await setIngestion("RECEIVED");
+      return { matched: false, candidateWorkoutId: plannedCandidate.id };
+    }
+
     const titleMatchCount =
       precomputedTitleMatchCount > 0
         ? precomputedTitleMatchCount
         : activityNameContainsPushedWorkoutTitle({
             activityName: activity.activityName,
-            workoutTitle: candidate.title,
-            weekNumber: candidate.weekNumber,
-            workoutType: candidate.workoutType,
-            dayAssigned: candidate.dayAssigned,
-            planId: candidate.planId,
-            catalogueName: candidate.workout_catalogue?.name ?? null,
-            estimatedDistanceInMeters: candidate.estimatedDistanceInMeters,
+            workoutTitle: plannedCandidate.title,
+            weekNumber: plannedCandidate.weekNumber,
+            workoutType: plannedCandidate.workoutType,
+            dayAssigned: plannedCandidate.dayAssigned,
+            planId: plannedCandidate.planId,
+            catalogueName: plannedCandidate.workout_catalogue?.name ?? null,
+            estimatedDistanceInMeters: plannedCandidate.estimatedDistanceInMeters,
           })
           ? 1
           : 0;
@@ -340,7 +390,7 @@ export async function tryMatchActivityToTrainingWorkout(
     const scored =
       precomputedScored ??
       scoreActivityCandidateForWorkout({
-        workout: workoutScoreInput(candidate),
+        workout: plannedScoreInput(plannedCandidate),
         activity: activityCandidateInput({
           ...activity,
           startTime: activity.startTime,
@@ -352,21 +402,25 @@ export async function tryMatchActivityToTrainingWorkout(
     if (autoMatchEligible && scored) {
       const existingLink = await prisma.workouts.findFirst({
         where: { matchedActivityId: activity.id },
-        select: { id: true, planId: true },
+        select: { id: true, planId: true, plannedWorkoutId: true },
       });
 
-      if (existingLink && existingLink.id !== candidate.id) {
-        if (existingLink.planId == null) {
+      if (
+        existingLink &&
+        existingLink.plannedWorkoutId !== plannedCandidate.id &&
+        existingLink.id !== plannedCandidate.id
+      ) {
+        if (existingLink.planId == null && existingLink.plannedWorkoutId == null) {
           console.log("✅ reassigning activity from standalone ghost to planned workout", {
             athleteActivityId,
             ghostWorkoutId: existingLink.id,
-            plannedWorkoutId: candidate.id,
+            plannedWorkoutId: plannedCandidate.id,
             activityName: activity.activityName,
-            workoutTitle: candidate.title,
+            workoutTitle: plannedCandidate.title,
           });
-          const reassignResult = await reassignActivityToWorkout({
+          const reassignResult = await reassignActivityToPlannedWorkout({
             activityId: activity.id,
-            targetWorkoutId: candidate.id,
+            plannedWorkoutId: plannedCandidate.id,
             athleteId: activity.athleteId,
           });
           if (reassignResult.success) {
@@ -377,30 +431,30 @@ export async function tryMatchActivityToTrainingWorkout(
         console.warn("⚠️ activity already linked to another workout; skipping auto-match", {
           athleteActivityId,
           existingWorkoutId: existingLink.id,
-          candidateWorkoutId: candidate.id,
+          candidatePlannedWorkoutId: plannedCandidate.id,
         });
         await setIngestion("RECEIVED");
-        return { matched: false, candidateWorkoutId: candidate.id };
+        return { matched: false, candidateWorkoutId: plannedCandidate.id };
       }
 
       console.log("✅ auto-matching high-confidence planned workout", {
         athleteActivityId,
-        workoutId: candidate.id,
+        plannedWorkoutId: plannedCandidate.id,
         activityName: activity.activityName,
-        workoutTitle: candidate.title,
+        workoutTitle: plannedCandidate.title,
         reasonLabels: scored.reasonLabels,
       });
       try {
-        const { workoutId } = await applyActivityToWorkout({
-          workout: candidate,
+        const { workoutId } = await applyActivityToPlannedWorkout({
+          plannedWorkoutId: plannedCandidate.id,
           activity,
         });
         logGarminWorkoutMatchAttempt({
           activityId: athleteActivityId,
-          plannedWorkoutId: candidate.id,
+          plannedWorkoutId: plannedCandidate.id,
           rawGarminWorkoutName: activity.activityName,
-          rawPlannedWorkoutName: candidate.title,
-          catalogueName: candidate.workout_catalogue?.name ?? null,
+          rawPlannedWorkoutName: plannedCandidate.title,
+          catalogueName: plannedCandidate.workout_catalogue?.name ?? null,
           garminNameProperty: "athlete_activities.activityName",
           titleMatch: titleMatchCount === 1,
           matchCandidateFound: true,
@@ -412,10 +466,10 @@ export async function tryMatchActivityToTrainingWorkout(
         const message = error instanceof Error ? error.message : String(error);
         logGarminWorkoutMatchAttempt({
           activityId: athleteActivityId,
-          plannedWorkoutId: candidate.id,
+          plannedWorkoutId: plannedCandidate.id,
           rawGarminWorkoutName: activity.activityName,
-          rawPlannedWorkoutName: candidate.title,
-          catalogueName: candidate.workout_catalogue?.name ?? null,
+          rawPlannedWorkoutName: plannedCandidate.title,
+          catalogueName: plannedCandidate.workout_catalogue?.name ?? null,
           garminNameProperty: "athlete_activities.activityName",
           titleMatch: titleMatchCount === 1,
           matchCandidateFound: true,
@@ -429,10 +483,10 @@ export async function tryMatchActivityToTrainingWorkout(
 
     logGarminWorkoutMatchAttempt({
       activityId: athleteActivityId,
-      plannedWorkoutId: candidate.id,
+      plannedWorkoutId: plannedCandidate.id,
       rawGarminWorkoutName: activity.activityName,
-      rawPlannedWorkoutName: candidate.title,
-      catalogueName: candidate.workout_catalogue?.name ?? null,
+      rawPlannedWorkoutName: plannedCandidate.title,
+      catalogueName: plannedCandidate.workout_catalogue?.name ?? null,
       garminNameProperty: "athlete_activities.activityName",
       titleMatch: titleMatchCount === 1,
       matchCandidateFound: true,
@@ -442,17 +496,17 @@ export async function tryMatchActivityToTrainingWorkout(
     });
     console.log("ℹ️ planned workout candidate found; awaiting manual match", {
       athleteActivityId,
-      workoutId: candidate.id,
+      plannedWorkoutId: plannedCandidate.id,
       activityName: activity.activityName,
-      workoutTitle: candidate.title,
+      workoutTitle: plannedCandidate.title,
       reasonLabels: scored?.reasonLabels ?? [],
     });
     await setIngestion("RECEIVED");
-    return { matched: false, candidateWorkoutId: candidate.id };
+    return { matched: false, candidateWorkoutId: plannedCandidate.id };
   }
 
   const { workoutId } = await applyActivityToWorkout({
-    workout: candidate,
+    workout: standaloneCandidate!,
     activity,
   });
 

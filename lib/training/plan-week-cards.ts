@@ -1,5 +1,5 @@
 /**
- * Merge persisted `training_plans.planSchedule` with optional materialized `workouts`.
+ * Merge persisted `training_plans.planSchedule` with planned_workouts (+ spawned instance actuals).
  */
 
 import { prisma } from "@/lib/prisma";
@@ -9,7 +9,9 @@ import { loadCatalogueTitleByIdForWeekSchedule } from "./catalogue-title-map";
 import { mergePlanDayTitle } from "./workout-display-title";
 
 export type PlanDayCard = {
-  /** Present once the athlete has opened this day (lazy materialization). */
+  /** Planned prescribe row id (canonical calendar key). */
+  plannedWorkoutId: string | null;
+  /** Spawned instance id when the athlete has run / opened post-match detail. */
   workoutId: string | null;
   dateKey: string;
   date: string;
@@ -86,7 +88,7 @@ export async function buildPlanWeekCards(params: {
   );
   const { gte, lte } = utcDayRange(weekStart, weekEnd);
 
-  const materialized = await prisma.workouts.findMany({
+  const materializedPlanned = await prisma.planned_workouts.findMany({
     where: {
       planId: params.planId,
       athleteId: params.athleteId,
@@ -95,27 +97,45 @@ export async function buildPlanWeekCards(params: {
     orderBy: { date: "asc" },
   });
 
-  const byDateKey = new Map<
-    string,
-    (typeof materialized)[number]
-  >();
-  for (const w of materialized) {
-    if (w.date) {
-      byDateKey.set(isoDateKey(w.date), w);
+  const plannedIds = materializedPlanned.map((p) => p.id);
+  const spawnedInstances =
+    plannedIds.length > 0
+      ? await prisma.workouts.findMany({
+          where: {
+            athleteId: params.athleteId,
+            plannedWorkoutId: { in: plannedIds },
+          },
+          orderBy: { updatedAt: "desc" },
+        })
+      : [];
+
+  const instanceByPlannedId = new Map<string, (typeof spawnedInstances)[number]>();
+  for (const inst of spawnedInstances) {
+    if (inst.plannedWorkoutId && !instanceByPlannedId.has(inst.plannedWorkoutId)) {
+      instanceByPlannedId.set(inst.plannedWorkoutId, inst);
     }
   }
 
+  const byDateKey = new Map<string, (typeof materializedPlanned)[number]>();
+  for (const p of materializedPlanned) {
+    byDateKey.set(isoDateKey(p.date), p);
+  }
+
   return scheduled.map((s) => {
-    const row = byDateKey.get(s.dateKey);
-    const workoutType = row?.workoutType ?? s.workoutType;
+    const planned = byDateKey.get(s.dateKey);
+    const instance = planned ? instanceByPlannedId.get(planned.id) : undefined;
+    const workoutType = planned?.workoutType ?? instance?.workoutType ?? s.workoutType;
     const estimatedDistanceInMeters =
-      row?.estimatedDistanceInMeters ?? s.estimatedDistanceInMeters;
+      planned?.estimatedDistanceInMeters ??
+      instance?.estimatedDistanceInMeters ??
+      s.estimatedDistanceInMeters;
     return {
-      workoutId: row?.id ?? null,
+      plannedWorkoutId: planned?.id ?? null,
+      workoutId: instance?.id ?? null,
       dateKey: s.dateKey,
       date: s.dateKey,
       title: mergePlanDayTitle({
-        rowTitle: row?.title,
+        rowTitle: planned?.title ?? instance?.title,
         scheduleTitle: s.title,
         workoutType,
         estimatedDistanceInMeters,
@@ -126,13 +146,13 @@ export async function buildPlanWeekCards(params: {
       phase: s.phase,
       dayAssigned: s.dayAssigned,
       estimatedDistanceInMeters,
-      matchedActivityId: row?.matchedActivityId ?? null,
-      skippedAt: row?.skippedAt?.toISOString() ?? null,
-      skipReason: row?.skipReason ?? null,
-      actualDistanceMeters: row?.actualDistanceMeters ?? null,
-      actualAvgPaceSecPerMile: row?.actualAvgPaceSecPerMile ?? null,
-      actualAverageHeartRate: row?.actualAverageHeartRate ?? null,
-      actualDurationSeconds: row?.actualDurationSeconds ?? null,
+      matchedActivityId: instance?.matchedActivityId ?? null,
+      skippedAt: instance?.skippedAt?.toISOString() ?? null,
+      skipReason: instance?.skipReason ?? null,
+      actualDistanceMeters: instance?.actualDistanceMeters ?? null,
+      actualAvgPaceSecPerMile: instance?.actualAvgPaceSecPerMile ?? null,
+      actualAverageHeartRate: instance?.actualAverageHeartRate ?? null,
+      actualDurationSeconds: instance?.actualDurationSeconds ?? null,
     };
   });
 }

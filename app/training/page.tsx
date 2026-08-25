@@ -31,11 +31,16 @@ import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import {
   fetchTrainingPlanDetail,
   fetchPlanWeekSchedule,
+  planDayOpenId,
   type PlanDayCard,
   type RaceReadinessSummary,
 } from "@/lib/training/fetch-plan-week-client";
 import { planScheduleLooksStructured } from "@/lib/training/plan-schedule-schema";
 import { getRacePhase } from "@/lib/race-calendar-phase";
+import {
+  planRaceDisplayName,
+  planTitleRaceMismatch,
+} from "@/lib/training/plan-display-title";
 
 type PlanDetailHub = {
   id: string;
@@ -435,8 +440,9 @@ export default function TrainingHubPage() {
   }
 
   function handleOpenSession(day: PlanDayCard) {
-    if (day.workoutId) {
-      router.push(workoutDetailPathWithBackHref(day.workoutId, "/training"));
+    const openId = planDayOpenId(day);
+    if (openId) {
+      router.push(workoutDetailPathWithBackHref(openId, "/training"));
       return;
     }
     router.push(`/training/day/${day.dateKey}`);
@@ -826,10 +832,14 @@ export default function TrainingHubPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-amber-900">
               Finish your plan
             </p>
-            <h2 className="mt-1 text-xl font-semibold text-gray-900">{planDetail.name}</h2>
-            {planDetail.race_registry?.name && (
+            <h2 className="mt-1 text-xl font-semibold text-gray-900">
+              {planRaceDisplayName(planDetail)}
+            </h2>
+            {planDetail.name !== planRaceDisplayName(planDetail) ? (
+              <p className="mt-1 text-sm text-gray-600">{planDetail.name}</p>
+            ) : planDetail.race_registry?.name ? (
               <p className="mt-1 text-sm text-gray-600">{planDetail.race_registry.name}</p>
-            )}
+            ) : null}
             <p className="mt-3 text-sm text-amber-950/90">
               Generate your schedule in setup to see workouts here each week.
             </p>
@@ -855,13 +865,15 @@ export default function TrainingHubPage() {
             {/* Goal strip — plan, race, week progress */}
             <div className="flex flex-col gap-3 rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 text-sm sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-gray-900">{planDetail.name}</p>
+                <p className="font-semibold text-gray-900">
+                  {planRaceDisplayName(planDetail)}
+                </p>
                 <p className="text-gray-600 tabular-nums">
                   Week {weekNumber} of {effectiveTotalWeeks}
                   {calendarRangeLabel ? ` · ${calendarRangeLabel}` : ""}
                 </p>
-                {planDetail.race_registry?.name ? (
-                  <p className="text-xs text-gray-500 mt-0.5">{planDetail.race_registry.name}</p>
+                {planDetail.name !== planRaceDisplayName(planDetail) ? (
+                  <p className="text-xs text-gray-500 mt-0.5">{planDetail.name}</p>
                 ) : null}
                 {goalPaceDisplay ? (
                   <p className="mt-1 text-xs text-emerald-900/80">
@@ -971,34 +983,49 @@ export default function TrainingHubPage() {
                             ))}
                           </>
                         ) : null}
-                        <div className="my-1 border-t border-gray-100" />
-                        <button
-                          type="button"
-                          disabled={archiving || deleting}
-                          onClick={() => {
-                            setPlanMenuOpen(false);
-                            void archiveActivePlan();
-                          }}
-                          className="w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-50"
-                        >
-                          {archiving ? "Archiving…" : "Archive this plan"}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={deleting || archiving}
-                          onClick={() => {
-                            setPlanMenuOpen(false);
-                            void deleteActivePlan();
-                          }}
-                          className="w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
-                        >
-                          {deleting ? "Deleting…" : "Delete plan"}
-                        </button>
                       </div>
                     </>
                   ) : null}
                 </div>
               </div>
+            </div>
+
+            {planTitleRaceMismatch(planDetail) && planDetail.race_registry?.name ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                <p className="font-medium">This plan may not match your race</p>
+                <p className="mt-1 text-amber-900/90">
+                  Delete and start fresh for {planDetail.race_registry.name}, or archive and add a
+                  new plan.
+                </p>
+              </div>
+            ) : null}
+
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 w-full sm:w-auto">
+                Plan actions
+              </span>
+              <Link
+                href={`/training-setup/${planDetail.id}`}
+                className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+              >
+                Edit weekly miles
+              </Link>
+              <button
+                type="button"
+                disabled={archiving || deleting}
+                onClick={() => void archiveActivePlan()}
+                className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {archiving ? "Archiving…" : "Archive this plan"}
+              </button>
+              <button
+                type="button"
+                disabled={deleting || archiving}
+                onClick={() => void deleteActivePlan()}
+                className="inline-flex items-center rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+              >
+                {deleting ? "Deleting…" : "Delete plan"}
+              </button>
             </div>
 
             <div className="rounded-xl border border-orange-200 bg-orange-50/70 px-4 py-3 text-sm">
@@ -1136,9 +1163,9 @@ export default function TrainingHubPage() {
                           Full results and coach feedback are on the workout page.
                         </p>
                         <div className="mt-5 flex flex-wrap items-center gap-3">
-                          {focusPlanDay.workoutId ? (
+                          {planDayOpenId(focusPlanDay) ? (
                             <Link
-                              href={workoutDetailPathWithBackHref(focusPlanDay.workoutId, "/training")}
+                              href={workoutDetailPathWithBackHref(planDayOpenId(focusPlanDay), "/training")}
                               className="inline-flex justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
                             >
                               Review run
@@ -1169,13 +1196,13 @@ export default function TrainingHubPage() {
                             : ""}
                         </p>
                         <div className="mt-5 flex flex-wrap items-center gap-3">
-                          {focusPlanDay.workoutId && !focusPlanDay.matchedActivityId ? (
+                          {planDayOpenId(focusPlanDay) && !focusPlanDay.matchedActivityId ? (
                             <p className="w-full text-sm text-gray-700 leading-relaxed">
                               After your run, sync Garmin Connect — GoFast should link the activity
                               to this workout automatically.
                             </p>
                           ) : null}
-                          {focusPlanDay.workoutId && !focusPlanDay.matchedActivityId ? (
+                          {planDayOpenId(focusPlanDay) && !focusPlanDay.matchedActivityId ? (
                             <button
                               type="button"
                               onClick={() => {
@@ -1211,8 +1238,8 @@ export default function TrainingHubPage() {
                           ) : null}
                           <Link
                             href={
-                              focusPlanDay.workoutId
-                                ? `/training/schedule-run?date=${encodeURIComponent(focusPlanDay.dateKey)}&workoutId=${encodeURIComponent(focusPlanDay.workoutId)}`
+                              planDayOpenId(focusPlanDay)
+                                ? `/training/schedule-run?date=${encodeURIComponent(focusPlanDay.dateKey)}&workoutId=${encodeURIComponent(planDayOpenId(focusPlanDay))}`
                                 : `/training/schedule-run?date=${encodeURIComponent(focusPlanDay.dateKey)}`
                             }
                             className="inline-flex justify-center rounded-xl border-2 border-sky-600 bg-white px-5 py-2.5 text-sm font-semibold text-sky-900 hover:bg-sky-50"
@@ -1225,12 +1252,12 @@ export default function TrainingHubPage() {
                             {garminPushMessage}
                           </p>
                         ) : null}
-                        {focusPlanDay.workoutId &&
+                        {planDayOpenId(focusPlanDay) &&
                         !focusPlanDay.matchedActivityId &&
                         showMatchPanel ? (
                           <div id="match-garmin-panel" className="mt-4 space-y-4">
                             <WorkoutSkipActions
-                              workoutId={focusPlanDay.workoutId}
+                              workoutId={planDayOpenId(focusPlanDay)}
                               dateKey={focusPlanDay.dateKey}
                               matchedActivityId={focusPlanDay.matchedActivityId}
                               skippedAt={focusPlanDay.skippedAt}
@@ -1240,7 +1267,7 @@ export default function TrainingHubPage() {
                               onUpdated={loadHub}
                             />
                             <WorkoutActivityMatchPanel
-                              workoutId={focusPlanDay.workoutId}
+                              workoutId={planDayOpenId(focusPlanDay)}
                               workoutTitle={displayWorkoutListTitle(focusPlanDay)}
                               plannedDistanceMeters={focusPlanDay.estimatedDistanceInMeters ?? null}
                               compact

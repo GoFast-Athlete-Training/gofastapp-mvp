@@ -2,8 +2,9 @@
  * Plan lifecycle — ACTIVE, PARKED, ARCHIVED.
  */
 
-import { prisma } from "@/lib/prisma";
 import { TrainingPlanLifecycle } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { rematerializeFuturePlannedWorkoutsForPlan } from "@/lib/training/rematerialize-future-planned-workouts";
 import { utcDateOnly } from "@/lib/training/plan-utils";
 
 /** Race calendar day strictly before today (UTC) — aligns with training hub "past race" treatment. */
@@ -156,4 +157,15 @@ export async function syncAthleteFiveKPaceToActivePlan(athleteId: string): Promi
       updatedAt: new Date(),
     },
   });
+
+  if (pace) {
+    try {
+      await rematerializeFuturePlannedWorkoutsForPlan({
+        athleteId,
+        planId: active.id,
+      });
+    } catch (err) {
+      console.error("rematerializeFuturePlannedWorkoutsForPlan after 5K sync:", err);
+    }
+  }
 }

@@ -136,9 +136,8 @@ export async function pushPlanWorkoutsInDateRange(
     athleteFilterCount: athleteIds?.length ?? null,
   });
 
-  const candidates = await prisma.workouts.findMany({
+  const candidates = await prisma.planned_workouts.findMany({
     where: {
-      planId: { not: null },
       athleteId: { not: null },
       date: { gte: dateStart, lte: dateEnd },
       ...(unsentOnly ? { garminScheduleId: null } : {}),
@@ -184,8 +183,8 @@ export async function pushPlanWorkoutsInDateRange(
     const athleteId = w.athleteId;
     if (!athleteId) continue;
 
-    const segCount = await prisma.workout_segments.count({
-      where: { workoutId: w.id },
+    const segCount = await prisma.planned_workout_segments.count({
+      where: { plannedWorkoutId: w.id },
     });
     if (segCount === 0) {
       skipped++;

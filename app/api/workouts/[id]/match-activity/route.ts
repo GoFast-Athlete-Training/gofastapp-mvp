@@ -9,6 +9,8 @@ import {
   reassignActivityToWorkout,
   type ActivityLinkConflict,
 } from "@/lib/training/apply-activity-to-workout";
+import { reassignActivityToPlannedWorkout } from "@/lib/training/match-planned-workout";
+import { loadPlannedWorkoutDetailForAthlete } from "@/lib/training/planned-workout-detail";
 import { RUNNING_ACTIVITY_TYPES } from "@/lib/training/activity-type-sets";
 import {
   scoreAndSortActivityCandidates,
@@ -126,32 +128,59 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     }
 
     const { id } = await ctx.params;
-    const workout = await prisma.workouts.findFirst({
+
+    let workout = await prisma.workouts.findFirst({
       where: { id, athleteId: auth.athlete.id },
       include: workoutMatchInclude,
     });
 
-    if (!workout) {
+    const plannedDetail =
+      workout == null
+        ? await loadPlannedWorkoutDetailForAthlete({
+            plannedWorkoutId: id,
+            athleteId: auth.athlete.id,
+          })
+        : null;
+
+    const matchTarget = workout ?? (plannedDetail
+      ? {
+          id: plannedDetail.id,
+          title: plannedDetail.title,
+          date: plannedDetail.date,
+          weekNumber: plannedDetail.weekNumber,
+          dayAssigned: plannedDetail.dayAssigned,
+          planId: plannedDetail.planId,
+          estimatedDistanceInMeters: plannedDetail.estimatedDistanceInMeters,
+          workoutType: plannedDetail.workoutType,
+          matchedActivityId: plannedDetail.matchedActivityId,
+          matched_activity: plannedDetail.matched_activity,
+          workout_catalogue: plannedDetail.workout_catalogue
+            ? { name: plannedDetail.workout_catalogue.name }
+            : null,
+        }
+      : null);
+
+    if (!matchTarget) {
       return NextResponse.json({ error: "Workout not found" }, { status: 404 });
     }
 
-    if (workout.matchedActivityId && workout.matched_activity) {
+    if (matchTarget.matchedActivityId && matchTarget.matched_activity) {
       return NextResponse.json({
         workout: {
-          id: workout.id,
-          title: workout.title,
-          date: workout.date?.toISOString() ?? null,
-          matchedActivityId: workout.matchedActivityId,
+          id: matchTarget.id,
+          title: matchTarget.title,
+          date: matchTarget.date?.toISOString() ?? null,
+          matchedActivityId: matchTarget.matchedActivityId,
         },
         matchedActivity: serializeActivity({
-          ...workout.matched_activity,
-          paceSecPerMile: speedMpsToSecPerMile(workout.matched_activity.averageSpeed),
+          ...matchTarget.matched_activity,
+          paceSecPerMile: speedMpsToSecPerMile(matchTarget.matched_activity.averageSpeed),
         }),
         candidates: [],
       });
     }
 
-    const dateRange = workoutMatchCandidateUtcRange(workout.date);
+    const dateRange = workoutMatchCandidateUtcRange(matchTarget.date);
     const activityWhere: {
       athleteId: string;
       startTime?: { gte: Date; lt: Date };
@@ -187,15 +216,15 @@ export async function GET(request: NextRequest, ctx: Ctx) {
 
     const candidates = scoreAndSortActivityCandidates({
       workout: {
-        id: workout.id,
-        title: workout.title,
-        weekNumber: workout.weekNumber,
-        date: workout.date,
-        estimatedDistanceInMeters: workout.estimatedDistanceInMeters,
-        workoutType: workout.workoutType,
-        dayAssigned: workout.dayAssigned,
-        planId: workout.planId,
-        catalogueName: workout.workout_catalogue?.name ?? null,
+        id: matchTarget.id,
+        title: matchTarget.title,
+        weekNumber: matchTarget.weekNumber,
+        date: matchTarget.date,
+        estimatedDistanceInMeters: matchTarget.estimatedDistanceInMeters,
+        workoutType: matchTarget.workoutType,
+        dayAssigned: matchTarget.dayAssigned,
+        planId: matchTarget.planId,
+        catalogueName: matchTarget.workout_catalogue?.name ?? null,
       },
       activities: runningActivities.map((a) => ({
         id: a.id,
@@ -214,10 +243,10 @@ export async function GET(request: NextRequest, ctx: Ctx) {
 
     return NextResponse.json({
       workout: {
-        id: workout.id,
-        title: workout.title,
-        date: workout.date?.toISOString() ?? null,
-        matchedActivityId: workout.matchedActivityId,
+        id: matchTarget.id,
+        title: matchTarget.title,
+        date: matchTarget.date?.toISOString() ?? null,
+        matchedActivityId: matchTarget.matchedActivityId,
       },
       matchedActivity: null,
       candidates: candidates.map((c) => {
@@ -235,7 +264,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
           reasonLabels: c.reasonLabels,
           score: c.score,
           conflict: conflictForCandidate({
-            targetWorkout: workout,
+            targetWorkout: matchTarget,
             matchedWorkout: source?.matched_workout,
           }),
         });
@@ -276,7 +305,15 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       include: workoutMatchInclude,
     });
 
-    if (!workout) {
+    const plannedRow =
+      workout == null
+        ? await prisma.planned_workouts.findFirst({
+            where: { id, athleteId: auth.athlete.id },
+            select: { id: true },
+          })
+        : null;
+
+    if (!workout && !plannedRow) {
       return NextResponse.json({ error: "Workout not found" }, { status: 404 });
     }
 
@@ -284,14 +321,17 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       body.activityId === null ? null : body.activityId?.trim() || null;
 
     if (requestedActivityId === null) {
-      const result = await clearActivityFromWorkout({
-        workoutId: workout.id,
-        athleteId: auth.athlete.id,
-      });
-      return NextResponse.json({ success: true, cleared: result.cleared });
+      if (workout) {
+        const result = await clearActivityFromWorkout({
+          workoutId: workout.id,
+          athleteId: auth.athlete.id,
+        });
+        return NextResponse.json({ success: true, cleared: result.cleared });
+      }
+      return NextResponse.json({ success: true, cleared: false });
     }
 
-    if (workout.matchedActivityId === requestedActivityId) {
+    if (workout?.matchedActivityId === requestedActivityId) {
       return NextResponse.json({ success: true, workoutId: workout.id, alreadyMatched: true });
     }
 
@@ -317,9 +357,33 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       );
     }
 
+    if (plannedRow && !workout) {
+      const reassignResult = await reassignActivityToPlannedWorkout({
+        activityId: activity.id,
+        plannedWorkoutId: plannedRow.id,
+        athleteId: auth.athlete.id,
+      });
+
+      if (!reassignResult.success) {
+        return NextResponse.json(
+          {
+            error: `Activity is already linked to "${reassignResult.conflict.workoutTitle}"`,
+            conflict: reassignResult.conflict,
+          },
+          { status: 409 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        workoutId: reassignResult.workoutId,
+        reassignedFrom: reassignResult.reassignedFrom ?? null,
+      });
+    }
+
     const reassignResult = await reassignActivityToWorkout({
       activityId: activity.id,
-      targetWorkoutId: workout.id,
+      targetWorkoutId: workout!.id,
       athleteId: auth.athlete.id,
     });
 

@@ -14,8 +14,8 @@ import {
 } from "./workout-materializer";
 
 export type HorizonDayResult =
-  | { dateKey: string; status: "already_ready"; workoutId: string }
-  | { dateKey: string; status: "materialized"; workoutId: string }
+  | { dateKey: string; status: "already_ready"; plannedWorkoutId: string; workoutId: string }
+  | { dateKey: string; status: "materialized"; plannedWorkoutId: string; workoutId: string }
   | { dateKey: string; status: "skipped_no_session" }
   | { dateKey: string; status: "error"; message: string };
 
@@ -145,10 +145,20 @@ export async function ensureWorkoutHorizonForAthlete(params: {
         dateParam: dateKey,
       });
       if (result.status === "already_ready") {
-        days.push({ dateKey, status: "already_ready", workoutId: result.workoutId });
+        days.push({
+          dateKey,
+          status: "already_ready",
+          plannedWorkoutId: result.plannedWorkoutId,
+          workoutId: result.plannedWorkoutId,
+        });
         alreadyReady++;
       } else {
-        days.push({ dateKey, status: "materialized", workoutId: result.workoutId });
+        days.push({
+          dateKey,
+          status: "materialized",
+          plannedWorkoutId: result.plannedWorkoutId,
+          workoutId: result.plannedWorkoutId,
+        });
         materialized++;
       }
     } catch (e) {

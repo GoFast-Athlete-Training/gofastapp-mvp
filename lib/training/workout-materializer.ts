@@ -1,6 +1,6 @@
 /**
- * Materialize one `workouts` row (+ segments) for a plan calendar day from `planSchedule`.
- * Resolves existing rows by `(athleteId, planId, date)` — not JSON `workoutId` stamps.
+ * Materialize one `planned_workouts` row (+ planned_workout_segments) for a plan calendar day.
+ * Resolves existing rows by `(athleteId, planId, date)` — never creates instance `workouts` rows.
  */
 
 import type { Prisma } from "@prisma/client";
@@ -22,7 +22,7 @@ import {
 } from "./workout-segment-snapshot";
 import { resolveGoalRacePace } from "./goal-pace-calculator";
 import { EASY_RUN_NOT_CONFIGURED } from "./run-type-config-validation";
-import { ensureWorkoutPrescriptionNarrative } from "./prescription-narrative-service";
+import { ensurePlannedWorkoutPrescriptionNarrative } from "./prescription-narrative-service";
 import { loadCatalogueTitleByIdFromPlanSchedule } from "./catalogue-title-map";
 import { effectivePaceProfileForPreset } from "./pace-key-resolver";
 import type { PresetStrategyFields } from "./preset-strategy";
@@ -37,13 +37,15 @@ export class MaterializeWorkoutError extends Error {
 export const NO_PRESCRIPTION_STEPS = "NO_PRESCRIPTION_STEPS";
 
 export type MaterializeWorkoutForPlanDayResult = {
+  plannedWorkoutId: string;
+  /** @deprecated Use plannedWorkoutId — alias for callers during transition. */
   workoutId: string;
   status: "already_ready" | "materialized";
 };
 
-function enqueuePrescriptionNarrative(workoutId: string, athleteId: string): void {
-  void ensureWorkoutPrescriptionNarrative({ workoutId, athleteId }).catch((e) =>
-    console.warn("ensureWorkoutPrescriptionNarrative:", e)
+function enqueuePrescriptionNarrative(plannedWorkoutId: string, athleteId: string): void {
+  void ensurePlannedWorkoutPrescriptionNarrative({ plannedWorkoutId, athleteId }).catch(
+    (e) => console.warn("ensurePlannedWorkoutPrescriptionNarrative:", e)
   );
 }
 
@@ -68,7 +70,7 @@ function parseDateParam(dateParam: string): Date {
   return d;
 }
 
-function workoutNeedsRematerialize(params: {
+function plannedNeedsRematerialize(params: {
   existing: {
     catalogueWorkoutId: string | null;
     estimatedDistanceInMeters: number | null;
@@ -103,18 +105,18 @@ function assertPrescriptionSteps(
   );
 }
 
-async function createSegmentsForWorkout(params: {
+async function createPlannedSegments(params: {
   tx: Prisma.TransactionClient;
-  workoutId: string;
+  plannedWorkoutId: string;
   steps: WorkoutStep[];
   snapshotSource: SegmentSnapshotSource;
   scheduled: PlanScheduleDay;
   dateKey: string;
 }): Promise<void> {
-  const { tx, workoutId, steps, snapshotSource, scheduled, dateKey } = params;
+  const { tx, plannedWorkoutId, steps, snapshotSource, scheduled, dateKey } = params;
   assertPrescriptionSteps(steps, scheduled, dateKey);
-  const segmentRows: Prisma.workout_segmentsCreateManyInput[] = steps.map((s) => ({
-    workoutId,
+  const segmentRows: Prisma.planned_workout_segmentsCreateManyInput[] = steps.map((s) => ({
+    plannedWorkoutId,
     stepOrder: s.stepOrder,
     title: s.title,
     durationType: s.durationType,
@@ -124,14 +126,12 @@ async function createSegmentsForWorkout(params: {
     paceTargetEncodingVersion: 2,
     updatedAt: new Date(),
   }));
-  await tx.workout_segments.createMany({ data: segmentRows });
-  await tx.workouts.update({
-    where: { id: workoutId },
+  await tx.planned_workout_segments.createMany({ data: segmentRows });
+  await tx.planned_workouts.update({
+    where: { id: plannedWorkoutId },
     data: {
-      segmentSnapshotJson: segmentSnapshotDocumentFromApiSegments(
-        steps,
-        snapshotSource
-      ),
+      segmentSnapshotJson: segmentSnapshotDocumentFromApiSegments(steps, snapshotSource),
+      updatedAt: new Date(),
     },
   });
 }
@@ -246,6 +246,13 @@ async function buildPrescriptionSteps(params: {
   });
 }
 
+function resultFromPlannedId(
+  plannedWorkoutId: string,
+  status: "already_ready" | "materialized"
+): MaterializeWorkoutForPlanDayResult {
+  return { plannedWorkoutId, workoutId: plannedWorkoutId, status };
+}
+
 export async function materializeWorkoutForPlanDay(params: {
   planId: string;
   athleteId: string;
@@ -315,7 +322,7 @@ export async function materializeWorkoutForPlanDay(params: {
     throw new MaterializeWorkoutError("No scheduled workout for this date");
   }
 
-  let existing = await prisma.workouts.findFirst({
+  let existing = await prisma.planned_workouts.findFirst({
     where: {
       planId,
       athleteId,
@@ -332,26 +339,33 @@ export async function materializeWorkoutForPlanDay(params: {
   if (
     existing &&
     existing._count.segments > 0 &&
-    !workoutNeedsRematerialize({
+    !plannedNeedsRematerialize({
       existing: { ...existing, segmentCount: existing._count.segments },
       scheduled,
     })
   ) {
     enqueuePrescriptionNarrative(existing.id, athleteId);
-    return { workoutId: existing.id, status: "already_ready" };
+    return resultFromPlannedId(existing.id, "already_ready");
   }
 
   const steps = await buildPrescriptionSteps({ scheduled, plan, race });
   assertPrescriptionSteps(steps, scheduled, dateKey);
 
   if (existing && existing._count.segments > 0) {
-    await prisma.workout_segments.deleteMany({ where: { workoutId: existing.id } });
-    await prisma.workouts.update({
+    await prisma.planned_workout_segments.deleteMany({
+      where: { plannedWorkoutId: existing.id },
+    });
+    await prisma.planned_workouts.update({
       where: { id: existing.id },
       data: {
         catalogueWorkoutId: scheduled.catalogueWorkoutId ?? null,
         estimatedDistanceInMeters: scheduled.estimatedDistanceInMeters,
         title: scheduled.title,
+        workoutType: scheduled.workoutType,
+        weekNumber: scheduled.weekNumber,
+        dayAssigned: scheduled.dayAssigned,
+        nOffset: scheduled.nOffset,
+        planCycleIndex: scheduled.planCycleIndex,
         garminWorkoutId: null,
         garminScheduleId: null,
         updatedAt: new Date(),
@@ -361,9 +375,9 @@ export async function materializeWorkoutForPlanDay(params: {
 
   if (existing) {
     await prisma.$transaction(async (tx) => {
-      await createSegmentsForWorkout({
+      await createPlannedSegments({
         tx,
-        workoutId: existing!.id,
+        plannedWorkoutId: existing!.id,
         steps,
         snapshotSource: "plan_day_materialize_existing",
         scheduled,
@@ -371,11 +385,11 @@ export async function materializeWorkoutForPlanDay(params: {
       });
     });
     enqueuePrescriptionNarrative(existing.id, athleteId);
-    return { workoutId: existing.id, status: "materialized" };
+    return resultFromPlannedId(existing.id, "materialized");
   }
 
-  const workoutId = await prisma.$transaction(async (tx) => {
-    const w = await tx.workouts.create({
+  const plannedWorkoutId = await prisma.$transaction(async (tx) => {
+    const pw = await tx.planned_workouts.create({
       data: {
         title: scheduled.title,
         workoutType: scheduled.workoutType,
@@ -392,18 +406,18 @@ export async function materializeWorkoutForPlanDay(params: {
       },
     });
 
-    await createSegmentsForWorkout({
+    await createPlannedSegments({
       tx,
-      workoutId: w.id,
+      plannedWorkoutId: pw.id,
       steps,
       snapshotSource: "plan_day_materialize",
       scheduled,
       dateKey,
     });
 
-    return w.id;
+    return pw.id;
   });
 
-  enqueuePrescriptionNarrative(workoutId, athleteId);
-  return { workoutId, status: "materialized" };
+  enqueuePrescriptionNarrative(plannedWorkoutId, athleteId);
+  return resultFromPlannedId(plannedWorkoutId, "materialized");
 }

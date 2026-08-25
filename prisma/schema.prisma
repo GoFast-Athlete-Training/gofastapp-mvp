@@ -177,6 +177,7 @@ model Athlete {
   hosted_training_cohorts      training_cohorts[]               @relation("TrainingCohortHost")
   authored_public_training_plans public_training_plans[]        @relation("PublicPlanAuthor")
   plan_custom_workouts         plan_custom_workouts[]
+  planned_workouts             planned_workouts[]
   athlete_appnotification_devices     athlete_appnotification_devices[]
   gofast_with_me              gofast_with_me?
   athlete_tips                athlete_tips[]
@@ -2100,7 +2101,8 @@ model training_plans {
   publicDescription    String?                  @db.Text
   createdAt            DateTime               @default(now())
   updatedAt            DateTime
-  planned_workouts     workouts[]
+  workout_instances    workouts[]             @relation("TrainingPlanWorkoutInstances")
+  planned_workouts     planned_workouts[]
   Athlete              Athlete                @relation(fields: [athleteId], references: [id])
   race_registry        race_registry?         @relation(fields: [raceId], references: [id])
   athlete_race         athlete_races?         @relation("PlanAthleteRace", fields: [athleteRaceId], references: [id], onDelete: SetNull)
@@ -2233,6 +2235,7 @@ model workout_catalogue {
   createdAt                    DateTime    @default(now())
   updatedAt                    DateTime    @updatedAt
   workouts                    workouts[]
+  planned_workouts            planned_workouts[]
   long_run_config_positions  long_run_config_position[]
   intervals_config_positions  intervals_config_position[]
   tempo_config_positions      tempo_config_position[]
@@ -2240,6 +2243,59 @@ model workout_catalogue {
 
   @@unique([name, workoutType])
   @@index([workoutType])
+}
+
+/// Prescribe-only plan day — segments live on planned_workout_segments until match spawns an instance.
+model planned_workouts {
+  id                        String              @id @default(cuid())
+  title                     String
+  workoutType               WorkoutType
+  athleteId                 String
+  planId                    String
+  catalogueWorkoutId        String?
+  date                      DateTime
+  estimatedDistanceInMeters Float?
+  nOffset                   Int?
+  weekNumber                Int?
+  dayAssigned               String?
+  planCycleIndex            Int?
+  garminWorkoutId           Int?
+  garminScheduleId          Int?
+  segmentSnapshotJson       Json?
+  prescriptionNarrative     String?
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+  Athlete                   Athlete             @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  training_plans            training_plans      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  workout_catalogue         workout_catalogue?  @relation(fields: [catalogueWorkoutId], references: [id], onDelete: SetNull)
+  segments                  planned_workout_segments[]
+  spawned_instances         workouts[]
+
+  @@unique([athleteId, planId, date])
+  @@index([athleteId, garminWorkoutId])
+  @@index([planId, date])
+  @@index([catalogueWorkoutId])
+}
+
+model planned_workout_segments {
+  id                        String           @id @default(cuid())
+  plannedWorkoutId          String
+  stepOrder                 Int
+  title                     String
+  durationType              String
+  durationValue             Float
+  targets                   Json?
+  paceTargetEncodingVersion Int              @default(2)
+  repeatCount               Int?
+  recoveryDurationType      String?
+  recoveryDurationValue     Float?
+  notes                     String?
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
+  planned_workout           planned_workouts @relation(fields: [plannedWorkoutId], references: [id], onDelete: Cascade)
+
+  @@index([plannedWorkoutId])
+  @@index([plannedWorkoutId, stepOrder])
 }
 
 model workouts {
@@ -2254,6 +2310,8 @@ model workouts {
   /// Company company_staff.id when staff created the group workout.
   createdByStaffId          String?
   scope                     WorkoutScope          @default(ATHLETE)
+  /// Spawned copy of a planned_workouts row after match (null = standalone / leftover Garmin).
+  plannedWorkoutId          String?
   /// Training plan this workout belongs to (null = standalone)
   planId                    String?
   /// Selected catalogue prescription when materialized from plan schedule
@@ -2341,7 +2399,8 @@ model workouts {
   updatedAt                 DateTime            @updatedAt
   Athlete                   Athlete?            @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   runClub                   run_clubs?          @relation(fields: [runClubId], references: [id], onDelete: SetNull)
-  training_plans            training_plans?     @relation(fields: [planId], references: [id], onDelete: SetNull)
+  planned_workout           planned_workouts?   @relation(fields: [plannedWorkoutId], references: [id], onDelete: SetNull)
+  training_plans            training_plans?     @relation("TrainingPlanWorkoutInstances", fields: [planId], references: [id], onDelete: SetNull)
   workout_catalogue         workout_catalogue?  @relation(fields: [catalogueWorkoutId], references: [id], onDelete: SetNull)
   matched_activity          athlete_activities? @relation("WorkoutMatchedActivity", fields: [matchedActivityId], references: [id], onDelete: SetNull)
   segments                  workout_segments[]
@@ -2353,6 +2412,7 @@ model workouts {
   @@index([scope])
   @@index([workoutType])
   @@index([planId])
+  @@index([plannedWorkoutId])
   @@index([planId, date])
   @@index([planId, weekNumber])
   @@index([planId, nOffset])

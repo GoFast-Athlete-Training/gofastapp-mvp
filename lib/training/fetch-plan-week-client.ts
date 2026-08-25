@@ -8,6 +8,7 @@ import type { WeekPerformanceSnapshot } from "@/lib/training/week-performance-ty
 export type { WeekPerformanceSnapshot };
 
 export type PlanDayCard = {
+  plannedWorkoutId: string | null;
   workoutId: string | null;
   dateKey: string;
   date: string;
@@ -105,7 +106,7 @@ export async function fetchPlanWeekSchedule(
 }
 
 /**
- * Resolve `workouts.id` for a calendar day (creates row + segments if needed).
+ * Resolve `planned_workouts.id` for a calendar day (creates prescribe row + segments if needed).
  */
 export async function resolveWorkoutForPlanDay(
   planId: string,
@@ -116,13 +117,23 @@ export async function resolveWorkoutForPlanDay(
     `/api/training/workout/day?planId=${encodeURIComponent(planId)}&date=${encodeURIComponent(dateKeyOrIso)}`,
     { headers: athleteBearerFetchHeaders(bearerToken) }
   );
-  const data = (await res.json()) as { error?: string; workoutId?: string };
-  if (!res.ok || typeof data.workoutId !== "string") {
+  const data = (await res.json()) as {
+    error?: string;
+    plannedWorkoutId?: string;
+    workoutId?: string;
+  };
+  const id = data.plannedWorkoutId ?? data.workoutId;
+  if (!res.ok || typeof id !== "string") {
     throw new Error(
       typeof data.error === "string" ? data.error : "Could not open workout"
     );
   }
-  return data.workoutId;
+  return id;
+}
+
+/** Preferred id for opening a plan day (planned prescribe row, else spawned instance). */
+export function planDayOpenId(day: PlanDayCard): string | null {
+  return day.plannedWorkoutId ?? day.workoutId;
 }
 
 /** Full workout + segments (lazy segment creation may run on server for I/T). */

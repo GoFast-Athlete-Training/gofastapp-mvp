@@ -39,9 +39,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: materialized.message }, { status: 400 });
   }
 
-  const workoutId = materialized.workoutId;
-  const segCount = await prisma.workout_segments.count({
-    where: { workoutId },
+  const workoutId = materialized.plannedWorkoutId;
+  const segCount = await prisma.planned_workout_segments.count({
+    where: { plannedWorkoutId: workoutId },
   });
   if (segCount === 0) {
     return NextResponse.json(
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const workoutRow = await prisma.workouts.findFirst({
+  const workoutRow = await prisma.planned_workouts.findFirst({
     where: { id: workoutId, athleteId },
     select: { garminWorkoutId: true, garminScheduleId: true },
   });

@@ -11,7 +11,7 @@ import { ymdFromDate } from "./plan-utils";
 import { materializeWorkoutForPlanDay } from "./workout-materializer";
 
 export type MaterializeTodayPlanResult =
-  | { status: "materialized"; workoutId: string }
+  | { status: "materialized"; plannedWorkoutId: string; workoutId: string }
   | { status: "no_session_today" }
   | { status: "no_active_plan" }
   | { status: "error"; message: string };
@@ -77,7 +77,11 @@ export async function materializeTodayPlanWorkoutForAthlete(
       athleteId,
       dateParam,
     });
-    return { status: "materialized", workoutId: result.workoutId };
+    return {
+      status: "materialized",
+      plannedWorkoutId: result.plannedWorkoutId,
+      workoutId: result.plannedWorkoutId,
+    };
   } catch (e) {
     const message = e instanceof Error ? e.message : "materialize failed";
     return { status: "error", message };

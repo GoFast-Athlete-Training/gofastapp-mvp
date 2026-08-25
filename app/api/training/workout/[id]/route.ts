@@ -16,6 +16,7 @@ import { parseEasyRunConfigJson } from "@/lib/training/easy-run-config";
 import { effectivePaceProfileForPreset } from "@/lib/training/pace-key-resolver";
 import { ensureWorkoutPrescriptionNarrative } from "@/lib/training/prescription-narrative-service";
 import { computeWorkoutPerformanceAnalysis } from "@/lib/training/workout-performance-analysis";
+import { loadPlannedWorkoutDetailForAthlete } from "@/lib/training/planned-workout-detail";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -195,7 +196,50 @@ export async function GET(request: NextRequest, context: Ctx) {
     let workout = await loadWorkout();
 
     if (!workout) {
-      return NextResponse.json({ error: "Workout not found" }, { status: 404 });
+      const plannedDetail = await loadPlannedWorkoutDetailForAthlete({
+        plannedWorkoutId: id,
+        athleteId: auth.athlete.id,
+      });
+      if (!plannedDetail) {
+        return NextResponse.json({ error: "Workout not found" }, { status: 404 });
+      }
+
+      const performanceAnalysis = computeWorkoutPerformanceAnalysis({
+        workoutType: plannedDetail.workoutType,
+        targetPaceSecPerMile: plannedDetail.targetPaceSecPerMile,
+        targetPaceSecPerMileHigh: plannedDetail.targetPaceSecPerMileHigh,
+        paceDeltaSecPerMile: plannedDetail.paceDeltaSecPerMile,
+        actualAvgPaceSecPerMile: plannedDetail.actualAvgPaceSecPerMile,
+        actualDistanceMeters: plannedDetail.actualDistanceMeters,
+        actualDurationSeconds: plannedDetail.actualDurationSeconds,
+        estimatedDistanceInMeters: plannedDetail.estimatedDistanceInMeters,
+        completedActivityDetailJson: plannedDetail.completedActivityDetailJson,
+        matchedActivityId: plannedDetail.matchedActivityId,
+        matched_activity: plannedDetail.matched_activity,
+        segmentExecutionStatus: plannedDetail.segmentExecutionStatus,
+        segmentExecutionLapCount: plannedDetail.segmentExecutionLapCount,
+        segmentExecutionSegmentCount: plannedDetail.segmentExecutionSegmentCount,
+        segments: plannedDetail.segments.map((s) => ({
+          id: s.id,
+          title: s.title,
+          stepOrder: s.stepOrder,
+          targets: s.targets,
+          paceTargetEncodingVersion: s.paceTargetEncodingVersion,
+          actualPaceSecPerMile: s.actualPaceSecPerMile,
+          actualDurationSeconds: s.actualDurationSeconds,
+          actualDistanceMiles: s.actualDistanceMiles,
+          segment_laps: "segment_laps" in s ? s.segment_laps : [],
+        })),
+      });
+
+      return NextResponse.json({
+        workout: {
+          ...plannedDetail,
+          catalogueName: plannedDetail.workout_catalogue?.name ?? null,
+          paceAnchor: plannedDetail.workout_catalogue?.paceAnchor ?? null,
+        },
+        performanceAnalysis,
+      });
     }
 
     const athleteFiveKRow = await prisma.athlete.findUnique({

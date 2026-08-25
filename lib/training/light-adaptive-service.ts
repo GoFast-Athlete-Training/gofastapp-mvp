@@ -8,6 +8,7 @@ import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculat
 import { syncAthleteFiveKPaceToActivePlan } from "@/lib/training/plan-lifecycle";
 import { EASY_LONG_RUN_MAX_FAST_DRIFT_SEC_PER_MILE } from "@/lib/training/apply-activity-to-workout";
 import { applyLongRunCapabilityCreditFromWorkout } from "@/lib/training/apply-long-run-capability-credit";
+import { rematerializeFuturePlannedWorkoutsForPlan } from "@/lib/training/rematerialize-future-planned-workouts";
 
 const METERS_PER_MILE = 1609.34;
 /** Long run distance considered "target met" when actual >= this fraction of planned. */
@@ -252,6 +253,15 @@ export async function applyLightAdaptiveIfEligible(params: {
   });
 
   await syncAthleteFiveKPaceToActivePlan(params.athleteId);
+
+  try {
+    await rematerializeFuturePlannedWorkoutsForPlan({
+      athleteId: params.athleteId,
+      planId: params.planId,
+    });
+  } catch (err) {
+    console.error("rematerializeFuturePlannedWorkoutsForPlan after light adaptive:", err);
+  }
 
   return {
     applied: true,

@@ -9,7 +9,7 @@ import {
 
 /**
  * GET /api/training/workout/day?planId=&date=
- * `date` = YYYY-MM-DD (UTC) or ISO datetime. Find-or-create `workouts` row for that plan day.
+ * `date` = YYYY-MM-DD (UTC) or ISO datetime. Find-or-create `planned_workouts` for that plan day.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -29,13 +29,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { workoutId } = await materializeWorkoutForPlanDay({
+    const { plannedWorkoutId } = await materializeWorkoutForPlanDay({
       planId: planId.trim(),
       athleteId: auth.athlete.id,
       dateParam: date.trim(),
     });
 
-    return NextResponse.json({ workoutId });
+    return NextResponse.json({ plannedWorkoutId, workoutId: plannedWorkoutId });
   } catch (e: unknown) {
     const msg =
       e instanceof MaterializeWorkoutError

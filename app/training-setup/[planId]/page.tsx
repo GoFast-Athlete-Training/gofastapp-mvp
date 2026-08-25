@@ -40,6 +40,11 @@ import {
   isAddedRacePromptDismissed,
   type PlanRaceEventsPayload,
 } from "@/lib/training/added-race-plan-regen";
+import {
+  planRaceDisplayName,
+  planSharingTitle,
+  planTitleRaceMismatch,
+} from "@/lib/training/plan-display-title";
 
 type PlanWeekRow =
   | { weekNumber: number; phase: string; schedule: string }
@@ -372,6 +377,21 @@ export default function TrainingSetupPlanPage({
     return Array.isArray(plan.planSchedule) && plan.planSchedule.length > 0;
   }, [plan?.planSchedule]);
   const hasSchedule = hasPlanSchedulePersisted;
+
+  const planHeaderTitle = useMemo(
+    () => (plan ? planRaceDisplayName(plan) : "Training plan"),
+    [plan]
+  );
+
+  const showPlanTitleMismatch = useMemo(
+    () => (plan && hasSchedule ? planTitleRaceMismatch(plan) : false),
+    [plan, hasSchedule]
+  );
+
+  const sharingTitleLabel = useMemo(
+    () => (plan ? planSharingTitle(plan) : null),
+    [plan]
+  );
 
   /** Setup form: first-time generate, or user opened "Edit preferences". */
   const inPreferencesSetupMode = !hasSchedule || showPreferencesEditor;
@@ -808,20 +828,64 @@ export default function TrainingSetupPlanPage({
       <div className="min-h-screen bg-gray-50 px-4 py-8 sm:px-6">
         <div className="mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white p-6 text-gray-900 shadow-sm sm:p-8">
           <h1 className="mb-1 text-2xl font-semibold tracking-tight">
-            {plan.name}
+            {planHeaderTitle}
           </h1>
           {plan.race_registry && (
-            <p className="mb-4 text-sm text-gray-600">
-              This plan is for{" "}
-              <span className="font-medium text-gray-900">{plan.race_registry.name}</span>
-              {" — "}
+            <p className="mb-1 text-sm text-gray-600">
               {formatPlanDateDisplay(plan.race_registry.raceDate)}
+              {" · "}
+              {effectiveTotalWeeks} weeks · Start {formatPlanDateDisplay(plan.startDate)}
             </p>
           )}
-          <p className="mb-4 text-sm text-gray-600">
-            {effectiveTotalWeeks} weeks · Start{" "}
-            {formatPlanDateDisplay(plan.startDate)}
-          </p>
+          {sharingTitleLabel &&
+          sharingTitleLabel !== planHeaderTitle &&
+          !showPlanTitleMismatch ? (
+            <p className="mb-4 text-xs text-gray-500">
+              Sharing title: {sharingTitleLabel}
+            </p>
+          ) : (
+            <div className="mb-4" />
+          )}
+
+          {showPlanTitleMismatch && plan.race_registry ? (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <p className="font-medium">This plan may not match your race</p>
+              <p className="mt-1 text-amber-900/90">
+                The saved title still references another race. Delete and start fresh for{" "}
+                {plan.race_registry.name}, or archive this plan and add a new one.
+              </p>
+            </div>
+          ) : null}
+
+          {hasSchedule ? (
+            <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-3">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 w-full sm:w-auto">
+                Plan actions
+              </span>
+              <Link
+                href="/training"
+                className="inline-flex items-center rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+              >
+                Go to my plan
+              </Link>
+              <button
+                type="button"
+                disabled={archiving || deleting}
+                onClick={() => void archivePlan()}
+                className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {archiving ? "Archiving…" : "Archive this plan"}
+              </button>
+              <button
+                type="button"
+                disabled={deleting || archiving}
+                onClick={() => void deletePlan()}
+                className="inline-flex items-center rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+              >
+                {deleting ? "Deleting…" : "Delete plan"}
+              </button>
+            </div>
+          ) : null}
 
           {pendingRaceCandidates
             .filter(
@@ -958,15 +1022,6 @@ export default function TrainingSetupPlanPage({
                 >
                   Edit weekly miles & regenerate
                 </button>
-              </div>
-
-              <div className="mb-4 flex flex-wrap items-center gap-2">
-                <Link
-                  href="/training"
-                  className="inline-flex items-center rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
-                >
-                  Go to my plan
-                </Link>
               </div>
 
               <PlanWeekViewer
@@ -1361,26 +1416,6 @@ export default function TrainingSetupPlanPage({
             <Link href="/workouts" className="hover:text-orange-600">
               Workouts
             </Link>
-            {hasSchedule ? (
-              <>
-                <button
-                  type="button"
-                  disabled={archiving || deleting}
-                  onClick={() => void archivePlan()}
-                  className="hover:text-gray-800 disabled:opacity-50"
-                >
-                  {archiving ? "Archiving…" : "Archive this plan"}
-                </button>
-                <button
-                  type="button"
-                  disabled={deleting || archiving}
-                  onClick={() => void deletePlan()}
-                  className="text-red-700 hover:text-red-800 disabled:opacity-50"
-                >
-                  {deleting ? "Deleting…" : "Delete plan"}
-                </button>
-              </>
-            ) : null}
           </div>
         </div>
       </div>

@@ -374,6 +374,29 @@ test("LongRun paceKey without authored preset profile resolves targets via canon
   assert.equal(totalDistanceMiles(steps), 19.6);
 });
 
+test("LongRun workFraction + goalRacePace uses back-half canonical path (no mpFraction)", () => {
+  const steps = prescribe({
+    entry: baseCatalogue({
+      workoutType: "LongRun",
+      paceAnchor: PACE_ANCHOR_MP_SIMULATION,
+      workFraction: 0.25,
+      mpFraction: null,
+      mpTotalMiles: null,
+      warmupMiles: null,
+      cooldownMiles: null,
+      workPaceOffsetSecPerMile: 90,
+    }),
+    scheduleMiles: 16,
+    anchorSecondsPerMile: ANCHOR_SEC,
+    racePaceSecondsPerMile: 412,
+  });
+  const mpStep = steps.find((s) => s.title.toLowerCase().includes("goal marathon"));
+  const easyStep = steps.find((s) => s.title === "Long Run");
+  assert.ok(mpStep, "expected goal marathon pace block");
+  assert.ok(easyStep, "expected easy long run remainder");
+  assert.ok(mpStep!.stepOrder > easyStep!.stepOrder, "MP block follows easy miles");
+});
+
 test("LongRun paceKey with explicit preset profile uses authored offsets", () => {
   const anchorSec = 386;
   const steps = prescribe({

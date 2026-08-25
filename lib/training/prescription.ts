@@ -570,13 +570,55 @@ export function prescribe(params: {
     const wf0 = entry.warmupFraction;
     const wkf0 = entry.workFraction;
     const cf0 = entry.cooldownFraction;
+
+    // Canonical quality long run: workFraction + goalRacePace at the back (no easy-before-work mpBlock).
+    const canonicalWorkFractionOnly =
+      wkf0 != null &&
+      wkf0 > 0 &&
+      mpP != null &&
+      isMpSimulationAnchor(entry.paceAnchor) &&
+      entry.mpFraction == null &&
+      entry.mpTotalMiles == null &&
+      entry.warmupMiles == null &&
+      entry.cooldownMiles == null &&
+      (wf0 == null || wf0 <= 0) &&
+      (cf0 == null || cf0 <= 0);
+
+    if (canonicalWorkFractionOnly) {
+      const workM = round(
+        totalMiles * effectiveMpFraction(wkf0!, planCycleIndex),
+        2
+      );
+      const clampedWork = Math.min(Math.max(0.25, workM), round(totalMiles * 0.9, 2));
+      const easyRemain = round(Math.max(0.25, totalMiles - clampedWork), 2);
+      const out: WorkoutStep[] = [];
+      if (easyRemain > 0.05) {
+        out.push({
+          stepOrder: 1,
+          title: "Long Run",
+          durationType: "DISTANCE",
+          durationValue: easyRemain,
+          ...targetsOrOpen(longP),
+        });
+      }
+      out.push({
+        stepOrder: out.length + 1,
+        title: "Goal marathon pace",
+        durationType: "DISTANCE",
+        durationValue: clampedWork,
+        targets: [paceTargetFromSecondsPerMile(mpP)],
+      });
+      if (out.length > 0) return out;
+    }
+
     const legacyMpFractionSimulation =
       isMpSimulationAnchor(entry.paceAnchor) &&
       ((wf0 != null && wf0 > 0) ||
         (wkf0 != null && wkf0 > 0) ||
         (cf0 != null && cf0 > 0)) &&
       entry.warmupMiles == null &&
-      entry.cooldownMiles == null;
+      entry.cooldownMiles == null &&
+      !canonicalWorkFractionOnly;
 
     const mpSimulationBookendsAuthored =
       entry.warmupMiles != null || entry.cooldownMiles != null;

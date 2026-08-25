@@ -208,22 +208,18 @@ async function mutateSegmentExecution(params: {
 }
 
 async function recordAlignmentFailure(params: {
-  activityId: string;
-  workout: { id: string; segments: { id: string }[] };
+  workout: { id: string };
   lapCount: number;
   segmentCount: number;
 }): Promise<void> {
-  await prisma.$transaction(async (tx) => {
-    await clearWorkoutSegmentExecution(tx, params.workout, params.activityId);
-    await tx.workouts.update({
-      where: { id: params.workout.id },
-      data: {
-        segmentExecutionStatus: "ALIGNMENT_FAILED",
-        segmentExecutionLapCount: params.lapCount,
-        segmentExecutionSegmentCount: params.segmentCount,
-        updatedAt: new Date(),
-      },
-    });
+  await prisma.workouts.update({
+    where: { id: params.workout.id },
+    data: {
+      segmentExecutionStatus: "ALIGNMENT_FAILED",
+      segmentExecutionLapCount: params.lapCount,
+      segmentExecutionSegmentCount: params.segmentCount,
+      updatedAt: new Date(),
+    },
   });
 }
 
@@ -274,7 +270,6 @@ export async function parseActivityToSegmentExecution(params: {
 
   if (!workout.segments.length) {
     await recordAlignmentFailure({
-      activityId: params.activityId,
       workout,
       lapCount: 0,
       segmentCount: 0,
@@ -289,7 +284,6 @@ export async function parseActivityToSegmentExecution(params: {
   const derived = normalizeActivityLapsFromDetail(activity.detailData);
   if (derived.length === 0) {
     await recordAlignmentFailure({
-      activityId: params.activityId,
       workout,
       lapCount: 0,
       segmentCount: workout.segments.length,
@@ -322,7 +316,6 @@ export async function parseActivityToSegmentExecution(params: {
 
   if (!assignment) {
     await recordAlignmentFailure({
-      activityId: params.activityId,
       workout,
       lapCount: derived.length,
       segmentCount: workout.segments.length,
