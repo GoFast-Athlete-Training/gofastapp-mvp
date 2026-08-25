@@ -8,6 +8,7 @@ import { TrainingPlanLifecycle } from "@prisma/client";
 import { archiveOtherActivePlans, cascadeLinkedGoalAfterPlanArchived } from "@/lib/training/plan-lifecycle";
 import { validatePreferredTempoInterval } from "@/lib/training/preferred-tempo-interval";
 import { cleanupPlanWorkoutsBeforeDelete } from "@/lib/training/plan-delete-cleanup";
+import { cleanupFutureGarminSchedulesForPlan } from "@/lib/training/plan-garmin-cleanup";
 import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import { resolvePlanTerminalRaceDisplay } from "@/lib/training/plan-race-snapshots";
 import {
@@ -540,6 +541,10 @@ export async function PATCH(request: NextRequest, context: Ctx) {
 
     if (body.lifecycleStatus === TrainingPlanLifecycle.ARCHIVED) {
       await cascadeLinkedGoalAfterPlanArchived(id, auth.athlete.id);
+      await cleanupFutureGarminSchedulesForPlan({
+        planId: id,
+        athleteId: auth.athlete.id,
+      });
     }
 
     if (
@@ -611,7 +616,11 @@ export async function DELETE(request: NextRequest, context: Ctx) {
       return NextResponse.json({ error: "Plan not found" }, { status: 404 });
     }
 
-    const cleanup = await cleanupPlanWorkoutsBeforeDelete({
+    const cleanup = await cleanupFutureGarminSchedulesForPlan({
+      planId: id,
+      athleteId: auth.athlete.id,
+    });
+    const workoutCleanup = await cleanupPlanWorkoutsBeforeDelete({
       planId: id,
       athleteId: auth.athlete.id,
     });
@@ -620,8 +629,9 @@ export async function DELETE(request: NextRequest, context: Ctx) {
 
     return NextResponse.json({
       success: true,
-      deletedFutureWorkouts: cleanup.deletedFutureWorkouts,
-      detachedCompletedWorkouts: cleanup.detachedCompletedWorkouts,
+      deletedFutureWorkouts: workoutCleanup.deletedFutureWorkouts,
+      detachedCompletedWorkouts: workoutCleanup.detachedCompletedWorkouts,
+      garminSchedulesCleared: cleanup.clearedScheduleIds,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Failed to delete plan";

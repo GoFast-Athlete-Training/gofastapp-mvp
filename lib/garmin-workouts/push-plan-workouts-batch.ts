@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { TrainingPlanLifecycle } from "@prisma/client";
 import { pushWorkoutToGarminForAthlete } from "@/lib/garmin-workouts/push-workout-for-athlete";
 import type { GarminPushMode } from "@/lib/garmin-workouts/garmin-calendar-state";
 import { ymdFromDate } from "@/lib/training/plan-utils";
@@ -140,6 +141,9 @@ export async function pushPlanWorkoutsInDateRange(
     where: {
       date: { gte: dateStart, lte: dateEnd },
       ...(unsentOnly ? { garminScheduleId: null } : {}),
+      training_plans: {
+        lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+      },
       Athlete: {
         garmin_access_token: { not: null },
         garmin_user_id: { not: null },

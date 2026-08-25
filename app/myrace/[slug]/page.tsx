@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { formatRaceListDate, daysUntilRace } from "@/lib/races-display";
 import { RacePlanSection } from "@/components/races/RacePlanSection";
+import { InlineGoalForm } from "@/components/races/InlineGoalForm";
 import {
   getPublicCoursePageUrl,
   getPublicRacePageUrl,
@@ -299,13 +300,12 @@ export default function MyRacePage() {
         const planForRace = athleteRaceId
           ? plans.find((p) => p.athleteRaceId === athleteRaceId) ?? null
           : null;
-        const resolvedTrainingPlanId =
-          su?.trainingPlanId ?? planForRace?.id ?? null;
+        const resolvedTrainingPlanId = planForRace?.id ?? null;
         setTrainingPlanId(resolvedTrainingPlanId);
 
         const summary = upcomingRes.data.activePlanSummary ?? null;
         const sessions = upcomingRes.data.sessions ?? [];
-        if (resolvedTrainingPlanId && summary) {
+        if (resolvedTrainingPlanId && summary?.hasSchedule) {
           setActivePlanSummary(summary);
           setNextSession(sessions[0] ?? null);
         } else {
@@ -484,7 +484,7 @@ export default function MyRacePage() {
         </div>
       ) : (
         <>
-          {hasPlanForRace || isGoalRace ? (
+          {hasSignup ? (
             <section className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white p-5 shadow-sm">
               <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-900 flex items-center gap-2">
                 <Zap className="w-4 h-4" />
@@ -543,9 +543,19 @@ export default function MyRacePage() {
                   </Link>
                 </>
               ) : (
-                <p className="mt-2 text-sm text-gray-600">
-                  Set a goal time below, then start a training plan.
-                </p>
+                <div className="mt-3">
+                  <InlineGoalForm
+                    race={{
+                      athleteRaceId: signup!.id,
+                      name: race.name,
+                      raceDate: race.raceDate,
+                      distanceLabel: race.distanceLabel,
+                      distanceMeters: race.distanceMeters,
+                    }}
+                    goal={goal}
+                    onSaved={setGoal}
+                  />
+                </div>
               )}
             </section>
           ) : null}

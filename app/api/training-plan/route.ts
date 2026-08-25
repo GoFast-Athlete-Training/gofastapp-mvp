@@ -22,6 +22,7 @@ import {
   planRaceSnapshotsToPrismaJson,
 } from "@/lib/training/plan-race-snapshots";
 import { isRaceCalendarBeforeTodayUtc } from "@/lib/training/plan-lifecycle";
+import { cleanupFutureGarminSchedulesForPlan } from "@/lib/training/plan-garmin-cleanup";
 
 /**
  * POST /api/training-plan
@@ -331,6 +332,13 @@ export async function POST(request: NextRequest) {
         },
       });
     });
+
+    if (existingActive && bodyRetireActivePlan === "archive") {
+      await cleanupFutureGarminSchedulesForPlan({
+        planId: existingActive.id,
+        athleteId: athlete.id,
+      });
+    }
 
     await snapPrimaryRaceToPlanTerminal({
       athleteId: athlete.id,

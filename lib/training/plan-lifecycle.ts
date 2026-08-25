@@ -6,6 +6,7 @@ import { TrainingPlanLifecycle } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { rematerializeFuturePlannedWorkoutsForPlan } from "@/lib/training/rematerialize-future-planned-workouts";
 import { utcDateOnly } from "@/lib/training/plan-utils";
+import { cleanupFutureGarminSchedulesForPlan } from "@/lib/training/plan-garmin-cleanup";
 
 /** Race calendar day strictly before today (UTC) — aligns with training hub "past race" treatment. */
 export function isRaceCalendarBeforeTodayUtc(raceDate: Date | null | undefined): boolean {
@@ -74,7 +75,13 @@ export async function archiveOtherActivePlans(
   });
 
   await Promise.all(
-    toArchive.map((p) => cascadeLinkedGoalAfterPlanArchived(p.id, athleteId))
+    toArchive.map(async (p) => {
+      await cascadeLinkedGoalAfterPlanArchived(p.id, athleteId);
+      await cleanupFutureGarminSchedulesForPlan({
+        planId: p.id,
+        athleteId,
+      });
+    })
   );
 }
 
