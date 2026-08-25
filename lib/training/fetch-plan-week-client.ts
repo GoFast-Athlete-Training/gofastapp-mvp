@@ -131,11 +131,6 @@ export async function resolveWorkoutForPlanDay(
   return id;
 }
 
-/** Preferred id for opening a plan day (planned prescribe row, else spawned instance). */
-export function planDayOpenId(day: PlanDayCard): string | null {
-  return day.plannedWorkoutId ?? day.workoutId;
-}
-
 /** Full workout + segments (lazy segment creation may run on server for I/T). */
 export async function fetchTrainingWorkoutDetail(
   workoutId: string,

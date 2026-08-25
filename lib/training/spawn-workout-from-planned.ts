@@ -1,5 +1,6 @@
 /**
  * Match spawns an instance `workouts` row as a copy of a planned_workout prescribe tree.
+ * Same-id spawn: workouts.id = planned_workouts.id (acq/prod club pattern).
  */
 
 import type { Prisma } from "@prisma/client";
@@ -7,6 +8,11 @@ import { prisma } from "@/lib/prisma";
 import { segmentSnapshotDocumentFromDbRows } from "./workout-segment-snapshot";
 
 const plannedInclude = {
+  segments: { orderBy: { stepOrder: "asc" as const } },
+  workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true, name: true } },
+} as const;
+
+const spawnedInclude = {
   segments: { orderBy: { stepOrder: "asc" as const } },
   workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true, name: true } },
 } as const;
@@ -40,35 +46,41 @@ export async function loadPlannedWorkoutForSpawn(
   });
 }
 
-/** Reuse an existing spawned instance for this planned day + activity, if any. */
+/** Reuse an existing spawned instance for this planned day (+ optional activity), if any. */
 export async function findSpawnedInstanceForPlanned(params: {
   plannedWorkoutId: string;
   matchedActivityId?: string;
 }): Promise<SpawnedWorkoutForApply | null> {
-  const row = await prisma.workouts.findFirst({
+  const activityFilter =
+    params.matchedActivityId != null
+      ? { matchedActivityId: params.matchedActivityId }
+      : {};
+
+  const sameId = await prisma.workouts.findFirst({
+    where: {
+      id: params.plannedWorkoutId,
+      ...activityFilter,
+    },
+    include: spawnedInclude,
+  });
+  if (sameId) return spawnedRowToApplyShape(sameId);
+
+  const legacyFk = await prisma.workouts.findFirst({
     where: {
       plannedWorkoutId: params.plannedWorkoutId,
-      ...(params.matchedActivityId
-        ? { matchedActivityId: params.matchedActivityId }
-        : {}),
+      id: { not: params.plannedWorkoutId },
+      ...activityFilter,
     },
-    include: {
-      segments: { orderBy: { stepOrder: "asc" } },
-      workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true, name: true } },
-    },
+    include: spawnedInclude,
     orderBy: { updatedAt: "desc" },
   });
-  if (!row) return null;
-  return spawnedRowToApplyShape(row);
+  if (legacyFk) return spawnedRowToApplyShape(legacyFk);
+
+  return null;
 }
 
 function spawnedRowToApplyShape(
-  row: Prisma.workoutsGetPayload<{
-    include: {
-      segments: { orderBy: { stepOrder: "asc" } };
-      workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true; name: true } };
-    };
-  }>
+  row: Prisma.workoutsGetPayload<{ include: typeof spawnedInclude }>
 ): SpawnedWorkoutForApply {
   return {
     id: row.id,
@@ -89,7 +101,7 @@ function spawnedRowToApplyShape(
 
 /**
  * Insert workouts + workout_segments from planned prescribe tree (no actuals).
- * Idempotent when an instance already exists for the planned row.
+ * Idempotent when an instance already exists at planned.id (or legacy FK row).
  */
 export async function spawnWorkoutFromPlanned(
   planned: PlannedWorkoutForSpawn
@@ -119,9 +131,12 @@ export async function spawnWorkoutFromPlanned(
     "plan_day_materialize"
   );
 
-  const workoutId = await prisma.$transaction(async (tx) => {
-    const w = await tx.workouts.create({
+  const instanceId = planned.id;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.workouts.create({
       data: {
+        id: instanceId,
         title: planned.title,
         workoutType: planned.workoutType,
         athleteId: planned.athleteId,
@@ -141,7 +156,7 @@ export async function spawnWorkoutFromPlanned(
 
     await tx.workout_segments.createMany({
       data: planned.segments.map((s) => ({
-        workoutId: w.id,
+        workoutId: instanceId,
         stepOrder: s.stepOrder,
         title: s.title,
         durationType: s.durationType,
@@ -155,16 +170,11 @@ export async function spawnWorkoutFromPlanned(
         updatedAt: new Date(),
       })),
     });
-
-    return w.id;
   });
 
   const spawned = await prisma.workouts.findUniqueOrThrow({
-    where: { id: workoutId },
-    include: {
-      segments: { orderBy: { stepOrder: "asc" } },
-      workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true, name: true } },
-    },
+    where: { id: instanceId },
+    include: spawnedInclude,
   });
 
   return spawnedRowToApplyShape(spawned);

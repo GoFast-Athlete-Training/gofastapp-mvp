@@ -103,7 +103,10 @@ export async function buildPlanWeekCards(params: {
       ? await prisma.workouts.findMany({
           where: {
             athleteId: params.athleteId,
-            plannedWorkoutId: { in: plannedIds },
+            OR: [
+              { id: { in: plannedIds } },
+              { plannedWorkoutId: { in: plannedIds } },
+            ],
           },
           orderBy: { updatedAt: "desc" },
         })
@@ -111,8 +114,17 @@ export async function buildPlanWeekCards(params: {
 
   const instanceByPlannedId = new Map<string, (typeof spawnedInstances)[number]>();
   for (const inst of spawnedInstances) {
-    if (inst.plannedWorkoutId && !instanceByPlannedId.has(inst.plannedWorkoutId)) {
-      instanceByPlannedId.set(inst.plannedWorkoutId, inst);
+    let plannedKey: string | null = null;
+    if (plannedIds.includes(inst.id)) {
+      plannedKey = inst.id;
+    } else if (
+      inst.plannedWorkoutId &&
+      plannedIds.includes(inst.plannedWorkoutId)
+    ) {
+      plannedKey = inst.plannedWorkoutId;
+    }
+    if (plannedKey && !instanceByPlannedId.has(plannedKey)) {
+      instanceByPlannedId.set(plannedKey, inst);
     }
   }
 

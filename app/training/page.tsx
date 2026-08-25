@@ -31,10 +31,15 @@ import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import {
   fetchTrainingPlanDetail,
   fetchPlanWeekSchedule,
-  planDayOpenId,
   type PlanDayCard,
   type RaceReadinessSummary,
 } from "@/lib/training/fetch-plan-week-client";
+import {
+  detailIdForHydrated,
+  hydratePlanButSwapIfExecuted,
+  matchTargetIdForHydrated,
+  prescribeIdForHydrated,
+} from "@/lib/training/hydrate-plan-day";
 import { planScheduleLooksStructured } from "@/lib/training/plan-schedule-schema";
 import { getRacePhase } from "@/lib/race-calendar-phase";
 import {
@@ -440,9 +445,9 @@ export default function TrainingHubPage() {
   }
 
   function handleOpenSession(day: PlanDayCard) {
-    const openId = planDayOpenId(day);
-    if (openId) {
-      router.push(workoutDetailPathWithBackHref(openId, "/training"));
+    const hydrated = hydratePlanButSwapIfExecuted(day);
+    if (hydrated) {
+      router.push(workoutDetailPathWithBackHref(detailIdForHydrated(hydrated), "/training"));
       return;
     }
     router.push(`/training/day/${day.dateKey}`);
@@ -560,7 +565,9 @@ export default function TrainingHubPage() {
         title: focusPlanDay.title,
       })
     : null;
-  const focusOpenWorkoutId = focusPlanDay ? planDayOpenId(focusPlanDay) : null;
+  const focusHydrated = focusPlanDay
+    ? hydratePlanButSwapIfExecuted(focusPlanDay)
+    : null;
 
   const weekPlannedMiles = useMemo(() => {
     if (!weekDays.length) return null;
@@ -1164,9 +1171,12 @@ export default function TrainingHubPage() {
                           Full results and coach feedback are on the workout page.
                         </p>
                         <div className="mt-5 flex flex-wrap items-center gap-3">
-                          {focusOpenWorkoutId ? (
+                          {focusHydrated?.kind === "executed" ? (
                             <Link
-                              href={workoutDetailPathWithBackHref(focusOpenWorkoutId, "/training")}
+                              href={workoutDetailPathWithBackHref(
+                                focusHydrated.workoutId,
+                                "/training"
+                              )}
                               className="inline-flex justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
                             >
                               Review run
@@ -1197,13 +1207,13 @@ export default function TrainingHubPage() {
                             : ""}
                         </p>
                         <div className="mt-5 flex flex-wrap items-center gap-3">
-                          {focusOpenWorkoutId && !focusPlanDay.matchedActivityId ? (
+                          {focusHydrated && !focusPlanDay.matchedActivityId ? (
                             <p className="w-full text-sm text-gray-700 leading-relaxed">
                               After your run, sync Garmin Connect — GoFast should link the activity
                               to this workout automatically.
                             </p>
                           ) : null}
-                          {focusOpenWorkoutId && !focusPlanDay.matchedActivityId ? (
+                          {focusHydrated && !focusPlanDay.matchedActivityId ? (
                             <button
                               type="button"
                               onClick={() => {
@@ -1239,8 +1249,8 @@ export default function TrainingHubPage() {
                           ) : null}
                           <Link
                             href={
-                              focusOpenWorkoutId
-                                ? `/training/schedule-run?date=${encodeURIComponent(focusPlanDay.dateKey)}&workoutId=${encodeURIComponent(focusOpenWorkoutId)}`
+                              focusHydrated
+                                ? `/training/schedule-run?date=${encodeURIComponent(focusPlanDay.dateKey)}&workoutId=${encodeURIComponent(prescribeIdForHydrated(focusHydrated))}`
                                 : `/training/schedule-run?date=${encodeURIComponent(focusPlanDay.dateKey)}`
                             }
                             className="inline-flex justify-center rounded-xl border-2 border-sky-600 bg-white px-5 py-2.5 text-sm font-semibold text-sky-900 hover:bg-sky-50"
@@ -1253,22 +1263,24 @@ export default function TrainingHubPage() {
                             {garminPushMessage}
                           </p>
                         ) : null}
-                        {focusOpenWorkoutId &&
+                        {focusHydrated &&
                         !focusPlanDay.matchedActivityId &&
                         showMatchPanel ? (
                           <div id="match-garmin-panel" className="mt-4 space-y-4">
-                            <WorkoutSkipActions
-                              workoutId={focusOpenWorkoutId}
-                              dateKey={focusPlanDay.dateKey}
-                              matchedActivityId={focusPlanDay.matchedActivityId}
-                              skippedAt={focusPlanDay.skippedAt}
-                              workoutType={focusPlanDay.workoutType}
-                              title={focusPlanDay.title}
-                              showMissedPrompt={focusStatus === "missed"}
-                              onUpdated={loadHub}
-                            />
+                            {focusHydrated.kind === "executed" ? (
+                              <WorkoutSkipActions
+                                workoutId={focusHydrated.workoutId}
+                                dateKey={focusPlanDay.dateKey}
+                                matchedActivityId={focusPlanDay.matchedActivityId}
+                                skippedAt={focusPlanDay.skippedAt}
+                                workoutType={focusPlanDay.workoutType}
+                                title={focusPlanDay.title}
+                                showMissedPrompt={focusStatus === "missed"}
+                                onUpdated={loadHub}
+                              />
+                            ) : null}
                             <WorkoutActivityMatchPanel
-                              workoutId={focusOpenWorkoutId}
+                              workoutId={matchTargetIdForHydrated(focusHydrated)}
                               workoutTitle={displayWorkoutListTitle(focusPlanDay)}
                               plannedDistanceMeters={focusPlanDay.estimatedDistanceInMeters ?? null}
                               compact

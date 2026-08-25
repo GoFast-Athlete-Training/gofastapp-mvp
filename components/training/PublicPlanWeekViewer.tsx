@@ -21,6 +21,7 @@ type Props = {
 
 function toPlanDayCard(day: PublicPlanWeek["days"][number]): PlanDayCard {
   return {
+    plannedWorkoutId: null,
     workoutId: null,
     dateKey: day.dateKey,
     date: day.dateKey,
