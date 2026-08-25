@@ -25,6 +25,7 @@ import {
   formatCalendarWeekRangeLabel,
   formatPlanDateDisplay,
   localTodayKey,
+  raceCalendarBeforeTodayUtc,
 } from "@/lib/training/plan-utils";
 import { workoutDetailPathWithBackHref } from "@/lib/training/workout-nav-query";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
@@ -241,12 +242,14 @@ export default function TrainingHubPage() {
           goalTime?: string | null;
         }>;
         setMyRacesForPick(
-          rows.map((r) => ({
-            id: r.id,
-            name: r.name,
-            raceDate: String(r.raceDate),
-            goalTime: r.goalTime?.trim() || null,
-          }))
+          rows
+            .filter((r) => !raceCalendarBeforeTodayUtc(String(r.raceDate)))
+            .map((r) => ({
+              id: r.id,
+              name: r.name,
+              raceDate: String(r.raceDate),
+              goalTime: r.goalTime?.trim() || null,
+            }))
         );
         return;
       }
@@ -271,12 +274,14 @@ export default function TrainingHubPage() {
           goalTime?: string | null;
         }>;
         setMyRacesForPick(
-          rows.map((r) => ({
-            id: r.id,
-            name: r.name,
-            raceDate: String(r.raceDate),
-            goalTime: r.goalTime?.trim() || null,
-          }))
+          rows
+            .filter((r) => !raceCalendarBeforeTodayUtc(String(r.raceDate)))
+            .map((r) => ({
+              id: r.id,
+              name: r.name,
+              raceDate: String(r.raceDate),
+              goalTime: r.goalTime?.trim() || null,
+            }))
         );
         return;
       }
@@ -678,8 +683,8 @@ export default function TrainingHubPage() {
           <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm mb-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Choose a race to train for</h2>
             <p className="text-sm text-gray-600 mb-6">
-              Training follows one active plan tied to a race in My Races. Pick your race, set a
-              goal time, then build your plan.
+              Training follows one active plan tied to an upcoming race in My Races. Pick your
+              race, set a goal time, then build your plan.
             </p>
             {myRacesForPick.length > 0 ? (
               <ul className="space-y-2 mb-6">

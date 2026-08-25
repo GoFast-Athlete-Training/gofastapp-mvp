@@ -86,7 +86,7 @@ export default function GoFastWithOthersDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [noHandle, setNoHandle] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [activeView, setActiveView] = useState<StudioView>("dashboard");
+  const [activeView, setActiveView] = useState<StudioView>("page");
   const [contentFocus, setContentFocus] = useState<ContentEditorFocus | null>(null);
   const [followerCount, setFollowerCount] = useState<number | null>(null);
   const [shareHubStatus, setShareHubStatus] = useState<ShareHubStatus | null>(null);
@@ -95,12 +95,6 @@ export default function GoFastWithOthersDashboard() {
   const landingValues = ownerRowToLanding(ownerGwm);
   const isWelcomeComplete = isWelcomeContentComplete(landingValues);
   const showStudioExplainer = shouldShowStudioExplainer(ownerGwm, introDismissed);
-
-  const isPublishReady = Boolean(
-    landingValues.welcome?.trim() ||
-      landingValues.gofastWithMeBio?.trim() ||
-      landingValues.whatYoullSeeHere?.trim()
-  );
 
   const openWorkspace = useCallback((section: StudioSection, focus?: ContentEditorFocus) => {
     setActiveView(section);
@@ -187,7 +181,11 @@ export default function GoFastWithOthersDashboard() {
           setShareHubStatus(hubStatusRes.data.status as ShareHubStatus);
         }
 
-        if (!cancelled) setLoading(false);
+        const landing = ownerRowToLanding(gwm);
+        if (!cancelled) {
+          setActiveView(isWelcomeContentComplete(landing) ? "communityHome" : "page");
+          setLoading(false);
+        }
       } catch {
         if (!cancelled) {
           setError("Something went wrong loading GoFastWithMe Studio.");
@@ -264,9 +262,8 @@ export default function GoFastWithOthersDashboard() {
   const studioShell = (content: React.ReactNode) => (
     <GoFastWithMeStudioAppShell
       activeView={activeView}
-      contentFocus={contentFocus}
       onViewChange={handleViewChange}
-      pageNeedsAction={!isWelcomeComplete}
+      landingNeedsAction={!isWelcomeComplete}
     >
       <div className="px-4 sm:px-6 py-6 max-w-6xl mx-auto">{content}</div>
     </GoFastWithMeStudioAppShell>
@@ -321,10 +318,6 @@ export default function GoFastWithOthersDashboard() {
 
   const dashboardMetrics: DashboardMetrics = {
     followerCount,
-    landingComplete: isWelcomeComplete,
-    publishReady: isPublishReady,
-    planPublished: shareHubStatus?.plan.isPublished ?? null,
-    planName: shareHubStatus?.plan.planName ?? null,
     liveUrl,
     invitePath,
     publicSlug,
@@ -333,7 +326,7 @@ export default function GoFastWithOthersDashboard() {
   };
 
   const renderStudioContent = () => {
-    if (activeView === "dashboard") {
+    if (activeView === "communityHome") {
       return (
         <div className="space-y-6">
           {showStudioExplainer ? (
@@ -371,7 +364,6 @@ export default function GoFastWithOthersDashboard() {
               setSlugUsesHandle(usesHandle);
             }}
           />
-
         </div>
       );
     }
@@ -389,6 +381,7 @@ export default function GoFastWithOthersDashboard() {
               setOwnerGwm((prev) => (prev ? { ...prev, ...values } : prev));
             }}
             onAvatarSaved={(photoURL) => setProfilePhotoURL(photoURL)}
+            onOpenWorkspace={openWorkspace}
           />
         );
       case "community":

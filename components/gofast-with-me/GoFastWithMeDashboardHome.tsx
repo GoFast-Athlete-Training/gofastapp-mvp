@@ -1,12 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { BookOpen, CalendarDays, Copy, ExternalLink, MapPin, PenLine, Users } from 'lucide-react';
-import {
-  STUDIO_CENTRAL_LABEL,
-  type ContentEditorFocus,
-  type StudioSection,
-} from '@/components/gofast-with-me/studio-sections';
+import { Copy, ExternalLink, Users } from 'lucide-react';
+import { STUDIO_COMMUNITY_LABEL, type ContentEditorFocus, type StudioSection } from '@/components/gofast-with-me/studio-sections';
+import GoFastWithMeBuildContentStrip from '@/components/gofast-with-me/GoFastWithMeBuildContentStrip';
 import GoFastWithMeUrlEditor from '@/components/profile/GoFastWithMeUrlEditor';
 import {
   athleteCommunityPath,
@@ -15,10 +12,6 @@ import {
 
 export type DashboardMetrics = {
   followerCount: number | null;
-  landingComplete: boolean;
-  publishReady: boolean;
-  planPublished: boolean | null;
-  planName: string | null;
   liveUrl: string;
   invitePath: string;
   publicSlug: string;
@@ -33,70 +26,6 @@ type Props = {
   onUrlUpdated?: (slug: string, usesHandle: boolean) => void;
 };
 
-const BUILD_CONTENT_ACTIONS = [
-  {
-    title: 'Daily log',
-    description: 'How you\u2019re feeling today \u2014 spills into the member feed.',
-    section: 'community' as const,
-  },
-  {
-    title: 'Tip',
-    description: 'Evergreen training thoughts followers can come back to.',
-    section: 'content' as const,
-    focus: 'tip' as const,
-  },
-  {
-    title: 'Route',
-    description: 'Share a Strava route or feature one from the catalog.',
-    section: 'content' as const,
-    focus: 'route' as const,
-  },
-  {
-    title: 'Run / training',
-    description: 'Pick the plan or workout followers see on your community.',
-    section: 'workouts' as const,
-  },
-] as const;
-
-type SetupStatus = 'not_started' | 'in_progress' | 'ready';
-
-function myPageSetupStatus(landingComplete: boolean, publishReady: boolean): SetupStatus {
-  if (landingComplete) return 'ready';
-  if (publishReady) return 'in_progress';
-  return 'not_started';
-}
-
-function pageHealthLabel(status: SetupStatus): string {
-  if (status === 'ready') return 'Ready';
-  if (status === 'in_progress') return 'Almost';
-  return 'Needs work';
-}
-
-type Stoplight = 'green' | 'yellow' | 'red' | 'gray';
-
-function pageStoplight(status: SetupStatus): Stoplight {
-  if (status === 'ready') return 'green';
-  if (status === 'in_progress') return 'yellow';
-  return 'red';
-}
-
-function planStoplight(live: boolean): Stoplight {
-  return live ? 'green' : 'yellow';
-}
-
-function stoplightDotClass(light: Stoplight): string {
-  switch (light) {
-    case 'green':
-      return 'bg-emerald-500 ring-emerald-500/30';
-    case 'yellow':
-      return 'bg-amber-400 ring-amber-400/30';
-    case 'red':
-      return 'bg-red-500 ring-red-500/30';
-    default:
-      return 'bg-gray-300 ring-gray-300/30';
-  }
-}
-
 export default function GoFastWithMeDashboardHome({
   metrics,
   visitorHeadline,
@@ -104,9 +33,7 @@ export default function GoFastWithMeDashboardHome({
   onUrlUpdated,
 }: Props) {
   const [inviteCopied, setInviteCopied] = useState(false);
-  const pageStatus = myPageSetupStatus(metrics.landingComplete, metrics.publishReady);
   const memberCount = metrics.followerCount ?? 0;
-  const planLive = metrics.planPublished === true;
   const publicCommunityPath = athleteCommunityPath(metrics.publicSlug);
   const followerPreviewPath = athleteCommunityPreviewPath(metrics.publicSlug);
 
@@ -128,55 +55,11 @@ export default function GoFastWithMeDashboardHome({
   return (
     <div className="lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start">
       <div className="space-y-5 lg:col-span-7">
-        <div className="space-y-2">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">{STUDIO_CENTRAL_LABEL}</h2>
-            <p className="text-sm text-gray-600 mt-0.5">
-              Your community at a glance — setup status, followers, and invite link.
-            </p>
-          </div>
-
-          <div
-            className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2"
-            role="group"
-            aria-label="Setup status"
-          >
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 shrink-0">
-              Setup
-            </span>
-            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-              <StoplightChip
-                label="Landing"
-                light={pageStoplight(pageStatus)}
-                hint={pageHealthLabel(pageStatus)}
-                onClick={() => onOpenWorkspace('page')}
-              />
-              <StoplightChip
-                label="Messages"
-                light="green"
-                hint="Live"
-                onClick={() => onOpenWorkspace('community')}
-              />
-              <StoplightChip
-                label="Runs/Training"
-                light={planStoplight(planLive)}
-                hint={planLive ? 'Public' : 'Private'}
-                onClick={() => onOpenWorkspace('workouts')}
-              />
-              <StoplightChip
-                label="Tips"
-                light="gray"
-                hint="Library"
-                onClick={() => onOpenWorkspace('content')}
-              />
-            </div>
-          </div>
-
-          {pageStatus !== 'ready' ? (
-            <p className="text-xs text-amber-800 px-1">
-              Landing still needs work — use <strong>Landing page</strong> in the sidebar.
-            </p>
-          ) : null}
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">{STUDIO_COMMUNITY_LABEL}</h2>
+          <p className="text-sm text-gray-600 mt-0.5">
+            Your follower feed — invite people, then keep the scrolling community alive.
+          </p>
         </div>
 
         <section className="rounded-xl border border-gray-200 bg-white p-5">
@@ -215,12 +98,12 @@ export default function GoFastWithMeDashboardHome({
               {inviteCopied ? 'Link copied' : 'Copy invite link'}
             </button>
             <a
-              href={metrics.liveUrl}
+              href={publicCommunityPath}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-white px-4 py-2.5 text-sm font-semibold text-orange-800 hover:bg-orange-50"
             >
-              View public page
+              Open public community
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
           </div>
@@ -242,37 +125,30 @@ export default function GoFastWithMeDashboardHome({
             </div>
           </details>
         </section>
+
+        <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 space-y-2 lg:hidden">
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Preview</p>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={followerPreviewPath}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800 hover:bg-orange-100"
+            >
+              See what followers see
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        </div>
       </div>
 
-      <aside className="mt-5 space-y-5 rounded-xl border border-gray-200 bg-white p-5 lg:col-span-5 lg:mt-0 lg:sticky lg:top-6">
-        <div>
-          <h3 className="text-sm font-bold text-gray-900">Build content</h3>
-          <p className="text-xs text-gray-600 mt-0.5">
-            Pick what you want to create — each type opens its own editor.
-          </p>
-        </div>
-        <div className="grid gap-2">
-          {BUILD_CONTENT_ACTIONS.map((action) => (
-            <BuildContentButton
-              key={action.title}
-              title={action.title}
-              description={action.description}
-              onClick={() =>
-                onOpenWorkspace(
-                  action.section,
-                  'focus' in action ? action.focus : undefined
-                )
-              }
-            />
-          ))}
-        </div>
+      <div className="mt-5 space-y-5 lg:col-span-5 lg:mt-0 lg:sticky lg:top-6">
+        <GoFastWithMeBuildContentStrip surface="community" onOpenWorkspace={onOpenWorkspace} />
 
-        <div className="border-t border-gray-100 pt-4 space-y-2">
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500">Preview</h4>
-            <p className="text-xs text-gray-600 mt-0.5">Check how your community looks to followers.</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+        <div className="hidden lg:block rounded-xl border border-gray-200 bg-white p-5 space-y-2">
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Preview</p>
+          <p className="text-xs text-gray-600">Check how your community looks to followers.</p>
+          <div className="flex flex-wrap gap-2 pt-1">
             <a
               href={followerPreviewPath}
               target="_blank"
@@ -293,74 +169,7 @@ export default function GoFastWithMeDashboardHome({
             </a>
           </div>
         </div>
-      </aside>
+      </div>
     </div>
-  );
-}
-
-const BUILD_CONTENT_ICONS = {
-  'Daily log': PenLine,
-  Tip: BookOpen,
-  Route: MapPin,
-  'Run / training': CalendarDays,
-} as const;
-
-function BuildContentButton({
-  title,
-  description,
-  onClick,
-}: {
-  title: keyof typeof BUILD_CONTENT_ICONS;
-  description: string;
-  onClick: () => void;
-}) {
-  const Icon = BUILD_CONTENT_ICONS[title];
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex w-full items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-left transition hover:border-orange-200 hover:bg-orange-50"
-    >
-      <span className="rounded-lg bg-white p-2 text-orange-700 ring-1 ring-gray-200">
-        <Icon className="h-4 w-4 shrink-0" aria-hidden />
-      </span>
-      <span className="min-w-0">
-        <p className="text-sm font-semibold text-gray-900">{title}</p>
-        <p className="mt-1 text-xs leading-relaxed text-gray-600">{description}</p>
-      </span>
-    </button>
-  );
-}
-
-function StoplightChip({
-  label,
-  light,
-  hint,
-  onClick,
-  muted,
-}: {
-  label: string;
-  light: Stoplight;
-  hint: string;
-  onClick: () => void;
-  muted?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={`${label}: ${hint}`}
-      className={`inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 text-left hover:bg-white/80 transition-colors ${
-        muted ? 'opacity-70' : ''
-      }`}
-    >
-      <span
-        className={`h-2.5 w-2.5 rounded-full shrink-0 ring-2 ${stoplightDotClass(light)}`}
-        aria-hidden
-      />
-      <span className="text-xs font-medium text-gray-800">{label}</span>
-      <span className="text-[10px] text-gray-500 hidden sm:inline">{hint}</span>
-    </button>
   );
 }

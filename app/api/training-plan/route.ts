@@ -21,6 +21,7 @@ import {
   buildPlanRaceSnapshots,
   planRaceSnapshotsToPrismaJson,
 } from "@/lib/training/plan-race-snapshots";
+import { isRaceCalendarBeforeTodayUtc } from "@/lib/training/plan-lifecycle";
 
 /**
  * POST /api/training-plan
@@ -111,6 +112,13 @@ export async function POST(request: NextRequest) {
     });
     if (!race) {
       return NextResponse.json({ error: "Race not found" }, { status: 404 });
+    }
+
+    if (isRaceCalendarBeforeTodayUtc(race.raceDate)) {
+      return NextResponse.json(
+        { error: "That race has finished — pick an upcoming race to train for" },
+        { status: 400 }
+      );
     }
 
     if (

@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BookOpen, CalendarDays, Layout, LayoutDashboard, Users, Wallet, X, type LucideIcon } from 'lucide-react';
+import { Layout, Users, Wallet, X, type LucideIcon } from 'lucide-react';
 import {
-  STUDIO_BIN_DESCRIPTIONS,
-  STUDIO_BIN_ORDER,
-  STUDIO_BIN_LABELS,
-  STUDIO_CENTRAL_LABEL,
-  type StudioSection,
+  STUDIO_CHROME_LABELS,
+  STUDIO_CHROME_VIEWS,
+  STUDIO_COMMUNITY_LABEL,
+  STUDIO_LANDING_LABEL,
+  type StudioChromeView,
 } from '@/components/gofast-with-me/studio-sections';
 import {
   fetchStudioTutorial,
@@ -15,13 +15,10 @@ import {
   type StudioTutorialPayload,
 } from '@/lib/gofast-with-me/studio-tutorial';
 
-const NAV_ICONS: Record<StudioSection | 'dashboard', LucideIcon> = {
-  dashboard: LayoutDashboard,
+const CHROME_ICONS: Record<StudioChromeView, LucideIcon> = {
   page: Layout,
-  community: Users,
+  communityHome: Users,
   payouts: Wallet,
-  workouts: CalendarDays,
-  content: BookOpen,
 };
 
 type Props = {
@@ -69,22 +66,28 @@ export default function GoFastWithMeStudioExplainer({ onDismiss }: Props) {
         <p className="text-xs text-violet-700">Loading tutorial…</p>
       ) : (
         <ul className="space-y-2">
-          <TutorialRow
-            icon={NAV_ICONS.dashboard}
-            label={STUDIO_CENTRAL_LABEL}
-            description="Setup progress and follower count"
-          />
-          {STUDIO_BIN_ORDER.map((section) => {
-            const Icon = NAV_ICONS[section];
+          {STUDIO_CHROME_VIEWS.map((view) => {
+            const Icon = CHROME_ICONS[view];
+            const description =
+              view === 'page'
+                ? `${STUDIO_LANDING_LABEL} — who you are plus recent highlights.`
+                : view === 'communityHome'
+                  ? `${STUDIO_COMMUNITY_LABEL} — follower feed, invite link, and build actions.`
+                  : 'Stripe Connect and sponsorship earnings.';
             return (
               <TutorialRow
-                key={section}
+                key={view}
                 icon={Icon}
-                label={STUDIO_BIN_LABELS[section]}
-                description={STUDIO_BIN_DESCRIPTIONS[section]}
+                label={STUDIO_CHROME_LABELS[view]}
+                description={description}
               />
             );
           })}
+          <TutorialRow
+            icon={Users}
+            label="Build content"
+            description="Daily log, tips, routes, and runs — one pool that surfaces on Landing and Community differently."
+          />
         </ul>
       )}
 
