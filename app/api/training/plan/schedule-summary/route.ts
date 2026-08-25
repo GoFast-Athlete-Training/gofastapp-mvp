@@ -15,7 +15,7 @@ type StructuredWorkoutRow = {
 
 type CyclePoolData = {
   nCycles: number;
-  cycleLen: number;
+  longRunCycleWeeks: number;
   poolMilesByCycle: number[];
   baseMiles: number;
   peakMiles: number;

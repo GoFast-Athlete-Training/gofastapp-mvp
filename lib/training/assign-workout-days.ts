@@ -3,6 +3,8 @@
  * Miles stay at 0 until long-run and tempo/interval/easy passes.
  */
 
+import { LONG_RUN_BLOCK_WEEKS } from "@/lib/training/long-run-block-weeks";
+
 import type { WorkoutType } from "@prisma/client";
 import { WorkoutType as WT } from "@prisma/client";
 import { dateForDayInWeek } from "@/lib/training/plan-schedule-dates";
@@ -36,8 +38,8 @@ export type WorkoutDayInput = {
   intervalIdealDow: number;
   longRunDefaultDow: number;
   peakWeeklyMilesForCap: number | null;
-  /** LR macro block: one long run per week for LR1..LRn; must match preset cycleLen and apply-long-run */
-  longRunCycleLen: number;
+  /** LR macro block: one long run per week for LR1..LR4; always 4 in product */
+  longRunCycleLen?: number;
   longRunPositions: readonly RunTypePosition[];
   intervalsPositions: readonly RunTypePosition[];
   tempoPositions: readonly RunTypePosition[];
@@ -137,7 +139,7 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
   const preferred =
     input.preferredDays.length > 0 ? [...input.preferredDays].sort((a, b) => a - b) : [1, 2, 3, 4, 5, 6];
 
-  const lrCycleLen = Math.max(1, Math.floor(input.longRunCycleLen));
+  const lrCycleLen = Math.max(1, Math.floor(input.longRunCycleLen ?? LONG_RUN_BLOCK_WEEKS));
 
   const raceUtc = utcDateOnly(input.raceDate);
   const planStart = utcDateOnly(input.planStartDate);
@@ -177,7 +179,7 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
     const { cyclePos } = weekCycleMeta({
       weekNumber,
       totalWeeks: input.totalWeeks,
-      cycleLen: lrCycleLen,
+      longRunCycleWeeks: lrCycleLen,
     });
 
     const days: PlanWeekSchedule["days"] = [];

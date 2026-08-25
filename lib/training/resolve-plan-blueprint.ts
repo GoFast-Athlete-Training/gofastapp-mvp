@@ -18,7 +18,6 @@ export type ResolvedPlanBlueprint = {
   rotationPreset: LoadedPresetInclude;
   volumePreset: Pick<
     training_plan_preset,
-    | "cycleLen"
     | "minWeeklyMiles"
     | "maxWeeklyMiles"
     | "baseMiles"
@@ -61,7 +60,6 @@ export async function loadPlanBlueprintForGenerate(params: {
     if (!rotationPreset) return null;
 
     const volumePreset = {
-      cycleLen: athletePreset.cycleLen,
       minWeeklyMiles: athletePreset.minWeeklyMiles,
       maxWeeklyMiles: athletePreset.maxWeeklyMiles,
       baseMiles: athletePreset.baseMiles,

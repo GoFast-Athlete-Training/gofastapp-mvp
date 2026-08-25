@@ -131,7 +131,6 @@ export async function PATCH(
     }
 
     const volKeys = [
-      "cycleLen",
       "minWeeklyMiles",
       "maxWeeklyMiles",
       "baseMiles",
@@ -149,12 +148,6 @@ export async function PATCH(
             scalarData.maxWeeklyMiles = null;
           } else if (typeof v === "number" && Number.isFinite(v)) {
             scalarData.maxWeeklyMiles = Math.max(1, Math.round(v));
-          }
-        } else if (k === "cycleLen") {
-          const v = bodyRec.cycleLen;
-          if (typeof v === "number" && Number.isFinite(v)) {
-            const r = Math.round(v);
-            if (r >= 1 && r <= 8) scalarData.cycleLen = r;
           }
         } else {
           const v = bodyRec[k];

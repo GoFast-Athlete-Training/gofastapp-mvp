@@ -4,13 +4,15 @@
  * to any plan length. Split across long_run_config positions by distribution weights.
  */
 
+import { LONG_RUN_BLOCK_WEEKS } from "@/lib/training/long-run-block-weeks";
+
 function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
 export type GenerateCyclePoolTotalsInput = {
   totalWeeks: number;
-  cycleLen?: number;
+  longRunCycleWeeks?: number;
   /** Long-run pool in the first block (index 0). Used with peak to derive the per-step multiplier. */
   baseMiles: number;
   /** Long-run pool in the peak block (cycle N-1, 0-based: index N-2 in pool array for N cycles). */
@@ -46,11 +48,11 @@ export function deriveBuildCoefForPlanLength(
   baseMiles: number,
   peakMiles: number,
   totalWeeks: number,
-  cycleLen: number
+  longRunCycleWeeks: number = LONG_RUN_BLOCK_WEEKS
 ): number {
-  const cLen = Math.floor(Number(cycleLen));
+  const cLen = Math.floor(Number(longRunCycleWeeks));
   if (!Number.isFinite(cLen) || cLen < 1) {
-    throw new Error("deriveBuildCoefForPlanLength: cycleLen must be a positive integer");
+    throw new Error("deriveBuildCoefForPlanLength: longRunCycleWeeks must be a positive integer");
   }
   const w = Math.max(1, Math.floor(totalWeeks));
   const nCycles = Math.max(1, Math.ceil(w / cLen));
@@ -69,7 +71,7 @@ export function generateCyclePoolTotals(
   poolMilesByCycle: number[];
 } {
   const { totalWeeks, peakMiles, taperMiles, baseMiles, multiplierOverrides = {} } = input;
-  const cycleLen = Math.max(1, input.cycleLen ?? 4);
+  const cycleLen = Math.max(1, input.longRunCycleWeeks ?? LONG_RUN_BLOCK_WEEKS);
   const w = Math.max(1, Math.floor(totalWeeks));
   const N = Math.max(1, Math.ceil(w / cycleLen));
   const peak = Number(peakMiles);

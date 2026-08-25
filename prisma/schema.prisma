@@ -1713,8 +1713,8 @@ model training_plan_preset {
   /// Enabled workout types, weekly counts, cadence — canonical structure snapshot.
   workoutStructure Json?
 
-  /// Long-run rotation block: one long run per week for this many consecutive weeks (LR1…LRn) before the pattern repeats; drives pool stepping and placement.
-  cycleLen           Int    @default(4)
+  /// Long-run rotation block: one long run per week for this many consecutive weeks (LR1…LRn) before the pattern repeats; product always 4.
+  longRunCycleWeeks  Int    @default(4)
   minWeeklyMiles     Int    @default(40)
   maxWeeklyMiles     Int?
   baseMiles          Float
@@ -1752,7 +1752,7 @@ model athlete_presets {
   description     String?
   objectiveOfPlan String?
 
-  cycleLen          Int    @default(4)
+  longRunCycleWeeks Int    @default(4)
   minWeeklyMiles    Int    @default(40)
   maxWeeklyMiles    Int?
   baseMiles         Float
@@ -1764,6 +1764,8 @@ model athlete_presets {
 
   trainingHistory  String?
   fitnessPhase     AthletePresetFitnessPhase @default(BASE)
+  /// Inferred from free-text history by first OpenAI prompt — not an athlete form picker.
+  progressionAggressiveness ProgressionAggressiveness?
   ageYearsSnapshot Int?
   genderSnapshot   String?
 
@@ -1809,8 +1811,8 @@ model swim_plan_preset {
   /// Enabled swim workout types, weekly counts, cadence — canonical structure snapshot.
   workoutStructure Json?
 
-  /// Repeating cycle length for rotation configs (weeks).
-  cycleLen Int @default(4)
+  /// Repeating cycle length for rotation configs (weeks); product always 4.
+  longRunCycleWeeks Int @default(4)
   /// JSON: per-week multipliers within a cycle, e.g. { "weekMultipliers": [1, 1.05, 1.1, 0.85] }.
   weeklyProgressionPattern Json?
   /// recommendedWeeklyMeters = goalSwimDistanceMeters × recommendationMultiplier when goal is set.
@@ -2079,7 +2081,7 @@ model training_plans {
   taperStartWeekNumber Int?
   /// Max long-run distance (mi) used when applying volume / rotation
   calculatedLongRunMax Float?
-  /// Cycle pool snapshot from last generation: { nCycles, cycleLen, poolMilesByCycle, baseMiles, peakMiles, taperMiles, positionCounts }
+  /// Cycle pool snapshot from last generation: { nCycles, longRunCycleWeeks, poolMilesByCycle, baseMiles, peakMiles, taperMiles, positionCounts }
   cyclePoolData        Json?
   /// Snapshot from preset at last generation (easy standard miles, min trim, pace offset, weekly buffer)
   easyRunConfig        Json?

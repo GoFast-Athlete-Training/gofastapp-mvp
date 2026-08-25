@@ -1,47 +1,5 @@
 import type { AthletePresetFitnessPhase } from "@prisma/client";
 
-export type AthletePresetVolumeInput = {
-  fitnessPhase: AthletePresetFitnessPhase;
-  weeklyMileage?: number | null;
-};
-
-export function computeAthletePresetVolume(input: AthletePresetVolumeInput): {
-  baseMiles: number;
-  peakMiles: number;
-  taperMiles: number;
-  minWeeklyMiles: number;
-  maxWeeklyMiles: number | null;
-} {
-  const weekly =
-    typeof input.weeklyMileage === "number" && Number.isFinite(input.weeklyMileage)
-      ? Math.round(input.weeklyMileage)
-      : null;
-
-  if (input.fitnessPhase === "PEAK") {
-    const peak = weekly != null ? Math.max(35, Math.min(70, weekly + 5)) : 55;
-    const base = Math.max(25, Math.round(peak * 0.65));
-    const taper = Math.max(20, Math.round(peak * 0.55));
-    return {
-      baseMiles: base,
-      peakMiles: peak,
-      taperMiles: taper,
-      minWeeklyMiles: Math.max(25, base),
-      maxWeeklyMiles: peak,
-    };
-  }
-
-  const base = weekly != null ? Math.max(30, Math.min(60, weekly)) : 45;
-  const peak = Math.max(base + 5, Math.round(base * 1.15));
-  const taper = Math.max(25, Math.round(base * 0.75));
-  return {
-    baseMiles: base,
-    peakMiles: peak,
-    taperMiles: taper,
-    minWeeklyMiles: Math.max(25, base),
-    maxWeeklyMiles: peak,
-  };
-}
-
 export function ageYearsFromBirthday(birthday: Date | null | undefined): number | null {
   if (!birthday) return null;
   const b = new Date(birthday);
@@ -77,3 +35,9 @@ export function buildTrainingHistoryPrefill(athlete: {
   }
   return parts.join(" ");
 }
+
+/** @deprecated removed — volume comes from OpenAI core infer, not weekly heuristics */
+export type AthletePresetVolumeInput = {
+  fitnessPhase: AthletePresetFitnessPhase;
+  weeklyMileage?: number | null;
+};

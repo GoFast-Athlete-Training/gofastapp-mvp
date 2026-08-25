@@ -24,7 +24,7 @@ type PresetCheckResponse = {
   resolvedPresetId: string;
   presetSlug: string;
   presetTitle: string;
-  cycleLen: number | null;
+  longRunCycleWeeks: number | null;
   minWeeklyMiles: number | null;
   maxWeeklyMiles: number | null;
   baseMiles: number | null;
@@ -344,8 +344,8 @@ export default function TrainingGenerateTestPage() {
               <p className="font-semibold text-gray-900">Volume & long-run cycle</p>
               <p className="mt-2 text-gray-800">
                 Base {result.baseMiles ?? "—"} mi → Peak {result.peakMiles ?? "—"} mi → Taper{" "}
-                {result.taperMiles ?? "—"} mi · long-run cycle {result.cycleLen ?? "—"} weeks (
-                {result.cycleLen ?? "—"} long runs before the rotation repeats)
+                {result.taperMiles ?? "—"} mi · long-run block {result.longRunCycleWeeks ?? 4} weeks (
+                {result.longRunCycleWeeks ?? 4} Saturday long runs per block)
               </p>
               <p className="mt-1 text-gray-700">
                 Min weekly {result.minWeeklyMiles ?? "—"} mi · Max weekly {result.maxWeeklyMiles ?? "— (none)"}{" "}

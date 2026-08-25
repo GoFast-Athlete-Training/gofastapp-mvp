@@ -30,7 +30,7 @@ export type SwimPresetWriteBody = {
   recommendedWeeklyMeters?: number | null;
   minWeeklyMeters?: number | null;
   maxWeeklyMeters?: number | null;
-  cycleLen?: number | null;
+  longRunCycleWeeks?: number | null;
   weeklyProgressionPattern?: unknown;
   taperWeeks?: number | null;
   taperVolumeMultiplier?: number | null;
@@ -98,9 +98,9 @@ export function parseSwimPresetFromBody(
     return { ok: false, error: strategy.error };
   }
 
-  const cycleLen = intOrNull(o.cycleLen);
-  if (cycleLen != null && (cycleLen < 1 || cycleLen > 52)) {
-    return { ok: false, error: "cycleLen must be between 1 and 52" };
+  const longRunCycleWeeks = intOrNull(o.longRunCycleWeeks);
+  if (longRunCycleWeeks != null && (longRunCycleWeeks < 1 || longRunCycleWeeks > 52)) {
+    return { ok: false, error: "longRunCycleWeeks must be between 1 and 52" };
   }
 
   for (const [key, label] of [
@@ -138,7 +138,7 @@ export function parseSwimPresetFromBody(
       recommendedWeeklyMeters: intOrNull(o.recommendedWeeklyMeters),
       minWeeklyMeters: intOrNull(o.minWeeklyMeters),
       maxWeeklyMeters: intOrNull(o.maxWeeklyMeters),
-      cycleLen,
+      longRunCycleWeeks,
       weeklyProgressionPattern: o.weeklyProgressionPattern,
       taperWeeks: intOrNull(o.taperWeeks),
       taperVolumeMultiplier: floatOrNull(o.taperVolumeMultiplier),
@@ -190,7 +190,7 @@ export function swimPresetWriteToPrismaCreate(
     recommendedWeeklyMeters: volume.recommendedWeeklyMeters ?? undefined,
     minWeeklyMeters: volume.minWeeklyMeters,
     maxWeeklyMeters: volume.maxWeeklyMeters ?? undefined,
-    cycleLen: parsed.cycleLen ?? 4,
+    longRunCycleWeeks: parsed.longRunCycleWeeks ?? 4,
     weeklyProgressionPattern:
       parsed.weeklyProgressionPattern != null
         ? (parsed.weeklyProgressionPattern as Prisma.InputJsonValue)

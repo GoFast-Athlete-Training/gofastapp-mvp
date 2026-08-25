@@ -59,7 +59,7 @@ export type CorePresetServiceResult = {
   objectiveOfPlan: string;
   workoutStructure: {
     weeklyRunCount: number;
-    cycleLen: number;
+    longRunCycleWeeks: number;
     cadenceWeeks: number;
     slots: WorkoutStructureSlot[];
   };

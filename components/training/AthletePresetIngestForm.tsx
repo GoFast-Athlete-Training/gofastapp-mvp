@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
+import { ageYearsFromBirthday } from "@/lib/training/athlete-preset-volume";
 
 export type PresetForWizardLite = {
   id: string;
@@ -13,17 +14,28 @@ export type AthletePresetIngestResult = {
   title: string;
 };
 
-type AthleteProfileSnapshot = {
-  ageYears: number | null;
-  gender: string | null;
-  trainingHistoryPrefill: string;
-  weeklyMileage: number | null;
+type CorePreview = {
+  weSeeYou: string;
+  barriers: string[];
+  progressionAggressiveness: string;
+  calendar: {
+    totalWeeks: number;
+    totalCycles: number;
+    poolMilesByCycle: number[];
+    peakWeekNumber: number | null;
+    taperStartWeekNumber: number;
+    longRunCycleWeeks: number;
+  };
 };
 
 type AthletePresetIngestFormProps = {
   getToken: () => Promise<string>;
   templatePresets: PresetForWizardLite[];
   raceDistanceMeters: number | null;
+  raceName: string;
+  raceDate: string;
+  planStartDate: string;
+  goalTime: string | null;
   defaultTitle: string;
   onCreated: (preset: AthletePresetIngestResult) => void;
   onCancel: () => void;
@@ -33,16 +45,26 @@ export function AthletePresetIngestForm({
   getToken,
   templatePresets,
   raceDistanceMeters,
+  raceName,
+  raceDate,
+  planStartDate,
+  goalTime,
   defaultTitle,
   onCreated,
   onCancel,
 }: AthletePresetIngestFormProps) {
-  const [profile, setProfile] = useState<AthleteProfileSnapshot | null>(null);
+  const [athleteId, setAthleteId] = useState<string | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [title, setTitle] = useState(defaultTitle);
+  const [description, setDescription] = useState("");
   const [trainingHistory, setTrainingHistory] = useState("");
   const [fitnessPhase, setFitnessPhase] = useState<"PEAK" | "BASE">("PEAK");
-  const [sourcePresetId, setSourcePresetId] = useState("");
+  const [weeklyMileage, setWeeklyMileage] = useState("");
+  const [birthdayInput, setBirthdayInput] = useState("");
+  const [ageYears, setAgeYears] = useState<number | null>(null);
+  const [gender, setGender] = useState<string | null>(null);
+  const [needsBirthday, setNeedsBirthday] = useState(false);
+  const [corePreview, setCorePreview] = useState<CorePreview | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,10 +73,16 @@ export function AthletePresetIngestForm({
       setLoadingProfile(true);
       try {
         const token = await getToken();
-        const res = await fetch("/api/athlete/me", {
-          headers: athleteBearerFetchHeaders(token),
-        });
-        const data = (await res.json()) as {
+        const headers = athleteBearerFetchHeaders(token);
+        const meRes = await fetch("/api/athlete/me", { headers });
+        const meData = (await meRes.json()) as { athleteId?: string };
+        if (!meRes.ok || !meData.athleteId) {
+          throw new Error("Could not load athlete profile");
+        }
+        setAthleteId(meData.athleteId);
+
+        const profileRes = await fetch(`/api/athlete/${meData.athleteId}`, { headers });
+        const profileData = (await profileRes.json()) as {
           athlete?: {
             birthday?: string | null;
             gender?: string | null;
@@ -63,17 +91,18 @@ export function AthletePresetIngestForm({
             longRunCapabilityMiles?: number | null;
           };
         };
-        const a = data.athlete;
-        let ageYears: number | null = null;
+        const a = profileData.athlete;
+        const age = ageYearsFromBirthday(a?.birthday ? new Date(a.birthday) : null);
+        setAgeYears(age);
+        setGender(a?.gender?.trim() || null);
+        setNeedsBirthday(age == null);
         if (a?.birthday) {
-          const b = new Date(a.birthday);
-          if (!Number.isNaN(b.getTime())) {
-            const today = new Date();
-            ageYears = today.getFullYear() - b.getFullYear();
-          }
+          setBirthdayInput(a.birthday.slice(0, 10));
         }
+
         const parts: string[] = [];
         if (a?.weeklyMileage != null && Number.isFinite(a.weeklyMileage)) {
+          setWeeklyMileage(String(Math.round(a.weeklyMileage)));
           parts.push(`Running about ${Math.round(a.weeklyMileage)} miles per week recently.`);
         }
         if (a?.fiveKPace?.trim()) {
@@ -84,44 +113,76 @@ export function AthletePresetIngestForm({
             `Longest recent long run about ${a.longRunCapabilityMiles.toFixed(1)} miles.`
           );
         }
-        setProfile({
-          ageYears,
-          gender: a?.gender?.trim() || null,
-          trainingHistoryPrefill: parts.join(" "),
-          weeklyMileage: a?.weeklyMileage ?? null,
-        });
         setTrainingHistory(parts.join(" "));
-      } catch {
-        setProfile({
-          ageYears: null,
-          gender: null,
-          trainingHistoryPrefill: "",
-          weeklyMileage: null,
-        });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not load profile");
       } finally {
         setLoadingProfile(false);
       }
     })();
   }, [getToken]);
 
-  useEffect(() => {
-    if (sourcePresetId || templatePresets.length === 0) return;
-    setSourcePresetId(templatePresets[0]!.id);
-  }, [templatePresets, sourcePresetId]);
+  async function ensureBirthdaySaved(token: string): Promise<void> {
+    if (!needsBirthday || !birthdayInput.trim() || !athleteId) return;
+    const res = await fetch(`/api/athlete/${athleteId}/profile`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...athleteBearerFetchHeaders(token),
+      },
+      body: JSON.stringify({ birthday: birthdayInput }),
+    });
+    if (!res.ok) {
+      const data = (await res.json()) as { error?: string };
+      throw new Error(data.error ?? "Could not save birthday");
+    }
+    setAgeYears(ageYearsFromBirthday(new Date(birthdayInput)));
+    setNeedsBirthday(false);
+  }
+
+  async function ensureWeeklyMileageSaved(token: string, miles: number): Promise<void> {
+    if (!athleteId) return;
+    const res = await fetch(`/api/athlete/${athleteId}/profile`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...athleteBearerFetchHeaders(token),
+      },
+      body: JSON.stringify({ weeklyMileage: miles }),
+    });
+    if (!res.ok) {
+      const data = (await res.json()) as { error?: string };
+      throw new Error(data.error ?? "Could not save weekly mileage");
+    }
+  }
 
   async function handleSubmit() {
+    const sourcePresetId = templatePresets[0]?.id;
     if (!sourcePresetId) {
-      setError("Pick a GoFast workout template.");
+      setError("No GoFast rotation stub for this race distance.");
       return;
     }
     if (!title.trim()) {
-      setError("Give your blueprint a name.");
+      setError("Name your preset.");
       return;
     }
+    const miles = Number(weeklyMileage);
+    if (!Number.isFinite(miles) || miles < 1) {
+      setError("Weekly mileage is required.");
+      return;
+    }
+    if (needsBirthday && !birthdayInput.trim()) {
+      setError("Add your birthday so we can size your training.");
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
       const token = await getToken();
+      await ensureBirthdaySaved(token);
+      await ensureWeeklyMileageSaved(token, Math.round(miles));
+
       const res = await fetch("/api/athlete-presets", {
         method: "POST",
         headers: {
@@ -130,24 +191,33 @@ export function AthletePresetIngestForm({
         },
         body: JSON.stringify({
           title: title.trim(),
+          description: description.trim() || null,
           fitnessPhase,
           trainingHistory: trainingHistory.trim(),
           sourcePresetId,
           targetDistanceMeters: raceDistanceMeters,
-          weeklyMileage: profile?.weeklyMileage ?? null,
+          weeklyMileage: Math.round(miles),
+          raceName,
+          raceDate,
+          planStartDate,
+          goalTime,
         }),
       });
       const data = (await res.json()) as {
         athletePreset?: AthletePresetIngestResult;
+        corePreview?: CorePreview;
         error?: string;
       };
       if (!res.ok || !data.athletePreset?.id) {
-        setError(data.error ?? "Could not save your blueprint");
+        setError(data.error ?? "Could not save your preset");
         return;
+      }
+      if (data.corePreview) {
+        setCorePreview(data.corePreview);
       }
       onCreated(data.athletePreset);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save your blueprint");
+      setError(e instanceof Error ? e.message : "Could not save your preset");
     } finally {
       setSaving(false);
     }
@@ -156,104 +226,140 @@ export function AthletePresetIngestForm({
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-sky-100 bg-sky-50/80 p-4 text-sm text-gray-800">
-        <p className="font-medium text-gray-900">Create your own blueprint</p>
+        <p className="font-medium text-gray-900">Create my own</p>
         <p className="mt-1 text-gray-700">
-          We use your profile and recent training — no coach persona wizard.
+          Tell us who you are and where you are in training. We infer volume from your words — no
+          persona wizard.
         </p>
       </div>
 
       {loadingProfile ? (
         <p className="text-sm text-gray-600">Loading your profile…</p>
       ) : (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-          <p className="font-medium text-gray-900">About you</p>
-          <p className="mt-1">
-            {profile?.ageYears != null ? `${profile.ageYears} years old` : "Age not set"}
-            {profile?.gender ? ` · ${profile.gender}` : ""}
-          </p>
-        </div>
+        <>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-800">Name your preset</label>
+            <input
+              type="text"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-800">Description</label>
+            <input
+              type="text"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base"
+              placeholder="So you remember"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+            <p className="mt-1 text-xs text-gray-500">Optional — just for you, not sent to the coach AI.</p>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-800">
+              Who am I — your training history
+            </label>
+            <textarea
+              rows={3}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base"
+              placeholder="PR chaser, coming back from injury, first marathon…"
+              value={trainingHistory}
+              onChange={(e) => setTrainingHistory(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <p className="mb-2 text-sm font-medium text-gray-800">Where in training?</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setFitnessPhase("PEAK")}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+                  fitnessPhase === "PEAK"
+                    ? "bg-orange-600 text-white"
+                    : "border border-gray-300 bg-white text-gray-800"
+                }`}
+              >
+                Peak — already built up
+              </button>
+              <button
+                type="button"
+                onClick={() => setFitnessPhase("BASE")}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+                  fitnessPhase === "BASE"
+                    ? "bg-orange-600 text-white"
+                    : "border border-gray-300 bg-white text-gray-800"
+                }`}
+              >
+                Base — building up
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-800">
+              Weekly mileage (required)
+            </label>
+            <input
+              type="number"
+              min={1}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base"
+              value={weeklyMileage}
+              onChange={(e) => setWeeklyMileage(e.target.value)}
+            />
+          </div>
+
+          {needsBirthday ? (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-800">Birthday</label>
+              <input
+                type="date"
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base"
+                value={birthdayInput}
+                onChange={(e) => setBirthdayInput(e.target.value)}
+              />
+            </div>
+          ) : ageYears != null ? (
+            <p className="text-sm text-gray-600">
+              Age {ageYears}
+              {gender ? ` · ${gender}` : ""}
+            </p>
+          ) : null}
+
+          {corePreview ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 text-sm text-gray-800">
+              <p className="font-medium text-gray-900">{corePreview.weSeeYou}</p>
+              {corePreview.barriers.length > 0 ? (
+                <ul className="mt-2 list-disc pl-5 text-gray-700">
+                  {corePreview.barriers.map((b) => (
+                    <li key={b}>{b}</li>
+                  ))}
+                </ul>
+              ) : null}
+              <p className="mt-2 text-gray-700">
+                {corePreview.calendar.totalCycles} long-run blocks · peak week{" "}
+                {corePreview.calendar.peakWeekNumber ?? "—"} · taper starts week{" "}
+                {corePreview.calendar.taperStartWeekNumber}
+              </p>
+            </div>
+          ) : null}
+        </>
       )}
-
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-800">Blueprint name</label>
-        <input
-          type="text"
-          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-800">
-          Previous training history
-        </label>
-        <textarea
-          rows={3}
-          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base"
-          value={trainingHistory}
-          onChange={(e) => setTrainingHistory(e.target.value)}
-        />
-      </div>
-
-      <div>
-        <p className="mb-2 text-sm font-medium text-gray-800">Where do you feel you are?</p>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setFitnessPhase("PEAK")}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold ${
-              fitnessPhase === "PEAK"
-                ? "bg-orange-600 text-white"
-                : "border border-gray-300 bg-white text-gray-800"
-            }`}
-          >
-            Peak — already built up
-          </button>
-          <button
-            type="button"
-            onClick={() => setFitnessPhase("BASE")}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold ${
-              fitnessPhase === "BASE"
-                ? "bg-orange-600 text-white"
-                : "border border-gray-300 bg-white text-gray-800"
-            }`}
-          >
-            Base — building up
-          </button>
-        </div>
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-800">
-          GoFast workout template
-        </label>
-        <select
-          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base"
-          value={sourcePresetId}
-          onChange={(e) => setSourcePresetId(e.target.value)}
-        >
-          {templatePresets.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.title}
-            </option>
-          ))}
-        </select>
-        <p className="mt-1 text-xs text-gray-600">
-          Workout rotations come from this template; volume comes from your peak/base choice.
-        </p>
-      </div>
 
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
 
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          disabled={saving}
+          disabled={saving || loadingProfile}
           onClick={() => void handleSubmit()}
           className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
         >
-          {saving ? "Saving…" : "Save blueprint & continue"}
+          {saving ? "Building your preset…" : "Save preset & continue"}
         </button>
         <button
           type="button"

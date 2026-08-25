@@ -59,7 +59,7 @@ export async function GET(
       const v = preset;
       const { poolMilesByCycle, nCycles } = generateCyclePoolTotals({
         totalWeeks,
-        cycleLen: v.cycleLen,
+        longRunCycleWeeks: v.longRunCycleWeeks,
         baseMiles: v.baseMiles,
         peakMiles: v.peakMiles,
         taperMiles: v.taperMiles,

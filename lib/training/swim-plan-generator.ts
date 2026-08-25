@@ -21,7 +21,7 @@ import {
 export type SwimPlanGeneratorInput = {
   preset: Pick<
     swim_plan_preset,
-    | "cycleLen"
+    | "longRunCycleWeeks"
     | "weeklyProgressionPattern"
     | "recommendedWeeklyMeters"
     | "minWeeklyMeters"
@@ -89,7 +89,7 @@ export function generateSwimPlanSchedule(
     const weeksFromEnd = input.totalWeeks - weekNumber + 1;
     const isTaperWeek = taperWeeks > 0 && weeksFromEnd <= taperWeeks;
 
-    const cycleIndex = (weekNumber - 1) % Math.max(1, input.preset.cycleLen);
+    const cycleIndex = (weekNumber - 1) % Math.max(1, input.preset.longRunCycleWeeks);
     let weeklyMeters = weeklyMetersForCycleWeek(baseWeekly, cycleIndex, progression);
     if (isTaperWeek) {
       weeklyMeters = taperWeeklyMeters(weeklyMeters, taperMult);

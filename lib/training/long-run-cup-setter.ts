@@ -1,11 +1,13 @@
 /**
  * Derives per–macro-cycle long-run POOL totals (preset long-run pool anchors)
- * spanning the athlete's `totalWeeks × cycleLen` layout.
+ * spanning the athlete's totalWeeks × longRunCycleWeeks layout.
  *
  * Geometric cup: peak cycle index derives from total cycles N (~65% through), not a
  * fixed second-to-last slot. Ramp base→peak compounds with one coefficient; ramp
  * peak→taper compounds with another — gradual downshift instead of a cliff before taper.
  */
+
+import { LONG_RUN_BLOCK_WEEKS } from "@/lib/training/long-run-block-weeks";
 
 function round1(n: number): number {
   const x = Math.max(0, Number(n));
@@ -15,7 +17,7 @@ function round1(n: number): number {
 
 export type LongRunCupSetterInput = {
   totalWeeks: number;
-  cycleLen: number;
+  longRunCycleWeeks?: number;
   /** LR pool aggregate for first / base macro block (miles). */
   baseMiles: number;
   /** LR anchor for peak mileage (mile pool target at the geometric peak cycle). */
@@ -35,7 +37,7 @@ export type LongRunCupSetterResult = {
  * `N = ⌈totalWeeks / cycleLen⌉` cycles.
  */
 export function longRunCupSetter(input: LongRunCupSetterInput): LongRunCupSetterResult {
-  const len = Math.max(1, Math.floor(input.cycleLen));
+  const len = Math.max(1, Math.floor(input.longRunCycleWeeks ?? LONG_RUN_BLOCK_WEEKS));
   const w = Math.max(1, Math.floor(input.totalWeeks));
   const N = Math.max(1, Math.ceil(w / len));
 

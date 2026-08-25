@@ -1,15 +1,16 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { AthletePresetFitnessPhase } from "@prisma/client";
+import { AthletePresetFitnessPhase, ProgressionAggressiveness } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import {
   ageYearsFromBirthday,
   buildTrainingHistoryPrefill,
-  computeAthletePresetVolume,
 } from "@/lib/training/athlete-preset-volume";
 import { presetMatchesDistance } from "@/lib/training/preset-distance-match";
+import { inferAthletePresetCore } from "@/lib/training/athlete-preset-core-service";
+import { LONG_RUN_BLOCK_WEEKS } from "@/lib/training/long-run-block-weeks";
 
 function serializeAthletePreset(row: {
   id: string;
@@ -17,6 +18,7 @@ function serializeAthletePreset(row: {
   description: string | null;
   objectiveOfPlan: string | null;
   fitnessPhase: AthletePresetFitnessPhase;
+  progressionAggressiveness: ProgressionAggressiveness | null;
   trainingHistory: string | null;
   sourcePresetId: string | null;
   minWeeklyMiles: number;
@@ -31,6 +33,7 @@ function serializeAthletePreset(row: {
     description: row.description,
     objectiveOfPlan: row.objectiveOfPlan,
     fitnessPhase: row.fitnessPhase,
+    progressionAggressiveness: row.progressionAggressiveness,
     trainingHistory: row.trainingHistory,
     sourcePresetId: row.sourcePresetId,
     minWeeklyMiles: row.minWeeklyMiles,
@@ -41,7 +44,7 @@ function serializeAthletePreset(row: {
   };
 }
 
-/** GET /api/athlete-presets — athlete-owned blueprints */
+/** GET /api/athlete-presets — athlete-owned presets */
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAthleteFromBearer(request);
@@ -66,7 +69,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/** POST /api/athlete-presets — create athlete-owned blueprint (never writes catalog) */
+/** POST /api/athlete-presets — create athlete-owned preset (never writes catalog) */
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAthleteFromBearer(request);
@@ -90,7 +93,7 @@ export async function POST(request: NextRequest) {
         : null;
     if (!sourcePresetId) {
       return NextResponse.json(
-        { error: "sourcePresetId is required — pick a GoFast workout template" },
+        { error: "sourcePresetId is required — rotation stub missing" },
         { status: 400 }
       );
     }
@@ -100,7 +103,6 @@ export async function POST(request: NextRequest) {
       select: {
         id: true,
         targetDistanceLabel: true,
-        cycleLen: true,
         tempoIdealDow: true,
         intervalIdealDow: true,
         longRunDefaultDow: true,
@@ -140,15 +142,40 @@ export async function POST(request: NextRequest) {
       body.weeklyMileage != null && body.weeklyMileage !== ""
         ? Number(body.weeklyMileage)
         : athleteRow.weeklyMileage;
-    const volume = computeAthletePresetVolume({
-      fitnessPhase,
-      weeklyMileage: weeklyFromBody,
-    });
+    if (weeklyFromBody == null || !Number.isFinite(Number(weeklyFromBody)) || Number(weeklyFromBody) < 1) {
+      return NextResponse.json(
+        { error: "weeklyMileage is required — set it on your profile or in the form" },
+        { status: 400 }
+      );
+    }
+    const weeklyMileage = Math.round(Number(weeklyFromBody));
 
     const trainingHistory =
       typeof body.trainingHistory === "string" && body.trainingHistory.trim()
         ? body.trainingHistory.trim()
         : buildTrainingHistoryPrefill(athleteRow);
+
+    const raceName = typeof body.raceName === "string" ? body.raceName.trim() : "Goal race";
+    const raceDate = typeof body.raceDate === "string" ? body.raceDate : "";
+    const planStartDate = typeof body.planStartDate === "string" ? body.planStartDate : new Date().toISOString();
+    if (!raceDate) {
+      return NextResponse.json({ error: "raceDate is required" }, { status: 400 });
+    }
+
+    const core = await inferAthletePresetCore({
+      fitnessPhase,
+      trainingHistory,
+      ageYears: ageYearsFromBirthday(athleteRow.birthday),
+      gender: athleteRow.gender?.trim() || null,
+      weeklyMileage,
+      fiveKPace: athleteRow.fiveKPace?.trim() || null,
+      longRunCapabilityMiles: athleteRow.longRunCapabilityMiles,
+      raceName,
+      raceDate,
+      planStartDate,
+      goalTime: typeof body.goalTime === "string" ? body.goalTime.trim() || null : null,
+      raceDistanceLabel: sourcePreset.targetDistanceLabel,
+    });
 
     const row = await prisma.athlete_presets.create({
       data: {
@@ -162,20 +189,34 @@ export async function POST(request: NextRequest) {
             : fitnessPhase === "PEAK"
               ? "Sharpen toward race — already built up"
               : "Build base toward race",
-        ...volume,
-        cycleLen: sourcePreset.cycleLen,
+        baseMiles: core.cups.baseMiles,
+        peakMiles: core.cups.peakMiles,
+        taperMiles: core.cups.taperMiles,
+        minWeeklyMiles: core.minWeeklyMiles,
+        maxWeeklyMiles: core.maxWeeklyMiles,
+        longRunCycleWeeks: LONG_RUN_BLOCK_WEEKS,
         tempoIdealDow: sourcePreset.tempoIdealDow,
         intervalIdealDow: sourcePreset.intervalIdealDow,
         longRunDefaultDow: sourcePreset.longRunDefaultDow,
         trainingHistory,
         fitnessPhase,
+        progressionAggressiveness: core.progressionAggressiveness,
         ageYearsSnapshot: ageYearsFromBirthday(athleteRow.birthday),
         genderSnapshot: athleteRow.gender?.trim() || null,
         sourcePresetId,
       },
     });
 
-    return NextResponse.json({ athletePreset: serializeAthletePreset(row) });
+    return NextResponse.json({
+      athletePreset: serializeAthletePreset(row),
+      corePreview: {
+        weSeeYou: core.weSeeYou,
+        barriers: core.barriers,
+        progressionAggressiveness: core.progressionAggressiveness,
+        calendar: core.calendar,
+        poolMilesByCycle: core.calendar.poolMilesByCycle,
+      },
+    });
   } catch (e: unknown) {
     console.error("POST /api/athlete-presets", e);
     return NextResponse.json(

@@ -23,7 +23,7 @@ export const DEFAULT_TAPER_VOLUME_MULTIPLIER = 0.5;
 export const DEFAULT_LONG_SWIM_SHARE_OF_WEEK = 0.28;
 
 export type SwimWeeklyProgressionPattern = {
-  /** Per-week multipliers within one cycle (length should match preset cycleLen). */
+  /** Per-week multipliers within one cycle (length should match preset longRunCycleWeeks). */
   weekMultipliers: number[];
 };
 

@@ -2,10 +2,11 @@
  * Service 2: assign long-run miles from preset position weights × macro-cycle pool share.
  * Long runs are sacred — pool math is the answer, nothing trims it.
  *
- * Macro cycle = `cycleLen` consecutive calendar weeks, each with exactly one long run (LR1..LRcycleLen).
+ * Macro cycle = `longRunCycleWeeks` consecutive calendar weeks (always 4 in product).
  * The cup gives total LR miles for that block; this file splits it across those weeks.
  */
 
+import { LONG_RUN_BLOCK_WEEKS } from "@/lib/training/long-run-block-weeks";
 import type { PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";
 import { longRunCupSetter } from "@/lib/training/long-run-cup-setter";
 import type { RunTypePosition } from "@/lib/training/run-type-config-shared";
@@ -14,7 +15,7 @@ import { weekCycleMeta } from "@/lib/training/cycle-blocks";
 export type ApplyLongRunInput = {
   planSchedule: PlanWeekSchedule[];
   totalWeeks: number;
-  cycleLen: number;
+  longRunCycleWeeks?: number;
   baseMiles: number;
   peakMiles: number;
   taperMiles: number;
@@ -38,10 +39,10 @@ function sortedPos(positions: readonly RunTypePosition[]): RunTypePosition[] {
 function weightNormInMacroBlock(
   positions: readonly RunTypePosition[],
   cyclePos: number,
-  cycleLen: number
+  longRunCycleWeeks: number
 ): { catalogueWorkoutId: string | null; weightNorm: number } {
   const rows = sortedPos(positions);
-  const len = Math.max(1, Math.floor(cycleLen));
+  const len = Math.max(1, Math.floor(longRunCycleWeeks));
   if (rows.length === 0) {
     return {
       catalogueWorkoutId: null,
@@ -68,16 +69,16 @@ export function applyLongRunSchedule(input: ApplyLongRunInput): void {
   const {
     planSchedule,
     totalWeeks,
-    cycleLen,
+    longRunCycleWeeks: cycleWeeksIn,
     baseMiles,
     peakMiles,
     taperMiles,
     longRunPositions,
   } = input;
-  const len = Math.max(1, Math.floor(cycleLen));
+  const len = Math.max(1, Math.floor(cycleWeeksIn ?? LONG_RUN_BLOCK_WEEKS));
   const { poolMilesByCycle, nCycles } = longRunCupSetter({
     totalWeeks,
-    cycleLen: len,
+    longRunCycleWeeks: len,
     baseMiles,
     peakMiles,
     taperMiles,
@@ -85,7 +86,7 @@ export function applyLongRunSchedule(input: ApplyLongRunInput): void {
 
   for (const week of planSchedule) {
     const wn = week.weekNumber;
-    const { cyclePos } = weekCycleMeta({ weekNumber: wn, totalWeeks, cycleLen: len });
+    const { cyclePos } = weekCycleMeta({ weekNumber: wn, totalWeeks, longRunCycleWeeks: len });
     const cycleIdx = Math.min(nCycles - 1, Math.floor((wn - 1) / len));
     const macroPool = poolMilesByCycle[cycleIdx] ?? 0;
     const { weightNorm, catalogueWorkoutId } = weightNormInMacroBlock(

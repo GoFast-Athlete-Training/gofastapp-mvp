@@ -101,7 +101,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         parsed.data.recommendedWeeklyMeters ?? existing.recommendedWeeklyMeters,
       minWeeklyMeters: parsed.data.minWeeklyMeters ?? existing.minWeeklyMeters,
       maxWeeklyMeters: parsed.data.maxWeeklyMeters ?? existing.maxWeeklyMeters,
-      cycleLen: parsed.data.cycleLen ?? existing.cycleLen,
+      longRunCycleWeeks: parsed.data.longRunCycleWeeks ?? existing.longRunCycleWeeks,
       weeklyProgressionPattern:
         parsed.data.weeklyProgressionPattern ?? existing.weeklyProgressionPattern,
       taperWeeks: parsed.data.taperWeeks ?? existing.taperWeeks,

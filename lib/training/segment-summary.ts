@@ -157,33 +157,33 @@ function tryCollapseMultiStepRepeatCycle<T extends SegmentLike>(
   const maxCycleLen = Math.min(8, Math.floor(remaining / 2));
   if (maxCycleLen < 1) return null;
 
-  for (let cycleLen = 2; cycleLen <= maxCycleLen; cycleLen++) {
-    const cycle = segmentsInOrder.slice(start, start + cycleLen);
+  for (let windowLen = 2; windowLen <= maxCycleLen; windowLen++) {
+    const cycle = segmentsInOrder.slice(start, start + windowLen);
     if (cycle.some((s) => isRecoveryTitle(s.title ?? ""))) continue;
 
     let repeatCount = 1;
-    let idx = start + cycleLen;
+    let idx = start + windowLen;
     let betweenRepeatsRecovery: T | undefined;
 
     while (idx < segmentsInOrder.length) {
       const maybeRecovery = segmentsInOrder[idx];
       if (maybeRecovery && isRecoveryTitle(maybeRecovery.title ?? "")) {
         const nextStart = idx + 1;
-        if (nextStart + cycleLen > segmentsInOrder.length) break;
-        const nextCycle = segmentsInOrder.slice(nextStart, nextStart + cycleLen);
+        if (nextStart + windowLen > segmentsInOrder.length) break;
+        const nextCycle = segmentsInOrder.slice(nextStart, nextStart + windowLen);
         if (!cyclesMatchForRepeat(cycle, nextCycle)) break;
         if (!betweenRepeatsRecovery) betweenRepeatsRecovery = maybeRecovery;
         else if (!segmentsMatchForRepeat(betweenRepeatsRecovery, maybeRecovery)) break;
         repeatCount++;
-        idx = nextStart + cycleLen;
+        idx = nextStart + windowLen;
         continue;
       }
 
-      if (idx + cycleLen > segmentsInOrder.length) break;
-      const nextCycle = segmentsInOrder.slice(idx, idx + cycleLen);
+      if (idx + windowLen > segmentsInOrder.length) break;
+      const nextCycle = segmentsInOrder.slice(idx, idx + windowLen);
       if (!cyclesMatchForRepeat(cycle, nextCycle)) break;
       repeatCount++;
-      idx += cycleLen;
+      idx += windowLen;
     }
 
     if (repeatCount < 2) continue;

@@ -3,6 +3,8 @@
  * persists structured planSchedule (+ skeleton scalars). No workout rows here.
  */
 
+import { LONG_RUN_BLOCK_WEEKS } from "@/lib/training/long-run-block-weeks";
+
 import { prisma } from "@/lib/prisma";
 import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
 import { Prisma } from "@prisma/client";
@@ -170,17 +172,7 @@ export async function executePlanGenerate(params: {
       ? metersToMiles(Number(race.distanceMeters))
       : 3.1;
 
-  function macroCycleLen(): number {
-    const cv = vol.cycleLen;
-    const c =
-      typeof cv === "number" && Number.isFinite(cv) ? Math.round(cv) : NaN;
-    if (c >= 1 && c <= 8) return c;
-    throw new Error(
-      `Training preset "${presetLabel}" has invalid long-run cycle length (${String(vol.cycleLen)}): use 1–8 weeks per long-run rotation block in GoFast Company.`
-    );
-  }
-
-  const cLen = macroCycleLen();
+  const cLen = LONG_RUN_BLOCK_WEEKS;
 
   const coachOverview = parseCoachPlanOverview(rawPreset.coachPlanOverview);
   const composition = coachOverview?.weeklyWorkoutComposition;
@@ -273,7 +265,7 @@ export async function executePlanGenerate(params: {
   applyLongRunSchedule({
     planSchedule: schedule,
     totalWeeks: weekCount,
-    cycleLen: cLen,
+    longRunCycleWeeks: cLen,
     baseMiles,
     peakMiles,
     taperMiles,
@@ -282,7 +274,7 @@ export async function executePlanGenerate(params: {
 
   const cupResult = longRunCupSetter({
     totalWeeks: weekCount,
-    cycleLen: cLen,
+    longRunCycleWeeks: cLen,
     baseMiles,
     peakMiles,
     taperMiles,
@@ -290,7 +282,7 @@ export async function executePlanGenerate(params: {
 
   const cyclePoolData = {
     nCycles: cupResult.nCycles,
-    cycleLen: cLen,
+    longRunCycleWeeks: LONG_RUN_BLOCK_WEEKS,
     poolMilesByCycle: cupResult.poolMilesByCycle,
     baseMiles,
     peakMiles,

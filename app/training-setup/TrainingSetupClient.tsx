@@ -829,7 +829,7 @@ export default function TrainingSetupClient() {
     }
 
     const baselinePresetTitle =
-      selectedPreset?.title ?? (selectedAthletePresetId ? "Your blueprint" : "");
+      selectedPreset?.title ?? (selectedAthletePresetId ? "Your preset" : "");
 
     async function getTokenForIngest() {
       const u = auth.currentUser;
@@ -988,6 +988,10 @@ export default function TrainingSetupClient() {
                     getToken={getTokenForIngest}
                     templatePresets={presetsForWizardGoal}
                     raceDistanceMeters={rr.distanceMeters ?? null}
+                    raceName={rr.name}
+                    raceDate={rr.raceDate}
+                    planStartDate={startDate || new Date().toISOString()}
+                    goalTime={wizardGoal.goalTime}
                     defaultTitle={suggestPlanName(rr.name, athleteFirstName)}
                     onCreated={(ap) => {
                       setSelectedAthletePresetId(ap.id);
@@ -1067,7 +1071,7 @@ export default function TrainingSetupClient() {
                   }}
                   className="mb-5 text-sm font-medium text-orange-600 hover:text-orange-800"
                 >
-                  ← Change blueprint
+                  ← Change preset
                 </button>
 
                 <div className="space-y-4">

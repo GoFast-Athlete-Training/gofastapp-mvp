@@ -260,8 +260,8 @@ export function trainingWeekNumberForDateKey(
  * Phases are contiguous `cycleLen`-week blocks from the race backward.
  * `nOffset`: 0 = race week; negative = weeks before race.
  */
-export function phaseForCatalogue(nOffset: number, cycleLen: number): string {
-  const L = Math.max(1, Math.floor(Math.abs(cycleLen)));
+export function phaseForCatalogue(nOffset: number, longRunCycleWeeks: number = 4): string {
+  const L = Math.max(1, Math.floor(Math.abs(longRunCycleWeeks)));
   if (nOffset === 0) return "taper";
   if (nOffset > 0) return "base";
   const w = -nOffset;
@@ -285,7 +285,7 @@ export function cataloguePhaseFallbackForWeek(
   planStartRaw: Date | string,
   raceRaw: Date | string,
   weekNumber: number,
-  cycleLen: number = 4
+  longRunCycleWeeks: number = 4
 ): string {
   const planStart = utcDateOnly(
     typeof planStartRaw === "string" ? new Date(planStartRaw) : planStartRaw
@@ -294,6 +294,6 @@ export function cataloguePhaseFallbackForWeek(
   const firstMonday = mondayUtcOfWeekContaining(planStart);
   const weekAnchor = addDaysUtc(firstMonday, (weekNumber - 1) * 7);
   const nOffset = nOffsetFromWeekAnchor(weekAnchor, raceUtc);
-  return phaseForCatalogue(nOffset, cycleLen);
+  return phaseForCatalogue(nOffset, longRunCycleWeeks);
 }
 

@@ -6,7 +6,6 @@ import { WorkoutType, Prisma, type training_plan_preset } from "@prisma/client";
 import { runTypeConfigPositionsToInputs, type RunTypeConfigInput } from "@/lib/training/run-type-config-shared";
 
 export interface PlanGenConfig {
-  cycleLen?: number | null;
   minWeeklyMiles?: number | null;
   peakMiles?: number | null;
   baseMiles?: number | null;
@@ -20,7 +19,6 @@ export interface PlanGenConfig {
 export function presetToPlanGenConfig(
   preset: Pick<
     training_plan_preset,
-    | "cycleLen"
     | "minWeeklyMiles"
     | "maxWeeklyMiles"
     | "baseMiles"
@@ -32,7 +30,6 @@ export function presetToPlanGenConfig(
   >
 ): PlanGenConfig {
   return {
-    cycleLen: preset.cycleLen,
     minWeeklyMiles: preset.minWeeklyMiles,
     baseMiles: preset.baseMiles,
     peakMiles: preset.peakMiles,

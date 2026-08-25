@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { newEntityId } from "@/lib/training/new-entity-id";
 import type { RunTypePositionInput } from "@/lib/training/run-type-config-parser";
 import { validateRunTypePositionsForSave } from "@/lib/training/run-type-config-validation";
+import { LONG_RUN_BLOCK_WEEKS } from "@/lib/training/long-run-block-weeks";
 
 export type ConfigPickerBlock = {
   name: string;
@@ -10,7 +11,6 @@ export type ConfigPickerBlock = {
 };
 
 export type WorkoutPickerApplyInput = {
-  cycleLen: number;
   longRun: ConfigPickerBlock;
   easy: ConfigPickerBlock;
   intervals?: ConfigPickerBlock | null;
@@ -144,8 +144,6 @@ export async function applyWorkoutPickerToPreset(
     throw new Error("Preset not found");
   }
 
-  const cycleLen = Math.max(1, Math.min(8, Math.round(input.cycleLen)));
-
   const longRunConfigId = await createConfigWithPositions({
     kind: "longRun",
     block: input.longRun,
@@ -183,7 +181,7 @@ export async function applyWorkoutPickerToPreset(
   await prisma.training_plan_preset.update({
     where: { id: presetId },
     data: {
-      cycleLen,
+      longRunCycleWeeks: LONG_RUN_BLOCK_WEEKS,
       longRunConfigId,
       easyConfigId,
       intervalsConfigId,

@@ -198,20 +198,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const cycleRaw = body.cycleLen;
-    const cycleLen =
-      typeof cycleRaw === "number" && Number.isFinite(cycleRaw) ? Math.round(cycleRaw) : null;
-    if (cycleLen == null || cycleLen < 1 || cycleLen > 8) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "cycleLen (long-run cycle: weeks per rotation block, 1 long run per week) is required and must be an integer from 1 to 8",
-        },
-        { status: 400 }
-      );
-    }
-
     let maxWeeklyMiles: number | null = null;
     if ("maxWeeklyMiles" in body) {
       if (body.maxWeeklyMiles === null || body.maxWeeklyMiles === "") {
@@ -328,7 +314,7 @@ export async function POST(request: NextRequest) {
           ? publicDescription.trim()
           : null,
       ...(tdl.value !== undefined ? { targetDistanceLabel: tdl.value } : {}),
-      cycleLen,
+      longRunCycleWeeks: 4,
       minWeeklyMiles,
       maxWeeklyMiles: maxWeeklyMiles ?? null,
       baseMiles,

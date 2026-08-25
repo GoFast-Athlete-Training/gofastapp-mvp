@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
       resolvedPresetId,
       presetSlug: rawPreset.slug ?? "",
       presetTitle: rawPreset.title ?? "",
-      cycleLen: rawPreset.cycleLen,
+      longRunCycleWeeks: rawPreset.longRunCycleWeeks,
       minWeeklyMiles: rawPreset.minWeeklyMiles,
       maxWeeklyMiles: rawPreset.maxWeeklyMiles,
       baseMiles: rawPreset.baseMiles,
