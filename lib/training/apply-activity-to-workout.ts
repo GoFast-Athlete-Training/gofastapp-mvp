@@ -16,7 +16,7 @@ import {
 import { normalizeGarminMatchText } from "./garmin-activity-match-helpers";
 import { ymdFromDate } from "./plan-utils";
 import { parseActivityToSegmentExecution } from "./activity-to-segment-execution";
-import { isWorkSegmentTitle } from "./workout-performance-analysis";
+import { isWorkSegmentTitle, requiresDetailForTargetAnalysis } from "./workout-performance-analysis";
 import { sendAppNotification } from "@/lib/app-notifications/send";
 /** Max sec/mi faster than prescribed easy pace before we skip aerobic HR credit (target − actual). */
 export const EASY_LONG_RUN_MAX_FAST_DRIFT_SEC_PER_MILE = 15;
@@ -297,6 +297,49 @@ async function applyMatchCreditsFromWorkoutRow(params: {
   });
 }
 
+/** Credits + adaptive after Writer B (or easy/long Writer A) has written paceDelta. */
+export async function runPostAnalyzeMatchFollowups(activityId: string): Promise<void> {
+  const workout = await prisma.workouts.findFirst({
+    where: { matchedActivityId: activityId },
+    include: {
+      segments: { orderBy: { stepOrder: "asc" } },
+      workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true } },
+    },
+  });
+  if (!workout) return;
+
+  const activity = await prisma.athlete_activities.findUnique({
+    where: { id: activityId },
+    select: {
+      id: true,
+      athleteId: true,
+      distance: true,
+      averageSpeed: true,
+      averageHeartRate: true,
+      duration: true,
+      maxHeartRate: true,
+      elevationGain: true,
+      calories: true,
+      steps: true,
+      summaryData: true,
+    },
+  });
+  if (!activity) return;
+
+  await applyMatchCreditsFromWorkoutRow({
+    workout: {
+      id: workout.id,
+      title: workout.title,
+      planId: workout.planId,
+      weekNumber: workout.weekNumber,
+      workoutType: workout.workoutType,
+      segments: workout.segments,
+      workout_catalogue: workout.workout_catalogue,
+    },
+    activity,
+  });
+}
+
 function pickMainPaceTargetSecPerMile(
   segments: {
     title: string;
@@ -420,10 +463,19 @@ async function syncActivityDetailToLinkedWorkout(activityId: string): Promise<vo
   });
 
   try {
-    await parseActivityToSegmentExecution({
+    const result = await parseActivityToSegmentExecution({
       activityId: activity.id,
       workoutId: workout.id,
     });
+    if (result.ok && result.status === "ALIGNED") {
+      const typed = await prisma.workouts.findUnique({
+        where: { id: workout.id },
+        select: { workoutType: true },
+      });
+      if (typed && requiresDetailForTargetAnalysis(typed.workoutType)) {
+        await runPostAnalyzeMatchFollowups(activity.id);
+      }
+    }
   } catch (lapErr) {
     console.warn("activity-to-segment after activity match:", lapErr);
   }
@@ -528,7 +580,12 @@ export async function applyActivityToWorkout(params: {
     console.warn("activity detail/segment persist after match:", detailErr);
   }
 
-  await applyMatchCreditsFromWorkoutRow({ workout, activity });
+  const deferFollowupsToSegmentAnalyze = requiresDetailForTargetAnalysis(
+    workout.workoutType
+  );
+  if (!deferFollowupsToSegmentAnalyze) {
+    await applyMatchCreditsFromWorkoutRow({ workout, activity });
+  }
 
   return { workoutId: workout.id };
 }

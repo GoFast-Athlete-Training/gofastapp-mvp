@@ -672,7 +672,8 @@ function segmentHasActuals(seg: PerformanceAnalysisSegmentInput): boolean {
 }
 
 /**
- * Structured execution detail: exactly one persisted lap per segment row (lap[i] → segment[i]).
+ * @deprecated Legacy 1:1 lap-per-row gate. Prefer {@link structuredSegmentExecutionReady}.
+ * Repeat blocks (e.g. 400×8) bolt many laps onto one segment row by design.
  */
 export function structuredSegmentLapsAligned(
   segments: PerformanceAnalysisSegmentInput[]
@@ -680,6 +681,40 @@ export function structuredSegmentLapsAligned(
   if (segments.length === 0) return false;
   const sorted = [...segments].sort((a, b) => a.stepOrder - b.stepOrder);
   return sorted.every((s) => (s.segment_laps?.length ?? 0) === 1);
+}
+
+function workSegmentHasBolt(seg: PerformanceAnalysisSegmentInput): boolean {
+  return seg.actualPaceSecPerMile != null || (seg.segment_laps?.length ?? 0) > 0;
+}
+
+/**
+ * Structured workouts: trust matcher bolt — work segments with laps/actuals,
+ * ALIGNED status, or a written rollup. Display must not re-gate on 1:1 lap count.
+ */
+export function structuredSegmentExecutionReady(
+  workout: Pick<
+    PerformanceAnalysisWorkoutInput,
+    "segments" | "segmentExecutionStatus" | "paceDeltaSecPerMile"
+  >
+): boolean {
+  const workSegments = workout.segments.filter((s) => isWorkSegmentTitle(s.title));
+  if (workSegments.length === 0) return false;
+
+  const hasWorkBolt = workSegments.some(workSegmentHasBolt);
+  if (!hasWorkBolt) return false;
+
+  if (workout.segmentExecutionStatus === "ALIGNMENT_FAILED") {
+    return false;
+  }
+
+  if (
+    workout.segmentExecutionStatus === "ALIGNED" ||
+    workout.paceDeltaSecPerMile != null
+  ) {
+    return true;
+  }
+
+  return workSegments.every(workSegmentHasBolt);
 }
 
 export function resolveLapSource(params: {
@@ -705,11 +740,11 @@ export function computeWorkoutPerformanceAnalysis(
   );
 
   const requiresDetail = requiresDetailForTargetAnalysis(workout.workoutType);
-  const segmentLapsAligned = structuredSegmentLapsAligned(workout.segments);
+  const segmentExecutionReady = structuredSegmentExecutionReady(workout);
   const hasTrustworthyStructuredDetail =
     requiresDetail &&
     hasActivityDetail &&
-    segmentLapsAligned &&
+    segmentExecutionReady &&
     hasWorkSegmentActuals;
 
   const hasSegmentLaps = workout.segments.some((s) => (s.segment_laps?.length ?? 0) > 0);
@@ -767,7 +802,7 @@ export function computeWorkoutPerformanceAnalysis(
     analysisMode === "completion_only"
       ? requiresDetail &&
         hasActivityDetail &&
-        !segmentLapsAligned &&
+        !segmentExecutionReady &&
         (workout.segmentExecutionStatus === "ALIGNMENT_FAILED" ||
           workout.segmentExecutionLapCount != null)
         ? formatAlignmentFailedMessage({

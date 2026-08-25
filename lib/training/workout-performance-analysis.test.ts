@@ -13,6 +13,7 @@ import {
   requiresDetailForTargetAnalysis,
   resolveTargetComparisonPace,
   structuredSegmentLapsAligned,
+  structuredSegmentExecutionReady,
 } from "./workout-performance-analysis";
 
 test("isWorkSegmentTitle excludes recovery and bookends", () => {
@@ -149,7 +150,7 @@ test("interval workout with work segment actuals uses rep pace not whole run", (
   assert.notEqual(comparison.actualPaceSecPerMile, 520);
 });
 
-test("interval with detail but misaligned laps is completion_only", () => {
+test("interval with detail and work bolt surfaces detail despite non-1:1 warmup laps", () => {
   const segments = [
     {
       id: "s1",
@@ -179,6 +180,11 @@ test("interval with detail but misaligned laps is completion_only", () => {
   ];
 
   assert.equal(structuredSegmentLapsAligned(segments), false);
+  assert.equal(structuredSegmentExecutionReady({
+    segments,
+    segmentExecutionStatus: null,
+    paceDeltaSecPerMile: -30,
+  }), true);
 
   const analysis = computeWorkoutPerformanceAnalysis({
     workoutType: "Intervals",
@@ -194,11 +200,75 @@ test("interval with detail but misaligned laps is completion_only", () => {
     segments,
   });
 
-  assert.equal(analysis.analysisMode, "completion_only");
-  assert.equal(analysis.canJudgeTargetPace, false);
+  assert.equal(analysis.analysisMode, "detail");
+  assert.equal(analysis.canJudgeTargetPace, true);
   assert.ok(analysis.phaseAwareLaps.length > 0);
   assert.equal(analysis.lapSource, "step");
-  assert.equal(analysis.workSegmentActual, null);
+  assert.notEqual(analysis.workSegmentActual, null);
+});
+
+test("interval 400x8 with eight laps on one work segment surfaces detail analysis", () => {
+  const workLaps = Array.from({ length: 8 }, (_, i) => ({
+    lapIndex: i,
+    avgPaceSecPerMile: 400 + i,
+  }));
+
+  const segments = [
+    {
+      id: "s1",
+      title: "Warmup",
+      stepOrder: 1,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+      actualPaceSecPerMile: 540,
+      actualDurationSeconds: 600,
+      actualDistanceMiles: 1.5,
+      segment_laps: [{ lapIndex: 0, avgPaceSecPerMile: 540 }],
+    },
+    {
+      id: "s2",
+      title: "400m",
+      stepOrder: 2,
+      targets: [{ type: "PACE", valueLow: 260, valueHigh: 270 }],
+      paceTargetEncodingVersion: 2,
+      actualPaceSecPerMile: 403,
+      actualDurationSeconds: 1920,
+      actualDistanceMiles: 1.99,
+      segment_laps: workLaps,
+    },
+  ];
+
+  assert.equal(structuredSegmentLapsAligned(segments), false);
+  assert.equal(
+    structuredSegmentExecutionReady({
+      segments,
+      segmentExecutionStatus: "ALIGNED",
+      paceDeltaSecPerMile: 17,
+    }),
+    true
+  );
+
+  const analysis = computeWorkoutPerformanceAnalysis({
+    workoutType: "Intervals",
+    targetPaceSecPerMile: 420,
+    targetPaceSecPerMileHigh: 430,
+    paceDeltaSecPerMile: 17,
+    actualAvgPaceSecPerMile: 520,
+    actualDistanceMeters: 10000,
+    actualDurationSeconds: 2880,
+    completedActivityDetailJson: { laps: [] },
+    matchedActivityId: "act1",
+    matched_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
+    segmentExecutionStatus: "ALIGNED",
+    segmentExecutionLapCount: 9,
+    segmentExecutionSegmentCount: 2,
+    segments,
+  });
+
+  assert.equal(analysis.analysisMode, "detail");
+  assert.equal(analysis.canJudgeTargetPace, true);
+  assert.ok((analysis.scorecard.workSegmentDeltas.length ?? 0) > 0);
+  assert.equal(analysis.workSegmentActual?.workSegmentCount, 1);
 });
 
 test("interval with detail and alignment failure shows explicit completion message", () => {

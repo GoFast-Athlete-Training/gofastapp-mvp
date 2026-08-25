@@ -10,6 +10,8 @@ import { activityExists } from "./dedupe";
 import { normalizeActivityFields } from "./normalizeActivityFields";
 import { isCyclingActivityType, RUNNING_ACTIVITY_TYPES } from "../training/activity-type-sets";
 import { parseMatchedActivityToSegmentExecution } from "../training/activity-to-segment-execution";
+import { runPostAnalyzeMatchFollowups } from "../training/apply-activity-to-workout";
+import { requiresDetailForTargetAnalysis } from "../training/structured-workout-types";
 import { tryMatchActivityToCityRun } from "../cta-triggers/try-match-activity-to-city-run";
 import { tryMatchActivityToTrainingWorkout } from "../training/match-activity-to-workout";
 import { tryMatchActivityToBikeWorkout } from "../training/match-activity-to-bike-workout";
@@ -116,10 +118,19 @@ async function runDetailHydrationPipeline(rowId: string, detailData: object): Pr
   try {
     const workout = await prisma.workouts.findFirst({
       where: { matchedActivityId: rowId },
-      select: { id: true },
+      select: { id: true, segmentExecutionStatus: true, workoutType: true },
     });
     if (workout) {
-      await parseMatchedActivityToSegmentExecution(rowId);
+      const wasAligned = workout.segmentExecutionStatus === "ALIGNED";
+      const result = await parseMatchedActivityToSegmentExecution(rowId);
+      if (
+        result.ok &&
+        result.status === "ALIGNED" &&
+        !wasAligned &&
+        requiresDetailForTargetAnalysis(workout.workoutType)
+      ) {
+        await runPostAnalyzeMatchFollowups(rowId);
+      }
     }
   } catch (lapErr) {
     console.warn("activity-to-segment pipeline:", lapErr);
