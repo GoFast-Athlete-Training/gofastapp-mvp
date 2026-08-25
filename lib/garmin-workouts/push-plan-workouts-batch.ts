@@ -138,7 +138,6 @@ export async function pushPlanWorkoutsInDateRange(
 
   const candidates = await prisma.planned_workouts.findMany({
     where: {
-      athleteId: { not: null },
       date: { gte: dateStart, lte: dateEnd },
       ...(unsentOnly ? { garminScheduleId: null } : {}),
       Athlete: {
