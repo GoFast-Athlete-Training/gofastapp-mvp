@@ -87,7 +87,6 @@ export function AthletePresetBuilder({
   const [trainingHistory, setTrainingHistory] = useState("");
   const [profilePrefill, setProfilePrefill] = useState("");
   const [fitnessPhase, setFitnessPhase] = useState<"PEAK" | "BASE">("PEAK");
-  const [weeklyMileage, setWeeklyMileage] = useState("");
   const [longRunCapabilityMiles, setLongRunCapabilityMiles] = useState("");
   const [birthdayInput, setBirthdayInput] = useState("");
   const [ageYears, setAgeYears] = useState<number | null>(null);
@@ -180,9 +179,6 @@ export function AthletePresetBuilder({
         setGender(a?.gender?.trim() || null);
         setNeedsBirthday(age == null);
         if (a?.birthday) setBirthdayInput(a.birthday.slice(0, 10));
-        if (a?.weeklyMileage != null && Number.isFinite(a.weeklyMileage)) {
-          setWeeklyMileage(String(Math.round(a.weeklyMileage)));
-        }
         if (a?.longRunCapabilityMiles != null && Number.isFinite(a.longRunCapabilityMiles)) {
           setLongRunCapabilityMiles(String(a.longRunCapabilityMiles));
         }
@@ -219,10 +215,6 @@ export function AthletePresetBuilder({
   function addMyDetails() {
     if (!profilePrefill.trim()) return;
     setTrainingHistory((prev) => (prev.trim() ? prev : profilePrefill));
-    const weeklyMatch = profilePrefill.match(/about (\d+) miles per week/);
-    if (weeklyMatch && !weeklyMileage) {
-      setWeeklyMileage(weeklyMatch[1]!);
-    }
     const lrMatch = profilePrefill.match(/Longest recent long run about ([\d.]+) miles/);
     if (lrMatch && !longRunCapabilityMiles) {
       setLongRunCapabilityMiles(lrMatch[1]!);
@@ -260,19 +252,6 @@ export function AthletePresetBuilder({
     }
   }
 
-  async function ensureWeeklyMileageSaved(token: string, miles: number): Promise<void> {
-    if (!athleteId) return;
-    const res = await fetch(`/api/athlete/${athleteId}/profile`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", ...athleteBearerFetchHeaders(token) },
-      body: JSON.stringify({ weeklyMileage: miles }),
-    });
-    if (!res.ok) {
-      const data = (await res.json()) as { error?: string };
-      throw new Error(data.error ?? "Could not save weekly mileage");
-    }
-  }
-
   async function runCoreInfer() {
     const sourcePresetId = templatePresets[0]?.id;
     if (!sourcePresetId) {
@@ -287,13 +266,13 @@ export function AthletePresetBuilder({
       setError("Add your training history or tap Add my details.");
       return;
     }
-    const miles = Number(weeklyMileage);
-    if (!Number.isFinite(miles) || miles < 1) {
-      setError("Weekly mileage is required.");
-      return;
-    }
     if (needsBirthday && !birthdayInput.trim()) {
       setError("Add your birthday so we can size your training.");
+      return;
+    }
+    const lr = longRunCapabilityMiles.trim();
+    if (!lr || !Number.isFinite(Number(lr)) || Number(lr) <= 0) {
+      setError("Longest recent long run is required.");
       return;
     }
     if (presetId) {
@@ -306,7 +285,6 @@ export function AthletePresetBuilder({
     try {
       const token = await getToken();
       await ensureBirthdaySaved(token);
-      await ensureWeeklyMileageSaved(token, Math.round(miles));
       await ensureLongRunCapabilitySaved(token);
 
       const lrBody =
@@ -325,7 +303,6 @@ export function AthletePresetBuilder({
           trainingHistory: trainingHistory.trim(),
           sourcePresetId,
           targetDistanceMeters: raceDistanceMeters,
-          weeklyMileage: Math.round(miles),
           ...lrBody,
           raceName,
           raceDate,
@@ -402,7 +379,6 @@ export function AthletePresetBuilder({
           ...cupPayload,
         });
       } else {
-        const miles = Number(weeklyMileage);
         const res = await fetch("/api/athlete-presets", {
           method: "POST",
           headers: { "Content-Type": "application/json", ...athleteBearerFetchHeaders(token) },
@@ -413,7 +389,10 @@ export function AthletePresetBuilder({
             trainingHistory: trainingHistory.trim(),
             sourcePresetId,
             targetDistanceMeters: raceDistanceMeters,
-            weeklyMileage: Math.round(miles),
+            longRunCapabilityMiles:
+              longRunCapabilityMiles.trim() && Number(longRunCapabilityMiles) > 0
+                ? Number(longRunCapabilityMiles)
+                : undefined,
             raceName,
             raceDate,
             planStartDate,
@@ -543,6 +522,10 @@ export function AthletePresetBuilder({
           </div>
           <div>
             <p className="mb-2 text-sm font-medium text-gray-800">Where in training?</p>
+            <p className="mb-2 text-xs text-gray-500">
+              Peak vs base plus your history — we infer weekly volume from that, not a separate
+              mileage box.
+            </p>
             <div className="flex flex-wrap gap-2">
               {(["PEAK", "BASE"] as const).map((phase) => (
                 <button
@@ -562,19 +545,7 @@ export function AthletePresetBuilder({
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-800">
-              Weekly mileage (required)
-            </label>
-            <input
-              type="number"
-              min={1}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base"
-              value={weeklyMileage}
-              onChange={(e) => setWeeklyMileage(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-800">
-              Longest recent long run (mi)
+              Longest recent long run (mi) <span className="font-normal text-gray-500">(required)</span>
             </label>
             <input
               type="number"

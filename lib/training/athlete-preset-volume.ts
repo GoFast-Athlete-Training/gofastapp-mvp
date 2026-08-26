@@ -36,6 +36,53 @@ export function buildTrainingHistoryPrefill(athlete: {
   return parts.join(" ");
 }
 
+/** Parse mpw from free text — e.g. "50 mpw", "45 miles per week". */
+export function parseWeeklyMileageFromHistory(text: string): number | null {
+  const t = text.trim();
+  if (!t) return null;
+  const patterns = [
+    /\b(\d{2,3})\s*(?:mpw|miles?\s*(?:per|\/)\s*week)\b/i,
+    /\b(?:running|run(?:ning)?)\s*(?:about|around|~)?\s*(\d{2,3})\s*miles?\b/i,
+    /\b(\d{2,3})\s*miles?\s*(?:a|per)\s*week\b/i,
+  ];
+  for (const re of patterns) {
+    const m = t.match(re);
+    if (m?.[1]) {
+      const n = Number(m[1]);
+      if (Number.isFinite(n) && n >= 10 && n <= 120) return Math.round(n);
+    }
+  }
+  return null;
+}
+
+/**
+ * Weekly mileage for preset infer — profile/history first, then long-run estimate, then phase default.
+ * Athletes do not type this on the preset builder; Peak/Base + history carry it.
+ */
+export function resolveWeeklyMileageForPresetInfer(input: {
+  fitnessPhase: AthletePresetFitnessPhase;
+  trainingHistory: string;
+  profileWeeklyMileage?: number | null;
+  longRunCapabilityMiles?: number | null;
+  bodyWeeklyMileage?: number | null;
+}): number {
+  const fromBody = input.bodyWeeklyMileage;
+  if (fromBody != null && Number.isFinite(fromBody) && fromBody >= 1) {
+    return Math.round(fromBody);
+  }
+  const fromProfile = input.profileWeeklyMileage;
+  if (fromProfile != null && Number.isFinite(fromProfile) && fromProfile >= 1) {
+    return Math.round(fromProfile);
+  }
+  const fromHistory = parseWeeklyMileageFromHistory(input.trainingHistory);
+  if (fromHistory != null) return fromHistory;
+  const lr = input.longRunCapabilityMiles;
+  if (lr != null && Number.isFinite(lr) && lr > 0) {
+    return Math.max(20, Math.min(90, Math.round(lr * 2.8)));
+  }
+  return input.fitnessPhase === "PEAK" ? 48 : 32;
+}
+
 /** @deprecated removed — volume comes from OpenAI core infer, not weekly heuristics */
 export type AthletePresetVolumeInput = {
   fitnessPhase: AthletePresetFitnessPhase;

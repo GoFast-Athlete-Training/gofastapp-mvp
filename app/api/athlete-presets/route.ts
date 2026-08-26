@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { AthletePresetFitnessPhase } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { ageYearsFromBirthday } from "@/lib/training/athlete-preset-volume";
+import { ageYearsFromBirthday, resolveWeeklyMileageForPresetInfer } from "@/lib/training/athlete-preset-volume";
 import { presetMatchesDistance } from "@/lib/training/preset-distance-match";
 import { inferAthletePresetCore } from "@/lib/training/athlete-preset-core-service";
 import {
@@ -119,17 +119,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
     }
 
-    const weeklyFromBody =
-      body.weeklyMileage != null && body.weeklyMileage !== ""
-        ? Number(body.weeklyMileage)
-        : athleteRow.weeklyMileage;
-    if (weeklyFromBody == null || !Number.isFinite(Number(weeklyFromBody)) || Number(weeklyFromBody) < 1) {
+    const trainingHistory =
+      typeof body.trainingHistory === "string" ? body.trainingHistory.trim() : "";
+    if (!trainingHistory) {
       return NextResponse.json(
-        { error: "weeklyMileage is required — set it on your profile or in the form" },
+        { error: "trainingHistory is required — describe your running or tap Add my details" },
         { status: 400 }
       );
     }
-    const weeklyMileage = Math.round(Number(weeklyFromBody));
 
     const longRunFromBody =
       body.longRunCapabilityMiles != null && body.longRunCapabilityMiles !== ""
@@ -140,14 +137,18 @@ export async function POST(request: NextRequest) {
         ? Math.round(longRunFromBody * 10) / 10
         : athleteRow.longRunCapabilityMiles;
 
-    const trainingHistory =
-      typeof body.trainingHistory === "string" ? body.trainingHistory.trim() : "";
-    if (!trainingHistory) {
-      return NextResponse.json(
-        { error: "trainingHistory is required — describe your running or tap Add my details" },
-        { status: 400 }
-      );
-    }
+    const weeklyFromBody =
+      body.weeklyMileage != null && body.weeklyMileage !== ""
+        ? Number(body.weeklyMileage)
+        : null;
+    const weeklyMileage = resolveWeeklyMileageForPresetInfer({
+      fitnessPhase,
+      trainingHistory,
+      profileWeeklyMileage: athleteRow.weeklyMileage,
+      longRunCapabilityMiles,
+      bodyWeeklyMileage:
+        weeklyFromBody != null && Number.isFinite(weeklyFromBody) ? weeklyFromBody : null,
+    });
 
     const raceName = typeof body.raceName === "string" ? body.raceName.trim() : "Goal race";
     const raceDate = typeof body.raceDate === "string" ? body.raceDate : "";
