@@ -8,7 +8,7 @@ import { newEntityId } from "@/lib/training/new-entity-id";
 import { reorderPositionRows } from "@/lib/training/reorder-position-rows";
 import { trainingPlanPresetInclude } from "@/lib/training/plan-generate-presets-loader";
 
-export const QUALITY_ROTATION_SLOTS = 8;
+import { QUALITY_ROTATION_SLOTS } from "@/lib/training/athlete-rotation-constants";
 
 type ConfigPositionRow = {
   id: string;

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { RotationOrderList } from "@/components/training/RotationOrderList";
-import { QUALITY_ROTATION_SLOTS } from "@/lib/training/athlete-rotation-setup";
+import { QUALITY_ROTATION_SLOTS } from "@/lib/training/athlete-rotation-constants";
 
 export type CatalogueOption = {
   id: string;

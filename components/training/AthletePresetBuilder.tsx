@@ -11,7 +11,7 @@ import {
   foundationPeakPoolComparisonRows,
   peakLongRunPoolFoundationKey,
 } from "@/lib/training/long-run-pool-fields";
-import { QUALITY_ROTATION_SLOTS } from "@/lib/training/athlete-rotation-setup";
+import { QUALITY_ROTATION_SLOTS } from "@/lib/training/athlete-rotation-constants";
 import {
   DEFAULT_ATHLETE_PACE_ADJUSTER,
   type AthletePaceAdjuster,
